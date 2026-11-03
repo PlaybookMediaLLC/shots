@@ -299,9 +299,13 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	if _, err := repo.ReviewContentDraft(ctx, reviewer, approvalDraft.ID, product.ContentDraftReviewInput{Action: "changes"}); err != nil {
 		t.Fatal(err)
 	}
+	// A separate workspace whose account the provider revokes after scheduling.
+	revokedOwner, revokedAccounts := workspace("main:linkedin")
+	revoked := schedule(revokedOwner, "revoked post", revokedAccounts["main"])
+	exec(`UPDATE channel_connection SET status='REVOKED' WHERE id=$1`, revokedAccounts["main"])
 
 	// The API wakes each post's workflow; the late and restart posts' wakeups are "lost".
-	for _, result := range []*product.ScheduleContentDraftResult{ok, refused, lost, busy, split, cancelled, slow, receipt, media, approval} {
+	for _, result := range []*product.ScheduleContentDraftResult{ok, refused, lost, busy, split, cancelled, slow, receipt, media, approval, revoked} {
 		for _, row := range result.Scheduled {
 			start(row)
 		}
@@ -444,6 +448,12 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 		}
 		if row := settle(approval.Posts[0].ID, scheduledpost.StatusCANCELLED); code(row) != publishing.FailureChangesRequested || provider.count("approval post") != 0 {
 			t.Fatalf("approval=%+v calls=%d", row, provider.count("approval post"))
+		}
+	})
+
+	t.Run("an account revoked after scheduling stops its post before sending", func(t *testing.T) {
+		if row := settle(revoked.Posts[0].ID, scheduledpost.StatusCANCELLED); code(row) != publishing.FailureAccountUnavailable || provider.count("revoked post") != 0 {
+			t.Fatalf("revoked=%+v calls=%d", row, provider.count("revoked post"))
 		}
 	})
 
