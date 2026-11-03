@@ -268,7 +268,7 @@ export function ScheduleDialog({
         // Another schedule took the reviewed slot: show the next one; never move silently.
         setQueueSlot(next)
         setSlotNotice(
-          'That slot was just taken. Review the next free slot below and confirm again.'
+          'That slot was just taken. Review the next free slot above and confirm again.'
         )
       } else {
         setError(error instanceof Error ? error.message : 'The draft could not be scheduled.')
@@ -439,28 +439,6 @@ export function ScheduleDialog({
                 : ' · none available'}
           </Button>
         </div>
-        {slotNotice ? (
-          <p
-            className="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-300"
-            data-testid="queue-slot-notice"
-            role="alert"
-          >
-            {slotNotice}
-            {!reviewedSlot ? (
-              <Button
-                onClick={() => {
-                  setSlotNotice('')
-                  setSlotRequest((value) => value + 1)
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                Check again
-              </Button>
-            ) : null}
-          </p>
-        ) : null}
         {data.advancedScheduling ? (
           <details
             className="rounded-lg border border-border p-3"
@@ -608,6 +586,29 @@ export function ScheduleDialog({
             <span className="text-muted-foreground"> ± up to 4 minutes</span>
           ) : null}
         </p>
+        {/* Beside the summary and the confirm button, where the person is looking. */}
+        {slotNotice ? (
+          <p
+            className="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-300"
+            data-testid="queue-slot-notice"
+            role="alert"
+          >
+            {slotNotice}
+            {!reviewedSlot ? (
+              <Button
+                onClick={() => {
+                  setSlotNotice('')
+                  setSlotRequest((value) => value + 1)
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Check again
+              </Button>
+            ) : null}
+          </p>
+        ) : null}
         <ReplacedPosts context={context} timeZone={zone} />
         {past && !queue ? <p className="text-xs text-red-700 dark:text-red-300">That time has passed.</p> : null}
         <Problems context={context} problems={problems} />
