@@ -3,7 +3,9 @@ import test from 'node:test'
 import { analyticsReportSchema, analyticsQuerySchema } from '../lib/api/contracts/plan-analyze'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
+  draftPostsState,
   OVERDUE_AFTER_MS,
+  POST_STATE_TONE,
   postFailureReason,
   postState,
   STATUS_GROUPS,
@@ -504,4 +506,46 @@ test('a status filter saved before the finer states still shows every post in it
   assert.deepEqual(shown(['Scheduled']), ['Scheduled', 'Overdue', 'Publishing'])
   assert.deepEqual(shown(['Failed']), ['Failed', 'Needs check'])
   assert.equal(shown([]).length, items.length)
+})
+
+test('a draft reads as the state that needs attention first, never hiding a failure behind a success', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z')
+  const later = '2026-11-05T12:00:00Z'
+  assert.equal(draftPostsState([], now), null)
+  assert.equal(draftPostsState([{ status: 'CANCELLED', scheduledFor: later }], now), null)
+  assert.deepEqual(
+    draftPostsState(
+      [
+        { status: 'PUBLISHED', scheduledFor: later },
+        { status: 'FAILED', scheduledFor: later },
+        { status: 'CANCELLED', scheduledFor: later },
+      ],
+      now
+    ),
+    { state: 'Failed', count: 1, total: 2 }
+  )
+  assert.deepEqual(
+    draftPostsState(
+      [
+        { status: 'UNKNOWN_DELIVERY', scheduledFor: later },
+        { status: 'FAILED', scheduledFor: later },
+      ],
+      now
+    ),
+    { state: 'Needs check', count: 1, total: 2 }
+  )
+  assert.deepEqual(
+    draftPostsState([{ status: 'SCHEDULED', scheduledFor: '2026-11-04T11:00:00Z' }], now),
+    { state: 'Overdue', count: 1, total: 1 }
+  )
+  // Every state has one colour wherever it is shown.
+  assert.deepEqual(Object.keys(POST_STATE_TONE).sort(), [
+    'Cancelled',
+    'Failed',
+    'Needs check',
+    'Overdue',
+    'Published',
+    'Publishing',
+    'Scheduled',
+  ])
 })

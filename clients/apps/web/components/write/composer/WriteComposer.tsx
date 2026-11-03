@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { connectHref } from '@/components/settings/social-sets/api'
-import { Pill } from '@/components/platform-ui'
+import { Pill, type PillTone } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -48,6 +48,7 @@ import {
   type DraftWire,
   draftsApi,
 } from '@/lib/content-drafts/client'
+import { draftPostsState, POST_STATE_TONE } from '@/lib/content-drafts/post-status'
 import { renderBlockImages } from '@/lib/content-drafts/render-blocks'
 import {
   type BlockImages,
@@ -809,16 +810,36 @@ export function WriteComposer({
         set={set}
       />
     ) : null
-  const status =
+  // The destinations' state that needs attention first; a plan only when nothing is queued.
+  const destinations = draftPostsState(posts)
+  const status: { label: string; tone: PillTone } | null =
     server.status === 'archived'
-      ? 'Archived'
-      : posts.some((post) => post.status === 'PUBLISHED')
-        ? 'Posted'
-        : server.status === 'scheduled'
-          ? 'Scheduled'
-          : server.plannedFor
-            ? 'Planned'
-            : null
+      ? { label: 'Archived', tone: 'gray' }
+      : destinations
+        ? {
+            label:
+              destinations.count < destinations.total
+                ? `${destinations.state} · ${destinations.count} of ${destinations.total}`
+                : destinations.state,
+            tone: POST_STATE_TONE[destinations.state],
+          }
+        : server.plannedFor
+          ? { label: 'Planned', tone: 'purple' }
+          : null
+  // shortcut: compares each queued post's first text and thread length with the current
+  // version, not reply text or media; store a content hash on the post to catch those too.
+  const edited = new Set(
+    posts
+      .filter((post) => post.status === 'SCHEDULED')
+      .filter((post) => {
+        const current = items.find((item) => item.account.id === post.channelConnectionId)
+          ?.publication.serialized.posts
+        return (
+          !current || current[0]?.caption !== post.caption || current.length - 1 !== post.replies
+        )
+      })
+      .map((post) => post.id)
+  )
   return (
     <SocialMentionContext.Provider
       value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
@@ -891,19 +912,9 @@ export function WriteComposer({
                 </Button>
               ) : null}
               {status ? (
-                <Pill
-                  tone={
-                    status === 'Posted'
-                      ? 'blue'
-                      : status === 'Scheduled'
-                        ? 'green'
-                        : status === 'Planned'
-                          ? 'purple'
-                          : 'gray'
-                  }
-                >
-                  {status}
-                </Pill>
+                <span data-testid="draft-status">
+                  <Pill tone={status.tone}>{status.label}</Pill>
+                </span>
               ) : null}
               {requireApproval || server.reviewStatus !== 'none' ? (
                 <ReviewControls
@@ -1377,6 +1388,10 @@ export function WriteComposer({
             </div>
             <DraftPosts
               canSchedule={canPublish}
+              edited={edited}
+              onReschedule={
+                canPublish && edited.size > 0 ? () => setDialog('schedule') : undefined
+              }
               onCancel={async (postId) => {
                 try {
                   await trpcClient.scheduledPost.cancel.mutate({ scheduledPostId: postId })

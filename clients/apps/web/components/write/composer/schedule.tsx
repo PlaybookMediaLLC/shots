@@ -298,6 +298,8 @@ export function ScheduleDialog({
     }
   }
   const reviewedSlot = queueSlot ? new Date(queueSlot) : null
+  // A draft with queued posts is rescheduled: confirming replaces them (listed below).
+  const rescheduling = (context.scheduled ?? []).length > 0
   const summary = queue
     ? reviewedSlot
       ? `Next free slot: ${reviewedSlot.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short', timeZone: zone })} · ${zone} (${offsetLabel(reviewedSlot, zone)})`
@@ -314,7 +316,7 @@ export function ScheduleDialog({
         data-testid="schedule-dialog"
       >
         <DialogHeader>
-          <DialogTitle>Schedule</DialogTitle>
+          <DialogTitle>{rescheduling ? 'Reschedule' : 'Schedule'}</DialogTitle>
           <DialogDescription>
             Times are in {zone} ({offsetLabel(instant ?? now, zone)}). Save as planned keeps it on
             the calendar without publishing.
@@ -654,8 +656,12 @@ export function ScheduleDialog({
             {action === 'schedule'
               ? 'Scheduling…'
               : queue
-                ? 'Confirm: next free slot'
-                : 'Confirm schedule'}
+                ? rescheduling
+                  ? 'Reschedule to next free slot'
+                  : 'Add to queue'
+                : rescheduling
+                  ? 'Confirm reschedule'
+                  : 'Confirm schedule'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -804,7 +810,16 @@ function Destinations({
  * destination: a schedule replaces them all, so a destination switched off
  * here is cancelled rather than left at its old time.
  */
-function ReplacedPosts({ context, timeZone }: { context: ScheduleContext; timeZone: string }) {
+function ReplacedPosts({
+  context,
+  publishNow = false,
+  timeZone,
+}: {
+  context: ScheduleContext
+  /** Publish now sends the replacement at once instead of at a new time. */
+  publishNow?: boolean
+  timeZone: string
+}) {
   const { data } = useWrite()
   const scheduled = context.scheduled ?? []
   if (scheduled.length === 0) return null
@@ -841,7 +856,9 @@ function ReplacedPosts({ context, timeZone }: { context: ScheduleContext; timeZo
                 })}
               </span>
               {selected.has(post.channelConnectionId) ? (
-                <span className="text-muted-foreground">→ moves to the new time</span>
+                <span className="text-muted-foreground">
+                  {publishNow ? '→ publishes now instead' : '→ moves to the new time'}
+                </span>
               ) : (
                 <span className="text-amber-700 dark:text-amber-300">
                   → cancelled: not selected
@@ -1013,7 +1030,7 @@ export function PublishReview({
             )
           })}
         </ul>
-        <ReplacedPosts context={context} timeZone={context.setTimeZone ?? 'UTC'} />
+        <ReplacedPosts context={context} publishNow timeZone={context.setTimeZone ?? 'UTC'} />
         <CommunityTimeline context={context} />
         {context.items.some((item) => item.account.channel === 'x') ? (
           <AutoDmDraft

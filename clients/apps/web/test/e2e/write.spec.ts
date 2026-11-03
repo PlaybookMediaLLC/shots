@@ -173,6 +173,23 @@ test(
     expect(posts.map((post) => post.caption).join(' ')).not.toContain('Ask legal')
     await snap(page, 'write-scheduled')
 
+    // Queued posts keep what was scheduled: an edit afterwards says so until it replaces them.
+    await expect(page.getByTestId('draft-status')).toHaveText('Scheduled')
+    await expect(page.getByTestId('queued-snapshot')).toHaveCount(0)
+    await caretAtEndOf(page, editor.getByText('Launch day is here. Today!'))
+    await page.keyboard.type(' Updated.')
+    await expectSaved(page)
+    // Only X changed: LinkedIn has its own text.
+    await expect(page.getByTestId('queued-snapshot')).toHaveCount(1)
+    expect((await draftPosts(draftId)).map((post) => post.caption).join(' ')).not.toContain(
+      'Updated.'
+    )
+    await page.getByRole('button', { name: 'Replace queued posts with this version…' }).click()
+    await expect(schedule.getByRole('heading', { name: 'Reschedule' })).toBeVisible()
+    await expect(schedule.getByTestId('replaced-posts')).toContainText('moves to the new time')
+    await expect(schedule.getByRole('button', { name: 'Confirm reschedule' })).toBeVisible()
+    await page.keyboard.press('Escape')
+
     // The library: both posts in the queue; the draft found by its scratchpad, shown by its title.
     await app.open('/write?tab=queue')
     await expect(page.getByTestId('write-rail')).toContainText('Launch day is here. Today! 1/2')
@@ -291,7 +308,7 @@ test(
       'FAILED',
     ])
     await app.reload()
-    const unknown = page.getByTestId('draft-post').filter({ hasText: 'Outcome unknown' })
+    const unknown = page.getByTestId('draft-post').filter({ hasText: 'Needs check' })
     while (await unknown.count()) {
       const remaining = await unknown.count()
       await expect(

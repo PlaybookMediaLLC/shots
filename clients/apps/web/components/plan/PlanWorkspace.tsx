@@ -13,6 +13,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -39,7 +40,12 @@ import { calendarPostSchema } from '@/lib/api/contracts/content-draft-platform'
 import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
 import { calendarResultSchema, type CalendarPlacement } from '@/lib/api/contracts/plan-analyze'
 import { call, draftsApi, type DraftWire, type DraftPostWire } from '@/lib/content-drafts/client'
-import { postFailureReason, postState, STATUS_GROUPS } from '@/lib/content-drafts/post-status'
+import {
+  POST_STATE_TONE,
+  postFailureReason,
+  postState,
+  STATUS_GROUPS,
+} from '@/lib/content-drafts/post-status'
 import { draftPlainText, channelForPlatform } from '@/lib/content-drafts/serialize'
 import {
   writeApi,
@@ -1885,10 +1891,24 @@ function PlanDetail({
               <p className="text-xs">No publication commitment or provider receipt.</p>
             ) : (
               receipts.map((post) => (
-                <div key={post.id} className="my-2 rounded border p-2 text-xs">
-                  <p>
-                    {post.platform} · {post.status.replaceAll('_', ' ')}
+                <div key={post.id} className="my-2 grid gap-1 rounded border p-2 text-xs">
+                  <p className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-foreground">{post.platform}</span>
+                    <Pill tone={POST_STATE_TONE[postState(post.status, post.scheduledFor)]}>
+                      {postState(post.status, post.scheduledFor)}
+                    </Pill>
+                    <span className="text-muted-foreground">
+                      {new Date(post.scheduledFor).toLocaleString(undefined, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: post.scheduleTimeZone ?? item.zone,
+                      })}{' '}
+                      · {post.scheduleTimeZone ?? item.zone}
+                    </span>
                   </p>
+                  {postFailureReason(post.failureCode) ? (
+                    <p className="text-muted-foreground">{postFailureReason(post.failureCode)}</p>
+                  ) : null}
                   {post.url ? (
                     <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
                       <a href={post.url} target="_blank" rel="noreferrer">
