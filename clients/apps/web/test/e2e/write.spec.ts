@@ -369,8 +369,12 @@ test(
     await snap(page, 'write-phone-preview')
     await page.keyboard.press('Escape')
 
+    // Schedule stays in the header on a phone; Publish now is one menu away and still reviewed.
+    await expect(page.getByTestId('schedule-button')).toBeVisible()
+    await expect(page.getByTestId('publish-button')).toBeHidden()
+    await page.getByRole('button', { name: 'More draft actions' }).click()
+    await page.getByRole('menuitem', { name: 'Publish now…' }).click()
     // The final review still names the set and each account.
-    await page.getByTestId('publish-button').click()
     const publish = page.getByTestId('publish-review')
     await expect(publish).toContainText('Publishing as')
     await expect(publish.getByTestId('review-destination').first()).toContainText('@shots_')

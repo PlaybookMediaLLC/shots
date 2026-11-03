@@ -312,7 +312,7 @@ export function ScheduleDialog({
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
       <DialogContent
-        className="max-h-[92dvh] max-w-xl gap-4 overflow-y-auto"
+        className="max-h-[92dvh] max-w-[calc(100%-1rem)] gap-4 overflow-y-auto sm:max-w-xl"
         data-testid="schedule-dialog"
       >
         <DialogHeader>
@@ -323,7 +323,7 @@ export function ScheduleDialog({
           </DialogDescription>
         </DialogHeader>
         <Button
-          className="justify-start px-0 text-xs underline"
+          className="h-auto max-w-full justify-start whitespace-normal px-0 text-left text-xs underline"
           size="sm"
           variant="ghost"
           onClick={() => {
@@ -421,7 +421,10 @@ export function ScheduleDialog({
           <Button
             disabled={!data.advancedScheduling}
             aria-pressed={queue}
-            className={cn('rounded-full', queue && 'border-sky-400/60 text-sky-700 dark:text-sky-200')}
+            className={cn(
+              'h-auto min-h-8 max-w-full whitespace-normal rounded-full text-left',
+              queue && 'border-sky-400/60 text-sky-700 dark:text-sky-200'
+            )}
             onClick={() => setQueue(!queue)}
             size="sm"
             type="button"
@@ -493,7 +496,7 @@ export function ScheduleDialog({
                   <span className="text-xs text-muted-foreground">Suggested times</span>
                   {bestTimes.map((best) => (
                     <Button
-                      className="rounded-full border-emerald-400/30 text-emerald-700 dark:text-emerald-200"
+                      className="h-auto min-h-8 max-w-full whitespace-normal rounded-full border-emerald-400/30 text-left text-emerald-700 dark:text-emerald-200"
                       key={best.at}
                       onClick={() => setInstant(new Date(best.at))}
                       size="sm"
@@ -972,7 +975,7 @@ export function PublishReview({
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
       <DialogContent
-        className="max-h-[92dvh] max-w-xl gap-4 overflow-y-auto"
+        className="max-h-[92dvh] max-w-[calc(100%-1rem)] gap-4 overflow-y-auto sm:max-w-xl"
         data-testid="publish-review"
       >
         <DialogHeader>

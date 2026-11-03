@@ -866,7 +866,7 @@ export function WriteComposer({
                 title={`Writing as ${set.name}`}
               >
                 <SetDot color={set.color} />
-                <span className={cn('max-w-32 truncate', panel ? 'hidden' : 'hidden xl:inline')}>
+                <span className={cn('max-w-32 truncate', panel ? 'hidden' : 'hidden 2xl:inline')}>
                   {set.name}
                 </span>
               </span>
@@ -885,49 +885,53 @@ export function WriteComposer({
               placeholder="Untitled draft"
               value={document.title}
             />
-            <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1">
-              <span
-                className={cn(
-                  'text-xs',
-                  saveState === 'error' || saveState === 'offline'
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : 'text-muted-foreground'
-                )}
-                data-testid="save-state"
-                role="status"
+            <span
+              className={cn(
+                'shrink-0 text-xs',
+                saveState === 'error' || saveState === 'offline'
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-muted-foreground'
+              )}
+              data-testid="save-state"
+              role="status"
+            >
+              {SAVE_LABELS[saveState]}
+            </span>
+            {saveState === 'error' || saveState === 'offline' ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  void flush().catch((error: unknown) =>
+                    toast.error(error instanceof Error ? error.message : 'Could not save.')
+                  )
+                }
               >
-                {SAVE_LABELS[saveState]}
+                Retry save
+              </Button>
+            ) : null}
+            {status ? (
+              <span className="shrink-0" data-testid="draft-status">
+                <Pill tone={status.tone}>{status.label}</Pill>
               </span>
-              {saveState === 'error' || saveState === 'offline' ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    void flush().catch((error: unknown) =>
-                      toast.error(error instanceof Error ? error.message : 'Could not save.')
-                    )
-                  }
-                >
-                  Retry save
-                </Button>
-              ) : null}
-              {status ? (
-                <span data-testid="draft-status">
-                  <Pill tone={status.tone}>{status.label}</Pill>
-                </span>
-              ) : null}
-              {requireApproval || server.reviewStatus !== 'none' ? (
-                <ReviewControls
-                  canEdit={canEdit}
-                  canReview={canReview}
-                  draftId={initial.id}
-                  onDraft={(next) => {
-                    setServer(next)
-                    router.refresh()
-                  }}
-                  review={{ ...server, version: version.current }}
-                />
-              ) : null}
+            ) : null}
+            {requireApproval || server.reviewStatus !== 'none' ? (
+              <ReviewControls
+                canEdit={canEdit}
+                canReview={canReview}
+                draftId={initial.id}
+                onDraft={(next) => {
+                  setServer(next)
+                  router.refresh()
+                }}
+                review={{ ...server, version: version.current }}
+              />
+            ) : null}
+            {/* One row of actions that wraps as a whole; narrow screens keep the rest in ⋯. */}
+            <div
+              className="ml-auto flex shrink-0 items-center gap-1"
+              data-testid="composer-actions"
+            >
               {focus ? null : (
                 <>
                   <PanelButton
@@ -939,6 +943,7 @@ export function WriteComposer({
                   />
                   <PanelButton
                     active={panel === 'comments'}
+                    className="hidden md:inline-flex"
                     icon={<MessageSquare aria-hidden className="size-4" />}
                     label="Comments"
                     onClick={() => togglePanel('comments')}
@@ -946,6 +951,7 @@ export function WriteComposer({
                   />
                   <PanelButton
                     active={panel === 'properties'}
+                    className="hidden md:inline-flex"
                     icon={<PanelRight aria-hidden className="size-4" />}
                     label="Draft details"
                     onClick={() => togglePanel('properties')}
@@ -954,6 +960,7 @@ export function WriteComposer({
                   {aiEnabled ? (
                     <PanelButton
                       active={panel === 'assistant'}
+                      className="hidden md:inline-flex"
                       icon={<Sparkles aria-hidden className="size-4" />}
                       label="Assistant"
                       onClick={() => togglePanel('assistant')}
@@ -962,11 +969,13 @@ export function WriteComposer({
                   ) : null}
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
                   {set ? (
-                    <DraftSettingsDrawer
-                      canManage={canPublish}
-                      canWrite={canEdit}
-                      socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}
-                    />
+                    <span className="hidden md:contents">
+                      <DraftSettingsDrawer
+                        canManage={canPublish}
+                        canWrite={canEdit}
+                        socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}
+                      />
+                    </span>
                   ) : null}
                 </>
               )}
@@ -974,7 +983,7 @@ export function WriteComposer({
               <Button
                 ref={shareButton}
                 aria-label="Share"
-                className={panel ? 'size-8 px-0' : 'hidden sm:inline-flex'}
+                className={cn('hidden lg:inline-flex', panel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
                 title={`Share (${mod}⌥S)`}
@@ -986,47 +995,85 @@ export function WriteComposer({
                 <>
                   <Button
                     className="hidden sm:inline-flex"
-                    data-testid="schedule-button"
-                    onClick={() => setDialog('schedule')}
-                    size="sm"
-                    variant="outline"
-                  >
-                    {server.status === 'scheduled' &&
-                    posts.some((post) => post.status === 'SCHEDULED')
-                      ? 'Reschedule'
-                      : 'Schedule'}
-                  </Button>
-                  <Button
                     data-testid="publish-button"
                     onClick={() => setDialog('publish')}
                     size="sm"
-                    title={`Publish review (${mod}⇧↵)`}
+                    title={`Review and publish now (${mod}⇧↵)`}
+                    variant="outline"
                   >
-                    Publish
+                    Publish now…
+                  </Button>
+                  <Button
+                    data-testid="schedule-button"
+                    onClick={() => setDialog('schedule')}
+                    size="sm"
+                  >
+                    {posts.some((post) => post.status === 'SCHEDULED') ? 'Reschedule' : 'Schedule'}
                   </Button>
                 </>
               ) : null}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button aria-label="More draft actions" size="sm" variant="ghost">
+                  <Button
+                    aria-label="More draft actions"
+                    className="size-8 px-0"
+                    size="sm"
+                    variant="ghost"
+                  >
                     ⋯
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
                   {canPublish && server.status !== 'archived' ? (
-                    <DropdownMenuItem className="sm:hidden" onSelect={() => setDialog('schedule')}>
-                      Schedule…
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onSelect={() => setDialog('queue')}>
+                        Add to queue
+                        <DropdownMenuShortcut>{mod}⌥↵</DropdownMenuShortcut>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onSelect={() => setDialog('publish')}>
+                        Publish now…
+                      </DropdownMenuItem>
+                    </>
                   ) : null}
-                  {canPublish && server.status !== 'archived' ? (
-                    <DropdownMenuItem onSelect={() => setDialog('queue')}>
-                      Add to queue
-                      <DropdownMenuShortcut>{mod}⌥↵</DropdownMenuShortcut>
-                    </DropdownMenuItem>
-                  ) : null}
-                  <DropdownMenuItem className="sm:hidden" onSelect={() => setDialog('share')}>
+                  <DropdownMenuItem className="lg:hidden" onSelect={() => setDialog('share')}>
                     Share…
                   </DropdownMenuItem>
+                  {focus ? null : (
+                    <>
+                      <DropdownMenuItem
+                        className="md:hidden"
+                        onSelect={() => togglePanel('comments')}
+                      >
+                        Comments
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="md:hidden"
+                        onSelect={() => togglePanel('properties')}
+                      >
+                        Draft details
+                      </DropdownMenuItem>
+                      {aiEnabled ? (
+                        <DropdownMenuItem
+                          className="md:hidden"
+                          onSelect={() => togglePanel('assistant')}
+                        >
+                          Assistant
+                        </DropdownMenuItem>
+                      ) : null}
+                      {set ? (
+                        <DropdownMenuItem
+                          className="md:hidden"
+                          onSelect={() => {
+                            const url = new URL(window.location.href)
+                            url.searchParams.set('settings', 'scheduling')
+                            window.history.pushState(null, '', url)
+                          }}
+                        >
+                          Brand settings…
+                        </DropdownMenuItem>
+                      ) : null}
+                    </>
+                  )}
                   {canEdit && activePublication.settings[0]?.poll ? (
                     <DropdownMenuItem
                       onSelect={() => {
@@ -1389,9 +1436,7 @@ export function WriteComposer({
             <DraftPosts
               canSchedule={canPublish}
               edited={edited}
-              onReschedule={
-                canPublish && edited.size > 0 ? () => setDialog('schedule') : undefined
-              }
+              onReschedule={canPublish && edited.size > 0 ? () => setDialog('schedule') : undefined}
               onCancel={async (postId) => {
                 try {
                   await trpcClient.scheduledPost.cancel.mutate({ scheduledPostId: postId })
@@ -1667,12 +1712,14 @@ function readDiscussionsOnce(draft: DraftWire) {
 
 function PanelButton({
   active,
+  className,
   icon,
   label,
   onClick,
   shortcut,
 }: {
   active: boolean
+  className?: string
   icon: React.ReactNode
   label: string
   onClick: () => void
@@ -1682,7 +1729,7 @@ function PanelButton({
     <Button
       aria-label={label}
       aria-pressed={active}
-      className={cn('size-8 px-0', active && 'bg-foreground/[0.08] text-foreground')}
+      className={cn('size-8 px-0', active && 'bg-foreground/[0.08] text-foreground', className)}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       size="sm"
