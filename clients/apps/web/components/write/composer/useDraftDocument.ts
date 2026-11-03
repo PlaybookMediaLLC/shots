@@ -38,6 +38,8 @@ const pendingDocuments = new Map<
   string,
   { document: DraftDocument; discussions: DraftDiscussions; version: number; generation: number }
 >()
+// A local edit a newer version replaced, kept until the writer restores or discards it.
+const conflictedDocuments = new Map<string, DraftDocument>()
 
 /** The parts of a draft the composer edits and saves. */
 export type DraftDocument = {
@@ -81,6 +83,9 @@ export function useDraftDocument({
   onSaved?: (saved: DraftWire) => void
 }) {
   const [recovery] = React.useState(() => pendingDocuments.get(draft.id))
+  const [conflict, setConflict] = React.useState<DraftDocument | null>(
+    () => conflictedDocuments.get(draft.id) ?? null
+  )
   const [document, setDocument] = React.useState<DraftDocument>(
     () => recovery?.document ?? documentOf(draft)
   )
@@ -112,6 +117,14 @@ export function useDraftDocument({
     setDocument(latest.current)
     setEditorKey((key) => key + 1)
   }, [draft.id])
+
+  const keepConflict = React.useCallback(
+    (mine: DraftDocument) => {
+      conflictedDocuments.set(draft.id, mine)
+      setConflict(mine)
+    },
+    [draft.id]
+  )
 
   const save = React.useCallback(async (): Promise<boolean> => {
     if (!canEdit) return !dirty.current
@@ -164,11 +177,11 @@ export function useDraftDocument({
             // keeping the comment threads they saved as well as ours.
             const fresh = await draftsApi.get(draft.id)
             if (fresh.collabGeneration !== generation.current) {
+              const mine = latest.current
               await reloadLatest()
+              keepConflict(mine)
               setSaveState('saved')
-              toast.info(
-                'This draft was replaced elsewhere. Showing the latest version; your last edit was not saved.'
-              )
+              toast.info('This draft was replaced elsewhere. Your edit is kept above the editor.')
               return false
             }
             version.current = fresh.version
@@ -179,12 +192,12 @@ export function useDraftDocument({
             continue
           }
           if (error instanceof DraftRequestError && error.status === 409) {
-            // Someone saved a newer version: show it rather than overwrite it.
+            // Someone saved a newer version: show it, and keep ours to restore or copy.
+            const mine = latest.current
             await reloadLatest()
+            keepConflict(mine)
             setSaveState('saved')
-            toast.info(
-              'This draft was changed elsewhere. Showing the latest version; your last edit was not saved.'
-            )
+            toast.info('This draft was changed elsewhere. Your edit is kept above the editor.')
             return false
           }
           if (
@@ -223,7 +236,7 @@ export function useDraftDocument({
           generation: generation.current,
         })
     }
-  }, [canEdit, collaborating, draft.id, reloadLatest])
+  }, [canEdit, collaborating, draft.id, keepConflict, reloadLatest])
 
   const scheduleSave = React.useCallback(() => {
     if (!canEdit) return
@@ -250,6 +263,24 @@ export function useDraftDocument({
     },
     [scheduleSave]
   )
+
+  /** Put the conflicting edit back over the newer version and save it on top. */
+  const restoreConflict = React.useCallback(() => {
+    const mine = conflictedDocuments.get(draft.id)
+    conflictedDocuments.delete(draft.id)
+    setConflict(null)
+    if (!mine) return
+    latest.current = mine
+    setDocument(mine)
+    setEditorKey((key) => key + 1)
+    scheduleSave()
+  }, [draft.id, scheduleSave])
+
+  /** Drop the conflicting edit and keep the newer version. */
+  const discardConflict = React.useCallback(() => {
+    conflictedDocuments.delete(draft.id)
+    setConflict(null)
+  }, [draft.id])
 
   /** Save now, waiting for any save in flight: before scheduling, sharing, or leaving. */
   const flush = React.useCallback(async () => {
@@ -310,12 +341,15 @@ export function useDraftDocument({
     setServer(next)
   }, [])
   return {
+    conflict,
+    discardConflict,
     discussions,
     document,
     editorKey,
     flush,
     onDiscussionsChange,
     reloadLatest,
+    restoreConflict,
     saveState,
     server,
     setServer: adopt,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { LocalTime } from '@/components/drafts/local-time'
 import { Group, Row } from '@/components/platform-ui'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
@@ -10,6 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { POSTING_SLOT_LIMIT } from '@/lib/api/contracts/social-sets'
+import { upcomingSlots } from '@/lib/write/calendar'
+import { offsetLabel } from '@/lib/write/zoned-time'
 import { type SocialSetRecord, useSaveSocialSet } from './api'
 
 type Slot = SocialSetRecord['postingSlots'][number]
@@ -39,7 +43,18 @@ export function weeklySlotCount(slots: Slot[]): number {
  * the queue fills, and natural posting times. The grid is a template: changing
  * it never moves a post that is already scheduled.
  */
-export function SchedulingPage({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
+export function SchedulingPage({
+  advancedScheduling,
+  canManage: canManageSet,
+  set,
+}: {
+  /** Whether the plan has queue slots; unknown (undefined) leaves the backend to say. */
+  advancedScheduling?: boolean
+  canManage: boolean
+  set: SocialSetRecord
+}) {
+  const locked = advancedScheduling === false
+  const canManage = canManageSet && !locked
   const save = useSaveSocialSet(set.id)
   const weekStart = usePreferences().preferences?.weekStart ?? 'monday'
   const days = weekStart === 'monday' ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6]
@@ -49,13 +64,17 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
   const [zoneState, runZone] = useSaveState()
   const [naturalState, runNatural] = useSaveState()
   const [adding, setAdding] = useState('')
+  // A time whose last weekday was unticked keeps its row until it is removed.
+  const [kept, setKept] = useState<string[]>([])
 
   // A save confirmed elsewhere, or a reload, brings the server's grid back.
   useEffect(() => {
     if (pending.current === 0) setSlots(set.postingSlots)
   }, [set.postingSlots])
 
-  const times = useMemo(() => [...new Set(slots.map((slot) => slot.time))].sort(), [slots])
+  const times = useMemo(() => [...new Set([...slots.map((slot) => slot.time), ...kept])].sort(), [slots, kept])
+  const count = weeklySlotCount(slots)
+  const next = upcomingSlots(set.postingSlots, set.timeZone, []).slice(0, 3)
   const enabled = (weekday: number, time: string) => slots.some((slot) => slot.weekday === weekday && slot.time === time)
 
   const commit = (next: Slot[]) => {
@@ -69,11 +88,18 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
     })
   }
 
-  const toggle = (weekday: number, time: string, on: boolean) =>
+  const toggle = (weekday: number, time: string, on: boolean) => {
+    if (!on) setKept((current) => [...new Set([...current, time])])
     commit(on ? [...slots, { time, weekday }] : slots.filter((slot) => !(slot.weekday === weekday && slot.time === time)))
-  const removeTime = (time: string) => commit(slots.filter((slot) => slot.time !== time))
+  }
+  const removeTime = (time: string) => {
+    setKept((current) => current.filter((item) => item !== time))
+    commit(slots.filter((slot) => slot.time !== time))
+  }
+  // A new time takes Monday to Friday, so it needs five free slots.
+  const full = count + 5 > POSTING_SLOT_LIMIT
   const addTime = () => {
-    if (!adding || times.includes(adding)) return
+    if (!adding || times.includes(adding) || full) return
     commit([...slots, ...[1, 2, 3, 4, 5].map((weekday) => ({ time: adding, weekday }))])
     setAdding('')
   }
@@ -82,7 +108,7 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
     <div className="grid gap-6">
       <Group>
         <Row
-          description="The time zone this publishing brand's queue, slots and calendar use. It is separate from your display time zone."
+          description="The time zone this publishing brand's queue, slots and calendar use. It is separate from your display time zone. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
           label={
             <span className="flex items-center gap-2">
               Scheduling time zone <SaveStatus state={zoneState} />
@@ -91,7 +117,7 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
           layout="stacked"
         >
           <TimeZonePicker
-            disabled={!canManage}
+            disabled={!canManageSet}
             label="Scheduling time zone"
             onChange={(timeZone) => void runZone(() => save({ timeZone }))}
             value={set.timeZone}
@@ -110,8 +136,16 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
           layout="stacked"
         >
           <div className="grid w-full min-w-0 gap-3">
+            {locked ? (
+              <p className="text-sm text-muted-foreground" data-testid="slots-locked">
+                <a className="underline" href="/pricing">
+                  Upgrade to Pro
+                </a>{' '}
+                for queue slots, suggested times and automatic follow-ups.
+              </p>
+            ) : null}
             <div className="overflow-x-auto">
-              <Table className="w-full min-w-[34rem] text-sm">
+              <Table className="w-full min-w-[28rem] text-sm">
                 <TableCaption className="sr-only">Posting times by weekday in {set.timeZone}</TableCaption>
                 <TableHeader>
                   <TableRow className="text-xs text-muted-foreground">
@@ -146,7 +180,7 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
                           <Checkbox
                             aria-label={`${DAY_NAMES[day]} at ${readableTime(time)}`}
                             checked={enabled(day, time)}
-                            disabled={!canManage}
+                            disabled={!canManage || (!enabled(day, time) && count >= POSTING_SLOT_LIMIT)}
                             onCheckedChange={(checked) => toggle(day, time, checked === true)}
                           />
                         </TableCell>
@@ -188,14 +222,34 @@ export function SchedulingPage({ canManage, set }: { canManage: boolean; set: So
                     ))}
                   </SelectContent>
                 </Select>
-                <Button disabled={!canManage || !adding} type="submit" variant="outline">
+                <Button disabled={!canManage || !adding || full} type="submit" variant="outline">
                   Add time
                 </Button>
               </form>
               <p aria-live="polite" className="text-sm text-foreground" data-testid="weekly-slot-count">
-                {weeklySlotCount(slots)} weekly posting slots
+                {count} of {POSTING_SLOT_LIMIT} weekly posting slots
+                {full && canManage ? (
+                  <span className="block text-xs text-muted-foreground">
+                    A new time takes five slots (Monday to Friday). Remove some to add another.
+                  </span>
+                ) : null}
               </p>
             </div>
+            {next.length > 0 ? (
+              <p className="text-xs text-muted-foreground" data-testid="upcoming-slots">
+                Next slots:{' '}
+                {next.map(({ at }, index) => (
+                  <span key={at.toISOString()}>
+                    {index > 0 ? ' · ' : null}
+                    <LocalTime
+                      options={{ weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: set.timeZone }}
+                      value={at}
+                    />{' '}
+                    ({offsetLabel(at, set.timeZone)})
+                  </span>
+                ))}
+              </p>
+            ) : null}
           </div>
         </Row>
       </Group>

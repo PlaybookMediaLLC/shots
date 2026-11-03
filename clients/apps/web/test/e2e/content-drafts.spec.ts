@@ -264,8 +264,13 @@ test(
     await page
       .getByTestId('draft-post')
       .filter({ hasText: 'X ·' })
-      .getByRole('button', { name: 'Cancel' })
+      .getByRole('button', { name: 'Cancel the X post' })
       .click()
+    // Cancelling one destination names it and asks first; the others stay queued.
+    const cancel = page.getByRole('alertdialog')
+    await expect(cancel).toContainText('Cancel the X post?')
+    await expect(cancel).toContainText('other destinations stay queued')
+    await cancel.getByRole('button', { name: 'Cancel this post', exact: true }).click()
     await expect(page.getByTestId('draft-post').filter({ hasText: 'Cancelled' })).toHaveCount(1)
     expect(
       await db.row(

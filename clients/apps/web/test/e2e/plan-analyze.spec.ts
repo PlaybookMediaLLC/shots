@@ -145,18 +145,26 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.getByRole('button', { name: 'Next month', exact: true }).click()
     await page.getByRole('button', { name: 'Today', exact: true }).click()
     await expect(page.locator('time[aria-current="date"]')).toHaveCount(1)
+    // Near a month's end the planned day is in the next month, which later steps need.
+    const today = await page.locator('time[aria-current="date"]').getAttribute('datetime')
+    if (today?.slice(0, 7) !== day.slice(0, 7))
+      await page.getByRole('button', { name: 'Next month', exact: true }).click()
   })
   await test.step('P27 P28 P29 picker search and distinct source tabs cancel without a commit', async () => {
     await page.getByRole('button', { name: `Create draft ${day}`, exact: true }).click()
     await page.getByRole('button', { name: 'Choose existing content' }).click()
     await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeDisabled()
-    await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeDisabled()
+    await expect(
+      page.getByRole('button', { name: 'Review and schedule…', exact: true })
+    ).toBeDisabled()
     await page.getByLabel('Search existing content').fill('no matching draft')
     await expect(page.getByText('No content matches.', { exact: true })).toBeVisible()
     await page.getByLabel('Search existing content').fill('Picker source')
     await page.getByRole('button', { name: /Picker source draft/ }).click()
     await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeEnabled()
-    await expect(page.getByRole('button', { name: 'Schedule', exact: true })).toBeEnabled()
+    await expect(
+      page.getByRole('button', { name: 'Review and schedule…', exact: true })
+    ).toBeEnabled()
     await page.getByRole('button', { name: 'Published', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Plan', exact: true })).toBeDisabled()
     await page.getByRole('button', { name: 'Close', exact: true }).first().click()
@@ -405,11 +413,25 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await app.reload()
     await expect(card).toBeVisible()
   })
-  await test.step('P35 detail preserves provider context and schedules the planned content', async () => {
+  await test.step('P35 detail preserves provider context and schedules the planned content through its review', async () => {
     await card.click()
     await expect(page.getByText('Original scheduling timezone:', { exact: false })).toBeVisible()
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    // Plan never commits a schedule itself: it opens the draft's own review at that time.
+    await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
+    await page.waitForURL(new RegExp(`/write/${draftId}\\?.*panel=schedule`))
+    const review = page.getByTestId('schedule-dialog')
+    await expect(review.getByTestId('schedule-summary')).toContainText('America/New_York')
+    await expect(review.getByTestId('destinations')).toBeVisible()
+    await review.getByRole('checkbox', { name: 'Open a new draft after scheduling' }).uncheck()
+    await review.getByRole('button', { name: /^Confirm schedule/ }).click()
+    await expect(review).toHaveCount(0)
+    const scheduled = await db.query(
+      `SELECT status::text, "scheduleTimeZone" FROM scheduled_post WHERE "contentDraftId"=$1`,
+      [draftId]
+    )
+    expect(scheduled.rows.length).toBeGreaterThan(0)
+    expect(scheduled.rows.every((r) => r.status === 'SCHEDULED')).toBe(true)
+    await app.open(`/write/plan?day=${day}`)
     await expect(
       page.getByTestId('calendar-post').filter({ hasText: 'A planned post', visible: true })
     ).toBeVisible()

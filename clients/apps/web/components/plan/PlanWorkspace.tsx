@@ -13,6 +13,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -39,7 +40,12 @@ import { calendarPostSchema } from '@/lib/api/contracts/content-draft-platform'
 import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
 import { calendarResultSchema, type CalendarPlacement } from '@/lib/api/contracts/plan-analyze'
 import { call, draftsApi, type DraftWire, type DraftPostWire } from '@/lib/content-drafts/client'
-import { postFailureReason, postState, STATUS_GROUPS } from '@/lib/content-drafts/post-status'
+import {
+  POST_STATE_TONE,
+  postFailureReason,
+  postState,
+  STATUS_GROUPS,
+} from '@/lib/content-drafts/post-status'
 import { draftPlainText, channelForPlatform } from '@/lib/content-drafts/serialize'
 import {
   writeApi,
@@ -54,7 +60,9 @@ import {
   displayDaySlots,
   itemDay,
   planPreferencesSchema,
+  movedToDay,
   selectedInstant,
+  takenSlots,
   selectionState,
   shiftAnchor,
   validDay,
@@ -381,11 +389,8 @@ export function PlanWorkspace({
     if (!item) {
       const draft = sources?.find((d) => d.id === id)
       if (draft)
-        setCompose({
-          day,
-          time: `${String(hour ?? 12).padStart(2, '0')}:00`,
-          setId: draft.socialSetId ?? '',
-          zone: prefs.zone,
+        create(day, `${String(hour ?? 12).padStart(2, '0')}:00`, {
+          setId: draft.socialSetId ?? undefined,
           selected: draft,
           source,
         })
@@ -402,12 +407,12 @@ export function PlanWorkspace({
       void mutate('swap', [placement(item, target.at), placement(target, item.at)])
       return
     }
-    const time =
-      hour === undefined
-        ? wallTime(new Date(item.at), prefs.zone).slice(11)
-        : `${String(hour).padStart(2, '0')}:00`
     try {
-      const at = selectedInstant(`${day}T${time}`, prefs.zone, 'reject')
+      // A day keeps the post's own clock; a week hour is the one picked in this display.
+      const at =
+        hour === undefined
+          ? movedToDay(item.at, item.zone, prefs.zone, day)
+          : selectedInstant(`${day}T${String(hour).padStart(2, '0')}:00`, prefs.zone, 'reject')
       void mutate('move', [placement(item, at.toISOString())])
     } catch (e) {
       toast.error((e as Error).message)
@@ -484,7 +489,7 @@ export function PlanWorkspace({
           prefs.zone,
           focused.timeZone,
           focused.postingSlots,
-          items.filter((item) => item.setId === focused.id).map((item) => item.at)
+          takenSlots(items, focused.id)
         ).map((slot) => {
           const [hour, minute] = slot.displayTime.split(':').map(Number)
           return (
@@ -544,17 +549,28 @@ export function PlanWorkspace({
           )
         })
       : null
-  const create = (day: string, time = '12:00') => {
-    const setId = focused?.id ?? activeIds[0] ?? sets[0]?.id ?? ''
+  // A grid day and hour are read in the display zone, then composed in the brand's zone.
+  const create = (
+    day: string,
+    time = '12:00',
+    from: { setId?: string; selected?: DraftWire; source?: 'drafts' | 'posted' } = {}
+  ) => {
+    const setId = from.setId || focused?.id || activeIds[0] || sets[0]?.id || ''
     const scheduleZone = sets.find((set) => set.id === setId)?.timeZone ?? prefs.zone
     const resolved = resolveLocalTime(`${day}T${time}`, prefs.zone)
     if (resolved.kind !== 'exact') {
       // Keep the explicit display-zone occurrence selector for ambiguous grid hours.
-      setCompose({ day, time, setId, zone: prefs.zone })
+      setCompose({ ...from, day, time, setId, zone: prefs.zone })
       return
     }
     const local = wallTime(resolved.at, scheduleZone)
-    setCompose({ day: local.slice(0, 10), time: local.slice(11), setId, zone: scheduleZone })
+    setCompose({
+      ...from,
+      day: local.slice(0, 10),
+      time: local.slice(11),
+      setId,
+      zone: scheduleZone,
+    })
   }
   return (
     <div className="flex h-full min-h-0 flex-col" inert={!hydrated} aria-busy={!hydrated}>
@@ -1247,16 +1263,11 @@ function PlanComposer({
         })
         created.current = draft
       }
-      if (schedule)
-        await draftsApi.schedule(draft.id, {
-          version: draft.version,
-          baseCalendarVersion: draft.calendarVersion,
-          scheduledFor: instant,
-          timeZone: zone,
-          naturalPostingTime: false,
-          channelConnectionIds: draft.channelConnectionIds,
-        })
-      else {
+      if (schedule) {
+        onClose()
+        router.push(reviewScheduleHref(draft.id, instant, set.timeZone ?? zone))
+        return
+      } else {
         planKey.current ??= crypto.randomUUID()
         const result = readWire(
           calendarResultSchema,
@@ -1535,13 +1546,23 @@ function PlanComposer({
               title={!canPublish ? 'Publishing permission required.' : undefined}
               onClick={() => void commit(true)}
             >
-              Schedule
+              Review and schedule…
             </Button>
           ) : null}
         </div>
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * Scheduling from Plan opens the draft's own review (ScheduleDialog) at the
+ * chosen instant, read in the brand's zone, so every schedule is confirmed
+ * with its destinations, content, zone and checks in one place.
+ */
+function reviewScheduleHref(draftId: string, at: Date, zone: string): string {
+  const wall = wallTime(at, zone)
+  return `/write/${draftId}?${new URLSearchParams({ panel: 'schedule', day: wall.slice(0, 10), time: wall.slice(11) })}`
 }
 
 function PlanDetail({
@@ -1572,6 +1593,7 @@ function PlanDetail({
   const [activity, setActivity] = React.useState<DraftActivityWire[]>([])
   const [revisionCount, setRevisionCount] = React.useState<number | null>(null)
   const [local, setLocal] = React.useState(wallTime(new Date(item.at), item.zone))
+  const router = useRouter()
   const [zone, setZone] = React.useState(item.zone)
   const [choice, setChoice] = React.useState<'reject' | 'earlier' | 'later'>('reject')
   const [reload, setReload] = React.useState(0)
@@ -1735,23 +1757,16 @@ function PlanDetail({
             {item.status === 'Planned' ? (
               <>
                 <Button
-                  disabled={busy || !canPublish || !draft}
+                  disabled={busy || !canPublish}
                   onClick={() =>
                     void run(async () => {
-                      if (!draft) return
-                      await draftsApi.schedule(draft.id, {
-                        version: draft.version,
-                        baseCalendarVersion: draft.calendarVersion,
-                        scheduledFor: selectedInstant(local, zone, choice),
-                        timeZone: zone,
-                        channelConnectionIds: draft.channelConnectionIds,
-                        naturalPostingTime: false,
-                      })
+                      const at = selectedInstant(local, zone, choice)
                       onClose()
+                      router.push(reviewScheduleHref(item.draftId, at, set?.timeZone ?? zone))
                     })
                   }
                 >
-                  Schedule
+                  Review and schedule…
                 </Button>
                 <Button
                   variant="outline"
@@ -1876,10 +1891,24 @@ function PlanDetail({
               <p className="text-xs">No publication commitment or provider receipt.</p>
             ) : (
               receipts.map((post) => (
-                <div key={post.id} className="my-2 rounded border p-2 text-xs">
-                  <p>
-                    {post.platform} · {post.status.replaceAll('_', ' ')}
+                <div key={post.id} className="my-2 grid gap-1 rounded border p-2 text-xs">
+                  <p className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-foreground">{post.platform}</span>
+                    <Pill tone={POST_STATE_TONE[postState(post.status, post.scheduledFor)]}>
+                      {postState(post.status, post.scheduledFor)}
+                    </Pill>
+                    <span className="text-muted-foreground">
+                      {new Date(post.scheduledFor).toLocaleString(undefined, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                        timeZone: post.scheduleTimeZone ?? item.zone,
+                      })}{' '}
+                      · {post.scheduleTimeZone ?? item.zone}
+                    </span>
                   </p>
+                  {postFailureReason(post.failureCode) ? (
+                    <p className="text-muted-foreground">{postFailureReason(post.failureCode)}</p>
+                  ) : null}
                   {post.url ? (
                     <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
                       <a href={post.url} target="_blank" rel="noreferrer">

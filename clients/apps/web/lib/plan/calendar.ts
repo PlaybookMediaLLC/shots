@@ -114,6 +114,43 @@ export function itemDay(item: PlanItem, zone: string): string {
   return zonedDayKey(new Date(item.at), zone)
 }
 
+/**
+ * A card dropped on another displayed day keeps its time in its own
+ * scheduling zone, moved by the days between the two displayed days: a
+ * display zone across a daylight-saving change never shifts its clock.
+ */
+export function movedToDay(
+  at: string,
+  postZone: string,
+  displayZone: string,
+  day: string,
+  now = new Date()
+): Date {
+  const instant = new Date(at)
+  const days = Math.round(
+    (Date.parse(`${day}T12:00:00Z`) -
+      Date.parse(`${zonedDayKey(instant, displayZone)}T12:00:00Z`)) /
+      86_400_000
+  )
+  const wall = wallTime(instant, postZone)
+  return selectedInstant(
+    `${addDays(wall.slice(0, 10), days)}T${wall.slice(11)}`,
+    postZone,
+    'reject',
+    now
+  )
+}
+
+/** States whose post holds its queue slot, as the backend's free-slot search counts them. */
+const SLOT_HOLDERS = new Set(['Scheduled', 'Overdue', 'Publishing', 'Needs check'])
+
+/** The slot instants a brand's queued posts hold; planned, failed and published items free theirs. */
+export function takenSlots(items: PlanItem[], setId: string): string[] {
+  return items
+    .filter((item) => item.setId === setId && SLOT_HOLDERS.has(item.status))
+    .map((item) => item.at)
+}
+
 /** Reserve a separate lane for every overlapping card, including repeated DST hours. */
 export function weekCardLayout(items: PlanItem[], zone: string, height: number) {
   const ends: number[] = []

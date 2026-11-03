@@ -2,11 +2,14 @@ package temporalmaintenance
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
@@ -62,13 +65,19 @@ type fakeSchedules struct {
 	client.ScheduleClient
 	created map[string]client.ScheduleOptions
 	handles map[string]*fakeHandle
+	creates int
 }
 type fakeHandle struct {
 	client.ScheduleHandle
 	schedule client.Schedule
 }
+type failingHandle struct {
+	client.ScheduleHandle
+	err error
+}
 
 func (f *fakeSchedules) Create(_ context.Context, o client.ScheduleOptions) (client.ScheduleHandle, error) {
+	f.creates++
 	if _, ok := f.created[o.ID]; ok {
 		return nil, temporal.ErrScheduleAlreadyRunning
 	}
@@ -77,7 +86,13 @@ func (f *fakeSchedules) Create(_ context.Context, o client.ScheduleOptions) (cli
 	return f.handles[o.ID], nil
 }
 func (f *fakeSchedules) GetHandle(_ context.Context, id string) client.ScheduleHandle {
-	return f.handles[id]
+	if handle, ok := f.handles[id]; ok {
+		return handle
+	}
+	return failingHandle{err: serviceerror.NewNotFound("schedule not found")}
+}
+func (h failingHandle) Update(context.Context, client.ScheduleUpdateOptions) error {
+	return h.err
 }
 func (f *fakeHandle) Update(_ context.Context, o client.ScheduleUpdateOptions) error {
 	u, e := o.DoUpdate(client.ScheduleUpdateInput{Description: client.ScheduleDescription{Schedule: f.schedule}})
@@ -86,6 +101,50 @@ func (f *fakeHandle) Update(_ context.Context, o client.ScheduleUpdateOptions) e
 	}
 	return e
 }
+
+// Another replica, still on the previous release, creates each schedule
+// between this replica's update and its create.
+type racedSchedules struct{ *fakeSchedules }
+
+func (r racedSchedules) Create(ctx context.Context, o client.ScheduleOptions) (client.ScheduleHandle, error) {
+	previous := o
+	previous.Spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: 7 * time.Minute}}}
+	previous.Action = &client.ScheduleWorkflowAction{ID: o.ID, Workflow: "platform-maintenance-v0", TaskQueue: TaskQueue}
+	_, _ = r.fakeSchedules.Create(ctx, previous)
+	return r.fakeSchedules.Create(ctx, o)
+}
+
+func TestScheduleReconciliationUpdatesWhenAnotherReplicaCreatesFirst(t *testing.T) {
+	f := &fakeSchedules{created: map[string]client.ScheduleOptions{}, handles: map[string]*fakeHandle{}}
+	if err := Reconcile(context.Background(), racedSchedules{f}); err != nil {
+		t.Fatal(err)
+	}
+	for _, job := range Jobs {
+		want := ScheduleOptions(job)
+		got := f.handles[want.ID].schedule
+		policy := client.SchedulePolicies{Overlap: want.Overlap, CatchupWindow: want.CatchupWindow}
+		if !reflect.DeepEqual(*got.Spec, want.Spec) || !reflect.DeepEqual(got.Action, want.Action) || got.Policy == nil || *got.Policy != policy {
+			t.Fatalf("%s kept the other replica's schedule", want.ID)
+		}
+	}
+}
+
+// Temporal cannot answer: Reconcile reports that error and creates nothing.
+type unavailableSchedules struct{ *fakeSchedules }
+
+func (unavailableSchedules) GetHandle(context.Context, string) client.ScheduleHandle {
+	return failingHandle{err: serviceerror.NewUnavailable("temporal unavailable")}
+}
+
+func TestScheduleReconciliationCreatesOnlyMissingSchedules(t *testing.T) {
+	f := &fakeSchedules{created: map[string]client.ScheduleOptions{}, handles: map[string]*fakeHandle{}}
+	err := Reconcile(context.Background(), unavailableSchedules{f})
+	var unavailable *serviceerror.Unavailable
+	if !errors.As(err, &unavailable) || f.creates != 0 {
+		t.Fatalf("got %v after %d creates", err, f.creates)
+	}
+}
+
 func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 	f := &fakeSchedules{created: map[string]client.ScheduleOptions{}, handles: map[string]*fakeHandle{}}
 	for range 2 {
@@ -95,6 +154,10 @@ func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 	}
 	if len(f.created) != len(Jobs) {
 		t.Fatalf("created %d schedules", len(f.created))
+	}
+	// A refused Create is an error span on every restart; a redeploy only updates.
+	if f.creates != len(Jobs) {
+		t.Fatalf("called Create %d times for %d schedules", f.creates, len(Jobs))
 	}
 	for id, o := range f.created {
 		if o.Overlap != enumspb.SCHEDULE_OVERLAP_POLICY_SKIP {

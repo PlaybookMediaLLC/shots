@@ -9,6 +9,7 @@ import (
 	"time"
 
 	enumspb "go.temporal.io/api/enums/v1"
+	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
@@ -104,18 +105,28 @@ func ScheduleOptions(job string) client.ScheduleOptions {
 }
 
 // Reconcile is replica-safe and preserves operator pause state on redeploy.
+// It updates first and creates only a missing schedule: the tracing
+// interceptor records each refused Create as an error span.
 func Reconcile(ctx context.Context, schedules client.ScheduleClient) error {
 	for _, job := range Jobs {
 		options := ScheduleOptions(job)
-		_, err := schedules.Create(ctx, options)
-		if errors.Is(err, temporal.ErrScheduleAlreadyRunning) {
-			err = schedules.GetHandle(ctx, options.ID).Update(ctx, client.ScheduleUpdateOptions{DoUpdate: func(input client.ScheduleUpdateInput) (*client.ScheduleUpdate, error) {
+		update := func() error {
+			return schedules.GetHandle(ctx, options.ID).Update(ctx, client.ScheduleUpdateOptions{DoUpdate: func(input client.ScheduleUpdateInput) (*client.ScheduleUpdate, error) {
 				current := input.Description.Schedule
 				current.Spec = &options.Spec
 				current.Action = options.Action
 				current.Policy = &client.SchedulePolicies{Overlap: options.Overlap, CatchupWindow: options.CatchupWindow}
 				return &client.ScheduleUpdate{Schedule: &current}, nil
 			}})
+		}
+		err := update()
+		var missing *serviceerror.NotFound
+		if errors.As(err, &missing) {
+			_, err = schedules.Create(ctx, options)
+			if errors.Is(err, temporal.ErrScheduleAlreadyRunning) {
+				// Another replica created it first.
+				err = update()
+			}
 		}
 		if err != nil {
 			return fmt.Errorf("reconcile %s: %w", options.ID, err)

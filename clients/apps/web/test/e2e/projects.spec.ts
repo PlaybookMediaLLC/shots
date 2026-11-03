@@ -1,12 +1,4 @@
-import {
-  createWorkspace,
-  expect,
-  type Page,
-  type Route,
-  test,
-  trpcMutation,
-  trpcQuery,
-} from './framework'
+import { createWorkspace, expect, type Page, test, trpcMutation, trpcQuery } from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -76,9 +68,12 @@ test('unsaved changes survive a reload before autosave runs', async ({ app, page
   await app.openEditor()
   await saveAsProject(page, 'Interrupted')
   // Saves cannot reach the server (the leave-page save included), so the edit
-  // exists only in this device's draft when the page reloads.
-  const blockSaves = (route: Route) => route.abort('internetdisconnected')
-  await page.route('**/api/trpc/**project.updateDocument**', blockSaves)
+  // exists only in this device's draft when the page reloads. The route stays
+  // in place: a save sent while Playwright removes a route can hang.
+  let offline = true
+  await page.route('**/api/trpc/**project.updateDocument**', (route) =>
+    offline ? route.abort('internetdisconnected') : route.fallback()
+  )
   await addText(page)
   await expect(projectButton(page, 'Interrupted', 'Offline, saved on this device')).toBeVisible({
     timeout: 30_000,
@@ -88,7 +83,8 @@ test('unsaved changes survive a reload before autosave runs', async ({ app, page
   // eslint-disable-next-line no-restricted-syntax -- The local draft autosave runs on a 1 s timer and fires no event.
   await page.waitForTimeout(2_000)
   await app.reload()
-  await page.unroute('**/api/trpc/**project.updateDocument**', blockSaves)
+  // A save refused before this line retries after 5 s.
+  offline = false
   await expect(page.getByText('Recovered your unsaved changes')).toBeVisible({ timeout: 60_000 })
   await expect(texts(page)).toHaveCount(1)
   await expect(projectButton(page, 'Interrupted')).toBeVisible({ timeout: 30_000 })

@@ -1,0 +1,373 @@
+{
+  "composer-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 49
+  },
+  "schedule-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "queue-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 49
+  },
+  "publish-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "scheduled-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "settings-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "plan-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-1440-light": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "composer-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "schedule-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "queue-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 89
+  },
+  "publish-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "scheduled-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "settings-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "plan-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-1024-light": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "composer-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 101
+  },
+  "schedule-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "queue-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 101
+  },
+  "publish-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "scheduled-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 101
+  },
+  "settings-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "plan-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-390-light": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "composer-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 49
+  },
+  "schedule-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "queue-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 49
+  },
+  "publish-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "scheduled-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "settings-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  },
+  "plan-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "composer-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "schedule-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "queue-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 89
+  },
+  "publish-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "scheduled-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "settings-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "plan-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-1024-dark": {
+    "scrollWidth": 1024,
+    "innerWidth": 1024,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "composer-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 101
+  },
+  "schedule-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "queue-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": true,
+    "headerHeight": 101
+  },
+  "publish-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "scheduled-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 101
+  },
+  "settings-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 101
+  },
+  "plan-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": null
+  },
+  "plan-detail-390-dark": {
+    "scrollWidth": 390,
+    "innerWidth": 390,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": null
+  },
+  "snapshot-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 89
+  },
+  "reschedule-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "cancel-confirm-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 89
+  },
+  "conflict-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": null,
+    "headerHeight": 49
+  },
+  "conflict-blocks-schedule-1440-dark": {
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "overflow": false,
+    "dialogOverflow": false,
+    "headerHeight": 49
+  }
+}

@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.42.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.42.0...v2.42.1) (2026-10-31)
+
+
+### Bug Fixes
+
+* stop the schedule error spans and fix two e2e failures ([#395](https://github.com/PlaybookMediaLLC/shots/issues/395)) ([a5ae158](https://github.com/PlaybookMediaLLC/shots/commit/a5ae15816ab223445785a620e8179a915a519afc))
+
 ## [2.42.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.41.1...v2.42.0) (2026-10-31)
 
 

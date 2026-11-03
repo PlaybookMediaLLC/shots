@@ -2,13 +2,13 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
-import { Pill, type PillTone } from '@/components/platform-ui'
+import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { postFailureReason, postState } from '@/lib/content-drafts/post-status'
+import { POST_STATE_TONE, postFailureReason, postState } from '@/lib/content-drafts/post-status'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { cn } from '@/lib/utils'
 import { CHANNEL_META, ChannelIcon } from './channel-meta'
@@ -26,25 +26,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
-const POST_TONES: Partial<Record<DraftPostWire['status'], PillTone>> = {
-  CANCELLED: 'gray',
-  FAILED: 'red',
-  PROCESSING: 'blue',
-  PUBLISHED: 'green',
-  SCHEDULED: 'purple',
-  UNKNOWN_DELIVERY: 'yellow',
-}
-
-/** What each status means to the person reading it. */
-const STATUS_LABELS: Partial<Record<DraftPostWire['status'], string>> = {
-  CANCELLED: 'Cancelled',
-  FAILED: 'Failed',
-  PROCESSING: 'Publishing',
-  PUBLISHED: 'Published',
-  SCHEDULED: 'Scheduled',
-  UNKNOWN_DELIVERY: 'Outcome unknown',
-}
-
 /** The engagement counts the posts list shows, in order, with their labels. */
 const METRICS: [string, string][] = [
   ['likes', 'likes'],
@@ -52,6 +33,20 @@ const METRICS: [string, string][] = [
   ['replies', 'replies'],
   ['impressions', 'views'],
 ]
+
+/** A post's time in the zone it was scheduled in, named, so it matches the review and calendar. */
+function zoned(post: DraftPostWire, seconds = false): Intl.DateTimeFormatOptions {
+  return {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    ...(seconds ? { second: '2-digit' } : {}),
+    timeZone: post.scheduleTimeZone ?? undefined,
+    timeZoneName: 'short',
+    year: 'numeric',
+  }
+}
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : 'The request could not be completed.'
@@ -64,12 +59,18 @@ function message(error: unknown): string {
  */
 export function DraftPosts({
   canSchedule,
+  edited,
   onCancel,
   onChange,
+  onReschedule,
   posts,
 }: {
   canSchedule: boolean
+  /** Queued posts whose content the draft has changed since: they still send what was scheduled. */
+  edited?: ReadonlySet<string>
   onCancel: (postId: string) => Promise<void>
+  /** Open the reschedule review that replaces the queued posts with the current text. */
+  onReschedule?: () => void
   /** Called with a post as the server now has it, or a new one. */
   onChange: (post: DraftPostWire) => void
   posts: DraftPostWire[]
@@ -89,9 +90,16 @@ export function DraftPosts({
   if (posts.length === 0) return null
   return (
     <section className={cn('mb-10', POST_COLUMN)}>
-      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Posts from this draft
-      </h2>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Posts from this draft
+        </h2>
+        {onReschedule ? (
+          <Button onClick={onReschedule} size="sm" variant="outline">
+            Replace queued posts with this version…
+          </Button>
+        ) : null}
+      </div>
       <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
         {posts.map((post) => {
           const channel = channelForPlatform(post.platform)
@@ -100,28 +108,32 @@ export function DraftPosts({
             post.threadProgress.total > 0 &&
             post.threadProgress.posted < post.threadProgress.total
           const counts = METRICS.filter(([key]) => post.metrics?.[key] !== undefined)
-          const overdue = postState(post.status, post.scheduledFor) === 'Overdue'
+          const state = postState(post.status, post.scheduledFor)
+          const overdue = state === 'Overdue'
           const reason = postFailureReason(post.failureCode)
+          const label = channel ? CHANNEL_META[channel].label : post.platform
           return (
             <li className="flex flex-col gap-2 px-4 py-3" data-testid="draft-post" key={post.id}>
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 text-sm text-foreground">
                     {channel ? <ChannelIcon channel={channel} /> : null}
-                    {channel ? CHANNEL_META[channel].label : post.platform} ·{' '}
-                    <LocalTime value={post.scheduledFor} />
+                    {label} ·{' '}
+                    <LocalTime
+                      options={zoned(post, Boolean(post.naturalOffsetSeconds))}
+                      value={post.scheduledFor}
+                    />
                     {post.naturalOffsetSeconds ? (
                       <span className="text-xs text-muted-foreground">
-                        (natural time; slot <LocalTime value={post.slotAt ?? post.scheduledFor} />)
+                        (natural time; slot{' '}
+                        <LocalTime options={zoned(post)} value={post.slotAt ?? post.scheduledFor} />)
                       </span>
                     ) : null}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">{post.caption}</p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Pill tone={overdue ? 'yellow' : (POST_TONES[post.status] ?? 'gray')}>
-                    {overdue ? 'Overdue' : (STATUS_LABELS[post.status] ?? post.status)}
-                  </Pill>
+                  <Pill tone={POST_STATE_TONE[state]}>{state}</Pill>
                   {post.url ? (
                     <a
                       className="text-xs text-sky-700 dark:text-sky-300 hover:text-sky-700 dark:hover:text-sky-200"
@@ -133,9 +145,30 @@ export function DraftPosts({
                     </a>
                   ) : null}
                   {canSchedule && (post.status === 'SCHEDULED' || post.status === 'DRAFT') ? (
-                    <Button onClick={() => void onCancel(post.id)} size="sm" variant="outline">
-                      Cancel
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button aria-label={`Cancel the ${label} post`} size="sm" variant="outline">
+                          Cancel
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Cancel the {label} post?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            It will not publish at{' '}
+                            <LocalTime options={zoned(post)} value={post.scheduledFor} />. The
+                            draft&rsquo;s other destinations stay queued, and you can schedule
+                            this one again.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Keep it queued</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => void onCancel(post.id)}>
+                            Cancel this post
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   ) : null}
                   {canSchedule && post.status === 'SCHEDULED' ? (
                     <AlertDialog>
@@ -179,6 +212,12 @@ export function DraftPosts({
                   ) : null}
                 </div>
               </div>
+              {post.status === 'SCHEDULED' && edited?.has(post.id) ? (
+                <p className="text-xs text-muted-foreground" data-testid="queued-snapshot">
+                  Queued with the text from when it was scheduled. Later edits are not in this post
+                  until you reschedule.
+                </p>
+              ) : null}
               {overdue ? (
                 <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
                   Its time passed and publishing has not started yet. It still goes out if it starts

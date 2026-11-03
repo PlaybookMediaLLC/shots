@@ -78,7 +78,7 @@ export function VersionOptionsBar({
   const [dialog, setDialog] = React.useState<'numbering' | 'finisher' | 'community' | null>(null)
   const capabilities = CAPABILITIES[channel]
   const button =
-    'h-7 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:border-input hover:text-foreground'
+    'h-7 rounded-full border border-border px-3 text-xs text-muted-foreground hover:border-input hover:text-foreground'
   const tools: React.ReactNode[] = []
   if (capabilities.thread) {
     tools.push(
@@ -178,7 +178,7 @@ export function VersionOptionsBar({
   if (tools.length === 0) return null
   return (
     <div
-      className="flex flex-wrap items-center gap-1.5 px-4 pb-2"
+      className="flex flex-wrap items-center gap-2 pb-3"
       data-testid={`version-options-${channel}`}
     >
       {tools}
