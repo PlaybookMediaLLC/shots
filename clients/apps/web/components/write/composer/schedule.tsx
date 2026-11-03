@@ -34,6 +34,7 @@ import {
 } from '@/lib/content-drafts/client'
 import { type BlockImages, channelForPlatform } from '@/lib/content-drafts/serialize'
 import { followUpLines } from '@/lib/write/automation'
+import { upcomingSlots } from '@/lib/write/calendar'
 import { writeApi } from '@/lib/write/client'
 import type { AutoDm, Automation, Community } from '@/lib/write/document'
 import {
@@ -695,30 +696,6 @@ function atNine(days: number, zone: string): Date {
 function nextMondayOffset(zone: string): number {
   const weekday = new Date(`${dayIn(new Date(), zone)}T12:00:00Z`).getUTCDay()
   return (8 - weekday) % 7 || 7
-}
-
-/** The next weekly slots in the zone, marking those a queued post already takes. */
-function upcomingSlots(
-  postingSlots: { time: string; weekday: number }[],
-  zone: string,
-  taken: string[]
-): { at: Date; busy: boolean }[] {
-  const out: { at: Date; busy: boolean }[] = []
-  for (let days = 0; days < 21 && out.length < 12; days += 1) {
-    const day = dayIn(new Date(Date.now() + days * 86_400_000), zone)
-    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay()
-    for (const slot of postingSlots.filter((item) => item.weekday === weekday)) {
-      const resolved = resolveLocalTime(`${day}T${slot.time}`, zone)
-      if (resolved.kind !== 'exact' || resolved.at.getTime() <= Date.now()) continue
-      out.push({
-        at: resolved.at,
-        busy: taken.some(
-          (item) => Math.abs(new Date(item).getTime() - resolved.at.getTime()) < 5 * 60_000
-        ),
-      })
-    }
-  }
-  return out.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, 12)
 }
 
 /** One persisted audience choice shared by scheduling and immediate-publish review. */

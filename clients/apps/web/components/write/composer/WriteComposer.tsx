@@ -200,6 +200,7 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
+    data,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -971,6 +972,7 @@ export function WriteComposer({
                   {set ? (
                     <span className="hidden md:contents">
                       <DraftSettingsDrawer
+                        advancedScheduling={data.advancedScheduling}
                         canManage={canPublish}
                         canWrite={canEdit}
                         socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}

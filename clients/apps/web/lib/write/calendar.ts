@@ -1,4 +1,4 @@
-import { resolveLocalTime } from './zoned-time'
+import { resolveLocalTime, wallTime } from './zoned-time'
 
 /** Dragging an authored draft opens scheduling review; it never creates a job. */
 export const CALENDAR_DRAFT_DRAG = 'application/x-shots-calendar-draft'
@@ -32,6 +32,35 @@ export function availableDaySlots(
       )
     })
     .sort()
+}
+
+/**
+ * The next weekly slots in a brand's zone, up to 12 in three weeks, marking
+ * those a queued post already takes. Repeated or skipped wall times are left
+ * out, as on the calendar.
+ */
+export function upcomingSlots(
+  postingSlots: { time: string; weekday: number }[],
+  zone: string,
+  taken: string[],
+  now = new Date()
+): { at: Date; busy: boolean }[] {
+  const out: { at: Date; busy: boolean }[] = []
+  for (let days = 0; days < 21 && out.length < 12; days += 1) {
+    const day = wallTime(new Date(now.getTime() + days * 86_400_000), zone).slice(0, 10)
+    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay()
+    for (const slot of postingSlots.filter((item) => item.weekday === weekday)) {
+      const resolved = resolveLocalTime(`${day}T${slot.time}`, zone)
+      if (resolved.kind !== 'exact' || resolved.at <= now) continue
+      out.push({
+        at: resolved.at,
+        busy: taken.some(
+          (item) => Math.abs(new Date(item).getTime() - resolved.at.getTime()) < 5 * 60_000
+        ),
+      })
+    }
+  }
+  return out.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, 12)
 }
 
 /** Visible calendar days, including adjacent weeks in month view. */

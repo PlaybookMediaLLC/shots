@@ -5,6 +5,7 @@ import {
   calendarRange,
   shiftCalendar,
   calendarMoveTime,
+  upcomingSlots,
 } from '@/lib/write/calendar'
 
 test('TF-053/081: month boundaries cover every day and preserve the chosen first weekday', () => {
@@ -79,4 +80,29 @@ test('month calendar includes adjacent days and navigates leap and year boundari
   assert.equal(shiftCalendar('2026-12-31', 'month', 1), '2027-01-01')
   assert.equal(calendarRange('2026-10-24', 'week', 0).start, '2026-10-18')
   assert.throws(() => calendarRange('2026-02-31', 'month'))
+})
+
+test('the next weekly slots are read in the brand zone, in order, with taken ones marked', () => {
+  // Monday 2 November 2026, 13:00 UTC = 08:00 in New York.
+  const now = new Date('2026-11-02T13:00:00Z')
+  const slots = upcomingSlots(
+    [
+      { weekday: 1, time: '09:00' },
+      { weekday: 1, time: '07:00' },
+      { weekday: 2, time: '09:00' },
+    ],
+    'America/New_York',
+    ['2026-11-03T14:00:00.000Z'],
+    now
+  )
+  assert.deepEqual(
+    slots.slice(0, 3).map((slot) => [slot.at.toISOString(), slot.busy]),
+    [
+      // Monday 07:00 has passed; 09:00 has not.
+      ['2026-11-02T14:00:00.000Z', false],
+      ['2026-11-03T14:00:00.000Z', true],
+      ['2026-11-09T12:00:00.000Z', false],
+    ]
+  )
+  assert.equal(slots.length, 8)
 })
