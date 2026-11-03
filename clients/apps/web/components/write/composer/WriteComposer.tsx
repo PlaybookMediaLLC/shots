@@ -651,7 +651,7 @@ export function WriteComposer({
       <div className="mb-1 flex items-center gap-3" data-testid="post-header">
         <span
           aria-hidden
-          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-sm font-medium text-foreground ring-4 ring-[#111111] sm:flex"
+          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-sm font-medium text-foreground ring-4 ring-card sm:flex"
           data-post-avatar
         >
           {account?.avatarUrl ? (
@@ -1268,7 +1268,7 @@ export function WriteComposer({
             }}
             open={optionsOpen || pasteNotice}
           >
-            <summary className="w-fit cursor-pointer select-none rounded-md py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+            <summary className="w-fit cursor-pointer select-none rounded-md py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground">
               Post options
             </summary>
             <VersionOptionsBar

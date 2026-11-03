@@ -63,14 +63,14 @@ export function ThreadTools({
     window.setTimeout(performSplit, 0)
   }, [pasted, options.splitOnPaste, performSplit])
   return (
-    <div className="flex flex-wrap items-center gap-2 px-4 pb-2 text-xs">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 text-xs">
       {pasted ? (
         <p className="w-full text-muted-foreground" role="status">
           Pasted content is ready. Make thread splits it at your chosen length while keeping its
           formatting and links.
         </p>
       ) : null}
-      <Label className="flex items-center gap-2">
+      <Label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
         Characters per post
         <Input
           aria-label="Characters per post"
@@ -86,7 +86,7 @@ export function ThreadTools({
           }}
         />
       </Label>
-      <Label className="flex items-center gap-1">
+      <Label className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
         <Checkbox
           checked={options.splitOnPaste ?? false}
           onCheckedChange={(checked) => onChange({ ...options, splitOnPaste: checked === true })}
@@ -94,7 +94,8 @@ export function ThreadTools({
         Split automatically on paste
       </Label>
       <Button
-        size="sm"
+        className="h-7 rounded-full px-3 text-xs"
+        size={null}
         variant="outline"
         onClick={() => {
           performSplit()
@@ -103,7 +104,8 @@ export function ThreadTools({
         Make thread
       </Button>
       <Button
-        size="sm"
+        className="h-7 rounded-full px-3 text-xs"
+        size={null}
         variant="ghost"
         onClick={async () => {
           const current = editor.current

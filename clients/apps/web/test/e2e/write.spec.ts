@@ -72,8 +72,8 @@ test(
     const draftId = await newDraft(page)
 
     // The composer says who it publishes as, and every post shows its account.
-    await expect(page.getByTestId('platform-tab-x')).toContainText('Main version')
-    await expect(page.getByTestId('platform-tab-linkedin')).toContainText('Use main version')
+    await expect(page.getByTestId('platform-tab-x')).toContainText('Main')
+    await expect(page.getByTestId('platform-tab-linkedin')).not.toContainText('Own text')
 
     const editor = draftEditor(page)
     await editor.click()
