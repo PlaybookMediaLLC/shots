@@ -206,10 +206,13 @@ export function WriteComposer({
     [trpcClient, aiEnabled]
   )
   const {
+    conflict,
+    discardConflict,
     document,
     editorKey,
     flush,
     onDiscussionsChange,
+    restoreConflict,
     saveState,
     server,
     setServer,
@@ -433,8 +436,14 @@ export function WriteComposer({
   const context: ScheduleContext = {
     approved,
     canPublish: canPublish && server.status !== 'archived',
+    conflict: conflict !== null,
     draft: server,
     flush,
+    retrySave: () =>
+      void flush().catch((error: unknown) =>
+        toast.error(error instanceof Error ? error.message : 'Could not save.')
+      ),
+    saveState,
     items,
     onDone: ({ draft, newDraft }) => {
       setServer(draft)
@@ -1074,6 +1083,45 @@ export function WriteComposer({
                   Restore draft
                 </Button>
               ) : null}
+            </div>
+          ) : null}
+          {conflict ? (
+            <div
+              className="flex flex-wrap items-center gap-2 border-b border-amber-400/40 bg-amber-400/[0.08] px-4 py-3 text-sm text-foreground"
+              data-testid="save-conflict"
+              role="alert"
+            >
+              <span className="min-w-0 flex-1 basis-64">
+                This draft changed elsewhere. You are seeing the latest version; your unsaved edit
+                is kept here until you choose.
+              </span>
+              {canEdit && !collabUrl ? (
+                <Button
+                  onClick={restoreConflict}
+                  size="sm"
+                  title="Replaces the newer version with your edit"
+                  variant="outline"
+                >
+                  Use my version
+                </Button>
+              ) : null}
+              <Button
+                onClick={() =>
+                  void navigator.clipboard
+                    .writeText(
+                      [conflict.title, draftPlainText(conflict.value)].filter(Boolean).join('\n\n')
+                    )
+                    .then(() => toast.success('Your edit is copied.'))
+                    .catch(() => toast.error('Copying was blocked by the browser.'))
+                }
+                size="sm"
+                variant="outline"
+              >
+                Copy my text
+              </Button>
+              <Button onClick={discardConflict} size="sm" variant="ghost">
+                Discard my edit
+              </Button>
             </div>
           ) : null}
           {accounts.length === 0 ? (

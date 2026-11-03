@@ -44,6 +44,7 @@ import { AutoDmDraft } from './auto-dm-draft'
 import type { PreviewItem } from './preview'
 import { healthLabel, SetDot } from '../sets'
 import { useWrite } from '../write-context'
+import type { SaveState } from './useDraftDocument'
 
 /** A date's YYYY-MM-DD in a zone. */
 function dayIn(at: Date, zone: string): string {
@@ -56,8 +57,14 @@ export type ScheduleContext = {
   items: PreviewItem[]
   approved: boolean
   canPublish: boolean
+  /** An unsaved edit a newer version replaced, waiting for the writer's choice. */
+  conflict: boolean
   draft: DraftWire
   flush: () => Promise<void>
+  /** Try the failed save again. */
+  retrySave: () => void
+  /** Whether the latest edits are saved: review never sends content that is not. */
+  saveState: SaveState
   onDone: (result: { draft: DraftWire; newDraft?: boolean }) => void
   onToggle: (accountId: string, on: boolean) => void
   requireApproval: boolean
@@ -79,6 +86,12 @@ export type ScheduleContext = {
 /** Problems that block every destination, collected for the dialogs. */
 function blocking(context: ScheduleContext): string[] {
   const problems: string[] = []
+  if (context.conflict)
+    problems.push(
+      'Your unsaved edit conflicts with a newer version. Choose what to do with it above the editor first.'
+    )
+  if (context.saveState === 'error' || context.saveState === 'offline')
+    problems.push('Your latest edits are not saved. Retry saving before you schedule or publish.')
   if (context.draft.status === 'archived')
     problems.push('Restore this draft before scheduling or publishing.')
   if (context.items.length === 0)
@@ -154,6 +167,7 @@ export function ScheduleDialog({
   const [browsing, setBrowsing] = React.useState(false)
   // Which button is working, so only that one says so.
   const [action, setAction] = React.useState<'clear' | 'plan' | 'schedule' | null>(null)
+  const [error, setError] = React.useState('')
   const busy = action !== null
   React.useEffect(() => {
     if (!data.advancedScheduling) return
@@ -215,6 +229,7 @@ export function ScheduleDialog({
   )
   const schedule = async () => {
     setAction('schedule')
+    setError('')
     try {
       await context.flush()
       const result = await draftsApi.schedule(context.draft.id, {
@@ -245,9 +260,7 @@ export function ScheduleDialog({
           'That slot was just taken. Review the next free slot below and confirm again.'
         )
       } else {
-        toast.error(
-          error instanceof DraftRequestError ? error.message : 'The draft could not be scheduled.'
-        )
+        setError(error instanceof Error ? error.message : 'The draft could not be scheduled.')
       }
     } finally {
       setAction(null)
@@ -255,6 +268,7 @@ export function ScheduleDialog({
   }
   const plan = async (clear = false) => {
     setAction(clear ? 'clear' : 'plan')
+    setError('')
     try {
       await context.flush()
       const saved = await writeApi.plan(context.draft.id, {
@@ -268,7 +282,7 @@ export function ScheduleDialog({
       )
       onClose()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The draft could not be planned.')
+      setError(error instanceof Error ? error.message : 'The draft could not be planned.')
     } finally {
       setAction(null)
     }
@@ -577,7 +591,8 @@ export function ScheduleDialog({
         </p>
         <ReplacedPosts context={context} timeZone={zone} />
         {past && !queue ? <p className="text-xs text-red-700 dark:text-red-300">That time has passed.</p> : null}
-        <Problems problems={problems} />
+        <Problems context={context} problems={problems} />
+        <ActionError message={error} />
         <Label className="flex items-center gap-2 text-xs">
           <Checkbox
             checked={continueWriting}
@@ -827,17 +842,44 @@ function ReplacedPosts({ context, timeZone }: { context: ScheduleContext; timeZo
   )
 }
 
-/** A list of blocking problems, or nothing. */
-function Problems({ problems }: { problems: string[] }) {
+/** A list of blocking problems, or nothing; a failed save can be retried from here. */
+function Problems({ context, problems }: { context: ScheduleContext; problems: string[] }) {
   if (problems.length === 0) return null
   return (
-    <ul className="grid gap-0.5" data-testid="blocking-problems" role="alert">
-      {problems.map((problem) => (
-        <li className="text-xs text-red-700 dark:text-red-300" key={problem}>
-          {problem}
-        </li>
-      ))}
-    </ul>
+    <div className="grid gap-1.5" data-testid="blocking-problems" role="alert">
+      <ul className="grid gap-0.5">
+        {problems.map((problem) => (
+          <li className="text-xs text-red-700 dark:text-red-300" key={problem}>
+            {problem}
+          </li>
+        ))}
+      </ul>
+      {context.saveState === 'error' || context.saveState === 'offline' ? (
+        <Button
+          className="w-fit"
+          onClick={context.retrySave}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Retry save
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
+/** Why the last action failed, kept in the dialog with the draft untouched. */
+function ActionError({ message }: { message: string }) {
+  if (!message) return null
+  return (
+    <p
+      className="rounded-md border border-red-500/30 px-3 py-2 text-sm text-red-700 dark:text-red-300"
+      data-testid="action-error"
+      role="alert"
+    >
+      {message} Your draft and its text are kept.
+    </p>
   )
 }
 
@@ -858,6 +900,7 @@ export function PublishReview({
 }) {
   const { data } = useWrite()
   const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState('')
   const problems = blocking(context)
   const set = data.sets.find(
     (item) =>
@@ -873,6 +916,7 @@ export function PublishReview({
   )
   const publish = async () => {
     setBusy(true)
+    setError('')
     try {
       await context.flush()
       const result = await draftsApi.schedule(context.draft.id, {
@@ -890,9 +934,7 @@ export function PublishReview({
       )
       onClose()
     } catch (error) {
-      toast.error(
-        error instanceof DraftRequestError ? error.message : 'The draft could not be published.'
-      )
+      setError(error instanceof Error ? error.message : 'The draft could not be published.')
     } finally {
       setBusy(false)
     }
@@ -995,7 +1037,8 @@ export function PublishReview({
             : 'This workspace does not require approval.'}{' '}
           {context.canPublish ? 'You can publish.' : 'You cannot publish.'}
         </p>
-        <Problems problems={problems} />
+        <Problems context={context} problems={problems} />
+        <ActionError message={error} />
         <DialogFooter>
           <Button onClick={onPreview} type="button" variant="ghost">
             Preview
