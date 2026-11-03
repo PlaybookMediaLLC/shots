@@ -105,6 +105,31 @@ export function offsetLabel(at: Date, zone: string): string {
 }
 
 /**
+ * What a confirmed schedule committed, as stored: when the first post
+ * publishes in the brand's zone with its UTC offset, and the queue slot it
+ * holds when a natural offset moves it off the slot.
+ */
+export function committedMessage(
+  posts: { scheduledFor: string; slotAt?: string | null }[],
+  zone: string,
+  queue: boolean
+): string {
+  const count = `${posts.length} post${posts.length === 1 ? '' : 's'}`
+  const done = queue ? `Added ${count} to the queue` : `Scheduled ${count}`
+  const first = posts[0]
+  if (!first) return `${done}.`
+  const at = new Date(first.scheduledFor)
+  const slot =
+    first.slotAt && Date.parse(first.slotAt) !== at.getTime() ? new Date(first.slotAt) : null
+  const when = (value: Date, timeStyle: 'short' | 'medium') =>
+    value.toLocaleString(undefined, { dateStyle: 'medium', timeStyle, timeZone: zone })
+  const zoned = `${zone} (${offsetLabel(at, zone)})`
+  return slot
+    ? `${done} in the ${when(slot, 'short')} slot, publishing ${when(at, 'medium')} · ${zoned}.`
+    : `${done} for ${when(at, 'short')} · ${zoned}.`
+}
+
+/**
  * A typed time ("tomorrow 9am", "in 3 hours") read in `zone`, as a wall
  * time rounded up to the quarter hour, or null. The parser works in the
  * runtime's own clock, so it is handed the zone's wall time as "now".

@@ -36,7 +36,13 @@ import { type BlockImages, channelForPlatform } from '@/lib/content-drafts/seria
 import { followUpLines } from '@/lib/write/automation'
 import { writeApi } from '@/lib/write/client'
 import type { AutoDm, Automation, Community } from '@/lib/write/document'
-import { offsetLabel, readWhen, resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
+import {
+  committedMessage,
+  offsetLabel,
+  readWhen,
+  resolveLocalTime,
+  wallTime,
+} from '@/lib/write/zoned-time'
 import { browserTimeZone } from '@/components/settings/TimeZonePicker'
 import { cn } from '@/lib/utils'
 import { AutomationControls } from './automation'
@@ -162,6 +168,7 @@ export function ScheduleDialog({
   const [bestTimes, setBestTimes] = React.useState<{ at: string; reason: string }[]>([])
   // The queue slot the backend offers; scheduling reserves exactly this one.
   const [queueSlot, setQueueSlot] = React.useState<string | null>(null)
+  const [slotLoading, setSlotLoading] = React.useState(false)
   const [slotNotice, setSlotNotice] = React.useState('')
   const [slotRequest, setSlotRequest] = React.useState(0)
   const [browsing, setBrowsing] = React.useState(false)
@@ -179,6 +186,7 @@ export function ScheduleDialog({
   React.useEffect(() => {
     if (!data.advancedScheduling || !setId) return
     let active = true
+    setSlotLoading(true)
     void call<{ times: string[] }>('/api/v1/content-draft-batch/times', {
       body: { count: 1, mode: 'queue', seed: crypto.randomUUID(), socialSetId: setId },
       method: 'POST',
@@ -191,6 +199,9 @@ export function ScheduleDialog({
           setQueueSlot(null)
           setSlotNotice(error instanceof Error ? error.message : 'The queue could not be read.')
         }
+      })
+      .finally(() => {
+        if (active) setSlotLoading(false)
       })
     return () => {
       active = false
@@ -244,10 +255,9 @@ export function ScheduleDialog({
       })
       context.versionRef.current = result.draft.version
       context.onDone({ ...result, newDraft: continueWriting })
-      const first = result.posts[0]
       toast.success(
         result.created
-          ? `Scheduled ${result.posts.length} post${result.posts.length === 1 ? '' : 's'}${first ? ` for ${new Date(first.scheduledFor).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone })} (${zone})` : ''}.`
+          ? committedMessage(result.posts, zone, queue)
           : 'Already scheduled: nothing new was queued.'
       )
       onClose()
@@ -371,6 +381,7 @@ export function ScheduleDialog({
                         {resolution[option].toLocaleTimeString(undefined, {
                           hour: 'numeric',
                           minute: '2-digit',
+                          timeZone: zone,
                           timeZoneName: 'short',
                         })}
                         )
@@ -417,7 +428,9 @@ export function ScheduleDialog({
             Next free slot
             {reviewedSlot
               ? ` · ${reviewedSlot.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: zone, timeZoneName: 'short' })}`
-              : ' · none available'}
+              : slotLoading
+                ? ' · finding…'
+                : ' · none available'}
           </Button>
         </div>
         {slotNotice ? (

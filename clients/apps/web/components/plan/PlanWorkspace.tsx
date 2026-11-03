@@ -54,7 +54,9 @@ import {
   displayDaySlots,
   itemDay,
   planPreferencesSchema,
+  movedToDay,
   selectedInstant,
+  takenSlots,
   selectionState,
   shiftAnchor,
   validDay,
@@ -381,11 +383,8 @@ export function PlanWorkspace({
     if (!item) {
       const draft = sources?.find((d) => d.id === id)
       if (draft)
-        setCompose({
-          day,
-          time: `${String(hour ?? 12).padStart(2, '0')}:00`,
-          setId: draft.socialSetId ?? '',
-          zone: prefs.zone,
+        create(day, `${String(hour ?? 12).padStart(2, '0')}:00`, {
+          setId: draft.socialSetId ?? undefined,
           selected: draft,
           source,
         })
@@ -402,12 +401,12 @@ export function PlanWorkspace({
       void mutate('swap', [placement(item, target.at), placement(target, item.at)])
       return
     }
-    const time =
-      hour === undefined
-        ? wallTime(new Date(item.at), prefs.zone).slice(11)
-        : `${String(hour).padStart(2, '0')}:00`
     try {
-      const at = selectedInstant(`${day}T${time}`, prefs.zone, 'reject')
+      // A day keeps the post's own clock; a week hour is the one picked in this display.
+      const at =
+        hour === undefined
+          ? movedToDay(item.at, item.zone, prefs.zone, day)
+          : selectedInstant(`${day}T${String(hour).padStart(2, '0')}:00`, prefs.zone, 'reject')
       void mutate('move', [placement(item, at.toISOString())])
     } catch (e) {
       toast.error((e as Error).message)
@@ -484,7 +483,7 @@ export function PlanWorkspace({
           prefs.zone,
           focused.timeZone,
           focused.postingSlots,
-          items.filter((item) => item.setId === focused.id).map((item) => item.at)
+          takenSlots(items, focused.id)
         ).map((slot) => {
           const [hour, minute] = slot.displayTime.split(':').map(Number)
           return (
@@ -544,17 +543,28 @@ export function PlanWorkspace({
           )
         })
       : null
-  const create = (day: string, time = '12:00') => {
-    const setId = focused?.id ?? activeIds[0] ?? sets[0]?.id ?? ''
+  // A grid day and hour are read in the display zone, then composed in the brand's zone.
+  const create = (
+    day: string,
+    time = '12:00',
+    from: { setId?: string; selected?: DraftWire; source?: 'drafts' | 'posted' } = {}
+  ) => {
+    const setId = from.setId || focused?.id || activeIds[0] || sets[0]?.id || ''
     const scheduleZone = sets.find((set) => set.id === setId)?.timeZone ?? prefs.zone
     const resolved = resolveLocalTime(`${day}T${time}`, prefs.zone)
     if (resolved.kind !== 'exact') {
       // Keep the explicit display-zone occurrence selector for ambiguous grid hours.
-      setCompose({ day, time, setId, zone: prefs.zone })
+      setCompose({ ...from, day, time, setId, zone: prefs.zone })
       return
     }
     const local = wallTime(resolved.at, scheduleZone)
-    setCompose({ day: local.slice(0, 10), time: local.slice(11), setId, zone: scheduleZone })
+    setCompose({
+      ...from,
+      day: local.slice(0, 10),
+      time: local.slice(11),
+      setId,
+      zone: scheduleZone,
+    })
   }
   return (
     <div className="flex h-full min-h-0 flex-col" inert={!hydrated} aria-busy={!hydrated}>

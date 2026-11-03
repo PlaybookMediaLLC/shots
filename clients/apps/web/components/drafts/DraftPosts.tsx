@@ -53,6 +53,20 @@ const METRICS: [string, string][] = [
   ['impressions', 'views'],
 ]
 
+/** A post's time in the zone it was scheduled in, named, so it matches the review and calendar. */
+function zoned(post: DraftPostWire, seconds = false): Intl.DateTimeFormatOptions {
+  return {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    ...(seconds ? { second: '2-digit' } : {}),
+    timeZone: post.scheduleTimeZone ?? undefined,
+    timeZoneName: 'short',
+    year: 'numeric',
+  }
+}
+
 function message(error: unknown): string {
   return error instanceof Error ? error.message : 'The request could not be completed.'
 }
@@ -109,10 +123,14 @@ export function DraftPosts({
                   <p className="flex items-center gap-1.5 text-sm text-foreground">
                     {channel ? <ChannelIcon channel={channel} /> : null}
                     {channel ? CHANNEL_META[channel].label : post.platform} ·{' '}
-                    <LocalTime value={post.scheduledFor} />
+                    <LocalTime
+                      options={zoned(post, Boolean(post.naturalOffsetSeconds))}
+                      value={post.scheduledFor}
+                    />
                     {post.naturalOffsetSeconds ? (
                       <span className="text-xs text-muted-foreground">
-                        (natural time; slot <LocalTime value={post.slotAt ?? post.scheduledFor} />)
+                        (natural time; slot{' '}
+                        <LocalTime options={zoned(post)} value={post.slotAt ?? post.scheduledFor} />)
                       </span>
                     ) : null}
                   </p>

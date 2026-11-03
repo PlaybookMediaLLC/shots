@@ -18,6 +18,8 @@ import {
   selectedInstant,
   visibleItems,
   itemDay,
+  movedToDay,
+  takenSlots,
   weekCardLayout,
   type PlanItem,
 } from '../lib/plan/calendar'
@@ -225,6 +227,44 @@ test('P22/P23 display zone moves a card across midnight without changing its sch
   assert.equal(itemDay(items[0], 'America/New_York'), '2026-03-31')
   assert.equal(itemDay(items[0], 'Asia/Tokyo'), '2026-04-01')
   assert.equal(JSON.stringify(items[0]), before)
+})
+test('P23 a card dropped on another day keeps its own zone clock across a daylight-saving change', () => {
+  const now = new Date('2026-03-01')
+  // 14:00 London on 25 March (GMT), seen from New York (already on EDT) as 10:00.
+  const at = '2026-03-25T14:00:00.000Z'
+  // Dropped a week later in the New York display, after London moved to BST:
+  // it stays 14:00 London, not 10:00 New York (which would be 15:00 London).
+  assert.equal(
+    movedToDay(at, 'Europe/London', 'America/New_York', '2026-04-01', now).toISOString(),
+    '2026-04-01T13:00:00.000Z'
+  )
+  // A late-evening post whose display day is the next day moves by displayed days.
+  assert.equal(
+    movedToDay('2026-03-10T23:30:00.000Z', 'UTC', 'Asia/Tokyo', '2026-03-13', now).toISOString(),
+    '2026-03-12T23:30:00.000Z'
+  )
+  assert.throws(() => movedToDay(at, 'Europe/London', 'UTC', '2026-02-20', now), /future/)
+})
+test('P19 only posts the queue still holds take their slot', () => {
+  const at = '2026-04-02T13:00:00Z'
+  const slotItems: PlanItem[] = (
+    [
+      'Planned',
+      'Scheduled',
+      'Overdue',
+      'Publishing',
+      'Needs check',
+      'Failed',
+      'Published',
+      'Cancelled',
+    ] as const
+  ).map((status, index) => ({ ...items[0], id: `slot-${index}`, setId: 'set-q', at, status }))
+  assert.deepEqual(takenSlots([...slotItems, { ...items[0], status: 'Scheduled' }], 'set-q'), [
+    at,
+    at,
+    at,
+    at,
+  ])
 })
 test('P30 invalid dates and past instants are rejected', () => {
   assert.equal(validDay('2026-02-30'), false)
