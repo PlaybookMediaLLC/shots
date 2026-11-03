@@ -1257,16 +1257,11 @@ function PlanComposer({
         })
         created.current = draft
       }
-      if (schedule)
-        await draftsApi.schedule(draft.id, {
-          version: draft.version,
-          baseCalendarVersion: draft.calendarVersion,
-          scheduledFor: instant,
-          timeZone: zone,
-          naturalPostingTime: false,
-          channelConnectionIds: draft.channelConnectionIds,
-        })
-      else {
+      if (schedule) {
+        onClose()
+        router.push(reviewScheduleHref(draft.id, instant, set.timeZone ?? zone))
+        return
+      } else {
         planKey.current ??= crypto.randomUUID()
         const result = readWire(
           calendarResultSchema,
@@ -1545,13 +1540,23 @@ function PlanComposer({
               title={!canPublish ? 'Publishing permission required.' : undefined}
               onClick={() => void commit(true)}
             >
-              Schedule
+              Review and schedule…
             </Button>
           ) : null}
         </div>
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * Scheduling from Plan opens the draft's own review (ScheduleDialog) at the
+ * chosen instant, read in the brand's zone, so every schedule is confirmed
+ * with its destinations, content, zone and checks in one place.
+ */
+function reviewScheduleHref(draftId: string, at: Date, zone: string): string {
+  const wall = wallTime(at, zone)
+  return `/write/${draftId}?${new URLSearchParams({ panel: 'schedule', day: wall.slice(0, 10), time: wall.slice(11) })}`
 }
 
 function PlanDetail({
@@ -1582,6 +1587,7 @@ function PlanDetail({
   const [activity, setActivity] = React.useState<DraftActivityWire[]>([])
   const [revisionCount, setRevisionCount] = React.useState<number | null>(null)
   const [local, setLocal] = React.useState(wallTime(new Date(item.at), item.zone))
+  const router = useRouter()
   const [zone, setZone] = React.useState(item.zone)
   const [choice, setChoice] = React.useState<'reject' | 'earlier' | 'later'>('reject')
   const [reload, setReload] = React.useState(0)
@@ -1745,23 +1751,16 @@ function PlanDetail({
             {item.status === 'Planned' ? (
               <>
                 <Button
-                  disabled={busy || !canPublish || !draft}
+                  disabled={busy || !canPublish}
                   onClick={() =>
                     void run(async () => {
-                      if (!draft) return
-                      await draftsApi.schedule(draft.id, {
-                        version: draft.version,
-                        baseCalendarVersion: draft.calendarVersion,
-                        scheduledFor: selectedInstant(local, zone, choice),
-                        timeZone: zone,
-                        channelConnectionIds: draft.channelConnectionIds,
-                        naturalPostingTime: false,
-                      })
+                      const at = selectedInstant(local, zone, choice)
                       onClose()
+                      router.push(reviewScheduleHref(item.draftId, at, set?.timeZone ?? zone))
                     })
                   }
                 >
-                  Schedule
+                  Review and schedule…
                 </Button>
                 <Button
                   variant="outline"
