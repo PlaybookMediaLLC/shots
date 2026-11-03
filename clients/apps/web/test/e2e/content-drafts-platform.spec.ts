@@ -82,7 +82,7 @@ test(
     await expectSaved(page)
 
     const dialog = await openSchedule(page)
-    await dialog.getByText('Advanced scheduling', { exact: true }).click()
+    await dialog.getByText('More options', { exact: true }).click()
     await expect(dialog.getByText('Suggested times', { exact: true })).toBeVisible()
     await dialog.getByRole('button', { name: 'Next free slot' }).click()
     // Stay on this draft; scheduling opens a new one by default.
@@ -345,7 +345,7 @@ test(
     const zone = /Times are in (\S+) /.exec(
       (await dialog.getByText(/^Times are in /).textContent()) ?? ''
     )?.[1]
-    await dialog.getByText('Advanced scheduling', { exact: true }).click()
+    await dialog.getByText('More options', { exact: true }).click()
     await dialog.getByLabel('When, in words').fill('tomorrow 9am')
     await expect(dialog.getByTestId('when-reading')).toContainText('9:00')
     await dialog.getByRole('switch', { name: 'Auto-Plug' }).click()
