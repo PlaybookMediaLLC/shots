@@ -11,7 +11,7 @@ live-provider certification; see [what was verified](#verification).
 
 | Step | Owner | What it guarantees |
 | --- | --- | --- |
-| Review | `components/write/composer/schedule.tsx`, `components/plan/PlanWorkspace.tsx`, `components/write/bulk-schedule.tsx` | Content, destinations, the instant in its zone and offset, problems, and which queued posts a confirmation replaces |
+| Review | `components/write/composer/schedule.tsx` (Plan's "Review and schedule…" opens it), `components/write/bulk-schedule.tsx` | Content, destinations, the instant in its zone and offset, problems (including unsaved or conflicting edits), and which queued posts a confirmation replaces |
 | Contract | `lib/api/contracts/content-drafts.ts`, `lib/tenant/content-drafts.ts`, backend SDK | Each destination's payload is built from the stored draft at the confirmed version |
 | Commit | `server/internal/product/content_draft_schedule.go` | One transaction: approval, eligibility, quota, one `scheduled_post` per destination, revision, audit and event |
 | Durable work | `server/internal/temporalpublishing` | `PostWorkflowV2` per post (`post_<id>`), started on commit and by the once-a-minute dispatcher |
@@ -57,7 +57,28 @@ Each lead was reproduced with a failing test before it was fixed.
 | Nothing recovered a post stuck in `PROCESSING` | Recovery listed only `SCHEDULED` posts | A lost workflow left a permanent "Publishing" | The dispatcher settles posts whose workflow run has closed |
 | A failed workflow wakeup read as a failed schedule | The handler answered 503 "could not start publishing workflow" after committing | People thought the schedule was lost | It still answers 503, but says the schedule is saved and starts within a minute; the dispatcher starts the due post and a retry replays |
 
-## Scheduling identity
+## Write and Plan journey (2 November 2026)
+
+A second audit followed the journey through the browser at 1440, 1024 and
+390 pixels in both themes (before and after captures in
+`docs/product/qa-evidence/2026-11-02/`). Each behavior fix has a test that
+failed before it.
+
+| Finding | Evidence before the fix | Impact | Fix |
+| --- | --- | --- | --- |
+| A save that met a newer version dropped the writer's edit | `useDraftDocument` reloaded the server copy on 409 with a toast "your last edit was not saved" | Lost work with no way back | The edit is kept (also across navigation) beside the newer version: Use my version (without live collaboration), Copy my text, Discard. Review is blocked until the writer chooses |
+| Review did not show an unsaved draft | Schedule and Publish failed only at confirm, as a toast | The person did not know why, and the toast vanished | A failed or offline save is a blocking problem with Retry save; a failed confirm stays in the dialog |
+| Plan scheduled without review | The detail sheet and picker called `schedule` directly with natural time forced off and no destination review | Wrong destinations or timing could be committed unseen | Both open the composer's schedule review at the chosen time in the brand's zone ("Review and schedule…") |
+| A day drop moved a post's own clock | A Month/Flex drop kept the display zone's clock time | Across a daylight-saving change the post moved by an hour in its own zone | `movedToDay` keeps the post's own clock; a Week drop keeps the hour picked |
+| Times in the wrong zone | The repeated-hour choice and the draft's post list used the browser's zone | "3:00 PM" beside "10:00 AM EST" for the same post | Both use the scheduling zone and name it; the confirmation names instant, zone, offset and moved slot |
+| One state, several words | The post list said "Outcome unknown"; the header said "Posted" when any destination published | A failure hid behind a success | `postState` words and `POST_STATE_TONE` colours everywhere; the header shows the state that needs attention first (`draftPostsState`) |
+| Edits after scheduling were invisible | Queued posts are snapshots; nothing said so | People assumed later edits would publish | A changed queued post says so, with "Replace queued posts with this version…" (the reschedule review) |
+| Ambiguous actions | The dialog was "Schedule" when rescheduling; the queue confirm read "Confirm: next free slot"; one-click per-destination Cancel | Unclear what a click commits | Schedule or Reschedule; Confirm schedule, Confirm reschedule, Add to queue, Reschedule to next free slot; a named confirmation before cancelling one destination |
+| A taken slot was announced out of view | The "slot was just taken" notice sat by the chips at the top of a scrolled dialog | The new slot changed beside the button with no visible reason | The notice sits with the summary, above the confirm button |
+| Phone layout | The schedule and queue dialogs were wider than a 390 px screen; Schedule was hidden while Publish stayed | Clipped controls; immediate publishing was the easy path | Dialogs fit the screen; Schedule is the primary action at every width and Publish now is outline (in ⋯ on a phone) |
+| Posting-times settings | Unticking a time's last weekday removed its row; no 50-slot limit; Remove clipped in the drawer | Lost rows and saves that failed after the fact | Rows stay until removed, "N of 50" with the limit enforced, a Pro note when the plan has no queue slots, the next slots with zone and offset |
+
+
 
 - A post's idempotency key is `content-draft:<draft>:<connection>:v<version>`;
   scheduling bumps the draft version, so a deliberate new schedule names the
@@ -97,7 +118,7 @@ retry or recovery lands on the same instant.
 | Provider rate-limits (429) | Durable retry after `PUBLISHING_RETRY_DELAY`, up to `PUBLISHING_MAX_ATTEMPTS` | `TestSchedulingThroughTemporal` "rate limit" |
 | Response lost after the provider may have accepted | `UNKNOWN_DELIVERY`; retry refused until a person reconciles it as live (with its URL, clearing the code) or not live (`NOT_LIVE`, retryable) | `TestSchedulingThroughTemporal` "lost response", `TestWritePublishing` |
 | Provider accepted, receipt write fails | The write retries for 24 hours; the provider ID is in the worker log. If the run still closes, the sweep marks the post `UNKNOWN_DELIVERY`. It is never sent again | `TestSchedulingThroughTemporal` "receipt" |
-| Destination or approval becomes ineligible | `CANCELLED` with `ACCOUNT_UNAVAILABLE`, `CHANGES_REQUESTED` (draft), `APPROVAL_REQUIRED` (campaign variant) or `WORKSPACE_INACTIVE`, checked before media; nothing sent | `TestSchedulingThroughTemporal` "withdrawn approval", `TestContentDraftScheduleReliability`, `TestPrepareSendsOnlyEligibleOnTimePosts` |
+| Destination or approval becomes ineligible | `CANCELLED` with `ACCOUNT_UNAVAILABLE`, `CHANGES_REQUESTED` (draft), `APPROVAL_REQUIRED` (campaign variant) or `WORKSPACE_INACTIVE`, checked before media; nothing sent | `TestSchedulingThroughTemporal` "withdrawn approval" and "an account revoked after scheduling", `TestContentDraftScheduleReliability`, `TestPrepareSendsOnlyEligibleOnTimePosts` |
 | Media unavailable at send time | `FAILED` with `MEDIA_UNAVAILABLE`; nothing sent. A signing failure fails with 503, also before sending | `TestSchedulingThroughTemporal` "missing media" |
 | Worker down past the time | Overdue after 5 minutes; published late within the window; `MISSED_WINDOW` after it | `TestSchedulingThroughTemporal` "late window", `TestPrepareSendsOnlyEligibleOnTimePosts` |
 | Cancel races the provider call | The calendar refuses: "Publication has started or needs reconciliation"; the post finishes with its real result | `TestSchedulingThroughTemporal` "cancellation racing" |
@@ -193,6 +214,23 @@ per-destination reasons, and a live conflict in which a second request took
 the reviewed slot and the dialog showed the next one. The native stack runs
 no publishing worker, so worker outcomes there were seeded in the database;
 the worker itself is covered by the Temporal test below.
+
+On 2 November 2026 the same commands ran against the native stack's
+PostgreSQL 16 (a migrated `shots_test` database) and Temporal dev server:
+`TestSchedulingThroughTemporal` passed all 13 subtests, including the new
+"an account revoked after scheduling stops its post before sending", and
+`TestContentDraftScheduleReliability`, `TestContentDraftScheduling`,
+`TestContentDraftPlatform`, `TestWritePublishing` and
+`TestPlanAnalyzeDatabase` passed. The social gate's browser spec
+(`social-gate.spec.ts`) also passed natively, without Docker: the web, the
+Go API and worker built with the `e2e` tag, the fake provider and an
+in-memory S3 store. Both of its flows passed, so due posts and draft media
+went through real Temporal timers to one provider request each with a
+receipt. The composer cannot select the gate's fake destination, so that
+path is driven through the API; the browser states (a competing slot, a
+failed save, seeded unconfirmed and reviewer-cancelled posts) were checked
+against the e2e social mock, with captures in
+`docs/product/qa-evidence/2026-11-02/write-scheduling/`.
 
 `TestSchedulingThroughTemporal` drives product scheduling, real PostgreSQL,
 `PostWorkflowV2` on a real Temporal server and an in-process fake provider.

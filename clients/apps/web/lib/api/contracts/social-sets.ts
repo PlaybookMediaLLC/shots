@@ -60,6 +60,9 @@ export const writingAssistantStatusSchema = z.enum([
   'attention',
 ])
 
+/** How many weekly posting slots a set may have; the backend enforces the same. */
+export const POSTING_SLOT_LIMIT = 50
+
 /** A weekly posting slot: a weekday (0 is Sunday) and a time as HH:MM. */
 export const weeklySlotSchema = z.object({
   time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
@@ -191,7 +194,7 @@ export const socialSetUpdateSchema = z
     engagementDefaults: engagementSchema.optional(),
     name: z.string().trim().min(1).max(80).optional(),
     naturalPostingTimes: z.boolean().optional(),
-    postingSlots: z.array(weeklySlotSchema).max(50).optional(),
+    postingSlots: z.array(weeklySlotSchema).max(POSTING_SLOT_LIMIT).optional(),
     primaryPlatform: z.union([draftPlatformSchema, z.literal('')]).optional(),
     publicProfile: z.boolean().optional(),
     timeZone: z.string().max(64).optional(),

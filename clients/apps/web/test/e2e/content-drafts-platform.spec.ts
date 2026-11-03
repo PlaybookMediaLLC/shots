@@ -82,12 +82,12 @@ test(
     await expectSaved(page)
 
     const dialog = await openSchedule(page)
-    await dialog.getByText('Advanced scheduling', { exact: true }).click()
+    await dialog.getByText('More options', { exact: true }).click()
     await expect(dialog.getByText('Suggested times', { exact: true })).toBeVisible()
     await dialog.getByRole('button', { name: 'Next free slot' }).click()
     // Stay on this draft; scheduling opens a new one by default.
     await dialog.getByLabel('Open a new draft after scheduling').uncheck()
-    await dialog.getByRole('button', { name: 'Confirm: next free slot' }).click()
+    await dialog.getByRole('button', { name: 'Add to queue', exact: true }).click()
     await expect(page.getByTestId('draft-post')).toHaveCount(1, { timeout: 30_000 })
     const [queued] = await draftPosts(draftId)
     // The default slots: weekdays at 9:00 in the workspace's time zone.
@@ -345,7 +345,7 @@ test(
     const zone = /Times are in (\S+) /.exec(
       (await dialog.getByText(/^Times are in /).textContent()) ?? ''
     )?.[1]
-    await dialog.getByText('Advanced scheduling', { exact: true }).click()
+    await dialog.getByText('More options', { exact: true }).click()
     await dialog.getByLabel('When, in words').fill('tomorrow 9am')
     await expect(dialog.getByTestId('when-reading')).toContainText('9:00')
     await dialog.getByRole('switch', { name: 'Auto-Plug' }).click()

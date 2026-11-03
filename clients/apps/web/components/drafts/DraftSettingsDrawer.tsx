@@ -42,10 +42,13 @@ function go(page: DrawerPage | null) {
  * selection, media, channel text and comments stay as they were.
  */
 export function DraftSettingsDrawer({
+  advancedScheduling,
   canManage,
   canWrite,
   socialSet,
 }: {
+  /** Whether the plan has queue slots, so the schedule page can say so before a save fails. */
+  advancedScheduling?: boolean
   canManage: boolean
   canWrite: boolean
   socialSet: { id: string; name: string; timeZone: string }
@@ -100,7 +103,7 @@ export function DraftSettingsDrawer({
                 {settingsErrorMessage(set.error)}
               </p>
             ) : null}
-            {set.data && page === 'scheduling' ? <SchedulingPage canManage={canManage} set={set.data} /> : null}
+            {set.data && page === 'scheduling' ? <SchedulingPage advancedScheduling={advancedScheduling} canManage={canManage} set={set.data} /> : null}
             {set.data && page === 'new-draft' ? <NewDraftPage canManage={canManage} set={set.data} /> : null}
             {set.data && page === 'writing-assistant' ? <WritingAssistantPage canWrite={canWrite} set={set.data} /> : null}
             <Link className="text-sm underline" href={socialSetHref(socialSet.id)}>

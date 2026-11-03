@@ -86,6 +86,37 @@ test(
       'Retry keeps this title'
     )
     await expect(editor).toContainText('Second post with padding')
+
+    // Another client replaces the body: the next save keeps this edit until the writer chooses.
+    const before = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
+      version: number
+    }
+    const replaced = await apiRequest(page, `/api/v1/content-drafts/${id}`, {
+      method: 'PATCH',
+      body: {
+        baseVersion: before.version,
+        body: [{ type: 'p', children: [{ text: 'Replaced by another client' }] }],
+        plainText: 'Replaced by another client',
+      },
+    })
+    expect(replaced.status, JSON.stringify(replaced.body)).toBe(200)
+    await editor.getByText('Second post with padding').click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' and my unsaved words')
+    const conflict = page.getByTestId('save-conflict')
+    await expect(conflict).toContainText('changed elsewhere')
+    await expect(editor).toContainText('Replaced by another client')
+    // Review stays blocked until the writer keeps, copies or discards the edit.
+    await page.getByTestId('schedule-button').click()
+    await expect(page.getByTestId('blocking-problems')).toContainText(
+      'conflicts with a newer version'
+    )
+    await expect(page.getByRole('button', { name: 'Confirm schedule' })).toBeDisabled()
+    await page.keyboard.press('Escape')
+    await conflict.getByRole('button', { name: 'Discard my edit', exact: true }).click()
+    await expect(conflict).toHaveCount(0)
+    await app.reload()
+    await expect(editor).toContainText('Replaced by another client')
     expect(errors).toEqual([])
 
     const serverSearches: string[] = []
