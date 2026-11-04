@@ -385,9 +385,7 @@ test('the backend worker publishes draft photos, video, and ordered images once 
             'Not made for kids'
           )
         } else {
-          await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveText(
-            'Only me'
-          )
+          await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveText('Only me')
           await expect(
             page.getByRole('checkbox', {
               name: 'I consent to send this video to TikTok at the scheduled time.',

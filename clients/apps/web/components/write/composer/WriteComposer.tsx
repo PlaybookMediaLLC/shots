@@ -11,6 +11,7 @@ import { ChatIcon as MessageSquare } from '@phosphor-icons/react/dist/ssr/Chat'
 import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sidebar'
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
+import { ListPlusIcon as ListPlus } from '@phosphor-icons/react/dist/ssr/ListPlus'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
@@ -40,7 +41,7 @@ import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/Dr
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
-import { appendPost, movePost, postRanges } from '@/components/drafts/thread'
+import { appendPost, deletePost, movePost, postRanges } from '@/components/drafts/thread'
 import { POST_COLUMN } from '@/components/drafts/layout'
 import {
   DraftRequestError,
@@ -99,7 +100,14 @@ import {
 import { PostSettingsTools } from './post-tools'
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
-import { PublishReview, ScheduleDialog, type ScheduleContext } from './schedule'
+import {
+  PublishReview,
+  type ScheduleBlocker,
+  scheduleBlockers,
+  ScheduleDialog,
+  type ScheduleContext,
+} from './schedule'
+import { optionsSummary } from './video-options'
 import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
@@ -454,6 +462,18 @@ export function WriteComposer({
           )
     },
     onToggle: toggle,
+    cancelPosts: async (postIds) => {
+      try {
+        for (const scheduledPostId of postIds)
+          await trpcClient.scheduledPost.cancel.mutate({ scheduledPostId })
+        toast.success('Undone. Nothing from that schedule will publish.')
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'The schedule could not be undone.')
+      } finally {
+        await refreshPosts()
+        router.refresh()
+      }
+    },
     requireApproval,
     scheduled: posts.filter((post) => post.status === 'SCHEDULED'),
     setTimeZone: set?.timeZone ?? null,
@@ -493,6 +513,17 @@ export function WriteComposer({
       : undefined,
   }
   const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next))
+  // Blockers show beside Schedule once there is something to post, not on an empty draft.
+  const blockers = items.some((item) => item.publication.serialized.posts.length > 0)
+    ? scheduleBlockers(context)
+    : []
+  const jumpTo = (blocker: ScheduleBlocker) => {
+    if (!blocker.channel) return
+    if (channels.includes(blocker.channel)) setTab(blocker.channel)
+    const options = versionFor(document.versions, blocker.channel).options ?? {}
+    if (optionsSummary(blocker.channel, options).needsInput) setPanel('options')
+    else editor.current?.tf.focus()
+  }
   React.useEffect(() => {
     openPreviewRef.current = () => setPanel('preview')
     return () => {
@@ -673,6 +704,27 @@ export function WriteComposer({
           ) : null}
           {CAPABILITIES[active].thread ? <span>#{number}</span> : null}
         </span>
+        {/* An empty post in a thread is dropped when published: say so, and offer to remove it. */}
+        {!post &&
+        canEdit &&
+        CAPABILITIES[active].thread &&
+        editor.current &&
+        postRanges(editor.current.children).length > 1 ? (
+          <span
+            className="flex shrink-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-300"
+            data-testid={`empty-post-${number}`}
+          >
+            Empty, not sent
+            <Button
+              className="h-6 px-1.5 text-xs"
+              onClick={() => editor.current && deletePost(editor.current, number)}
+              size={null}
+              variant="ghost"
+            >
+              Remove empty post
+            </Button>
+          </span>
+        ) : null}
       </div>
     )
   }
@@ -1022,6 +1074,7 @@ export function WriteComposer({
               </Button>
               {canPublish && server.status !== 'archived' ? (
                 <>
+                  {blockers.length > 0 ? <Blockers blockers={blockers} onJump={jumpTo} /> : null}
                   <Button
                     className="hidden sm:inline-flex"
                     data-testid="publish-button"
@@ -1032,13 +1085,28 @@ export function WriteComposer({
                   >
                     Publish now…
                   </Button>
-                  <Button
-                    data-testid="schedule-button"
-                    onClick={() => setDialog('schedule')}
-                    size="sm"
-                  >
-                    {posts.some((post) => post.status === 'SCHEDULED') ? 'Reschedule' : 'Schedule'}
-                  </Button>
+                  {/* Schedule picks a time; its arrow takes the next free queue slot. */}
+                  <span className="flex items-center" role="group" aria-label="Schedule">
+                    <Button
+                      className="rounded-r-none"
+                      data-testid="schedule-button"
+                      onClick={() => setDialog('schedule')}
+                      size="sm"
+                      title="Choose a time"
+                    >
+                      {posts.some((post) => post.status === 'SCHEDULED') ? 'Reschedule' : 'Schedule'}
+                    </Button>
+                    <Button
+                      aria-label="Add to the next free slot"
+                      className="rounded-l-none border-l border-background/25 px-2"
+                      data-testid="queue-button"
+                      onClick={() => setDialog('queue')}
+                      size="sm"
+                      title={`Add to the next free slot (${mod}⌥↵)`}
+                    >
+                      <ListPlus aria-hidden className="size-4" />
+                    </Button>
+                  </span>
                 </>
               ) : null}
               <DropdownMenu>
@@ -1701,6 +1769,52 @@ export function WriteComposer({
 }
 
 /** Panel titles. */
+/** What blocks scheduling, beside Schedule; each item opens where it is fixed. */
+function Blockers({
+  blockers,
+  onJump,
+}: {
+  blockers: ScheduleBlocker[]
+  onJump: (blocker: ScheduleBlocker) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <Button
+          className="text-amber-700 dark:text-amber-300"
+          data-testid="blockers-button"
+          size="sm"
+          variant="ghost"
+        >
+          <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+          {blockers.length} to fix
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-80 p-2" data-testid="blockers">
+        <p className="px-2 py-1 text-xs text-muted-foreground">Fix these before you schedule:</p>
+        <ul className="grid gap-0.5">
+          {blockers.map((blocker) => (
+            <li key={blocker.text}>
+              <Button
+                className="h-auto w-full justify-start px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
+                onClick={() => {
+                  setOpen(false)
+                  onJump(blocker)
+                }}
+                size={null}
+                variant="ghost"
+              >
+                {blocker.text}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 const PANEL_TITLES: Record<Panel, string> = {
   assistant: 'Writing assistant',
   comments: 'Comments',

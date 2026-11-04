@@ -63,6 +63,37 @@ export function upcomingSlots(
   return out.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, 12)
 }
 
+/**
+ * The queue's next days in a brand's zone: each day's queued items and its
+ * free weekly slots, so an empty slot reads as a prompt to write, and how many
+ * future slots it has. A slot an item holds (within five minutes) is not free.
+ */
+export function queueDays<T extends { at: string }>(
+  postingSlots: { time: string; weekday: number }[],
+  zone: string,
+  items: T[],
+  now = new Date(),
+  count = 7
+): { day: string; free: string[]; items: T[]; slots: number }[] {
+  const [year, month, date] = wallTime(now, zone).slice(0, 10).split('-').map(Number)
+  return Array.from({ length: count }, (_, offset) => {
+    const day = new Date(Date.UTC(year, month - 1, date + offset)).toISOString().slice(0, 10)
+    const held = items.filter((item) => wallTime(new Date(item.at), zone).slice(0, 10) === day)
+    return {
+      day,
+      free: availableDaySlots(
+        day,
+        zone,
+        postingSlots,
+        held.map((item) => item.at),
+        now
+      ),
+      items: held,
+      slots: availableDaySlots(day, zone, postingSlots, [], now).length,
+    }
+  })
+}
+
 /** Visible calendar days, including adjacent weeks in month view. */
 export function calendarRange(anchor: string, view: 'week' | 'month' | 'queue', firstWeekday = 1) {
   const parsed = new Date(`${anchor}T12:00:00Z`)

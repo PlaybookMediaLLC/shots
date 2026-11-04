@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import {
+  currentPosts,
   POST_STATE_TONE,
   postFailureFix,
   postFailureReason,
@@ -98,15 +99,9 @@ export function DraftPosts({
     }
   }
   if (posts.length === 0) return null
-  // Each destination's newest post leads; its earlier attempts fold away.
-  const newest = [...posts].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
-  const latest = newest.filter(
-    (post, index) =>
-      newest.findIndex((item) => item.channelConnectionId === post.channelConnectionId) === index
-  )
-  const earlier = newest.filter((post) => !latest.includes(post))
+  // A failure a newer post of its destination replaced (a retry) folds away.
+  const latest = currentPosts(posts)
+  const earlier = posts.filter((post) => !latest.includes(post))
   const row = (post: DraftPostWire) => {
           const channel = channelForPlatform(post.platform)
           const stopped =

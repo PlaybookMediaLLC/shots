@@ -37,7 +37,7 @@ import { type BlockImages, channelForPlatform } from '@/lib/content-drafts/seria
 import { followUpLines } from '@/lib/write/automation'
 import { upcomingSlots } from '@/lib/write/calendar'
 import { writeApi } from '@/lib/write/client'
-import type { AutoDm, Automation, Community } from '@/lib/write/document'
+import type { AutoDm, Automation, Community, DraftChannel } from '@/lib/write/document'
 import {
   committedMessage,
   offsetLabel,
@@ -88,34 +88,52 @@ export type ScheduleContext = {
   onCommunity?: (community: Community) => void
   autoDm?: AutoDm
   onAutoDm?: (config: AutoDm | undefined) => void
+  /** Cancel posts this schedule just queued: the Undo of its confirmation. */
+  cancelPosts?: (postIds: string[]) => Promise<void>
+}
+
+/** One thing that blocks scheduling, and the platform it belongs to, if any. */
+export type ScheduleBlocker = { channel?: DraftChannel; text: string }
+
+/**
+ * What blocks scheduling every destination, checked live as the draft
+ * changes: the header shows these beside Schedule, and the dialogs list them.
+ */
+export function scheduleBlockers(context: ScheduleContext): ScheduleBlocker[] {
+  const problems: ScheduleBlocker[] = []
+  if (context.conflict)
+    problems.push({
+      text: 'Your unsaved edit conflicts with a newer version. Choose what to do with it above the editor first.',
+    })
+  if (context.saveState === 'error' || context.saveState === 'offline')
+    problems.push({
+      text: 'Your latest edits are not saved. Retry saving before you schedule or publish.',
+    })
+  if (context.draft.status === 'archived')
+    problems.push({ text: 'Restore this draft before scheduling or publishing.' })
+  if (context.items.length === 0)
+    problems.push({ text: 'Connect or turn on at least one account in this publishing brand.' })
+  for (const item of context.items) {
+    const channel = item.account.channel
+    if (item.account.health !== 'connected') {
+      problems.push({ channel, text: `${CHANNEL_META[channel].label}: reconnect the account first.` })
+    }
+    for (const problem of item.publication.problems)
+      problems.push({ channel, text: `${CHANNEL_META[channel].label}: ${problem}` })
+  }
+  if (context.requireApproval && !context.approved) {
+    problems.push({
+      text: 'This workspace approves drafts before they publish. Ask for review first.',
+    })
+  }
+  if (!context.canPublish)
+    problems.push({ text: 'Your role needs publishing permission to schedule or publish.' })
+  return problems
 }
 
 /** Problems that block every destination, collected for the dialogs. */
 function blocking(context: ScheduleContext): string[] {
-  const problems: string[] = []
-  if (context.conflict)
-    problems.push(
-      'Your unsaved edit conflicts with a newer version. Choose what to do with it above the editor first.'
-    )
-  if (context.saveState === 'error' || context.saveState === 'offline')
-    problems.push('Your latest edits are not saved. Retry saving before you schedule or publish.')
-  if (context.draft.status === 'archived')
-    problems.push('Restore this draft before scheduling or publishing.')
-  if (context.items.length === 0)
-    problems.push('Connect or turn on at least one account in this publishing brand.')
-  for (const item of context.items) {
-    if (item.account.health !== 'connected') {
-      problems.push(`${CHANNEL_META[item.account.channel].label}: reconnect the account first.`)
-    }
-    for (const problem of item.publication.problems)
-      problems.push(`${CHANNEL_META[item.account.channel].label}: ${problem}`)
-  }
-  if (context.requireApproval && !context.approved) {
-    problems.push('This workspace approves drafts before they publish. Ask for review first.')
-  }
-  if (!context.canPublish)
-    problems.push('Your role needs publishing permission to schedule or publish.')
-  return problems
+  return scheduleBlockers(context).map((problem) => problem.text)
 }
 
 /**
@@ -239,6 +257,7 @@ export function ScheduleDialog({
     zone,
     data.queue.map((item) => item.at)
   )
+  const freeSlots = slots.filter((slot) => !slot.busy).slice(0, 3)
   const schedule = async () => {
     setAction('schedule')
     setError('')
@@ -256,10 +275,19 @@ export function ScheduleDialog({
       })
       context.versionRef.current = result.draft.version
       context.onDone({ ...result, newDraft: continueWriting })
+      const cancel = context.cancelPosts
       toast.success(
         result.created
           ? committedMessage(result.posts, zone, queue)
-          : 'Already scheduled: nothing new was queued.'
+          : 'Already scheduled: nothing new was queued.',
+        result.created && cancel
+          ? {
+              action: {
+                label: 'Undo',
+                onClick: () => void cancel(result.posts.map((post) => post.id)),
+              },
+            }
+          : undefined
       )
       onClose()
     } catch (error) {
@@ -299,6 +327,11 @@ export function ScheduleDialog({
     }
   }
   const reviewedSlot = queueSlot ? new Date(queueSlot) : null
+  const confirmable = !(
+    busy ||
+    problems.length > 0 ||
+    (queue ? !reviewedSlot : !instant || past)
+  )
   // A draft with queued posts is rescheduled: confirming replaces them (listed below).
   const rescheduling = (context.scheduled ?? []).length > 0
   const chosen = queue ? reviewedSlot : instant
@@ -324,6 +357,13 @@ export function ScheduleDialog({
       <DialogContent
         className="max-h-[92dvh] max-w-[calc(100%-1rem)] gap-6 overflow-y-auto p-5 sm:max-w-lg sm:p-6"
         data-testid="schedule-dialog"
+        onKeyDown={(event) => {
+          // ⌘↵ confirms, so the next free slot is a keyboard-only path.
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && confirmable) {
+            event.preventDefault()
+            void schedule()
+          }
+        }}
       >
         <DialogHeader className="gap-1.5 text-left">
           <DialogTitle>{rescheduling ? 'Reschedule' : 'Schedule'}</DialogTitle>
@@ -359,6 +399,31 @@ export function ScheduleDialog({
           ) : null}
           {queue ? null : (
             <div className="grid gap-4">
+              {freeSlots.length > 0 ? (
+                <div className="grid gap-2" data-testid="free-slot-picks">
+                  <p className="text-xs text-muted-foreground">Next free slots</p>
+                  <div className="flex flex-wrap gap-2">
+                    {freeSlots.map((slot) => (
+                      <Button
+                        aria-pressed={instant?.getTime() === slot.at.getTime()}
+                        className="h-8 rounded-md px-3 text-ui aria-pressed:border-foreground/40 aria-pressed:bg-foreground/[0.06]"
+                        key={slot.at.toISOString()}
+                        onClick={() => setInstant(slot.at)}
+                        size={null}
+                        type="button"
+                        variant="outline"
+                      >
+                        {slot.at.toLocaleString(undefined, {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          timeZone: zone,
+                          weekday: 'short',
+                        })}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-3">
                 <Label className="grid content-start gap-1.5 text-xs text-muted-foreground">
                   Day
@@ -670,8 +735,9 @@ export function ScheduleDialog({
             </Button>
             <Button
               className="w-full sm:w-auto"
-              disabled={busy || problems.length > 0 || (queue ? !reviewedSlot : !instant || past)}
+              disabled={!confirmable}
               onClick={() => void schedule()}
+              title="Confirm (⌘↵)"
               type="button"
             >
               {action === 'schedule'
