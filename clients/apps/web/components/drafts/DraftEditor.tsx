@@ -317,15 +317,19 @@ function DiscussionsWatcher({ onChange }: { onChange: (discussions: DraftDiscuss
 function Presence() {
   const editor = useEditorRef()
   const awareness = editor.getOptions(YjsPlugin).awareness
-  const [people, setPeople] = React.useState<{ color: string; name: string }[]>([])
+  const [people, setPeople] = React.useState<{ color: string; key: string; name: string }[]>([])
   React.useEffect(() => {
-    const update = () =>
-      setPeople(
-        [...awareness.getStates().values()].flatMap((state) => {
-          const data = (state as { data?: { color?: string; name?: string } }).data
-          return data?.name ? [{ color: data.color ?? 'gray', name: data.name }] : []
-        })
-      )
+    // One chip per person: each tab or reconnect is its own awareness client.
+    const update = () => {
+      const byPerson = new Map<string, { color: string; key: string; name: string }>()
+      for (const state of awareness.getStates().values()) {
+        const data = (state as { data?: { color?: string; name?: string; userId?: string } }).data
+        const key = data?.userId ?? data?.name
+        if (data?.name && key && !byPerson.has(key))
+          byPerson.set(key, { color: data.color ?? 'gray', key, name: data.name })
+      }
+      setPeople([...byPerson.values()])
+    }
     update()
     awareness.on('change', update)
     return () => awareness.off('change', update)
@@ -333,13 +337,18 @@ function Presence() {
   return (
     // Who else is here sits above the post, at the column's right edge.
     <div className="flex flex-wrap justify-end gap-1.5 px-6 py-2" data-testid="presence">
-      {people.map((person, index) => (
+      {people.map((person) => (
         <span
-          className="max-w-48 truncate whitespace-nowrap rounded-full px-2 py-0.5 text-xs text-foreground"
-          key={`${person.name}-${index}`}
-          style={{ background: person.color }}
+          className="flex max-w-48 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-1 text-label text-foreground"
+          key={person.key}
+          style={{ background: `color-mix(in srgb, ${person.color} 14%, transparent)` }}
         >
-          {person.name}
+          <span
+            aria-hidden="true"
+            className="size-1.5 shrink-0 rounded-full"
+            style={{ background: person.color }}
+          />
+          <span className="truncate">{person.name}</span>
         </span>
       ))}
     </div>
@@ -527,7 +536,7 @@ function DraftToolbar({
   return (
     <Toolbar
       aria-label="Draft formatting"
-      className="flex max-w-full flex-nowrap items-center justify-start gap-0.5 overflow-x-auto rounded-xl border border-border bg-card/95 px-1.5 py-1 shadow-lg backdrop-blur [&_button]:text-[13px]"
+      className="flex max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md border border-border bg-card/95 p-px backdrop-blur [&_button]:!h-7 [&_button]:!px-2 [&_button]:!text-[13px] [&_button]:!font-medium"
     >
       <ToolbarGroup>
         <MarkToolbarButton aria-label="Bold" nodeType={KEYS.bold} tooltip="Bold">
@@ -581,7 +590,10 @@ function DraftToolbar({
           }}
         />
       ) : null}
-      {extras ? <ToolbarGroup>{extras}</ToolbarGroup> : null}
+      {/* The longest group wraps inside itself, so no tool is cut off at the edge. */}
+      {extras ? (
+        <ToolbarGroup className="min-w-0 shrink [&>div]:flex-wrap">{extras}</ToolbarGroup>
+      ) : null}
       <ToolbarGroup>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -1078,7 +1090,7 @@ function DraftEditorSession({
               // media tools can retain the empty pre-connection value until an edit.
               // The formatting bar floats at the bottom of the page, out of the text's way.
               <div
-                // One row, above the home indicator, so the controls above it stay reachable.
+                // Above the home indicator, so the controls above it stay reachable.
                 // inline-size containment keeps that row's width from widening the editor
                 // (which would switch comments to the wide side-column layout).
                 style={{

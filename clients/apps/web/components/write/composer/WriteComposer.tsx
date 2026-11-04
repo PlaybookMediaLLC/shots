@@ -880,7 +880,7 @@ export function WriteComposer({
             </span>
             <Input
               aria-label="Draft title"
-              className="h-8 min-w-20 max-w-64 flex-1 truncate border-transparent bg-transparent text-sm text-foreground focus:text-foreground"
+              className="h-8 min-w-20 max-w-64 flex-1 truncate border-transparent bg-transparent text-ui-lg font-medium text-foreground focus:text-foreground"
               disabled={!canEdit}
               maxLength={200}
               onChange={(event) => update({ title: event.target.value })}
@@ -1257,7 +1257,7 @@ export function WriteComposer({
             />
           ) : null}
           <details
-            className="border-b border-border px-4 pb-1"
+            className="mx-4 mt-1 mb-3 overflow-hidden rounded-[14.4px] border border-border bg-card"
             onToggle={(event) => {
               const open = event.currentTarget.open
               setOptionsOpen(open)
@@ -1269,7 +1269,7 @@ export function WriteComposer({
             }}
             open={optionsOpen || pasteNotice}
           >
-            <summary className="w-fit cursor-pointer select-none rounded-md py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+            <summary className="cursor-pointer select-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
               Post options
             </summary>
             <VersionOptionsBar
@@ -1418,24 +1418,32 @@ export function WriteComposer({
               className={cn('mb-6 flex flex-wrap justify-end gap-3', POST_COLUMN)}
               data-testid="platform-counters"
             >
-              {items.map((item) => {
-                const over = item.publication.serialized.posts.some(
-                  (post) => post.length > item.publication.serialized.limit
+              {/* An editor shows the edited platform's count in each post's header. */}
+              {items
+                .filter(
+                  (item) =>
+                    item.account.channel !== active ||
+                    (active !== primary && versionOfTab.mode !== 'manual') ||
+                    item.publication.serialized.posts.length === 0
                 )
-                return (
-                  <span
-                    className={cn(
-                      'flex items-center gap-1 text-xs',
-                      over ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'
-                    )}
-                    data-testid={`counter-${item.account.channel}`}
-                    key={item.account.id}
-                  >
-                    <ChannelIcon channel={item.account.channel} />
-                    {item.publication.serialized.length} / {item.publication.serialized.limit}
-                  </span>
-                )
-              })}
+                .map((item) => {
+                  const over = item.publication.serialized.posts.some(
+                    (post) => post.length > item.publication.serialized.limit
+                  )
+                  return (
+                    <span
+                      className={cn(
+                        'flex items-center gap-1 text-xs',
+                        over ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'
+                      )}
+                      data-testid={`counter-${item.account.channel}`}
+                      key={item.account.id}
+                    >
+                      <ChannelIcon channel={item.account.channel} />
+                      {item.publication.serialized.length} / {item.publication.serialized.limit}
+                    </span>
+                  )
+                })}
             </div>
             <DraftPosts
               canSchedule={canPublish}

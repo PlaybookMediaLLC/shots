@@ -127,7 +127,8 @@ test(
     // Over X's limit: the counter goes red, and scheduling is blocked.
     await caretAtEndOf(page, draftEditor(page).getByText('for you.'))
     await page.keyboard.type(` ${'x'.repeat(260)}`)
-    await expect(page.getByTestId('counter-x')).toHaveText(/^3\d\d \/ 280$/)
+    // X is being edited, so its count is in the post's header.
+    await expect(page.getByTestId('post-length-1')).toHaveText(/^3\d\d \/ 280$/)
     await expect(page.getByTestId('counter-linkedin')).toHaveText(/ \/ 3000$/)
     await inPreview(page, async () => {
       await previewOf(page, 'x')
@@ -163,7 +164,7 @@ test(
     // Count from the counter, so a keystroke the browser dropped under load
     // cannot skew it.
     const counted = async () =>
-      Number((await page.getByTestId('counter-x').textContent())?.split(' / ')[0])
+      Number((await page.getByTestId('post-length-1').textContent())?.split(' / ')[0])
     // The counter trails the keys; a reading taken while it still moves made
     // the loop delete too much. Read it only once it holds still.
     const settledCount = async () => {
@@ -186,7 +187,7 @@ test(
       for (let index = 0; index < extra; index += 1) await page.keyboard.press('Backspace')
       expect(await settledCount()).toBe(51)
     }).toPass({ timeout: 30_000 })
-    await expect(page.getByTestId('counter-x')).toHaveText('51 / 280')
+    await expect(page.getByTestId('post-length-1')).toHaveText('51 / 280')
     await expectSaved(page)
 
     // Dropped formatting is shown in the preview, not a block: nothing stops scheduling.

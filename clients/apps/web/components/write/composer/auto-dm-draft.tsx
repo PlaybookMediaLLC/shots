@@ -37,7 +37,7 @@ export function AutoDmDraft({
         disabled={readOnly}
         variant="outline"
         size="sm"
-        className="h-7 rounded-full text-xs"
+        className="h-8 rounded-md text-ui"
         onClick={() => {
           setError('')
           setForm(

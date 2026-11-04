@@ -81,7 +81,7 @@ export function VersionOptionsBar({
   const [dialog, setDialog] = React.useState<'numbering' | 'finisher' | 'community' | null>(null)
   const capabilities = CAPABILITIES[channel]
   const button =
-    'h-7 rounded-full border border-border px-3 text-xs text-muted-foreground hover:border-input hover:text-foreground'
+    'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:border-input hover:text-foreground'
   const tools: React.ReactNode[] = []
   if (channel === 'tiktok' || channel === 'youtube')
     tools.push(
@@ -158,7 +158,7 @@ export function VersionOptionsBar({
         }
         value={options.visibility ?? 'PUBLIC'}
       >
-        <SelectTrigger aria-label="LinkedIn visibility" className="h-7 w-auto rounded-full text-xs">
+        <SelectTrigger aria-label="LinkedIn visibility" className="h-8 w-auto rounded-md text-ui">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -192,7 +192,7 @@ export function VersionOptionsBar({
   if (tools.length === 0) return null
   return (
     <div
-      className="flex flex-wrap items-center gap-2 pb-3"
+      className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3 has-[[data-option-rows]]:p-0"
       data-testid={`version-options-${channel}`}
     >
       {tools}
@@ -766,7 +766,7 @@ function FirstComment({
       <PopoverTrigger asChild>
         <Button
           className={cn(
-            'h-7 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:text-foreground',
+            'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:text-foreground',
             value && 'border-sky-400/40 text-sky-700 dark:text-sky-200'
           )}
           disabled={readOnly}
@@ -834,7 +834,7 @@ function PdfDocument({
     <>
       <Button
         className={cn(
-          'h-7 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:text-foreground',
+          'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:text-foreground',
           document && 'border-sky-400/40 text-sky-700 dark:text-sky-200',
           state === 'failed' && 'border-red-400/40 text-red-700 dark:text-red-200'
         )}

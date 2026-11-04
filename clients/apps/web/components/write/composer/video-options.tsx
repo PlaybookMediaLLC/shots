@@ -33,46 +33,56 @@ export function VideoOptions({
     const change = (next: Partial<NonNullable<VersionOptions['youtube']>>) =>
       onChange({ ...options, youtube: { ...value, ...next } })
     return (
-      <div className="grid w-full gap-3 rounded-lg border p-3">
-        <Label htmlFor="youtube-title">YouTube title</Label>
-        <Input
-          id="youtube-title"
-          value={value.title}
-          maxLength={100}
-          disabled={disabled}
-          onChange={(event) => change({ title: event.target.value })}
-        />
-        <Select
-          value={value.privacy}
-          disabled={disabled}
-          onValueChange={(privacy) =>
-            change({ privacy: youtubeOptionsSchema.shape.privacy.parse(privacy) })
-          }
-        >
-          <SelectTrigger aria-label="YouTube privacy">
-            <SelectValue placeholder="Choose privacy" />
-          </SelectTrigger>
-          <SelectContent>
-            {['public', 'unlisted', 'private'].map((privacy) => (
-              <SelectItem key={privacy} value={privacy}>
-                {privacy}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={value.madeForKids === undefined ? '' : String(value.madeForKids)}
-          disabled={disabled}
-          onValueChange={(audience) => change({ madeForKids: audience === 'true' })}
-        >
-          <SelectTrigger aria-label="YouTube audience">
-            <SelectValue placeholder="Choose audience" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="true">Made for kids</SelectItem>
-            <SelectItem value="false">Not made for kids</SelectItem>
-          </SelectContent>
-        </Select>
+      <div
+        data-option-rows
+        className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
+      >
+        <div className="grid gap-2">
+          <Label htmlFor="youtube-title">YouTube title</Label>
+          <Input
+            id="youtube-title"
+            value={value.title}
+            maxLength={100}
+            disabled={disabled}
+            onChange={(event) => change({ title: event.target.value })}
+          />
+        </div>
+        {/* Each control is its own row. */}
+        <div>
+          <Select
+            value={value.privacy}
+            disabled={disabled}
+            onValueChange={(privacy) =>
+              change({ privacy: youtubeOptionsSchema.shape.privacy.parse(privacy) })
+            }
+          >
+            <SelectTrigger aria-label="YouTube privacy">
+              <SelectValue placeholder="Choose privacy" />
+            </SelectTrigger>
+            <SelectContent>
+              {['public', 'unlisted', 'private'].map((privacy) => (
+                <SelectItem key={privacy} value={privacy}>
+                  {privacy}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Select
+            value={value.madeForKids === undefined ? '' : String(value.madeForKids)}
+            disabled={disabled}
+            onValueChange={(audience) => change({ madeForKids: audience === 'true' })}
+          >
+            <SelectTrigger aria-label="YouTube audience">
+              <SelectValue placeholder="Choose audience" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="true">Made for kids</SelectItem>
+              <SelectItem value="false">Not made for kids</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     )
   }
@@ -102,34 +112,39 @@ export function VideoOptions({
     { key: 'madeWithAi', label: 'AI-generated video', unavailable: false },
   ] as const
   return (
-    <div className="grid w-full gap-3 rounded-lg border p-3">
+    <div
+      data-option-rows
+      className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
+    >
       <p>
         {creator
           ? `Posting to ${creator.nickname}. Maximum video length: ${creator.maxDurationSeconds} seconds.`
           : 'TikTok permissions are unavailable. Refresh the account before scheduling.'}
       </p>
-      <Select
-        disabled={disabled || !creator}
-        value={value.privacy}
-        onValueChange={(privacy) =>
-          change({ privacy: tiktokOptionsSchema.shape.privacy.parse(privacy), consent: false })
-        }
-      >
-        <SelectTrigger aria-label="TikTok privacy">
-          <SelectValue placeholder="Choose privacy" />
-        </SelectTrigger>
-        <SelectContent>
-          {creator?.privacyLevels.map((privacy) => (
-            <SelectItem
-              key={privacy}
-              value={privacy}
-              disabled={privacy === 'SELF_ONLY' && value.brandedContent}
-            >
-              {privacy}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div>
+        <Select
+          disabled={disabled || !creator}
+          value={value.privacy}
+          onValueChange={(privacy) =>
+            change({ privacy: tiktokOptionsSchema.shape.privacy.parse(privacy), consent: false })
+          }
+        >
+          <SelectTrigger aria-label="TikTok privacy">
+            <SelectValue placeholder="Choose privacy" />
+          </SelectTrigger>
+          <SelectContent>
+            {creator?.privacyLevels.map((privacy) => (
+              <SelectItem
+                key={privacy}
+                value={privacy}
+                disabled={privacy === 'SELF_ONLY' && value.brandedContent}
+              >
+                {privacy}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="flex items-center gap-2">
         <Checkbox
           id="tiktok-commercial"
@@ -182,7 +197,7 @@ export function VideoOptions({
           I consent to send this video to TikTok at the scheduled time.
         </Label>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p>
         By posting, you agree to TikTok’s{' '}
         <a
           href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
