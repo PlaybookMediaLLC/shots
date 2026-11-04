@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { defineContract } from '@/lib/api/contract'
+import { BATCH_ITEM_LIMIT } from './content-batches'
 import {
   contentDraftIdSchema,
   contentDraftParamsSchema,
@@ -13,7 +14,7 @@ export const draftBatchTimesContract = defineContract({
   path: '/api/v1/content-draft-batch/times',
   body: z.object({
     socialSetId: contentDraftIdSchema,
-    count: z.number().int().min(1).max(50),
+    count: z.number().int().min(1).max(BATCH_ITEM_LIMIT),
     mode: z.enum(['queue', 'spread']),
     localTime: z.string().optional(),
     postsPerDay: z.number().int().min(1).max(24).optional(),
@@ -21,7 +22,7 @@ export const draftBatchTimesContract = defineContract({
     shiftMinutes: z.number().int().min(0).max(55).multipleOf(5).optional(),
     seed: z.string().min(16).max(128),
   }),
-  output: z.object({ times: z.array(z.iso.datetime()).max(50) }),
+  output: z.object({ times: z.array(z.iso.datetime()).max(BATCH_ITEM_LIMIT) }),
   summary: 'Preview bulk scheduling times',
 })
 

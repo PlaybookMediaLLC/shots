@@ -67,6 +67,15 @@ export async function updateContentBatchItem(
   return readItem(await backendSDK(context).updateContentBatchItem(id, itemId, input))
 }
 
+/** Change many items as one operation: a refused item refuses them all. */
+export async function updateContentBatchItems(
+  context: OrganizationAccess,
+  id: string,
+  items: Parameters<ReturnType<typeof backendSDK>['updateContentBatchItems']>[1]
+) {
+  return readBatch(await backendSDK(context).updateContentBatchItems(id, items))
+}
+
 /** Save an item as its draft; a retry returns the same draft. */
 export async function createContentBatchItemDraft(
   context: OrganizationAccess,

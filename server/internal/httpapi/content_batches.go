@@ -16,6 +16,7 @@ type ContentBatchStore interface {
 	ArchiveContentBatch(context.Context, product.Actor, string) error
 	AddContentBatchItems(context.Context, product.Actor, string, []product.ContentBatchItemInput) (*product.ContentBatchRecord, error)
 	UpdateContentBatchItem(context.Context, product.Actor, string, string, product.ContentBatchItemUpdate) (*product.ContentBatchItemRecord, error)
+	UpdateContentBatchItems(context.Context, product.Actor, string, []product.ContentBatchItemPatch) (*product.ContentBatchRecord, error)
 	RemoveContentBatchItem(context.Context, product.Actor, string, string) error
 	CreateContentBatchItemDraft(context.Context, product.Actor, string, string, product.ContentDraftInput) (*product.ContentBatchItemRecord, error)
 	ValidateContentBatch(context.Context, product.Actor, string, []product.BatchValidationRow) ([]product.BatchValidationResult, error)
@@ -27,6 +28,7 @@ func (s *Server) registerContentBatches(mux *http.ServeMux) {
 	mux.Handle("GET /v1/content-batches/{id}", s.authenticateProduct(http.HandlerFunc(s.getContentBatch)))
 	mux.Handle("POST /v1/content-batches/{id}/archive", s.authenticateProduct(http.HandlerFunc(s.archiveContentBatch)))
 	mux.Handle("POST /v1/content-batches/{id}/items", s.authenticateProduct(http.HandlerFunc(s.addContentBatchItems)))
+	mux.Handle("PATCH /v1/content-batches/{id}/items", s.authenticateProduct(http.HandlerFunc(s.updateContentBatchItems)))
 	mux.Handle("PATCH /v1/content-batches/{id}/items/{itemId}", s.authenticateProduct(http.HandlerFunc(s.updateContentBatchItem)))
 	mux.Handle("DELETE /v1/content-batches/{id}/items/{itemId}", s.authenticateProduct(http.HandlerFunc(s.removeContentBatchItem)))
 	mux.Handle("POST /v1/content-batches/{id}/items/{itemId}/draft", s.authenticateProduct(http.HandlerFunc(s.createContentBatchItemDraft)))
@@ -126,6 +128,26 @@ func (s *Server) updateContentBatchItem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, item)
+}
+
+func (s *Server) updateContentBatchItems(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := batchIDs(w, r, false)
+	if !ok {
+		return
+	}
+	var input struct {
+		Items []product.ContentBatchItemPatch `json:"items"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid batch items")
+		return
+	}
+	batch, err := s.configuration.UpdateContentBatchItems(r.Context(), workspaceActor(r), id, input.Items)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, batch)
 }
 
 func (s *Server) removeContentBatchItem(w http.ResponseWriter, r *http.Request) {

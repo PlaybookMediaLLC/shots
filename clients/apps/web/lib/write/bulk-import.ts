@@ -1,3 +1,4 @@
+import { BATCH_ITEM_LIMIT } from '@/lib/api/contracts/content-batches'
 import { safeAssetFileName } from '@/lib/workspace/save-export'
 import { draftChannelSchema } from '@/lib/write/document'
 import { isTimeZone, localDateTimeSchema } from '@/lib/write/zoned-time'
@@ -121,7 +122,8 @@ export function parseBatchCSV(input: string): { mapping: ImportMapping; rows: Im
   if (!fields.includes('caption'))
     throw new Error('Add a caption column. Asset, channels, time and timezone are optional.')
   if (new Set(fields).size !== fields.length) throw new Error('Each CSV field may appear once.')
-  if (!rows.length || rows.length > 50) throw new Error('Import between 1 and 50 rows.')
+  if (!rows.length || rows.length > BATCH_ITEM_LIMIT)
+    throw new Error(`Import between 1 and ${BATCH_ITEM_LIMIT} rows.`)
   return {
     mapping,
     rows: rows.map(({ line, values }) => {

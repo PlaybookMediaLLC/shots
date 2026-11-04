@@ -11,6 +11,9 @@ import {
  * becomes its own draft and is scheduled through the ordinary draft schedule.
  */
 
+/** The most posts one batch holds; Go's `contentBatchItemLimit`. */
+export const BATCH_ITEM_LIMIT = 100
+
 /** A file name as stored in an object key: letters, digits, dots, dashes, underscores. */
 const fileNameSchema = z
   .string()
@@ -175,7 +178,7 @@ export const archiveContentBatchContract = defineContract({
 
 /** `POST /api/v1/content-batches/{id}/items` */
 export const addContentBatchItemsContract = defineContract({
-  body: z.object({ items: z.array(batchItemInputSchema).min(1).max(50) }),
+  body: z.object({ items: z.array(batchItemInputSchema).min(1).max(BATCH_ITEM_LIMIT) }),
   method: 'POST',
   name: 'content-batches.items.add',
   output: contentBatchSchema,
@@ -184,12 +187,38 @@ export const addContentBatchItemsContract = defineContract({
   summary: 'Stage items in a bulk batch',
 })
 
+/** What a batch item update may change. */
+const batchItemUpdateSchema = batchItemInputSchema
+  .pick({ caption: true, channelConnectionIds: true, media: true, timing: true })
+  .partial()
+  .extend({
+    position: z
+      .number()
+      .int()
+      .min(0)
+      .max(10 * BATCH_ITEM_LIMIT)
+      .optional(),
+  })
+
+/** `PATCH /api/v1/content-batches/{id}/items`: every change applies, or none does. */
+export const updateContentBatchItemsContract = defineContract({
+  body: z.object({
+    items: z
+      .array(batchItemUpdateSchema.extend({ itemId: contentDraftIdSchema }))
+      .min(1)
+      .max(BATCH_ITEM_LIMIT),
+  }),
+  method: 'PATCH',
+  name: 'content-batches.items.update-many',
+  output: contentBatchSchema,
+  params: batchParamsSchema,
+  path: '/api/v1/content-batches/{id}/items',
+  summary: 'Change many bulk batch items at once',
+})
+
 /** `PATCH /api/v1/content-batches/{id}/items/{itemId}` */
 export const updateContentBatchItemContract = defineContract({
-  body: batchItemInputSchema
-    .pick({ caption: true, channelConnectionIds: true, media: true, timing: true })
-    .partial()
-    .extend({ position: z.number().int().min(0).max(500).optional() }),
+  body: batchItemUpdateSchema,
   method: 'PATCH',
   name: 'content-batches.items.update',
   output: batchItemSchema,
@@ -243,7 +272,7 @@ export const validateContentBatchContract = defineContract({
         })
       )
       .min(1)
-      .max(50),
+      .max(BATCH_ITEM_LIMIT),
   }),
   method: 'POST',
   name: 'content-batches.validate',

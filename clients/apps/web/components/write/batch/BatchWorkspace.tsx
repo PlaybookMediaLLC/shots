@@ -38,12 +38,13 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useIsMobile } from '@/hooks/use-mobile'
-import type {
-  BatchItem,
-  BatchItemInput,
-  BatchMedia,
-  BatchValidation,
-  ContentBatch,
+import {
+  BATCH_ITEM_LIMIT,
+  type BatchItem,
+  type BatchItemInput,
+  type BatchMedia,
+  type BatchValidation,
+  type ContentBatch,
 } from '@/lib/api/contracts/content-batches'
 import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
 import { POST_STATE_TONE, postFailureReason, postState } from '@/lib/content-drafts/post-status'
@@ -78,7 +79,8 @@ const ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,application/pdf'
 /** Uploads at once: enough to keep a link busy, few enough to bound memory and sockets. */
 const UPLOAD_CONCURRENCY = 3
-const ITEM_LIMIT = 50
+/** Items checked per request. */
+const VALIDATE_CHUNK = 25
 
 type Staged = { input: BatchItemInput; line: number; problems: string[] }
 type Upload = { progress: number; error?: string }
@@ -501,9 +503,9 @@ export function BatchWorkspace({
 
   const previewImport = async () => {
     try {
-      if (chosen.length + items.length > ITEM_LIMIT && !csv.trim())
+      if (chosen.length + items.length > BATCH_ITEM_LIMIT && !csv.trim())
         throw new Error(
-          `A batch holds up to ${ITEM_LIMIT} posts. Choose fewer files or start another batch.`
+          `A batch holds up to ${BATCH_ITEM_LIMIT} posts. Choose fewer files or start another batch.`
         )
       const known = new Set<string>()
       let mapping: ImportMapping | null = null
@@ -557,9 +559,9 @@ export function BatchWorkspace({
           },
         }
       })
-      if (items.length + staged.length > ITEM_LIMIT)
+      if (items.length + staged.length > BATCH_ITEM_LIMIT)
         throw new Error(
-          `A batch holds up to ${ITEM_LIMIT} posts; this would make ${items.length + staged.length}.`
+          `A batch holds up to ${BATCH_ITEM_LIMIT} posts; this would make ${items.length + staged.length}.`
         )
       setPreview({
         files: chosen,
@@ -795,10 +797,15 @@ export function BatchWorkspace({
         )
         return
       }
-      const { results } = await call<{ results: BatchValidation[] }>(`${base}/validate`, {
-        body: { items: requests },
-        method: 'POST',
-      })
+      // Each account's media is prepared for the check, so a full batch goes in parts.
+      const results: BatchValidation[] = []
+      for (let at = 0; at < requests.length; at += VALIDATE_CHUNK) {
+        const part = await call<{ results: BatchValidation[] }>(`${base}/validate`, {
+          body: { items: requests.slice(at, at + VALIDATE_CHUNK) },
+          method: 'POST',
+        })
+        results.push(...part.results)
+      }
       // A time the browser reads differently (a skipped hour) is the item's problem too.
       const next: Record<string, BatchValidation> = {}
       for (const result of results)
@@ -886,7 +893,7 @@ export function BatchWorkspace({
       title={batch.title}
       description={
         <>
-          Each post here is <strong>its own draft</strong>, up to {ITEM_LIMIT}. To put several files
+          Each post here is <strong>its own draft</strong>, up to {BATCH_ITEM_LIMIT}. To put several files
           in one post, add them to the same CSV row. Times are in {zone}. The batch saves as you go,
           so you can reopen it from Write on any device.
         </>
@@ -894,7 +901,7 @@ export function BatchWorkspace({
       actions={
         <>
           <Pill>
-            {items.length} of {ITEM_LIMIT} posts
+            {items.length} of {BATCH_ITEM_LIMIT} posts
           </Pill>
           <Button
             variant="outline"
@@ -933,7 +940,7 @@ export function BatchWorkspace({
           </Alert>
         ) : null}
 
-        {items.length < ITEM_LIMIT ? (
+        {items.length < BATCH_ITEM_LIMIT ? (
           <Section
             title="Add posts"
             description="Choose files, paste or load a CSV, or both. Nothing is added until you review the preview."

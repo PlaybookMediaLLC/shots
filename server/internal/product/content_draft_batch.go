@@ -11,7 +11,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 )
 
-// DraftBatchTimesInput previews up to 50 instants without reserving or publishing.
+// DraftBatchTimesInput previews up to contentBatchItemLimit instants without reserving or publishing.
 type DraftBatchTimesInput struct {
 	SocialSetID    string `json:"socialSetId"`
 	Count          int    `json:"count"`
@@ -73,8 +73,8 @@ func (c *Configuration) PreviewDraftBatchTimes(ctx context.Context, actor Actor,
 	if err := c.authorizeContentDrafts(ctx, actor, false); err != nil {
 		return nil, err
 	}
-	if input.Count < 1 || input.Count > 50 {
-		return nil, invalid("Select between 1 and 50 drafts.")
+	if input.Count < 1 || input.Count > contentBatchItemLimit {
+		return nil, invalid(fmt.Sprintf("Select between 1 and %d drafts.", contentBatchItemLimit))
 	}
 	set, err := c.resolveSocialSet(ctx, actor, input.SocialSetID)
 	if err != nil {

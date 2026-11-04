@@ -19,7 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 )
 
-// Bulk scheduling (RFC 042): batches of 50 photos, 50 videos and a mix
+// Bulk scheduling (RFC 042): batches of 100 photos, 100 videos and a mix
 // survive a reload, stage per-item captions, media, accounts and times,
 // become one draft each, are checked per item and account, and schedule the
 // valid selections without touching the rest; a corrected item schedules its
@@ -29,7 +29,8 @@ func TestContentBatches(t *testing.T) {
 	ctx, owner := w.ctx, w.owner
 	objects := &derivativeObjects{recordingAssetObjects: recordingAssetObjects{exists: true}, files: map[string][]byte{}}
 	repo := w.repo.WithObjectStore(objects).WithMonthlyMeter(&recordingMonthlyMeter{})
-	subscribe(t, ctx, repo, w.org, "business")
+	// Three full batches schedule more posts than a Business month allows.
+	subscribe(t, ctx, repo, w.org, "enterprise")
 	upload := func(name, mime string, body []byte) string {
 		t.Helper()
 		signed, err := repo.SignAssetUpload(ctx, owner, AssetUploadInput{Bytes: len(body), ContentType: mime, FileName: name})
@@ -78,7 +79,7 @@ func TestContentBatches(t *testing.T) {
 			ImportKey: fmt.Sprintf("%s-item-%04d-key", batch, i),
 			Caption:   fmt.Sprintf("Post %d — «%s»\nsecond line #batch", i, batch),
 			Media:     []schema.BatchMedia{{AssetID: media}}, ChannelConnectionIDs: []string{linkedin, threads},
-			Timing: schema.BatchTiming{Mode: "time", TimeZone: "Europe/Paris", LocalTime: fmt.Sprintf("%sT%02d:%02d", day, 8+i/6, (i%6)*10)},
+			Timing: schema.BatchTiming{Mode: "time", TimeZone: "Europe/Paris", LocalTime: fmt.Sprintf("%sT%02d:%02d", day, 8+i/10, (i%10)*5)},
 		}
 	}
 	build := func(name string, pick func(int) string) *ContentBatchRecord {
@@ -87,11 +88,11 @@ func TestContentBatches(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		items := make([]ContentBatchItemInput, 50)
+		items := make([]ContentBatchItemInput, contentBatchItemLimit)
 		for i := range items {
 			items[i] = item(name, i, pick(i))
 		}
-		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, items); err != nil || len(batch.Items) != 50 {
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, items); err != nil || len(batch.Items) != contentBatchItemLimit {
 			t.Fatalf("%s: %v", name, err)
 		}
 		return batch
@@ -123,7 +124,7 @@ func TestContentBatches(t *testing.T) {
 		}
 	}
 
-	t.Run("fifty photos, fifty videos and a mixed batch become a hundred posts each", func(t *testing.T) {
+	t.Run("a hundred photos, a hundred videos and a mixed batch become two hundred posts each", func(t *testing.T) {
 		for name, pick := range map[string]func(int) string{
 			"photos": func(i int) string { return photos[i%3] },
 			"videos": func(i int) string { return videos[i%3] },
@@ -147,7 +148,7 @@ func TestContentBatches(t *testing.T) {
 				}
 				posts += len(entry.Posts)
 			}
-			if posts != 100 {
+			if posts != 2*contentBatchItemLimit {
 				t.Fatalf("%s: %d posts", name, posts)
 			}
 		}
@@ -225,12 +226,59 @@ func TestContentBatches(t *testing.T) {
 			reloaded.Items[0].Media[0].AssetID != photos[1] || reloaded.Items[0].Media[0].MediaType != "image/jpeg" || reloaded.Items[0].Media[0].Status != "UPLOADED" {
 			t.Fatalf("drafted item media: %+v %v", reloaded.Items[0].Media, err)
 		}
-		over := make([]ContentBatchItemInput, 49)
+		over := make([]ContentBatchItemInput, contentBatchItemLimit-1)
 		for i := range over {
 			over[i] = item("over", i, photos[0])
 		}
 		if _, err := repo.AddContentBatchItems(ctx, owner, batch.ID, over); !errors.Is(err, ErrInvalidInput) {
-			t.Fatalf("51 items: %v", err)
+			t.Fatalf("%d items: %v", contentBatchItemLimit+1, err)
+		}
+	})
+
+	t.Run("a bulk update applies to every item or to none", func(t *testing.T) {
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Captions"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		inputs := []ContentBatchItemInput{item("bulk", 0, photos[0]), item("bulk", 1, photos[0]), item("bulk", 2, photos[0])}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, inputs); err != nil {
+			t.Fatal(err)
+		}
+		caption := func(text string) *string { return &text }
+		patch := func(i int, text string) ContentBatchItemPatch {
+			return ContentBatchItemPatch{ItemID: batch.Items[i].ID, ContentBatchItemUpdate: ContentBatchItemUpdate{Caption: caption(text)}}
+		}
+		refused := map[string][]ContentBatchItemPatch{
+			"an item twice": {patch(0, "One"), patch(0, "Two")},
+			"a bad time": {patch(0, "One"), {ItemID: batch.Items[1].ID, ContentBatchItemUpdate: ContentBatchItemUpdate{
+				Caption: caption("Two"), Timing: &schema.BatchTiming{Mode: "time", LocalTime: "tomorrow", TimeZone: "UTC"}}}},
+			"an unknown item": {patch(0, "One"), {ItemID: "cmissingitem0000000000000", ContentBatchItemUpdate: ContentBatchItemUpdate{Caption: caption("Two")}}},
+		}
+		for name, patches := range refused {
+			if _, err := repo.UpdateContentBatchItems(ctx, owner, batch.ID, patches); err == nil {
+				t.Fatalf("%s was accepted", name)
+			}
+			reloaded, err := repo.GetContentBatch(ctx, owner, batch.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i, entry := range reloaded.Items {
+				if entry.Caption != inputs[i].Caption {
+					t.Fatalf("%s left item %d as %q", name, i, entry.Caption)
+				}
+			}
+		}
+		updated, err := repo.UpdateContentBatchItems(ctx, owner, batch.ID, []ContentBatchItemPatch{patch(2, "Three"), patch(0, "One")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if updated.Items[0].Caption != "One" || updated.Items[1].Caption != inputs[1].Caption || updated.Items[2].Caption != "Three" {
+			t.Fatalf("bulk update: %+v", updated.Items)
+		}
+		// A saved item reads back alone, with its media and posts.
+		one, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, batch.Items[1].ID, ContentBatchItemUpdate{Caption: caption("Two")})
+		if err != nil || one.ID != batch.Items[1].ID || one.Caption != "Two" || one.Media[0].Status != "UPLOADED" {
+			t.Fatalf("single update: %+v %v", one, err)
 		}
 	})
 

@@ -3266,6 +3266,19 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Change many items as one operation: a refused item refuses them all. */
+  async updateContentBatchItems(
+    id: string,
+    items: (Partial<
+      Pick<BackendContentBatchItemInput, 'caption' | 'channelConnectionIds' | 'media' | 'timing'>
+    > & { itemId: string; position?: number })[]
+  ) {
+    return this.request<BackendContentBatch>(`v1/content-batches/${encodeURIComponent(id)}/items`, {
+      body: { items },
+      method: 'PATCH',
+    })
+  }
+
   /** Take an item out of its batch; a draft it made stays in Write. */
   async removeContentBatchItem(id: string, itemId: string) {
     await this.request<Response>(

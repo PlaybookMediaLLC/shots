@@ -68,8 +68,8 @@ test('CSV refuses malformed input and takes exactly fifty rows', () => {
   ])
     assert.throws(() => parseBatchCSV(text))
   assert.match(parseBatchCSV('caption,asset\none').rows[0].problems[0], /wrong number of fields/)
-  assert.equal(parseBatchCSV('caption\n' + Array(50).fill('item').join('\n')).rows.length, 50)
-  assert.throws(() => parseBatchCSV('caption\n' + Array(51).fill('item').join('\n')), /50/)
+  assert.equal(parseBatchCSV('caption\n' + Array(100).fill('item').join('\n')).rows.length, 100)
+  assert.throws(() => parseBatchCSV('caption\n' + Array(101).fill('item').join('\n')), /100/)
 })
 
 test('media matches an exact selected name or a confirmed asset, and flags everything else', () => {
