@@ -159,6 +159,8 @@ export type DraftEditorProps = {
   postHeader: (number: number) => React.ReactNode
   /** Per-post settings tools for the platform being edited. */
   postSettings?: PostTools['settings']
+  /** Open Rewrite for one post, beside its sparkle. */
+  onRefinePost?: PostTools['refine']
   /** Extra buttons for the bottom toolbar: numbering, finishers, platform tools. */
   toolbarExtras?: React.ReactNode
   /** Menu items the host adds to the toolbar's Media menu. */
@@ -646,6 +648,7 @@ function DraftEditorSession({
   hashtags,
   postHeader,
   postSettings,
+  onRefinePost,
   toolbarExtras,
   toolbarMediaItems,
   toolbarMoreItems,
@@ -943,8 +946,12 @@ function DraftEditorSession({
     () =>
       readOnly || waitingForConnection
         ? {}
-        : { addImage: () => imageInput.current?.click(), settings: postSettings },
-    [postSettings, readOnly, waitingForConnection]
+        : {
+            addImage: () => imageInput.current?.click(),
+            refine: onRefinePost,
+            settings: postSettings,
+          },
+    [onRefinePost, postSettings, readOnly, waitingForConnection]
   )
   return (
     <EditorServicesProvider services={services}>

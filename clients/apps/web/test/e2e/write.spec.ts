@@ -262,10 +262,9 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // The writing assistant, in the set's voice: set up or skipped, then asked.
+    // The writing assistant helps at once; its voice setup is offered later, never as a gate.
     await page.getByRole('button', { name: 'Assistant', exact: true }).click()
-    await expect(page.getByTestId('assistant-setup')).toBeVisible()
-    await page.getByTestId('assistant-setup').getByRole('button', { name: 'Skip for now' }).click()
+    await expect(page.getByTestId('assistant-setup')).toHaveCount(0)
     const assistant = page.getByTestId('assistant-panel')
     await assistant.getByRole('button', { name: /stronger hooks/ }).click()
     await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })

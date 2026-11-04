@@ -14,7 +14,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { CAPABILITIES } from '@/lib/write/capabilities'
 import { postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
@@ -85,12 +86,15 @@ export function RefineButton({
   editor,
   limit,
   draftId,
+  opener,
 }: {
   channel: DraftChannel
   editor: React.MutableRefObject<PlateEditor | null>
   limit: number
   /** The draft, whose set's writing context guides Refine. */
   draftId: string
+  /** Set to open Rewrite beside an element, such as a post's sparkle. */
+  opener?: React.MutableRefObject<((anchor: HTMLElement) => void) | null>
 }) {
   const { mod } = useKeys()
   const [open, setOpen] = React.useState(false)
@@ -103,6 +107,14 @@ export function RefineButton({
     texts: string[]
   } | null>(null)
   const [hasSelection, setHasSelection] = React.useState(false)
+  // Rewrite opens where it was asked for: at a post's sparkle, else at this button.
+  const trigger = React.useRef<HTMLButtonElement>(null)
+  const anchor = React.useRef<HTMLElement | null>(null)
+  const virtual = React.useRef({
+    getBoundingClientRect: () =>
+      (anchor.current?.isConnected ? anchor.current : trigger.current)?.getBoundingClientRect() ??
+      new DOMRect(),
+  })
   const openMenu = () => {
     const current = editor.current
     const selected = Boolean(current?.selection && !current.api.isCollapsed())
@@ -111,9 +123,29 @@ export function RefineButton({
     setOpen(true)
   }
   useShortcuts([
-    { inEditor: true, key: 'e', label: 'Rewrite', mod: true, run: openMenu, shift: true },
+    {
+      inEditor: true,
+      key: 'e',
+      label: 'Rewrite',
+      mod: true,
+      run: () => {
+        anchor.current = null
+        openMenu()
+      },
+      shift: true,
+    },
   ])
-  const run = async (action: RefineAction) => {
+  React.useEffect(() => {
+    if (!opener) return
+    opener.current = (element) => {
+      anchor.current = element
+      openMenu()
+    }
+    return () => {
+      opener.current = null
+    }
+  })
+  const run = async (action: RefineAction, instruction = prompt) => {
     const current = editor.current
     if (!current) return
     let request: Request
@@ -152,7 +184,7 @@ export function RefineButton({
           action,
           channel,
           limit,
-          prompt: action === 'custom' ? prompt : undefined,
+          prompt: action === 'custom' ? instruction : undefined,
           draftId,
           scope,
           texts,
@@ -204,9 +236,19 @@ export function RefineButton({
   }
   return (
     <>
-      <Popover onOpenChange={(next) => (next ? openMenu() : setOpen(false))} open={open}>
+      <Popover
+        onOpenChange={(next) => {
+          if (next) {
+            anchor.current = null
+            openMenu()
+          } else setOpen(false)
+        }}
+        open={open}
+      >
+        <PopoverAnchor virtualRef={virtual} />
         <PopoverTrigger asChild>
           <Button
+            ref={trigger}
             aria-label="Rewrite"
             className="h-7 rounded-md px-2 text-xs"
             disabled={busy}
@@ -262,6 +304,21 @@ export function RefineButton({
               Go
             </Button>
           </form>
+          <Button
+            className="h-auto justify-start px-2 py-1 text-left text-xs"
+            disabled={busy}
+            onClick={() =>
+              void run(
+                'custom',
+                `Adapt this for ${CAPABILITIES[channel].label}: keep the facts and the point, and write it the way people post there.`
+              )
+            }
+            size={null}
+            type="button"
+            variant="outline"
+          >
+            Adapt for {CAPABILITIES[channel].label}
+          </Button>
           <div className="grid grid-cols-2 gap-1">
             {(Object.keys(REFINE_LABELS) as (keyof typeof REFINE_LABELS)[])
               .filter((action) => action !== 'custom')

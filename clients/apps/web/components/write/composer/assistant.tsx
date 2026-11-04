@@ -56,7 +56,6 @@ export function AssistantPanel({
   const [message, setMessage] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [setup, setSetup] = React.useState(false)
-  const [skipped, setSkipped] = React.useState(false)
   const configured = set?.writingAssistant.status === 'configured'
   const send = async (text: string) => {
     const content = text.trim()
@@ -79,17 +78,9 @@ export function AssistantPanel({
       setBusy(false)
     }
   }
-  if (setup || (!configured && !skipped && turns.length === 0 && set)) {
-    return (
-      <AssistantSetup
-        onDone={() => {
-          setSetup(false)
-          setSkipped(true)
-        }}
-        set={set}
-      />
-    )
-  }
+  // Help comes first; the brand's voice is offered after a few answers, never as a gate.
+  if (setup) return <AssistantSetup onDone={() => setSetup(false)} set={set} />
+  const nudge = !configured && Boolean(set) && turns.filter((turn) => turn.role === 'assistant').length >= 3
   return (
     <div className="flex h-full flex-col gap-3 p-4 text-sm" data-testid="assistant-panel">
       <p className="text-xs text-muted-foreground">
@@ -136,6 +127,20 @@ export function AssistantPanel({
           ))}
         </ul>
       </details>
+      {nudge ? (
+        <p className="rounded-lg border border-border p-3 text-xs text-muted-foreground" role="status">
+          Add a style guide and writing samples so answers sound like {set?.name ?? 'this brand'}.{' '}
+          <Button
+            className="text-sky-700 dark:text-sky-300"
+            onClick={() => setSetup(true)}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            Set up its voice
+          </Button>
+        </p>
+      ) : null}
       {turns.length === 0 ? (
         <VoiceMemo draftId={draftId} channel={channel} onUse={setMessage} />
       ) : null}

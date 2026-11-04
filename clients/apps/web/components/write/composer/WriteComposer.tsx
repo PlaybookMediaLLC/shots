@@ -385,6 +385,8 @@ export function WriteComposer({
   const bodyArea = React.useRef<HTMLDivElement>(null)
   const [pasteNotice, setPasteNotice] = React.useState(false)
   const [toolDialog, setToolDialog] = React.useState<ToolDialog | null>(null)
+  // Rewrite registers here, so a post's sparkle opens it beside that post.
+  const refineAt = React.useRef<((anchor: HTMLElement) => void) | null>(null)
   const tools = (writing: DraftChannel[]) =>
     toolMenuItems(
       setToolDialog,
@@ -755,6 +757,7 @@ export function WriteComposer({
     }))
   }
   const editorProps = {
+    onRefinePost: aiEnabled ? (anchor: HTMLElement) => refineAt.current?.(anchor) : undefined,
     draftId: initial.id,
     extraPlugins: WRITE_PLUGINS,
     handles: vocabulary.handles,
@@ -1428,6 +1431,7 @@ export function WriteComposer({
                     editor={editor}
                     draftId={initial.id}
                     onDialog={setToolDialog}
+                    refineAt={refineAt}
                     setId={server.socialSetId ?? set?.id ?? null}
                   />
                 }
@@ -1475,6 +1479,7 @@ export function WriteComposer({
                       editor={editor}
                       draftId={initial.id}
                       onDialog={setToolDialog}
+                      refineAt={refineAt}
                       setId={server.socialSetId ?? set?.id ?? null}
                     />
                   }
@@ -1982,11 +1987,14 @@ function ToolbarExtras({
   limit,
   draftId,
   onDialog,
+  refineAt,
   setId,
 }: {
   aiEnabled: boolean
   /** The tool the toolbar's menus opened, if any. */
   dialog: ToolDialog | null
+  /** Where Rewrite registers its opener for a post's sparkle. */
+  refineAt: React.MutableRefObject<((anchor: HTMLElement) => void) | null>
   onDialog: (dialog: ToolDialog | null) => void
   onDescriptionSaved: (assetId: string, alt: string) => void
   /** The version being edited, which Refine writes for. */
@@ -2006,7 +2014,13 @@ function ToolbarExtras({
   return (
     <>
       {aiEnabled ? (
-        <RefineButton channel={channel} draftId={draftId} editor={editor} limit={limit} />
+        <RefineButton
+          channel={channel}
+          draftId={draftId}
+          editor={editor}
+          limit={limit}
+          opener={refineAt}
+        />
       ) : null}
       <MentionPicker
         channels={channels}

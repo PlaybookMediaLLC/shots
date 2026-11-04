@@ -2,6 +2,7 @@
 
 import { normalizeMentions } from '@/lib/write/normalize-mentions'
 import { AddIcon, DragIcon, ImageIcon, MoreIcon } from '@/components/platform-shell/icons'
+import { SparkleIcon } from '@phosphor-icons/react/dist/ssr/Sparkle'
 
 import * as React from 'react'
 import {
@@ -292,6 +293,8 @@ export const PostBreakPlugin = createPlatePlugin({
 /** What a post's tools can do beyond the editor itself. */
 export type PostTools = {
   addImage?: () => void
+  /** Open Rewrite for the post holding the caret, beside the given element. */
+  refine?: (anchor: HTMLElement) => void
   /** Settings tools for this platform's posts, drawn beside the header. */
   settings?: (props: { number: number; settings: PostSettings }) => React.ReactNode
 }
@@ -363,6 +366,22 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
           >
             <AddIcon aria-hidden size={15} />
           </Button>
+          {tools.refine ? (
+            <Button
+              variant="custom"
+              size={null}
+              aria-label={`Rewrite post ${number}`}
+              className={button}
+              onClick={(event) => {
+                selectPostEnd(editor, number)
+                tools.refine?.(event.currentTarget)
+              }}
+              title="Rewrite this post (⌘⇧E)"
+              type="button"
+            >
+              <SparkleIcon aria-hidden size={15} />
+            </Button>
+          ) : null}
           {tools.addImage ? (
             <Button
               variant="custom"
