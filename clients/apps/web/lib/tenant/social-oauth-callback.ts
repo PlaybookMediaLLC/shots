@@ -94,6 +94,20 @@ export const socialOAuthReturnSchema = z
   .regex(/^\/(?:workspace\/social-sets|write)\/[a-z0-9]{10,32}$/)
 
 /**
+ * Links open the connection start in the browser. A sign-in that is missing or
+ * too old for this sensitive action signs in again, then returns to the same
+ * start, so the connection continues.
+ */
+export function socialOAuthSignInRedirect(requestUrl: string): Response {
+  const { pathname, search } = new URL(requestUrl)
+  const query = new URLSearchParams({ reauthenticate: '1', callbackURL: pathname + search })
+  return new Response(null, {
+    headers: { 'Cache-Control': 'no-store', Location: `/sign-in?${query}` },
+    status: 303,
+  })
+}
+
+/**
  * Back to where the connection started, which confirms it: the social set's
  * settings (RFC 024), or else the Channels settings.
  */

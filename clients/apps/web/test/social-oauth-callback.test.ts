@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict'
 import { getAuthBaseUrl } from '@/lib/auth/environment'
 import { afterEach, test } from 'node:test'
-import { completeSocialOAuth, selectInstagramAccount } from '../lib/tenant/social-oauth-callback'
+import {
+  completeSocialOAuth,
+  selectInstagramAccount,
+  socialOAuthSignInRedirect,
+} from '../lib/tenant/social-oauth-callback'
 import { socialOAuthCompletionRedirect } from '../lib/tenant/social-oauth-completion'
+import { safeReturnPath } from '../lib/platform/navigation'
 
 afterEach(() => {
   delete process.env.BETTER_AUTH_SECRET
@@ -240,4 +245,17 @@ test('a completed Instagram callback recovers without asking for page selection 
   )
   assert.equal(response.status, 303)
   assert.equal(completed, 1)
+})
+
+test('a start without a fresh sign-in signs in again and returns to the same start', () => {
+  const start = '/integrations/social/tiktok/start?socialSet=cmw1m3hsq00010ayj93w7zag8&reconnect=c1'
+  const response = socialOAuthSignInRedirect(`https://app.test${start}`)
+  assert.equal(response.status, 303)
+  assert.equal(response.headers.get('cache-control'), 'no-store')
+  const location = new URL(response.headers.get('location') ?? '', 'https://app.test')
+  assert.equal(location.pathname, '/sign-in')
+  assert.equal(location.searchParams.get('reauthenticate'), '1')
+  assert.equal(location.searchParams.get('callbackURL'), start)
+  // The sign-in page follows only internal paths; this one must survive unchanged.
+  assert.equal(safeReturnPath(location.searchParams.get('callbackURL')), start)
 })
