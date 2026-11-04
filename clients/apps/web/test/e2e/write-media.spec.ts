@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   apiRequest,
+  caretAtDocumentEnd,
   db,
   draftEditor,
   expect,
@@ -531,8 +532,7 @@ test(
 
 test(
   'TF-057 TF-074 TF-078 TF-085 TF-100: live preview, expansion and scaled mobile geometry preserve draft',
-  // Temporary: pull request CI renders the new avatar baselines (only @smoke runs there).
-  { tag: ['@journey', '@smoke'] },
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin', 'threads'] })
     const id = await openNewDraft(page)
@@ -548,20 +548,20 @@ test(
     await panel.getByRole('combobox', { name: 'Preview device' }).click()
     await page.getByRole('option', { name: 'Desktop', exact: true }).click()
     await expect(panel.getByRole('button', { name: 'Show more', exact: true })).toBeVisible()
-    await expect.soft(panel).toHaveScreenshot('x-desktop-collapsed.png', {
+    await expect(panel).toHaveScreenshot('x-desktop-collapsed.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     await expect(panel.getByText(/Preview opening/)).toContainText('<script>alert(1)</script>')
-    await expect.soft(panel).toHaveScreenshot('x-desktop-expanded.png', {
+    await expect(panel).toHaveScreenshot('x-desktop-expanded.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
     await panel.getByRole('button', { name: 'Show less', exact: true }).click()
     await panel.getByRole('button', { name: 'LinkedIn', exact: true }).click()
     await expect(panel.getByRole('button', { name: /more/ })).toBeVisible()
-    await expect.soft(panel).toHaveScreenshot('linkedin-desktop-collapsed.png', {
+    await expect(panel).toHaveScreenshot('linkedin-desktop-collapsed.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
@@ -570,24 +570,24 @@ test(
     const bounds = await panel.getByTestId('preview-device-content').boundingBox()
     const available = await panel.getByTestId('preview-scroll').boundingBox()
     expect(bounds!.width).toBeLessThanOrEqual(available!.width + 1)
-    await expect.soft(panel).toHaveScreenshot('linkedin-mobile-collapsed.png', {
+    await expect(panel).toHaveScreenshot('linkedin-mobile-collapsed.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
     await panel.getByRole('button', { name: /more/ }).click()
-    await expect.soft(panel).toHaveScreenshot('linkedin-mobile-expanded.png', {
+    await expect(panel).toHaveScreenshot('linkedin-mobile-expanded.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
-    await draftEditor(page).click()
-    await page.keyboard.press('ControlOrMeta+End')
+    // A click then End can leave the caret where the click landed: set it at the end.
+    await caretAtDocumentEnd(page)
     await page.keyboard.type(' Live update.')
     await expect(panel).toContainText('Live update.')
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('A short second post 🚀')
     await panel.getByRole('button', { name: 'Threads', exact: true }).click()
     await expect(panel.locator('article')).toHaveCount(2)
-    await expect.soft(panel).toHaveScreenshot('threads-mobile-thread.png', {
+    await expect(panel).toHaveScreenshot('threads-mobile-thread.png', {
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
