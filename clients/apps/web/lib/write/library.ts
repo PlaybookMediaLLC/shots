@@ -35,6 +35,7 @@ export function libraryDraft(draft: DraftWire) {
   return {
     attentionPosts: draft.attentionPosts,
     channelConnectionIds: draft.channelConnectionIds,
+    checkPosts: draft.checkPosts,
     excerpt: text.slice(0, 180),
     id: draft.id,
     searchText: `${text} ${draft.scratchpad}`,

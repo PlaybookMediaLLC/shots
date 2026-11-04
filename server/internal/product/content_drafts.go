@@ -110,9 +110,11 @@ type ContentDraftRecord struct {
 	Target           *draftdoc.Target          `json:"target"`
 	// Lists only: posts waiting to go out, the next one's time, and posts
 	// that failed or whose outcome is unknown, which need attention.
-	AttentionPosts int        `json:"attentionPosts"`
-	NextPostAt     *time.Time `json:"nextPostAt"`
-	QueuedPosts    int        `json:"queuedPosts"`
+	AttentionPosts int `json:"attentionPosts"`
+	// CheckPosts are the attention posts whose outcome is unknown.
+	CheckPosts  int        `json:"checkPosts"`
+	NextPostAt  *time.Time `json:"nextPostAt"`
+	QueuedPosts int        `json:"queuedPosts"`
 }
 
 // ContentDraftPage is one page of a workspace's drafts in the asked order.
@@ -889,16 +891,22 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftIDIn(ids...),
 		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(scheduledpost.StatusPUBLISHED,
 			scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED,
-			scheduledpost.StatusUNKNOWN_DELIVERY)).All(ctx)
+			scheduledpost.StatusUNKNOWN_DELIVERY)).Order(ent.Desc(scheduledpost.FieldCreatedAt)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	type summary struct {
-		attention, published, queued int
-		next                         *time.Time
+		attention, check, published, queued int
+		next                                *time.Time
 	}
 	byDraft := map[string]*summary{}
+	// A failure needs attention only while it is its destination's newest
+	// post: a retry is a new post, so the failure it replaced is history.
+	seen := map[[2]string]bool{}
 	for _, post := range posts {
+		destination := [2]string{*post.ContentDraftID, post.ChannelConnectionID}
+		replaced := seen[destination]
+		seen[destination] = true
 		item := byDraft[*post.ContentDraftID]
 		if item == nil {
 			item = &summary{}
@@ -913,14 +921,21 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 				at := post.ScheduledFor
 				item.next = &at
 			}
+		case scheduledpost.StatusUNKNOWN_DELIVERY:
+			if !replaced {
+				item.attention++
+				item.check++
+			}
 		default:
-			item.attention++
+			if !replaced {
+				item.attention++
+			}
 		}
 	}
 	return func(row *ent.ContentDraft) ContentDraftRecord {
 		record := contentDraftRecord(row)
 		if item := byDraft[row.ID]; item != nil {
-			record.AttentionPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.published, item.queued, item.next
+			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
 		}
 		return record
 	}, nil

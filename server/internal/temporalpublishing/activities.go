@@ -110,13 +110,8 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 	}
 
 	providerErr := &socialapi.Error{}
-	failureCode := "UNKNOWN"
-	if errors.Is(publishErr, errMissedWindow) {
-		failureCode = publishing.FailureMissedWindow
-	}
-	if errors.As(publishErr, &providerErr) {
-		failureCode = publishing.ProviderFailureCode(providerErr.Status, providerErr.UnknownDelivery)
-	}
+	errors.As(publishErr, &providerErr)
+	failureCode := failureCodeFor(ctx, input.Job, publishErr)
 	if providerErr.UnknownDelivery {
 		if err := a.store.FailUnknown(ctx, post.ID, input.RunID, input.AttemptNumber); err != nil {
 			return PublishResult{}, err
@@ -137,6 +132,25 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 		return PublishResult{}, err
 	}
 	return PublishResult{FailureCode: failureCode, Outcome: OutcomeFailed}, nil
+}
+
+// failureCodeFor is the code a failed publication keeps: missed window, a
+// cause the publisher named, the provider's status, or PUBLISHER_ERROR for a
+// fault with no provider status, which is logged because the code cannot
+// carry it.
+func failureCodeFor(ctx context.Context, job PreparedPublication, err error) string {
+	if errors.Is(err, errMissedWindow) {
+		return publishing.FailureMissedWindow
+	}
+	providerErr := &socialapi.Error{}
+	if !errors.As(err, &providerErr) {
+		slog.ErrorContext(ctx, "publication failed without a provider status", "post", job.PostID, "platform", job.Platform, "error", err)
+		return "PUBLISHER_ERROR"
+	}
+	if providerErr.Code != "" && !providerErr.UnknownDelivery {
+		return providerErr.Code
+	}
+	return publishing.ProviderFailureCode(providerErr.Status, providerErr.UnknownDelivery)
 }
 
 func (a *Activities) MarkUnknown(ctx context.Context, input MarkUnknownInput) error {
@@ -300,16 +314,11 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 		}
 		return PublishResult{Outcome: OutcomePending, ProviderID: providerID}, nil
 	}
-	if errors.Is(err, errMissedWindow) {
-		return PublishResult{FailureCode: publishing.FailureMissedWindow, Outcome: OutcomeFailed}, nil
-	}
 	providerErr := &socialapi.Error{}
 	if !errors.As(err, &providerErr) {
-		// The failure code cannot carry this error, so log it for diagnosis.
-		slog.ErrorContext(ctx, "publication failed without a provider status", "post", input.Job.PostID, "platform", input.Job.Platform, "error", err)
-		return PublishResult{FailureCode: "UNKNOWN", Outcome: OutcomeFailed}, nil
+		return PublishResult{FailureCode: failureCodeFor(ctx, input.Job, err), Outcome: OutcomeFailed}, nil
 	}
-	failureCode := publishing.ProviderFailureCode(providerErr.Status, providerErr.UnknownDelivery)
+	failureCode := failureCodeFor(ctx, input.Job, err)
 	if providerErr.UnknownDelivery {
 		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown, ProviderID: providerID, Progress: progress}, nil
 	}

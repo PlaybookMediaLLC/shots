@@ -112,7 +112,7 @@ func (p *Publisher) analyticsAccount(ctx context.Context, organizationID, destin
 func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinationID, platform, secretReference string,
 	providerSettings map[string]any, publication bool) (*socialent.Integration, poster, json.RawMessage, error) {
 	if p.bindings == nil || p.integrations == nil || p.signer == nil || p.resolve == nil {
-		return nil, nil, nil, socialapi.NewError(http.StatusServiceUnavailable, false, "direct publisher is not configured")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusServiceUnavailable, "PUBLISHER_UNAVAILABLE", "direct publisher is not configured")
 	}
 	binding, err := p.bindings.Binding(ctx, organizationID)
 	if err != nil {
@@ -127,10 +127,10 @@ func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinat
 	}
 	if account == nil || account.ID != destinationID || account.OrganizationID != binding.GoOrganizationID || account.ProviderIdentifier != platform || account.DeletedAt != nil || account.InBetweenSteps || account.Disabled || account.RefreshNeeded || account.Token == "" ||
 		account.TokenExpiration != nil && !account.TokenExpiration.After(p.currentTime()) {
-		return nil, nil, nil, socialapi.NewError(http.StatusConflict, false, "social credentials have expired or been disabled")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, "ACCOUNT_RECONNECT", "social credentials have expired or been disabled")
 	}
 	if integrations.RequireVerifiedIdentity(account) != nil {
-		return nil, nil, nil, socialapi.NewError(http.StatusConflict, false, "reconnect this account to verify its identity, publishing permissions and limits")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, "ACCOUNT_RECONNECT", "reconnect this account to verify its identity, publishing permissions and limits")
 	}
 	provider := p.resolve(platform)
 	if provider == nil || (publication && !directPlatformAllowed(platform)) {
@@ -166,7 +166,7 @@ func publicationOutcome(err error) error {
 		return socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
 	}
 	if temporalx.FailureType(err) == temporalx.TypeRefreshToken || temporalx.FailureType(err) == temporalx.TypeDisconnect {
-		return socialapi.NewError(http.StatusConflict, false, "social credentials must be reconnected")
+		return socialapi.NewCodedError(http.StatusConflict, "ACCOUNT_RECONNECT", "social credentials must be reconnected")
 	}
 	// The provider may have accepted the post before the call failed. A
 	// reconciliation step must inspect the remote account before retrying.
@@ -192,12 +192,12 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		youtubeOptions, tiktokOptions = input.Options.YouTube, input.Options.TikTok
 	}
 	if err := postoptions.ValidateVideoOptions(input.Platform, youtubeOptions, tiktokOptions, true); err != nil {
-		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, "POST_OPTIONS", err.Error())
 	}
 	assets := input.Media()
 	if input.Platform == "tiktok" || input.Platform == "youtube" {
 		if len(assets) != 1 || assets[0].MediaType != "video/mp4" || len(input.Replies) > 0 || input.ReplyTo != "" || input.Poll != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, "choose one MP4 video")
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, "MEDIA_UNSUPPORTED", "choose one MP4 video")
 		}
 	}
 	if input.Platform == "tiktok" {
@@ -209,14 +209,18 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 		creator, err := reader.CreatorInfo(ctx, account.Token)
 		if err != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, false, "TikTok creator information unavailable")
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadGateway, "PROVIDER_PERMISSIONS", "TikTok creator information unavailable")
 		}
 		duration := 0
 		if assets[0].DurationMs != nil {
 			duration = *assets[0].DurationMs
 		}
 		if err := creator.Check(input.Options.TikTok, duration); err != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+			code := "POST_OPTIONS"
+			if errors.Is(err, postoptions.ErrVideoTooLong) {
+				code = "VIDEO_TOO_LONG"
+			}
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, code, err.Error())
 		}
 	}
 	if input.Document != nil {

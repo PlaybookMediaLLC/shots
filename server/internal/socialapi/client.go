@@ -172,7 +172,10 @@ type OAuthExchange = schema.SocialOAuthExchange
 type Error struct {
 	Status          int
 	UnknownDelivery bool
-	message         string
+	// Code names a known cause, such as ACCOUNT_RECONNECT, for the failure
+	// receipt to keep; empty when only the status is known.
+	Code    string
+	message string
 }
 
 func (e *Error) Error() string { return e.message }
@@ -182,6 +185,11 @@ func (e *Error) HTTPStatus() int { return e.Status }
 
 func NewError(status int, unknownDelivery bool, message string) *Error {
 	return &Error{Status: status, UnknownDelivery: unknownDelivery, message: message}
+}
+
+// NewCodedError is a refusal with a named cause: nothing reached the provider.
+func NewCodedError(status int, code, message string) *Error {
+	return &Error{Status: status, Code: code, message: message}
 }
 
 func New(baseURL string, httpClient *http.Client, assetReader AssetReader) *Client {
@@ -397,11 +405,11 @@ func (c *Client) Publish(ctx context.Context, input PublishInput) (string, error
 		}
 	}
 	if !publishing.IsSecretReference(input.SecretReference) {
-		return "", &Error{message: "invalid social API credential reference"}
+		return "", &Error{Code: "PUBLISHER_UNAVAILABLE", message: "invalid social API credential reference"}
 	}
 	token, ok := os.LookupEnv(input.SecretReference)
 	if !ok || token == "" {
-		return "", &Error{message: "Social API credentials are unavailable"}
+		return "", &Error{Code: "PUBLISHER_UNAVAILABLE", message: "Social API credentials are unavailable"}
 	}
 	// A content draft post without an image publishes as text (RFC 013).
 	images, err := c.uploadAll(ctx, token, input.OrganizationID, input.Media())
@@ -504,11 +512,11 @@ func (c *Client) UploadAsset(ctx context.Context, input PublishInput) (string, e
 
 func (c *Client) Status(ctx context.Context, input StatusInput) (StatusResult, error) {
 	if !publishing.IsSecretReference(input.SecretReference) {
-		return StatusResult{}, &Error{message: "invalid social API credential reference"}
+		return StatusResult{}, &Error{Code: "PUBLISHER_UNAVAILABLE", message: "invalid social API credential reference"}
 	}
 	token, ok := os.LookupEnv(input.SecretReference)
 	if !ok || token == "" {
-		return StatusResult{}, &Error{message: "Social API credentials are unavailable"}
+		return StatusResult{}, &Error{Code: "PUBLISHER_UNAVAILABLE", message: "Social API credentials are unavailable"}
 	}
 	now := time.Now().UTC()
 	query := url.Values{

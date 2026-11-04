@@ -15,7 +15,7 @@ import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { connectHref } from '@/components/settings/social-sets/api'
-import { Pill, type PillTone } from '@/components/platform-ui'
+import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -48,10 +48,11 @@ import {
   type DraftWire,
   draftsApi,
 } from '@/lib/content-drafts/client'
-import { draftPostsState, POST_STATE_TONE } from '@/lib/content-drafts/post-status'
+import { currentPosts, draftPostsState, draftStatus } from '@/lib/content-drafts/post-status'
 import { renderBlockImages } from '@/lib/content-drafts/render-blocks'
 import {
   type BlockImages,
+  channelForPlatform,
   draftPlainText,
   renderableBlockCount,
 } from '@/lib/content-drafts/serialize'
@@ -744,6 +745,8 @@ export function WriteComposer({
     title: document.title,
     user,
   }
+  // The destinations' state that needs attention first; a plan only when nothing is queued.
+  const status = draftStatus(server, draftPostsState(currentPosts(posts)))
   const panelContent =
     panel === 'properties' ? (
       <PropertiesPanel
@@ -756,6 +759,7 @@ export function WriteComposer({
           channel: item.account.channel,
           publication: item.publication,
         }))}
+        status={status?.label ?? 'Draft'}
         title={document.title}
       />
     ) : panel === 'preview' ? (
@@ -812,22 +816,6 @@ export function WriteComposer({
         set={set}
       />
     ) : null
-  // The destinations' state that needs attention first; a plan only when nothing is queued.
-  const destinations = draftPostsState(posts)
-  const status: { label: string; tone: PillTone } | null =
-    server.status === 'archived'
-      ? { label: 'Archived', tone: 'gray' }
-      : destinations
-        ? {
-            label:
-              destinations.count < destinations.total
-                ? `${destinations.state} · ${destinations.count} of ${destinations.total}`
-                : destinations.state,
-            tone: POST_STATE_TONE[destinations.state],
-          }
-        : server.plannedFor
-          ? { label: 'Planned', tone: 'purple' }
-          : null
   // shortcut: compares each queued post's first text and thread length with the current
   // version, not reply text or media; store a content hash on the post to catch those too.
   const edited = new Set(
@@ -1467,6 +1455,11 @@ export function WriteComposer({
                     : [changed, ...current]
                 )
               }
+              onEdit={(platform) => {
+                const channel = channelForPlatform(platform)
+                if (channel && channels.includes(channel)) setTab(channel)
+                focusRoot.current?.closest('main')?.scrollTo({ top: 0 })
+              }}
               posts={posts}
             />
             <div className="h-32" />

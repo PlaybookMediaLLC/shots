@@ -101,6 +101,88 @@ export function draftPostsState(
   return { state, count: states.filter((item) => item === state).length, total: states.length }
 }
 
+/**
+ * A draft's posts without the failures a newer post of the same destination
+ * replaced: a retry is a new post, so the failure before it is history. The
+ * backend's list counts read the same way.
+ */
+export function currentPosts<
+  T extends {
+    channelConnectionId: string
+    createdAt: string | Date
+    status: ScheduledPostStatus
+  },
+>(posts: T[]): T[] {
+  return posts.filter(
+    (post) =>
+      (post.status !== 'FAILED' && post.status !== 'UNKNOWN_DELIVERY') ||
+      !posts.some(
+        (other) =>
+          other.channelConnectionId === post.channelConnectionId &&
+          other.status !== 'CANCELLED' &&
+          new Date(other.createdAt).getTime() > new Date(post.createdAt).getTime()
+      )
+  )
+}
+
+/** How many destinations are in a state, in the words every surface uses. */
+export function stateLabel(state: PostState, count: number, total: number): string {
+  return count < total ? `${state} · ${count} of ${total}` : state
+}
+
+/**
+ * The one status a draft reads as in its header and its details: archived,
+ * else its destinations' state that needs attention first, else a plan.
+ * It is derived from the posts each time, never from a stored draft status.
+ */
+export function draftStatus(
+  draft: { status: string; plannedFor: string | Date | null },
+  destinations: { state: PostState; count: number; total: number } | null
+): { label: string; tone: PillTone } | null {
+  if (draft.status === 'archived') return { label: 'Archived', tone: 'gray' }
+  if (destinations)
+    return {
+      label: stateLabel(destinations.state, destinations.count, destinations.total),
+      tone: POST_STATE_TONE[destinations.state],
+    }
+  return draft.plannedFor ? { label: 'Planned', tone: 'purple' } : null
+}
+
+/**
+ * A listed draft's state that needs a person, from the list's counts: the
+ * list has no post rows, so it reads the same words from the totals.
+ */
+export function listedAttention(counts: {
+  attentionPosts: number
+  checkPosts: number
+  publishedPosts: number
+  queuedPosts: number
+}): { state: PostState; count: number; total: number } | null {
+  if (counts.attentionPosts === 0) return null
+  const check = counts.checkPosts > 0
+  return {
+    count: check ? counts.checkPosts : counts.attentionPosts,
+    state: check ? 'Needs check' : 'Failed',
+    total: counts.attentionPosts + counts.queuedPosts + counts.publishedPosts,
+  }
+}
+
+/**
+ * What a person can do about a failure besides retrying it: reconnect the
+ * account, or edit the post or its options. Null when retrying is the fix.
+ */
+export function postFailureFix(code: string | null | undefined): 'reconnect' | 'edit' | null {
+  if (!code) return null
+  if (['ACCOUNT_RECONNECT', 'ACCOUNT_UNAVAILABLE', 'PROVIDER_PERMISSIONS', '401', '403'].includes(code))
+    return 'reconnect'
+  if (
+    ['POST_OPTIONS', 'VIDEO_TOO_LONG', 'MEDIA_UNSUPPORTED', 'MEDIA_UNAVAILABLE'].includes(code) ||
+    (/^4\d\d$/.test(code) && code !== '429')
+  )
+    return 'edit'
+  return null
+}
+
 /** Why a destination did not publish, or null when nothing went wrong. */
 export function postFailureReason(code: string | null | undefined): string | null {
   switch (code) {
@@ -124,6 +206,21 @@ export function postFailureReason(code: string | null | undefined): string | nul
       return 'The workspace or this content is no longer active, so it was not sent.'
     case 'UNKNOWN_DELIVERY':
       return 'The platform did not confirm the result. It may already be live.'
+    case 'ACCOUNT_RECONNECT':
+      return 'The account must be reconnected, so nothing was sent. Reconnect it, then retry.'
+    case 'PROVIDER_PERMISSIONS':
+      return 'The platform did not return this account’s posting permissions. Retry it. If it fails again, reconnect the account.'
+    case 'POST_OPTIONS':
+      return 'This account cannot post with these options, so nothing was sent. Change the platform options, then retry.'
+    case 'VIDEO_TOO_LONG':
+      return 'The video is longer than this account may post, so nothing was sent. Use a shorter video, then retry.'
+    case 'MEDIA_UNSUPPORTED':
+      return 'This platform takes one MP4 video, so nothing was sent. Replace the media, then retry.'
+    case 'PUBLISHER_UNAVAILABLE':
+      return 'Shots could not reach its publishing service, so nothing was sent. Retry it later, or send the details to support.'
+    case 'PUBLISHER_ERROR':
+    case 'UNKNOWN':
+      return 'Shots had an error before it handed the post to the platform. Retry it. If it fails again, send the details to support.'
     case 'NETWORK':
       return 'The platform could not be reached. Retry it.'
     case '429':

@@ -3,9 +3,13 @@ import test from 'node:test'
 import { analyticsReportSchema, analyticsQuerySchema } from '../lib/api/contracts/plan-analyze'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
+  currentPosts,
   draftPostsState,
+  draftStatus,
+  listedAttention,
   OVERDUE_AFTER_MS,
   POST_STATE_TONE,
+  postFailureFix,
   postFailureReason,
   postState,
   STATUS_GROUPS,
@@ -548,4 +552,78 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Publishing',
     'Scheduled',
   ])
+})
+
+test('every surface reads a draft with the same status words, from its current posts', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z')
+  const later = '2026-11-05T12:00:00Z'
+  const post = (id: string, status: 'FAILED' | 'PUBLISHED' | 'CANCELLED', createdAt: string) => ({
+    channelConnectionId: id,
+    createdAt,
+    scheduledFor: later,
+    status,
+  })
+  // The demo draft: TikTok failed twice; both are its current state.
+  const demo = [post('tiktok', 'FAILED', '2026-11-04T04:25:00Z')]
+  const header = draftStatus(
+    { plannedFor: null, status: 'scheduled' },
+    draftPostsState(currentPosts(demo), now)
+  )
+  assert.deepEqual(header, { label: 'Failed', tone: 'red' })
+  // The list reads its counts in the same words.
+  const listed = listedAttention({
+    attentionPosts: 1,
+    checkPosts: 0,
+    publishedPosts: 0,
+    queuedPosts: 0,
+  })
+  assert.equal(listed?.state, 'Failed')
+  // A successful retry replaces the failure it followed; a cancelled one does not.
+  const retried = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'PUBLISHED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.deepEqual(draftPostsState(currentPosts(retried), now), {
+    count: 1,
+    state: 'Published',
+    total: 1,
+  })
+  const cancelled = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'CANCELLED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(cancelled), now)?.state, 'Failed')
+  assert.equal(
+    listedAttention({ attentionPosts: 2, checkPosts: 1, publishedPosts: 1, queuedPosts: 0 })?.state,
+    'Needs check'
+  )
+  assert.equal(
+    listedAttention({ attentionPosts: 0, checkPosts: 0, publishedPosts: 1, queuedPosts: 0 }),
+    null
+  )
+  assert.deepEqual(draftStatus({ plannedFor: null, status: 'archived' }, null), {
+    label: 'Archived',
+    tone: 'gray',
+  })
+  assert.equal(draftStatus({ plannedFor: null, status: 'scheduled' }, null), null)
+})
+
+test('every failure names a cause and an action besides retrying when one exists', () => {
+  for (const code of [
+    'UNKNOWN',
+    'PUBLISHER_ERROR',
+    'PUBLISHER_UNAVAILABLE',
+    'ACCOUNT_RECONNECT',
+    'POST_OPTIONS',
+    'VIDEO_TOO_LONG',
+    'MEDIA_UNSUPPORTED',
+    'PROVIDER_PERMISSIONS',
+  ])
+    assert.doesNotMatch(postFailureReason(code) ?? '', /\(/, code)
+  assert.equal(postFailureFix('ACCOUNT_RECONNECT'), 'reconnect')
+  assert.equal(postFailureFix('403'), 'reconnect')
+  assert.equal(postFailureFix('VIDEO_TOO_LONG'), 'edit')
+  assert.equal(postFailureFix('400'), 'edit')
+  assert.equal(postFailureFix('429'), null)
+  assert.equal(postFailureFix(null), null)
 })

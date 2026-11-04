@@ -19,6 +19,8 @@ export const draftWriteFieldsSchema = z.object({
   article: articleSchema.nullable(),
   /** Posts that failed or whose outcome is unknown (lists only). */
   attentionPosts: z.number().int(),
+  /** The attention posts whose outcome is unknown (lists only). */
+  checkPosts: z.number().int().default(0),
   kind: draftKindSchema,
   /** When the next queued post goes out (lists only). */
   nextPostAt: timestampSchema.nullable(),

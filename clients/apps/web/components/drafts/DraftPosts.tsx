@@ -8,7 +8,14 @@ import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { POST_STATE_TONE, postFailureReason, postState } from '@/lib/content-drafts/post-status'
+import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
+import { socialSetHref } from '@/components/workspace/settings-sections'
+import {
+  POST_STATE_TONE,
+  postFailureFix,
+  postFailureReason,
+  postState,
+} from '@/lib/content-drafts/post-status'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { cn } from '@/lib/utils'
 import { CHANNEL_META, ChannelIcon } from './channel-meta'
@@ -62,6 +69,7 @@ export function DraftPosts({
   edited,
   onCancel,
   onChange,
+  onEdit,
   onReschedule,
   posts,
 }: {
@@ -73,6 +81,8 @@ export function DraftPosts({
   onReschedule?: () => void
   /** Called with a post as the server now has it, or a new one. */
   onChange: (post: DraftPostWire) => void
+  /** Open the editor on a failed post's platform, to fix its text, media or options. */
+  onEdit?: (platform: string) => void
   posts: DraftPostWire[]
 }) {
   const [busy, setBusy] = React.useState<string | null>(null)
@@ -88,20 +98,16 @@ export function DraftPosts({
     }
   }
   if (posts.length === 0) return null
-  return (
-    <section className={cn('mb-10', POST_COLUMN)}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Posts from this draft
-        </h2>
-        {onReschedule ? (
-          <Button onClick={onReschedule} size="sm" variant="outline">
-            Replace queued posts with this version…
-          </Button>
-        ) : null}
-      </div>
-      <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
-        {posts.map((post) => {
+  // Each destination's newest post leads; its earlier attempts fold away.
+  const newest = [...posts].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )
+  const latest = newest.filter(
+    (post, index) =>
+      newest.findIndex((item) => item.channelConnectionId === post.channelConnectionId) === index
+  )
+  const earlier = newest.filter((post) => !latest.includes(post))
+  const row = (post: DraftPostWire) => {
           const channel = channelForPlatform(post.platform)
           const stopped =
             post.status === 'PUBLISHED' &&
@@ -111,6 +117,7 @@ export function DraftPosts({
           const state = postState(post.status, post.scheduledFor)
           const overdue = state === 'Overdue'
           const reason = postFailureReason(post.failureCode)
+          const fix = postFailureFix(post.failureCode)
           const label = channel ? CHANNEL_META[channel].label : post.platform
           return (
             <li className="flex flex-col gap-2 px-4 py-3" data-testid="draft-post" key={post.id}>
@@ -238,6 +245,16 @@ export function DraftPosts({
                 <p className="flex flex-wrap items-center gap-2 text-xs text-red-700 dark:text-red-300" role="status">
                   {reason ? `${reason} ` : ''}This destination did not publish; the draft’s other
                   posts are unaffected.
+                  {fix === 'reconnect' && post.socialSetId ? (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
+                    </Button>
+                  ) : null}
+                  {fix === 'edit' && onEdit ? (
+                    <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
+                      Edit the {label} post
+                    </Button>
+                  ) : null}
                   {canSchedule ? (
                     <Button
                       disabled={busy === post.id}
@@ -278,6 +295,30 @@ export function DraftPosts({
                     />
                   ) : null}
                 </div>
+              ) : null}
+              {post.failureCode ? (
+                <details className="text-xs text-muted-foreground" data-testid="failure-details">
+                  <summary className="cursor-pointer select-none hover:text-foreground">
+                    Details
+                  </summary>
+                  <p className="mt-1 flex flex-wrap items-center gap-2 font-mono">
+                    {`code ${post.failureCode} · post ${post.id} · ${post.platform}`}
+                    <Button
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(
+                            `code ${post.failureCode} · post ${post.id} · ${post.platform} · ${post.scheduledFor}`
+                          )
+                          .then(() => toast.success('Details copied for support.'))
+                          .catch(() => toast.error('The details could not be copied.'))
+                      }
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Copy for support
+                    </Button>
+                  </p>
+                </details>
               ) : null}
               {post.replies > 0 && post.status !== 'PUBLISHED' ? (
                 <p className="text-xs text-muted-foreground">
@@ -373,8 +414,32 @@ export function DraftPosts({
               ) : null}
             </li>
           )
-        })}
+  }
+  return (
+    <section className={cn('mb-10', POST_COLUMN)}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Posts from this draft
+        </h2>
+        {onReschedule ? (
+          <Button onClick={onReschedule} size="sm" variant="outline">
+            Replace queued posts with this version…
+          </Button>
+        ) : null}
+      </div>
+      <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
+        {latest.map(row)}
       </ul>
+      {earlier.length > 0 ? (
+        <details className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
+          <summary className="cursor-pointer select-none hover:text-foreground">
+            {earlier.length} earlier attempt{earlier.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-2 divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
+            {earlier.map(row)}
+          </ul>
+        </details>
+      ) : null}
     </section>
   )
 }

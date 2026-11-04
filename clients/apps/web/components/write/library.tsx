@@ -52,6 +52,7 @@ import { Input } from '@/components/ui/input'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
+import { listedAttention, stateLabel } from '@/lib/content-drafts/post-status'
 import { writeApi } from '@/lib/write/client'
 import type { DraftKind } from '@/lib/write/document'
 import type { ContentDraftSort } from '@/lib/write/wire'
@@ -706,10 +707,18 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
   // Times read in the set's scheduling zone, as the Plan calendar shows them.
   const timeZone = useWrite().data.activeSet?.timeZone
   const parts: React.ReactNode[] = []
-  if (draft.attentionPosts > 0) {
+  const attention = listedAttention(draft)
+  if (attention) {
     parts.push(
-      <span className="text-red-700 dark:text-red-300" key="attention">
-        {draft.attentionPosts} need{draft.attentionPosts === 1 ? 's' : ''} attention
+      <span
+        className={
+          attention.state === 'Failed'
+            ? 'text-red-700 dark:text-red-300'
+            : 'text-amber-700 dark:text-amber-300'
+        }
+        key="attention"
+      >
+        {stateLabel(attention.state, attention.count, attention.total)}
       </span>
     )
   }
