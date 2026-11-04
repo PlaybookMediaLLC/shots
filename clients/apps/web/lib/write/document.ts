@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
 
 /**
  * The Write document (RFC 025): the structured parts of a content draft
@@ -14,6 +15,8 @@ export const draftChannelSchema = z.enum([
   'threads',
   'bluesky',
   'mastodon',
+  'tiktok',
+  'youtube',
 ])
 
 /** One of {@link draftChannelSchema}. */
@@ -175,6 +178,8 @@ export type AutoDm = z.infer<typeof autoDmSchema>
 
 /** A platform version's settings; each belongs to the platforms that support it. */
 export const versionOptionsSchema = z.strictObject({
+  youtube: youtubeOptionsSchema.optional(),
+  tiktok: tiktokOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),
@@ -217,7 +222,7 @@ export const PLATFORM_VERSIONS_SCHEMA = 1
 /** Every platform version of a draft beside its primary body. */
 export const platformVersionsSchema = z.strictObject({
   schemaVersion: z.literal(PLATFORM_VERSIONS_SCHEMA),
-  versions: z.array(platformVersionSchema).max(6),
+  versions: z.array(platformVersionSchema).max(draftChannelSchema.options.length),
 })
 
 /** One of {@link platformVersionsSchema}. */

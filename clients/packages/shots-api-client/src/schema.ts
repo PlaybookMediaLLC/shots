@@ -1615,11 +1615,29 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
                         options?: {
+                            youtube?: {
+                                title: string;
+                                /** @enum {string} */
+                                privacy: "" | "public" | "private" | "unlisted";
+                                madeForKids?: boolean;
+                            };
+                            tiktok?: {
+                                /** @enum {string} */
+                                privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                allowComments: boolean;
+                                allowDuet: boolean;
+                                allowStitch: boolean;
+                                commercialContent?: boolean;
+                                brandOrganic: boolean;
+                                brandedContent: boolean;
+                                madeWithAi: boolean;
+                                consent: boolean;
+                            };
                             autoDm?: {
                                 /** @enum {string} */
                                 match: "any" | "all";
@@ -1714,6 +1732,12 @@ export interface components {
                 url: string | null;
                 replies: number;
                 threadProgress: {
+                    publication?: {
+                        remoteId: string;
+                        /** Format: uri */
+                        url: string;
+                        visibility?: string;
+                    };
                     quotes?: {
                         postId: string;
                         state: string;
@@ -1902,7 +1926,7 @@ export interface components {
             returnPath?: string;
             socialSetId?: string;
             /** @enum {string} */
-            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "threads" | "mastodon" | "mastodon-custom";
+            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom";
             instanceServer?: string;
         };
         SocialConnectionAttemptResponse: {
@@ -1914,7 +1938,7 @@ export interface components {
             version: 1;
             providers: {
                 /** @enum {string} */
-                provider: "x" | "linkedin" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
+                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
@@ -2472,11 +2496,29 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
                         options?: {
+                            youtube?: {
+                                title: string;
+                                /** @enum {string} */
+                                privacy: "" | "public" | "private" | "unlisted";
+                                madeForKids?: boolean;
+                            };
+                            tiktok?: {
+                                /** @enum {string} */
+                                privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                allowComments: boolean;
+                                allowDuet: boolean;
+                                allowStitch: boolean;
+                                commercialContent?: boolean;
+                                brandOrganic: boolean;
+                                brandedContent: boolean;
+                                madeWithAi: boolean;
+                                consent: boolean;
+                            };
                             autoDm?: {
                                 /** @enum {string} */
                                 match: "any" | "all";
@@ -2646,11 +2688,29 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
                         options?: {
+                            youtube?: {
+                                title: string;
+                                /** @enum {string} */
+                                privacy: "" | "public" | "private" | "unlisted";
+                                madeForKids?: boolean;
+                            };
+                            tiktok?: {
+                                /** @enum {string} */
+                                privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                allowComments: boolean;
+                                allowDuet: boolean;
+                                allowStitch: boolean;
+                                commercialContent?: boolean;
+                                brandOrganic: boolean;
+                                brandedContent: boolean;
+                                madeWithAi: boolean;
+                                consent: boolean;
+                            };
                             autoDm?: {
                                 /** @enum {string} */
                                 match: "any" | "all";
@@ -2743,11 +2803,29 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
                     options?: {
+                        youtube?: {
+                            title: string;
+                            /** @enum {string} */
+                            privacy: "" | "public" | "private" | "unlisted";
+                            madeForKids?: boolean;
+                        };
+                        tiktok?: {
+                            /** @enum {string} */
+                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                            allowComments: boolean;
+                            allowDuet: boolean;
+                            allowStitch: boolean;
+                            commercialContent?: boolean;
+                            brandOrganic: boolean;
+                            brandedContent: boolean;
+                            madeWithAi: boolean;
+                            consent: boolean;
+                        };
                         autoDm?: {
                             /** @enum {string} */
                             match: "any" | "all";
@@ -2839,7 +2917,7 @@ export interface components {
             /** @enum {string} */
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
-            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
             scratchpad?: string;
             socialSetId?: string;
             tagIds?: string[];
@@ -2934,11 +3012,29 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
                     options?: {
+                        youtube?: {
+                            title: string;
+                            /** @enum {string} */
+                            privacy: "" | "public" | "private" | "unlisted";
+                            madeForKids?: boolean;
+                        };
+                        tiktok?: {
+                            /** @enum {string} */
+                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                            allowComments: boolean;
+                            allowDuet: boolean;
+                            allowStitch: boolean;
+                            commercialContent?: boolean;
+                            brandOrganic: boolean;
+                            brandedContent: boolean;
+                            madeWithAi: boolean;
+                            consent: boolean;
+                        };
                         autoDm?: {
                             /** @enum {string} */
                             match: "any" | "all";
@@ -3030,11 +3126,29 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
                     options?: {
+                        youtube?: {
+                            title: string;
+                            /** @enum {string} */
+                            privacy: "" | "public" | "private" | "unlisted";
+                            madeForKids?: boolean;
+                        };
+                        tiktok?: {
+                            /** @enum {string} */
+                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                            allowComments: boolean;
+                            allowDuet: boolean;
+                            allowStitch: boolean;
+                            commercialContent?: boolean;
+                            brandOrganic: boolean;
+                            brandedContent: boolean;
+                            madeWithAi: boolean;
+                            consent: boolean;
+                        };
                         autoDm?: {
                             /** @enum {string} */
                             match: "any" | "all";
@@ -3127,7 +3241,7 @@ export interface components {
             /** @enum {string} */
             status?: "draft" | "archived";
             naturalPostingTime?: boolean;
-            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon") | "";
+            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube") | "";
             plannedFor?: string | "";
         };
         ContentDraftPostList: {
@@ -3147,6 +3261,12 @@ export interface components {
                 url: string | null;
                 replies: number;
                 threadProgress: {
+                    publication?: {
+                        remoteId: string;
+                        /** Format: uri */
+                        url: string;
+                        visibility?: string;
+                    };
                     quotes?: {
                         postId: string;
                         state: string;
@@ -3275,11 +3395,29 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
                         options?: {
+                            youtube?: {
+                                title: string;
+                                /** @enum {string} */
+                                privacy: "" | "public" | "private" | "unlisted";
+                                madeForKids?: boolean;
+                            };
+                            tiktok?: {
+                                /** @enum {string} */
+                                privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                allowComments: boolean;
+                                allowDuet: boolean;
+                                allowStitch: boolean;
+                                commercialContent?: boolean;
+                                brandOrganic: boolean;
+                                brandedContent: boolean;
+                                madeWithAi: boolean;
+                                consent: boolean;
+                            };
                             autoDm?: {
                                 /** @enum {string} */
                                 match: "any" | "all";
@@ -3527,7 +3665,7 @@ export interface components {
             threadId?: string;
             anchor: {
                 /** @enum {string} */
-                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram";
+                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube";
                 postId: string;
                 quote?: string;
             };
@@ -4693,6 +4831,14 @@ export interface operations {
                                 id: string;
                                 platform: string;
                                 premium: boolean;
+                                tiktokCreator?: {
+                                    nickname: string;
+                                    privacyLevels: ("PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY")[];
+                                    maxDurationSeconds: number;
+                                    commentDisabled: boolean;
+                                    duetDisabled: boolean;
+                                    stitchDisabled: boolean;
+                                } | null;
                                 xCaptionLimit?: (280 | 25000) | null;
                                 xArticles?: boolean | null;
                                 xQuotes?: boolean;
@@ -4774,6 +4920,14 @@ export interface operations {
                             id: string;
                             platform: string;
                             premium: boolean;
+                            tiktokCreator?: {
+                                nickname: string;
+                                privacyLevels: ("PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY")[];
+                                maxDurationSeconds: number;
+                                commentDisabled: boolean;
+                                duetDisabled: boolean;
+                                stitchDisabled: boolean;
+                            } | null;
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
@@ -4868,6 +5022,14 @@ export interface operations {
                             id: string;
                             platform: string;
                             premium: boolean;
+                            tiktokCreator?: {
+                                nickname: string;
+                                privacyLevels: ("PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY")[];
+                                maxDurationSeconds: number;
+                                commentDisabled: boolean;
+                                duetDisabled: boolean;
+                                stitchDisabled: boolean;
+                            } | null;
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
@@ -5091,6 +5253,14 @@ export interface operations {
                             id: string;
                             platform: string;
                             premium: boolean;
+                            tiktokCreator?: {
+                                nickname: string;
+                                privacyLevels: ("PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY")[];
+                                maxDurationSeconds: number;
+                                commentDisabled: boolean;
+                                duetDisabled: boolean;
+                                stitchDisabled: boolean;
+                            } | null;
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
@@ -5298,6 +5468,12 @@ export interface operations {
                             url: string | null;
                             replies: number;
                             threadProgress: {
+                                publication?: {
+                                    remoteId: string;
+                                    /** Format: uri */
+                                    url: string;
+                                    visibility?: string;
+                                };
                                 quotes?: {
                                     postId: string;
                                     state: string;

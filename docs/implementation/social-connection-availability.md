@@ -55,7 +55,9 @@ Supply application credentials only to the social component. Local Compose maps
 `SOCIAL_THREADS_APP_ID`/`SOCIAL_THREADS_APP_SECRET`,
 `SOCIAL_MASTODON_CLIENT_ID`/`SOCIAL_MASTODON_CLIENT_SECRET`, and the existing
 Instagram/Facebook variables to their adapter names. LinkedIn retains
-`LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`. `SOCIAL_FRONTEND_URL` supplies the
+`LINKEDIN_CLIENT_ID`/`LINKEDIN_CLIENT_SECRET`. LinkedIn Page requires
+`PLATFORM_LINKEDIN_PAGE_CLIENT_ID`/`PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET` when
+the Page client ID is set, else the LinkedIn pair. `SOCIAL_FRONTEND_URL` supplies the
 callback origin. Every backend reading credentials requires the existing
 `PLATFORM_SOCIAL_ENCRYPTION_KEY`; never rotate it as part of this rollout.
 

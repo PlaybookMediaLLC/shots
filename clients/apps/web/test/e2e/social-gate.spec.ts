@@ -10,6 +10,7 @@ import {
   db,
   enableTwoFactor,
   expect,
+  expectSaved,
   getActiveOrganizationId,
   png,
   test,
@@ -67,6 +68,8 @@ async function readBootstrap() {
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
+      tiktokDestinationId: z.string().min(1),
+      youtubeDestinationId: z.string().min(1),
     })
     .parse(JSON.parse(await readFile(process.env.E2E_SOCIAL_GATE_BOOTSTRAP!, 'utf8')))
 }
@@ -83,10 +86,10 @@ async function bindWorkspace(organizationId: string, goOrganizationId: string): 
   )
 }
 
-async function connect(page: Page, externalAccountId: string): Promise<string> {
+async function connect(page: Page, externalAccountId: string, platform = 'e2e'): Promise<string> {
   const response = await trpcMutation(page, 'channelConnection.create', {
     externalAccountId,
-    platform: 'e2e',
+    platform,
     secretReference,
   })
   expect(response.status, JSON.stringify(response.body)).toBe(200)
@@ -264,9 +267,7 @@ test('the backend worker publishes draft photos, video, and ordered images once 
   try {
     await bindWorkspace(organizationId, bootstrap.goOrganizationId)
     const connectionId = await connect(page, bootstrap.destinationId)
-    const mp4 = await readFile(
-      '../../../server/internal/social/integrations/social/x/testdata/sample.mp4'
-    )
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
     // Each through the signed-upload flow, as the composer uploads.
     const upload = async (bytes: Buffer, contentType: string, fileName: string) => ({
       bytes,
@@ -277,15 +278,43 @@ test('the backend worker publishes draft photos, video, and ordered images once 
     const clip = await upload(mp4, 'video/mp4', 'clip.mp4')
     const first = await upload(red, 'image/png', 'red.png')
     const last = await upload(blue, 'image/png', 'blue.png')
+    const tiktokConnection = await connect(page, bootstrap.tiktokDestinationId, 'tiktok')
+    const youtubeConnection = await connect(page, bootstrap.youtubeDestinationId, 'youtube')
     const drafts = [
       { caption: 'Unicode survives: café, naïve, 日本語, emoji 🚀 ✓', media: [photo] },
       { caption: 'A short clip.', media: [clip] },
+      {
+        caption: 'TikTok private clip.',
+        media: [clip],
+        connectionId: tiktokConnection,
+        channel: 'tiktok',
+        options: {
+          tiktok: {
+            privacy: 'SELF_ONLY',
+            allowComments: false,
+            allowDuet: false,
+            allowStitch: false,
+            brandOrganic: false,
+            brandedContent: false,
+            madeWithAi: false,
+            consent: true,
+          },
+        },
+      },
+      {
+        caption: 'YouTube private clip.',
+        media: [clip],
+        connectionId: youtubeConnection,
+        channel: 'youtube',
+        options: { youtube: { title: 'Fixture video', privacy: 'private', madeForKids: false } },
+      },
       // Not the upload order, so the post's order is the draft's.
       { caption: 'Three images, in order.', media: [first, photo, last] },
     ]
 
     const postIds: string[] = []
     for (const draft of drafts) {
+      const targetConnection = draft.connectionId ?? connectionId
       const created = await apiRequest(page, '/api/v1/content-drafts', {
         body: {
           assetIds: draft.media.map((item) => item.id),
@@ -299,17 +328,80 @@ test('the backend worker publishes draft photos, video, and ordered images once 
               url: `/api/v1/assets/${item.id}/content`,
             })),
           ],
-          channelConnectionIds: [connectionId],
+          channelConnectionIds: [targetConnection],
+          primaryPlatform: draft.channel ?? 'x',
+          platformVersions: {
+            schemaVersion: 1,
+            versions: draft.channel
+              ? [{ channel: draft.channel, mode: 'synced', options: {} }]
+              : [],
+          },
           plainText: draft.caption,
         },
         method: 'POST',
       })
       expect(created.status, JSON.stringify(created.body)).toBe(201)
-      const { id, version } = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+      const { id } = z.object({ id: z.string() }).parse(created.body)
+      let { version } = z.object({ version: z.number() }).parse(created.body)
+      if (draft.channel) {
+        const incomplete = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+          body: {
+            channelConnectionIds: [targetConnection],
+            scheduledFor: new Date(Date.now() + 60_000).toISOString(),
+            version,
+          },
+          method: 'POST',
+        })
+        expect(incomplete.status).toBe(409)
+        await page.goto(`/write/${id}`)
+        if (draft.channel === 'youtube') {
+          await page.getByLabel('YouTube title', { exact: true }).fill('Fixture video')
+          await page.getByRole('combobox', { name: 'YouTube privacy' }).click()
+          await page.getByRole('option', { name: 'private', exact: true }).click()
+          await page.getByRole('combobox', { name: 'YouTube audience' }).click()
+          await page.getByRole('option', { name: 'Not made for kids', exact: true }).click()
+        } else {
+          await page.getByRole('combobox', { name: 'TikTok privacy' }).click()
+          await page.getByRole('option', { name: 'SELF_ONLY', exact: true }).click()
+          await page
+            .getByRole('checkbox', {
+              name: 'I consent to send this video to TikTok at the scheduled time.',
+            })
+            .check()
+        }
+        await expectSaved(page)
+        await page.reload()
+        if (draft.channel === 'youtube') {
+          await expect(page.getByLabel('YouTube title', { exact: true })).toHaveValue(
+            'Fixture video'
+          )
+          await expect(page.getByRole('combobox', { name: 'YouTube privacy' })).toHaveText(
+            'private'
+          )
+          await expect(page.getByRole('combobox', { name: 'YouTube audience' })).toHaveText(
+            'Not made for kids'
+          )
+        } else {
+          await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveText(
+            'SELF_ONLY'
+          )
+          await expect(
+            page.getByRole('checkbox', {
+              name: 'I consent to send this video to TikTok at the scheduled time.',
+            })
+          ).toBeChecked()
+        }
+        const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+        expect(saved.status).toBe(200)
+        expect(saved.body).toMatchObject({
+          platformVersions: { versions: [{ channel: draft.channel, options: draft.options }] },
+        })
+        version = z.object({ version: z.number() }).parse(saved.body).version
+      }
       // A draft is scheduled at least 30 seconds out.
       const scheduledFor = new Date(Date.now() + 35_000).toISOString()
       const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
-        body: { channelConnectionIds: [connectionId], scheduledFor, version },
+        body: { channelConnectionIds: [targetConnection], scheduledFor, version },
         method: 'POST',
       })
       expect(response.status, JSON.stringify(response.body)).toBe(201)

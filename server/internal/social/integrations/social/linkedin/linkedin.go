@@ -40,9 +40,11 @@ var Scopes = []string{
 	"w_member_social",
 }
 
+// PageScopes are Community Management (or Advertising API) permissions. LinkedIn
+// grants Community Management only to an app with no other product, so a Page
+// connection cannot use OpenID: it reads the member through r_basicprofile.
 var PageScopes = []string{
-	"openid",
-	"profile",
+	"r_basicprofile",
 	"rw_organization_admin",
 	"w_organization_social",
 	"r_organization_social",
@@ -228,9 +230,19 @@ func (l *LogoV2) URL() string {
 	return l.Original.Elements[0].Identifiers[0].Identifier
 }
 
-func clientForm(extra url.Values) []byte {
-	extra.Set("client_id", os.Getenv("LINKEDIN_CLIENT_ID"))
-	extra.Set("client_secret", os.Getenv("LINKEDIN_CLIENT_SECRET"))
+// Credentials returns the LinkedIn app of this adapter. The Page adapter uses
+// its own Community Management app when one is set, else the shared app.
+func (p *Provider) Credentials() (clientID, clientSecret string) {
+	if p.identifier == "linkedin-page" && os.Getenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID") != "" {
+		return os.Getenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID"), os.Getenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET")
+	}
+	return os.Getenv("LINKEDIN_CLIENT_ID"), os.Getenv("LINKEDIN_CLIENT_SECRET")
+}
+
+func (p *Provider) clientForm(extra url.Values) []byte {
+	id, secret := p.Credentials()
+	extra.Set("client_id", id)
+	extra.Set("client_secret", secret)
 	return []byte(extra.Encode())
 }
 
@@ -268,16 +280,34 @@ func fetchVanityName(ctx context.Context, accessToken string) (string, error) {
 	return me.VanityName, err
 }
 
+// member reads the authorizing member and vanity name. A Page app has
+// r_basicprofile instead of OpenID, so it reads both from /v2/me.
+func (p *Provider) member(ctx context.Context, accessToken string) (*userInfo, string, error) {
+	if p.identifier == "linkedin-page" {
+		var me struct {
+			ID                 string `json:"id"`
+			LocalizedFirstName string `json:"localizedFirstName"`
+			LocalizedLastName  string `json:"localizedLastName"`
+			VanityName         string `json:"vanityName"`
+		}
+		err := FetchJSON(ctx, http.MethodGet, APIURL+"/v2/me?projection=(id,localizedFirstName,localizedLastName,vanityName)",
+			map[string]string{"Authorization": "Bearer " + accessToken}, nil, &me)
+		return &userInfo{Sub: me.ID, Name: strings.TrimSpace(me.LocalizedFirstName + " " + me.LocalizedLastName)}, me.VanityName, err
+	}
+	info, err := fetchUserInfo(ctx, accessToken)
+	if err != nil {
+		return nil, "", err
+	}
+	vanityName, err := fetchVanityName(ctx, accessToken)
+	return info, vanityName, err
+}
+
 func (p *Provider) RefreshToken(ctx context.Context, refreshToken string) (*integrations.AuthTokenDetails, error) {
-	token, err := requestToken(ctx, clientForm(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}}))
+	token, err := requestToken(ctx, p.clientForm(url.Values{"grant_type": {"refresh_token"}, "refresh_token": {refreshToken}}))
 	if err != nil {
 		return nil, err
 	}
-	vanityName, err := fetchVanityName(ctx, token.AccessToken)
-	if err != nil {
-		return nil, err
-	}
-	info, err := fetchUserInfo(ctx, token.AccessToken)
+	info, vanityName, err := p.member(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -294,8 +324,9 @@ func (p *Provider) RefreshToken(ctx context.Context, refreshToken string) (*inte
 
 func (p *Provider) GenerateAuthURL(context.Context, *integrations.ClientInformation) (*integrations.GenerateAuthURLResponse, error) {
 	state := ids.Secure(6)
+	clientID, _ := p.Credentials()
 	return &integrations.GenerateAuthURLResponse{
-		URL: "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=" + os.Getenv("LINKEDIN_CLIENT_ID") +
+		URL: "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=" + clientID +
 			"&redirect_uri=" + EncodeURIComponent(os.Getenv("FRONTEND_URL")+"/integrations/social/linkedin") +
 			"&state=" + state + "&scope=" + EncodeURIComponent(strings.Join(Scopes, " ")),
 		CodeVerifier: ids.Secure(30),
@@ -310,7 +341,7 @@ func (p *Provider) ExchangeCode(ctx context.Context, code, redirectURI string) (
 }
 
 func (p *Provider) ExchangeCodeForScopes(ctx context.Context, code, redirectURI string, scopes []string) (*integrations.AuthTokenDetails, error) {
-	token, err := requestToken(ctx, clientForm(url.Values{
+	token, err := requestToken(ctx, p.clientForm(url.Values{
 		"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {redirectURI},
 	}))
 	if err != nil {
@@ -319,11 +350,7 @@ func (p *Provider) ExchangeCodeForScopes(ctx context.Context, code, redirectURI 
 	if err := p.CheckScopes(scopes, token.Scope); err != nil {
 		return nil, err
 	}
-	info, err := fetchUserInfo(ctx, token.AccessToken)
-	if err != nil {
-		return nil, err
-	}
-	vanityName, err := fetchVanityName(ctx, token.AccessToken)
+	info, vanityName, err := p.member(ctx, token.AccessToken)
 	if err != nil {
 		return nil, err
 	}

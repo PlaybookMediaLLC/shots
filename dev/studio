@@ -240,6 +240,7 @@ smoke() {
   local storage_test_url
 
   load_env
+  local app_url="http://localhost:${STUDIO_WEB_PORT:-3000}"
   storage_test_url="http://127.0.0.1:9003/$R2_BUCKET_NAME/smoke/health/smoke.txt"
   compose exec -T postgres pg_isready --username=postgres --dbname=postgres >/dev/null
   compose exec -T redis redis-cli ping | grep -qx PONG
@@ -252,19 +253,19 @@ smoke() {
     --aws-sigv4 "aws:amz:us-east-1:s3" --user "$RUSTFS_ACCESS_KEY:$RUSTFS_SECRET_KEY" | grep -qx smoke
   curl --fail --silent --show-error --request DELETE "$storage_test_url" \
     --aws-sigv4 "aws:amz:us-east-1:s3" --user "$RUSTFS_ACCESS_KEY:$RUSTFS_SECRET_KEY" >/dev/null
-  wait_for_http "http://127.0.0.1:3000/api/health" "Screenshot Studio"
-  wait_for_http "http://127.0.0.1:3000/api/auth/ok" "Better Auth"
+  wait_for_http "${app_url}/api/health" "Screenshot Studio"
+  wait_for_http "${app_url}/api/auth/ok" "Better Auth"
   # A cold editor compile can outlast the locale proxy's request
   # deadline. Finish it before the one-shot public endpoint smoke checks.
-  wait_for_redirect_or_ok "http://127.0.0.1:3000/" "Screenshot Studio editor route"
+  wait_for_redirect_or_ok "${app_url}/" "Screenshot Studio editor route"
   [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST \
     --header 'content-type: application/json' --data '{}' \
-    http://127.0.0.1:3000/api/screenshot/invalidate)" == "401" ]]
+    "${app_url}/api/screenshot/invalidate")" == "401" ]]
   [[ "$(curl --silent --output /dev/null --write-out '%{http_code}' --request POST \
     --header "x-shots-maintenance-secret: $CLEANUP_SECRET" \
     --header 'content-type: application/json' --data '{"url":"not-a-url"}' \
-    http://127.0.0.1:3000/api/screenshot/invalidate)" == "400" ]]
-  rate_limit_smoke
+    "${app_url}/api/screenshot/invalidate")" == "400" ]]
+  SCREENSHOT_STUDIO_URL="$app_url" rate_limit_smoke
   echo "Local stack is healthy."
 }
 
@@ -274,8 +275,9 @@ rate_limit_smoke() {
 
 tenant_isolation() {
   load_env
-  wait_for_http "http://localhost:3000/api/health" "Screenshot Studio"
-  TENANT_TEST_BASE_URL="http://localhost:3000" npm --prefix "$WEB_DIR" run test:tenant-isolation
+  local app_url="http://localhost:${STUDIO_WEB_PORT:-3000}"
+  wait_for_http "$app_url/api/health" "Screenshot Studio"
+  TENANT_TEST_BASE_URL="$app_url" npm --prefix "$WEB_DIR" run test:tenant-isolation
 }
 
 wait_for_redirect_or_ok() {
@@ -460,7 +462,7 @@ e2e_npm() {
 run_e2e() {
   local test_script="$1"
   shift
-  local app_url="${E2E_BASE_URL:-http://localhost:3000}"
+  local app_url="${E2E_BASE_URL:-http://localhost:${STUDIO_WEB_PORT:-3000}}"
   local e2e_trusted_origins
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
@@ -541,7 +543,7 @@ check() {
 # A local account with a workspace, so a fresh database never leaves you at a
 # sign-in page with nothing to sign in with. Safe to run repeatedly.
 dev_login() {
-  local app="http://localhost:3000"
+  local app="http://localhost:${STUDIO_WEB_PORT:-3000}"
   local email="dev@localhost.test"
   local jar
   local password
@@ -596,7 +598,7 @@ up() {
   fi
   smoke
   dev_login
-  echo "App:     http://localhost:3000"
+  echo "App:     http://localhost:${STUDIO_WEB_PORT:-3000}"
   if [[ "$renderer" == "on" ]]; then
     echo "Render browser: running (STUDIO_RENDERER=off to skip)"
   fi

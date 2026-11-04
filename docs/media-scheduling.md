@@ -179,15 +179,15 @@ were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
 
 | Destination | Content | Uploadable | Convertible | Implemented | Test-verified | Live-verified |
 | --- | --- | --- | --- | --- | --- | --- |
-| X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | No: live publishing needs API credit |
+| X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. |
 | X | GIF, alone, ≤ 15 MB | Yes | — | Yes | Adapter (`TestGIFFullAnimationLimits`) | No |
-| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`), worker | No |
-| LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | No (earlier, pre-cutover image only) |
-| LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | No |
+| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
+| LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | Yes: image on `yoanyomba`, 2026-11-03; receipt and deletion recorded |
+| LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | Yes: 8-second video on `yoanyomba`, 2026-11-03; playback and deletion verified |
 | LinkedIn | PDF document, alone, ≤ 100 MB, ≤ 300 pages | Yes | — | Yes | Upload checks; publish via the document option | No |
 | LinkedIn | GIF ≤ 20 MB | Yes | — | Yes | Adapter (`TestLinkedInRejectsIncompatibleGIFBeforeProviderMutation`) | No |
-| Instagram (Instagram Login) | Image, aspect 4:5–1.91:1, width ≥ 320 | Yes | PNG/WebP → JPEG, transparency to white | Yes | Adapter (`TestCarouselPendingFlow`), `TestJPEGOnlyProfileFlattensTransparency` | No (earlier, pre-cutover feed image and Reel) |
-| Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | No |
+| Instagram (Instagram Login) | Image, aspect 4:5–1.91:1, width ≥ 320 | Yes | PNG/WebP → JPEG, transparency to white | Yes | Adapter (`TestCarouselPendingFlow`), `TestJPEGOnlyProfileFlattensTransparency` | Yes: feed image on `@get.eigenn`, 2026-11-03; receipt and deletion recorded |
+| Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | Yes: 8-second Reel on `@get.eigenn`, 2026-11-03; playback and deletion verified |
 | Instagram | Carousel of up to 20, images and videos mixed | Yes | As above | Yes | Adapter, worker (order and mixed MOV) | No |
 | Instagram | GIF | Yes | — | No | — | Blocked: no animated GIF in the API |
 | Instagram (Facebook Login) | Any | Yes | — | Adapter exists | — | Blocked: refused at scheduling until the account reconnects with Instagram Login |
@@ -197,7 +197,9 @@ were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
 | Mastodon | 1–4 images ≤ 16 MiB | Yes | — | Yes | Adapter (`TestDynamicPostWaitsForMediaThenPublishes`) | No |
 | Mastodon | Video (MP4, MOV, WebM) or GIF, alone, ≤ 99 MiB | Yes | — | Yes (generic media upload) | Rules only; no adapter video test | No. Server-specific limits beyond mastodon.social defaults are not read per instance. |
 | Any | Audio, or a file other than a PDF, as an attachment | Uploadable for design timelines | — | No | Refused before scheduling, with the reason | Blocked |
-| TikTok, YouTube, Pinterest, Facebook Pages | — | — | — | Not in the direct publishing path | — | Blocked for drafts |
+| TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
+| YouTube | One MP4, ≤ 512 MiB; explicit title, privacy and audience | Yes | — | Resumable upload with processing confirmation | Adapter, options, worker and social gate | No: @getconduitt private video scheduled for 2026-11-04 00:20 UTC; receipt and playback pending |
+| Pinterest, Facebook Pages | — | — | — | Not in the direct publishing path | — | Blocked for drafts |
 
 Nothing is silently dropped. Content a destination cannot take is refused
 before scheduling with the reason and the fix; conversions are listed per

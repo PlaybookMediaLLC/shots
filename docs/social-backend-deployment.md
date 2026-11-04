@@ -49,7 +49,14 @@ web. In the local overlay, use `SOCIAL_X_API_KEY`,
 `SOCIAL_FACEBOOK_APP_SECRET`, `SOCIAL_INSTAGRAM_APP_ID`, and
 `SOCIAL_INSTAGRAM_APP_SECRET` as applicable. Compose maps them to the Go
 process variables. LinkedIn uses `LINKEDIN_CLIENT_ID` and
-`LINKEDIN_CLIENT_SECRET`. Do not commit the overlay or tokens.
+`LINKEDIN_CLIENT_SECRET`. LinkedIn grants Page publishing (Community
+Management API) only to an app with no other products. Set that app in
+`PLATFORM_LINKEDIN_PAGE_CLIENT_ID` and `PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET`;
+when they are not set, LinkedIn Page uses the shared app. Either app needs
+`r_basicprofile` and the organization permissions; Page connections do not use
+OpenID. A refresh token works only with the app that issued it, so reconnect
+each LinkedIn Page channel after you change these variables. Do not commit the
+overlay or tokens.
 
 Threads uses `SOCIAL_THREADS_APP_ID` and `SOCIAL_THREADS_APP_SECRET`; the legacy
 mastodon.social branch uses `SOCIAL_MASTODON_CLIENT_ID` and

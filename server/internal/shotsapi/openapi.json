@@ -2417,6 +2417,58 @@
                                 "premium": {
                                   "type": "boolean"
                                 },
+                                "tiktokCreator": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "nickname": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "privacyLevels": {
+                                          "minItems": 1,
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "PUBLIC_TO_EVERYONE",
+                                              "MUTUAL_FOLLOW_FRIENDS",
+                                              "FOLLOWER_OF_CREATOR",
+                                              "SELF_ONLY"
+                                            ]
+                                          }
+                                        },
+                                        "maxDurationSeconds": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0,
+                                          "maximum": 9007199254740991
+                                        },
+                                        "commentDisabled": {
+                                          "type": "boolean"
+                                        },
+                                        "duetDisabled": {
+                                          "type": "boolean"
+                                        },
+                                        "stitchDisabled": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "required": [
+                                        "nickname",
+                                        "privacyLevels",
+                                        "maxDurationSeconds",
+                                        "commentDisabled",
+                                        "duetDisabled",
+                                        "stitchDisabled"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "xCaptionLimit": {
                                   "anyOf": [
                                     {
@@ -2859,6 +2911,58 @@
                           "premium": {
                             "type": "boolean"
                           },
+                          "tiktokCreator": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "nickname": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "privacyLevels": {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PUBLIC_TO_EVERYONE",
+                                        "MUTUAL_FOLLOW_FRIENDS",
+                                        "FOLLOWER_OF_CREATOR",
+                                        "SELF_ONLY"
+                                      ]
+                                    }
+                                  },
+                                  "maxDurationSeconds": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "commentDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "duetDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "stitchDisabled": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nickname",
+                                  "privacyLevels",
+                                  "maxDurationSeconds",
+                                  "commentDisabled",
+                                  "duetDisabled",
+                                  "stitchDisabled"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "xCaptionLimit": {
                             "anyOf": [
                               {
@@ -3147,6 +3251,58 @@
                           },
                           "premium": {
                             "type": "boolean"
+                          },
+                          "tiktokCreator": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "nickname": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "privacyLevels": {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PUBLIC_TO_EVERYONE",
+                                        "MUTUAL_FOLLOW_FRIENDS",
+                                        "FOLLOWER_OF_CREATOR",
+                                        "SELF_ONLY"
+                                      ]
+                                    }
+                                  },
+                                  "maxDurationSeconds": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "commentDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "duetDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "stitchDisabled": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nickname",
+                                  "privacyLevels",
+                                  "maxDurationSeconds",
+                                  "commentDisabled",
+                                  "duetDisabled",
+                                  "stitchDisabled"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "xCaptionLimit": {
                             "anyOf": [
@@ -3831,6 +3987,58 @@
                           "premium": {
                             "type": "boolean"
                           },
+                          "tiktokCreator": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "nickname": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "privacyLevels": {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "enum": [
+                                        "PUBLIC_TO_EVERYONE",
+                                        "MUTUAL_FOLLOW_FRIENDS",
+                                        "FOLLOWER_OF_CREATOR",
+                                        "SELF_ONLY"
+                                      ]
+                                    }
+                                  },
+                                  "maxDurationSeconds": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "commentDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "duetDisabled": {
+                                    "type": "boolean"
+                                  },
+                                  "stitchDisabled": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "nickname",
+                                  "privacyLevels",
+                                  "maxDurationSeconds",
+                                  "commentDisabled",
+                                  "duetDisabled",
+                                  "stitchDisabled"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "xCaptionLimit": {
                             "anyOf": [
                               {
@@ -4491,6 +4699,26 @@
                           "threadProgress": {
                             "type": "object",
                             "properties": {
+                              "publication": {
+                                "type": "object",
+                                "properties": {
+                                  "remoteId": {
+                                    "type": "string"
+                                  },
+                                  "url": {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  "visibility": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "remoteId",
+                                  "url"
+                                ],
+                                "additionalProperties": false
+                              },
                               "quotes": {
                                 "type": "array",
                                 "items": {
@@ -16272,7 +16500,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 6,
+                      "maxItems": 8,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -16296,7 +16524,9 @@
                               "instagram",
                               "threads",
                               "bluesky",
-                              "mastodon"
+                              "mastodon",
+                              "tiktok",
+                              "youtube"
                             ]
                           },
                           "forkedFromVersion": {
@@ -16314,6 +16544,82 @@
                           "options": {
                             "type": "object",
                             "properties": {
+                              "youtube": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "public",
+                                      "private",
+                                      "unlisted"
+                                    ]
+                                  },
+                                  "madeForKids": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "privacy"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "tiktok": {
+                                "type": "object",
+                                "properties": {
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "PUBLIC_TO_EVERYONE",
+                                      "MUTUAL_FOLLOW_FRIENDS",
+                                      "FOLLOWER_OF_CREATOR",
+                                      "SELF_ONLY"
+                                    ]
+                                  },
+                                  "allowComments": {
+                                    "type": "boolean"
+                                  },
+                                  "allowDuet": {
+                                    "type": "boolean"
+                                  },
+                                  "allowStitch": {
+                                    "type": "boolean"
+                                  },
+                                  "commercialContent": {
+                                    "type": "boolean"
+                                  },
+                                  "brandOrganic": {
+                                    "type": "boolean"
+                                  },
+                                  "brandedContent": {
+                                    "type": "boolean"
+                                  },
+                                  "madeWithAi": {
+                                    "type": "boolean"
+                                  },
+                                  "consent": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "privacy",
+                                  "allowComments",
+                                  "allowDuet",
+                                  "allowStitch",
+                                  "brandOrganic",
+                                  "brandedContent",
+                                  "madeWithAi",
+                                  "consent"
+                                ],
+                                "additionalProperties": false
+                              },
                               "autoDm": {
                                 "type": "object",
                                 "properties": {
@@ -16782,6 +17088,26 @@
                 "threadProgress": {
                   "type": "object",
                   "properties": {
+                    "publication": {
+                      "type": "object",
+                      "properties": {
+                        "remoteId": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "visibility": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "remoteId",
+                        "url"
+                      ],
+                      "additionalProperties": false
+                    },
                     "quotes": {
                       "type": "array",
                       "items": {
@@ -17687,6 +18013,9 @@
               "instagram",
               "instagram-standalone",
               "linkedin",
+              "linkedin-page",
+              "tiktok",
+              "youtube",
               "threads",
               "mastodon",
               "mastodon-custom"
@@ -17725,8 +18054,8 @@
             "const": 1
           },
           "providers": {
-            "minItems": 9,
-            "maxItems": 9,
+            "minItems": 12,
+            "maxItems": 12,
             "type": "array",
             "items": {
               "type": "object",
@@ -17736,6 +18065,9 @@
                   "enum": [
                     "x",
                     "linkedin",
+                    "linkedin-page",
+                    "tiktok",
+                    "youtube",
                     "threads",
                     "mastodon",
                     "mastodon-custom",
@@ -20259,7 +20591,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 6,
+                      "maxItems": 8,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -20283,7 +20615,9 @@
                               "instagram",
                               "threads",
                               "bluesky",
-                              "mastodon"
+                              "mastodon",
+                              "tiktok",
+                              "youtube"
                             ]
                           },
                           "forkedFromVersion": {
@@ -20301,6 +20635,82 @@
                           "options": {
                             "type": "object",
                             "properties": {
+                              "youtube": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "public",
+                                      "private",
+                                      "unlisted"
+                                    ]
+                                  },
+                                  "madeForKids": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "privacy"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "tiktok": {
+                                "type": "object",
+                                "properties": {
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "PUBLIC_TO_EVERYONE",
+                                      "MUTUAL_FOLLOW_FRIENDS",
+                                      "FOLLOWER_OF_CREATOR",
+                                      "SELF_ONLY"
+                                    ]
+                                  },
+                                  "allowComments": {
+                                    "type": "boolean"
+                                  },
+                                  "allowDuet": {
+                                    "type": "boolean"
+                                  },
+                                  "allowStitch": {
+                                    "type": "boolean"
+                                  },
+                                  "commercialContent": {
+                                    "type": "boolean"
+                                  },
+                                  "brandOrganic": {
+                                    "type": "boolean"
+                                  },
+                                  "brandedContent": {
+                                    "type": "boolean"
+                                  },
+                                  "madeWithAi": {
+                                    "type": "boolean"
+                                  },
+                                  "consent": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "privacy",
+                                  "allowComments",
+                                  "allowDuet",
+                                  "allowStitch",
+                                  "brandOrganic",
+                                  "brandedContent",
+                                  "madeWithAi",
+                                  "consent"
+                                ],
+                                "additionalProperties": false
+                              },
                               "autoDm": {
                                 "type": "object",
                                 "properties": {
@@ -21025,7 +21435,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 6,
+                      "maxItems": 8,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -21049,7 +21459,9 @@
                               "instagram",
                               "threads",
                               "bluesky",
-                              "mastodon"
+                              "mastodon",
+                              "tiktok",
+                              "youtube"
                             ]
                           },
                           "forkedFromVersion": {
@@ -21067,6 +21479,82 @@
                           "options": {
                             "type": "object",
                             "properties": {
+                              "youtube": {
+                                "type": "object",
+                                "properties": {
+                                  "title": {
+                                    "type": "string",
+                                    "maxLength": 100
+                                  },
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "public",
+                                      "private",
+                                      "unlisted"
+                                    ]
+                                  },
+                                  "madeForKids": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "title",
+                                  "privacy"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "tiktok": {
+                                "type": "object",
+                                "properties": {
+                                  "privacy": {
+                                    "type": "string",
+                                    "enum": [
+                                      "",
+                                      "PUBLIC_TO_EVERYONE",
+                                      "MUTUAL_FOLLOW_FRIENDS",
+                                      "FOLLOWER_OF_CREATOR",
+                                      "SELF_ONLY"
+                                    ]
+                                  },
+                                  "allowComments": {
+                                    "type": "boolean"
+                                  },
+                                  "allowDuet": {
+                                    "type": "boolean"
+                                  },
+                                  "allowStitch": {
+                                    "type": "boolean"
+                                  },
+                                  "commercialContent": {
+                                    "type": "boolean"
+                                  },
+                                  "brandOrganic": {
+                                    "type": "boolean"
+                                  },
+                                  "brandedContent": {
+                                    "type": "boolean"
+                                  },
+                                  "madeWithAi": {
+                                    "type": "boolean"
+                                  },
+                                  "consent": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "privacy",
+                                  "allowComments",
+                                  "allowDuet",
+                                  "allowStitch",
+                                  "brandOrganic",
+                                  "brandedContent",
+                                  "madeWithAi",
+                                  "consent"
+                                ],
+                                "additionalProperties": false
+                              },
                               "autoDm": {
                                 "type": "object",
                                 "properties": {
@@ -21500,7 +21988,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 6,
+                "maxItems": 8,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -21524,7 +22012,9 @@
                         "instagram",
                         "threads",
                         "bluesky",
-                        "mastodon"
+                        "mastodon",
+                        "tiktok",
+                        "youtube"
                       ]
                     },
                     "forkedFromVersion": {
@@ -21542,6 +22032,82 @@
                     "options": {
                       "type": "object",
                       "properties": {
+                        "youtube": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "public",
+                                "private",
+                                "unlisted"
+                              ]
+                            },
+                            "madeForKids": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "privacy"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "tiktok": {
+                          "type": "object",
+                          "properties": {
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "PUBLIC_TO_EVERYONE",
+                                "MUTUAL_FOLLOW_FRIENDS",
+                                "FOLLOWER_OF_CREATOR",
+                                "SELF_ONLY"
+                              ]
+                            },
+                            "allowComments": {
+                              "type": "boolean"
+                            },
+                            "allowDuet": {
+                              "type": "boolean"
+                            },
+                            "allowStitch": {
+                              "type": "boolean"
+                            },
+                            "commercialContent": {
+                              "type": "boolean"
+                            },
+                            "brandOrganic": {
+                              "type": "boolean"
+                            },
+                            "brandedContent": {
+                              "type": "boolean"
+                            },
+                            "madeWithAi": {
+                              "type": "boolean"
+                            },
+                            "consent": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "privacy",
+                            "allowComments",
+                            "allowDuet",
+                            "allowStitch",
+                            "brandOrganic",
+                            "brandedContent",
+                            "madeWithAi",
+                            "consent"
+                          ],
+                          "additionalProperties": false
+                        },
                         "autoDm": {
                           "type": "object",
                           "properties": {
@@ -21902,7 +22468,9 @@
                 "instagram",
                 "threads",
                 "bluesky",
-                "mastodon"
+                "mastodon",
+                "tiktok",
+                "youtube"
               ]
             },
             "additionalProperties": {
@@ -21952,7 +22520,9 @@
               "instagram",
               "threads",
               "bluesky",
-              "mastodon"
+              "mastodon",
+              "tiktok",
+              "youtube"
             ]
           },
           "scratchpad": {
@@ -22292,7 +22862,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 6,
+                "maxItems": 8,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -22316,7 +22886,9 @@
                         "instagram",
                         "threads",
                         "bluesky",
-                        "mastodon"
+                        "mastodon",
+                        "tiktok",
+                        "youtube"
                       ]
                     },
                     "forkedFromVersion": {
@@ -22334,6 +22906,82 @@
                     "options": {
                       "type": "object",
                       "properties": {
+                        "youtube": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "public",
+                                "private",
+                                "unlisted"
+                              ]
+                            },
+                            "madeForKids": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "privacy"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "tiktok": {
+                          "type": "object",
+                          "properties": {
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "PUBLIC_TO_EVERYONE",
+                                "MUTUAL_FOLLOW_FRIENDS",
+                                "FOLLOWER_OF_CREATOR",
+                                "SELF_ONLY"
+                              ]
+                            },
+                            "allowComments": {
+                              "type": "boolean"
+                            },
+                            "allowDuet": {
+                              "type": "boolean"
+                            },
+                            "allowStitch": {
+                              "type": "boolean"
+                            },
+                            "commercialContent": {
+                              "type": "boolean"
+                            },
+                            "brandOrganic": {
+                              "type": "boolean"
+                            },
+                            "brandedContent": {
+                              "type": "boolean"
+                            },
+                            "madeWithAi": {
+                              "type": "boolean"
+                            },
+                            "consent": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "privacy",
+                            "allowComments",
+                            "allowDuet",
+                            "allowStitch",
+                            "brandOrganic",
+                            "brandedContent",
+                            "madeWithAi",
+                            "consent"
+                          ],
+                          "additionalProperties": false
+                        },
                         "autoDm": {
                           "type": "object",
                           "properties": {
@@ -22758,7 +23406,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 6,
+                "maxItems": 8,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -22782,7 +23430,9 @@
                         "instagram",
                         "threads",
                         "bluesky",
-                        "mastodon"
+                        "mastodon",
+                        "tiktok",
+                        "youtube"
                       ]
                     },
                     "forkedFromVersion": {
@@ -22800,6 +23450,82 @@
                     "options": {
                       "type": "object",
                       "properties": {
+                        "youtube": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "maxLength": 100
+                            },
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "public",
+                                "private",
+                                "unlisted"
+                              ]
+                            },
+                            "madeForKids": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "privacy"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "tiktok": {
+                          "type": "object",
+                          "properties": {
+                            "privacy": {
+                              "type": "string",
+                              "enum": [
+                                "",
+                                "PUBLIC_TO_EVERYONE",
+                                "MUTUAL_FOLLOW_FRIENDS",
+                                "FOLLOWER_OF_CREATOR",
+                                "SELF_ONLY"
+                              ]
+                            },
+                            "allowComments": {
+                              "type": "boolean"
+                            },
+                            "allowDuet": {
+                              "type": "boolean"
+                            },
+                            "allowStitch": {
+                              "type": "boolean"
+                            },
+                            "commercialContent": {
+                              "type": "boolean"
+                            },
+                            "brandOrganic": {
+                              "type": "boolean"
+                            },
+                            "brandedContent": {
+                              "type": "boolean"
+                            },
+                            "madeWithAi": {
+                              "type": "boolean"
+                            },
+                            "consent": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "privacy",
+                            "allowComments",
+                            "allowDuet",
+                            "allowStitch",
+                            "brandOrganic",
+                            "brandedContent",
+                            "madeWithAi",
+                            "consent"
+                          ],
+                          "additionalProperties": false
+                        },
                         "autoDm": {
                           "type": "object",
                           "properties": {
@@ -23160,7 +23886,9 @@
                 "instagram",
                 "threads",
                 "bluesky",
-                "mastodon"
+                "mastodon",
+                "tiktok",
+                "youtube"
               ]
             },
             "additionalProperties": {
@@ -23218,7 +23946,9 @@
                   "instagram",
                   "threads",
                   "bluesky",
-                  "mastodon"
+                  "mastodon",
+                  "tiktok",
+                  "youtube"
                 ]
               },
               {
@@ -23319,6 +24049,26 @@
                 "threadProgress": {
                   "type": "object",
                   "properties": {
+                    "publication": {
+                      "type": "object",
+                      "properties": {
+                        "remoteId": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "visibility": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "remoteId",
+                        "url"
+                      ],
+                      "additionalProperties": false
+                    },
                     "quotes": {
                       "type": "array",
                       "items": {
@@ -23843,7 +24593,7 @@
                     "const": 1
                   },
                   "versions": {
-                    "maxItems": 6,
+                    "maxItems": 8,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -23867,7 +24617,9 @@
                             "instagram",
                             "threads",
                             "bluesky",
-                            "mastodon"
+                            "mastodon",
+                            "tiktok",
+                            "youtube"
                           ]
                         },
                         "forkedFromVersion": {
@@ -23885,6 +24637,82 @@
                         "options": {
                           "type": "object",
                           "properties": {
+                            "youtube": {
+                              "type": "object",
+                              "properties": {
+                                "title": {
+                                  "type": "string",
+                                  "maxLength": 100
+                                },
+                                "privacy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "",
+                                    "public",
+                                    "private",
+                                    "unlisted"
+                                  ]
+                                },
+                                "madeForKids": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "title",
+                                "privacy"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "tiktok": {
+                              "type": "object",
+                              "properties": {
+                                "privacy": {
+                                  "type": "string",
+                                  "enum": [
+                                    "",
+                                    "PUBLIC_TO_EVERYONE",
+                                    "MUTUAL_FOLLOW_FRIENDS",
+                                    "FOLLOWER_OF_CREATOR",
+                                    "SELF_ONLY"
+                                  ]
+                                },
+                                "allowComments": {
+                                  "type": "boolean"
+                                },
+                                "allowDuet": {
+                                  "type": "boolean"
+                                },
+                                "allowStitch": {
+                                  "type": "boolean"
+                                },
+                                "commercialContent": {
+                                  "type": "boolean"
+                                },
+                                "brandOrganic": {
+                                  "type": "boolean"
+                                },
+                                "brandedContent": {
+                                  "type": "boolean"
+                                },
+                                "madeWithAi": {
+                                  "type": "boolean"
+                                },
+                                "consent": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "privacy",
+                                "allowComments",
+                                "allowDuet",
+                                "allowStitch",
+                                "brandOrganic",
+                                "brandedContent",
+                                "madeWithAi",
+                                "consent"
+                              ],
+                              "additionalProperties": false
+                            },
                             "autoDm": {
                               "type": "object",
                               "properties": {
@@ -25086,7 +25914,9 @@
                       "threads",
                       "mastodon",
                       "bluesky",
-                      "instagram"
+                      "instagram",
+                      "tiktok",
+                      "youtube"
                     ]
                   },
                   "postId": {

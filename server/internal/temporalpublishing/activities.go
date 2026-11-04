@@ -93,7 +93,7 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 	if err != nil {
 		return PublishResult{NextAttempt: input.AttemptNumber, Outcome: OutcomeRetry, RetryAfter: time.Second}, nil
 	}
-	providerID, publishErr := a.publish(ctx, socialapi.PublishInput{
+	receipt, publishErr := a.publish(ctx, socialapi.PublishInput{
 		AssetMediaType: input.Job.AssetMediaType, AssetObjectKey: input.Job.AssetObjectKey, Assets: input.Job.Assets, Replies: input.Job.Replies, ReplyTo: input.Job.ReplyTo, Poll: input.Job.Poll,
 		Options: input.Job.Options, Document: input.Job.Document, Cover: input.Job.Cover,
 		Caption: input.Job.Caption, DestinationID: input.Job.DestinationID,
@@ -101,6 +101,7 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 		PostID:           input.Job.PostID,
 		ProviderSettings: input.Job.ProviderSettings, SecretReference: input.Job.SecretReference,
 	})
+	providerID := receipt.PostID
 	if publishErr == nil {
 		if err := a.store.Complete(ctx, post, attempt, providerID, input.RunID); err != nil {
 			return PublishResult{}, err
@@ -139,6 +140,9 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 }
 
 func (a *Activities) MarkUnknown(ctx context.Context, input MarkUnknownInput) error {
+	if err := a.recordProgress(ctx, input.PostID, input.Progress); err != nil {
+		return err
+	}
 	return a.store.FailUnknown(ctx, input.PostID, input.RunID, input.AttemptNumber)
 }
 
@@ -191,30 +195,31 @@ type threadRecorder interface {
 // the post is live either way. It checks the late window again first: the
 // send runs on the activity queue, whose worker may start it long after
 // Prepare checked, and a post that cannot be checked is not sent.
-func (a *Activities) publish(ctx context.Context, input socialapi.PublishInput) (string, error) {
+func (a *Activities) publish(ctx context.Context, input socialapi.PublishInput) (socialapi.Receipt, error) {
 	scheduledFor, err := a.store.PostScheduledFor(ctx, input.OrganizationID, input.PostID)
 	if err != nil {
 		slog.ErrorContext(ctx, "publication not sent: its schedule could not be read", "post", input.PostID, "error", err)
-		return "", err
+		return socialapi.Receipt{}, err
 	}
 	if late := a.now().UTC().Sub(scheduledFor); late > LatePublicationWindow {
 		slog.WarnContext(ctx, "publication missed its window", "post", input.PostID, "lateSeconds", int(late.Seconds()))
-		return "", errMissedWindow
+		return socialapi.Receipt{}, errMissedWindow
 	}
 	threads, ok := a.provider.(threadPublisher)
 	if !ok {
-		return a.provider.Publish(ctx, input)
+		id, err := a.provider.Publish(ctx, input)
+		return socialapi.Receipt{PostID: id}, err
 	}
 	receipt, err := threads.PublishThread(ctx, input)
-	if err != nil {
-		return "", err
+	if err != nil && receipt.Thread.Publication == nil {
+		return socialapi.Receipt{}, err
 	}
 	if recorder, ok := a.store.(threadRecorder); ok {
 		if err := recorder.RecordThread(ctx, input.PostID, receipt.Thread); err != nil {
 			slog.ErrorContext(ctx, "thread progress was not recorded", "post", input.PostID, "error", err)
 		}
 	}
-	return receipt.PostID, nil
+	return receipt, err
 }
 
 // autoActor runs a live post's follow-ups (repost, plug, quote).
@@ -274,7 +279,7 @@ func (a *Activities) RunAutoActions(ctx context.Context, input AutoActionsInput)
 }
 
 func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResult, error) {
-	providerID, err := a.publish(ctx, socialapi.PublishInput{
+	receipt, err := a.publish(ctx, socialapi.PublishInput{
 		AssetMediaType: input.Job.AssetMediaType, AssetObjectKey: input.Job.AssetObjectKey, Assets: input.Job.Assets, Replies: input.Job.Replies, ReplyTo: input.Job.ReplyTo, Poll: input.Job.Poll,
 		Options: input.Job.Options, Document: input.Job.Document, Cover: input.Job.Cover,
 		Caption: input.Job.Caption, DestinationID: input.Job.DestinationID,
@@ -282,11 +287,16 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 		PostID:           input.Job.PostID,
 		ProviderSettings: input.Job.ProviderSettings, SecretReference: input.Job.SecretReference,
 	})
+	providerID := receipt.PostID
+	var progress *postoptions.ThreadProgress
+	if receipt.Thread.Publication != nil {
+		progress = &receipt.Thread
+	}
 	if err == nil {
 		// Evidence for reconciliation should recording the receipt fail later.
 		slog.InfoContext(ctx, "provider accepted publication", "post", input.Job.PostID, "platform", input.Job.Platform, "remotePostId", providerID)
 		if direct, ok := a.provider.(interface{ PublishesSynchronously() bool }); ok && direct.PublishesSynchronously() {
-			return PublishResult{Outcome: OutcomePublished, ProviderID: providerID}, nil
+			return PublishResult{Outcome: OutcomePublished, ProviderID: providerID, Progress: progress}, nil
 		}
 		return PublishResult{Outcome: OutcomePending, ProviderID: providerID}, nil
 	}
@@ -299,7 +309,7 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 	}
 	failureCode := publishing.ProviderFailureCode(providerErr.Status, providerErr.UnknownDelivery)
 	if providerErr.UnknownDelivery {
-		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown}, nil
+		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown, ProviderID: providerID, Progress: progress}, nil
 	}
 	if providerErr.Status == 429 {
 		return PublishResult{FailureCode: failureCode, Outcome: OutcomeRetry}, nil
@@ -327,6 +337,9 @@ func (a *Activities) Check(ctx context.Context, input CheckInput) (PublishResult
 }
 
 func (a *Activities) CompleteV2(ctx context.Context, input CompleteInput) error {
+	if err := a.recordProgress(ctx, input.Job.PostID, input.Progress); err != nil {
+		return err
+	}
 	runID := input.RunID
 	post := &ent.ScheduledPost{
 		ID: input.Job.PostID, OrganizationID: input.Job.OrganizationID,
@@ -346,4 +359,16 @@ func (a *Activities) FailV2(ctx context.Context, input FailInput) error {
 		retryAt = &input.RetryAt
 	}
 	return a.store.Fail(ctx, post, publishing.Attempt{ID: input.AttemptID, Number: input.AttemptNumber}, input.FailureCode, retryAt, input.RunID)
+}
+
+// recordProgress runs inside retryable outcome activities, never resubmitting a post.
+func (a *Activities) recordProgress(ctx context.Context, postID string, progress *postoptions.ThreadProgress) error {
+	if progress == nil {
+		return nil
+	}
+	recorder, ok := a.store.(threadRecorder)
+	if !ok {
+		return errors.New("publication receipt storage is unavailable")
+	}
+	return recorder.RecordThread(ctx, postID, *progress)
 }

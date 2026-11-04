@@ -401,6 +401,7 @@ export function WriteComposer({
           channel: account.channel,
           connectionId: account.id,
           standing: {
+            tiktokCreator: account.tiktokCreator,
             maxWeightedCharacters: account.xCaptionLimit,
             articles: account.xArticles,
             xQuotes: account.xQuotes,
@@ -1272,6 +1273,7 @@ export function WriteComposer({
               Post options
             </summary>
             <VersionOptionsBar
+              tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
               channel={active}
               captionLimit={activePublication.serialized.limit}
               onApplyFinisher={

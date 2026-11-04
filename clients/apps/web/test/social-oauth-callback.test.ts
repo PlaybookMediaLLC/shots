@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { getAuthBaseUrl } from '@/lib/auth/environment'
 import { afterEach, test } from 'node:test'
 import { completeSocialOAuth, selectInstagramAccount } from '../lib/tenant/social-oauth-callback'
 import { socialOAuthCompletionRedirect } from '../lib/tenant/social-oauth-completion'
@@ -77,7 +78,7 @@ test('LinkedIn uses the same session-bound callback exchange', async () => {
 })
 
 test('Facebook Login requires a linked Instagram account selection', async () => {
-  process.env.BETTER_AUTH_SECRET = 'test-picker-secret'
+  process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
   const url = 'http://localhost/integrations/social/instagram?code=code1&state=state1'
   const picker = await completeSocialOAuth(new Request(url), 'instagram', {
     exchange: async () => ({
@@ -97,7 +98,7 @@ test('Facebook Login requires a linked Instagram account selection', async () =>
   const selected = await selectInstagramAccount(
     new Request(url, {
       body: new URLSearchParams({ choice }),
-      headers: { origin: 'http://localhost' },
+      headers: { origin: new URL(getAuthBaseUrl()).origin },
       method: 'POST',
     }),
     {
@@ -110,6 +111,7 @@ test('Facebook Login requires a linked Instagram account selection', async () =>
   assert.equal(selected.headers.get('Location'), '/workspace/channels?connected=instagram')
   assert.deepEqual(selections, [
     {
+      provider: 'instagram',
       accountId: 'ig1',
       expiresAt: (selections[0] as { expiresAt: number }).expiresAt,
       integrationId: 'go-ig',
@@ -121,7 +123,7 @@ test('Facebook Login requires a linked Instagram account selection', async () =>
   const rejected = await selectInstagramAccount(
     new Request(url, {
       body: new URLSearchParams({ choice: `${choice}tampered` }),
-      headers: { origin: 'http://localhost' },
+      headers: { origin: new URL(getAuthBaseUrl()).origin },
       method: 'POST',
     }),
     {
@@ -155,7 +157,7 @@ test('invalid OAuth callbacks make no backend request', async () => {
 })
 
 test('page selection rejects cross-origin form submission', async () => {
-  process.env.BETTER_AUTH_SECRET = 'test-picker-secret'
+  process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
   const result = await selectInstagramAccount(
     new Request('http://localhost/integrations/social/instagram', {
       body: new URLSearchParams({ choice: 'invalid' }),

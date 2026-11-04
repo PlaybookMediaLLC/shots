@@ -78,3 +78,16 @@ func TestDraftMediaFollowsEachDestination(t *testing.T) {
 		}
 	}
 }
+
+func TestVideoDraftChannelsAcceptStandardPostsOnly(t *testing.T) {
+	for _, channel := range []string{"tiktok", "youtube"} {
+		if err := draftKindChannel("standard", channel); err != nil {
+			t.Fatalf("%s standard draft: %v", channel, err)
+		}
+		for _, kind := range []string{"reply", "quote", "article"} {
+			if err := draftKindChannel(kind, channel); err == nil {
+				t.Fatalf("%s must reject %s", channel, kind)
+			}
+		}
+	}
+}

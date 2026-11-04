@@ -34,7 +34,7 @@ import (
 var draftPlatformChannels = map[string]string{
 	"x": "x", "linkedin": "linkedin", "instagram": "instagram", "instagram-standalone": "instagram",
 	"threads": "threads", "bluesky": "bluesky", "mastodon": "mastodon",
-	"twitter": "x", "linkedin-page": "linkedin", "mastodon-custom": "mastodon", "mastodoncustom": "mastodon",
+	"tiktok": "tiktok", "youtube": "youtube", "twitter": "x", "linkedin-page": "linkedin", "mastodon-custom": "mastodon", "mastodoncustom": "mastodon",
 }
 
 // EnableE2EDraftPlatform lets the local provider fixture's "e2e" connections
@@ -47,7 +47,7 @@ func EnableE2EDraftPlatform() {
 // draftChannelLimits is each channel's caption limit; the composer holds the
 // same numbers (DRAFT_CHANNEL_LIMITS in lib/content-drafts/serialize.ts).
 var draftChannelLimits = map[string]int{
-	"bluesky": 300, "instagram": 2200, "linkedin": 3000, "mastodon": 500, "threads": 500, "x": 280,
+	"tiktok": 2000, "youtube": 5000, "bluesky": 300, "instagram": 2200, "linkedin": 3000, "mastodon": 500, "threads": 500, "x": 280,
 }
 
 // ContentDraftScheduleTarget is one channel and the caption serialized for it.
@@ -114,6 +114,7 @@ func naturalOffset(draftID string, version int, base time.Time) int {
 // AccountStanding is a display projection of verified connection capabilities.
 // Scheduling independently rechecks the current proof in its transaction.
 type AccountStanding struct {
+	TikTokCreator  *postoptions.TikTokCreator `json:"tiktokCreator,omitempty"`
 	MastodonQuotes *bool                      `json:"mastodonQuotes"`
 	PollLimits     *socialidentity.PollLimits `json:"pollLimits"`
 	Premium        bool                       `json:"premium"`
@@ -240,10 +241,14 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		value := string(*post.ScheduleMode)
 		mode = &value
 	}
+	postURL := livePostURL(platform, post.RemotePostID)
+	if receipt := post.ThreadProgress.Publication; receipt != nil && receipt.URL != "" {
+		postURL = &receipt.URL
+	}
 	return ContentDraftPost{Caption: post.Caption, ChannelConnectionID: post.ChannelConnectionID,
 		CreatedAt: post.CreatedAt, ID: post.ID, Platform: platform, ScheduledFor: post.ScheduledFor,
 		Status: string(post.Status), Metrics: post.Metrics, MetricsAt: post.MetricsAt,
-		URL: livePostURL(platform, post.RemotePostID), Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
+		URL: postURL, Replies: len(post.Replies), ThreadProgress: post.ThreadProgress,
 		NaturalOffsetSeconds: post.NaturalOffsetSeconds, ScheduleMode: mode, ScheduleTimeZone: post.ScheduleTimeZone,
 		SlotAt: post.SlotAt, SocialSetID: post.SocialSetID, Automations: []PostAutomation{},
 		FailureCode: post.FailureCode, PublishedAt: post.PublishedAt}
@@ -361,6 +366,16 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		}
 		if err := checkDraftMedia(channel, rows); err != nil {
 			return nil, nil, err
+		}
+		if channel == "tiktok" {
+			standing := c.accountStanding(ctx, connection)
+			duration := 0
+			if len(rows) == 1 && rows[0].DurationMs != nil {
+				duration = *rows[0].DurationMs
+			}
+			if err := standing.TikTokCreator.Check(target.Options.TikTok, duration); err != nil {
+				return nil, nil, conflict(err.Error())
+			}
 		}
 		if channel == "instagram" && len(ids) == 0 {
 			return nil, nil, conflict("Instagram needs an image. Add one to the draft first.")

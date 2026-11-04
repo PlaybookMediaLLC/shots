@@ -189,7 +189,7 @@ func TestBeginOAuthRequiresBoundOrganization(t *testing.T) {
 		switch r.URL.Path {
 		case "/me":
 			_ = json.NewEncoder(w).Encode(map[string]any{"organization": map[string]string{"id": "go-org-1"}})
-		case "/social/x":
+		case "/social/x", "/social/linkedin-page", "/social/tiktok", "/social/youtube":
 			_ = json.NewEncoder(w).Encode(map[string]string{"url": "https://api.x.com/oauth/authorize?oauth_token=test"})
 		default:
 			http.NotFound(w, r)
@@ -197,14 +197,18 @@ func TestBeginOAuthRequiresBoundOrganization(t *testing.T) {
 	}))
 	defer server.Close()
 	client := New(server.URL, server.Client(), nil)
-	input := BeginOAuthInput{ExpectedGoOrganizationID: "go-org-1", Provider: "x", SecretReference: "SOCIAL_API_KEY_TEST"}
-	url, err := client.BeginOAuth(context.Background(), input)
-	if err != nil || url != "https://api.x.com/oauth/authorize?oauth_token=test" {
-		t.Fatalf("url=%q err=%v", url, err)
-	}
-	input.ExpectedGoOrganizationID = "another-org"
-	if _, err := client.BeginOAuth(context.Background(), input); err == nil {
-		t.Fatal("another Go organization started OAuth")
+	for _, provider := range []string{"x", "linkedin-page", "tiktok", "youtube"} {
+		t.Run(provider, func(t *testing.T) {
+			input := BeginOAuthInput{ExpectedGoOrganizationID: "go-org-1", Provider: provider, SecretReference: "SOCIAL_API_KEY_TEST"}
+			url, err := client.BeginOAuth(context.Background(), input)
+			if err != nil || url != "https://api.x.com/oauth/authorize?oauth_token=test" {
+				t.Fatalf("url=%q err=%v", url, err)
+			}
+			input.ExpectedGoOrganizationID = "another-org"
+			if _, err := client.BeginOAuth(context.Background(), input); err == nil {
+				t.Fatal("another Go organization started OAuth")
+			}
+		})
 	}
 }
 

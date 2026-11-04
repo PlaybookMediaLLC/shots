@@ -24,10 +24,14 @@ type activityStore struct {
 
 type quoteReceiptStore struct {
 	activityStore
-	progress postoptions.ThreadProgress
+	progress  postoptions.ThreadProgress
+	recordErr error
 }
 
 func (s *quoteReceiptStore) RecordThread(_ context.Context, _ string, progress postoptions.ThreadProgress) error {
+	if s.recordErr != nil {
+		return s.recordErr
+	}
 	s.progress = progress
 	return nil
 }
@@ -233,5 +237,35 @@ func TestSendRechecksTheLatePublicationWindow(t *testing.T) {
 				t.Fatalf("publish=%#v failed=%q sends=%d err=%v", published, store.failed, provider.sends, err)
 			}
 		})
+	}
+}
+
+type processingReceiptProvider struct{ directProvider }
+
+func (processingReceiptProvider) PublishThread(context.Context, socialapi.PublishInput) (socialapi.Receipt, error) {
+	return socialapi.Receipt{PostID: "video", Thread: postoptions.ThreadProgress{Publication: &postoptions.PublicationReceipt{RemoteID: "video", URL: "https://www.youtube.com/watch?v=video"}}}, socialapi.NewError(502, true, "processing pending")
+}
+func TestProcessingReceiptSurvivesUnknownDelivery(t *testing.T) {
+	store := &quoteReceiptStore{}
+	_, err := NewActivities(store, processingReceiptProvider{}).publish(context.Background(), socialapi.PublishInput{})
+	if err == nil || store.progress.Publication == nil || store.progress.Publication.RemoteID != "video" {
+		t.Fatalf("receipt lost: %#v %v", store.progress, err)
+	}
+}
+
+func TestReceiptSurvivesStorageOutageWithoutResubmitting(t *testing.T) {
+	store := &quoteReceiptStore{recordErr: context.DeadlineExceeded}
+	activities := NewActivities(store, processingReceiptProvider{})
+	result, err := activities.Submit(context.Background(), SubmitInput{})
+	if err != nil || result.Outcome != OutcomeUnknown || result.ProviderID != "video" || result.Progress == nil {
+		t.Fatalf("safe receipt lost: %#v %v", result, err)
+	}
+	input := MarkUnknownInput{PostID: "post", Progress: result.Progress}
+	if err := activities.MarkUnknown(context.Background(), input); err == nil || store.unknown {
+		t.Fatal("outcome must await receipt storage")
+	}
+	store.recordErr = nil
+	if err := activities.MarkUnknown(context.Background(), input); err != nil || !store.unknown || store.progress.Publication.RemoteID != "video" {
+		t.Fatalf("receipt recovery failed: %#v %v", store, err)
 	}
 }

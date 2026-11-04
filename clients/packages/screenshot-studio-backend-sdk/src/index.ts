@@ -1,3 +1,11 @@
+import type { YouTubeOptions, TikTokOptions, PublicationReceipt } from './video-publishing.ts'
+export {
+  publicationReceiptSchema,
+  youtubeOptionsSchema,
+  tiktokOptionsSchema,
+  tiktokCreatorSchema,
+} from './video-publishing.ts'
+export type { YouTubeOptions, TikTokOptions } from './video-publishing.ts'
 import { z } from 'zod'
 import {
   frontendSourceSchema,
@@ -976,6 +984,8 @@ export type BackendDraftArticle = { coverAssetId?: string; title: string }
 
 /** A platform version's settings. */
 export type BackendVersionOptions = {
+  youtube?: YouTubeOptions
+  tiktok?: TikTokOptions
   /** X: follow-ups once the post is live. */
   automation?: BackendAutoActions
   community?: { id: string; name?: string; shareWithFollowers?: boolean }
@@ -1195,6 +1205,7 @@ export type BackendContentDraftPost = {
   /** A thread: its reply count and how many went out. */
   replies: number
   threadProgress: {
+    publication?: PublicationReceipt
     lastReplyId?: string
     posted: number
     total: number
@@ -1236,6 +1247,8 @@ export type BackendContentDraftScheduleTarget = {
 
 /** A post's settings beyond its text, as a scheduled post keeps them (RFC 025). */
 export type BackendPublishOptions = {
+  youtube?: YouTubeOptions
+  tiktok?: TikTokOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string
@@ -2312,6 +2325,7 @@ export class ScreenshotStudioBackendSDK {
   }
 
   async selectInstagramOAuthPage(input: {
+    provider?: OAuthProvider
     state: string
     integrationId: string
     accountId: string
@@ -2323,9 +2337,13 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
-  async rememberInstagramIntegration(state: string, integrationId: string) {
+  async rememberInstagramIntegration(
+    state: string,
+    integrationId: string,
+    provider: OAuthProvider = 'instagram'
+  ) {
     return this.request('v1/social-oauth/remember', {
-      body: { provider: 'instagram', state, integrationId },
+      body: { provider, state, integrationId },
       method: 'POST',
     })
   }

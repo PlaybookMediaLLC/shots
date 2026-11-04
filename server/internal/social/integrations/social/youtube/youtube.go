@@ -49,7 +49,6 @@ var scopes = []string{
 	"https://www.googleapis.com/auth/youtube.force-ssl",
 	"https://www.googleapis.com/auth/youtube.readonly",
 	"https://www.googleapis.com/auth/youtube.upload",
-	"https://www.googleapis.com/auth/youtubepartner",
 	"https://www.googleapis.com/auth/yt-analytics.readonly",
 }
 
@@ -294,7 +293,7 @@ func (p *Provider) Pages(ctx context.Context, accessToken string) ([]Page, error
 	// Get all channels the user has access to
 	channels, err := channelsList(ctx, accessToken, url.Values{"part": {"snippet", "contentDetails", "statistics"}, "mine": {"true"}})
 	if err != nil {
-		log.Println("Failed to fetch YouTube channels:", err)
+		log.Println("Failed to fetch YouTube channels")
 		return []Page{}, nil
 	}
 	out := make([]Page, 0, len(channels))
@@ -319,7 +318,7 @@ func (p *Provider) FetchPageInformation(ctx context.Context, accessToken string,
 		err = errors.New("Channel not found")
 	}
 	if err != nil {
-		log.Println("Failed to fetch YouTube channel information:", err)
+		log.Println("Failed to fetch YouTube channel information")
 		return nil, err
 	}
 	c := channels[0]
@@ -384,37 +383,6 @@ type pendingData struct {
 func (d pendingData) raw() json.RawMessage {
 	data, _ := json.Marshal(d)
 	return data
-}
-
-// youtubeMediaSize resolves the total byte size of the media without loading
-// it into memory: a HEAD request for remote URLs, stat for local files.
-func youtubeMediaSize(ctx context.Context, path string) (int64, error) {
-	if !strings.HasPrefix(path, "http") {
-		info, err := os.Stat(path)
-		if err != nil {
-			return 0, err
-		}
-		return info.Size(), nil
-	}
-	// the media path is user-influenced, keep the SSRF-safe client. identity
-	// encoding so content-length matches the bytes a later GET actually streams.
-	temporalx.SetHeartbeatDetails(ctx, "youtube: media size "+temporalx.StripQuery(path))
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, path, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("Accept-Encoding", "identity")
-	res, err := ssrf.Client().Do(req)
-	if err != nil {
-		return 0, err
-	}
-	res.Body.Close()
-	length := res.Header.Get("Content-Length")
-	if length == "" {
-		return 0, temporalx.BadBody(identifier, "{}", "{}", "Could not determine the video size for the YouTube upload")
-	}
-	n, _ := strconv.ParseInt(length, 10, 64)
-	return n, nil
 }
 
 // youtubeChunkStream returns a streaming body for the [start, end] byte range
@@ -544,7 +512,7 @@ func (p *Provider) PostPending(ctx context.Context, _ string, accessToken string
 	if len(firstPost.Media) > 0 {
 		path = firstPost.Media[0].Path
 	}
-	videoSize, err := youtubeMediaSize(ctx, path)
+	videoSize, err := p.MediaSize(ctx, path, identifier)
 	if err != nil {
 		return nil, err
 	}
@@ -836,6 +804,57 @@ func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []int
 		}
 		data = finalize.PendingData
 	}
+}
+
+// Processing checks only read the known upload; an uncertain result never repeats it.
+var processingPollInterval = 5 * time.Second
+
+func (p *Provider) ConfirmVideo(ctx context.Context, token, videoID, channelID string) (string, error) {
+	visibility := ""
+	for attempt := 0; attempt < 12; attempt++ {
+		var result struct {
+			Items []struct {
+				ID      string `json:"id"`
+				Snippet struct {
+					ChannelID string `json:"channelId"`
+				} `json:"snippet"`
+				Status struct {
+					UploadStatus  string `json:"uploadStatus"`
+					PrivacyStatus string `json:"privacyStatus"`
+				} `json:"status"`
+				Processing struct {
+					Status string `json:"processingStatus"`
+				} `json:"processingDetails"`
+			} `json:"items"`
+		}
+		query := url.Values{"id": {videoID}, "part": {"snippet,status,processingDetails"}}
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, youtubeAPI+"/youtube/v3/videos?"+query.Encode(), nil)
+		if err != nil {
+			return visibility, errors.New("YouTube processing request is unavailable")
+		}
+		request.Header.Set("Authorization", "Bearer "+token)
+		if err := googleapi.Send(request, &result); err == nil && len(result.Items) == 1 {
+			item := result.Items[0]
+			if item.ID != videoID || item.Snippet.ChannelID != channelID {
+				return visibility, errors.New("YouTube returned an unexpected video identity")
+			}
+			visibility = item.Status.PrivacyStatus
+			if item.Status.UploadStatus == "processed" && item.Processing.Status == "succeeded" && (visibility == "public" || visibility == "private" || visibility == "unlisted") {
+				return visibility, nil
+			}
+			if item.Status.UploadStatus == "failed" || item.Status.UploadStatus == "rejected" || item.Status.UploadStatus == "deleted" || item.Processing.Status == "failed" || item.Processing.Status == "terminated" {
+				return visibility, errors.New("YouTube video processing did not succeed")
+			}
+		}
+		if attempt < 11 {
+			select {
+			case <-ctx.Done():
+				return visibility, errors.New("YouTube processing confirmation timed out")
+			case <-time.After(processingPollInterval):
+			}
+		}
+	}
+	return visibility, errors.New("YouTube video processing remains unconfirmed")
 }
 
 // rawText renders a JSON scalar the way String(value) would.

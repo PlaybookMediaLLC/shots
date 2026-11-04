@@ -31,6 +31,9 @@ import {
 const providers = [
   { id: 'x', label: 'X / Twitter' },
   { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'linkedin-page', label: 'LinkedIn Page' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'youtube', label: 'YouTube' },
   { id: 'mastodon', label: 'Mastodon' },
   { id: 'threads', label: 'Threads' },
   { id: 'bluesky', label: 'Bluesky' },

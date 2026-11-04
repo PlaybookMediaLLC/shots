@@ -247,7 +247,9 @@ test('channel limits and requirements block scheduling', () => {
 test('connection platforms map to draft channels', () => {
   assert.equal(channelForPlatform('instagram-standalone'), 'instagram')
   assert.equal(channelForPlatform('x'), 'x')
-  assert.equal(channelForPlatform('tiktok'), null)
+  assert.equal(channelForPlatform('tiktok'), 'tiktok')
+  assert.equal(channelForPlatform('youtube'), 'youtube')
+  assert.equal(channelForPlatform('linkedin-page'), 'linkedin')
   assert.equal(draftPlainText([p(text('Hello'), text(' world', { bold: true }))]), 'Hello world')
 })
 

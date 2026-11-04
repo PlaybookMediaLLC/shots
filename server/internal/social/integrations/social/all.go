@@ -88,7 +88,7 @@ func All(lifecycle ...slack.Lifecycle) []integrations.Provider {
 	if os.Getenv("PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED") == "true" {
 		providers = append(providers, mastodoncustom.New())
 	}
-	return append(providers, e2eProviders()...)
+	return append(e2eProviders(), providers...)
 }
 
 // NewManager is the IntegrationManager over All().

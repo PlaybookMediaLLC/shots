@@ -51,9 +51,10 @@ type CreateScheduledPostResult struct {
 
 // MediaAsset is one stored file a post publishes.
 type MediaAsset struct {
-	AssetID   string `json:",omitempty"`
-	MediaType string
-	ObjectKey string
+	DurationMs *int   `json:",omitempty"`
+	AssetID    string `json:",omitempty"`
+	MediaType  string
+	ObjectKey  string
 	// Alt describes an image (RFC 025); jobs recorded before it have none.
 	Alt string `json:",omitempty"`
 }
