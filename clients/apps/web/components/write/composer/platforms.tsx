@@ -87,14 +87,14 @@ export function PlatformTabs({
               {CHANNEL_META[channel].label}
               {/* A synced version is the default, so only main and own text are named. */}
               {mode === 'primary' ? (
-                <span className="text-[10px] text-muted-foreground">Main</span>
+                <span className="text-label text-muted-foreground">Main</span>
               ) : mode === 'manual' ? (
-                <span className="rounded-full bg-amber-400/15 px-1.5 text-[10px] text-amber-700 dark:text-amber-200">
+                <span className="rounded-full bg-amber-400/15 px-1.5 text-label text-amber-700 dark:text-amber-200">
                   Own text
                 </span>
               ) : null}
               {!publishing ? (
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-label text-muted-foreground">
                   {account ? '· off' : '· not connected'}
                 </span>
               ) : null}
@@ -214,7 +214,7 @@ export function ManagePlatformsDialog({
                             account.handle ??
                             CHANNEL_META[account.channel].label}
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">
+                        <span className="block text-label text-muted-foreground">
                           {account.handle ? `@${account.handle} · ` : ''}
                           {healthLabel(account.health)}
                           {account.channel === 'x'
@@ -232,13 +232,13 @@ export function ManagePlatformsDialog({
                       />
                     </div>
                     {!supported ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
+                      <p className="mt-1 text-label text-muted-foreground">
                         {CHANNEL_META[account.channel].label} does not take this kind of draft.
                       </p>
                     ) : null}
                     {account.health !== 'connected' ? (
                       <a
-                        className="mt-1 block text-[11px] text-amber-700 dark:text-amber-300 underline"
+                        className="mt-1 block text-label text-amber-700 dark:text-amber-300 underline"
                         href="/workspace/channels"
                       >
                         Reconnect in workspace settings
@@ -392,7 +392,7 @@ export function SyncedVersion({
       {posts.length === 0 ? <p className="text-sm text-muted-foreground">Nothing written yet.</p> : null}
       {posts.map((post, index) => (
         <article
-          className="mb-3 whitespace-pre-wrap rounded-lg border border-border p-3 text-[15px] leading-relaxed text-foreground"
+          className="mb-3 whitespace-pre-wrap rounded-lg border border-border p-3 text-body leading-relaxed text-foreground"
           key={index}
         >
           {post.caption}

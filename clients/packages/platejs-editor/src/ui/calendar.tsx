@@ -54,7 +54,7 @@ function Calendar({
           "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
         day_today: "bg-accent text-accent-foreground",
         head_cell:
-          "text-muted-foreground rounded-none w-9 font-normal text-[0.8rem]",
+          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
         head_row: "flex",
         month: "space-y-4",
         months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",

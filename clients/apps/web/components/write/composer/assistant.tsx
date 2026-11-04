@@ -220,7 +220,7 @@ export function AssistantPanel({
           rows={3}
           value={message}
         />
-        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span className="flex items-center justify-between text-label text-muted-foreground">
           Uses your workspace’s AI credits.
           <Button disabled={busy || !message.trim()} size="sm" type="submit">
             Send

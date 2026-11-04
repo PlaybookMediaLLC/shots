@@ -234,11 +234,11 @@ export function Comment(props: {
       </div>
 
       {isFirst && showDocumentContent && (
-        <div className="relative mt-1 flex pl-[32px] text-sm text-subtle-foreground">
+        <div className="relative mt-1 flex pl-[32px] text-sm text-muted-foreground">
           {discussionLength > 1 && (
             <div className="absolute top-[5px] left-3 h-full w-0.5 shrink-0 bg-muted" />
           )}
-          <div className="my-px w-0.5 shrink-0 bg-highlight" />
+          <div className="my-px w-0.5 shrink-0 bg-primary" />
           {documentContent && <div className="ml-2">{documentContent}</div>}
         </div>
       )}
@@ -266,7 +266,7 @@ export function Comment(props: {
                   size="icon"
                   variant="ghost"
                 >
-                  <div className="flex size-5 shrink-0 items-center justify-center rounded-[50%] bg-primary/40">
+                  <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/40">
                     <XIcon className="!size-3 stroke-[3px] text-background" />
                   </div>
                 </Button>
@@ -279,7 +279,7 @@ export function Comment(props: {
                   size="icon"
                   variant="ghost"
                 >
-                  <div className="flex size-5 shrink-0 items-center justify-center rounded-[50%] bg-brand">
+                  <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary">
                     <CheckIcon className="!size-3 stroke-[3px] text-background" />
                   </div>
                 </Button>

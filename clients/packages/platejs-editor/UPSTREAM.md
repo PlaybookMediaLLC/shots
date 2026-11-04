@@ -100,6 +100,21 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   it as text; `always`: a space ends the query); the host's `onKeyDown` is
   composed with Plate's instead of replacing it; the popover sits 8px below
   the caret's line (`gutter`) with no extra margin.
+- `src/lib/utils.ts`: `cn` knows the host's type scale (`text-label`,
+  `text-caption`, `text-ui`, `text-body`, ...) as font sizes, so merging one
+  with a text color no longer drops it.
+- `src/ui/*.tsx` (tokens): every class the app does not define now names an
+  app token: `rounded-none` → `rounded-md` (floating surfaces `rounded-xl`
+  with a border), `shadow-floating`/`shadow-toolbar` → `shadow-popover`,
+  `animate-popover`/`animate-zoom` → `tw-animate-css` with
+  `motion-reduce:animate-none`, `*-brand` and `*-highlight` → `*-primary`
+  (the Appearance accent), `text-subtle-foreground` → `text-muted-foreground`,
+  `transition-bg-ease` → `transition-colors`, `focus-ring`/`no-focus-ring` →
+  the shell's focus ring; pixel font sizes and off-scale radii use the scale.
+  The editor font is the app's `font-sans` (Inter), controls are 32px like
+  the app's Button, and tooltips use the app's tooltip colors.
+  `test/editor-package-boundary.test.ts` in the web app fails on a raw hex
+  color, a pixel font size, an off-scale radius or a glyph icon.
 - `src/ui/slash-node.tsx`, `src/ui/floating-toolbar-buttons.tsx`,
   `src/ui/block-menu.tsx`: the multicolor 512-viewBox AI mark (three copies
   sharing one gradient id) is Phosphor's `Sparkle` in `text-primary`.

@@ -93,7 +93,7 @@ function HashtagChips({ hashtags }: { hashtags: string[] }) {
   const editor = useEditorRef()
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5 pb-6', POST_COLUMN)}>
-      <span className="text-[11px] text-muted-foreground">Your hashtags</span>
+      <span className="text-label text-muted-foreground">Your hashtags</span>
       {hashtags.map((tag) => (
         <Button
           variant="custom"
@@ -528,7 +528,7 @@ function SavedDraft({
     <section aria-label="Saved draft">
       <EditorStatic
         editor={editor}
-        className={cn(POST_COLUMN, 'draft-prose min-h-0 pt-1 pb-4 text-[15px] leading-relaxed')}
+        className={cn(POST_COLUMN, 'draft-prose min-h-0 pt-1 pb-4 text-body')}
         dir={textDirection}
       />
     </section>
@@ -901,7 +901,7 @@ function DraftEditorSession({
                   aria-label="Draft body"
                   className={cn(
                     POST_COLUMN,
-                    'draft-prose min-h-0 pt-1 pb-4 text-[15px] leading-relaxed [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[attr(placeholder)]'
+                    'draft-prose min-h-0 pt-1 pb-4 text-body [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[attr(placeholder)]'
                   )}
                   dir={textDirection}
                   placeholder="What would you like to share?"

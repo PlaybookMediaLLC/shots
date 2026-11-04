@@ -222,7 +222,7 @@ export function AIMenu() {
             )}
 
             <Button
-              className="no-focus-ring mt-1 shrink-0"
+              className="outline-none mt-1 shrink-0"
               disabled={!isLoading && input.trim().length === 0}
               onClick={() => {
                 if (isLoading) {
@@ -930,7 +930,7 @@ function SubmitIcon() {
   return (
     <div
       className={cn(
-        "flex size-5 items-center justify-center rounded-full bg-brand"
+        "flex size-5 items-center justify-center rounded-full bg-primary"
       )}
     >
       <ArrowUpIcon className="size-3! stroke-[3px] text-background" />

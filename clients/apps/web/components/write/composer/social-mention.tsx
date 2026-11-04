@@ -91,7 +91,7 @@ function SocialMentionInput(props: PlateElementProps) {
           ? 'Looking up account…'
           : (current.error ?? 'No matching account. Escape keeps your text.')
   return (
-    <PlateElement {...props} as="span">
+    <PlateElement {...props} as="span" className="rounded-sm bg-accent px-0.5 text-accent-foreground">
       <InlineCombobox
         element={props.element}
         trigger="@"
@@ -320,7 +320,7 @@ export function MentionPicker({
             Find
           </Button>
         </form>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-label text-muted-foreground">
           {channel === 'x'
             ? 'Looked up on X with this set’s account, by exact username.'
             : kind === 'person'

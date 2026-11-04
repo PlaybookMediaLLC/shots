@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { GroupIcon, InfoIcon, PollIcon, PublicIcon } from '@/components/platform-shell/icons'
+import { CloseIcon, GroupIcon, InfoIcon, PollIcon, PublicIcon } from '@/components/platform-shell/icons'
 import { useEditorRef } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -158,7 +158,7 @@ function AudienceTools({
         <Button
           aria-label={`Audience and disclosures for post ${number}`}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-[11px] hover:bg-foreground/[0.06]',
+            'flex h-6 items-center justify-center rounded-md px-1.5 text-label hover:bg-foreground/[0.06]',
             replies !== 'everyone' || labelled
               ? 'text-sky-700 dark:text-sky-300'
               : 'text-muted-foreground hover:text-foreground'
@@ -202,7 +202,7 @@ function AudienceTools({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-label text-muted-foreground">
               Who can reply never changes who can see the post.
             </p>
             {count > 1 ? (
@@ -257,7 +257,7 @@ function AudienceTools({
           <Label className="flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
             <span>
               Quote the first post
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-label text-muted-foreground">
                 Resolved once the first post is live.
               </span>
             </span>
@@ -299,7 +299,7 @@ function PollTool({
         <Button
           aria-label={poll ? 'Edit the poll' : 'Add a poll'}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-[11px] hover:bg-foreground/[0.06]',
+            'flex h-6 items-center justify-center rounded-md px-1.5 text-label hover:bg-foreground/[0.06]',
             poll ? 'text-sky-700 dark:text-sky-300' : 'text-muted-foreground hover:text-foreground'
           )}
           size={null}
@@ -464,7 +464,7 @@ export function PollEditor({
                 type="button"
                 variant="ghost"
               >
-                ✕
+                <CloseIcon aria-hidden size={14} />
               </Button>
             ) : null}
           </span>

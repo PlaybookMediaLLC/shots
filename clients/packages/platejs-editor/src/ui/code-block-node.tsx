@@ -56,7 +56,7 @@ export function CodeBlockElement(props: PlateElementProps) {
       {...props}
     >
       <pre
-        className="overflow-x-auto rounded-none bg-muted pt-[34px] pr-4 pb-8 pl-8 text-sm leading-[normal] [tab-size:2] print:break-inside-avoid"
+        className="overflow-x-auto rounded-md bg-muted pt-[34px] pr-4 pb-8 pl-8 text-sm leading-[normal] [tab-size:2] print:break-inside-avoid"
         data-plate-open-context-menu
       >
         <code>{props.children}</code>
@@ -122,7 +122,7 @@ function CodeBlockCombobox({ className }: { className?: string }) {
         <Button
           aria-expanded={open}
           className={cn(
-            "h-5 w-auto select-none justify-between gap-1 rounded-none px-[5px] align-top text-muted-foreground text-xs",
+            "h-5 w-auto select-none justify-between gap-1 rounded-md px-[5px] align-top text-muted-foreground text-xs",
             className
           )}
           contentEditable={false}

@@ -11,6 +11,9 @@ import { ChatIcon as MessageSquare } from '@phosphor-icons/react/dist/ssr/Chat'
 import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sidebar'
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
+import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
@@ -977,7 +980,7 @@ export function WriteComposer({
                 review={{ ...server, version: version.current }}
               />
             ) : null}
-            {/* One row of actions that wraps as a whole; narrow screens keep the rest in ⋯. */}
+            {/* One row of actions that wraps as a whole; narrow screens keep the rest in More. */}
             <div
               className="ml-auto flex shrink-0 items-center gap-1"
               data-testid="composer-actions"
@@ -1070,7 +1073,7 @@ export function WriteComposer({
                     size="sm"
                     variant="ghost"
                   >
-                    ⋯
+                    <DotsThreeIcon aria-hidden className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
@@ -1304,7 +1307,7 @@ export function WriteComposer({
             />
           ) : null}
           <details
-            className="mx-4 mt-1 mb-3 overflow-hidden rounded-[14.4px] border border-border bg-card"
+            className="group/options mx-4 mt-1 mb-3 overflow-hidden rounded-xl border border-border bg-card"
             onToggle={(event) => {
               const open = event.currentTarget.open
               setOptionsOpen(open)
@@ -1316,7 +1319,11 @@ export function WriteComposer({
             }}
             open={optionsOpen || pasteNotice}
           >
-            <summary className="cursor-pointer select-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
+            <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 bg-background px-4 py-2.5 text-caption font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+              <CaretRightIcon
+                aria-hidden
+                className="size-3.5 transition-transform group-open/options:rotate-90 motion-reduce:transition-none"
+              />
               Post options
             </summary>
             <VersionOptionsBar
@@ -1843,8 +1850,15 @@ function PanelHeader({ onClose, title }: { onClose: () => void; title: string })
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-2">
       <h2 className="text-ui-lg font-medium text-foreground">{title}</h2>
-      <Button aria-label={`Close ${title}`} onClick={onClose} size="sm" variant="ghost">
-        ✕
+      <Button
+        aria-label={`Close ${title}`}
+        className="size-8 px-0"
+        onClick={onClose}
+        size="sm"
+        title={`Close ${title}`}
+        variant="ghost"
+      >
+        <XIcon aria-hidden className="size-4" />
       </Button>
     </div>
   )

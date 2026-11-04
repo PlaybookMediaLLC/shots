@@ -28,7 +28,7 @@ export function MediaVideoElementStatic(
           <video
             className={cn(
               "w-full max-w-full object-cover px-0",
-              "rounded-none"
+              "rounded-md"
             )}
             controls
             src={url}

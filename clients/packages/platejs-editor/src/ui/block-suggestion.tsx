@@ -197,7 +197,7 @@ export function BlockSuggestionCard({
               <div className="flex flex-col gap-2">
                 {insertItems.map((item) => (
                   <Fragment key={item.id}>
-                    <div className="flex items-center text-brand/80">
+                    <div className="flex items-center text-primary/80">
                       <span className="text-sm">With:</span>
                       <span className="text-sm">"{item.text}"</span>
                     </div>
@@ -546,7 +546,7 @@ export function BlockSuggestion({ element }: { element: TSuggestionElement }) {
   return (
     <div
       className={cn(
-        "pointer-events-none absolute inset-0 z-1 border-2 border-brand/[0.8] transition-opacity",
+        "pointer-events-none absolute inset-0 z-1 border-2 border-primary/[0.8] transition-opacity",
         isRemove && "border-gray-300"
       )}
       contentEditable={false}

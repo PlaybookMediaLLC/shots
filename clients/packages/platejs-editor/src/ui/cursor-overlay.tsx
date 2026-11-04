@@ -42,7 +42,7 @@ export function Cursor({
         <div
           className={cn(
             "pointer-events-none absolute z-10",
-            id === "selection" && "bg-brand/25",
+            id === "selection" && "bg-primary/25",
             id === "selection" && isCursor && "bg-primary"
           )}
           id={OVERLAY_ID}
@@ -58,14 +58,14 @@ export function Cursor({
           <div
             className={cn(
               "pointer-events-none absolute z-10 w-0.5",
-              id === "drag" && "w-px bg-brand"
+              id === "drag" && "w-px bg-primary"
             )}
             id={OVERLAY_ID}
             style={{ ...caretPosition, ...style }}
           />
           {cursorName && id !== "selection" && (
             <div
-              className="pointer-events-none absolute z-20 -translate-y-full whitespace-nowrap rounded-sm px-1.5 py-0.5 font-medium text-[10px] text-white"
+              className="pointer-events-none absolute z-20 -translate-y-full whitespace-nowrap rounded-sm px-1.5 py-0.5 font-medium text-label text-white"
               style={{
                 backgroundColor:
                   typeof extendedData?.color === "string"

@@ -162,14 +162,14 @@ const menuVariants = cva(
     },
     variants: {
       animateZoom: {
-        false: "data-[state=open]:animate-popover",
-        true: "data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[state=open]:animate-zoom",
+        false: "data-[state=open]:animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none",
+        true: "data-[side=bottom]:origin-top data-[side=left]:origin-right data-[side=right]:origin-left data-[side=top]:origin-bottom data-[state=open]:animate-in zoom-in-95 motion-reduce:animate-none",
       },
       variant: {
         ai: "w-full px-12 sm:px-[max(64px,calc(50%-350px))]",
-        aiSub: "max-h-[70vh] w-[220px] rounded-none bg-popover shadow-floating",
+        aiSub: "max-h-[70vh] w-[220px] rounded-xl border border-border bg-popover shadow-popover",
         default:
-          "max-h-[70vh] w-[260px] overflow-y-auto rounded-none bg-popover shadow-floating",
+          "max-h-[70vh] w-[260px] overflow-y-auto rounded-xl border border-border bg-popover shadow-popover",
       },
     },
   }
@@ -264,7 +264,7 @@ export function MenuShortcut({ ...props }: ComponentProps<"span">) {
 }
 
 const menuItemVariants = cva(
-  "group/menu-item relative flex min-h-[28px] select-none items-center justify-between gap-2 px-2.5 text-accent-foreground text-sm outline-hidden transition-bg-ease data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:size-4",
+  "group/menu-item relative flex min-h-[28px] select-none items-center justify-between gap-2 px-2.5 text-accent-foreground text-sm outline-hidden transition-colors data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:size-4",
   {
     defaultVariants: {
       isEmpty: false,
@@ -277,7 +277,7 @@ const menuItemVariants = cva(
         true: "text-muted-foreground",
       },
       variant: {
-        default: "mx-1 w-[calc(100%-8px)] rounded-none",
+        default: "mx-1 w-[calc(100%-8px)] rounded-md",
       },
     },
   }
@@ -320,7 +320,7 @@ function renderMenuItemChildren({
     <>
       <div className="flex w-full items-center gap-2 whitespace-nowrap">
         {icon && (
-          <span className="menu-item-icon text-subtle-foreground">{icon}</span>
+          <span className="menu-item-icon text-muted-foreground">{icon}</span>
         )}
         {children ?? label}
       </div>
@@ -443,7 +443,7 @@ export const comboboxVariants = cva("", {
   },
   variants: {
     variant: {
-      ai: "min-w-[280px] max-w-[calc(100vw-24px)] rounded-none bg-popover py-0.5 shadow-toolbar",
+      ai: "min-w-[280px] max-w-[calc(100vw-24px)] rounded-xl border border-border bg-popover py-0.5 shadow-popover",
       default: "mx-3 pt-3.5 pb-1.5",
     },
   },
@@ -462,7 +462,7 @@ export function ComboboxContent({
 const comboboxListVariants = cva(
   cn(
     "group/combobox-list",
-    "h-full max-h-[70vh] grow overflow-y-auto rounded-none [&:has(>:last-child:not([role=group]))]:pb-1.5",
+    "h-full max-h-[70vh] grow overflow-y-auto rounded-md [&:has(>:last-child:not([role=group]))]:pb-1.5",
     "hidden has-[[role=option]]:block"
   ),
   {
@@ -471,7 +471,7 @@ const comboboxListVariants = cva(
     },
     variants: {
       variant: {
-        ai: "my-1 h-full max-h-[min(40vh,320px)] w-fit min-w-[280px] max-w-[320px] overflow-y-auto bg-popover p-0 shadow-floating",
+        ai: "my-1 h-full max-h-[min(40vh,320px)] w-fit min-w-[280px] max-w-[320px] overflow-y-auto bg-popover p-0 shadow-popover",
         default: "",
       },
     },

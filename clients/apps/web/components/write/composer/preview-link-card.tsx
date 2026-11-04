@@ -1,5 +1,6 @@
 'use client'
 
+import { CloseIcon } from '@/components/platform-shell/icons'
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { draftsApi } from '@/lib/content-drafts/client'
@@ -53,7 +54,7 @@ export function PreviewLinkCard({ text }: { text: string }) {
         variant="custom"
         onClick={() => setDismissed(url)}
       >
-        ×
+        <CloseIcon aria-hidden size={12} />
       </Button>
       {card.image ? (
         <img

@@ -130,7 +130,7 @@ export const ImageElement = withHOC(
                   /* biome-ignore lint/performance/noImgElement: print mode relies on native img sizing. */
                   <img
                     alt=""
-                    className={cn("h-full rounded-none")}
+                    className={cn("h-full rounded-md")}
                     height={fallbackHeight}
                     style={{ height: "auto", width: "100%" }}
                     width={fallbackWidth}
@@ -139,7 +139,7 @@ export const ImageElement = withHOC(
                 ) : (
                   <LazyLoadImage
                     className={cn(
-                      "h-full rounded-none opacity-100",
+                      "h-full rounded-md opacity-100",
                       loading && "opacity-0",
                       isDragging && "opacity-50"
                     )}
@@ -201,7 +201,7 @@ const ImagePlaceholder = ({ file }: { file?: File }) => {
         /* biome-ignore lint/performance/noImgElement: object URL previews use a native img for local files. */
         <img
           alt={file.name}
-          className="h-auto w-full rounded-none object-cover"
+          className="h-auto w-full rounded-md object-cover"
           height={200}
           src={objectUrl}
           width={200}

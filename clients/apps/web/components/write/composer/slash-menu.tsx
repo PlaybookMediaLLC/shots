@@ -90,7 +90,7 @@ function SlashMenu(props: PlateElementProps) {
     : recent.slice(0, 5).filter((id) => commands.some((command) => command.id === id)).length
   const recentRows = ranked.slice(0, recentCount)
   return (
-    <PlateElement {...props} as="span">
+    <PlateElement {...props} as="span" className="rounded-sm bg-accent px-0.5 text-accent-foreground">
       <InlineCombobox
         closeOnSpace="empty"
         element={element}

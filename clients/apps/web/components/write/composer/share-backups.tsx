@@ -107,7 +107,7 @@ export function ShareDialog({
           <Label className="flex items-center justify-between gap-3 text-sm text-foreground">
             <span>
               Public link
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-label text-muted-foreground">
                 Anyone with the link can read and comment. After publication it shows the delivered
                 thread, including confirmed replies.
               </span>
@@ -303,7 +303,7 @@ export function BackupsBrowser({
               <span className="text-center text-xs text-muted-foreground" data-testid="backup-time">
                 <LocalTime value={items[index].createdAt} /> · version {items[index].version} ·{' '}
                 {REASONS[items[index].reason]}
-                <span className="block text-[11px] text-muted-foreground">
+                <span className="block text-label text-muted-foreground">
                   {index + 1} of {items.length}
                 </span>
               </span>

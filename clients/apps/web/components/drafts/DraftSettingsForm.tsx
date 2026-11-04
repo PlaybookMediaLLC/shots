@@ -1,5 +1,6 @@
 'use client'
 
+import { CloseIcon } from '@/components/platform-shell/icons'
 import Link from 'next/link'
 import * as React from 'react'
 import { toast } from 'sonner'
@@ -75,7 +76,7 @@ export function DraftSettingsForm({
                         }
                         type="button"
                       >
-                        ✕
+                        <CloseIcon aria-hidden size={14} />
                       </Button>
                     ) : null}
                   </span>

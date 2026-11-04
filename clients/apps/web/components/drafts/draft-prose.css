@@ -10,28 +10,16 @@
 .draft-prose {
   caret-color: var(--foreground);
 }
-/* iOS zooms into any focused field under 16px. */
-@media (max-width: 639.98px) {
-  .draft-prose[contenteditable='true'] {
-    font-size: 1rem;
-  }
-}
-.draft-prose :is(.slate-h1, .slate-h2, .slate-h3) {
-  margin-top: 1.05rem;
-  margin-bottom: 0.45rem;
-  color: var(--foreground);
+/*
+ * Headings come from older drafts; posts publish them as plain text, so they
+ * read at the post's size (the notice above the post offers Convert to text).
+ */
+.draft-prose :is(.slate-h1, .slate-h2, .slate-h3, .slate-h4, .slate-h5, .slate-h6) {
+  margin: 0;
+  font-size: inherit;
   font-weight: 500;
-  letter-spacing: normal;
-  line-height: 1.4 !important;
-}
-.draft-prose .slate-h1 {
-  font-size: 1.24rem;
-}
-.draft-prose .slate-h2 {
-  font-size: 1.12rem;
-}
-.draft-prose .slate-h3 {
-  font-size: 1.02rem;
+  letter-spacing: inherit;
+  line-height: inherit !important;
 }
 .draft-prose li {
   margin-block: 0.1rem;
@@ -80,50 +68,10 @@
   color: color-mix(in srgb, var(--foreground) 40%, transparent);
 }
 
-/* Slash and mention menus open in a portal, so they are reached from the page. */
-body:has(.draft-prose) [role='listbox'].shadow-floating {
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  border-radius: 0.5rem;
-  padding: 0.32rem;
-  box-shadow:
-    0 10px 28px rgb(0 0 0 / 18%),
-    0 1px 2px rgb(0 0 0 / 10%);
-}
-body:has(.draft-prose) [role='listbox'].shadow-floating [role='option'] {
-  margin-inline: 0;
-  border-radius: 0.35rem;
-  padding: 0.4rem 0.45rem;
-  color: color-mix(in srgb, var(--foreground) 88%, transparent);
-}
-body:has(.draft-prose) [role='listbox'].shadow-floating [role='option'][data-active-item='true'] {
-  color: var(--foreground);
-}
-body:has(.draft-prose) [role='listbox'].shadow-floating [role='group'] + [role='group'] {
-  margin-top: 0.2rem;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-  padding-top: 0.2rem;
-}
-/* Group labels follow Polar's section labels: small, medium, muted, sentence case. */
-body:has(.draft-prose)
-  [role='listbox'].shadow-floating
-  [role='group']
-  > :first-child:not([role='option']) {
-  margin: 0;
-  padding: 0.3rem 0.45rem;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-/* Selection toolbar: a small bubble with a hairline and layered shadow. */
-body:has(.draft-prose) [role='toolbar'].shadow-toolbar {
-  gap: 0.1rem;
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  padding: 0.2rem 0.24rem;
-  box-shadow:
-    0 8px 24px rgb(0 0 0 / 14%),
-    0 1px 2px rgb(0 0 0 / 9%);
-}
-body:has(.draft-prose) [role='toolbar'].shadow-toolbar button {
-  border-radius: 0.35rem;
+/*
+ * The query being typed after "/", ":" or "@" is an input inside the post:
+ * the trigger and query carry a quiet highlight, not the shell's focus box.
+ */
+.draft-prose input[role='combobox']:focus-visible {
+  outline: none;
 }

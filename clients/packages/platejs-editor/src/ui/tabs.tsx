@@ -32,7 +32,7 @@ export function TabsList({
 
 const tabsTriggerVariants = cva(
   cn(
-    "relative inline-flex h-[28px] items-center justify-center whitespace-nowrap rounded-none px-2 transition-all disabled:pointer-events-none disabled:opacity-50",
+    "relative inline-flex h-[28px] items-center justify-center whitespace-nowrap rounded-md px-2 transition-all disabled:pointer-events-none disabled:opacity-50",
     "text-muted-foreground/80 ring-offset-background hover:bg-accent hover:text-accent-foreground",
     'data-[state=active]:text-foreground data-[state=active]:before:absolute data-[state=active]:before:bottom-[-6px] data-[state=active]:before:left-2 data-[state=active]:before:h-[2px] data-[state=active]:before:w-[calc(100%-16px)] data-[state=active]:before:bg-primary data-[state=active]:before:content-[""]'
   )

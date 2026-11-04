@@ -97,7 +97,7 @@ export function PdfCarousel({ assetId }: { assetId: string }) {
               aria-hidden
               className="pointer-events-none absolute inset-y-0 right-0 w-[12%] bg-black/25"
             />
-            <span className="pointer-events-none absolute top-1 left-2 text-[11px] text-white/80">
+            <span className="pointer-events-none absolute top-1 left-2 text-label text-white/80">
               {page} / {pdf.count}
             </span>
           </>

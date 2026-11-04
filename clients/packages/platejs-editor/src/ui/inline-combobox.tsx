@@ -314,7 +314,7 @@ function InlineComboboxInput({
 }
 
 const comboboxVariants = cva(
-  "z-500 h-full max-h-[40vh] min-w-[180px] max-w-[calc(100vw-24px)] animate-popover overflow-y-auto rounded-none bg-popover shadow-floating",
+  "z-500 h-full max-h-[40vh] min-w-[180px] max-w-[calc(100vw-24px)] animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-popover",
   {
     defaultVariants: {
       variant: "default",
@@ -331,7 +331,7 @@ const comboboxVariants = cva(
 );
 
 const comboboxItemVariants = cva(
-  "relative mx-1 flex select-none items-center rounded-none px-2 py-1 text-foreground text-sm outline-hidden transition-bg-ease [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "relative flex min-h-8 select-none items-center gap-2 rounded-md px-2 py-1.5 text-foreground text-sm outline-hidden transition-colors motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     defaultVariants: {
       interactive: true,
@@ -431,7 +431,7 @@ function InlineComboboxEmpty({
     <div
       className={cn(
         comboboxItemVariants({ interactive: false }),
-        "my-1.5 text-muted-foreground",
+        "text-muted-foreground",
         className
       )}
     >
@@ -447,7 +447,7 @@ function InlineComboboxGroup({
   return (
     <AriakitComboboxGroup
       className={cn(
-        "hidden not-last:border-b py-1.5 [&:has([role=option])]:block",
+        "hidden not-last:mb-1 not-last:border-border not-last:border-b not-last:pb-1 [&:has([role=option])]:block",
         className
       )}
       {...props}
@@ -462,7 +462,7 @@ function InlineComboboxGroupLabel({
   return (
     <AriakitComboboxGroupLabel
       className={cn(
-        "mt-1.5 mb-2 px-3 font-medium text-muted-foreground text-xs",
+        "px-2 pt-1.5 pb-1 text-caption text-muted-foreground",
         className
       )}
       {...props}

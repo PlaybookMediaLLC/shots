@@ -5,7 +5,7 @@ export function CommentLeafStatic(props: SlateLeafProps<TCommentText>) {
   return (
     <SlateLeaf
       {...props}
-      className="border-b-2 border-b-highlight/35 bg-highlight/15"
+      className="border-b-2 border-b-primary/35 bg-primary/15"
     />
   );
 }
