@@ -34,6 +34,9 @@ func (m *Manager) ConnectionStatus(id string) (string, bool) {
 		}
 	case "linkedin", "linkedin-page":
 		keys = []string{"LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"}
+		if id == "linkedin-page" && os.Getenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID") != "" {
+			keys = []string{"PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET"}
+		}
 	case "tiktok":
 		keys = []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET"}
 	case "youtube":

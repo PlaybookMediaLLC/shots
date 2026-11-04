@@ -24,6 +24,8 @@ func configuredManager(t *testing.T) *Manager {
 	t.Setenv("X_URL", "")
 	t.Setenv("MASTODON_URL", "")
 	t.Setenv("HIDDEN_PROVIDERS", "")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "")
 	for _, key := range []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "X_API_KEY", "X_API_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "THREADS_APP_ID", "THREADS_APP_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"} {
 		t.Setenv(key, "private-configuration-canary")
 	}
@@ -71,6 +73,20 @@ func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 				t.Fatalf("missing config accepted: %s", status)
 			}
 		})
+	}
+	// A dedicated LinkedIn Page app must be complete and is independent of the member app.
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "private-configuration-canary")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", " ")
+	if status, _ := m.ConnectionStatus("linkedin-page"); status != "not_configured" {
+		t.Fatalf("incomplete page app accepted: %s", status)
+	}
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "private-configuration-canary")
+	t.Setenv("LINKEDIN_CLIENT_SECRET", "")
+	if status, _ := m.ConnectionStatus("linkedin-page"); status != "available" {
+		t.Fatalf("page app: %s", status)
+	}
+	if status, _ := m.ConnectionStatus("linkedin"); status != "not_configured" {
+		t.Fatalf("member app used page credentials: %s", status)
 	}
 }
 
