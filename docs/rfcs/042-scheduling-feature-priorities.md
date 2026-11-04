@@ -193,7 +193,7 @@ nobody knows a draft waits for review.
 
 ### What exists
 
-`components/drafts/DraftCalendar.tsx` shows one week. `ListContentDraftPostsBetween`
+`components/plan/PlanWorkspace.tsx` is the calendar board. `ListContentDraftPostsBetween`
 already reads any date range.
 
 ### Work
