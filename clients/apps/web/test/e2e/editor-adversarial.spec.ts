@@ -27,7 +27,7 @@ test('an element-only composition stays visible and can export after its last te
 
 async function openStore(identity: E2EIdentity, page: Page) {
   await createWorkspace(identity, page)
-  await page.goto('/store-screenshots')
+  await page.goto('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
 }

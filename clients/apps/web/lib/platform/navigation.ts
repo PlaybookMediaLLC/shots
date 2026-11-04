@@ -15,6 +15,9 @@ export const PLATFORM_DESTINATIONS = [
 
 export type PlatformArea = (typeof PLATFORM_DESTINATIONS)[number]['key']
 
+/** The App Store and Google Play studio, one name and route on every surface; projects open at `/create/store/<id>`. */
+export const STORE_SCREENSHOTS = { href: '/create/store', label: 'Store screenshots' } as const
+
 /** What the workspace's plan and rollout flags open, as the sidebar shows it. */
 export const platformAccessSchema = z.object({
   campaignsEnabled: z.boolean(),
@@ -78,7 +81,7 @@ export const LIBRARY_LINKS = [
   { href: '/library', label: 'Screenshots' },
   { href: '/library?type=canvas', label: 'Canvas' },
   { href: '/library?type=story', label: 'Story Sets' },
-  { href: '/library?type=store', label: 'Store screenshots' },
+  { href: '/library?type=store', label: STORE_SCREENSHOTS.label },
   { href: '/library?view=assets', label: 'Assets' },
   { href: '/library?view=brand', label: 'Brand assets' },
 ]
@@ -96,6 +99,7 @@ export const AUTOMATE_LINKS = [
 ]
 export const CREATE_LINKS = [
   { href: '/create', label: 'New' },
+  STORE_SCREENSHOTS,
   { href: '/create?view=recent', label: 'Recent' },
   { href: '/create?view=templates', label: 'Templates' },
   { href: '/create?view=tools', label: 'Tools' },
@@ -129,10 +133,12 @@ export function activeLink<T extends { href: string }>(
   pathname: string,
   params: URLSearchParams
 ): T | undefined {
+  // A store project (`/create/store/<id>`) is a page of Store screenshots.
+  const page = pathname.startsWith(`${STORE_SCREENSHOTS.href}/`) ? STORE_SCREENSHOTS.href : pathname
   const matches = (href: string) => {
     const [path, query] = href.split('?')
     return (
-      pathname === path &&
+      page === path &&
       [...new URLSearchParams(query)].every(([key, value]) => params.get(key) === value)
     )
   }
@@ -140,7 +146,7 @@ export function activeLink<T extends { href: string }>(
     items.find((item) => item.href.includes('?') && matches(item.href)) ??
     items.find((item) => matches(item.href)) ??
     // A link that only carries context, like a publishing brand, still marks its page.
-    items.find((item) => item.href.split('?')[0] === pathname)
+    items.find((item) => item.href.split('?')[0] === page)
   )
 }
 
@@ -229,6 +235,7 @@ export function paidCapability(from: string | null | undefined): string | null {
   const tools: [string, string][] = [
     ['/canvas', 'Canvas'],
     ['/creative-sets', 'Story Sets'],
+    [STORE_SCREENSHOTS.href, STORE_SCREENSHOTS.label],
     ['/store-screenshots', 'Store screenshots'],
     ['/code', 'Code images'],
     ['/tweet', 'Post images'],

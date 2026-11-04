@@ -1427,8 +1427,8 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, or a canvas workspace of artboards. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards, or a store screenshot project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'store'
 
 /** A cloud creativeSet: an editor composition with revision-checked writes. */
 export type BackendCreativeSet = {
@@ -1438,7 +1438,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas document names itself (`kind: 'canvas'`); every other document is a Story Set. */
+  /** A canvas or store document names itself (`kind: 'canvas'` or `'store'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string
@@ -3765,6 +3765,13 @@ export class ScreenshotStudioBackendSDK {
   /** Permanently remove a canvas and its versions; delivered assets are retained. */
   async deleteCanvas(id: string) {
     return this.request<{ deleted: boolean }>(`v1/canvases/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /** Permanently remove a workspace's store screenshot project and its versions; browser copies stay. */
+  async deleteStoreProject(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/store-projects/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
   }
