@@ -1,5 +1,6 @@
 'use client'
 
+import { WarningIcon } from '@phosphor-icons/react/dist/ssr/Warning'
 import * as React from 'react'
 import {
   AlertDialog,
@@ -100,7 +101,7 @@ export function PlatformTabs({
               ) : null}
               {account && account.health !== 'connected' ? (
                 <span className="text-amber-700 dark:text-amber-300" title={healthLabel(account.health)}>
-                  ⚠
+                  <WarningIcon aria-label={healthLabel(account.health)} className="size-3.5" />
                 </span>
               ) : null}
             </Button>

@@ -1,5 +1,7 @@
 'use client'
 
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { BulkScheduleDialog } from './bulk-schedule'
 
 import { useWriteRouter } from '@/components/write/write-context'
@@ -210,7 +212,8 @@ export function WriteRail() {
                 variant="outline"
                 onClick={() => setQuery({ [filter.key]: undefined })}
               >
-                {filter.label} ×
+                {filter.label}
+                <XIcon aria-hidden className="size-3.5" />
               </Button>
             ))}
           <Button
@@ -382,7 +385,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
           type="button"
           variant="custom"
         >
-          ✕
+          <XIcon aria-hidden className="size-3.5" />
         </Button>
       ) : null}
     </div>
@@ -799,7 +802,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
             type="button"
             variant="custom"
           >
-            ⋯
+            <DotsThreeIcon aria-hidden className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
@@ -1195,7 +1198,7 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
         type="button"
         variant="ghost"
       >
-        ✕
+        <XIcon aria-hidden className="size-4" />
       </Button>
       <AlertDialog onOpenChange={setConfirm} open={confirm}>
         <AlertDialogContent>
