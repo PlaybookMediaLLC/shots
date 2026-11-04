@@ -1,9 +1,11 @@
 import type { BatchItem, BatchTiming } from '@/lib/api/contracts/content-batches'
 import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
-import type { DraftChannel } from '@/lib/write/document'
+import type { AccountStanding } from '@/lib/write/capabilities'
+import type { DraftChannel, VersionOptions } from '@/lib/write/document'
 import { mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
 import { analyzeSpintax } from '@/lib/write/spintax'
+import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
 
 /**
@@ -19,6 +21,7 @@ export type BatchAccount = {
   name: string
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
+  tiktokCreator?: AccountStanding['tiktokCreator']
 }
 
 /**
@@ -85,6 +88,48 @@ export function captionProblem(source: string, accounts: readonly BatchAccount[]
     if (length > limit)
       return `The longest caption is ${length} characters, and ${account.name} takes ${limit}. Shorten it or remove this account.`
   }
+}
+
+/** A YouTube title for an item: its caption's first line, else the name of its file. */
+function videoTitle(item: BatchItem) {
+  const name = (item.sourceKey || item.media[0]?.fileName || '').replace(/\.[^.]+$/, '')
+  const line = item.caption.trim().split('\n')[0] ?? ''
+  return (line.length >= 2 ? line : name).replace(/[<>]/g, '').slice(0, 100).trim()
+}
+
+/**
+ * The platform versions a staged item's draft starts with: its LinkedIn
+ * document, and the batch's YouTube and TikTok options for the channels the
+ * item goes to. A title chosen for the batch wins; otherwise each post has its
+ * own. Options are edited per post in Write from then on.
+ */
+export function stagedVersions(
+  item: BatchItem,
+  channels: readonly DraftChannel[],
+  options: VersionOptions
+) {
+  const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+  let versions = readVersions(undefined)
+  let changed = false
+  if (pdf?.assetId) {
+    versions = withOptions(versions, 'linkedin', {
+      document: {
+        assetId: pdf.assetId,
+        title: pdf.fileName?.replace(/\.pdf$/i, '').slice(0, 200) || 'Document',
+      },
+    })
+    changed = true
+  }
+  if (channels.includes('youtube') && options.youtube) {
+    const title = options.youtube.title.trim() || videoTitle(item)
+    versions = withOptions(versions, 'youtube', { youtube: { ...options.youtube, title } })
+    changed = true
+  }
+  if (channels.includes('tiktok') && options.tiktok) {
+    versions = withOptions(versions, 'tiktok', { tiktok: options.tiktok })
+    changed = true
+  }
+  return changed ? versions : undefined
 }
 
 /** The hours between posts that keep a day's posts inside its 24 hours. */

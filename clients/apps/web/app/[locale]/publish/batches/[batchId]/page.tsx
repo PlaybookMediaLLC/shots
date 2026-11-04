@@ -13,10 +13,12 @@ export const metadata = { title: 'Bulk batch · Publish' }
 /** One batch: its items, uploads, checks and results, reopened from the backend. */
 export default async function BatchPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; batchId: string }>
+  searchParams: Promise<{ start?: string }>
 }) {
-  const { locale, batchId } = await params
+  const [{ locale, batchId }, query] = await Promise.all([params, searchParams])
   const access = await requireDraftsPageAccess(
     locale,
     `/publish/batches/${encodeURIComponent(batchId)}`
@@ -29,6 +31,7 @@ export default async function BatchPage({
   const set = sets.find((candidate) => candidate.id === batch.socialSetId)
   const accounts = (set?.accounts ?? []).map((account) => ({
     captionLimit: captionLimit(account.channel, { maxWeightedCharacters: account.xCaptionLimit }),
+    tiktokCreator: account.tiktokCreator,
     channel: account.channel,
     id: account.id,
     name: account.handle
@@ -44,6 +47,7 @@ export default async function BatchPage({
         accounts={accounts}
         canPublish={hasPermission(access.role, 'publish:manage')}
         initial={contentBatchSchema.parse(batch)}
+        start={query.start === 'videos' || query.start === 'images' ? query.start : undefined}
       />
     </PlatformShell>
   )

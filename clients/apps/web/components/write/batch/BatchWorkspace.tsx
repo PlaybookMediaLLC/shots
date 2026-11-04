@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import * as React from 'react'
+import { useDropzone } from 'react-dropzone'
 import { toast } from 'sonner'
 import {
   CalendarIcon,
@@ -40,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useIsMobile } from '@/hooks/use-mobile'
 import {
   BATCH_ITEM_LIMIT,
+  BATCH_MEDIA_LIMIT,
   type BatchItem,
   type BatchItemInput,
   type BatchMedia,
@@ -61,6 +63,7 @@ import {
   spreadHourOptions,
   spreadTimings,
   stagedChecks,
+  stagedVersions,
 } from '@/lib/write/batch'
 import {
   channelProblem,
@@ -71,11 +74,14 @@ import {
   parseBatchCSV,
   unusedFiles,
 } from '@/lib/write/bulk-import'
+import { groupFiles, isInFolder, storedFileName } from '@/lib/write/bulk-intake'
+import type { VersionOptions } from '@/lib/write/document'
 import { importedBody, importedPosts } from '@/lib/write/import-text'
-import { readVersions, withOptions } from '@/lib/write/versions'
+import { uploadByteLimit } from '@/lib/write/media-limits'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { expandSpintax } from '@/lib/write/spintax'
+import { VideoOptions } from '../composer/video-options'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
 
@@ -83,11 +89,34 @@ import { FilePicker } from './FilePicker'
 const ACCEPT =
   'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,application/pdf'
 /** Uploads at once: enough to keep a link busy, few enough to bound memory and sockets. */
+const VIDEO_ACCEPT = 'video/mp4,video/quicktime,video/webm'
+const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 const UPLOAD_CONCURRENCY = 3
 /** Items checked per request. */
 const VALIDATE_CHUNK = 25
 
-type Staged = { input: BatchItemInput; line: number; problems: string[] }
+/** A row of the import preview; `files` holds each attachment's file, in order. */
+type Staged = {
+  files: (File | undefined)[]
+  input: BatchItemInput
+  line: number
+  problems: string[]
+}
+
+/** A saved attachment as an item's next save sends it. */
+function mediaInput({
+  assetId,
+  bytes,
+  fileName,
+  uploadAssetId,
+}: BatchItem['media'][number]): BatchMedia {
+  return assetId
+    ? { assetId, ...(fileName ? { fileName } : {}) }
+    : { fileName: fileName!, bytes: bytes!, ...(uploadAssetId ? { uploadAssetId } : {}) }
+}
+
+/** Which tool a batch was started for; it narrows what the page offers first. */
+export type BatchStart = 'videos' | 'images'
 type Upload = { progress: number; error?: string }
 
 /** A path a person can read: '2026-11-03 09:30 (Europe/Paris)'. */
@@ -265,10 +294,12 @@ export function BatchWorkspace({
   initial,
   accounts,
   canPublish,
+  start,
 }: {
   initial: ContentBatch
   accounts: BatchAccount[]
   canPublish: boolean
+  start?: BatchStart
 }) {
   const trpc = useTRPCClient()
   const [batch, setBatch] = React.useState(initial)
@@ -326,12 +357,8 @@ export function BatchWorkspace({
   const patchMedia = React.useCallback(
     (itemId: string, index: number, entry: BatchMedia) =>
       saveItem(itemId, (item) => ({
-        media: item.media.map(({ assetId, fileName, bytes, uploadAssetId }, at): BatchMedia =>
-          at === index
-            ? entry
-            : assetId
-              ? { assetId, ...(fileName ? { fileName } : {}) }
-              : { fileName: fileName!, bytes: bytes!, ...(uploadAssetId ? { uploadAssetId } : {}) }
+        media: item.media.map((current, at): BatchMedia =>
+          at === index ? entry : mediaInput(current)
         ),
       })),
     [saveItem]
@@ -456,21 +483,55 @@ export function BatchWorkspace({
   // Adding items: selected files, a CSV and shared settings, previewed first.
   const [csv, setCSV] = React.useState('')
   const [chosen, setChosen] = React.useState<File[]>([])
+  const [perImage, setPerImage] = React.useState(false)
+  const [accountFilter, setAccountFilter] = React.useState('')
+  const [videoOptions, setVideoOptions] = React.useState<VersionOptions>({})
   const [sharedCaption, setSharedCaption] = React.useState('')
   const [sharedAccounts, setSharedAccounts] = React.useState<string[]>(
     accounts.map((account) => account.id)
   )
   const [preview, setPreview] = React.useState<{
-    /** The files this preview matched; Add uploads these, not a later selection. */
-    files: File[]
     mapping: ImportMapping | null
+    skipped: { name: string; reason: string }[]
     staged: Staged[]
     unused: string[]
   } | null>(null)
+  const dropzone = useDropzone({ noClick: true, noKeyboard: true, onDrop: setChosen })
+  const folderChosen = chosen.some(isInFolder)
   const [busy, setBusy] = React.useState<string | null>(null)
 
   const previewImport = async () => {
     try {
+      // Folders group their files into posts; the preview shows how before anything is added.
+      if (!csv.trim() && (perImage || folderChosen)) {
+        const { posts, skipped } = groupFiles(chosen, perImage ? 'per-image' : 'folder')
+        if (items.length + posts.length > BATCH_ITEM_LIMIT)
+          throw new Error(
+            `A batch holds up to ${BATCH_ITEM_LIMIT} posts; this would make ${items.length + posts.length}.`
+          )
+        setPreview({
+          mapping: null,
+          skipped,
+          unused: [],
+          staged: posts.map((post, index) => ({
+            files: post.files,
+            line: index + 1,
+            problems: post.problems,
+            input: {
+              importKey: importKey(),
+              caption: expandSpintax(sharedCaption),
+              media: post.files.map((file, at) => ({
+                bytes: file.size,
+                fileName: post.storedNames[at]!,
+              })),
+              channelConnectionIds: sharedAccounts,
+              sourceKey: post.sourceKey,
+              timing: {},
+            },
+          })),
+        })
+        return
+      }
       if (chosen.length + items.length > BATCH_ITEM_LIMIT && !csv.trim())
         throw new Error(
           `A batch holds up to ${BATCH_ITEM_LIMIT} posts. Choose fewer files or start another batch.`
@@ -508,19 +569,36 @@ export function BatchWorkspace({
       const staged = rows.map((row): Staged => {
         const matched = matchRowMedia(row, chosen, known)
         const channelIssue = channelProblem(row.channels, connected)
+        const rowFiles = matched.media.map((media) =>
+          'fileName' in media
+            ? chosen.find((file) => safeAssetFileName(file.name) === media.fileName)
+            : undefined
+        )
+        const tooLarge = rowFiles.flatMap((file) =>
+          file && file.size > uploadByteLimit(file.type)
+            ? [`${file.name} is over the upload limit for this kind of file.`]
+            : []
+        )
         const chosenAccounts = row.channels.length
           ? accounts
               .filter((account) => row.channels.includes(account.channel))
               .map((account) => account.id)
           : sharedAccounts
         return {
+          files: rowFiles,
           line: row.line,
-          problems: [...row.problems, ...matched.problems, ...(channelIssue ? [channelIssue] : [])],
+          problems: [
+            ...row.problems,
+            ...matched.problems,
+            ...tooLarge,
+            ...(channelIssue ? [channelIssue] : []),
+          ],
           input: {
             importKey: importKey(),
             caption: row.caption || expandSpintax(sharedCaption),
             media: matched.media,
             channelConnectionIds: chosenAccounts,
+            ...(row.assets.length === 1 && !csv.trim() ? { sourceKey: row.assets[0] } : {}),
             timing: row.time
               ? { mode: 'time', localTime: row.time, timeZone: row.timeZone ?? zone }
               : {},
@@ -532,8 +610,8 @@ export function BatchWorkspace({
           `A batch holds up to ${BATCH_ITEM_LIMIT} posts; this would make ${items.length + staged.length}.`
         )
       setPreview({
-        files: chosen,
         mapping,
+        skipped: [],
         staged,
         unused: csv.trim() ? unusedFiles(rows, chosen) : [],
       })
@@ -552,13 +630,12 @@ export function BatchWorkspace({
         body: { items: valid.map((row) => row.input) },
         method: 'POST',
       })
-      // Hold each chosen file for the attachments it was matched to.
-      const byName = new Map(preview.files.map((file) => [safeAssetFileName(file.name), file]))
-      const added = new Set(valid.map((row) => row.input.importKey))
+      // Hold each row's own files for its attachments: two folders may share a file name.
+      const added = new Map(valid.map((row) => [row.input.importKey, row]))
       for (const item of next.items ?? []) {
-        if (!added.has(item.importKey)) continue
+        const row = added.get(item.importKey)
         item.media.forEach((entry, index) => {
-          const file = !entry.assetId && entry.fileName ? byName.get(entry.fileName) : undefined
+          const file = !entry.assetId ? row?.files[index] : undefined
           if (file) files.current.set(`${item.id}/${index}`, file)
         })
       }
@@ -567,9 +644,7 @@ export function BatchWorkspace({
       // Rows that were not added stay listed with their problems, so none is lost unseen.
       const left = preview.staged.filter((row) => row.problems.length > 0)
       setPreview(
-        left.length
-          ? { files: preview.files, mapping: preview.mapping, staged: left, unused: [] }
-          : null
+        left.length ? { mapping: preview.mapping, skipped: [], staged: left, unused: [] } : null
       )
       setCSV('')
       setChosen([])
@@ -583,9 +658,10 @@ export function BatchWorkspace({
 
   const reselect = (selected: File[]) => {
     for (const file of selected) {
-      const name = safeAssetFileName(file.name)
+      const names = [safeAssetFileName(file.name), storedFileName(file)]
       for (const { entry, key } of missingFiles)
-        if (entry.fileName === name && entry.bytes === file.size) files.current.set(key, file)
+        if (entry.fileName && names.includes(entry.fileName) && entry.bytes === file.size)
+          files.current.set(key, file)
     }
     startUploads()
     setUploads((current) => ({ ...current }))
@@ -610,6 +686,53 @@ export function BatchWorkspace({
   }
 
   // Bulk actions on staged items, with each item's own values kept unless asked.
+  /** A post with nothing in it yet, to fill by hand. */
+  const addEmptyPost = async () => {
+    setBusy('add')
+    try {
+      const next = await call<ContentBatch>(`${base}/items`, {
+        body: {
+          items: [
+            {
+              importKey: importKey(),
+              caption: '',
+              media: [],
+              channelConnectionIds: sharedAccounts,
+              timing: {},
+            },
+          ],
+        },
+        method: 'POST',
+      })
+      setBatch(next)
+      itemsRef.current = next.items ?? []
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The post could not be added.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  /** Add files to a post that is not a draft yet, after what it already holds. */
+  const addToItem = async (item: BatchItem, selected: File[]) => {
+    const latest = itemsRef.current.find((candidate) => candidate.id === item.id) ?? item
+    if (latest.media.length + selected.length > BATCH_MEDIA_LIMIT) {
+      toast.error(`A post takes up to ${BATCH_MEDIA_LIMIT} attachments.`)
+      return
+    }
+    const added = selected.map((file) => ({ bytes: file.size, fileName: storedFileName(file) }))
+    if (added.some((entry) => !entry.fileName || !entry.bytes)) {
+      toast.error('Rename files with no letters or digits, and leave out empty ones.')
+      return
+    }
+    const at = latest.media.length
+    await updateItem(latest, (current) => ({
+      media: [...current.media.map(mediaInput), ...added],
+    }))
+    selected.forEach((file, index) => files.current.set(`${item.id}/${at + index}`, file))
+    startUploads()
+  }
+
   const applySharedAccounts = async () => {
     setBusy('accounts')
     for (const item of items) {
@@ -690,6 +813,10 @@ export function BatchWorkspace({
         const posts = importedPosts(item.caption)
         const body = importedBody(posts.length ? posts : [''])
         const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+        const channels = accounts
+          .filter((account) => item.channelConnectionIds.includes(account.id))
+          .map((account) => account.channel)
+        const platformVersions = stagedVersions(item, channels, videoOptions)
         for (const entry of item.media)
           body.push({
             type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
@@ -710,16 +837,7 @@ export function BatchWorkspace({
               body,
               plainText: item.caption,
               assetIds: item.media.map((entry) => entry.assetId!),
-              ...(pdf
-                ? {
-                    platformVersions: withOptions(readVersions(undefined), 'linkedin', {
-                      document: {
-                        assetId: pdf.assetId!,
-                        title: pdf.fileName?.replace(/\.pdf$/i, '').slice(0, 200) || 'Document',
-                      },
-                    }),
-                  }
-                : {}),
+              ...(platformVersions ? { platformVersions } : {}),
             },
           })
         )
@@ -871,6 +989,13 @@ export function BatchWorkspace({
     accounts.find((account) => account.id === id)?.name ?? 'Removed account'
   const summary = batchSummary(items, zone)
   const unsaved = items.filter((item) => !item.draftId)
+  const unsavedAccounts = accounts.filter((account) =>
+    unsaved.some((item) => item.channelConnectionIds.includes(account.id))
+  )
+  const videoChannels = (['youtube', 'tiktok'] as const).flatMap((channel) => {
+    const account = unsavedAccounts.find((candidate) => candidate.channel === channel)
+    return account ? [{ channel, creator: account.tiktokCreator }] : []
+  })
   const ready = unsaved.filter((item) => item.media.every((entry) => entry.assetId))
   const drafted = items.filter((item) => item.draftId)
   const checked = Object.keys(verdicts).length > 0
@@ -929,6 +1054,13 @@ export function BatchWorkspace({
                 multiple
                 onFiles={reselect}
               />
+              <FilePicker
+                accept={IMAGE_ACCEPT}
+                directory
+                label="Select the folder again"
+                multiple
+                onFiles={reselect}
+              />
             </AlertDescription>
           </Alert>
         ) : null}
@@ -940,30 +1072,73 @@ export function BatchWorkspace({
           >
             <Group>
               <Row
-                label="Photos and videos"
-                description="Each file becomes its own post, or matches a CSV row by its exact name. JPEG, PNG, WebP, GIF, MP4, MOV and WebM; PDFs go to LinkedIn as documents."
+                label={
+                  start === 'videos'
+                    ? 'Videos'
+                    : start === 'images'
+                      ? 'Image folders'
+                      : 'Photos, videos and folders'
+                }
+                description={
+                  start === 'videos'
+                    ? 'Each video becomes its own post, or matches a CSV row by its exact name. MP4, MOV and WebM; each destination’s own length and size limits are checked before scheduling.'
+                    : 'Each file becomes its own post, or matches a CSV row by its exact name. A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP, GIF, MP4, MOV and WebM; PDFs go to LinkedIn as documents.'
+                }
               >
                 <div
-                  className="flex w-full flex-col items-start gap-2 rounded-xl border border-dashed border-border p-4"
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    setChosen(Array.from(event.dataTransfer.files))
-                  }}
+                  {...dropzone.getRootProps({
+                    className: cn(
+                      'flex w-full flex-col items-start gap-2 rounded-xl border border-dashed border-border p-4',
+                      dropzone.isDragActive && 'border-primary bg-muted'
+                    ),
+                  })}
                 >
-                  <FilePicker
-                    accept={ACCEPT}
-                    label="Batch media files"
-                    multiple
-                    onFiles={setChosen}
-                  >
-                    Choose files
-                  </FilePicker>
+                  <div className="flex flex-wrap gap-2">
+                    {start !== 'images' ? (
+                      <FilePicker
+                        accept={start === 'videos' ? VIDEO_ACCEPT : ACCEPT}
+                        label="Batch media files"
+                        multiple
+                        onFiles={setChosen}
+                      >
+                        {start === 'videos' ? 'Choose videos' : 'Choose files'}
+                      </FilePicker>
+                    ) : null}
+                    {start !== 'videos' ? (
+                      <FilePicker
+                        accept={IMAGE_ACCEPT}
+                        directory
+                        label="Batch image folder"
+                        multiple
+                        onFiles={setChosen}
+                      >
+                        Choose a folder
+                      </FilePicker>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy !== null}
+                      onClick={() => void addEmptyPost()}
+                    >
+                      Add an empty post
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {chosen.length
                       ? `${chosen.length} file${chosen.length === 1 ? '' : 's'} · ${megabytes(chosen.reduce((sum, file) => sum + file.size, 0))}`
-                      : 'Or drop files here.'}
+                      : 'Or drop files or folders here.'}
                   </p>
+                  {start !== 'videos' && (folderChosen || start === 'images') ? (
+                    <Label className="font-normal">
+                      <Checkbox
+                        checked={perImage}
+                        onCheckedChange={(checked) => setPerImage(checked === true)}
+                      />
+                      One post per image
+                    </Label>
+                  ) : null}
                 </div>
               </Row>
               <Row
@@ -1015,22 +1190,35 @@ export function BatchWorkspace({
                 label="Shared accounts"
                 description="Used for posts whose row names no channels."
               >
+                {accounts.length > 8 ? (
+                  <Input
+                    aria-label="Search accounts"
+                    className="w-full"
+                    placeholder="Search accounts"
+                    value={accountFilter}
+                    onChange={(event) => setAccountFilter(event.target.value)}
+                  />
+                ) : null}
                 {accounts.length ? (
-                  accounts.map((account) => (
-                    <Label key={account.id} className="font-normal">
-                      <Checkbox
-                        checked={sharedAccounts.includes(account.id)}
-                        onCheckedChange={(checked) =>
-                          setSharedAccounts((current) =>
-                            checked === true
-                              ? [...current, account.id]
-                              : current.filter((id) => id !== account.id)
-                          )
-                        }
-                      />
-                      {account.name}
-                    </Label>
-                  ))
+                  accounts
+                    .filter((account) =>
+                      account.name.toLowerCase().includes(accountFilter.trim().toLowerCase())
+                    )
+                    .map((account) => (
+                      <Label key={account.id} className="font-normal">
+                        <Checkbox
+                          checked={sharedAccounts.includes(account.id)}
+                          onCheckedChange={(checked) =>
+                            setSharedAccounts((current) =>
+                              checked === true
+                                ? [...current, account.id]
+                                : current.filter((id) => id !== account.id)
+                            )
+                          }
+                        />
+                        {account.name}
+                      </Label>
+                    ))
                 ) : (
                   <Button asChild variant="outline" size="sm">
                     <Link href="/settings/publishing-brands">Connect an account</Link>
@@ -1076,6 +1264,12 @@ export function BatchWorkspace({
                 {preview.unused.length ? (
                   <p className="text-xs text-muted-foreground">
                     Not used by any row: {preview.unused.join(', ')}
+                  </p>
+                ) : null}
+                {preview.skipped.length ? (
+                  <p className="text-xs text-muted-foreground" data-testid="import-skipped">
+                    Skipped:{' '}
+                    {preview.skipped.map((entry) => `${entry.name} (${entry.reason})`).join(', ')}
                   </p>
                 ) : null}
                 <Group>
@@ -1148,6 +1342,25 @@ export function BatchWorkspace({
                 </div>
               </div>
             ) : null}
+          </Section>
+        ) : null}
+
+        {videoChannels.length ? (
+          <Section
+            title="Video options"
+            description={`YouTube and TikTok need these before scheduling. They apply to the ${unsaved.length} post${unsaved.length === 1 ? '' : 's'} not yet saved as drafts; change one post's in Write afterwards. An empty YouTube title uses each post's first caption line, or its file name.`}
+          >
+            {videoChannels.map(({ channel, creator }) => (
+              <Group key={channel}>
+                <VideoOptions
+                  channel={channel}
+                  creator={creator}
+                  disabled={busy !== null}
+                  options={videoOptions}
+                  onChange={setVideoOptions}
+                />
+              </Group>
+            ))}
           </Section>
         ) : null}
 
@@ -1323,7 +1536,21 @@ export function BatchWorkspace({
                             {item.draft?.plainText || 'No caption'}
                           </p>
                         ) : (
+                          <div>
+                            <FilePicker
+                              accept={ACCEPT}
+                              label={`Add files to post ${index + 1}`}
+                              multiple
+                              onFiles={(selected) => void addToItem(item, selected)}
+                            >
+                              Add files
+                            </FilePicker>
+                          </div>
+                        )}
+                        {item.draftId ? null : (
                           <Textarea
+                            // A bulk caption replaces what this box first showed.
+                            key={item.caption}
                             aria-label={`Caption for item ${index + 1}`}
                             defaultValue={item.caption}
                             placeholder="Caption"

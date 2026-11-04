@@ -25762,6 +25762,7 @@ type ContentBatchItemMutation struct {
 	organization_id              *string
 	import_key                   *string
 	fingerprint                  *string
+	source_key                   *string
 	position                     *int
 	addposition                  *int
 	caption                      *string
@@ -26025,6 +26026,42 @@ func (m *ContentBatchItemMutation) OldFingerprint(ctx context.Context) (v string
 // ResetFingerprint resets all changes to the "fingerprint" field.
 func (m *ContentBatchItemMutation) ResetFingerprint() {
 	m.fingerprint = nil
+}
+
+// SetSourceKey sets the "source_key" field.
+func (m *ContentBatchItemMutation) SetSourceKey(s string) {
+	m.source_key = &s
+}
+
+// SourceKey returns the value of the "source_key" field in the mutation.
+func (m *ContentBatchItemMutation) SourceKey() (r string, exists bool) {
+	v := m.source_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceKey returns the old "source_key" field's value of the ContentBatchItem entity.
+// If the ContentBatchItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentBatchItemMutation) OldSourceKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceKey: %w", err)
+	}
+	return oldValue.SourceKey, nil
+}
+
+// ResetSourceKey resets all changes to the "source_key" field.
+func (m *ContentBatchItemMutation) ResetSourceKey() {
+	m.source_key = nil
 }
 
 // SetPosition sets the "position" field.
@@ -26412,7 +26449,7 @@ func (m *ContentBatchItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentBatchItemMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.batch_id != nil {
 		fields = append(fields, contentbatchitem.FieldBatchID)
 	}
@@ -26424,6 +26461,9 @@ func (m *ContentBatchItemMutation) Fields() []string {
 	}
 	if m.fingerprint != nil {
 		fields = append(fields, contentbatchitem.FieldFingerprint)
+	}
+	if m.source_key != nil {
+		fields = append(fields, contentbatchitem.FieldSourceKey)
 	}
 	if m.position != nil {
 		fields = append(fields, contentbatchitem.FieldPosition)
@@ -26465,6 +26505,8 @@ func (m *ContentBatchItemMutation) Field(name string) (ent.Value, bool) {
 		return m.ImportKey()
 	case contentbatchitem.FieldFingerprint:
 		return m.Fingerprint()
+	case contentbatchitem.FieldSourceKey:
+		return m.SourceKey()
 	case contentbatchitem.FieldPosition:
 		return m.Position()
 	case contentbatchitem.FieldCaption:
@@ -26498,6 +26540,8 @@ func (m *ContentBatchItemMutation) OldField(ctx context.Context, name string) (e
 		return m.OldImportKey(ctx)
 	case contentbatchitem.FieldFingerprint:
 		return m.OldFingerprint(ctx)
+	case contentbatchitem.FieldSourceKey:
+		return m.OldSourceKey(ctx)
 	case contentbatchitem.FieldPosition:
 		return m.OldPosition(ctx)
 	case contentbatchitem.FieldCaption:
@@ -26550,6 +26594,13 @@ func (m *ContentBatchItemMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFingerprint(v)
+		return nil
+	case contentbatchitem.FieldSourceKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceKey(v)
 		return nil
 	case contentbatchitem.FieldPosition:
 		v, ok := value.(int)
@@ -26691,6 +26742,9 @@ func (m *ContentBatchItemMutation) ResetField(name string) error {
 		return nil
 	case contentbatchitem.FieldFingerprint:
 		m.ResetFingerprint()
+		return nil
+	case contentbatchitem.FieldSourceKey:
+		m.ResetSourceKey()
 		return nil
 	case contentbatchitem.FieldPosition:
 		m.ResetPosition()

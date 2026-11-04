@@ -45,6 +45,20 @@ func (_c *ContentBatchItemCreate) SetFingerprint(v string) *ContentBatchItemCrea
 	return _c
 }
 
+// SetSourceKey sets the "source_key" field.
+func (_c *ContentBatchItemCreate) SetSourceKey(v string) *ContentBatchItemCreate {
+	_c.mutation.SetSourceKey(v)
+	return _c
+}
+
+// SetNillableSourceKey sets the "source_key" field if the given value is not nil.
+func (_c *ContentBatchItemCreate) SetNillableSourceKey(v *string) *ContentBatchItemCreate {
+	if v != nil {
+		_c.SetSourceKey(*v)
+	}
+	return _c
+}
+
 // SetPosition sets the "position" field.
 func (_c *ContentBatchItemCreate) SetPosition(v int) *ContentBatchItemCreate {
 	_c.mutation.SetPosition(v)
@@ -166,6 +180,10 @@ func (_c *ContentBatchItemCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *ContentBatchItemCreate) defaults() {
+	if _, ok := _c.mutation.SourceKey(); !ok {
+		v := contentbatchitem.DefaultSourceKey
+		_c.mutation.SetSourceKey(v)
+	}
 	if _, ok := _c.mutation.Caption(); !ok {
 		v := contentbatchitem.DefaultCaption
 		_c.mutation.SetCaption(v)
@@ -193,6 +211,9 @@ func (_c *ContentBatchItemCreate) check() error {
 	}
 	if _, ok := _c.mutation.Fingerprint(); !ok {
 		return &ValidationError{Name: "fingerprint", err: errors.New(`ent: missing required field "ContentBatchItem.fingerprint"`)}
+	}
+	if _, ok := _c.mutation.SourceKey(); !ok {
+		return &ValidationError{Name: "source_key", err: errors.New(`ent: missing required field "ContentBatchItem.source_key"`)}
 	}
 	if _, ok := _c.mutation.Position(); !ok {
 		return &ValidationError{Name: "position", err: errors.New(`ent: missing required field "ContentBatchItem.position"`)}
@@ -265,6 +286,10 @@ func (_c *ContentBatchItemCreate) createSpec() (*ContentBatchItem, *sqlgraph.Cre
 	if value, ok := _c.mutation.Fingerprint(); ok {
 		_spec.SetField(contentbatchitem.FieldFingerprint, field.TypeString, value)
 		_node.Fingerprint = value
+	}
+	if value, ok := _c.mutation.SourceKey(); ok {
+		_spec.SetField(contentbatchitem.FieldSourceKey, field.TypeString, value)
+		_node.SourceKey = value
 	}
 	if value, ok := _c.mutation.Position(); ok {
 		_spec.SetField(contentbatchitem.FieldPosition, field.TypeInt, value)

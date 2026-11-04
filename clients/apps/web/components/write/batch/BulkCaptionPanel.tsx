@@ -108,7 +108,7 @@ export function BulkCaptionPanel({
       if (file.size > 1_000_000) throw new Error('CSV files must be smaller than 1 MB.')
       const targets = unsaved.map((item) => ({
         id: item.id,
-        names: item.media.flatMap((entry) => entry.fileName ?? []),
+        names: [item.sourceKey ?? [], item.media.flatMap((entry) => entry.fileName ?? [])].flat(),
       }))
       const { matches, unchanged } = matchCaptions(parseCaptionCSV(await file.text()), targets)
       setRows({

@@ -12,6 +12,7 @@ import {
   spreadHourOptions,
   spreadTimings,
   stagedChecks,
+  stagedVersions,
 } from '@/lib/write/batch'
 
 const item = (overrides: Partial<BatchItem> = {}): BatchItem => ({
@@ -178,4 +179,34 @@ test('a caption must fit each chosen account by its own count', () => {
   // The longest alternative decides, even when a shorter one might be drawn.
   assert.match(captionProblem(`{short|${long}}`, [x]) ?? '', /281/)
   assert.equal(captionProblem('{short|fine}', [x]), undefined)
+})
+
+test('YouTube and TikTok options reach only the channels an item goes to', () => {
+  const youtube = { madeForKids: false, privacy: 'unlisted', title: '' } as const
+  const options = { youtube }
+  const video = item({
+    caption: 'Launch day\nSecond line',
+    media: [
+      {
+        assetId: 'clip',
+        durationMs: 8000,
+        fileName: 'launch-teaser.mp4',
+        height: 1920,
+        status: 'UPLOADED',
+        width: 1080,
+      },
+    ],
+  })
+  assert.equal(stagedVersions(video, ['linkedin'], options), undefined)
+  const title = (versions: ReturnType<typeof stagedVersions>) =>
+    versions?.versions.find((version) => version.channel === 'youtube')?.options?.youtube?.title
+  assert.equal(title(stagedVersions(video, ['youtube'], options)), 'Launch day')
+  assert.equal(
+    title(stagedVersions({ ...video, caption: '' }, ['youtube'], options)),
+    'launch-teaser'
+  )
+  assert.equal(
+    title(stagedVersions(video, ['youtube'], { youtube: { ...youtube, title: 'Chosen' } })),
+    'Chosen'
+  )
 })

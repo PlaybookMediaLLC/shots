@@ -208,7 +208,7 @@ test('the in-app plan page follows the theme like the rest of the app', () => {
 test('Campaigns lists Deliveries only where content drafts are rolled out', () => {
   assert.deepEqual(
     publishLinks('?set=a').map((item) => item.label),
-    ['Drafts', 'Calendar', 'Analyze', 'Link checks']
+    ['Drafts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
   )
   assert.deepEqual(
     campaignLinks(true).map((item) => item.label),

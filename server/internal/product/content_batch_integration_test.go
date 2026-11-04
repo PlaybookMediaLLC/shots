@@ -275,6 +275,13 @@ func TestContentBatches(t *testing.T) {
 		if updated.Items[0].Caption != "One" || updated.Items[1].Caption != inputs[1].Caption || updated.Items[2].Caption != "Three" {
 			t.Fatalf("bulk update: %+v", updated.Items)
 		}
+		// The name an item came from survives as given, for caption CSVs.
+		named := item("bulk", 3, photos[0])
+		named.SourceKey = "Été 2026 – trip"
+		withName, err := repo.AddContentBatchItems(ctx, owner, batch.ID, []ContentBatchItemInput{named})
+		if err != nil || withName.Items[3].SourceKey != "Été 2026 – trip" {
+			t.Fatalf("source key: %+v %v", withName, err)
+		}
 		// A saved item reads back alone, with its media and posts.
 		one, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, batch.Items[1].ID, ContentBatchItemUpdate{Caption: caption("Two")})
 		if err != nil || one.ID != batch.Items[1].ID || one.Caption != "Two" || one.Media[0].Status != "UPLOADED" {

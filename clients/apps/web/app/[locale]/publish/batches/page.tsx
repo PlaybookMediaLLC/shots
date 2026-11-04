@@ -34,7 +34,7 @@ export default async function BatchesPage({
     >
       <Page
         title="Bulk scheduling"
-        description="Prepare up to 50 separate posts at once from photos, videos or a CSV. Each becomes its own draft, so review and scheduling work as they do for one draft. A batch saves as you go."
+        description="Prepare up to 100 separate posts at once from videos, folders of images or a CSV. Each becomes its own draft, so review and scheduling work as they do for one draft. A batch saves as you go."
       >
         {canEdit ? (
           <Section

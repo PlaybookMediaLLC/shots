@@ -874,6 +874,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "importKey", Type: field.TypeString},
 		{Name: "fingerprint", Type: field.TypeString},
+		{Name: "sourceKey", Type: field.TypeString, Default: ""},
 		{Name: "position", Type: field.TypeInt},
 		{Name: "caption", Type: field.TypeString, Default: ""},
 		{Name: "media", Type: field.TypeJSON},
@@ -897,12 +898,12 @@ var (
 			{
 				Name:    "contentbatchitem_batchId_position",
 				Unique:  false,
-				Columns: []*schema.Column{ContentBatchItemColumns[1], ContentBatchItemColumns[5]},
+				Columns: []*schema.Column{ContentBatchItemColumns[1], ContentBatchItemColumns[6]},
 			},
 			{
 				Name:    "contentbatchitem_draftId",
 				Unique:  true,
-				Columns: []*schema.Column{ContentBatchItemColumns[10]},
+				Columns: []*schema.Column{ContentBatchItemColumns[11]},
 			},
 		},
 	}

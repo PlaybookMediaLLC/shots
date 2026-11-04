@@ -14,6 +14,9 @@ import {
 /** The most posts one batch holds; Go's `contentBatchItemLimit`. */
 export const BATCH_ITEM_LIMIT = 100
 
+/** The most attachments one post holds; Go's `contentDraftAssetLimit`. */
+export const BATCH_MEDIA_LIMIT = 20
+
 /** A file name as stored in an object key: letters, digits, dots, dashes, underscores. */
 const fileNameSchema = z
   .string()
@@ -58,8 +61,10 @@ export type BatchTiming = z.infer<typeof batchTimingSchema>
 export const batchItemInputSchema = z.object({
   importKey: z.string().min(16).max(128),
   caption: z.string().max(100_000),
-  media: z.array(batchMediaSchema).max(20),
+  media: z.array(batchMediaSchema).max(BATCH_MEDIA_LIMIT),
   channelConnectionIds: z.array(contentDraftIdSchema).max(10),
+  /** The file or folder name the item came from; caption CSVs match on it. */
+  sourceKey: z.string().max(255).optional(),
   timing: batchTimingSchema,
 })
 
@@ -102,6 +107,7 @@ export const batchItemSchema = z.object({
   media: z.array(batchMediaViewSchema),
   position: z.number().int(),
   posts: z.array(contentDraftPostSchema),
+  sourceKey: z.string().optional(),
   timing: batchTimingSchema,
 })
 

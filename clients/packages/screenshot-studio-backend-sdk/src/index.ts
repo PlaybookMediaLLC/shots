@@ -1312,6 +1312,8 @@ export type BackendContentBatchItemInput = {
   channelConnectionIds: string[]
   importKey: string
   media: BackendBatchMedia[]
+  /** The file or folder name the item came from, as the person knows it. */
+  sourceKey?: string
   timing: BackendBatchTiming
 }
 
@@ -1341,6 +1343,7 @@ export type BackendContentBatchItem = {
   })[]
   position: number
   posts: BackendContentDraftPost[]
+  sourceKey?: string
   timing: BackendBatchTiming
 }
 

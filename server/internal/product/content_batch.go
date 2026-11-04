@@ -86,6 +86,7 @@ type ContentBatchItemRecord struct {
 	Media                []BatchMediaRecord `json:"media"`
 	Position             int                `json:"position"`
 	Posts                []ContentDraftPost `json:"posts"`
+	SourceKey            string             `json:"sourceKey,omitempty"`
 	Timing               schema.BatchTiming `json:"timing"`
 }
 
@@ -95,6 +96,7 @@ type ContentBatchItemInput struct {
 	ChannelConnectionIDs []string            `json:"channelConnectionIds"`
 	ImportKey            string              `json:"importKey"`
 	Media                []schema.BatchMedia `json:"media"`
+	SourceKey            string              `json:"sourceKey,omitempty"`
 	Timing               schema.BatchTiming  `json:"timing"`
 }
 
@@ -260,7 +262,7 @@ func (c *Configuration) batchWithItems(ctx context.Context, actor Actor, row *en
 	record.Items = make([]ContentBatchItemRecord, 0, len(items))
 	for _, item := range items {
 		entry := ContentBatchItemRecord{Caption: item.Caption, ChannelConnectionIDs: item.ChannelConnectionIds, DraftID: item.DraftID, ID: item.ID,
-			ImportKey: item.ImportKey, Position: item.Position, Posts: []ContentDraftPost{}, Timing: item.Timing, Media: make([]BatchMediaRecord, 0, len(item.Media))}
+			ImportKey: item.ImportKey, Position: item.Position, Posts: []ContentDraftPost{}, SourceKey: item.SourceKey, Timing: item.Timing, Media: make([]BatchMediaRecord, 0, len(item.Media))}
 		for _, media := range item.Media {
 			// A file not uploaded yet keeps its own size, so the item can be saved back as it is.
 			view := BatchMediaRecord{BatchMedia: media, Bytes: media.Bytes, Status: "local"}
@@ -432,6 +434,9 @@ func (c *Configuration) AddContentBatchItems(ctx context.Context, actor Actor, b
 			}
 			continue
 		}
+		if utf8.RuneCountInString(input.SourceKey) > 255 || !utf8.ValidString(input.SourceKey) {
+			return nil, invalid("Each item's source name is at most 255 characters.")
+		}
 		if _, err := contentDraftText(input.Caption); err != nil {
 			return nil, err
 		}
@@ -452,7 +457,7 @@ func (c *Configuration) AddContentBatchItems(ctx context.Context, actor Actor, b
 			media = []schema.BatchMedia{}
 		}
 		item, err := tx.ContentBatchItem.Create().SetID(cuid.New()).SetBatchID(row.ID).SetOrganizationID(actor.OrganizationID).
-			SetImportKey(input.ImportKey).SetFingerprint(fingerprint).SetPosition(position).SetCaption(input.Caption).
+			SetImportKey(input.ImportKey).SetFingerprint(fingerprint).SetSourceKey(input.SourceKey).SetPosition(position).SetCaption(input.Caption).
 			SetMedia(media).SetChannelConnectionIds(channels).SetTiming(input.Timing).Save(ctx)
 		if err != nil {
 			return nil, err

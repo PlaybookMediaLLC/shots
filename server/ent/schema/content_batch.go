@@ -75,6 +75,8 @@ func (ContentBatchItem) Fields() []ent.Field {
 		field.String("import_key").StorageKey("importKey").Immutable(),
 		// Fingerprint is the creation input's digest: a reused key must match it.
 		field.String("fingerprint").Immutable(),
+		// SourceKey is the file or folder name the item came from, for caption CSVs.
+		field.String("source_key").StorageKey("sourceKey").Default("").Immutable(),
 		field.Int("position"),
 		field.String("caption").Default(""),
 		field.JSON("media", []BatchMedia{}).StorageKey("media"),

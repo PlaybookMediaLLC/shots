@@ -9,12 +9,15 @@ import { Input } from '@/components/ui/input'
 export function FilePicker({
   accept,
   children,
+  directory,
   label,
   multiple,
   onFiles,
 }: {
   accept: string
   children?: React.ReactNode
+  /** Choose a folder; each file keeps its path inside it. */
+  directory?: boolean
   label: string
   multiple?: boolean
   onFiles: (files: File[]) => void
@@ -29,6 +32,7 @@ export function FilePicker({
         accept={accept}
         multiple={multiple}
         className="hidden"
+        {...(directory ? { webkitdirectory: '' } : {})}
         onChange={(event) => {
           onFiles(Array.from(event.target.files ?? []))
           event.target.value = ''

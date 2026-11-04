@@ -9,6 +9,20 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { ContentBatch } from '@/lib/api/contracts/content-batches'
 import { call } from '@/lib/content-drafts/client'
 
+/** The bulk tools a batch can start with; each opens the same batch page. */
+const TOOLS = [
+  {
+    description: 'Up to 100 videos, one post each, with captions and times in bulk.',
+    label: 'Video upload',
+    start: 'videos',
+  },
+  {
+    description: 'Folders of images become posts, or one post per image.',
+    label: 'Image posts',
+    start: 'images',
+  },
+] as const
+
 /** Start a batch in a publishing brand and open it. */
 export function NewBatchButton({
   sets,
@@ -22,21 +36,26 @@ export function NewBatchButton({
     defaultSetId && sets.some((set) => set.id === defaultSetId) ? defaultSetId : sets[0]?.id
   )
   const [busy, setBusy] = React.useState(false)
+  const begin = (tool?: string) => {
+    setBusy(true)
+    void call<ContentBatch>('/api/v1/content-batches', {
+      method: 'POST',
+      body: { title, socialSetId: setId },
+    })
+      .then((batch) =>
+        window.location.assign(`/publish/batches/${batch.id}${tool ? `?start=${tool}` : ''}`)
+      )
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : 'The batch could not be started.')
+        setBusy(false)
+      })
+  }
   return (
     <form
       className="flex flex-wrap items-end gap-3"
       onSubmit={(event) => {
         event.preventDefault()
-        setBusy(true)
-        void call<ContentBatch>('/api/v1/content-batches', {
-          method: 'POST',
-          body: { title, socialSetId: setId },
-        })
-          .then((batch) => window.location.assign(`/publish/batches/${batch.id}`))
-          .catch((error: unknown) => {
-            toast.error(error instanceof Error ? error.message : 'The batch could not be started.')
-            setBusy(false)
-          })
+        begin()
       }}
     >
       <Label className="grid gap-1 font-normal">
@@ -60,6 +79,22 @@ export function NewBatchButton({
       <Button type="submit" disabled={busy || !title.trim() || !setId}>
         Start a batch
       </Button>
+      <div className="grid w-full gap-3 sm:grid-cols-2" data-testid="bulk-tools">
+        {TOOLS.map((tool) => (
+          <Button
+            key={tool.start}
+            type="button"
+            variant="custom"
+            size={null}
+            disabled={busy || !title.trim() || !setId}
+            className="grid justify-items-start gap-1 rounded-xl border border-border p-4 text-left whitespace-normal hover:bg-muted"
+            onClick={() => begin(tool.start)}
+          >
+            <span className="font-medium">{tool.label}</span>
+            <span className="text-xs text-muted-foreground">{tool.description}</span>
+          </Button>
+        ))}
+      </div>
     </form>
   )
 }
