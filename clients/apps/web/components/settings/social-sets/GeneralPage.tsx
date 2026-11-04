@@ -2,12 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { Group, Pill, Row } from '@/components/platform-ui'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
-import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
 import { DeveloperId } from '@/components/settings/DeveloperId'
 import {
@@ -58,6 +56,7 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault()
+            if (!dirty || !trimmed) return
             void runName(() => save({ name: trimmed })).then((saved) => {
               if (saved) setName(trimmed)
             })
@@ -68,15 +67,13 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
             className="w-64"
             disabled={!canManage || nameState === 'saving'}
             maxLength={80}
+            // The name saves when you leave the field or press Enter, like the colour below.
+            onBlur={(event) => event.currentTarget.form?.requestSubmit()}
             onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setName(set.name)
+            }}
             value={name}
-          />
-          <SettingsSaveBar
-            dirty={dirty}
-            busy={nameState === 'saving'}
-            disabled={!canManage || !trimmed}
-            label="Save name"
-            onDiscard={() => setName(set.name)}
           />
           <SaveStatus state={nameState} />
         </form>
@@ -110,8 +107,6 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
 }
 
 function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
-  const scope = useSocialSetScope()
-  const store = useStoreSocialSet()
   return (
     <Row
       description="One account per platform. Drafts in this publishing brand publish to these accounts."
@@ -176,51 +171,6 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
                       </Button>
                     </ConnectionLauncher>
                   ) : null}
-                  <ConfirmDialog
-                    confirmLabel="Remove account"
-                    description={
-                      <>
-                        <p>
-                          Its queued posts are cancelled and nothing more publishes through it. A
-                          post already publishing blocks the removal until it finishes.
-                        </p>
-                        <p>
-                          Drafts that chose it keep it marked as removed, and new drafts stop using
-                          it as a default. Published posts and their history stay.
-                        </p>
-                        <p>
-                          Follow-ups waiting on published posts, such as auto-retweets, do not run
-                          once it is removed.
-                        </p>
-                      </>
-                    }
-                    destructive
-                    onConfirm={async () => {
-                      try {
-                        const removal = await scope.request(
-                          `/api/v1/social-sets/${encodeURIComponent(set.id)}/accounts/${encodeURIComponent(account.id)}`,
-                          socialSetRemovalSchema,
-                          { method: 'DELETE' }
-                        )
-                        await store(
-                          await scope.request(
-                            `/api/v1/social-sets/${encodeURIComponent(set.id)}`,
-                            socialSetSchema
-                          )
-                        )
-                        toast.success(
-                          removal.cancelledPostIds.length > 0
-                            ? `Removed. ${removal.cancelledPostIds.length} queued posts were cancelled.`
-                            : 'Removed.'
-                        )
-                        return null
-                      } catch (error) {
-                        return settingsErrorMessage(error)
-                      }
-                    }}
-                    title={`Remove ${name} from ${set.name}?`}
-                    triggerLabel="Remove"
-                  />
                 </span>
               ) : null}
             </li>
@@ -245,6 +195,10 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
             </Button>
           </ConnectionLauncher>
           <p className="text-xs text-muted-foreground">
+            <Link className="underline" href={`/settings/channels?brand=${encodeURIComponent(set.id)}`}>
+              Manage in Channels
+            </Link>{' '}
+            to refresh or remove accounts.{' '}
             <Link className="underline" href={socialSetHref(set.id, 'new-draft')}>
               Choose default platforms for new drafts
             </Link>

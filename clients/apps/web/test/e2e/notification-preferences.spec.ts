@@ -8,6 +8,7 @@ import {
   grantWorkspacePlan,
   signUpViaApi,
   test,
+  openDisclosureFor,
 } from './framework'
 import { notificationSettingsSchema } from '../../lib/notifications/schema'
 import { socialSetSchema } from '../../lib/api/contracts/social-sets'
@@ -77,7 +78,7 @@ test(
     await expect(secondRow('Post published', 'in-app')).toBeChecked()
 
     const commentGroup = page.getByLabel('All comments: your email preferences', { exact: true })
-    await commentGroup.locator('xpath=ancestor::details').locator('summary').click()
+    await openDisclosureFor(commentGroup)
     await commentGroup.click()
     await expect(commentGroup).not.toBeChecked()
     await expect(

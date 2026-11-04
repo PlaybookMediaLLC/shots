@@ -1,4 +1,4 @@
-import { CREATE_LINKS } from '@/lib/platform/navigation'
+import { CREATE_LINKS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -83,9 +83,9 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                       add: true,
                     },
                     {
-                      title: 'Build store screenshots',
+                      title: STORE_SCREENSHOTS.label,
                       description: 'Prepare store listings across devices, sizes and languages.',
-                      href: '/?editor=app-store',
+                      href: STORE_SCREENSHOTS.href,
                       scope: 'App Store studio · On this browser',
                       pages: [
                         { kind: 'phone', ratio: '9:16' },

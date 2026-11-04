@@ -28,9 +28,9 @@ func (c *Configuration) requireCreativeSetCreation(ctx context.Context, actor Ac
 }
 
 // requireCreativeCreation gates new rows. Story Sets stay behind their rollout
-// feature; a canvas is part of the paid workspace (RFC 032).
+// feature; a canvas (RFC 032) and a store screenshot project are part of the paid workspace.
 func (c *Configuration) requireCreativeCreation(ctx context.Context, actor Actor, kind platformcreativeset.Kind) error {
-	if kind != platformcreativeset.KindCanvas {
+	if kind == platformcreativeset.KindStorySet {
 		return c.requireCreativeSetCreation(ctx, actor)
 	}
 	if err := c.AuthorizeRead(ctx, actor); err != nil {
@@ -49,21 +49,48 @@ func number(value any) float64 {
 	return -1
 }
 
-// creativeSetKind is the row kind a document belongs to: a canvas names itself,
-// and every earlier document is a Story Set.
+// creativeSetKind is the row kind a document belongs to: a canvas and a store
+// project name themselves, and every earlier document is a Story Set.
 func creativeSetKind(document map[string]any) platformcreativeset.Kind {
-	if document["kind"] == string(platformcreativeset.KindCanvas) {
+	switch document["kind"] {
+	case string(platformcreativeset.KindCanvas):
 		return platformcreativeset.KindCanvas
+	case string(platformcreativeset.KindStore):
+		return platformcreativeset.KindStore
 	}
 	return platformcreativeset.KindStorySet
 }
 
-// creativeDocumentAssetIDs validates a document of either kind and lists its assets.
+// creativeDocumentAssetIDs validates a document of any kind and lists its assets.
 func creativeDocumentAssetIDs(document map[string]any) ([]string, error) {
-	if creativeSetKind(document) == platformcreativeset.KindCanvas {
+	switch creativeSetKind(document) {
+	case platformcreativeset.KindCanvas:
 		return canvasAssetIDs(document)
+	case platformcreativeset.KindStore:
+		return storeProjectAssetIDs(document)
 	}
 	return creativeSetAssetIDs(document)
+}
+
+// A store screenshot project is one store group with no Story Set bindings,
+// every image already copied to workspace storage.
+func storeProjectAssetIDs(document map[string]any) ([]string, error) {
+	encoded, err := json.Marshal(document)
+	if err != nil || len(encoded) > 8<<20 {
+		return nil, invalid("Use a store screenshot project under 8 MB.")
+	}
+	if err := validateCreativeStoreGroups([]any{document}, nil); err != nil {
+		return nil, err
+	}
+	ids := map[string]bool{}
+	if !collectDesignAssetIDs(document, ids) {
+		return nil, ErrInvalidInput
+	}
+	result := make([]string, 0, len(ids))
+	for id := range ids {
+		result = append(result, id)
+	}
+	return result, nil
 }
 
 // Canvas workspaces hold positioned artboards, each a complete native design document.

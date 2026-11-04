@@ -26,8 +26,15 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -119,14 +126,11 @@ function LocalTimeFields({
           if (next) onChange((current) => `${next}T${current.split('T')[1] || time || '09:00'}`)
         }}
       />
-      <Input
+      <TimePicker
         aria-label={`${label} time`}
-        className="w-36"
         disabled={disabled}
-        type="time"
         value={time}
-        onChange={(event) => {
-          const next = event.target.value
+        onChange={(next) => {
           if (day && next) onChange((current) => `${current.split('T')[0] || day}T${next}`)
         }}
       />
@@ -1169,14 +1173,18 @@ export function BatchWorkspace({
               <div className="flex flex-wrap items-end gap-3">
                 <Label className="grid gap-1 font-normal">
                   Plan
-                  <NativeSelect
-                    aria-label="Batch time mode"
+                  <Select
                     value={timesMode}
-                    onChange={(event) => setTimesMode(event.target.value as 'queue' | 'spread')}
+                    onValueChange={(value) => setTimesMode(value as 'queue' | 'spread')}
                   >
-                    <NativeSelectOption value="queue">Fill the queue</NativeSelectOption>
-                    <NativeSelectOption value="spread">Spread over days</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Batch time mode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="queue">Fill the queue</SelectItem>
+                      <SelectItem value="spread">Spread over days</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 {timesMode === 'spread' ? (
                   <>

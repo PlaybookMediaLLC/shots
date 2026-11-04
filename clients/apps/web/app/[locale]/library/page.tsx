@@ -55,7 +55,7 @@ export default async function LibraryPage({ params, searchParams }: LibraryPageP
             ) : query.type === 'story' ? (
               <StorySetLibrary embedded canEdit={canEdit} canCreate={access.creativeSetsEnabled} />
             ) : query.type === 'store' ? (
-              <LocalStoreProjects />
+              <LocalStoreProjects canEdit={canEdit} />
             ) : (
               <div className="grid gap-4">
                 <p className="text-sm text-muted-foreground">

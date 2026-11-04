@@ -136,8 +136,11 @@ func creativeSetDocument(ctx context.Context, tx *ent.Tx, organizationID string,
 
 // creativeSetAction names an audit action for the row's kind.
 func creativeSetAction(kind platformcreativeset.Kind, action string) string {
-	if kind == platformcreativeset.KindCanvas {
+	switch kind {
+	case platformcreativeset.KindCanvas:
 		return "product.canvas_" + action
+	case platformcreativeset.KindStore:
+		return "product.store_project_" + action
 	}
 	return "product.creative_set_" + action
 }
@@ -203,8 +206,11 @@ func (c *Configuration) CreateCreativeSet(ctx context.Context, actor Actor, id, 
 	}
 	// The starting point is in the history, and it holds off the first checkpoint.
 	created := "Story Set created"
-	if kind == platformcreativeset.KindCanvas {
+	switch kind {
+	case platformcreativeset.KindCanvas:
 		created = "Canvas created"
+	case platformcreativeset.KindStore:
+		created = "Store screenshots created"
 	}
 	if _, err := recordCreativeSetVersion(ctx, tx, actor, row, platformcreativesetversion.KindAutosave, &created); err != nil {
 		return nil, err
@@ -265,7 +271,7 @@ func (c *Configuration) ListCreativeSets(ctx context.Context, actor Actor, query
 	if query.Kind != "" {
 		kind = platformcreativeset.Kind(query.Kind)
 		if platformcreativeset.KindValidator(kind) != nil {
-			return nil, invalid("List story-set or canvas documents.")
+			return nil, invalid("List story-set, canvas or store documents.")
 		}
 	}
 	rows := c.client.PlatformCreativeSet.Query().Where(platformcreativeset.OrganizationID(actor.OrganizationID), platformcreativeset.Archived(query.Archived), platformcreativeset.KindEQ(kind))

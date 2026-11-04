@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Sheet,
   SheetContent,
@@ -1246,10 +1247,9 @@ export function WriteComposer({
               }}
             />
           ) : null}
-          <details
+          <Disclosure
             className="mx-4 mt-1 mb-3 overflow-hidden rounded-[14.4px] border border-border bg-card"
-            onToggle={(event) => {
-              const open = event.currentTarget.open
+            onOpenChange={(open) => {
               setOptionsOpen(open)
               try {
                 localStorage.setItem(POST_OPTIONS_KEY, open ? 'open' : 'closed')
@@ -1259,9 +1259,10 @@ export function WriteComposer({
             }}
             open={optionsOpen || pasteNotice}
           >
-            <summary className="cursor-pointer select-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
+            <DisclosureTrigger className="select-none rounded-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
               Post options
-            </summary>
+            </DisclosureTrigger>
+            <DisclosureContent>
             <VersionOptionsBar
               tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
               channel={active}
@@ -1303,7 +1304,8 @@ export function WriteComposer({
                 onChange={(options) => setOptions(active, options)}
               />
             ) : null}
-          </details>
+            </DisclosureContent>
+          </Disclosure>
           <div
             className="relative flex-1"
             data-testid="composer-body"

@@ -9,15 +9,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { designDocumentSchema, type DesignDocument } from '@/lib/design/document'
 import { designCatalog, type FrameType } from '@/lib/design/catalog'
 import { useDocumentPreview } from '@/lib/render/use-document-preview'
 import { renderDocument } from '@/lib/render/scene-renderer'
 import { downloadBlob } from '@/lib/export/export-design'
+
+/** The menu's stand-in for an empty value, which a Select item cannot hold. */
+const NONE = '__none'
 
 const OUTPUT = { format: 'png' as const, scale: 1, quality: 'high' as const }
 
@@ -98,52 +107,53 @@ export function ChartShare({
         <div className="grid gap-3 sm:grid-cols-2">
           <Label>
             Crop{' '}
-            <NativeSelect
-              aria-label="Image crop"
-              value={crop}
-              onChange={(e) => setCrop(e.target.value)}
-            >
-              <NativeSelectOption value="landscape">Landscape</NativeSelectOption>
-              <NativeSelectOption value="square">Square</NativeSelectOption>
-              <NativeSelectOption value="portrait">Portrait</NativeSelectOption>
-            </NativeSelect>
+            <Select value={crop} onValueChange={(value) => setCrop(value)}>
+              <SelectTrigger aria-label="Image crop">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="landscape">Landscape</SelectItem>
+                <SelectItem value="square">Square</SelectItem>
+                <SelectItem value="portrait">Portrait</SelectItem>
+              </SelectContent>
+            </Select>
           </Label>
           <Label>
             Color{' '}
-            <Input
+            <SwatchColorPicker
               aria-label="Image color"
-              className="w-14 p-1"
-              type="color"
               value={color}
-              onChange={(e) => setColor(e.target.value)}
+              onChange={setColor}
             />
           </Label>
           <Label>
             Frame{' '}
-            <NativeSelect
-              aria-label="Image frame"
-              value={frame}
-              onChange={(e) => setFrame(e.target.value as FrameType)}
-            >
-              {designCatalog.frames.map((f) => (
-                <NativeSelectOption value={f} key={f}>
-                  {f}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Select value={frame} onValueChange={(value) => setFrame(value as FrameType)}>
+              <SelectTrigger aria-label="Image frame">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {designCatalog.frames.map((f) => (
+                  <SelectItem value={f} key={f}>
+                    {f}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Label>
           <Label>
             Gradient{' '}
-            <NativeSelect
-              aria-label="Image gradient"
-              value={gradient}
-              onChange={(e) => setGradient(e.target.value)}
-            >
-              <NativeSelectOption value="">Solid color</NativeSelectOption>
-              {designCatalog.gradients.map((g) => (
-                <NativeSelectOption key={g}>{g}</NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Select value={gradient || NONE} onValueChange={(value) => setGradient(value === NONE ? '' : value)}>
+              <SelectTrigger aria-label="Image gradient">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Solid color</SelectItem>
+                {designCatalog.gradients.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Label>
           {[
             { label: 'Inset', value: inset, max: 200, min: 0, set: setInset },
@@ -165,17 +175,20 @@ export function ChartShare({
           ))}
           <Label>
             Shadow{' '}
-            <NativeSelect
-              aria-label="Image shadow"
+            <Select
               value={shadow?.preset}
-              onChange={(e) =>
-                setShadow({ preset: e.target.value as 'none' | 'hug' | 'soft' | 'strong' })
-              }
+              onValueChange={(value) =>
+                setShadow({ preset: value as 'none' | 'hug' | 'soft' | 'strong' })}
             >
-              {designCatalog.shadowPresets.map((s) => (
-                <NativeSelectOption key={s}>{s}</NativeSelectOption>
-              ))}
-            </NativeSelect>
+              <SelectTrigger aria-label="Image shadow">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {designCatalog.shadowPresets.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Label>
         </div>
         <div className="min-h-48 rounded border bg-muted p-2">

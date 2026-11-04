@@ -28,6 +28,9 @@ export const navigationLayoutSchema = z.enum(['compact', 'dynamic', 'expanded'])
 /** The first day of a calendar week. */
 export const weekStartSchema = z.enum(['monday', 'sunday'])
 
+/** The clock times read on; `auto` follows the browser locale. */
+export const timeFormatSchema = z.enum(['auto', '12h', '24h'])
+
 /** The direction text runs in the editor. */
 export const textDirectionSchema = z.enum(['ltr', 'rtl'])
 
@@ -43,6 +46,7 @@ export const userPreferencesSchema = mirrors<UserPreferences>()(
     showScrollbars: z.boolean(),
     textDirection: textDirectionSchema,
     theme: themeSchema,
+    timeFormat: timeFormatSchema,
     timeZone: z.string().nullable(),
     updatedAt: isoInstantSchema.nullable(),
     version: z.number().int(),
@@ -70,6 +74,7 @@ export const userPreferencesUpdateSchema = z
     showScrollbars: z.boolean().optional(),
     textDirection: textDirectionSchema.optional(),
     theme: themeSchema.optional(),
+    timeFormat: timeFormatSchema.optional(),
     /** An IANA zone such as `Europe/Paris`, or an empty string to follow the browser. */
     timeZone: z.string().max(64).optional(),
     weekStart: weekStartSchema.optional(),
