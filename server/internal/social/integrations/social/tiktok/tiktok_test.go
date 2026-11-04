@@ -301,11 +301,13 @@ func TestValidate(t *testing.T) {
 	}
 }
 
-func TestHostedVideoUsesVerifiedPullSource(t *testing.T) {
+// A presigned R2 URL cannot be on a TikTok-verified domain, so hosted video
+// is uploaded from the URL, never pulled by TikTok.
+func TestHostedVideoUsesFileUpload(t *testing.T) {
 	post := integrations.PostDetails{Media: []integrations.MediaContent{{Path: "https://media.example.test/canary.mp4?signature=private", Type: "video"}}}
 	source := buildSourceInfoBody(post, &TikTokDTO{}, 123)["source_info"].(map[string]any)
-	if source["source"] != "PULL_FROM_URL" || source["video_url"] != post.Media[0].Path || source["video_size"] != nil {
-		t.Fatal("hosted video must use URL pull")
+	if source["source"] != "FILE_UPLOAD" || source["video_url"] != nil || source["video_size"] != int64(123) {
+		t.Fatalf("hosted video must use file upload, got %v", source)
 	}
 }
 
