@@ -34,6 +34,12 @@ import {
   updateAnalyticsSettingsContract,
 } from './plan-analyze'
 import {
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
+} from './calendar-notes'
+import {
   decideCampaignApprovalContract,
   listApprovalsContract,
   requestCampaignReviewContract,
@@ -128,6 +134,10 @@ export const documentedContracts = [
   draftGiphySearchContract,
   draftGiphyAttachContract,
   mutateCalendarContract,
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
   getAnalyticsContract,
   refreshAnalyticsContract,
   updateAnalyticsSettingsContract,

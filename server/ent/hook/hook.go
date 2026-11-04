@@ -225,6 +225,18 @@ func (f CalendarMutationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CalendarMutationMutation", m)
 }
 
+// The CalendarNoteFunc type is an adapter to allow the use of ordinary
+// function as CalendarNote mutator.
+type CalendarNoteFunc func(context.Context, *ent.CalendarNoteMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CalendarNoteFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CalendarNoteMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CalendarNoteMutation", m)
+}
+
 // The CampaignFunc type is an adapter to allow the use of ordinary
 // function as Campaign mutator.
 type CampaignFunc func(context.Context, *ent.CampaignMutation) (ent.Value, error)

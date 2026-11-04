@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { analyticsReportSchema, analyticsQuerySchema } from '../lib/api/contracts/plan-analyze'
+import {
+  calendarNoteChangesSchema,
+  calendarNoteInputSchema,
+} from '../lib/api/contracts/calendar-notes'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
   draftPostsState,
@@ -576,4 +580,20 @@ test('a month day caps its posts but never hides one that needs attention', () =
 
 test('saved calendar preferences from before Show all still load', () => {
   assert.equal(planPreferencesSchema.parse({ view: 'month' }).showAll, false)
+})
+
+test('a calendar note is a trimmed title, a known color and a real date', () => {
+  const input = { day: '2026-11-04', title: '  Launch  ', color: 'purple' }
+  assert.equal(calendarNoteInputSchema.parse(input).title, 'Launch')
+  for (const bad of [
+    { ...input, title: '   ' },
+    { ...input, title: 'x'.repeat(121) },
+    { ...input, color: 'pink' },
+    { ...input, day: '2026-02-30' },
+    { ...input, day: '2026-11-04T00:00:00Z' },
+    { ...input, organizationId: 'foreign' },
+  ])
+    assert.equal(calendarNoteInputSchema.safeParse(bad).success, false, JSON.stringify(bad))
+  // A note's day never changes after it is created.
+  assert.equal(calendarNoteChangesSchema.safeParse(input).success, false)
 })

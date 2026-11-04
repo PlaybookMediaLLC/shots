@@ -3138,6 +3138,25 @@ export class ScreenshotStudioBackendSDK {
   async mutateCalendar(input: unknown) {
     return this.request<unknown>('v1/calendar/mutations', { body: input, method: 'POST' })
   }
+  /** A workspace's date-only notes on the days from..to, inclusive. */
+  async listCalendarNotes(from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    return this.request<unknown>(`v1/calendar/notes?${params}`)
+  }
+  async createCalendarNote(input: unknown) {
+    return this.request<unknown>('v1/calendar/notes', { body: input, method: 'POST' })
+  }
+  async updateCalendarNote(id: string, input: unknown) {
+    return this.request<unknown>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PATCH',
+    })
+  }
+  async deleteCalendarNote(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
   async getAnalytics(id: string, query: Record<string, string | number | undefined>) {
     const params = new URLSearchParams(
       Object.entries(query)

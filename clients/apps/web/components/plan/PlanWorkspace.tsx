@@ -5,6 +5,7 @@ import { readWire } from '@/lib/plan/wire'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { NotePencilIcon } from '@phosphor-icons/react/dist/ssr/NotePencil'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import {
@@ -46,6 +47,7 @@ import {
 import { useShortcuts } from '@/components/write/shortcuts'
 import { calendarPostSchema } from '@/lib/api/contracts/content-draft-platform'
 import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
+import { calendarNoteListSchema, type CalendarNoteWire } from '@/lib/api/contracts/calendar-notes'
 import { calendarResultSchema, type CalendarPlacement } from '@/lib/api/contracts/plan-analyze'
 import { call, draftsApi, type DraftWire, type DraftPostWire } from '@/lib/content-drafts/client'
 import {
@@ -81,6 +83,7 @@ import {
   type PlanPreferences,
 } from '@/lib/plan/calendar'
 import { DraftSettingsDrawer, openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
+import { NoteChip, NoteDialog } from './CalendarNotes'
 import { WorkspaceNav } from './WorkspaceNav'
 import { useDraftSources } from './useDraftSources'
 
@@ -162,6 +165,11 @@ export function PlanWorkspace({
   const [detail, setDetail] = React.useState<PlanItem | null>(null)
   const [over, setOver] = React.useState<string | null>(null)
   const [openDays, setOpenDays] = React.useState<string[]>([])
+  const [notes, setNotes] = React.useState<CalendarNoteWire[]>([])
+  const [notesFailed, setNotesFailed] = React.useState(false)
+  const [noteEdit, setNoteEdit] = React.useState<{ day: string; note?: CalendarNoteWire } | null>(
+    null
+  )
   const [busy, setBusy] = React.useState(false)
   const activeIds = prefs.visible ?? sets.map((s) => s.id)
   const focused = activeIds.length === 1 ? sets.find((s) => s.id === activeIds[0]) : undefined
@@ -297,6 +305,25 @@ export function PlanWorkspace({
       })
     return () => controller.abort()
   }, [rangeKey, refresh, hydrated])
+  // Notes are dates: no zone is applied, and a failure here leaves the posts usable.
+  const noteRange = `${days[0]}:${days.at(-1)}`
+  React.useEffect(() => {
+    if (!hydrated) return
+    const controller = new AbortController()
+    const [from, to] = noteRange.split(':')
+    setNotesFailed(false)
+    fetch(`/api/v1/calendar/notes?${new URLSearchParams({ from, to })}`, {
+      signal: controller.signal,
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('Notes could not load.')
+        setNotes(readWire(calendarNoteListSchema, await r.json()).items)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setNotesFailed(true)
+      })
+    return () => controller.abort()
+  }, [noteRange, refresh, hydrated])
   const scopeKey = activeIds.slice().sort().join(',')
   React.useEffect(() => {
     // The saved brand selection loads first; reading tags before it read them twice.
@@ -969,23 +996,49 @@ export function PlanWorkspace({
               <p role="status" className="py-2">
                 Loading calendar…
               </p>
+            ) : notesFailed ? (
+              <div role="alert" className="flex items-center gap-2">
+                Notes could not load.{' '}
+                <Button variant="outline" size="sm" onClick={reload}>
+                  Retry calendar
+                </Button>
+              </div>
             ) : null}
           </div>
           <div ref={container} className="min-h-0 flex-1 overflow-auto" data-local-dropzone="">
             <div className="grid gap-3 p-3 md:hidden" aria-label="Mobile queue">
-              {shown
-                .sort((a, b) => a.at.localeCompare(b.at))
-                .map((item) => (
-                  <div key={item.id}>
-                    <p className="mb-1 text-sm">{readable(itemDay(item, prefs.zone))}</p>
-                    {card(item)}
+              {/* In date order, with a day's notes above its posts: a stable sort keeps them first. */}
+              {[
+                ...notes.map((note) => ({
+                  day: note.day,
+                  key: note.id,
+                  node: (
+                    <NoteChip
+                      note={note}
+                      onOpen={canEdit ? () => setNoteEdit({ day: note.day, note }) : undefined}
+                    />
+                  ),
+                })),
+                ...shown
+                  .sort((a, b) => a.at.localeCompare(b.at))
+                  .map((item) => ({
+                    day: itemDay(item, prefs.zone),
+                    key: item.id,
+                    node: card(item),
+                  })),
+              ]
+                .sort((a, b) => a.day.localeCompare(b.day))
+                .map(({ day, key, node }) => (
+                  <div key={key}>
+                    <p className="mb-1 text-sm">{readable(day)}</p>
+                    {node}
                   </div>
                 ))}
               {load === 'ready' && !shown.length ? <p>No content in this period.</p> : null}
               {canEdit ? <Button onClick={() => create(today)}>Plan a post</Button> : null}
             </div>
             <div
-              className="hidden min-w-[700px] grid-cols-7 md:grid"
+              className="hidden min-w-[760px] grid-cols-7 md:grid"
               aria-label={`${prefs.view} calendar`}
               style={
                 prefs.view === 'week'
@@ -1023,22 +1076,47 @@ export function PlanWorkspace({
                     <time
                       dateTime={day}
                       aria-current={day === today ? 'date' : undefined}
-                      className={
-                        day === today ? 'rounded-full bg-sky-600 px-2 py-1 text-white' : ''
-                      }
+                      className={`min-w-0 truncate ${day === today ? 'rounded-full bg-sky-600 px-1.5 py-0.5 text-white' : ''}`}
                     >
                       {readable(day, { weekday: 'short', day: 'numeric' })}
                     </time>
-                    {canEdit && day >= today ? (
-                      <Button
-                        aria-label={`Create draft ${day}`}
-                        onClick={() => create(day)}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        ＋
-                      </Button>
-                    ) : null}
+                    <span className="flex shrink-0 items-center">
+                      {prefs.view === 'week'
+                        ? notes
+                            .filter((note) => note.day === day)
+                            .map((note) => (
+                              <NoteChip
+                                compact
+                                key={note.id}
+                                note={note}
+                                onOpen={canEdit ? () => setNoteEdit({ day, note }) : undefined}
+                              />
+                            ))
+                        : null}
+                      {canEdit ? (
+                        <Button
+                          aria-label={`Add note ${day}`}
+                          className="size-6"
+                          onClick={() => setNoteEdit({ day })}
+                          size="icon-sm"
+                          title="Add note"
+                          variant="ghost"
+                        >
+                          <NotePencilIcon aria-hidden />
+                        </Button>
+                      ) : null}
+                      {canEdit && day >= today ? (
+                        <Button
+                          aria-label={`Create draft ${day}`}
+                          className="size-6"
+                          onClick={() => create(day)}
+                          size="icon-sm"
+                          variant="ghost"
+                        >
+                          ＋
+                        </Button>
+                      ) : null}
+                    </span>
                   </div>
                   {prefs.view === 'week' ? (
                     <div className="relative" style={{ height: 1440 + weekCardHeight }}>
@@ -1078,7 +1156,18 @@ export function PlanWorkspace({
                       ))}
                     </div>
                   ) : (
-                    dayCards(day)
+                    <div className="grid gap-2">
+                      {notes
+                        .filter((note) => note.day === day)
+                        .map((note) => (
+                          <NoteChip
+                            key={note.id}
+                            note={note}
+                            onOpen={canEdit ? () => setNoteEdit({ day, note }) : undefined}
+                          />
+                        ))}
+                      {dayCards(day)}
+                    </div>
                   )}
                   {prefs.view !== 'week' ? slotsFor(day) : null}
                 </section>
@@ -1093,6 +1182,21 @@ export function PlanWorkspace({
           sets={sets}
           canPublish={canPublish}
           onClose={() => setCompose(null)}
+          onSaved={reload}
+        />
+      ) : null}
+      {noteEdit ? (
+        <NoteDialog
+          day={noteEdit.day}
+          dayLabel={readable(noteEdit.day, {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric',
+          })}
+          key={noteEdit.note?.id ?? noteEdit.day}
+          note={noteEdit.note}
+          onClose={() => setNoteEdit(null)}
           onSaved={reload}
         />
       ) : null}
