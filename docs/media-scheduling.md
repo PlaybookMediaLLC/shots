@@ -213,6 +213,18 @@ kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
 | Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |
 | Handoff | A finished video is the item's media, so captions, times, drafts, review and scheduling apply. Download one, or several as a ZIP |
 
+The analysis's remaining checks ([verification matrix](scheduling/post-bridge/bulk-tools/bulk-tools-verification-matrix.csv)) are covered here:
+
+| Matrix | Where Shots proves it |
+| --- | --- |
+| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts` |
+| BULK-018 to 022: variations and overflow | `test/write-spintax.test.ts`, `test/write-batch.test.ts` |
+| BULK-023, 055: CSV matching | `test/write-bulk-import.test.ts` |
+| BULK-025 to 030: schedule | `TestSpreadTimes`, `test/write-batch.test.ts` |
+| BULK-035 to 041: concepts | `test/write-grid-concepts.test.ts`, `TestContentBatches` |
+| BULK-046 to 052: recovery, render, handoff | `test/e2e/bulk-tools.spec.ts`, `test/write-grid-layout.test.ts` |
+| BULK-056, 057: submission, retry, partial success | `TestContentBatches`, `TestContentDraftScheduleReliability` |
+
 Deliberately not built from the analysis: the proposed `/batches` and
 `/render-batches` API, a server-side submit job and server rendering (the client
 loop over per-draft idempotent scheduling resumes without duplicates); global
@@ -315,6 +327,17 @@ the two asset columns in a new reviewed migration.
   the scheduling transaction and again at publish time.
 
 ## Evidence
+
+Bulk tools, 4 November 2026. `make -C server check` passed with the four CI
+databases, and `npm run format:check`, lint and the web unit suite (1,300 tests)
+passed; the web's production image built. `renderGridVideo` ran in Chrome against
+served images and a tone: `ffprobe` read H.264, 1080×1920, 30 fps, 180 frames and
+6 s, with AAC at 6.08 s when there is music, and every frame decoded.
+`test/e2e/bulk-tools.spec.ts` has **not run yet**: Docker's storage failed when the
+host disk filled, before the stack could start. Until it does, the batch page and
+wizard are unproven in a browser. `./dev/social-gate` and `make tenant-isolation`
+were not run, and the gate has no grid case; a rendered video is an ordinary MP4
+asset on that path.
 
 Run on this branch, against local PostgreSQL (Docker was unavailable). The
 full Go suite and its race set pass except
