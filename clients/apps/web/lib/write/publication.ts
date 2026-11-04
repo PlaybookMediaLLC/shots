@@ -258,8 +258,10 @@ export function buildPublication(
       !options.tiktok.commercialContent
     )
       problems.push('Enable commercial content disclosure for promotional content.')
-    if (!options.tiktok?.privacy || !options.tiktok.consent)
-      problems.push('Choose TikTok privacy and confirm publishing consent before scheduling.')
+    if (!options.tiktok?.privacy)
+      problems.push('Choose who can see this TikTok post in its options before scheduling.')
+    if (!options.tiktok?.consent)
+      problems.push('Confirm consent to send this video to TikTok in its options before scheduling.')
     if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       problems.push('Branded TikTok content cannot be private.')
   }

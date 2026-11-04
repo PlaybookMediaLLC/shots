@@ -8,6 +8,7 @@ test(
     const id = await openNewDraft(page)
     await draftEditor(page).pressSequentially('A community update.')
     await expectSaved(page)
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Audience: everyone', exact: true }).click()
     const audience = page.getByRole('dialog', { name: 'Audience', exact: true })
     await audience.getByLabel('Community URL or id').fill('https://x.com/i/communities/42')

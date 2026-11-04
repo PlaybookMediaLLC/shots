@@ -25,10 +25,17 @@ import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import type { DraftChannel, DraftKind, PlateBody, PlatformVersions } from '@/lib/write/document'
+import type {
+  DraftChannel,
+  DraftKind,
+  PlateBody,
+  PlatformVersions,
+  VersionOptions,
+} from '@/lib/write/document'
 import { forkVersion, primaryChanged, resyncVersion, versionFor } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { healthLabel } from '../sets'
+import { optionsSummary } from './video-options'
 import type { WriteSet } from '../write-context'
 import { CONNECT_PROVIDERS } from '@/components/settings/social-sets/api'
 
@@ -47,6 +54,7 @@ export function PlatformTabs({
   enabled,
   onManage,
   onSelect,
+  options,
   primary,
   versions,
 }: {
@@ -55,6 +63,8 @@ export function PlatformTabs({
   enabled: string[]
   onManage?: () => void
   onSelect: (channel: DraftChannel) => void
+  /** The edited platform's options chip, at the row's end. */
+  options?: React.ReactNode
   primary: DraftChannel
   versions: PlatformVersions
 }) {
@@ -118,7 +128,47 @@ export function PlatformTabs({
           Manage platforms
         </Button>
       ) : null}
+      {options ? <div className="ml-auto shrink-0">{options}</div> : null}
     </div>
+  )
+}
+
+/**
+ * The edited platform's options in a few words, such as "TikTok: Only me ·
+ * comments on". It opens them beside the draft, so no form sits above the text.
+ */
+export function OptionsChip({
+  channel,
+  onClick,
+  open,
+  options,
+}: {
+  channel: DraftChannel
+  onClick: () => void
+  open: boolean
+  options: VersionOptions
+}) {
+  const summary = optionsSummary(channel, options)
+  const label = CHANNEL_META[channel].label
+  const text = summary.text ? `${label}: ${summary.text}` : `${label} options`
+  return (
+    <Button
+      aria-expanded={open}
+      className={cn(
+        'h-8 gap-1.5 text-ui',
+        summary.needsInput && 'text-amber-700 dark:text-amber-300'
+      )}
+      data-testid="options-chip"
+      onClick={onClick}
+      size="sm"
+      title="Post options for this platform"
+      variant="outline"
+    >
+      {summary.needsInput ? (
+        <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+      ) : null}
+      {text}
+    </Button>
   )
 }
 

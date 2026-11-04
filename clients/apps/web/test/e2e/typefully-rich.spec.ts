@@ -47,6 +47,7 @@ test(
     await expect(page.getByLabel('Article title', { exact: true })).toHaveValue(
       'An article with structure'
     )
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Auto-DM settings', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Delivery is off')
@@ -56,6 +57,7 @@ test(
     await dialog.getByRole('button', { name: 'Save prepared settings' }).click()
     await expectSaved(page)
     await app.reload()
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Auto-DM settings · prepared', exact: true }).click()
     await expect(
       page.getByRole('dialog').getByRole('textbox', { name: 'Direct message', exact: true })
@@ -76,6 +78,7 @@ test(
     await prepared.getByRole('button', { name: 'Save prepared settings', exact: true }).click()
     await expectSaved(page)
     await app.reload()
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Auto-DM settings · prepared', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Direct message', exact: true })).toHaveValue(
       'Saved from publish review for {{first_name}}'

@@ -14,6 +14,48 @@ import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-bac
 import type { AccountStanding } from '@/lib/write/capabilities'
 import type { VersionOptions } from '@/lib/write/document'
 
+/** TikTok's privacy levels as a person reads them. */
+export const TIKTOK_PRIVACY_LABELS: Record<string, string> = {
+  FOLLOWER_OF_CREATOR: 'Followers',
+  MUTUAL_FOLLOW_FRIENDS: 'Friends',
+  PUBLIC_TO_EVERYONE: 'Everyone',
+  SELF_ONLY: 'Only me',
+}
+
+const YOUTUBE_PRIVACY_LABELS: Record<string, string> = {
+  private: 'Private',
+  public: 'Public',
+  unlisted: 'Unlisted',
+}
+
+/**
+ * A platform's options in a few words for its chip, and whether a choice the
+ * platform requires is still missing. TikTok asks for privacy and consent on
+ * every post, so they are never filled in for the writer.
+ */
+export function optionsSummary(
+  channel: string,
+  options: VersionOptions
+): { text: string; needsInput: boolean } {
+  if (channel === 'tiktok') {
+    const value = options.tiktok
+    if (!value?.privacy) return { needsInput: true, text: 'Choose privacy' }
+    const parts = [
+      TIKTOK_PRIVACY_LABELS[value.privacy] ?? value.privacy,
+      value.allowComments ? 'comments on' : 'comments off',
+    ]
+    if (!value.consent) parts.push('consent needed')
+    return { needsInput: !value.consent, text: parts.join(' · ') }
+  }
+  if (channel === 'youtube') {
+    const value = options.youtube
+    if (!value?.privacy || !value.title.trim() || value.madeForKids === undefined)
+      return { needsInput: true, text: 'Title, privacy and audience needed' }
+    return { needsInput: false, text: YOUTUBE_PRIVACY_LABELS[value.privacy] ?? value.privacy }
+  }
+  return { needsInput: false, text: '' }
+}
+
 /** Explicit metadata travels with the reviewed platform version. */
 export function VideoOptions({
   channel,
@@ -62,7 +104,7 @@ export function VideoOptions({
             <SelectContent>
               {['public', 'unlisted', 'private'].map((privacy) => (
                 <SelectItem key={privacy} value={privacy}>
-                  {privacy}
+                  {YOUTUBE_PRIVACY_LABELS[privacy]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -139,7 +181,7 @@ export function VideoOptions({
                 value={privacy}
                 disabled={privacy === 'SELF_ONLY' && value.brandedContent}
               >
-                {privacy}
+                {TIKTOK_PRIVACY_LABELS[privacy] ?? privacy}
               </SelectItem>
             ))}
           </SelectContent>
@@ -185,7 +227,9 @@ export function VideoOptions({
       {value.commercialContent && !value.brandOrganic && !value.brandedContent && (
         <p>Indicate whether your content promotes yourself, a third party, or both.</p>
       )}
-      {value.privacy === 'SELF_ONLY' && <p>Branded content visibility cannot be private.</p>}
+      {value.privacy === 'SELF_ONLY' && value.commercialContent ? (
+        <p>Branded content visibility cannot be private.</p>
+      ) : null}
       <div className="flex items-center gap-2">
         <Checkbox
           id="tiktok-consent"

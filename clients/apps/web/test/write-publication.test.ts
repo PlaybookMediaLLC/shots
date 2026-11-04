@@ -4,6 +4,7 @@ import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 import type { PlateBody } from '@/lib/write/document'
 import { buildPublication, type PublicationDraft } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
+import { optionsSummary } from '@/components/write/composer/video-options'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
 const brk = (extra: object = {}) => ({ children: [{ text: '' }], type: POST_BREAK, ...extra })
@@ -600,4 +601,35 @@ test('video publication keeps explicit privacy and refuses missing choices', () 
     connectionId: 'ct0000000001',
   })
   assert.ok(unavailable.problems.some((problem) => problem.includes('permissions are unavailable')))
+})
+
+test('a platform chip names its options in words and flags a missing required choice', () => {
+  assert.deepEqual(optionsSummary('tiktok', {}), { needsInput: true, text: 'Choose privacy' })
+  const tiktok = {
+    allowComments: true,
+    allowDuet: false,
+    allowStitch: false,
+    brandOrganic: false,
+    brandedContent: false,
+    consent: false,
+    madeWithAi: false,
+    privacy: 'SELF_ONLY',
+  } as const
+  assert.deepEqual(optionsSummary('tiktok', { tiktok }), {
+    needsInput: true,
+    text: 'Only me · comments on · consent needed',
+  })
+  assert.deepEqual(optionsSummary('tiktok', { tiktok: { ...tiktok, consent: true } }), {
+    needsInput: false,
+    text: 'Only me · comments on',
+  })
+  assert.equal(optionsSummary('youtube', {}).needsInput, true)
+  assert.deepEqual(optionsSummary('x', {}), { needsInput: false, text: '' })
+  // TikTok privacy and consent are separate problems, each named.
+  const missing = buildPublication(draft({ body: [p('Video caption')] }), {
+    channel: 'tiktok',
+    connectionId: 'ct0000000001',
+  })
+  assert.ok(missing.problems.some((problem) => problem.includes('who can see')))
+  assert.ok(missing.problems.some((problem) => problem.includes('Confirm consent')))
 })

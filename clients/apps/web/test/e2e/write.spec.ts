@@ -89,6 +89,7 @@ test(
     await expect(page.getByTestId('post-length-2')).toHaveText('38 / 280')
 
     // Numbering is applied when serialized and counted; the text never holds it.
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: /Auto-numbering/ }).click()
     await page.getByLabel('Enable auto-numbering').click()
     await expect(page.getByTestId('numbering-preview')).toContainText('1/2')

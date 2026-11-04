@@ -91,6 +91,7 @@ import {
   CompareDialog,
   ManagePlatformsDialog,
   ManualVersionNotice,
+  OptionsChip,
   PlatformTabs,
   SyncedVersion,
   tabChannels,
@@ -127,7 +128,7 @@ const DraftEditor = dynamic(() => import('@/components/drafts/DraftEditor'), {
 })
 
 /** The panels beside the draft. */
-type Panel = 'properties' | 'preview' | 'comments' | 'assistant'
+type Panel = 'properties' | 'preview' | 'comments' | 'assistant' | 'options'
 
 /** The dialogs the composer opens. */
 type Dialog =
@@ -164,7 +165,6 @@ const SAVE_LABELS: Record<SaveState, string> = {
  */
 
 /** This browser's choice to keep the composer's post options open. */
-const POST_OPTIONS_KEY = 'shots-post-options'
 
 export function WriteComposer({
   aiEnabled,
@@ -372,15 +372,6 @@ export function WriteComposer({
   )
   const bodyArea = React.useRef<HTMLDivElement>(null)
   const [pasteNotice, setPasteNotice] = React.useState(false)
-  // Thread and automation settings stay one click away so writing leads.
-  const [optionsOpen, setOptionsOpen] = React.useState(false)
-  React.useEffect(() => {
-    try {
-      setOptionsOpen(localStorage.getItem(POST_OPTIONS_KEY) === 'open')
-    } catch {
-      // Without storage the options start closed, as on a first visit.
-    }
-  }, [])
   const renderBlocks = async (): Promise<BlockImages> => {
     if (pendingBlocks.length === 0 || !services.uploadFile) return []
     if (active !== primary || !bodyArea.current) {
@@ -747,8 +738,55 @@ export function WriteComposer({
   }
   // The destinations' state that needs attention first; a plan only when nothing is queued.
   const status = draftStatus(server, draftPostsState(currentPosts(posts)))
+  // Thread splitting for the edited platform; only the instance told about a paste splits it.
+  const threadTools =
+    canEdit &&
+    server.kind !== 'article' &&
+    CAPABILITIES[active].thread &&
+    (active === primary || versionOfTab.mode === 'manual')
+      ? (pasted: boolean) => (
+          <ThreadTools
+            pasted={pasted}
+            onSplit={() => setPasteNotice(false)}
+            editor={editor}
+            channel={active}
+            limit={activePublication.serialized.limit}
+            options={versionOfTab.options ?? {}}
+            onChange={(options) => setOptions(active, options)}
+          />
+        )
+      : null
+  // Shown options take a paste's split; otherwise its tools show above the text.
+  const optionsShown = panel === 'options' && !focus && !params.has('settings')
   const panelContent =
-    panel === 'properties' ? (
+    panel === 'options' ? (
+      <div data-testid="post-options">
+        <VersionOptionsBar
+          tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
+          channel={active}
+          captionLimit={activePublication.serialized.limit}
+          onApplyFinisher={
+            canEdit && (active === primary || versionOfTab.mode === 'manual')
+              ? (text, quoteFirstPost) => {
+                  if (editor.current)
+                    appendPost(editor.current, text, quoteFirstPost ? { quoteFirstPost: true } : {})
+                }
+              : undefined
+          }
+          onChange={(options) => setOptions(active, options)}
+          options={versionOfTab.options ?? {}}
+          postCount={activePublication.serialized.posts.length}
+          readOnly={!canEdit}
+          setId={server.socialSetId ?? set?.id ?? null}
+          uploadFile={
+            services.uploadFile
+              ? async (file) => ({ assetId: (await services.uploadFile!(file)).assetId ?? '' })
+              : undefined
+          }
+        />
+        {threadTools?.(pasteNotice)}
+      </div>
+    ) : panel === 'properties' ? (
       <PropertiesPanel
         aiEnabled={aiEnabled}
         canEdit={canEdit}
@@ -1195,6 +1233,16 @@ export function WriteComposer({
             enabled={enabled}
             onManage={canEdit ? () => setDialog('manage') : undefined}
             onSelect={setTab}
+            options={
+              accounts.length > 0 ? (
+                <OptionsChip
+                  channel={active}
+                  onClick={() => togglePanel('options')}
+                  open={panel === 'options'}
+                  options={versionOfTab.options ?? {}}
+                />
+              ) : null
+            }
             primary={primary}
             versions={document.versions}
           />
@@ -1244,64 +1292,21 @@ export function WriteComposer({
               }}
             />
           ) : null}
-          <details
-            className="mx-4 mt-1 mb-3 overflow-hidden rounded-[14.4px] border border-border bg-card"
-            onToggle={(event) => {
-              const open = event.currentTarget.open
-              setOptionsOpen(open)
-              try {
-                localStorage.setItem(POST_OPTIONS_KEY, open ? 'open' : 'closed')
-              } catch {
-                // The choice then lasts only as long as this composer.
-              }
-            }}
-            open={optionsOpen || pasteNotice}
-          >
-            <summary className="cursor-pointer select-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
-              Post options
-            </summary>
-            <VersionOptionsBar
-              tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
-              channel={active}
-              captionLimit={activePublication.serialized.limit}
-              onApplyFinisher={
-                canEdit && (active === primary || versionOfTab.mode === 'manual')
-                  ? (text, quoteFirstPost) => {
-                      if (editor.current)
-                        appendPost(
-                          editor.current,
-                          text,
-                          quoteFirstPost ? { quoteFirstPost: true } : {}
-                        )
-                    }
-                  : undefined
-              }
-              onChange={(options) => setOptions(active, options)}
-              options={versionOfTab.options ?? {}}
-              postCount={activePublication.serialized.posts.length}
-              readOnly={!canEdit}
-              setId={server.socialSetId ?? set?.id ?? null}
-              uploadFile={
-                services.uploadFile
-                  ? async (file) => ({ assetId: (await services.uploadFile!(file)).assetId ?? '' })
-                  : undefined
-              }
-            />
-            {canEdit &&
-            server.kind !== 'article' &&
-            CAPABILITIES[active].thread &&
-            (active === primary || versionOfTab.mode === 'manual') ? (
-              <ThreadTools
-                pasted={pasteNotice}
-                onSplit={() => setPasteNotice(false)}
-                editor={editor}
-                channel={active}
-                limit={activePublication.serialized.limit}
-                options={versionOfTab.options ?? {}}
-                onChange={(options) => setOptions(active, options)}
-              />
-            ) : null}
-          </details>
+          {/* A paste can become a thread: its tools show here until it is split or dismissed. */}
+          {pasteNotice && threadTools && !optionsShown ? (
+            <div className="relative mx-4 mb-3 rounded-[14.4px] border border-border bg-card">
+              {threadTools(true)}
+              <Button
+                aria-label="Dismiss the paste notice"
+                className="absolute top-2 right-2"
+                onClick={() => setPasteNotice(false)}
+                size="sm"
+                variant="ghost"
+              >
+                ✕
+              </Button>
+            </div>
+          ) : null}
           <div
             className="relative flex-1"
             data-testid="composer-body"
@@ -1699,6 +1704,7 @@ export function WriteComposer({
 const PANEL_TITLES: Record<Panel, string> = {
   assistant: 'Writing assistant',
   comments: 'Comments',
+  options: 'Post options',
   preview: 'Preview',
   properties: 'Draft details',
 }
