@@ -52,11 +52,13 @@ import { assetContentUrl } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
   type BatchAccount,
+  batchSummary,
   itemAccounts,
   pendingAccounts,
   postOn,
   queueTimings,
   readTiming,
+  spreadHourOptions,
   spreadTimings,
   stagedChecks,
 } from '@/lib/write/batch'
@@ -73,6 +75,9 @@ import { importedBody, importedPosts } from '@/lib/write/import-text'
 import { readVersions, withOptions } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { expandSpintax } from '@/lib/write/spintax'
+import { BulkCaptionPanel } from './BulkCaptionPanel'
+import { FilePicker } from './FilePicker'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
 const ACCEPT =
@@ -133,43 +138,6 @@ function LocalTimeFields({
         }}
       />
     </span>
-  )
-}
-
-/** A button that opens the file chooser; the input stays labelled for assistive tech and tests. */
-function FilePicker({
-  accept,
-  children,
-  label,
-  multiple,
-  onFiles,
-}: {
-  accept: string
-  children?: React.ReactNode
-  label: string
-  multiple?: boolean
-  onFiles: (files: File[]) => void
-}) {
-  const input = React.useRef<HTMLInputElement>(null)
-  return (
-    <>
-      <Input
-        ref={input}
-        aria-label={label}
-        type="file"
-        accept={accept}
-        multiple={multiple}
-        className="hidden"
-        onChange={(event) => {
-          onFiles(Array.from(event.target.files ?? []))
-          event.target.value = ''
-        }}
-      />
-      <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()}>
-        <UploadIcon />
-        {children ?? label}
-      </Button>
-    </>
   )
 }
 
@@ -550,7 +518,7 @@ export function BatchWorkspace({
           problems: [...row.problems, ...matched.problems, ...(channelIssue ? [channelIssue] : [])],
           input: {
             importKey: importKey(),
-            caption: row.caption || sharedCaption,
+            caption: row.caption || expandSpintax(sharedCaption),
             media: matched.media,
             channelConnectionIds: chosenAccounts,
             timing: row.time
@@ -642,17 +610,31 @@ export function BatchWorkspace({
   }
 
   // Bulk actions on staged items, with each item's own values kept unless asked.
-  const applyShared = async (what: 'caption' | 'accounts') => {
-    setBusy(what)
+  const applySharedAccounts = async () => {
+    setBusy('accounts')
     for (const item of items) {
-      if (item.draftId) continue
-      if (what === 'caption' && item.caption.trim()) continue
-      await updateItem(
-        item,
-        what === 'caption' ? { caption: sharedCaption } : { channelConnectionIds: sharedAccounts }
-      )
+      if (!item.draftId) await updateItem(item, { channelConnectionIds: sharedAccounts })
     }
     setBusy(null)
+  }
+
+  /** Change many captions as one operation; a refusal leaves every caption as it was. */
+  const applyCaptions = async (changes: { caption: string; itemId: string }[]) => {
+    setBusy('captions')
+    try {
+      await settled()
+      const next = await call<ContentBatch>(`${base}/items`, {
+        body: { items: changes },
+        method: 'PATCH',
+      })
+      setBatch(next)
+      itemsRef.current = next.items ?? []
+      toast.success(`${changes.length} caption${changes.length === 1 ? '' : 's'} applied.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The captions could not be applied.')
+    } finally {
+      setBusy(null)
+    }
   }
 
   const [timesMode, setTimesMode] = React.useState<'queue' | 'spread'>('queue')
@@ -780,6 +762,8 @@ export function BatchWorkspace({
   const [verdicts, setVerdicts] = React.useState<Record<string, BatchValidation>>({})
   const [selected, setSelected] = React.useState<Record<string, boolean>>({})
   const [outcomes, setOutcomes] = React.useState<Record<string, string>>({})
+  /** Scheduled posts left this month, read when the batch is checked. Go's charge decides. */
+  const [postsLeft, setPostsLeft] = React.useState<number | null>(null)
   const verdictKey = (itemId: string, accountId: string) => `${itemId}/${accountId}`
   const check = async () => {
     setBusy('check')
@@ -811,6 +795,12 @@ export function BatchWorkspace({
       for (const result of results)
         next[verdictKey(result.itemId, result.channelConnectionId)] = result
       setVerdicts(next)
+      setPostsLeft(
+        await trpc.billing.summary.query().then(
+          ({ posts }) => posts.left,
+          () => null
+        )
+      )
       setSelected(
         Object.fromEntries(
           results.map((result) => [
@@ -879,6 +869,7 @@ export function BatchWorkspace({
 
   const accountName = (id: string) =>
     accounts.find((account) => account.id === id)?.name ?? 'Removed account'
+  const summary = batchSummary(items, zone)
   const unsaved = items.filter((item) => !item.draftId)
   const ready = unsaved.filter((item) => item.media.every((entry) => entry.assetId))
   const drafted = items.filter((item) => item.draftId)
@@ -893,9 +884,9 @@ export function BatchWorkspace({
       title={batch.title}
       description={
         <>
-          Each post here is <strong>its own draft</strong>, up to {BATCH_ITEM_LIMIT}. To put several files
-          in one post, add them to the same CSV row. Times are in {zone}. The batch saves as you go,
-          so you can reopen it from Write on any device.
+          Each post here is <strong>its own draft</strong>, up to {BATCH_ITEM_LIMIT}. To put several
+          files in one post, add them to the same CSV row. Times are in {zone}. The batch saves as
+          you go, so you can reopen it from Write on any device.
         </>
       }
       actions={
@@ -907,7 +898,9 @@ export function BatchWorkspace({
             variant="outline"
             disabled={busy !== null}
             onClick={() => {
-              if (window.confirm('Close this batch? Its drafts and scheduled posts stay in Publish.'))
+              if (
+                window.confirm('Close this batch? Its drafts and scheduled posts stay in Publish.')
+              )
                 void archive()
             }}
           >
@@ -1009,7 +1002,7 @@ export function BatchWorkspace({
               <Row
                 label="Shared caption"
                 layout="stacked"
-                description="Used for posts whose row or file has no caption."
+                description="Used for posts whose row or file has no caption. {Hello|Hi} gives each post its own variation."
               >
                 <Textarea
                   aria-label="Shared caption"
@@ -1053,22 +1046,13 @@ export function BatchWorkspace({
                     Preview import
                   </Button>
                   {unsaved.length ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        disabled={busy !== null}
-                        onClick={() => void applyShared('caption')}
-                      >
-                        Apply shared caption to posts without one
-                      </Button>
-                      <Button
-                        variant="outline"
-                        disabled={busy !== null}
-                        onClick={() => void applyShared('accounts')}
-                      >
-                        Apply shared accounts to unsaved posts
-                      </Button>
-                    </>
+                    <Button
+                      variant="outline"
+                      disabled={busy !== null}
+                      onClick={() => void applySharedAccounts()}
+                    >
+                      Apply shared accounts to unsaved posts
+                    </Button>
                   ) : null}
                 </div>
               </Row>
@@ -1167,6 +1151,13 @@ export function BatchWorkspace({
           </Section>
         ) : null}
 
+        <BulkCaptionPanel
+          accounts={accounts}
+          disabled={busy !== null}
+          items={items}
+          onApply={applyCaptions}
+        />
+
         <Section
           title="Times"
           description="Set each post's time below, or fill the times of posts not yet scheduled. Queue slots are a preview: a slot taken before you schedule is refused, not moved."
@@ -1205,37 +1196,40 @@ export function BatchWorkspace({
                         min={1}
                         max={24}
                         value={spread.perDay}
-                        onChange={(event) =>
-                          setSpread({ ...spread, perDay: Number(event.target.value) })
-                        }
+                        onChange={(event) => {
+                          const perDay = Math.min(24, Math.max(1, Number(event.target.value) || 1))
+                          // A day's posts must still fit, so the spacing follows the count.
+                          const fits = Math.max(...spreadHourOptions(perDay)) * 60
+                          setSpread({ ...spread, perDay, spacing: Math.min(spread.spacing, fits) })
+                        }}
                       />
                     </Label>
-                    <Label className="grid gap-1 font-normal">
-                      Minutes apart
-                      <Input
-                        className="w-24"
-                        type="number"
-                        min={1}
-                        max={1440}
-                        value={spread.spacing}
-                        onChange={(event) =>
-                          setSpread({ ...spread, spacing: Number(event.target.value) })
+                    {spread.perDay > 1 ? (
+                      <Label className="grid gap-1 font-normal">
+                        Time between posts
+                        <NativeSelect
+                          aria-label="Time between posts"
+                          value={String(spread.spacing)}
+                          onChange={(event) =>
+                            setSpread({ ...spread, spacing: Number(event.target.value) })
+                          }
+                        >
+                          {spreadHourOptions(spread.perDay).map((hours) => (
+                            <NativeSelectOption key={hours} value={String(hours * 60)}>
+                              {hours} hour{hours === 1 ? '' : 's'}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                      </Label>
+                    ) : null}
+                    <Label className="font-normal">
+                      <Checkbox
+                        checked={spread.shift > 0}
+                        onCheckedChange={(checked) =>
+                          setSpread({ ...spread, shift: checked === true ? 55 : 0 })
                         }
                       />
-                    </Label>
-                    <Label className="grid gap-1 font-normal">
-                      Random shift (minutes)
-                      <Input
-                        className="w-24"
-                        type="number"
-                        min={0}
-                        max={55}
-                        step={5}
-                        value={spread.shift}
-                        onChange={(event) =>
-                          setSpread({ ...spread, shift: Number(event.target.value) })
-                        }
-                      />
+                      Randomize times by 0–55 minutes
                     </Label>
                   </>
                 ) : null}
@@ -1250,6 +1244,15 @@ export function BatchWorkspace({
               </div>
             </Row>
           </Group>
+          {summary.first && summary.last ? (
+            <p className="text-sm text-muted-foreground" data-testid="batch-summary">
+              {summary.posts} post{summary.posts === 1 ? '' : 's'} to {summary.destinations}{' '}
+              destination{summary.destinations === 1 ? '' : 's'}. First {when(summary.first, zone)},
+              last {when(summary.last, zone)}, on {summary.calendarDays} calendar day
+              {summary.calendarDays === 1 ? '' : 's'}.
+              {summary.withoutTime ? ` ${summary.withoutTime} still need a time.` : ''}
+            </p>
+          ) : null}
         </Section>
 
         <Section
@@ -1562,6 +1565,12 @@ export function BatchWorkspace({
                       : ''
                   }.`}
             </p>
+            {postsLeft !== null && chosenCount > postsLeft ? (
+              <p role="status" className="text-sm text-destructive" data-testid="quota-warning">
+                This schedules {chosenCount} posts and your plan has {postsLeft} left this month.
+                Posts past the limit are refused with a reason, and the rest stay scheduled.
+              </p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button
                 size={compact}

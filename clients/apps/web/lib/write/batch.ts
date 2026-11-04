@@ -1,6 +1,9 @@
 import type { BatchItem, BatchTiming } from '@/lib/api/contracts/content-batches'
+import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
+import { zonedDayKey } from '@/lib/settings/zoned-time'
 import type { DraftChannel } from '@/lib/write/document'
 import { mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { analyzeSpintax } from '@/lib/write/spintax'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
 
 /**
@@ -10,7 +13,13 @@ import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
  */
 
 /** An account of the batch's set that an item can go to. */
-export type BatchAccount = { channel: DraftChannel; id: string; name: string }
+export type BatchAccount = {
+  channel: DraftChannel
+  id: string
+  name: string
+  /** This account's own caption limit, when it differs from its channel's. */
+  captionLimit?: number
+}
 
 /**
  * An item's media facts once every attachment is uploaded; null while one is
@@ -62,6 +71,42 @@ export function stagedChecks(item: BatchItem, accounts: BatchAccount[]) {
         },
       ])
   )
+}
+
+/**
+ * Whether a caption source's longest expansion fits every account given, or
+ * what to shorten. Literal captions, variations and CSV rows all come here.
+ */
+export function captionProblem(source: string, accounts: readonly BatchAccount[]) {
+  for (const account of accounts) {
+    const measure = (text: string) => platformCaptionLength(account.channel, text)
+    const limit = account.captionLimit ?? DRAFT_CHANNEL_LIMITS[account.channel]
+    const length = measure(analyzeSpintax(source, measure).longest)
+    if (length > limit)
+      return `The longest caption is ${length} characters, and ${account.name} takes ${limit}. Shorten it or remove this account.`
+  }
+}
+
+/** The hours between posts that keep a day's posts inside its 24 hours. */
+export function spreadHourOptions(postsPerDay: number) {
+  return [1, 2, 3, 4, 6, 8, 12, 24].filter((hours) => hours * postsPerDay <= 24)
+}
+
+/** What a batch will do once scheduled, in real instants and calendar days of `zone`. */
+export function batchSummary(items: readonly BatchItem[], zone: string, now = new Date()) {
+  const instants = items.flatMap((item) => {
+    const timing = readTiming(item.timing, now)
+    return timing.kind === 'at' ? [timing.at] : []
+  })
+  const times = instants.map((at) => at.getTime())
+  return {
+    calendarDays: new Set(instants.map((at) => zonedDayKey(at, zone))).size,
+    destinations: items.reduce((total, item) => total + itemAccounts(item).length, 0),
+    first: times.length ? new Date(Math.min(...times)) : null,
+    last: times.length ? new Date(Math.max(...times)) : null,
+    posts: items.length,
+    withoutTime: items.length - instants.length,
+  }
 }
 
 /** When an item is meant to go out, or why that cannot be read yet. */

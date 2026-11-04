@@ -5,6 +5,7 @@ import { contentBatchSchema } from '@/lib/api/contracts/content-batches'
 import { hasPermission } from '@/lib/auth/permissions'
 import { getContentBatch } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
+import { captionLimit } from '@/lib/write/capabilities'
 import { requireDraftsPageAccess } from '../../../drafts/page-access'
 
 export const metadata = { title: 'Bulk batch · Publish' }
@@ -27,6 +28,7 @@ export default async function BatchPage({
   if (!batch) notFound()
   const set = sets.find((candidate) => candidate.id === batch.socialSetId)
   const accounts = (set?.accounts ?? []).map((account) => ({
+    captionLimit: captionLimit(account.channel, { maxWeightedCharacters: account.xCaptionLimit }),
     channel: account.channel,
     id: account.id,
     name: account.handle

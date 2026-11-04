@@ -2,11 +2,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { BatchItem } from '@/lib/api/contracts/content-batches'
 import {
+  batchSummary,
+  captionProblem,
   itemAccounts,
   pendingAccounts,
   postOn,
   queueTimings,
   readTiming,
+  spreadHourOptions,
   spreadTimings,
   stagedChecks,
 } from '@/lib/write/batch'
@@ -134,4 +137,45 @@ test("scheduling some accounts keeps the batch's other accounts to check and sen
   assert.deepEqual(itemAccounts(item({ draft, draftId: 'd' })), ['ig', 'li'])
   const widened = { channelConnectionIds: ['ig', 'x'] } as BatchItem['draft']
   assert.deepEqual(itemAccounts(item({ draft: widened, draftId: 'd' })), ['ig', 'li', 'x'])
+})
+
+test('the hours between posts keep a day inside 24 hours', () => {
+  assert.deepEqual(spreadHourOptions(3), [1, 2, 3, 4, 6, 8])
+  assert.deepEqual(spreadHourOptions(4), [1, 2, 3, 4, 6])
+  assert.deepEqual(spreadHourOptions(24), [1])
+})
+
+test('a summary counts real calendar days, also across midnight', () => {
+  const at = (localTime: string) =>
+    item({ timing: { mode: 'time', localTime, timeZone: 'America/New_York' } })
+  const now = new Date('2027-06-01T00:00:00Z')
+  const summary = batchSummary(
+    [
+      at('2027-07-13T08:00'),
+      at('2027-07-13T14:00'),
+      at('2027-07-13T20:00'),
+      at('2027-07-14T02:00'),
+      item({ timing: {} }),
+    ],
+    'America/New_York',
+    now
+  )
+  assert.equal(summary.calendarDays, 2)
+  assert.equal(summary.posts, 5)
+  assert.equal(summary.destinations, 10)
+  assert.equal(summary.withoutTime, 1)
+  assert.equal(summary.first?.toISOString(), '2027-07-13T12:00:00.000Z')
+  assert.equal(summary.last?.toISOString(), '2027-07-14T06:00:00.000Z')
+})
+
+test('a caption must fit each chosen account by its own count', () => {
+  const x = { channel: 'x', id: 'x', name: '@shots (x)' } as const
+  const linkedin = { channel: 'linkedin', id: 'li', name: 'Shots (linkedin)' } as const
+  const long = 'a'.repeat(281)
+  assert.equal(captionProblem(long, [linkedin]), undefined)
+  assert.match(captionProblem(long, [linkedin, x]) ?? '', /281 characters.*@shots \(x\) takes 280/)
+  assert.equal(captionProblem(long, [{ ...x, captionLimit: 25_000 }]), undefined)
+  // The longest alternative decides, even when a shorter one might be drawn.
+  assert.match(captionProblem(`{short|${long}}`, [x]) ?? '', /281/)
+  assert.equal(captionProblem('{short|fine}', [x]), undefined)
 })
