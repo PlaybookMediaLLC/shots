@@ -41,6 +41,7 @@ import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
 import { calendarResultSchema, type CalendarPlacement } from '@/lib/api/contracts/plan-analyze'
 import { call, draftsApi, type DraftWire, type DraftPostWire } from '@/lib/content-drafts/client'
 import {
+  currentPosts,
   POST_STATE_TONE,
   postFailureReason,
   postState,
@@ -1653,6 +1654,8 @@ function PlanDetail({
   const set = sets.find((s) => s.id === item.setId)
   // A calendar unschedule returns the draft to a plan, so it cancels all of these.
   const queued = receipts.filter((post) => post.status === 'SCHEDULED')
+  // A failure a newer attempt replaced is history: retrying it could post twice.
+  const current = currentPosts(receipts)
   return (
     <Sheet
       open
@@ -1924,7 +1927,10 @@ function PlanDetail({
                       published.
                     </p>
                   ) : null}
-                  {post.status === 'FAILED' ? (
+                  {post.status === 'FAILED' && !current.includes(post) ? (
+                    <p>A newer attempt to this account replaced this one.</p>
+                  ) : null}
+                  {post.status === 'FAILED' && current.includes(post) ? (
                     <Button
                       size="sm"
                       variant="outline"

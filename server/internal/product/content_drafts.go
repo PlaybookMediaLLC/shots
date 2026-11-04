@@ -889,9 +889,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		ids = append(ids, row.ID)
 	}
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftIDIn(ids...),
-		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(scheduledpost.StatusPUBLISHED,
-			scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED,
-			scheduledpost.StatusUNKNOWN_DELIVERY)).Order(ent.Desc(scheduledpost.FieldCreatedAt)).All(ctx)
+		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(liveOrFailedStatuses...)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -903,11 +901,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	// A failure needs attention only while it is its destination's newest
 	// post: a retry is a new post, so the failure it replaced is history. An
 	// unconfirmed post always counts: it may be live until someone checks.
-	seen := map[[2]string]bool{}
+	replaced := replacedFailures(posts)
 	for _, post := range posts {
-		destination := [2]string{*post.ContentDraftID, post.ChannelConnectionID}
-		replaced := seen[destination]
-		seen[destination] = true
 		item := byDraft[*post.ContentDraftID]
 		if item == nil {
 			item = &summary{}
@@ -926,7 +921,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 			item.attention++
 			item.check++
 		default:
-			if !replaced {
+			if !replaced[post.ID] {
 				item.attention++
 			}
 		}
@@ -1301,4 +1296,34 @@ func (c *Configuration) DeleteContentDraftAtVersion(ctx context.Context, actor A
 	}
 	c.collabAccessChanged(ctx, actor.OrganizationID)
 	return nil
+}
+
+// liveOrFailedStatuses are the post statuses a draft's state reads: a
+// cancelled post (or one never queued) is not one of its outcomes.
+var liveOrFailedStatuses = []scheduledpost.Status{scheduledpost.StatusPUBLISHED, scheduledpost.StatusSCHEDULED,
+	scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED, scheduledpost.StatusUNKNOWN_DELIVERY}
+
+// replacedFailures names the failed posts that a newer post to the same
+// destination replaced: a retry or a new schedule. They are history, not
+// failures that need attention. posts must include each destination's newer
+// posts, in any order; the web's currentPosts reads the same rule.
+func replacedFailures(posts []*ent.ScheduledPost) map[string]bool {
+	newest := map[[2]string]time.Time{}
+	for _, post := range posts {
+		if post.ContentDraftID == nil {
+			continue
+		}
+		key := [2]string{*post.ContentDraftID, post.ChannelConnectionID}
+		if post.CreatedAt.After(newest[key]) {
+			newest[key] = post.CreatedAt
+		}
+	}
+	replaced := map[string]bool{}
+	for _, post := range posts {
+		if post.Status == scheduledpost.StatusFAILED && post.ContentDraftID != nil &&
+			newest[[2]string{*post.ContentDraftID, post.ChannelConnectionID}].After(post.CreatedAt) {
+			replaced[post.ID] = true
+		}
+	}
+	return replaced
 }

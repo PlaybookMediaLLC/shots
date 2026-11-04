@@ -102,7 +102,9 @@ export function DraftPosts({
   // A failure a newer post of its destination replaced (a retry) folds away.
   const latest = currentPosts(posts)
   const earlier = posts.filter((post) => !latest.includes(post))
-  const row = (post: DraftPostWire) => {
+  // An earlier attempt is history: it shows what happened, with no action, so
+  // it cannot be retried behind the post that replaced it.
+  const row = (post: DraftPostWire, history = false) => {
           const channel = channelForPlatform(post.platform)
           const stopped =
             post.status === 'PUBLISHED' &&
@@ -114,6 +116,7 @@ export function DraftPosts({
           const reason = postFailureReason(post.failureCode)
           const fix = postFailureFix(post.failureCode)
           const label = channel ? CHANNEL_META[channel].label : post.platform
+          const support = `code ${post.failureCode} · post ${post.id} · ${post.platform}`
           return (
             <li className="flex flex-col gap-2 px-4 py-3" data-testid="draft-post" key={post.id}>
               <div className="flex items-center justify-between gap-4">
@@ -240,17 +243,17 @@ export function DraftPosts({
                 <p className="flex flex-wrap items-center gap-2 text-xs text-red-700 dark:text-red-300" role="status">
                   {reason ? `${reason} ` : ''}This destination did not publish; the draft’s other
                   posts are unaffected.
-                  {fix === 'reconnect' && post.socialSetId ? (
+                  {!history && fix === 'reconnect' && post.socialSetId ? (
                     <Button asChild size="sm" variant="outline">
                       <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
                     </Button>
                   ) : null}
-                  {fix === 'edit' && onEdit ? (
+                  {!history && fix === 'edit' && onEdit ? (
                     <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
                       Edit the {label} post
                     </Button>
                   ) : null}
-                  {canSchedule ? (
+                  {!history && canSchedule ? (
                     <Button
                       disabled={busy === post.id}
                       onClick={() =>
@@ -297,13 +300,11 @@ export function DraftPosts({
                     Details
                   </summary>
                   <p className="mt-1 flex flex-wrap items-center gap-2 font-mono">
-                    {`code ${post.failureCode} · post ${post.id} · ${post.platform}`}
+                    {support}
                     <Button
                       onClick={() =>
                         void navigator.clipboard
-                          .writeText(
-                            `code ${post.failureCode} · post ${post.id} · ${post.platform} · ${post.scheduledFor}`
-                          )
+                          .writeText(`${support} · ${post.scheduledFor}`)
                           .then(() => toast.success('Details copied for support.'))
                           .catch(() => toast.error('The details could not be copied.'))
                       }
@@ -423,7 +424,7 @@ export function DraftPosts({
         ) : null}
       </div>
       <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
-        {latest.map(row)}
+        {latest.map((post) => row(post))}
       </ul>
       {earlier.length > 0 ? (
         <details className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
@@ -431,7 +432,7 @@ export function DraftPosts({
             {earlier.length} earlier attempt{earlier.length === 1 ? '' : 's'}
           </summary>
           <ul className="mt-2 divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
-            {earlier.map(row)}
+            {earlier.map((post) => row(post, true))}
           </ul>
         </details>
       ) : null}
