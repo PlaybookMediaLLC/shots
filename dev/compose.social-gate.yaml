@@ -64,6 +64,8 @@ services:
       args:
         GO_BUILD_TAGS: e2e
     environment:
+      # A batch submit schedules in this worker, under the same rule as publishing-backend.
+      PLATFORM_E2E_DRAFT_PLATFORM: enabled
       SOCIAL_E2E_URL: http://fake-social:8080
       FRONTEND_URL: http://localhost:3010
       TIKTOK_CLIENT_ID: fixture

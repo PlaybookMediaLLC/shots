@@ -167,7 +167,8 @@ func main() {
 		slog.Error("invalid GitHub App configuration")
 		os.Exit(1)
 	}
-	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore)
+	// Batch submits schedule here, so this store judges an account as the API does.
+	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore).WithAccountStanding(provider)
 	if github != nil {
 		automationStore.WithGitHubApp(github)
 	}
@@ -194,7 +195,10 @@ func main() {
 		}
 		automationStore.WithMonthlyMeter(meter)
 	}
-	// A batch submit schedules with the same object store and quota meter as the API.
+	// A batch submit schedules with the same media, standing and quota as the API.
+	if os.Getenv("PLATFORM_E2E_DRAFT_PLATFORM") == "enabled" {
+		product.EnableE2EDraftPlatform()
+	}
 	if !slices.Contains(cfg.ExcludedQueues, temporalbatches.TaskQueue) {
 		batchWorker := worker.New(temporalClient, temporalbatches.TaskQueue, worker.Options{
 			MaxConcurrentActivityExecutionSize: max(1, 5/cfg.WorkerConcurrencyDivider),
