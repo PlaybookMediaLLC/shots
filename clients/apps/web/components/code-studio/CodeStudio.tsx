@@ -774,7 +774,9 @@ function Workspace({
             onSelect={(index) => {
               setSlideIndex(index)
               setSelection(null)
-              setPaneId(document.slides[index]!.panes[0]!.id)
+              // Add slide selects a slide this render's document does not have
+              // yet; an unknown pane falls back to the slide's first pane.
+              setPaneId(document.slides[index]?.panes[0]?.id ?? '')
             }}
             onChange={onChange}
           />

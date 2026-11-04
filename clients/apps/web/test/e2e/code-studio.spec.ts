@@ -92,6 +92,22 @@ test('a member saves a code project, reopens it from the Library and posts it wi
   expect(asset).toMatchObject({ altText: `TypeScript code:\n${SNIPPET}`, mediaType: 'image/png' })
 })
 
+test('adding a slide selects it and edits only that slide', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await openStudio(page, '/create/code')
+  const editor = page.getByRole('textbox', { name: 'Code editor' })
+  await editor.fill(SNIPPET)
+  await page.getByRole('button', { name: 'Add slide' }).click()
+
+  const slides = page.getByRole('navigation', { name: 'Slides' })
+  await expect(slides.getByRole('button', { name: /^2 / })).toHaveAttribute('aria-current', 'step')
+  await editor.fill('const next = 1')
+  await expect(slides.getByRole('button', { name: /^1 / })).toContainText('export function greet')
+  await expect(slides.getByRole('button', { name: /^2 / })).toContainText('const next = 1')
+  expect(errors).toEqual([])
+})
+
 test('code projects stay in their workspace and refuse invalid documents', async ({
   browser,
   identity,
