@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { hasPermission, normalizeOrganizationRole, organizationRoles } from '@/lib/auth/permissions'
+import {
+  hasPermission,
+  needsShotsTwoFactor,
+  normalizeOrganizationRole,
+  organizationRoles,
+} from '@/lib/auth/permissions'
 
 test('fixed roles enforce least-privilege permissions', () => {
   assert.equal(hasPermission('creator', 'release:create'), true)
@@ -41,4 +46,16 @@ test('writing, approval, account administration and billing stay separate', () =
 test('legacy Better Auth member role remains viewer-equivalent', () => {
   assert.equal(normalizeOrganizationRole('member'), 'viewer')
   assert.equal(normalizeOrganizationRole('unexpected-role'), 'viewer')
+})
+
+test('a sensitive action needs Shots two-factor unless the account has no Shots password', () => {
+  assert.equal(needsShotsTwoFactor(true, ['credential']), false)
+  assert.equal(needsShotsTwoFactor(false, ['credential']), true)
+  assert.equal(needsShotsTwoFactor(false, ['credential', 'google']), true)
+  // Google, GitHub or SSO only: the provider carries the second factor.
+  assert.equal(needsShotsTwoFactor(false, ['google']), false)
+  assert.equal(needsShotsTwoFactor(false, ['github', 'sso']), false)
+  // Unknown accounts fail closed.
+  assert.equal(needsShotsTwoFactor(false, null), true)
+  assert.equal(needsShotsTwoFactor(false, []), true)
 })

@@ -106,6 +106,19 @@ export function normalizeOrganizationRole(role: string): OrganizationRole {
     : 'viewer'
 }
 
+/**
+ * Whether a sensitive action still needs Shots two-factor. An account with no
+ * Shots password cannot enroll an authenticator, so its sign-in provider
+ * (Google, GitHub or SSO) carries the second factor. Unknown accounts fail closed.
+ */
+export function needsShotsTwoFactor(
+  twoFactorEnabled: boolean,
+  providerIds: readonly string[] | null
+): boolean {
+  if (twoFactorEnabled) return false
+  return !providerIds?.length || providerIds.includes('credential')
+}
+
 export function isSupportedOrganizationRole(role: string): boolean {
   return role === 'member' || organizationRoles.includes(role as OrganizationRole)
 }
