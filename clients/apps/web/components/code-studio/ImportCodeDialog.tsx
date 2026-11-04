@@ -74,6 +74,8 @@ export function ImportCodeDialog({
     }
   }
 
+  const fileInput = React.useRef<HTMLInputElement>(null)
+
   const openFile = async (file: File | undefined) => {
     if (!file) return
     setError(null)
@@ -137,13 +139,28 @@ export function ImportCodeDialog({
               />
             </div>
           ) : null}
-          <div className="space-y-1.5">
-            <Label htmlFor={`${id}-file`}>Or open a file</Label>
+          <div className="flex items-center gap-2">
+            {/* Any file: code has no fixed type, and a dropped file works too. */}
             <Input
-              id={`${id}-file`}
+              ref={fileInput}
               type="file"
-              onChange={(event) => void openFile(event.target.files?.[0])}
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                void openFile(file)
+              }}
             />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => fileInput.current?.click()}
+            >
+              Open a file…
+            </Button>
+            <span className="text-xs text-muted-foreground">or drop one on this dialog</span>
           </div>
           {error ? (
             <p role="alert" className="text-sm text-destructive">

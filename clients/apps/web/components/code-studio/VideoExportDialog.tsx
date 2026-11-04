@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Label } from '@/components/ui/label'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Slider } from '@/components/ui/slider'
@@ -375,15 +375,18 @@ export function VideoExportDialog({
         {format !== 'gif' ? (
           <div className="space-y-1.5">
             <Label htmlFor={`${id}-voice`}>Voice-over (optional)</Label>
-            <Input
+            <FileDropZone
               id={`${id}-voice`}
-              type="file"
-              accept="audio/*"
-              onChange={(event) => setVoiceOver(event.target.files?.[0] ?? null)}
+              accept={{ 'audio/*': [] }}
+              disabled={progress !== null}
+              hint="An audio file, trimmed or padded to the video's length. It stays in this browser."
+              label="Voice-over"
+              onFiles={([file]) => setVoiceOver(file ?? null)}
+              onRemove={() => setVoiceOver(null)}
+              preview={
+                voiceOver ? <span className="truncate text-sm">{voiceOver.name}</span> : undefined
+              }
             />
-            <p className="text-xs text-muted-foreground">
-              Trimmed or padded to the video&apos;s length. It stays in this browser.
-            </p>
           </div>
         ) : null}
         <DialogFooter>
