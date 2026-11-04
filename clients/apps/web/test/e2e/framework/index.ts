@@ -305,7 +305,7 @@ export {
   socialMockPort,
   xVerification,
 } from './content-drafts'
-export { chooseOption } from './controls'
+export { chooseOption, contrastOf } from './controls'
 export { mockBrowserJson } from './downstream'
 export { startHttpMockServer, type HttpMockRequest, type HttpMockServer } from './http-server'
 export { getMaintenanceHeaders } from './maintenance'

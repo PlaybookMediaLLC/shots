@@ -5,8 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ctaClassName } from '@/components/platform-landing/CtaLink'
-import { ctaToneSchema } from '@/components/platform-landing/primitives'
+import { Button } from '@/components/ui/button'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { getErrorMessage } from './settings-client'
 
@@ -95,18 +94,14 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
             <Row
               description="You sign in with the provider, then return here."
               label="Connect an account"
-              layout="inline"
+              layout="stacked"
             >
               <div className="flex flex-wrap gap-2">
                 {PROVIDERS.map(({ label, provider }) => (
-                  // A plain link, not next/link: prefetching the start route would begin an OAuth flow.
-                  <a
-                    className={ctaClassName(ctaToneSchema.enum.secondary)}
-                    href={`/integrations/social/${provider}/start`}
-                    key={provider}
-                  >
-                    Connect {label}
-                  </a>
+                  <Button asChild key={provider} size="sm">
+                    {/* A plain link, not next/link: prefetching the start route would begin an OAuth flow. */}
+                    <a href={`/integrations/social/${provider}/start`}>Connect {label}</a>
+                  </Button>
                 ))}
               </div>
             </Row>

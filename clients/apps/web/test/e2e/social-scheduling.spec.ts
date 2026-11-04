@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import {
   bindTestGoOrganization,
   connectionSchema,
+  contrastOf,
   createApprovedVariant,
   createScheduledPost,
   createWorkspace,
@@ -263,6 +264,19 @@ test('X OAuth start binds its one-use callback to the active workspace', async (
     await app.open(`/integrations/social/x?oauth_token=${state}&oauth_verifier=test-verifier`)
     await expect(page).toHaveURL(/\/workspace\/channels\?connected=x$/)
     await expect(page.getByText('X is connected.')).toBeVisible()
+    // The connect row keeps its heading on one line and its buttons readable on the light card.
+    for (const width of [584, 1440]) {
+      await page.setViewportSize({ width, height: 900 })
+      const heading = page.getByRole('heading', { name: 'Connect an account', exact: true })
+      const box = await heading.boundingBox()
+      const lineHeight = await heading.evaluate((node) =>
+        parseFloat(getComputedStyle(node).lineHeight)
+      )
+      expect(box?.height ?? 0).toBeLessThanOrEqual(lineHeight + 1)
+      const connect = page.getByRole('link', { name: 'Connect X', exact: true })
+      await expect(connect).toBeVisible()
+      expect(await contrastOf(connect)).toBeGreaterThanOrEqual(4.5)
+    }
 
     await expectOAuthConnection(organizationId, integrationId, state, 'x')
 
