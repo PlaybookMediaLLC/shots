@@ -240,7 +240,7 @@ export function EditorTopBar({ title, description, shortcuts, frameExport }: Edi
             priority
           />
         </Link>
-        <span className="text-sm font-medium text-white/90">{title}</span>
+        <span className="text-ui-lg font-medium text-white/90">{title}</span>
         <span className="hidden text-xs text-white/40 sm:inline">
           by Shots
         </span>

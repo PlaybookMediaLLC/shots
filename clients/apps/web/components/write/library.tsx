@@ -426,7 +426,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
   return (
     <div className={cn('flex items-center gap-px', compact ? '' : 'mx-3 mt-2')}>
       <Button
-        className="flex h-9 flex-1 items-center gap-2 rounded-l-full bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:opacity-50"
+        className="flex h-9 flex-1 items-center gap-2 rounded-l-full bg-primary px-3.5 text-ui-lg font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:opacity-50"
         data-testid="new-draft"
         disabled={creating}
         onClick={() => void create('standard')}

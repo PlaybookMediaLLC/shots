@@ -226,7 +226,7 @@ function ConnectionRow({
     <Row>
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{connection.accountLogin}</span>
+          <span className="text-ui-lg font-medium text-foreground">{connection.accountLogin}</span>
           <Pill tone={connection.status === 'ACTIVE' ? 'green' : 'yellow'}>
             {connection.status.toLowerCase()}
           </Pill>

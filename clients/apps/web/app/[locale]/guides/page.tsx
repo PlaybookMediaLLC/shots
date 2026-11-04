@@ -159,7 +159,7 @@ export default function GuidesHubPage() {
               <span className="text-[15px] leading-relaxed text-muted-foreground">
                 {featured.metaDescription}
               </span>
-              <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <span className="mt-2 inline-flex items-center gap-1.5 text-ui-lg font-medium text-foreground">
                 Read the guide
                 <ArrowRight01Icon
                   aria-hidden="true"

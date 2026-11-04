@@ -137,7 +137,7 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
                   <ChannelIcon channel={channel} className="size-4 text-foreground/80" />
                 ) : null}
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-foreground">
+                  <span className="block truncate text-ui-lg font-medium text-foreground">
                     {name}
                     {account.handle ? (
                       <span className="font-normal text-muted-foreground"> @{account.handle}</span>
@@ -369,7 +369,7 @@ export function GeneralPage({
       <Group>
         <Ownership canManage={permissions.canManage} set={set} />
       </Group>
-      <h3 className="text-sm font-medium text-red-700 dark:text-red-300">Danger zone</h3>
+      <h3 className="text-ui-lg font-medium text-red-700 dark:text-red-300">Danger zone</h3>
       <DangerZone permissions={permissions} set={set} />
     </div>
   )

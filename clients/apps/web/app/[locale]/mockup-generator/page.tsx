@@ -49,7 +49,7 @@ const cardSurface =
   "rounded-2xl bg-card ring-1 ring-border shadow-[var(--card-edge-shadow)]";
 
 const chipLinkClassName =
-  "group flex items-center justify-between rounded-md bg-foreground/[0.04] px-4 py-3 text-sm font-medium text-foreground/90 ring-1 ring-border transition-colors hover:bg-foreground/[0.08] hover:text-foreground";
+  "group flex items-center justify-between rounded-md bg-foreground/[0.04] px-4 py-3 text-ui-lg font-medium text-foreground/90 ring-1 ring-border transition-colors hover:bg-foreground/[0.08] hover:text-foreground";
 
 const FAMILY_LABELS: Partial<Record<DeviceFamily, string>> = {
   phone: "iPhone",
@@ -238,7 +238,7 @@ export default function MockupGeneratorPage() {
               <Link href="/editor" className={ctaClassName}>
                 Make a Mockup
               </Link>
-              <p className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground/70">
+              <p className="mt-4 inline-flex items-center gap-2 text-ui-lg font-medium text-muted-foreground/70">
                 <span>Every plan</span>
                 <span className="h-3 w-px bg-border" aria-hidden />
                 <span>Open source</span>
@@ -316,7 +316,7 @@ export default function MockupGeneratorPage() {
             <ol className="space-y-8">
               {howToSteps.map((item, index) => (
                 <li key={item.title} className="flex items-start gap-6">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-sm font-semibold text-primary-foreground">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary text-ui-lg font-semibold text-primary-foreground">
                     {index + 1}
                   </div>
                   <div>

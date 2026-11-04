@@ -98,7 +98,7 @@ export default async function StoreScreenshotsPage(): Promise<React.JSX.Element>
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
           {STORE_TEMPLATES.map((template) => (
             <div key={template.id}>
-              <dt className="text-sm font-medium text-foreground">
+              <dt className="text-ui-lg font-medium text-foreground">
                 {template.name}
               </dt>
               <dd className="mt-1 text-sm text-muted-foreground">

@@ -54,7 +54,7 @@ export function PersonalNotificationDeliveries({
   }
   return (
     <details className="rounded-lg border border-border p-5">
-      <summary className="cursor-pointer text-sm font-medium">
+      <summary className="cursor-pointer text-ui-lg font-medium">
         Your email and Slack delivery history
       </summary>
       <p className="mt-3 text-sm text-muted-foreground">
@@ -82,7 +82,7 @@ export function PersonalNotificationDeliveries({
         <ul className="mt-4 divide-y divide-border">
           {deliveries.data.deliveries.map((delivery) => (
             <li className="space-y-2 py-4" key={delivery.id} aria-label={`Delivery ${delivery.id}`}>
-              <p className="text-sm font-medium">
+              <p className="text-ui-lg font-medium">
                 {settings.catalogue.find((event) => event.id === delivery.kind)?.label ??
                   'Test notification'}{' '}
                 · {delivery.channel === 'slack_dm' ? 'Slack DM' : 'Email'}

@@ -113,7 +113,7 @@ export function ProjectsDialog({
                         className="h-7 w-full rounded border border-foreground/20 px-1.5 text-xs"
                       />
                     ) : (
-                      <p className="truncate text-sm font-medium">
+                      <p className="truncate text-ui-lg font-medium">
                         {project.name}
                         {project.id === currentProjectId ? <span className="ml-1 text-[10px] text-muted-foreground">(open)</span> : null}
                       </p>
@@ -227,7 +227,7 @@ export function VersionsDialog({
                   <img src={version.thumbnail} alt="" className="h-12 w-8 rounded object-cover" />
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{version.name}</p>
+                  <p className="truncate text-ui-lg font-medium">{version.name}</p>
                   <p className="text-[11px] text-muted-foreground">
                     {version.slideCount} slides · {formatDistanceToNow(version.createdAt, { addSuffix: true })}
                   </p>

@@ -303,7 +303,7 @@ function StyleGuideForm({ canWrite, set }: { canWrite: boolean; set: SocialSetRe
           {area('endings', 'Example endings', 'One per line.')}
         </div>
         <fieldset className="grid gap-2" disabled={!canWrite || state === 'saving'}>
-          <legend className="text-sm font-medium text-foreground">Platform guidance</legend>
+          <legend className="text-ui-lg font-medium text-foreground">Platform guidance</legend>
           {(['x', 'linkedin', 'threads', 'bluesky', 'mastodon', 'instagram'] as const).map(
             (platform) => (
               <div className="grid gap-1 text-sm" key={platform}>

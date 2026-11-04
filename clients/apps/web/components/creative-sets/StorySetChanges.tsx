@@ -38,7 +38,7 @@ export function ChangeComparison({
         .filter((output) => !storyId || output.storyId === storyId)
         .map((output) => (
           <div key={output.id} className="space-y-2">
-            <h3 className="text-sm font-medium">
+            <h3 className="text-ui-lg font-medium">
               {storyForOutput(after, output).headline} · {outputDimensions(output).name}
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -78,7 +78,7 @@ export function ChangeComparison({
           const previous = before.storeGroups.find((item) => item.id === group.id)
           return (
             <section key={group.id} className="space-y-2 md:col-span-3">
-              <h3 className="text-sm font-medium">{group.name} · Store slides</h3>
+              <h3 className="text-ui-lg font-medium">{group.name} · Store slides</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="mb-2 text-xs">Before</p>

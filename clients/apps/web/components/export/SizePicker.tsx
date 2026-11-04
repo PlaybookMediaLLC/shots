@@ -79,7 +79,7 @@ export function SizePicker({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">Sizes</span>
+        <span className="text-ui-lg font-medium text-foreground">Sizes</span>
         <Popover onOpenChange={setOpen} open={open}>
           <PopoverTrigger asChild>
             <Button variant="custom" size={null}

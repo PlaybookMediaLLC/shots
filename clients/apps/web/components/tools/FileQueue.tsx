@@ -139,7 +139,7 @@ export function FileQueue({ items, onRemove, disabled = false }: FileQueueProps)
           </div>
 
           <div className="min-w-0 flex-1">
-            <p className="mb-0.5 truncate text-sm font-medium text-foreground" title={item.name}>
+            <p className="mb-0.5 truncate text-ui-lg font-medium text-foreground" title={item.name}>
               {item.name}
             </p>
             <StatusBadge item={item} />

@@ -240,7 +240,7 @@ export function StoreGroupPanel({
   return (
     <div data-testid="store-group-panel">
       <section className="space-y-2 border-b px-4 py-4">
-        <h2 className="text-sm font-medium">App Store screenshots</h2>
+        <h2 className="text-ui-lg font-medium">App Store screenshots</h2>
         <p className="text-[11px] text-muted-foreground">
           {item.group.document.slides.length} slides ·{' '}
           {item.group.document.localization.locales.length || 1} languages · drawn and exported by
@@ -567,7 +567,7 @@ export function CanvasStoreEditor({
             <StudioActionsProvider value={actions}>
               <ActiveSceneProvider>
                 <div className="flex items-center gap-2 border-b px-3 py-2">
-                  <DialogTitle className="mr-auto text-sm font-medium">
+                  <DialogTitle className="mr-auto text-ui-lg font-medium">
                     {item.group.name} · App Store screenshots
                   </DialogTitle>
                   <DialogDescription className="sr-only">

@@ -189,7 +189,7 @@ export function StorySetExport({
               key={item.outputId}
               className="min-w-0 overflow-hidden rounded-xl border bg-foreground/[0.02]"
             >
-              <h3 className="truncate px-4 pt-4 text-sm font-medium" title={item.name}>
+              <h3 className="truncate px-4 pt-4 text-ui-lg font-medium" title={item.name}>
                 {
                   outputDimensions(
                     snapshot.document.outputs.find((output) => output.id === item.outputId)!

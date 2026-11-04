@@ -129,7 +129,7 @@ export function StoreReviewViewer({ token, review }: { token: string; review: Re
         </main>
         <aside className="flex min-h-0 flex-col border-l border-foreground/10" aria-label="Comments">
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
-            <h2 className="text-sm font-semibold">Comments on this slide</h2>
+            <h2 className="text-ui-lg font-semibold">Comments on this slide</h2>
             {slideComments.length === 0 ? <p className="text-xs text-muted-foreground">No comments yet. Click the slide to point at something, then write below.</p> : null}
             {slideComments.map((comment, number) => (
               <article key={comment.id} className={cn('rounded-md border p-2.5 text-sm', comment.resolvedAt ? 'border-foreground/10 opacity-60' : 'border-foreground/15')}>

@@ -1871,7 +1871,7 @@ function PlanDetail({
             )}
           </fieldset>
           <section aria-label="Publication results">
-            <h3 className="text-sm font-medium">Publication results</h3>
+            <h3 className="text-ui-lg font-medium">Publication results</h3>
             {receipts.length === 0 ? (
               <p className="text-xs">No publication commitment or provider receipt.</p>
             ) : (

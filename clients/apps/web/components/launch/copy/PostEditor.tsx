@@ -223,7 +223,7 @@ export function PostEditor({
           role="alert"
         >
           <div>
-            <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+            <p className="text-ui-lg font-medium text-amber-700 dark:text-amber-300">
               This post changed elsewhere
             </p>
             <p className="mt-0.5 text-xs text-foreground/65">
@@ -234,7 +234,7 @@ export function PostEditor({
           <div className="rounded-lg bg-foreground/[0.03] px-3 py-2 ring-1 ring-foreground/[0.06]">
             <p className="text-xs font-medium text-muted-foreground">Their version</p>
             {state.theirs.title ? (
-              <p className="mt-1 text-sm font-medium text-foreground">{state.theirs.title}</p>
+              <p className="mt-1 text-ui-lg font-medium text-foreground">{state.theirs.title}</p>
             ) : null}
             <p className="mt-1 text-sm whitespace-pre-wrap text-foreground">{state.theirs.copy}</p>
             {state.theirs.callToAction ? (
@@ -264,7 +264,7 @@ export function PostEditor({
       ) : null}
       {state.kind === 'prohibited' ? (
         <div className="rounded-xl bg-red-500/[0.06] px-4 py-3 ring-1 ring-red-500/20" role="alert">
-          <p className="text-sm font-medium text-red-700 dark:text-red-300">
+          <p className="text-ui-lg font-medium text-red-700 dark:text-red-300">
             Not saved: this post uses {state.matches.length === 1 ? 'a term' : 'terms'} your brand
             never uses
           </p>

@@ -31,7 +31,7 @@ function Section({
 }) {
   return (
     <section className={cn(PANEL, 'p-6')}>
-      <h3 className="text-sm font-medium text-foreground">{title}</h3>
+      <h3 className="text-ui-lg font-medium text-foreground">{title}</h3>
       <p className="mb-3 text-xs text-muted-foreground">{description}</p>
       {empty ? <p className="text-sm text-muted-foreground">{empty}</p> : <dl>{children}</dl>}
     </section>

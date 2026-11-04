@@ -27,13 +27,13 @@ export function HistoryCard({ entries }: { entries: LinkPreviewSnapshot[] }) {
   return (
     <section className={cn(PANEL, 'space-y-4 p-5')}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
           <History className="size-4" />
           Since your last check {formatDistanceToNow(previous.at, { addSuffix: true })}
         </h3>
         <span
           className={cn(
-            'text-sm font-medium tabular-nums',
+            'text-ui-lg font-medium tabular-nums',
             delta > 0 ? 'text-emerald-400' : delta < 0 ? 'text-red-400' : 'text-muted-foreground'
           )}
         >

@@ -180,7 +180,7 @@ export function VersionHistoryDialog({
                       onClick={() => setSelectedId(item.id)}
                       type="button"
                     >
-                      <span className="block truncate text-sm font-medium">
+                      <span className="block truncate text-ui-lg font-medium">
                         {versionTitle(item)}
                       </span>
                       <span className="mt-0.5 block truncate text-xs text-muted-foreground">

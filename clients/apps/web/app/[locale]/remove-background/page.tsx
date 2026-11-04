@@ -207,7 +207,7 @@ export default function RemoveBackgroundPage() {
                   <span className="flex size-7 items-center justify-center rounded-full bg-foreground/[0.08] text-xs font-semibold text-foreground">
                     {index + 1}
                   </span>
-                  <h3 className="mt-4 text-sm font-semibold text-foreground">
+                  <h3 className="mt-4 text-ui-lg font-semibold text-foreground">
                     {step.title}
                   </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -223,7 +223,7 @@ export default function RemoveBackgroundPage() {
             <div className={cn(CARD_CLASS, 'mt-5 grid gap-x-10 gap-y-7 p-6 sm:grid-cols-2')}>
               {highlights.map((highlight) => (
                 <div key={highlight.title}>
-                  <h3 className="text-sm font-semibold text-foreground">
+                  <h3 className="text-ui-lg font-semibold text-foreground">
                     {highlight.title}
                   </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">

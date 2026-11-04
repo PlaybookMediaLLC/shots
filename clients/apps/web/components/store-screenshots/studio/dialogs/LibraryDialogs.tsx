@@ -80,7 +80,7 @@ export function TemplatesDialog({ open, onOpenChange, onCreateProject }: DialogP
             <li key={template.id} className="space-y-2 rounded-lg border border-foreground/10 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold">
+                  <p className="text-ui-lg font-semibold">
                     {template.name} <span className="text-xs font-normal text-muted-foreground">· {CATEGORY_LABELS[template.category]}</span>
                   </p>
                   <p className="text-xs text-muted-foreground">{template.description}</p>

@@ -1,11 +1,12 @@
 'use client'
 
+import type { IconWeight } from '@phosphor-icons/react'
 import type { ComponentType, ReactNode } from 'react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { SidebarLink } from './SidebarLink'
 
-export type NavIcon = ComponentType<{ className?: string; size?: number }>
+export type NavIcon = ComponentType<{ className?: string; size?: number; weight?: IconWeight }>
 
 /**
  * One sidebar row, shared by the main and settings navigation: the icon and
@@ -44,7 +45,12 @@ export function NavRow({
       href={href}
       onClick={onNavigate}
     >
-      <Icon aria-hidden="true" className="shrink-0" size={17} />
+      <Icon
+        aria-hidden="true"
+        className="shrink-0"
+        size={20}
+        weight={active ? 'fill' : 'regular'}
+      />
       {collapsed ? null : <span className="truncate">{label}</span>}
       {collapsed ? null : badge}
     </SidebarLink>

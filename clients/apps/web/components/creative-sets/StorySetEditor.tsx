@@ -428,7 +428,7 @@ function SetWorkspace({
         >
           ← Sets
         </Link>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{session.record.name}</h1>
+        <h1 className="min-w-0 flex-1 truncate text-ui-lg font-semibold">{session.record.name}</h1>
         <SetCollaborators
           session={session}
           url={collabUrl}
@@ -714,7 +714,7 @@ function SetWorkspace({
               </TabsList>
               <TabsContent value="message" className="space-y-5">
                 <fieldset className="space-y-4" disabled={!canEdit || !ready}>
-                  <legend className="mb-2 text-sm font-medium">Shared message</legend>
+                  <legend className="mb-2 text-ui-lg font-medium">Shared message</legend>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     Updates linked copy in every format. Custom wording stays yours.
                   </p>
@@ -757,7 +757,7 @@ function SetWorkspace({
               </TabsContent>
               <TabsContent value="product">
                 <section className="space-y-4">
-                  <h2 className="text-sm font-medium">Product evidence</h2>
+                  <h2 className="text-ui-lg font-medium">Product evidence</h2>
                   <p className="break-words text-xs text-muted-foreground">
                     {story.source.name} · revision {story.source.revision}
                   </p>
@@ -787,7 +787,7 @@ function SetWorkspace({
               </TabsContent>
               <TabsContent value="layout">
                 <section className="space-y-4">
-                  <h2 className="text-sm font-medium">Layout · this format</h2>
+                  <h2 className="text-ui-lg font-medium">Layout · this format</h2>
                   <Select
                     value={active.composition.id}
                     disabled={!canEdit || !ready || active.format === 'original'}
@@ -882,7 +882,7 @@ function SetWorkspace({
               </TabsContent>
               <TabsContent value="brand">
                 <section className="space-y-4">
-                  <h2 className="text-sm font-medium">Brand · across this set</h2>
+                  <h2 className="text-ui-lg font-medium">Brand · across this set</h2>
                   <p className="text-xs text-muted-foreground">
                     {state.document.brand
                       ? `${state.document.brand.name} · pinned v${state.document.brand.version}`
@@ -943,7 +943,7 @@ function SetWorkspace({
             className="flex min-w-0 flex-1 flex-col bg-foreground/[0.035]"
           >
             <div className="flex items-center justify-between px-6 py-3">
-              <h2 className="text-sm font-medium">
+              <h2 className="text-ui-lg font-medium">
                 {dimensions.name}{' '}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {dimensions.width} × {dimensions.height}
@@ -1037,7 +1037,7 @@ function SetWorkspace({
           <aside aria-label="This format" className="w-[272px] shrink-0 overflow-y-auto border-l">
             <Tabs defaultValue="copy" className="gap-4 pt-4">
               <div className="px-4">
-                <h2 className="mb-3 text-sm font-medium">This format</h2>
+                <h2 className="mb-3 text-ui-lg font-medium">This format</h2>
                 <TabsList aria-label="Format controls" className="w-full">
                   <TabsTrigger
                     value="copy"

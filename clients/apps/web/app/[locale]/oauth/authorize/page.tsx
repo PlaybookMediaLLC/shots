@@ -97,7 +97,7 @@ export default async function AgentConsentPage({ params, searchParams }: Consent
           this connection.
         </p>
         <fieldset className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-medium text-white">What it may do</legend>
+          <legend className="mb-2 text-ui-lg font-medium text-white">What it may do</legend>
           {apiKeyScopes.map((scope) => (
             <Label className="flex items-start gap-3" key={scope}>
               <Checkbox

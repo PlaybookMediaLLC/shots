@@ -87,7 +87,7 @@ export function ToolPage({ tool }: ToolPageProps) {
                     href={item.slug}
                     className={cn(
                       CARD_CLASS,
-                      "group flex items-center justify-between gap-2 rounded-xl px-4 py-3.5 text-sm font-medium text-foreground transition-shadow duration-200 hover:ring-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
+                      "group flex items-center justify-between gap-2 rounded-xl px-4 py-3.5 text-ui-lg font-medium text-foreground transition-shadow duration-200 hover:ring-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
                     )}
                   >
                     {item.name}

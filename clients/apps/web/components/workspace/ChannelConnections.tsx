@@ -78,7 +78,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
               connections.map((connection) => (
                 <Row key={connection.id}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-foreground">
+                    <span className="text-ui-lg font-medium text-foreground">
                       {connection.displayName || connection.externalAccountId}
                     </span>
                     {connection.handle ? (

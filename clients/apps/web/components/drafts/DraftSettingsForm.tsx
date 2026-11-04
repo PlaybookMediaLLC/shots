@@ -45,7 +45,7 @@ export function DraftSettingsForm({
         <p className="mt-1 text-sm text-muted-foreground">Times are in {settings.timeZone}.</p>
       </div>
       <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-medium text-foreground">Posting queue</h3>
+        <h3 className="text-ui-lg font-medium text-foreground">Posting queue</h3>
         <p className="text-xs text-muted-foreground">
           These are the times of your first publishing brand. Each publishing brand now keeps its own queue,
           time zone and defaults; edit them in{' '}
@@ -116,7 +116,7 @@ export function DraftSettingsForm({
         </ul>
       </section>
       <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-medium text-foreground">Approvals</h3>
+        <h3 className="text-ui-lg font-medium text-foreground">Approvals</h3>
         <Label className="flex items-center justify-between gap-3 rounded-xl border border-foreground/[0.06] px-4 py-3 text-sm text-foreground/80">
           A publisher or admin approves each draft before it is scheduled
           <Switch

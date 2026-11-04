@@ -49,7 +49,7 @@ function UsageRow({
 }) {
   return (
     <Row description={description} label={label} layout="inline">
-      <span className="text-sm font-medium text-foreground tabular-nums">
+      <span className="text-ui-lg font-medium text-foreground tabular-nums">
         {allowance.left.toLocaleString('en-US')}
         <span className="text-muted-foreground">
           {' '}
@@ -134,7 +134,7 @@ export function WorkspaceBilling({ canManage }: { canManage: boolean }) {
               layout="inline"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-foreground">
+                <span className="text-ui-lg font-medium text-foreground">
                   {PLAN_NAMES[summary.plan] ?? summary.plan}
                 </span>
                 {summary.paid && status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
@@ -146,7 +146,7 @@ export function WorkspaceBilling({ canManage }: { canManage: boolean }) {
                 description="Subscription base price before discounts, taxes, and one-time purchases."
                 layout="inline"
               >
-                <span className="text-sm font-medium">
+                <span className="text-ui-lg font-medium">
                   {cycle?.priceLabel ??
                     (subscriptionLoading ? 'Loading subscription…' : summary.plan === 'enterprise'
                       ? 'Contract pricing — see your agreement'
@@ -174,7 +174,7 @@ export function WorkspaceBilling({ canManage }: { canManage: boolean }) {
                 label={cycle.cancelsAt ? 'Ends' : 'Renews'}
                 layout="inline"
               >
-                <span className="text-sm font-medium text-foreground tabular-nums">
+                <span className="text-ui-lg font-medium text-foreground tabular-nums">
                   {new Date(
                     cycle.cancelsAt ?? cycle.renewsAt ?? ''
                   ).toLocaleDateString(undefined, { dateStyle: 'medium' })}
@@ -209,7 +209,7 @@ export function WorkspaceBilling({ canManage }: { canManage: boolean }) {
                   label="Extra launch credits"
                   layout="inline"
                 >
-                  <span className="text-sm font-medium text-foreground tabular-nums">
+                  <span className="text-ui-lg font-medium text-foreground tabular-nums">
                     {summary.creditBalance.toLocaleString('en-US')}
                   </span>
                 </Row>

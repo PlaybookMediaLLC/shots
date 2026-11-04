@@ -301,7 +301,7 @@ export function CampaignCopilot({
           </SheetDescription>
           {campaignId ? (
             <Link
-              className="self-start text-sm font-medium text-foreground underline-offset-4 hover:underline"
+              className="self-start text-ui-lg font-medium text-foreground underline-offset-4 hover:underline"
               href={`/campaigns/${campaignId}`}
             >
               Open campaign

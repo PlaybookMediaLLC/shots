@@ -73,7 +73,7 @@ export function ConditionEditor({
   })
   return (
     <fieldset className="space-y-3 rounded-lg border border-border p-3">
-      <legend className="px-1 text-sm font-medium">{label}</legend>
+      <legend className="px-1 text-ui-lg font-medium">{label}</legend>
       <Label className="grid gap-1 text-sm">
         Match logic
         <Select

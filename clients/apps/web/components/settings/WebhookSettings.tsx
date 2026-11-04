@@ -56,7 +56,7 @@ const httpsUrlSchema = z.url({ protocol: /^https$/ }).refine((value) => {
 function SecretNotice({ onDone, secret }: { onDone: () => void; secret: string }) {
   return (
     <div className="grid gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4" role="status">
-      <p className="text-sm font-medium text-foreground">Copy this signing secret now. It is not shown again.</p>
+      <p className="text-ui-lg font-medium text-foreground">Copy this signing secret now. It is not shown again.</p>
       <code className="break-all rounded bg-foreground/[0.06] px-2 py-1 text-xs">{secret}</code>
       <div className="flex gap-2">
         <Button
@@ -142,7 +142,7 @@ function AddWebhook({ onCreated }: { onCreated: (secret: string) => void }) {
         </Label>
       </div>
       <fieldset className="grid gap-2">
-        <legend className="mb-1 flex w-full items-center justify-between text-sm font-medium text-foreground">
+        <legend className="mb-1 flex w-full items-center justify-between text-ui-lg font-medium text-foreground">
           Events
           <Button onClick={() => setEvents(events.length === all.length ? [] : [...all])} size="sm" type="button" variant="ghost">
             {events.length === all.length ? 'Clear all' : 'Select all'}

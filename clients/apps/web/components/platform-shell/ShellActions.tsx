@@ -108,7 +108,7 @@ export function ShellActions({
             size={null}
             className={cn(
               // The landing page's primary pill.
-              'flex h-9 w-full items-center justify-start gap-2 rounded-full bg-primary px-3.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+              'flex h-9 w-full items-center justify-start gap-2 rounded-full bg-primary px-3.5 text-ui-lg font-medium text-primary-foreground transition-colors hover:bg-primary/90',
               collapsed && 'mx-auto size-10 justify-center px-0'
             )}
             aria-label={t('new')}
