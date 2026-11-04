@@ -120,6 +120,7 @@ import { SelectionToolbarPlugin } from './selection-toolbar'
 import { SlashMenuPlugin } from './slash-menu'
 import { HashtagPlugins, HashtagsContext } from './hashtags'
 import { QuietShortcutPlugins } from './quiet-shortcuts'
+import { PlainPastePlugin } from './plain-paste'
 import {
   SocialMentionPlugin,
   SocialMentionInputPlugins,
@@ -165,6 +166,7 @@ const WRITE_PLUGINS: unknown[] = [
   SelectionToolbarPlugin,
   ...HashtagPlugins,
   ...QuietShortcutPlugins,
+  PlainPastePlugin,
 ]
 
 /** What the save state reads as. */

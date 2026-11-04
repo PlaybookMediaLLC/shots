@@ -10,7 +10,7 @@ import {
   rankCommands,
 } from '@/components/write/composer/commands'
 import type { RefineApi } from '@/components/write/composer/refine'
-import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
+import { convertLegacyBlocks, legacyCount, withoutLegacy } from '@/lib/write/legacy-blocks'
 import { normalizeMentions } from '@/lib/write/normalize-mentions'
 import { postBreak } from '@/lib/write/versions'
 
@@ -176,4 +176,32 @@ test('an old draft’s document formatting converts to the plain text it publish
   assert.equal((editor.children[5].children as { bold?: boolean }[])[1].bold, true)
   editor.undo()
   assert.equal(legacyCount(editor.children), 6)
+})
+
+test('a paste keeps bold, italic, links and lists and loses headings, colors and callouts', () => {
+  const pasted = [
+    { type: 'h1', children: [{ text: 'Title', color: 'red' }] },
+    {
+      type: 'p',
+      children: [
+        { text: 'Bold', bold: true, fontFamily: 'Georgia' },
+        { type: 'a', url: 'https://example.com', children: [{ text: 'link' }] },
+      ],
+    },
+    { type: 'callout', children: [p('Inside')] },
+    { type: 'p', indent: 1, listStyleType: 'disc', children: [{ text: 'Item', italic: true }] },
+    { type: 'toc', children: [{ text: '' }] },
+  ]
+  assert.deepEqual(withoutLegacy(pasted), [
+    { type: 'p', children: [{ text: 'Title' }] },
+    {
+      type: 'p',
+      children: [
+        { text: 'Bold', bold: true },
+        { type: 'a', url: 'https://example.com', children: [{ text: 'link' }] },
+      ],
+    },
+    p('Inside'),
+    { type: 'p', indent: 1, listStyleType: 'disc', children: [{ text: 'Item', italic: true }] },
+  ])
 })

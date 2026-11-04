@@ -22,15 +22,3 @@ export function divLinesAsParagraphs(
   }
   return doc.body.innerHTML
 }
-
-/**
- * Pasted text as a post publishes it: clean lines, markdown bullets as "• "
- * and "1)" numbering as "1.", the way the editor's lists publish.
- */
-export function plainPaste(text: string): string {
-  return text
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => line.replace(/^(\s*)[-*+]\s+/, '$1• ').replace(/^(\s*)(\d+)\)\s+/, '$1$2. '))
-    .join('\n')
-}

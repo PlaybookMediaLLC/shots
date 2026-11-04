@@ -70,3 +70,33 @@ export function convertLegacyBlocks(editor: PlateEditor): void {
     })
   )
 }
+
+/** Inline elements, which stay inside their paragraph. */
+const INLINE = new Set(['a', 'date', 'footnoteReference', 'inline_equation', 'mention', 'social_mention'])
+
+/**
+ * Nodes without the formatting posts cannot carry, as a paste brings them in:
+ * headings and quotes become paragraphs, containers give way to their blocks,
+ * a table of contents goes, and colors and fonts are dropped. Bold, italic,
+ * links and lists stay, as the editor offers them.
+ */
+export function withoutLegacy<T>(nodes: readonly T[]): T[] {
+  return nodes.flatMap((entry): T[] => {
+    const node = entry as Node
+    if (typeof node.text === 'string') {
+      const text = { ...node }
+      for (const mark of STYLE_MARKS) delete text[mark]
+      return [text as T]
+    }
+    const type = node.type ?? ''
+    if (DROPPED.has(type)) return []
+    const children = withoutLegacy(node.children ?? [])
+    if (CONTAINERS.has(type)) {
+      const blocks = children.every(
+        (child) => typeof (child as Node).text !== 'string' && !INLINE.has((child as Node).type ?? '')
+      )
+      return blocks ? (children as T[]) : [{ ...node, children, type: 'p' } as T]
+    }
+    return [{ ...node, children, ...(TEXT_BLOCKS.has(type) ? { type: 'p' } : {}) } as T]
+  })
+}

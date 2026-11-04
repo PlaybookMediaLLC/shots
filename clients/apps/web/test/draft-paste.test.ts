@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, test } from 'node:test'
-import { divLinesAsParagraphs, plainPaste } from '@/lib/content-drafts/paste'
+import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
 
 // jsdom is hoisted into the workspace (the editor package tests with it); the
 // widened specifier keeps the type-checker from asking for its declarations.
@@ -28,11 +28,4 @@ test('pasted div lines become paragraphs instead of running together', () => {
 test('HTML without div lines is left to the editor', () => {
   assert.equal(divLinesAsParagraphs('<p>One</p><p>Two</p>', parser), null)
   assert.equal(divLinesAsParagraphs('One<br>Two', parser), null)
-})
-
-test('pasted text keeps its lines and turns markdown lists into the text a post publishes', () => {
-  assert.equal(
-    plainPaste('Launch notes\r\n- Faster\n* Calmer\n  + Nested\n1) One\n2) Two\nnot-a-list'),
-    'Launch notes\n• Faster\n• Calmer\n  • Nested\n1. One\n2. Two\nnot-a-list'
-  )
 })

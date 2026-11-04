@@ -48,8 +48,9 @@ test(
     // Typing filters with nothing pinned above the matches.
     await page.keyboard.type('he')
     await expect(options.first()).not.toContainText('Ask AI')
+    // No match leaves one row: Ask AI with the query when AI is on, else a note.
     await page.keyboard.type('zzz')
-    await expect(menu).toContainText('No commands match “hezzz”')
+    await expect(menu).toContainText(/^(Ask AI: hezzz|No commands match “hezzz”)$/)
 
     // Escape keeps what was typed, as text.
     await page.keyboard.press('Escape')

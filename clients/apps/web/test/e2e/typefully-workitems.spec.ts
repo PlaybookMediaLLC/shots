@@ -45,8 +45,9 @@ test(
     await expect(page.getByTestId('post-header')).toHaveCount(3)
     await expect(draftEditor(page)).toContainText('Third post')
 
+    // A post's poll sits in the bar under that post.
     await page
-      .locator('[data-post-number="1"]')
+      .getByRole('toolbar', { name: 'Post 1 tools', exact: true })
       .getByRole('button', { name: 'Add a poll', exact: true })
       .click()
     await page.getByRole('button', { name: 'Add poll', exact: true }).click()

@@ -41,7 +41,7 @@ import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
 import { useKeys } from '@/components/write/shortcuts'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
-import { divLinesAsParagraphs, plainPaste } from '@/lib/content-drafts/paste'
+import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
 import { OverLimitPlugin } from './over-limit'
@@ -236,21 +236,19 @@ function CommentColumn({ children }: { children: React.ReactNode }) {
       }}
       onPasteCapture={(event) => {
         const clipboard = event.clipboardData
-        // A copy from a draft keeps its posts, media and marks; files go to uploads.
-        const internal = clipboard.types.includes('application/x-slate-fragment')
-        const html = clipboard.files.length || internal ? '' : clipboard.getData('text/html')
+        const html = clipboard.files.length ? '' : clipboard.getData('text/html')
+        const lines = html ? divLinesAsParagraphs(html) : null
         // A paste over a selection replaces it through Plate's own handling.
         const header = editor.api.isCollapsed() && leaveHeader(editor)
-        if (!html && !header) return
+        if (!lines && !header) return
         // Handled here, so Slate's own paste handler below does not insert it again.
         event.preventDefault()
         event.stopPropagation()
-        if (!html) return editor.tf.insertData(clipboard)
-        // Rich text from elsewhere arrives as clean lines, as the post will publish.
-        const text = clipboard.getData('text/plain')
+        if (!lines) return editor.tf.insertData(clipboard)
         const data = new DataTransfer()
-        if (text) data.setData('text/plain', plainPaste(text))
-        else data.setData('text/html', divLinesAsParagraphs(html) ?? html)
+        for (const type of clipboard.types)
+          if (type !== 'Files')
+            data.setData(type, type === 'text/html' ? lines : clipboard.getData(type))
         editor.tf.insertData(data)
       }}
     >
