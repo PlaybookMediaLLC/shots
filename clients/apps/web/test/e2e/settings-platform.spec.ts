@@ -75,7 +75,6 @@ test('personal settings are addressable, saved on the server and survive a reloa
     /^Tokyo · UTC\+09:00/,
     'Tokyo'
   )
-  await page.getByRole('button', { name: 'Save time zone', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
   await app.reload()
   await expect(
