@@ -497,7 +497,7 @@ export function LinkPreviewApp() {
                 setMode(option)
               }}
               className={cn(
-                'rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+                'rounded-md px-3 py-1 text-ui-lg font-medium text-muted-foreground transition-colors',
                 mode === option && 'bg-background text-foreground shadow-sm'
               )}
             >

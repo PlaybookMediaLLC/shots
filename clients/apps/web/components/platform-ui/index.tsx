@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 const PAGE_WIDTH = { md: 'max-w-3xl', sm: 'max-w-2xl', full: 'max-w-none' } as const
 
 /**
- * A page with Polar's dashboard header: the title in medium 24px type on one
+ * A page with Polar's dashboard header: the title in medium 22px type on one
  * line, then any description at reading size. Pages span the full panel width.
  */
 export function Page({
@@ -38,9 +38,9 @@ export function Page({
     >
       <header className="flex min-w-0 flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div className="min-w-0">
-          <h1 className="text-2xl font-medium text-foreground [overflow-wrap:anywhere]">{title}</h1>
+          <h1 className="text-heading text-foreground [overflow-wrap:anywhere]">{title}</h1>
           {description ? (
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-pretty text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-ui leading-relaxed text-pretty text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -71,11 +71,11 @@ export function Section({
     <section className="flex min-w-0 scroll-mt-8 flex-col gap-4" id={id}>
       <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center sm:gap-6">
         <div className="min-w-0">
-          <h2 className="text-base leading-6 font-normal text-foreground [overflow-wrap:anywhere]">
+          <h2 className="text-body text-foreground [overflow-wrap:anywhere]">
             {title}
           </h2>
           {description ? (
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-pretty text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-caption leading-relaxed text-pretty text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -132,11 +132,11 @@ export function Row({
       <div
         className={cn('min-w-0', layout === 'split' && '@min-[36rem]/platform-group:max-w-[50%]')}
       >
-        <h3 className="text-sm leading-5 font-medium text-foreground [overflow-wrap:anywhere]">
+        <h3 className="text-ui-lg text-foreground [overflow-wrap:anywhere]">
           {label}
         </h3>
         {description ? (
-          <p className="mt-1 text-sm leading-normal text-pretty text-muted-foreground">
+          <p className="mt-1 text-ui leading-normal text-pretty text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -172,7 +172,7 @@ export function Pill({ children, tone = 'gray' }: { children: ReactNode; tone?: 
   return (
     <span
       className={cn(
-        'inline-flex min-h-6 items-center rounded-full px-2.5 py-0.5 text-xs leading-5 font-medium whitespace-nowrap ring-1 ring-inset',
+        'inline-flex min-h-6 items-center rounded-full px-2.5 py-0.5 text-caption leading-5 font-medium whitespace-nowrap ring-1 ring-inset',
         PILL_TONES[tone]
       )}
     >
@@ -197,8 +197,8 @@ export function EmptyState({
     <div className="flex min-h-[22rem] w-full flex-col items-center justify-center gap-6 rounded-xl border border-transparent bg-[var(--platform-group,var(--muted))] px-5 py-12 text-center md:p-8 lg:rounded-4xl dark:border-border">
       <Icon aria-hidden="true" className="text-muted-foreground/50" size={48} />
       <div className="flex max-w-md min-w-0 flex-col items-center gap-2">
-        <h3 className="text-lg font-medium text-foreground">{title}</h3>
-        <p className="text-sm leading-relaxed text-pretty text-muted-foreground">{description}</p>
+        <h3 className="text-body font-medium text-foreground">{title}</h3>
+        <p className="text-ui leading-relaxed text-pretty text-muted-foreground">{description}</p>
       </div>
       {action ? <div className="flex max-w-full flex-wrap justify-center gap-2">{action}</div> : null}
     </div>

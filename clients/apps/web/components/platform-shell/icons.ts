@@ -1,78 +1,77 @@
 /**
- * The signed-in app's icons. Polar's dashboard draws Material Icons Outlined,
- * so the shell and its pages use the same set, from react-icons' Material
- * module. Editor tools keep their own icons.
+ * The signed-in app's icons: Phosphor, from its SSR entry so server components
+ * can render them. Regular weight by default; the current page's navigation
+ * icon uses fill. Editor tools keep their own icons.
  */
-export {
-  MdAdd as AddIcon,
-  MdArrowBack as ArrowBackIcon,
-  MdArrowDownward as ArrowDownIcon,
-  MdArrowForward as ArrowForwardIcon,
-  MdArrowOutward as OutwardIcon,
-  MdArrowUpward as ArrowUpIcon,
-  MdCheck as CheckIcon,
-  MdErrorOutline as ErrorIcon,
-  MdChevronRight as ChevronRightIcon,
-  MdClose as CloseIcon,
-  MdDragIndicator as DragIcon,
-  MdInfoOutline as InfoIcon,
-  MdKeyboardArrowDown as ChevronDownIcon,
-  MdLink as LinkIcon,
-  MdMenu as MenuIcon,
-  MdMoreHoriz as MoreIcon,
-  MdOutlineAddBusiness as AddBusinessIcon,
-  MdOutlineAdminPanelSettings as AdminIcon,
-  MdOutlineBolt as AutomateIcon,
-  MdOutlineBrush as BrushIcon,
-  MdOutlineCalendarMonth as CalendarIcon,
-  MdOutlineCampaign as CampaignsIcon,
-  MdOutlineCategory as CategoryIcon,
-  MdOutlineChecklist as ChecklistIcon,
-  MdOutlineCode as CodeIcon,
-  MdOutlineContentCopy as CopyIcon,
-  MdOutlineContrast as ContrastIcon,
-  MdOutlineCreditCard as CreditCardIcon,
-  MdOutlineDarkMode as DarkModeIcon,
-  MdOutlineDelete as DeleteIcon,
-  MdOutlineFileUpload as UploadIcon,
-  MdOutlineDescription as PostIcon,
-  MdOutlineEdit as EditIcon,
-  MdOutlineExtension as ExtensionIcon,
-  MdOutlineFolder as FolderIcon,
-  MdOutlineGridView as GridIcon,
-  MdOutlineGroup as GroupIcon,
-  MdOutlineHub as HubIcon,
-  MdOutlineImage as ImageIcon,
-  MdOutlinePictureAsPdf as PdfIcon,
-  MdOutlineInstallDesktop as InstallIcon,
-  MdOutlineInventory2 as InventoryIcon,
-  MdOutlineLaptop as LaptopIcon,
-  MdOutlineLayers as CanvasIcon,
-  MdOutlineLightMode as LightModeIcon,
-  MdOutlineLock as LockIcon,
-  MdOutlineLogin as LoginIcon,
-  MdOutlineNotifications as NotificationsIcon,
-  MdOutlinePalette as CreateIcon,
-  MdOutlinePerson as PersonIcon,
-  MdOutlinePhoneIphone as StoreIcon,
-  MdOutlinePhotoLibrary as LibraryIcon,
-  MdOutlinePoll as PollIcon,
-  MdOutlinePublic as PublicIcon,
-  MdOutlineReceiptLong as ReceiptIcon,
-  MdOutlineRecordVoiceOver as VoiceIcon,
-  MdOutlineRocketLaunch as RocketIcon,
-  MdOutlineSchedule as RecentIcon,
-  MdOutlineScience as ScienceIcon,
-  MdOutlineSend as PublishIcon,
-  MdOutlineSettings as GearIcon,
-  MdOutlineSmartToy as AgentIcon,
-  MdOutlineSpaceDashboard as HomeIcon,
-  MdOutlineTimeline as ActivityIcon,
-  MdOutlineTune as SettingsIcon,
-  MdOutlineVerified as VerifiedIcon,
-  MdOutlineVideocam as VideoIcon,
-  MdOutlineViewSidebar as SidebarIcon,
-  MdRefresh as RefreshIcon,
-  MdSearch as SearchIcon,
-  MdOutlineWeb as WebIcon,
-} from 'react-icons/md'
+export { PlusIcon as AddIcon } from '@phosphor-icons/react/dist/ssr/Plus'
+export { ArrowLeftIcon as ArrowBackIcon } from '@phosphor-icons/react/dist/ssr/ArrowLeft'
+export { ArrowDownIcon } from '@phosphor-icons/react/dist/ssr/ArrowDown'
+export { ArrowRightIcon as ArrowForwardIcon } from '@phosphor-icons/react/dist/ssr/ArrowRight'
+export { ArrowUpRightIcon as OutwardIcon } from '@phosphor-icons/react/dist/ssr/ArrowUpRight'
+export { ArrowUpIcon } from '@phosphor-icons/react/dist/ssr/ArrowUp'
+export { CheckIcon } from '@phosphor-icons/react/dist/ssr/Check'
+export { WarningCircleIcon as ErrorIcon } from '@phosphor-icons/react/dist/ssr/WarningCircle'
+export { CaretRightIcon as ChevronRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
+export { XIcon as CloseIcon } from '@phosphor-icons/react/dist/ssr/X'
+export { DotsSixVerticalIcon as DragIcon } from '@phosphor-icons/react/dist/ssr/DotsSixVertical'
+export { InfoIcon } from '@phosphor-icons/react/dist/ssr/Info'
+export { CaretDownIcon as ChevronDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
+export { LinkIcon } from '@phosphor-icons/react/dist/ssr/Link'
+export { ListIcon as MenuIcon } from '@phosphor-icons/react/dist/ssr/List'
+export { DotsThreeIcon as MoreIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+// Phosphor has no "add business" glyph (a storefront with a plus), so this one stays Material.
+export { MdOutlineAddBusiness as AddBusinessIcon } from 'react-icons/md'
+export { UserGearIcon as AdminIcon } from '@phosphor-icons/react/dist/ssr/UserGear'
+export { LightningIcon as AutomateIcon } from '@phosphor-icons/react/dist/ssr/Lightning'
+export { PaintBrushIcon as BrushIcon } from '@phosphor-icons/react/dist/ssr/PaintBrush'
+export { CalendarIcon } from '@phosphor-icons/react/dist/ssr/Calendar'
+export { MegaphoneIcon as CampaignsIcon } from '@phosphor-icons/react/dist/ssr/Megaphone'
+export { ShapesIcon as CategoryIcon } from '@phosphor-icons/react/dist/ssr/Shapes'
+export { ListChecksIcon as ChecklistIcon } from '@phosphor-icons/react/dist/ssr/ListChecks'
+export { CodeIcon } from '@phosphor-icons/react/dist/ssr/Code'
+export { CopyIcon } from '@phosphor-icons/react/dist/ssr/Copy'
+export { CircleHalfIcon as ContrastIcon } from '@phosphor-icons/react/dist/ssr/CircleHalf'
+export { CreditCardIcon } from '@phosphor-icons/react/dist/ssr/CreditCard'
+export { MoonIcon as DarkModeIcon } from '@phosphor-icons/react/dist/ssr/Moon'
+export { TrashIcon as DeleteIcon } from '@phosphor-icons/react/dist/ssr/Trash'
+export { UploadSimpleIcon as UploadIcon } from '@phosphor-icons/react/dist/ssr/UploadSimple'
+export { FileTextIcon as PostIcon } from '@phosphor-icons/react/dist/ssr/FileText'
+export { PencilSimpleIcon as EditIcon } from '@phosphor-icons/react/dist/ssr/PencilSimple'
+export { PuzzlePieceIcon as ExtensionIcon } from '@phosphor-icons/react/dist/ssr/PuzzlePiece'
+export { FolderIcon } from '@phosphor-icons/react/dist/ssr/Folder'
+export { SquaresFourIcon as GridIcon } from '@phosphor-icons/react/dist/ssr/SquaresFour'
+export { UsersIcon as GroupIcon } from '@phosphor-icons/react/dist/ssr/Users'
+export { GraphIcon as HubIcon } from '@phosphor-icons/react/dist/ssr/Graph'
+export { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
+export { FilePdfIcon as PdfIcon } from '@phosphor-icons/react/dist/ssr/FilePdf'
+export { DownloadSimpleIcon as InstallIcon } from '@phosphor-icons/react/dist/ssr/DownloadSimple'
+export { ArchiveIcon as InventoryIcon } from '@phosphor-icons/react/dist/ssr/Archive'
+export { LaptopIcon } from '@phosphor-icons/react/dist/ssr/Laptop'
+export { StackIcon as CanvasIcon } from '@phosphor-icons/react/dist/ssr/Stack'
+export { SunIcon as LightModeIcon } from '@phosphor-icons/react/dist/ssr/Sun'
+export { LockIcon } from '@phosphor-icons/react/dist/ssr/Lock'
+export { SignInIcon as LoginIcon } from '@phosphor-icons/react/dist/ssr/SignIn'
+export { BellIcon as NotificationsIcon } from '@phosphor-icons/react/dist/ssr/Bell'
+export { PaletteIcon as CreateIcon } from '@phosphor-icons/react/dist/ssr/Palette'
+export { UserIcon as PersonIcon } from '@phosphor-icons/react/dist/ssr/User'
+export { DeviceMobileIcon as StoreIcon } from '@phosphor-icons/react/dist/ssr/DeviceMobile'
+export { ImagesIcon as LibraryIcon } from '@phosphor-icons/react/dist/ssr/Images'
+export { ChartBarIcon as PollIcon } from '@phosphor-icons/react/dist/ssr/ChartBar'
+export { GlobeIcon as PublicIcon } from '@phosphor-icons/react/dist/ssr/Globe'
+export { ReceiptIcon } from '@phosphor-icons/react/dist/ssr/Receipt'
+export { UserSoundIcon as VoiceIcon } from '@phosphor-icons/react/dist/ssr/UserSound'
+export { RocketLaunchIcon as RocketIcon } from '@phosphor-icons/react/dist/ssr/RocketLaunch'
+export { ClockIcon as RecentIcon } from '@phosphor-icons/react/dist/ssr/Clock'
+export { FlaskIcon as ScienceIcon } from '@phosphor-icons/react/dist/ssr/Flask'
+export { PaperPlaneRightIcon as PublishIcon } from '@phosphor-icons/react/dist/ssr/PaperPlaneRight'
+export { GearIcon } from '@phosphor-icons/react/dist/ssr/Gear'
+export { RobotIcon as AgentIcon } from '@phosphor-icons/react/dist/ssr/Robot'
+export { LayoutIcon as HomeIcon } from '@phosphor-icons/react/dist/ssr/Layout'
+export { PulseIcon as ActivityIcon } from '@phosphor-icons/react/dist/ssr/Pulse'
+export { SlidersHorizontalIcon as SettingsIcon } from '@phosphor-icons/react/dist/ssr/SlidersHorizontal'
+export { SealCheckIcon as VerifiedIcon } from '@phosphor-icons/react/dist/ssr/SealCheck'
+export { VideoCameraIcon as VideoIcon } from '@phosphor-icons/react/dist/ssr/VideoCamera'
+export { SidebarIcon } from '@phosphor-icons/react/dist/ssr/Sidebar'
+export { ArrowClockwiseIcon as RefreshIcon } from '@phosphor-icons/react/dist/ssr/ArrowClockwise'
+export { MagnifyingGlassIcon as SearchIcon } from '@phosphor-icons/react/dist/ssr/MagnifyingGlass'
+export { BrowserIcon as WebIcon } from '@phosphor-icons/react/dist/ssr/Browser'

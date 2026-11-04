@@ -194,7 +194,7 @@ export function BatchCheck({
           {imported && <p className="w-full text-xs text-muted-foreground">{imported}</p>}
         </form>
         <Label className="block space-y-1.5">
-          <span className="text-sm font-medium text-foreground">Links to check</span>
+          <span className="text-ui-lg font-medium text-foreground">Links to check</span>
           <span className="block text-xs text-muted-foreground">
             One per line, up to {MAX_LINKS}. Paste your campaign links, launch pages, or blog posts.
           </span>
@@ -226,7 +226,7 @@ export function BatchCheck({
       {rows.length > 0 && (
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h3 className="text-sm font-medium text-foreground">
+            <h3 className="text-ui-lg font-medium text-foreground">
               Results · {checked.length} checked, {done - checked.length} failed · {done} of {rows.length}
               {checked.length > 0 &&
                 ` · average score ${Math.round(checked.reduce((sum, row) => sum + row.score, 0) / checked.length)}`}
@@ -252,7 +252,7 @@ export function BatchCheck({
           </div>
           {duplicates.length > 0 && (
             <div className="space-y-2 rounded-2xl bg-amber-500/[0.06] p-4 ring-1 ring-amber-500/20">
-              <p className="flex items-center gap-2 text-sm font-medium text-amber-200">
+              <p className="flex items-center gap-2 text-ui-lg font-medium text-amber-200">
                 <CopyIcon className="size-4" />
                 {duplicates.length} shared {duplicates.length === 1 ? 'value' : 'values'} across
                 pages

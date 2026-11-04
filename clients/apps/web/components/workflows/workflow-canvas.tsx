@@ -121,7 +121,7 @@ function WorkflowNode({ data, selected }: NodeProps<CanvasNode>) {
           <Icon className="size-4" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold leading-5">{data.label}</p>
+          <p className="text-ui-lg font-semibold leading-5">{data.label}</p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground" title={data.detail}>
             {data.detail}
           </p>

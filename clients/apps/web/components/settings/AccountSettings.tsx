@@ -430,7 +430,7 @@ export function AccountSettings({ email, name }: { email: string; name: string }
       <div className="flex items-center gap-3">
         <Avatar image={session?.user.image} name={name || email} />
         <div>
-          <p className="text-sm font-medium text-foreground">{name || email}</p>
+          <p className="text-ui-lg font-medium text-foreground">{name || email}</p>
           <p className="text-xs text-muted-foreground">
             Your picture comes from the account you sign in with.
           </p>

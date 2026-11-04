@@ -105,7 +105,7 @@ export function DeliverPanel({ link, render }: { link: ShareLink; render: () => 
   return (
     <section className="grid gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Send to</span>
+        <span className="text-ui-lg font-medium">Send to</span>
         <Button onClick={() => void copyImage(render)} size="sm" type="button" variant="outline">
           Copy image for Figma
         </Button>

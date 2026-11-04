@@ -457,7 +457,7 @@ export function RightPanel(props: PanelProps) {
       <div className="flex flex-col">
         <div className="flex items-center gap-2 border-b px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{active.name}</p>
+            <p className="truncate text-ui-lg font-medium">{active.name}</p>
             <p className="text-[11px] text-muted-foreground">
               {artboardSize(active).width} × {artboardSize(active).height} · editing
             </p>
@@ -493,7 +493,7 @@ export function RightPanel(props: PanelProps) {
     return (
       <div>
         <section className={section}>
-          <h2 className="text-sm font-medium">{chosen.length} artboards</h2>
+          <h2 className="text-ui-lg font-medium">{chosen.length} artboards</h2>
           <h3 className={heading}>Align</h3>
           <div className="grid grid-cols-3 gap-1">
             {alignModeSchema.options.map((mode) => (
@@ -570,7 +570,7 @@ export function RightPanel(props: PanelProps) {
   return (
     <div>
       <section className={section}>
-        <h2 className="text-sm font-medium">Canvas</h2>
+        <h2 className="text-ui-lg font-medium">Canvas</h2>
         <p className="text-xs text-muted-foreground">
           {state.document.artboards.length} artboard
           {state.document.artboards.length === 1 ? '' : 's'} · revision {state.revision}

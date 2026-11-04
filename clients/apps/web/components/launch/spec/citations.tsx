@@ -221,7 +221,7 @@ export function SourceList({
               brief
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">Release brief</p>
+              <p className="text-ui-lg font-medium text-foreground">Release brief</p>
               <p className="mt-0.5 text-xs text-muted-foreground">What the team entered</p>
             </div>
           </li>
@@ -242,7 +242,7 @@ export function SourceList({
               </span>
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium break-words text-foreground">
+                  <p className="text-ui-lg font-medium break-words text-foreground">
                     {source.title || 'Untitled'}
                   </p>
                   {source.url ? (

@@ -29,7 +29,7 @@ export function CampaignSubnav({ campaignId }: { campaignId: string }) {
           <Link
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center rounded-full px-3 text-sm font-medium transition-colors',
+              'inline-flex h-8 shrink-0 items-center rounded-full px-3 text-ui-lg font-medium transition-colors',
               active
                 ? 'bg-foreground/[0.08] text-foreground'
                 : 'text-muted-foreground hover:bg-foreground/[0.03] hover:text-foreground'

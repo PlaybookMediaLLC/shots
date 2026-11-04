@@ -50,7 +50,7 @@ export function OptionGroup({
   return (
     <div className="flex flex-col gap-2">
       <div>
-        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-ui-lg font-medium text-foreground">{label}</p>
         {hint ? (
           <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
         ) : null}
@@ -477,7 +477,7 @@ export function ToggleRow({
   return (
     <div className={cn("flex items-center justify-between gap-4", className)}>
       <div className="min-w-0">
-        <Label htmlFor={id} className="cursor-pointer text-sm font-medium">
+        <Label htmlFor={id} className="cursor-pointer text-ui-lg font-medium">
           {label}
         </Label>
         {hint ? (

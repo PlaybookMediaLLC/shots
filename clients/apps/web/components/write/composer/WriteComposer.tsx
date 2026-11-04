@@ -652,7 +652,7 @@ export function WriteComposer({
       <div className="mb-1 flex items-center gap-3" data-testid="post-header">
         <span
           aria-hidden
-          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-sm font-medium text-foreground ring-4 ring-card sm:flex"
+          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-ui-lg font-medium text-foreground ring-4 ring-card sm:flex"
           data-post-avatar
         >
           {account?.avatarUrl ? (
@@ -1748,7 +1748,7 @@ function PanelButton({
 function PanelHeader({ onClose, title }: { onClose: () => void; title: string }) {
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-2">
-      <h2 className="text-sm font-medium text-foreground">{title}</h2>
+      <h2 className="text-ui-lg font-medium text-foreground">{title}</h2>
       <Button aria-label={`Close ${title}`} onClick={onClose} size="sm" variant="ghost">
         ✕
       </Button>

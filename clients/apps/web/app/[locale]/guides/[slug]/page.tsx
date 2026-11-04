@@ -106,7 +106,7 @@ function tocFor(guide: Guide): { id: string; label: string }[] {
 
 function VisitLink({ tool }: { tool: GuideTool }): React.JSX.Element {
   const className =
-    "inline-flex items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline";
+    "inline-flex items-center gap-1 text-ui-lg font-medium text-foreground underline-offset-4 hover:underline";
   if (tool.url.startsWith("/")) {
     return (
       <Link href={tool.url} className={className}>

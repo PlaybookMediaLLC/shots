@@ -324,7 +324,7 @@ export function DraftCalendar({
         </DialogContent>
       </Dialog>
       <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-3 py-2 border-b border-foreground/[0.06] px-4">
-        <h2 className="text-sm font-medium text-foreground">
+        <h2 className="text-ui-lg font-medium text-foreground">
           {view === 'month'
             ? readableDay(`${(anchor ?? weekStart).slice(0, 7)}-01`, {
                 month: 'long',

@@ -226,7 +226,7 @@ export function StoreGroupEditor({
           <ActiveSceneProvider>
             <div className="flex min-h-0 flex-1 flex-col">
               <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
-                <span className="mr-auto text-sm font-medium">
+                <span className="mr-auto text-ui-lg font-medium">
                   {group.name} · native store layers
                 </span>
                 {canEdit ? (

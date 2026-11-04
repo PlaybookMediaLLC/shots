@@ -189,7 +189,7 @@ function VisualCard({
       <div className="flex flex-1 flex-col gap-3 border-t border-foreground/[0.06] p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">{visual.name}</p>
+            <p className="text-ui-lg font-medium text-foreground">{visual.name}</p>
             {visual.caption ? (
               <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{visual.caption}</p>
             ) : null}
@@ -383,7 +383,7 @@ function Captures({ captures }: { captures: BoardCapture[] }) {
       >
         <AccordionTrigger className="[&>svg:last-child]:hidden flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 [&::-webkit-details-marker]:hidden">
           <span className="min-w-0">
-            <span className="block text-sm font-medium text-foreground">Captures</span>
+            <span className="block text-ui-lg font-medium text-foreground">Captures</span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
               {captures.length} live {captures.length === 1 ? 'capture' : 'captures'} of the product
               the visuals were built from.

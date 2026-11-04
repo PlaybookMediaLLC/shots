@@ -355,7 +355,7 @@ export function PlanView({
             >
               <div className="flex items-center gap-2">
                 <KeyChip>{angle.key}</KeyChip>
-                <h3 className="text-sm font-medium text-foreground">{angle.title}</h3>
+                <h3 className="text-ui-lg font-medium text-foreground">{angle.title}</h3>
               </div>
               <p className="text-xs text-muted-foreground">Pillar · {angle.pillar}</p>
               <p className="text-sm leading-6 text-foreground/80">{angle.hook}</p>
@@ -387,7 +387,7 @@ export function PlanView({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <KeyChip>{asset.key}</KeyChip>
-                      <h3 className="text-sm font-medium text-foreground">
+                      <h3 className="text-ui-lg font-medium text-foreground">
                         {ASSET_KIND[asset.kind]}
                       </h3>
                       <span className="text-xs text-muted-foreground">{asset.format}</span>
@@ -424,7 +424,7 @@ export function PlanView({
           if (items.length === 0) return null
           return (
             <div className="flex flex-col gap-2" key={phase}>
-              <h3 className="text-sm font-medium text-foreground/80">{PLAN_PHASE_LABELS[phase]}</h3>
+              <h3 className="text-ui-lg font-medium text-foreground/80">{PLAN_PHASE_LABELS[phase]}</h3>
               <Group>
                 <ol className="divide-y divide-foreground/[0.07]">
                   {items.map((item, position) => (

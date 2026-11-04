@@ -43,7 +43,7 @@ export function OnboardingShell({
                 src={publicImageUrl('/logo-mark.png')}
                 width={28}
               />
-              <span className="text-sm font-semibold tracking-tight">Shots</span>
+              <span className="text-ui-lg font-semibold tracking-tight">Shots</span>
             </div>
             <ol className="flex flex-col gap-6">
               {steps.map((step, index) => {
@@ -65,7 +65,7 @@ export function OnboardingShell({
                     <span className="pt-1">
                       <span
                         className={cn(
-                          'block text-sm font-medium',
+                          'block text-ui-lg font-medium',
                           active ? 'text-white' : done ? 'text-neutral-300' : 'text-neutral-500'
                         )}
                       >

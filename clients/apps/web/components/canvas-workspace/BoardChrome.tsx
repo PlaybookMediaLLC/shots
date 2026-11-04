@@ -139,7 +139,7 @@ export function ZoomBar({ actions }: { actions: CanvasActions }) {
           </Button>
         </PopoverTrigger>
         <PopoverContent side="top" align="start" className="w-80">
-          <p className="mb-2 text-sm font-medium">Keyboard shortcuts</p>
+          <p className="mb-2 text-ui-lg font-medium">Keyboard shortcuts</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
             {CANVAS_SHORTCUTS.map((shortcut) => (
               <div key={shortcut.keys} className="contents">

@@ -50,7 +50,7 @@ export function JavaScriptCheck({ preview }: { preview: LinkPreview }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
             <Braces className="size-4" />
             JavaScript check
           </h3>

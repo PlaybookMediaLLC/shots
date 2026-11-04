@@ -283,7 +283,7 @@ export function WorkflowTemplates() {
                     canvas: canvases.available && canvas,
                   })}
                 />
-                <span className="text-sm font-medium text-foreground">{candidate.name}</span>
+                <span className="text-ui-lg font-medium text-foreground">{candidate.name}</span>
                 <span className="text-sm font-normal text-muted-foreground">
                   {candidate.description}
                 </span>
@@ -291,7 +291,7 @@ export function WorkflowTemplates() {
             </li>
           ))}
           <li className="flex flex-col gap-2 rounded-xl p-5 ring-1 ring-border">
-            <span className="text-sm font-medium text-foreground">Manual campaign</span>
+            <span className="text-ui-lg font-medium text-foreground">Manual campaign</span>
             <span className="text-sm text-muted-foreground">
               Pick a release you already shipped and build its campaign by hand, with the same
               review rules.
@@ -304,7 +304,7 @@ export function WorkflowTemplates() {
             aria-disabled
             className="flex flex-col gap-2 rounded-xl p-5 opacity-60 ring-1 ring-border"
           >
-            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <span className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
               Weekly recurring campaign <Pill>Planned</Pill>
             </span>
             <span className="text-sm text-muted-foreground">

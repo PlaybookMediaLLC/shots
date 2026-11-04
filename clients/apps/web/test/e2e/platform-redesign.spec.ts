@@ -558,10 +558,10 @@ test(
     }
     expect(documents).toEqual([])
     await expect(sidebar).toHaveCSS('border-right-width', '0px')
-    // Polar's dashboard icons: Material Icons Outlined, on a 24-unit viewBox.
+    // The shell's icons are Phosphor, on a 256-unit viewBox.
     await expect(
       sidebar.getByRole('link', { name: 'Home', exact: true }).locator('svg')
-    ).toHaveAttribute('viewBox', '0 0 24 24')
+    ).toHaveAttribute('viewBox', '0 0 256 256')
     // The collapse control shares the footer row with the theme switch, above the switcher.
     const toggle = sidebar.getByRole('button', { name: 'Collapse navigation' })
     const theme = sidebar.getByRole('button', { name: /^Switch to (light|dark) mode$/ })

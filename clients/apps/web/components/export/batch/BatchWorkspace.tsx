@@ -486,7 +486,7 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
             className="space-y-5 overflow-y-auto border-foreground/[0.08] p-4 md:border-r"
           >
             <fieldset className="space-y-2" disabled={locked}>
-              <legend className="text-sm font-medium text-foreground">Style</legend>
+              <legend className="text-ui-lg font-medium text-foreground">Style</legend>
               {sources.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   Open a design in the editor to use it as the style.
@@ -565,7 +565,7 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
             </fieldset>
 
             <fieldset className="space-y-2.5" disabled={locked}>
-              <legend className="pb-1 text-sm font-medium text-foreground">
+              <legend className="pb-1 text-ui-lg font-medium text-foreground">
                 Apply to every screenshot
               </legend>
               <ToggleField
@@ -640,7 +640,7 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
                   type="button"
                 >
                   <ImageUploadIcon className="text-muted-foreground" size={28} />
-                  <span className="text-sm font-medium text-foreground">
+                  <span className="text-ui-lg font-medium text-foreground">
                     {importing
                       ? `Importing ${importing.done} of ${importing.total}…`
                       : 'Add screenshots'}

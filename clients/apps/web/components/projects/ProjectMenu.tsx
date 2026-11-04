@@ -206,7 +206,7 @@ export function ProjectMenu({ compact = false }: { compact?: boolean }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-64" sideOffset={8}>
           <DropdownMenuLabel className="font-normal">
-            <span className="block truncate text-sm font-medium">{project.name}</span>
+            <span className="block truncate text-ui-lg font-medium">{project.name}</span>
             <span
               className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"
               data-testid="project-save-status"

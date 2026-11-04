@@ -107,7 +107,7 @@ export function ProductContextPanel({
       </h2>
       {release ? (
         <div className="space-y-1 rounded-md border p-2">
-          <p className="text-sm font-medium">{release.title}</p>
+          <p className="text-ui-lg font-medium">{release.title}</p>
           <p className="text-[11px] text-muted-foreground">
             Release · {release.status.toLowerCase()}
             {context.feature ? ` · ${context.feature}` : ''}

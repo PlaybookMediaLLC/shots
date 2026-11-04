@@ -76,14 +76,14 @@ export function PlanJsonEditor({
         className="group rounded-2xl bg-foreground/[0.015] ring-1 ring-foreground/[0.08]"
       >
         <AccordionTrigger className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 select-none [&::-webkit-details-marker]:hidden">
-          <span className="text-sm font-medium text-foreground">Edit plan as JSON</span>
+          <span className="text-ui-lg font-medium text-foreground">Edit plan as JSON</span>
           <span className="text-xs text-muted-foreground group-data-[state=open]:hidden">
             Advanced
           </span>
         </AccordionTrigger>
         <AccordionContent className="p-0">
           <div className="flex flex-col gap-3 border-t border-foreground/[0.07] p-5">
-            <Label className="text-sm font-medium text-foreground" htmlFor={id}>
+            <Label className="text-ui-lg font-medium text-foreground" htmlFor={id}>
               Plan JSON
             </Label>
             <p className="text-xs leading-5 text-muted-foreground" id={`${id}-help`}>

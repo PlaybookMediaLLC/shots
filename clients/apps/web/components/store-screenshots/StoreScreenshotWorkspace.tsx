@@ -150,7 +150,7 @@ function StoreHeader({
       <div className="flex min-w-0 items-center gap-2">
         <Link href="/" className="flex shrink-0 items-center gap-2.5 transition-opacity hover:opacity-80">
           <Image src={publicImageUrl("/logo-mark.png")} alt="Shots" width={32} height={32} className="size-8" priority />
-          <span className="hidden text-sm font-semibold tracking-tight text-foreground lg:inline">Shots</span>
+          <span className="hidden text-ui-lg font-semibold tracking-tight text-foreground lg:inline">Shots</span>
         </Link>
         <div className="mx-1 hidden h-4 w-px bg-foreground/10 sm:block" />
         <p className="hidden truncate text-xs font-medium text-foreground sm:block">Store screenshots</p>

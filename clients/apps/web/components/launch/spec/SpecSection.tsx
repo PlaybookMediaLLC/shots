@@ -87,7 +87,7 @@ function SectionBody({
       if (content.audience.length === 0) return empty
       return content.audience.map((item, position) => (
         <Item key={position}>
-          <h3 className="text-sm font-medium text-foreground">{item.segment}</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">{item.segment}</h3>
           <p className={detailText}>
             {item.need}
             {cite(item.sources)}
@@ -98,7 +98,7 @@ function SectionBody({
       if (content.capabilities.length === 0) return empty
       return content.capabilities.map((item, position) => (
         <Item key={position}>
-          <h3 className="text-sm font-medium text-foreground">{item.name}</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">{item.name}</h3>
           <p className={detailText}>
             {item.description}
             {cite(item.sources)}
@@ -133,7 +133,7 @@ function SectionBody({
       if (content.faqs.length === 0) return empty
       return content.faqs.map((item, position) => (
         <Item key={position}>
-          <h3 className="text-sm font-medium text-foreground">{item.question}</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">{item.question}</h3>
           <p className={detailText}>
             {item.answer}
             {cite(item.sources)}
@@ -147,7 +147,7 @@ function SectionBody({
           {pillars.map((pillar, position) => (
             <Item key={position}>
               <p className="text-xs text-muted-foreground">Pillar {position + 1}</p>
-              <h3 className="mt-1 text-sm font-medium text-foreground">{pillar.title}</h3>
+              <h3 className="mt-1 text-ui-lg font-medium text-foreground">{pillar.title}</h3>
               <p className={detailText}>
                 {pillar.message}
                 {cite(pillar.sources)}
@@ -326,7 +326,7 @@ function SectionEditor({
     >
       {fields.map((field) => (
         <div className="flex flex-col gap-1.5" key={field.key}>
-          <Label className="text-sm font-medium text-foreground" htmlFor={`${id}-${field.key}`}>
+          <Label className="text-ui-lg font-medium text-foreground" htmlFor={`${id}-${field.key}`}>
             {field.label}
           </Label>
           <p className="text-xs text-muted-foreground" id={`${id}-${field.key}-help`}>

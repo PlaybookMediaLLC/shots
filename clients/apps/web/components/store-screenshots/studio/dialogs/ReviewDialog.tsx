@@ -187,7 +187,7 @@ export function ReviewDialog({ open, onOpenChange }: DialogProps): React.JSX.Ele
               <article key={review.id} className={cn('space-y-2 rounded-md border p-3', review.revokedAt ? 'border-foreground/10 opacity-60' : 'border-foreground/15')}>
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">
+                    <p className="truncate text-ui-lg font-medium">
                       {review.name}
                       {review.versionLabel ? <span className="text-muted-foreground"> · {review.versionLabel}</span> : null}
                     </p>

@@ -120,7 +120,7 @@ export function DropSurface({
         <span className="relative mt-1 block text-sm text-muted-foreground">
           {detail}
         </span>
-        <span className="relative mt-6 inline-flex h-9 items-center rounded-full bg-[var(--nav-cta-bg)] px-4 text-sm font-medium text-[var(--nav-cta-fg)] transition-shadow duration-200 [text-shadow:var(--nav-cta-text-shadow)] group-hover:shadow-[var(--nav-cta-hover-shadow)]">
+        <span className="relative mt-6 inline-flex h-9 items-center rounded-full bg-[var(--nav-cta-bg)] px-4 text-ui-lg font-medium text-[var(--nav-cta-fg)] transition-shadow duration-200 [text-shadow:var(--nav-cta-text-shadow)] group-hover:shadow-[var(--nav-cta-hover-shadow)]">
           {action}
         </span>
       </span>

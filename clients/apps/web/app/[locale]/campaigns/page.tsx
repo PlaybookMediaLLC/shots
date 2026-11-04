@@ -69,7 +69,7 @@ function CampaignWorkflows() {
               {workflow.href === null ? <Pill>Planned</Pill> : null}
             </div>
             <div className="flex-1">
-              <h3 className="text-sm font-medium text-foreground">{workflow.title}</h3>
+              <h3 className="text-ui-lg font-medium text-foreground">{workflow.title}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{workflow.description}</p>
             </div>
             {workflow.href ? (

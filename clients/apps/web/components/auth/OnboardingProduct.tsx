@@ -320,7 +320,7 @@ export function OnboardingProduct({
           Your product
         </Heading>
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-neutral-300" htmlFor="product-site-url">
+          <Label className="text-ui-lg font-medium text-neutral-300" htmlFor="product-site-url">
             Product URL
           </Label>
           <Input
@@ -335,7 +335,7 @@ export function OnboardingProduct({
           />
         </div>
         <div className="space-y-2">
-          <Label className="text-sm font-medium text-neutral-300" htmlFor="product-site-sentence">
+          <Label className="text-ui-lg font-medium text-neutral-300" htmlFor="product-site-sentence">
             In one sentence, what does it do? <span className="text-neutral-500">(optional)</span>
           </Label>
           <Input

@@ -71,7 +71,7 @@ export function CrawlerMatrix({ url }: { url: string }) {
     <section className={cn(PANEL, 'space-y-4 p-6')}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
             <ShieldAlert className="size-4" />
             What each crawler gets
           </h3>

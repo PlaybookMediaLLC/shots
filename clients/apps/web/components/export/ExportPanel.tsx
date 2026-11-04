@@ -317,7 +317,7 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
   if (busy) {
     return (
       <div className="space-y-3 p-5" aria-live="polite">
-        <p className="text-sm font-medium text-foreground">Exporting {info.label}…</p>
+        <p className="text-ui-lg font-medium text-foreground">Exporting {info.label}…</p>
         <p className="text-xs text-muted-foreground">
           {still
             ? still.total > 1
@@ -348,7 +348,7 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
   return (
     <div className="max-h-[min(640px,calc(100vh-96px))] space-y-4 overflow-y-auto p-4">
       <div className="space-y-2">
-        <span className="text-sm font-medium text-foreground">Format</span>
+        <span className="text-ui-lg font-medium text-foreground">Format</span>
         <div aria-label="Format" className="grid grid-cols-4 gap-1" role="group">
           {outputFormatSchema.options.map((option) => (
             <FormatButton
@@ -489,7 +489,7 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
       ) : null}
 
       <Button
-        className="h-10 w-full rounded-md text-sm font-semibold"
+        className="h-10 w-full rounded-md text-ui-lg font-semibold"
         disabled={!animated && targets.length === 0}
         onClick={handleExport}
       >

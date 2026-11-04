@@ -47,7 +47,7 @@ export function LayerSelectionPanel({
   return (
     <div data-testid="layer-selection-panel">
       <section className={section}>
-        <h2 className="text-sm font-medium">
+        <h2 className="text-ui-lg font-medium">
           {component ? component.name : isGroup ? group!.name : `${layers.length} layers`}
         </h2>
         <p className="text-[11px] text-muted-foreground">

@@ -908,7 +908,7 @@ export function WorkflowEditor({
                     </div>
                     <div className="rounded-lg border border-border bg-muted/20 p-3">
                       <p className="text-xs text-muted-foreground">GitHub event</p>
-                      <p className="mt-1 text-sm font-medium">{FAMILY_NAMES[graph.family]}</p>
+                      <p className="mt-1 text-ui-lg font-medium">{FAMILY_NAMES[graph.family]}</p>
                       <p className="mt-1 break-words text-xs text-muted-foreground">
                         {source?.name}
                         {source?.branch ? ` · watching ${source.branch}` : ''}
@@ -1101,7 +1101,7 @@ export function WorkflowEditor({
                               : 'border-amber-500/30 bg-amber-500/5'
                           )}
                         >
-                          <h3 className="flex items-center gap-2 text-sm font-semibold">
+                          <h3 className="flex items-center gap-2 text-ui-lg font-semibold">
                             {['completed', 'skipped'].includes(preview.outcome) ? (
                               <Check className="size-4" aria-hidden="true" />
                             ) : (
@@ -1168,7 +1168,7 @@ export function WorkflowEditor({
                     ) : (
                       <div className="rounded-lg border border-dashed border-border px-5 py-8 text-center">
                         <Play className="mx-auto size-6 text-muted-foreground" aria-hidden="true" />
-                        <p className="mt-3 text-sm font-medium">Ready for a test run</p>
+                        <p className="mt-3 text-ui-lg font-medium">Ready for a test run</p>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
                           Choose evidence, then select Test draft above. The result will highlight a
                           path on the canvas.

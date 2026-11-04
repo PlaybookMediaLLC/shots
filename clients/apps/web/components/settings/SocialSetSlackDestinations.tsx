@@ -21,7 +21,7 @@ export function SocialSetSlackDestinations({policy,channels,disabled,onChange}:{
   const shared=sets.data.items.filter((set) => set.visibility==='WORKSPACE')
   if (!shared.length) return null
   return <fieldset disabled={disabled} className="grid gap-3 border-t pt-4">
-    <legend className="text-sm font-medium">Channel by publishing brand</legend>
+    <legend className="text-ui-lg font-medium">Channel by publishing brand</legend>
     <p className="text-xs text-muted-foreground">Use the workspace channel, pick a channel in the connected Slack workspace, or turn shared-channel notices off. Private brands never send to shared channels.</p>
     {shared.map((set) => <Label key={set.id} className="grid gap-1 text-sm">
       {set.name}

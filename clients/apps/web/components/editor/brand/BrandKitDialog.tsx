@@ -270,7 +270,7 @@ export function BrandKitDialog({
           </div>
 
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-sm font-medium">Colours</legend>
+            <legend className="mb-1 text-ui-lg font-medium">Colours</legend>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2">
               <ColorField
                 label="Background"
@@ -325,7 +325,7 @@ export function BrandKitDialog({
           </fieldset>
 
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-sm font-medium">Fonts</legend>
+            <legend className="mb-1 text-ui-lg font-medium">Fonts</legend>
             <div className="grid gap-1.5">
               <span className="text-xs text-muted-foreground">Headlines</span>
               <FontPicker
@@ -348,7 +348,7 @@ export function BrandKitDialog({
           </fieldset>
 
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-sm font-medium">Logos</legend>
+            <legend className="mb-1 text-ui-lg font-medium">Logos</legend>
             {draft.logos.length === 0 ? (
               <p className="text-xs text-muted-foreground">
                 Add a light and a dark logo; designs pick the one that reads on their background.
@@ -428,7 +428,7 @@ export function BrandKitDialog({
           </fieldset>
 
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-sm font-medium">Defaults for designs</legend>
+            <legend className="mb-1 text-ui-lg font-medium">Defaults for designs</legend>
             <ChoiceField
               label="Background"
               onChange={setBackground}

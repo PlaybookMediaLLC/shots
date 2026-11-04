@@ -104,7 +104,7 @@ export function AutomatePanel({ url }: { url: string }) {
                 aria-pressed={item.id === target.id}
                 onClick={() => setTarget(item)}
                 className={cn(
-                  'rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+                  'rounded-md px-3 py-1 text-ui-lg font-medium text-muted-foreground transition-colors',
                   item.id === target.id && 'bg-background text-foreground shadow-sm'
                 )}
               >

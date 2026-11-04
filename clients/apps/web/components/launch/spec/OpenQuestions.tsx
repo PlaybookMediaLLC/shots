@@ -59,7 +59,7 @@ export function OpenQuestions({
           questions.map((question, position) => (
             <div className="flex flex-col gap-2 px-5 py-4" key={position}>
               <div className="flex items-start justify-between gap-4">
-                <h3 className="text-sm font-medium text-foreground">{question.question}</h3>
+                <h3 className="text-ui-lg font-medium text-foreground">{question.question}</h3>
                 <a
                   className="shrink-0 text-xs text-muted-foreground hover:text-foreground"
                   href={`#spec-${question.section}`}

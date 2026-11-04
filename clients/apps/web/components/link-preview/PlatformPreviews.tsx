@@ -143,7 +143,7 @@ export const PLATFORMS: Platform[] = [
       accent: '#dddddd',
       frame: 'rounded bg-white',
       media: 'bg-[#f8f8f8]',
-      site: 'text-sm font-bold text-[#1d1c1d]',
+      site: 'text-ui-lg font-bold text-[#1d1c1d]',
       title: 'line-clamp-2 text-[15px] font-bold text-[#1264a3]',
       description: 'line-clamp-3 text-[15px] text-[#1d1c1d]',
     },
@@ -152,7 +152,7 @@ export const PLATFORMS: Platform[] = [
     accent: '#4a4b4f',
     frame: 'rounded bg-[#1a1d21]',
     media: 'bg-[#222529]',
-    site: 'text-sm font-bold text-[#d1d2d3]',
+    site: 'text-ui-lg font-bold text-[#d1d2d3]',
     title: 'line-clamp-2 text-[15px] font-bold text-[#1d9bd1]',
     description: 'line-clamp-3 text-[15px] text-[#d1d2d3]',
   },
@@ -628,7 +628,7 @@ export function CacheRefresh({ url }: { url: string }) {
     <section className="space-y-3 rounded-2xl bg-white/[0.015] p-5 ring-1 ring-white/[0.08]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Changed your tags?</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">Changed your tags?</h3>
           <p className="text-xs text-muted-foreground">
             Platforms cache previews. Make each one read the page again.
           </p>

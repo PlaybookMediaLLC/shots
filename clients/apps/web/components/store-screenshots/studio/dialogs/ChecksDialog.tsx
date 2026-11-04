@@ -58,7 +58,7 @@ export function ChecksDialog({ open, onOpenChange, onExport }: DialogProps & { o
           const items = issues.filter((issue) => issue.severity === group.severity)
           return (
             <section key={group.severity} aria-labelledby={`checks-${group.severity}`} className="space-y-2">
-              <h3 id={`checks-${group.severity}`} className="text-sm font-semibold">
+              <h3 id={`checks-${group.severity}`} className="text-ui-lg font-semibold">
                 {group.title} <span className="font-normal text-muted-foreground">({items.length})</span>
               </h3>
               <p className="text-xs text-muted-foreground">{group.hint}</p>

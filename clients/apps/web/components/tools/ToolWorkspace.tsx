@@ -161,7 +161,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     <div className="mx-auto grid w-full max-w-5xl items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className={cn(CARD_CLASS, "p-2")}>
         <div className="flex items-center justify-between gap-3 px-3 pb-2 pt-2">
-          <p className="text-sm font-medium text-foreground">
+          <p className="text-ui-lg font-medium text-foreground">
             {queue.items.length} {queue.items.length === 1 ? "image" : "images"}
             <span className="font-normal text-muted-foreground">
               {" "}

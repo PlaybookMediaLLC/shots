@@ -198,7 +198,7 @@ export function StorySetIntake({
       </div>
       {image ? (
         <div className="mt-8 border-t pt-6">
-          <h2 className="mb-4 text-sm font-medium">Choose a visual treatment</h2>
+          <h2 className="mb-4 text-ui-lg font-medium">Choose a visual treatment</h2>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {previews.map(({ id, document }) => (
               <Button
@@ -215,7 +215,7 @@ export function StorySetIntake({
                 </div>
                 <div className="border-t p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <strong className="text-sm font-medium">{TREATMENTS[id]}</strong>
+                    <strong className="text-ui-lg font-medium">{TREATMENTS[id]}</strong>
                     {treatment === id ? (
                       <span className="text-xs text-emerald-400">Selected</span>
                     ) : null}
