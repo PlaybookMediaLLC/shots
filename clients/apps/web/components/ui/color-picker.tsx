@@ -4,12 +4,25 @@ import * as React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import { Input } from './input';
 import { z } from 'zod';
+import { Button } from './button';
+import { contrastRatio } from '@/lib/launch/brand';
 import { cn } from '@/lib/utils';
 
 interface ColorPickerProps {
   color: string;
   onChange: (color: string) => void;
   className?: string;
+}
+
+interface ColorPanelProps {
+  color: string;
+  onChange: (color: string) => void;
+  /** Offer transparency; without it the color is always `#rrggbb`. */
+  alpha?: boolean;
+  /** Colors one click away, such as a brand's saved ones. */
+  swatches?: readonly string[];
+  /** Show how text reads on white and on black. */
+  showContrast?: boolean;
 }
 
 interface HsvaColor {
@@ -128,16 +141,57 @@ const hexColorSchema = z.string()
   .regex(/^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/, 'Invalid hex color')
   .transform((value) => value.startsWith('#') ? value : `#${value}`);
 
-export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const { h, s, v, alpha } = colorToHsva(color);
+/** A 0–1 position inside an element, clamped to its edges. */
+function clamp(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+/**
+ * Drag on an area with mouse, pen or touch: `apply` gets the pointer's x and
+ * y as 0–1 fractions of the area, from the first press until release.
+ */
+function startDrag(e: React.PointerEvent<HTMLDivElement>, apply: (x: number, y: number) => void) {
+  e.preventDefault();
+  const area = e.currentTarget;
+  area.focus();
+  area.setPointerCapture?.(e.pointerId);
+  const move = (event: PointerEvent) => {
+    const rect = area.getBoundingClientRect();
+    apply(clamp((event.clientX - rect.left) / rect.width), clamp((event.clientY - rect.top) / rect.height));
+  };
+  const up = () => {
+    area.removeEventListener('pointermove', move);
+    area.removeEventListener('pointerup', up);
+    area.removeEventListener('pointercancel', up);
+  };
+  move(e.nativeEvent);
+  area.addEventListener('pointermove', move);
+  area.addEventListener('pointerup', up);
+  area.addEventListener('pointercancel', up);
+}
+
+/** Arrow keys as a step on two axes; Shift takes ten steps. Null for other keys. */
+function arrowStep(e: React.KeyboardEvent): [number, number] | null {
+  const step = e.shiftKey ? 10 : 1;
+  const moves: Record<string, [number, number]> = {
+    ArrowLeft: [-step, 0],
+    ArrowRight: [step, 0],
+    ArrowUp: [0, step],
+    ArrowDown: [0, -step],
+  };
+  return moves[e.key] ?? null;
+}
+
+const sliderFocus = 'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50';
+
+/** The picker itself: a saturation area, hue (and alpha) sliders, hex and channel fields. */
+export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches, showContrast }: ColorPanelProps) {
+  const parsed = colorToHsva(color);
+  const { h, s, v } = parsed;
+  const alpha = withAlpha ? parsed.alpha : 1;
   const currentRgb = hsvToRgb(h, s, v);
   const currentHex = rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]) + (alpha < 1 ? Math.round(alpha * 255).toString(16).padStart(2, '0') : '');
   const hueColor = rgbToHex(...hsvToRgb(h, 1, 1));
-
-  const saturationRef = React.useRef<HTMLDivElement>(null);
-  const hueRef = React.useRef<HTMLDivElement>(null);
-  const alphaRef = React.useRef<HTMLDivElement>(null);
 
   const [hexInput, setHexInput] = React.useState(currentHex);
   const [hexError, setHexError] = React.useState(false);
@@ -155,72 +209,11 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
 
   const updateColor = (newColor: HsvaColor) => {
     const [r, g, b] = hsvToRgb(newColor.h, newColor.s, newColor.v);
-    if (newColor.alpha < 1) {
+    if (withAlpha && newColor.alpha < 1) {
       onChange(`rgba(${r}, ${g}, ${b}, ${newColor.alpha.toFixed(2)})`);
       return;
     }
     onChange(rgbToHex(r, g, b));
-  };
-
-  // Handle saturation/brightness picker drag
-  const handleSaturationMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const handleMove = (e: MouseEvent) => {
-      if (!saturationRef.current) return;
-      const rect = saturationRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
-      updateColor({ h, s: x, v: 1 - y, alpha });
-    };
-
-    const handleUp = () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-
-    handleMove(e.nativeEvent as unknown as MouseEvent);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  };
-
-  // Handle hue slider drag
-  const handleHueMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const handleMove = (e: MouseEvent) => {
-      if (!hueRef.current) return;
-      const rect = hueRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      updateColor({ h: x * 360, s, v, alpha });
-    };
-
-    const handleUp = () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-
-    handleMove(e.nativeEvent as unknown as MouseEvent);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-  };
-
-  // Handle alpha slider drag
-  const handleAlphaMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const handleMove = (e: MouseEvent) => {
-      if (!alphaRef.current) return;
-      const rect = alphaRef.current.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-      updateColor({ h, s, v, alpha: Math.round(x * 100) / 100 });
-    };
-
-    const handleUp = () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-
-    handleMove(e.nativeEvent as unknown as MouseEvent);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
   };
 
   const handleHexCommit = () => {
@@ -244,6 +237,7 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
 
   const handleHexKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       (e.target as HTMLInputElement).blur();
     }
     if (e.key === 'Escape') {
@@ -266,12 +260,229 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
 
   const handleAlphaKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       (e.target as HTMLInputElement).blur();
     }
     if (e.key === 'Escape') {
       setAlphaInput(alphaValue);
     }
   };
+
+  const channel = (index: 0 | 1 | 2, label: string, name: string) => (
+    <div className="flex min-w-0 flex-col items-center gap-0.5">
+      <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
+      <Input
+        type="number"
+        min={0}
+        max={255}
+        step={1}
+        aria-label={name}
+        value={currentRgb[index]}
+        onChange={(e) => {
+          const next = [...currentRgb] as [number, number, number];
+          next[index] = Math.max(0, Math.min(255, Math.trunc(Number(e.target.value) || 0)));
+          const [newH, newS, newV] = rgbToHsv(...next);
+          updateColor({ h: newH, s: newS, v: newV, alpha });
+        }}
+        className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+    </div>
+  );
+
+  const solidHex = rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]);
+
+  return (
+    <div className="space-y-3">
+      {/* Saturation/Brightness picker */}
+      <div
+        role="slider"
+        tabIndex={0}
+        aria-label="Saturation and brightness"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(s * 100)}
+        aria-valuetext={`Saturation ${Math.round(s * 100)}%, brightness ${Math.round(v * 100)}%`}
+        className={cn('w-72 h-56 rounded-lg cursor-crosshair relative overflow-hidden touch-none', sliderFocus)}
+        style={{
+          background: `linear-gradient(to bottom, transparent, black), linear-gradient(to right, white, ${hueColor})`,
+        }}
+        onPointerDown={(e) => startDrag(e, (x, y) => updateColor({ h, s: x, v: 1 - y, alpha }))}
+        onKeyDown={(e) => {
+          const step = arrowStep(e);
+          if (!step) return;
+          e.preventDefault();
+          updateColor({ h, s: clamp(s + step[0] / 100), v: clamp(v + step[1] / 100), alpha });
+        }}
+      >
+        {/* Picker handle */}
+        <div
+          className="absolute w-6 h-6 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
+          style={{
+            left: `${s * 100}%`,
+            top: `${(1 - v) * 100}%`,
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: currentHex,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        />
+      </div>
+
+      {/* Hex input */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground shrink-0 w-5">HEX</span>
+        <Input
+          aria-label="Hex color"
+          value={hexInput}
+          onChange={(e) => {
+            setHexInput(e.target.value);
+            if (hexError) setHexError(false);
+          }}
+          onBlur={handleHexCommit}
+          onKeyDown={handleHexKeyDown}
+          aria-invalid={hexError}
+          className="h-7 text-xs font-mono"
+        />
+      </div>
+
+      {/* RGBA inputs */}
+      <div className={cn('grid w-72 gap-1.5', withAlpha ? 'grid-cols-4' : 'grid-cols-3')}>
+        {channel(0, 'R', 'Red')}
+        {channel(1, 'G', 'Green')}
+        {channel(2, 'B', 'Blue')}
+        {withAlpha ? (
+          <div className="flex min-w-0 flex-col items-center gap-0.5">
+            <span className="text-[10px] font-medium text-muted-foreground">A</span>
+            <Input
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              aria-label="Alpha"
+              value={alphaInput}
+              onChange={(e) => {
+                setAlphaInput(e.target.value);
+              }}
+              onBlur={handleAlphaCommit}
+              onKeyDown={handleAlphaKeyDown}
+              className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+          </div>
+        ) : null}
+      </div>
+
+      {/* Hue slider */}
+      <div
+        role="slider"
+        tabIndex={0}
+        aria-label="Hue"
+        aria-valuemin={0}
+        aria-valuemax={360}
+        aria-valuenow={Math.round(h)}
+        className={cn('w-72 h-4 rounded-full cursor-pointer relative overflow-hidden touch-none', sliderFocus)}
+        style={{
+          background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
+        }}
+        onPointerDown={(e) => startDrag(e, (x) => updateColor({ h: x * 360, s, v, alpha }))}
+        onKeyDown={(e) => {
+          const step = arrowStep(e);
+          if (!step) return;
+          e.preventDefault();
+          updateColor({ h: Math.max(0, Math.min(360, h + step[0] + step[1])), s, v, alpha });
+        }}
+      >
+        <div
+          className="absolute w-5 h-5 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
+          style={{
+            left: `${(h / 360) * 100}%`,
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: hueColor,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+          }}
+        />
+      </div>
+
+      {/* Alpha slider */}
+      {withAlpha ? (
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label="Opacity"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(alpha * 100)}
+          className={cn('w-72 h-4 rounded-full cursor-pointer relative overflow-hidden touch-none', sliderFocus)}
+          style={{
+            background: `linear-gradient(to right, transparent, ${currentHex}), repeating-conic-gradient(#808080 0% 25%, #fff 0% 50%) 50% / 8px 8px`,
+          }}
+          onPointerDown={(e) => startDrag(e, (x) => updateColor({ h, s, v, alpha: Math.round(x * 100) / 100 }))}
+          onKeyDown={(e) => {
+            const step = arrowStep(e);
+            if (!step) return;
+            e.preventDefault();
+            updateColor({ h, s, v, alpha: clamp(alpha + (step[0] + step[1]) / 100) });
+          }}
+        >
+          <div
+            className="absolute w-5 h-5 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
+            style={{
+              left: `${alpha * 100}%`,
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: `rgba(${currentRgb[0]}, ${currentRgb[1]}, ${currentRgb[2]}, ${alpha})`,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+            }}
+          />
+        </div>
+      ) : null}
+
+      {swatches?.length ? (
+        <div aria-label="Saved colors" className="flex w-72 flex-wrap gap-1.5" role="group">
+          {swatches.map((swatch) => (
+            <Button
+              aria-label={`Use ${swatch}`}
+              aria-pressed={swatch.toLowerCase() === solidHex}
+              className="size-6 rounded-md border border-foreground/15 aria-pressed:ring-2 aria-pressed:ring-ring"
+              key={swatch}
+              onClick={() => onChange(swatch.toLowerCase())}
+              size={null}
+              style={{ backgroundColor: swatch }}
+              type="button"
+              variant="custom"
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {showContrast ? (
+        <div className="grid w-72 grid-cols-2 gap-1.5 text-xs" aria-label="Text contrast">
+          {(['#ffffff', '#000000'] as const).map((surface) => {
+            const ratio = contrastRatio(solidHex, surface);
+            return (
+              <div
+                className="flex items-center justify-between rounded-md border border-foreground/10 px-2 py-1"
+                key={surface}
+                style={{ backgroundColor: surface, color: solidHex }}
+              >
+                <span className="font-semibold">Aa</span>
+                <span className={surface === '#ffffff' ? 'text-neutral-700' : 'text-neutral-300'}>
+                  {ratio.toFixed(1)}:1 on {surface === '#ffffff' ? 'white' : 'black'}
+                  {ratio >= 4.5 ? '' : ratio >= 3 ? ' · large text' : ' · low'}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const { h, s, v, alpha } = colorToHsva(color);
+  const currentRgb = hsvToRgb(h, s, v);
+  const currentHex = rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]) + (alpha < 1 ? Math.round(alpha * 255).toString(16).padStart(2, '0') : '');
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -296,159 +507,60 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
         align="start"
         side="right"
       >
-        <div className="space-y-3">
-          {/* Saturation/Brightness picker */}
-          <div
-            ref={saturationRef}
-            className="w-72 h-56 rounded-lg cursor-crosshair relative overflow-hidden"
-            style={{
-              background: `linear-gradient(to bottom, transparent, black), linear-gradient(to right, white, ${hueColor})`,
-            }}
-            onMouseDown={handleSaturationMouseDown}
-          >
-            {/* Picker handle */}
-            <div
-              className="absolute w-6 h-6 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
-              style={{
-                left: `${s * 100}%`,
-                top: `${(1 - v) * 100}%`,
-                transform: 'translate(-50%, -50%)',
-                backgroundColor: currentHex,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-              }}
-            />
-          </div>
+        <ColorPanel color={color} onChange={onChange} />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
-          {/* Hex input */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground shrink-0 w-5">HEX</span>
-            <Input
-              value={hexInput}
-              onChange={(e) => {
-                setHexInput(e.target.value);
-                if (hexError) setHexError(false);
-              }}
-              onBlur={handleHexCommit}
-              onKeyDown={handleHexKeyDown}
-              aria-invalid={hexError}
-              className="h-7 text-xs font-mono"
-            />
-          </div>
-
-          {/* RGBA inputs */}
-          <div className="grid w-72 grid-cols-4 gap-1.5">
-            <div className="flex min-w-0 flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground">R</span>
-              <Input
-                type="number"
-                min={0}
-                max={255}
-                step={1}
-                aria-label="Red"
-                value={currentRgb[0]}
-                onChange={(e) => {
-                  const r = Math.max(0, Math.min(255, Math.trunc(Number(e.target.value) || 0)));
-                  const [newH, newS, newV] = rgbToHsv(r, currentRgb[1], currentRgb[2]);
-                  updateColor({ h: newH, s: newS, v: newV, alpha });
-                }}
-                className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-            <div className="flex min-w-0 flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground">G</span>
-              <Input
-                type="number"
-                min={0}
-                max={255}
-                step={1}
-                aria-label="Green"
-                value={currentRgb[1]}
-                onChange={(e) => {
-                  const g = Math.max(0, Math.min(255, Math.trunc(Number(e.target.value) || 0)));
-                  const [newH, newS, newV] = rgbToHsv(currentRgb[0], g, currentRgb[2]);
-                  updateColor({ h: newH, s: newS, v: newV, alpha });
-                }}
-                className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-            <div className="flex min-w-0 flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground">B</span>
-              <Input
-                type="number"
-                min={0}
-                max={255}
-                step={1}
-                aria-label="Blue"
-                value={currentRgb[2]}
-                onChange={(e) => {
-                  const b = Math.max(0, Math.min(255, Math.trunc(Number(e.target.value) || 0)));
-                  const [newH, newS, newV] = rgbToHsv(currentRgb[0], currentRgb[1], b);
-                  updateColor({ h: newH, s: newS, v: newV, alpha });
-                }}
-                className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-            <div className="flex min-w-0 flex-col items-center gap-0.5">
-              <span className="text-[10px] font-medium text-muted-foreground">A</span>
-              <Input
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                aria-label="Alpha"
-                value={alphaInput}
-                onChange={(e) => {
-                  setAlphaInput(e.target.value);
-                }}
-                onBlur={handleAlphaCommit}
-                onKeyDown={handleAlphaKeyDown}
-                className="h-7 w-full text-center text-xs font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-          </div>
-
-          {/* Hue slider */}
-          <div
-            ref={hueRef}
-            className="w-72 h-4 rounded-full cursor-pointer relative overflow-hidden"
-            style={{
-              background: 'linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)',
-            }}
-            onMouseDown={handleHueMouseDown}
-          >
-            <div
-              className="absolute w-5 h-5 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
-              style={{
-                left: `${(h / 360) * 100}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                backgroundColor: hueColor,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-              }}
-            />
-          </div>
-
-          {/* Alpha slider */}
-          <div
-            ref={alphaRef}
-            className="w-72 h-4 rounded-full cursor-pointer relative overflow-hidden"
-            style={{
-              background: `linear-gradient(to right, transparent, ${currentHex}), repeating-conic-gradient(#808080 0% 25%, #fff 0% 50%) 50% / 8px 8px`,
-            }}
-            onMouseDown={handleAlphaMouseDown}
-          >
-            <div
-              className="absolute w-5 h-5 rounded-full border-[3px] border-white shadow-lg pointer-events-none"
-              style={{
-                left: `${alpha * 100}%`,
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                backgroundColor: `rgba(${currentRgb[0]}, ${currentRgb[1]}, ${currentRgb[2]}, ${alpha})`,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-              }}
-            />
-          </div>
-        </div>
+/**
+ * A color for a form: a swatch button showing the hex value opens the
+ * picker, with the given saved colors and text contrast. Always `#rrggbb`.
+ */
+export function SwatchColorPicker({
+  className,
+  disabled,
+  id,
+  onChange,
+  onOpenChange,
+  swatchOnly,
+  swatches,
+  value,
+  'aria-label': ariaLabel,
+}: {
+  className?: string;
+  disabled?: boolean;
+  id?: string;
+  onChange: (color: string) => void;
+  /** Called when the picker opens or closes, such as to save once it closes. */
+  onOpenChange?: (open: boolean) => void;
+  /** Show only the swatch, when a hex field beside it already shows the value. */
+  swatchOnly?: boolean;
+  swatches?: readonly string[];
+  value: string;
+  'aria-label'?: string;
+}) {
+  return (
+    <Popover onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          aria-label={ariaLabel}
+          className={cn('h-9 justify-start gap-2 font-mono font-normal', swatchOnly && 'w-9 justify-center px-0', className)}
+          disabled={disabled}
+          id={id}
+          type="button"
+          variant="outline"
+        >
+          <span
+            aria-hidden
+            className="size-5 shrink-0 rounded-md border border-foreground/15"
+            style={{ backgroundColor: value }}
+          />
+          {swatchOnly ? null : value}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-3">
+        <ColorPanel alpha={false} color={value} onChange={onChange} showContrast swatches={swatches} />
       </PopoverContent>
     </Popover>
   );

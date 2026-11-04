@@ -1,9 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { usePreferences } from './PreferencesProvider'
 import { SaveStatus, useSaveState } from './controls'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 
 /** Save a personal accent; artwork and teammates keep their own colors. */
@@ -11,6 +12,8 @@ export function AccentColorSettings() {
   const { preferences, save, status } = usePreferences()
   const [state, run] = useSaveState()
   const disabled = status !== 'ready' || state === 'saving'
+  const [draft, setDraft] = useState<string | null>(null)
+  const accent = draft ?? (preferences?.accentColor || '#527bc4')
   return (
     <form
       className="grid gap-2"
@@ -28,15 +31,13 @@ export function AccentColorSettings() {
         automatically.
       </p>
       <div className="flex flex-wrap items-center gap-2">
-        <Input
-          key={preferences?.accentColor}
-          id="personal-accent"
-          name="accentColor"
-          type="color"
-          defaultValue={preferences?.accentColor || '#527bc4'}
+        <SwatchColorPicker
           disabled={disabled}
-          className="h-9 w-14 rounded border bg-background p-1"
+          id="personal-accent"
+          onChange={setDraft}
+          value={accent}
         />
+        <input name="accentColor" type="hidden" value={accent} />
         <Button size="sm" disabled={disabled} type="submit">
           Apply accent
         </Button>

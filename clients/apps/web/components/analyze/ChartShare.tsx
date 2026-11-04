@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Slider } from '@/components/ui/slider'
@@ -110,12 +110,10 @@ export function ChartShare({
           </Label>
           <Label>
             Color{' '}
-            <Input
+            <SwatchColorPicker
               aria-label="Image color"
-              className="w-14 p-1"
-              type="color"
               value={color}
-              onChange={(e) => setColor(e.target.value)}
+              onChange={setColor}
             />
           </Label>
           <Label>
