@@ -1686,11 +1686,11 @@ func init() {
 	sharelinkFields := schema.ShareLink{}.Fields()
 	_ = sharelinkFields
 	// sharelinkDescCreatedAt is the schema descriptor for created_at field.
-	sharelinkDescCreatedAt := sharelinkFields[13].Descriptor()
+	sharelinkDescCreatedAt := sharelinkFields[14].Descriptor()
 	// sharelink.DefaultCreatedAt holds the default value on creation for the created_at field.
 	sharelink.DefaultCreatedAt = sharelinkDescCreatedAt.Default.(func() time.Time)
 	// sharelinkDescUpdatedAt is the schema descriptor for updated_at field.
-	sharelinkDescUpdatedAt := sharelinkFields[14].Descriptor()
+	sharelinkDescUpdatedAt := sharelinkFields[15].Descriptor()
 	// sharelink.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	sharelink.DefaultUpdatedAt = sharelinkDescUpdatedAt.Default.(func() time.Time)
 	// sharelink.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -30,6 +30,8 @@ const (
 	FieldDescription = "description"
 	// FieldAltText holds the string denoting the alt_text field in the database.
 	FieldAltText = "altText"
+	// FieldCode holds the string denoting the code field in the database.
+	FieldCode = "code"
 	// FieldAccess holds the string denoting the access field in the database.
 	FieldAccess = "access"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
@@ -57,6 +59,7 @@ var Columns = []string{
 	FieldTitle,
 	FieldDescription,
 	FieldAltText,
+	FieldCode,
 	FieldAccess,
 	FieldExpiresAt,
 	FieldRevokedAt,

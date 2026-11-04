@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -28,9 +29,9 @@ func (c *Configuration) requireCreativeSetCreation(ctx context.Context, actor Ac
 }
 
 // requireCreativeCreation gates new rows. Story Sets stay behind their rollout
-// feature; a canvas is part of the paid workspace (RFC 032).
+// feature; a canvas (RFC 032) and a code project (RFC 053) are part of the paid workspace.
 func (c *Configuration) requireCreativeCreation(ctx context.Context, actor Actor, kind platformcreativeset.Kind) error {
-	if kind != platformcreativeset.KindCanvas {
+	if kind == platformcreativeset.KindStorySet {
 		return c.requireCreativeSetCreation(ctx, actor)
 	}
 	if err := c.AuthorizeRead(ctx, actor); err != nil {
@@ -49,21 +50,86 @@ func number(value any) float64 {
 	return -1
 }
 
-// creativeSetKind is the row kind a document belongs to: a canvas names itself,
-// and every earlier document is a Story Set.
+// creativeSetKind is the row kind a document belongs to: a canvas or a code
+// project names itself, and every earlier document is a Story Set.
 func creativeSetKind(document map[string]any) platformcreativeset.Kind {
-	if document["kind"] == string(platformcreativeset.KindCanvas) {
+	switch document["kind"] {
+	case string(platformcreativeset.KindCanvas):
 		return platformcreativeset.KindCanvas
+	case string(platformcreativeset.KindCode):
+		return platformcreativeset.KindCode
 	}
 	return platformcreativeset.KindStorySet
 }
 
-// creativeDocumentAssetIDs validates a document of either kind and lists its assets.
+// creativeDocumentAssetIDs validates a document of any kind and lists its assets.
 func creativeDocumentAssetIDs(document map[string]any) ([]string, error) {
-	if creativeSetKind(document) == platformcreativeset.KindCanvas {
+	switch creativeSetKind(document) {
+	case platformcreativeset.KindCanvas:
 		return canvasAssetIDs(document)
+	case platformcreativeset.KindCode:
+		return codeDocumentAssetIDs(document)
 	}
 	return creativeSetAssetIDs(document)
+}
+
+var assetReference = regexp.MustCompile(`^asset:([0-9a-fA-F-]{36})$`)
+
+// codeDocumentAssetIDs checks a Code Studio document's envelope (RFC 053). The web
+// validates every field; this bounds what any client can store. Code text is never
+// scanned for references, so a snippet may contain "blob:" or "asset:" freely. The
+// only asset a code project uses is its footer logo.
+func codeDocumentAssetIDs(document map[string]any) ([]string, error) {
+	encoded, err := json.Marshal(document)
+	if err != nil || len(encoded) > 1<<20 || number(document["version"]) != 1 {
+		return nil, invalid("Use a supported code document under 1 MB.")
+	}
+	slides, ok := document["slides"].([]any)
+	if !ok || len(slides) < 1 || len(slides) > 50 {
+		return nil, invalid("A code project has 1 to 50 slides.")
+	}
+	for _, value := range slides {
+		slide, ok := value.(map[string]any)
+		if !ok {
+			return nil, ErrInvalidInput
+		}
+		panes, ok := slide["panes"].([]any)
+		if !ok || len(panes) < 1 || len(panes) > 2 {
+			return nil, ErrInvalidInput
+		}
+		for _, value := range panes {
+			pane, ok := value.(map[string]any)
+			if !ok {
+				return nil, ErrInvalidInput
+			}
+			files, ok := pane["files"].([]any)
+			if !ok || len(files) < 1 || len(files) > 10 {
+				return nil, ErrInvalidInput
+			}
+			for _, value := range files {
+				file, ok := value.(map[string]any)
+				if !ok {
+					return nil, ErrInvalidInput
+				}
+				code, ok := file["code"].(string)
+				base, _ := file["base"].(string)
+				if !ok || utf8.RuneCountInString(code) > 100_000 || utf8.RuneCountInString(base) > 100_000 {
+					return nil, invalid("Keep each file under 100,000 characters.")
+				}
+			}
+		}
+	}
+	style, _ := document["style"].(map[string]any)
+	footer, _ := style["footer"].(map[string]any)
+	logo, _ := footer["logo"].(string)
+	if logo == "" {
+		return []string{}, nil
+	}
+	match := assetReference.FindStringSubmatch(logo)
+	if match == nil {
+		return nil, invalid("The footer logo must be an uploaded asset of this workspace.")
+	}
+	return []string{match[1]}, nil
 }
 
 // Canvas workspaces hold positioned artboards, each a complete native design document.
@@ -300,6 +366,10 @@ func requireCreativeSetAssets(ctx context.Context, tx *ent.Tx, organizationID st
 	}
 	if count != len(ids) {
 		return invalid("Every image must be an uploaded asset of this workspace.")
+	}
+	// A code project pins no brand or block versions: its brand theme is a frozen copy.
+	if creativeSetKind(document) == platformcreativeset.KindCode {
+		return nil
 	}
 	var checkBrand func(any) error
 	checkBrand = func(value any) error {

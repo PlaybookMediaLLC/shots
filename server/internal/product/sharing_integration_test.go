@@ -72,6 +72,28 @@ func TestShareLinksAndIntegrations(t *testing.T) {
 		t.Fatalf("resolved=%+v err=%v", resolved, err)
 	}
 
+	// A code embed keeps a frozen Code Studio document and resolves with it.
+	embed, err := repo.CreateShareLink(ctx, actor, ShareLinkInput{AssetID: image, Title: "Snippet", Access: "PUBLIC", Code: codeFixture("const a = 1")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := repo.ResolveShareLink(ctx, embed.Token); err != nil || resolved.Code["kind"] != "code" {
+		t.Fatalf("code embed=%+v err=%v", resolved, err)
+	}
+	if resolved, err := repo.ResolveShareLink(ctx, link.Token); err != nil || resolved.Code != nil {
+		t.Fatalf("an image link carried code: %+v %v", resolved, err)
+	}
+	withLogo := codeFixture("x")
+	withLogo["style"].(map[string]any)["footer"] = map[string]any{"logo": "asset:" + image}
+	for name, input := range map[string]ShareLinkInput{
+		"code with a private logo": {AssetID: image, Title: "x", Access: "PUBLIC", Code: withLogo},
+		"a canvas as code":         {AssetID: image, Title: "x", Access: "PUBLIC", Code: canvasFixture()},
+	} {
+		if _, err := repo.CreateShareLink(ctx, actor, input); err == nil {
+			t.Fatalf("%s was accepted", name)
+		}
+	}
+
 	for name, input := range map[string]ShareLinkInput{
 		"another workspace's asset": {AssetID: foreign, Title: "x", Access: "PUBLIC"},
 		"an asset still uploading":  {AssetID: pending, Title: "x", Access: "PUBLIC"},

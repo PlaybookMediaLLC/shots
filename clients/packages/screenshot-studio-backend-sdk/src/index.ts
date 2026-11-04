@@ -1418,8 +1418,23 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, or a canvas workspace of artboards. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards or a Code Studio project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'code'
+
+/** One file of a code import: whole code, or a unified patch of a change. */
+export type BackendCodeImportFile = { name: string; code?: string; patch?: string; status?: string }
+
+/** What a GitHub link holds, for Code Studio (RFC 053). */
+export type BackendCodeImport = {
+  kind: 'github-file' | 'github-pull' | 'github-commit' | 'gist'
+  url: string
+  repo?: string
+  ref?: string
+  path?: string
+  title?: string
+  startLine?: number
+  files: BackendCodeImportFile[]
+}
 
 /** A cloud creativeSet: an editor composition with revision-checked writes. */
 export type BackendCreativeSet = {
@@ -1429,7 +1444,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas document names itself (`kind: 'canvas'`); every other document is a Story Set. */
+  /** A canvas or code document names itself (`kind: 'canvas'` or `'code'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string
@@ -1501,6 +1516,8 @@ export type BackendPublicShareLink = {
   posterMediaType: string | null
   title: string
   width: number | null
+  /** A frozen Code Studio document, for a live code embed. */
+  code?: Record<string, unknown> | null
 }
 
 /** A provider an integration connects. */
@@ -3802,6 +3819,11 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Read the code a GitHub file, pull request, commit or gist link points to; nothing is stored. */
+  async importCode(url: string) {
+    return this.request<BackendCodeImport>('v1/code-imports', { body: { url }, method: 'POST' })
+  }
+
   async listShareLinks() {
     return this.request<{ shareLinks: BackendShareLink[] }>('v1/share-links')
   }
@@ -3819,6 +3841,8 @@ export class ScreenshotStudioBackendSDK {
     posterAssetId?: string | null
     projectId?: string | null
     title: string
+    /** A Code Studio document to embed as text; frozen when the link is made. */
+    code?: Record<string, unknown>
   }) {
     return this.request<BackendShareLink>('v1/share-links', { body: input, method: 'POST' })
   }

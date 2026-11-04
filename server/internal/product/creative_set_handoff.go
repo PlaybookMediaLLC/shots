@@ -67,6 +67,10 @@ func (c *Configuration) AttachCreativeSetDelivery(ctx context.Context, actor Act
 	if err != nil {
 		return nil, err
 	}
+	// A code project has no delivery outputs; its images reach campaigns as linked assets.
+	if set.Kind == platformcreativeset.KindCode {
+		return nil, invalid("Code projects are not delivered this way. Save the image and add it to the campaign.")
+	}
 	designID := handoffID(actor.OrganizationID + ":" + setID + ":" + input.DeliveryID + ":" + owner.ID)
 	postID := handoffID(designID + ":post")
 	result := &CreativeSetHandoffResult{CampaignID: owner.ID, DesignID: designID, PostID: postID}
