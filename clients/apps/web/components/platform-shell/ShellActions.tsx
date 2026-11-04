@@ -57,12 +57,12 @@ export function SearchButton() {
       data-platform-action
       variant="ghost"
       size={null}
-      className="touch-hitbox grid size-8 place-items-center rounded-md p-0 text-muted-foreground hover:text-foreground"
+      className="touch-hitbox grid size-8 place-items-center rounded-full p-0 text-muted-foreground hover:text-foreground"
       aria-label={t('searchCommands')}
       title={`${t('searchCommands')} (${keys.label({ key: 'k', mod: true })})`}
       onClick={() => window.dispatchEvent(new Event('shots:search'))}
     >
-      <SearchIcon className="size-4" aria-hidden="true" />
+      <SearchIcon className="size-[18px]" aria-hidden="true" />
     </Button>
   )
 }
@@ -107,13 +107,13 @@ export function ShellActions({
             variant="custom"
             size={null}
             className={cn(
-              // A secondary button: the page keeps the one primary action.
-              'flex h-8 w-full items-center justify-start gap-2 rounded-md border border-border px-3 text-ui font-medium text-foreground transition-colors hover:bg-foreground/[0.04]',
-              collapsed && 'mx-auto size-8 justify-center px-0'
+              // The landing page's primary pill.
+              'flex h-9 w-full items-center justify-start gap-2 rounded-full bg-primary px-3.5 text-ui-lg font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+              collapsed && 'mx-auto size-10 justify-center px-0'
             )}
             aria-label={t('new')}
           >
-            <AddIcon className="size-4" aria-hidden="true" />
+            <AddIcon className="size-[18px]" aria-hidden="true" />
             {!collapsed ? t('new') : null}
           </Button>
         </DropdownMenuTrigger>

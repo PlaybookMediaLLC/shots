@@ -49,8 +49,6 @@ export async function PlatformShell({
         data-platform-variant={variant}
         className={cn(
           'platform-shell flex h-dvh min-h-0 flex-col overflow-hidden text-foreground md:flex-row',
-          // Pages: the sidebar and content are two cards 12px apart, 12px from the window.
-          variant === 'page' && 'md:gap-3 md:p-3',
           surface.base
         )}
       >
@@ -82,7 +80,7 @@ export async function PlatformShell({
           />
         ) : null}
         {variant === 'page' ? (
-          <div className="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden md:py-3 md:pe-3">
             <div
               data-platform-scroll
               id="platform-content"
@@ -90,8 +88,8 @@ export async function PlatformShell({
               aria-label="Page content"
               role="region"
               className={cn(
-                'h-full min-h-0 overflow-y-auto overscroll-contain md:rounded-[14px] md:border',
-                surface.base,
+                'h-full min-h-0 overflow-y-auto overscroll-contain md:rounded-2xl md:border',
+                surface.panel,
                 surface.border
               )}
             >

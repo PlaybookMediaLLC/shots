@@ -3,7 +3,7 @@
    rules out of canvas and export geometry. */
 .platform-shell,
 .platform-overlay {
-  --platform-nav-expanded: 14.875rem; /* 238px */
+  --platform-nav-expanded: 15rem;
   --platform-nav-compact: 4.75rem;
   --platform-header-height: 3.5rem;
   --platform-form-width: 55rem;
@@ -23,10 +23,10 @@
    13px UI text, and text-sm is that 13px step. On body, so portaled menus
    match. The editor keeps its own sizes. */
 :is(
-  body:has(.platform-shell[data-platform-variant='page']),
-  .platform-overlay,
-  [data-platform-sidebar]
-) {
+    body:has(.platform-shell[data-platform-variant='page']),
+    .platform-overlay,
+    [data-platform-sidebar]
+  ) {
   --text-sm: var(--text-ui);
   --text-sm--line-height: var(--text-ui--line-height);
 }
@@ -44,15 +44,14 @@ body:has(.platform-shell[data-platform-variant='page']) {
   --background: #fafafa;
   --card: #ffffff;
   --popover: #ffffff;
-  --sidebar: #ffffff;
+  /* The sidebar keeps sharing the page's surface. */
+  --sidebar: var(--background);
   --border: #eaeaea;
   --input: #eaeaea;
-  --sidebar-border: #eaeaea;
   --divider: #f2f2f2;
   --foreground: #0a0a0a;
   --card-foreground: #0a0a0a;
   --popover-foreground: #0a0a0a;
-  --sidebar-foreground: #0a0a0a;
   --muted-foreground: #666666;
   --fg-tertiary: #8f8f8f;
   --destructive: #d11a28;
@@ -64,15 +63,12 @@ body:has(.platform-shell[data-platform-variant='page']) {
   --background: #000000;
   --card: #0a0a0a;
   --popover: #0a0a0a;
-  --sidebar: #0a0a0a;
   --border: #1f1f1f;
   --input: #1f1f1f;
-  --sidebar-border: #1f1f1f;
   --divider: #1f1f1f;
   --foreground: #ededed;
   --card-foreground: #ededed;
   --popover-foreground: #ededed;
-  --sidebar-foreground: #ededed;
   --muted-foreground: #a1a1a1;
   --fg-tertiary: #737373;
   /* The dark theme keeps its danger and success colours. */
@@ -110,7 +106,7 @@ body:has(.platform-shell[data-platform-variant='page']) {
 
 [data-platform-sidebar] :where([data-platform-nav], [data-platform-action]) {
   min-width: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   font-size: var(--text-ui);
   font-weight: 500;
   line-height: var(--text-ui--line-height);
@@ -120,43 +116,19 @@ body:has(.platform-shell[data-platform-variant='page']) {
     color var(--platform-duration) var(--platform-ease);
 }
 
-/* Navigation rows: body text until hovered. The current page is medium
-   weight with a short bar at its left edge, and no fill. */
+/* Polar's navigation rows: muted until hovered, the current page raised as
+   a card above the sidebar (NavList's active item). */
 [data-platform-sidebar] [data-platform-nav] {
-  position: relative;
-  border-radius: 6px;
-  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
   color: var(--muted-foreground);
-  font-weight: 400;
 }
 
 [data-platform-sidebar] [data-platform-nav][aria-current='page'] {
+  border-color: var(--border);
+  background: var(--card);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   color: var(--foreground);
-  font-weight: 500;
-}
-
-[data-platform-sidebar] [data-platform-nav][aria-current='page']::before {
-  position: absolute;
-  inset-block: 8px;
-  inset-inline-start: 0;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--foreground);
-  content: '';
-}
-
-/* An open area's row leaves the bar to its current page in the group below. */
-[data-platform-sidebar] [data-platform-nav][aria-current='page']:has(+ nav)::before {
-  display: none;
-}
-
-/* The page variant draws the sidebar as its own card beside the content card. */
-@media (min-width: 768px) {
-  .platform-shell[data-platform-variant='page'] [data-platform-sidebar] {
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: var(--card);
-  }
 }
 
 /* The expanded sidebar lists the open area's pages (Polar's NavList), so the
@@ -697,4 +669,23 @@ body:has([data-platform-shell])
     [data-slot='select-content']
   ) {
   --tw-enter-opacity: 1;
+}
+
+/* The sidebar keeps its own controls: round, at the sizes their classes set.
+   revert-layer returns each property to the Tailwind utilities. */
+[data-platform-sidebar]
+  :is([data-slot='button'], [data-slot$='-trigger'][data-variant]):not(
+    [data-variant='custom'],
+    [data-variant='integration']
+  ) {
+  width: revert-layer;
+  height: revert-layer;
+  padding-inline: revert-layer;
+  border: revert-layer;
+  border-radius: 999px;
+  background: revert-layer;
+  box-shadow: revert-layer;
+  color: revert-layer;
+  font-size: revert-layer;
+  line-height: revert-layer;
 }

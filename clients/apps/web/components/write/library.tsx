@@ -119,8 +119,7 @@ export function WriteRail() {
       className="flex h-full min-h-0 w-full flex-col"
       data-testid="write-rail"
     >
-      {/* The page's top bar: its title, and Bulk schedule. */}
-      <div className="flex min-h-[68px] shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+      <div className="flex items-center justify-between gap-2 px-3 pt-4">
         <h2 className="text-heading">Publish</h2>
         {canEdit && (
           <Button asChild variant="outline" size="sm">

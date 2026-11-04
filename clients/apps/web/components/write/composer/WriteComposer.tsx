@@ -859,7 +859,7 @@ export function WriteComposer({
       >
         {/* The panel gives way before the editor drops below a readable column. */}
         <div className="flex min-w-[min(26rem,100%)] flex-1 flex-col">
-          <header className="sticky top-0 z-20 flex min-h-[68px] shrink-0 flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2">
+          <header className="sticky top-0 z-20 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/90 px-3 py-2 backdrop-blur">
             <DraftsDrawerButton />
             {set ? (
               <span

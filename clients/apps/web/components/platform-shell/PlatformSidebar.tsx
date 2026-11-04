@@ -141,7 +141,7 @@ function Navigation({
     return <SettingsNav collapsed={collapsed} onNavigate={onNavigate} />
   }
   return (
-    <nav aria-label={t('workspace')} className="flex min-h-full flex-col gap-3">
+    <nav aria-label={t('workspace')} className="flex min-h-full flex-col gap-4">
       <ShellActions
         collapsed={collapsed}
         campaignsEnabled={campaignsEnabled}
@@ -152,12 +152,9 @@ function Navigation({
         role={role}
       />
       {NAV_GROUPS.map((group, index) => (
-        <div
-          className={cn('grid gap-px', index === 1 && 'mt-auto border-t border-border pt-3')}
-          key={index}
-        >
+        <div className={cn('grid gap-0.5', index === 1 && 'mt-auto pt-4')} key={index}>
           {group.label && !collapsed ? (
-            <p className="platform-eyebrow mb-1 px-2">{t('workspace')}</p>
+            <p className="platform-eyebrow mb-1 px-3">{t('workspace')}</p>
           ) : null}
           {group.items
             .filter((item) => campaignsEnabled || item.href !== '/campaigns')
@@ -207,13 +204,13 @@ function WorkspaceSwitcher({
       align={collapsed ? 'end' : 'start'}
       side={collapsed ? 'right' : 'top'}
       triggerClassName={cn(
-        'flex h-10 w-full min-w-0 items-center gap-2 rounded-md px-2 text-start transition-colors hover:bg-foreground/[0.05]',
+        'flex h-11 w-full min-w-0 items-center gap-2.5 rounded-xl px-2 text-start transition-colors hover:bg-foreground/[0.05]',
         collapsed && 'mx-auto size-10 justify-center px-0'
       )}
     >
       <span
         aria-hidden="true"
-        className="grid size-6 shrink-0 place-items-center rounded-md bg-foreground text-xs font-medium text-background"
+        className="grid size-7 shrink-0 place-items-center rounded-lg bg-foreground text-xs font-medium text-background"
       >
         {organizationName.trim().charAt(0).toUpperCase() || 'W'}
       </span>
@@ -310,7 +307,7 @@ function SidebarFooter({
                 type="button"
                 variant="custom"
               >
-                <SidebarIcon size={16} aria-hidden="true" />
+                <SidebarIcon size={17} aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="right">
@@ -341,9 +338,7 @@ function Brand({ collapsed }: { collapsed: boolean }) {
         width={24}
       />
       {collapsed ? null : (
-        <span className="truncate text-ui-lg font-[450] tracking-[-0.015em] text-foreground">
-          Shots
-        </span>
+        <span className="truncate text-[15px] font-medium text-foreground">Shots</span>
       )}
     </SidebarLink>
   )
@@ -452,7 +447,7 @@ export function PlatformSidebar({
         aria-label="Primary navigation"
         data-platform-sidebar
         className={cn(
-          'hidden h-full shrink-0 flex-col px-3 pt-3 pb-3 md:flex',
+          'hidden h-full shrink-0 flex-col px-3 pt-4 pb-3 md:flex',
           collapsed
             ? 'w-[var(--platform-nav-compact)] items-center'
             : 'w-[var(--platform-nav-expanded)]',
@@ -473,7 +468,7 @@ export function PlatformSidebar({
           </div>
         </div>
 
-        <div className="mt-4 min-h-0 w-full flex-1 overflow-y-auto overscroll-contain px-0.5 py-1">
+        <div className="mt-5 min-h-0 w-full flex-1 overflow-y-auto overscroll-contain px-0.5 py-1">
           <Navigation
             campaignsEnabled={campaignsEnabled}
             collapsed={collapsed}

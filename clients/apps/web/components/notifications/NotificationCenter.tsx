@@ -120,7 +120,7 @@ export function NotificationCenter({
             aria-label={`Notifications${n ? `, ${n} unread` : ''}`}
             className={`touch-hitbox relative flex h-10 items-center gap-3 rounded-lg px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground ${collapsed ? 'size-8 justify-center px-0' : 'w-full'}`}
           >
-            <NotificationsIcon className="size-4 shrink-0" aria-hidden="true" />
+            <NotificationsIcon className="size-[18px] shrink-0" aria-hidden="true" />
             {!collapsed ? <span>Notifications</span> : null}
             {n > 0 ? (
               <span
