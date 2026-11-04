@@ -99,12 +99,12 @@ test('a stored session resumes only for a known tour and a step it has', () => {
 })
 
 test('a step route covers its page and the pages under it, with or without the locale', () => {
-  assert.equal(isOnTourRoute('/write', '/write'), true)
-  assert.equal(isOnTourRoute('/fr/write', '/write'), true)
+  assert.equal(isOnTourRoute('/publish', '/publish'), true)
+  assert.equal(isOnTourRoute('/fr/publish', '/publish'), true)
   // An open draft keeps the Publish rail, so the tour does not close it.
-  assert.equal(isOnTourRoute('/write/cmw1n2fx500000a052bauxilt', '/write'), true)
-  assert.equal(isOnTourRoute('/writer', '/write'), false)
-  assert.equal(isOnTourRoute('/home', '/write'), false)
+  assert.equal(isOnTourRoute('/publish/cmw1n2fx500000a052bauxilt', '/publish'), true)
+  assert.equal(isOnTourRoute('/writer', '/publish'), false)
+  assert.equal(isOnTourRoute('/home', '/publish'), false)
   assert.equal(isOnTourRoute('/home', undefined), true)
 })
 

@@ -75,7 +75,7 @@ test('a member saves a code project, reopens it from the Library and posts it wi
   const dialog = page.getByRole('dialog', { name: 'Post this' })
   await dialog.getByRole('switch', { name: 'Add the code as a reply' }).click()
   await dialog.getByRole('button', { name: 'Create draft' }).click()
-  await page.waitForURL(/\/write\/[^/?]+/, { timeout: 120_000 })
+  await page.waitForURL(/\/publish\/[^/?]+/, { timeout: 120_000 })
   const draftId = new URL(page.url()).pathname.split('/').pop()!
 
   const draft = (await browserJson(page, `/api/v1/content-drafts/${draftId}`)) as {

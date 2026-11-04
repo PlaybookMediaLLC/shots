@@ -19,6 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import { createWritingDraft } from './pending-draft'
 import { cn } from '@/lib/utils'
@@ -35,11 +36,11 @@ export const SHORTCUT_REFERENCE: {
   items: (Pick<Shortcut, 'alt' | 'key' | 'mod' | 'shift'> & { label: string })[]
 }[] = [
   {
-    group: 'Everywhere in Write',
+    group: 'Everywhere in Publish',
     items: [
       { key: 'k', label: 'Search and commands', mod: true },
       { key: '/', label: 'Show or hide the drafts list', mod: true },
-      { key: '1', label: 'Write', mod: true, shift: true },
+      { key: '1', label: 'Drafts', mod: true, shift: true },
       { key: '2', label: 'Calendar', mod: true, shift: true },
       { key: '.', label: 'New draft', mod: true },
       { alt: true, key: 'arrowdown', label: 'Next draft', mod: true },
@@ -120,6 +121,15 @@ export function WriteFrame({
       <FrameLayout activeId={activeId} campaignsEnabled={campaignsEnabled} section={section}>
         {children}
       </FrameLayout>
+      {/* Every Publish page opens its brand's settings over itself (?settings=scheduling). */}
+      {data.activeSet ? (
+        <DraftSettingsDrawer
+          advancedScheduling={data.advancedScheduling}
+          canManage={canManageSets}
+          canWrite={canEdit}
+          socialSetId={data.activeSet.id}
+        />
+      ) : null}
     </WriteProvider>
   )
 }
@@ -220,17 +230,17 @@ function FrameLayout({
     },
     {
       key: '!',
-      label: 'Write',
+      label: 'Drafts',
       mod: true,
-      run: () => router.push(`/write${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
+      run: () => router.push(`/publish${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
       shift: true,
       inEditor: true,
     },
     {
       key: '1',
-      label: 'Write',
+      label: 'Drafts',
       mod: true,
-      run: () => router.push(`/write${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
+      run: () => router.push(`/publish${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
       shift: true,
       inEditor: true,
     },
@@ -238,7 +248,7 @@ function FrameLayout({
       key: '@',
       label: 'Calendar',
       mod: true,
-      run: () => router.push(`/write/plan${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
+      run: () => router.push(`/publish/calendar${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
       shift: true,
       inEditor: true,
     },
@@ -246,7 +256,7 @@ function FrameLayout({
       key: '2',
       label: 'Calendar',
       mod: true,
-      run: () => router.push(`/write/plan${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
+      run: () => router.push(`/publish/calendar${data.activeSet ? `?set=${data.activeSet.id}` : ''}`),
       shift: true,
       inEditor: true,
     },
@@ -322,7 +332,6 @@ function FrameLayout({
         <div className={cn(activeId && section === 'drafts' && 'hidden md:block')}>
           <WorkspaceNav
             active={section}
-            campaigns={campaignsEnabled}
             scope={data.activeSet ? `?set=${data.activeSet.id}` : ''}
           />
         </div>

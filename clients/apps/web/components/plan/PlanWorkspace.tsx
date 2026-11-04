@@ -71,6 +71,7 @@ import {
   type PlanItem,
   type PlanPreferences,
 } from '@/lib/plan/calendar'
+import { DraftSettingsDrawer, openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from './WorkspaceNav'
 import { useDraftSources } from './useDraftSources'
 
@@ -90,6 +91,7 @@ const toggle = (values: string[], value: string) =>
 export function PlanWorkspace({
   sets,
   canEdit,
+  canManageSets = false,
   canPublish,
   preferenceKey,
   initialZone,
@@ -97,10 +99,11 @@ export function PlanWorkspace({
   initialDay,
   initialView,
   advancedScheduling = false,
-  campaignsEnabled = false,
 }: {
   sets: SocialSetWire[]
   canEdit: boolean
+  /** May change a brand's settings (workspace:update), in the sheet "Edit schedule" opens. */
+  canManageSets?: boolean
   canPublish: boolean
   preferenceKey: string
   initialZone: string
@@ -108,8 +111,6 @@ export function PlanWorkspace({
   initialDay?: string
   initialView?: string
   advancedScheduling?: boolean
-  /** Campaigns are usable here, so Publish lists Campaign deliveries. */
-  campaignsEnabled?: boolean
 }) {
   const router = useRouter()
   const [prefs, setPrefs] = React.useState<PlanPreferences>(() =>
@@ -539,12 +540,15 @@ export function PlanWorkspace({
               >
                 Available · {slot.displayTime}
               </Button>
-              <Link
-                className="block text-right text-[10px] text-muted-foreground underline"
-                href={`/write/settings?set=${focused.id}`}
+              <Button
+                className="block w-full text-right text-[10px] text-muted-foreground underline"
+                onClick={() => openBrandSettings('scheduling', focused.id)}
+                size={null}
+                type="button"
+                variant="custom"
               >
                 Edit schedule
-              </Link>
+              </Button>
             </div>
           )
         })
@@ -574,7 +578,15 @@ export function PlanWorkspace({
   }
   return (
     <div className="flex h-full min-h-0 flex-col" inert={!hydrated} aria-busy={!hydrated}>
-      <WorkspaceNav active="plan" campaigns={campaignsEnabled} />
+      <WorkspaceNav active="plan" />
+      {sets[0] ? (
+        <DraftSettingsDrawer
+          advancedScheduling={advancedScheduling}
+          canManage={canManageSets}
+          canWrite={canEdit}
+          socialSetId={focused?.id ?? sets[0].id}
+        />
+      ) : null}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <aside
           aria-label="Calendar accounts"
@@ -627,7 +639,7 @@ export function PlanWorkspace({
                       e.dataTransfer.setData(DRAG, d.id)
                       e.dataTransfer.effectAllowed = 'copy'
                     }}
-                    href={`/write/${d.id}`}
+                    href={`/publish/${d.id}`}
                     className="my-2 block rounded border p-2 text-xs"
                   >
                     <strong className="block">
@@ -687,8 +699,13 @@ export function PlanWorkspace({
                     >
                       Drafts
                     </Button>
-                    <Button asChild className="h-7 px-1.5 text-xs" size={null} variant="ghost">
-                      <Link href={`/write/settings?set=${set.id}`}>Settings</Link>
+                    <Button
+                      className="h-7 px-1.5 text-xs"
+                      onClick={() => openBrandSettings('scheduling', set.id)}
+                      size={null}
+                      variant="ghost"
+                    >
+                      Settings
                     </Button>
                   </div>
                 </div>
@@ -700,7 +717,7 @@ export function PlanWorkspace({
               ) : null}
               {!sets.length ? (
                 <Button asChild variant="outline">
-                  <Link href="/workspace/social-sets">
+                  <Link href="/settings/publishing-brands">
                     Connect a social account to plan content
                   </Link>
                 </Button>
@@ -1215,7 +1232,7 @@ function PlanComposer({
     try {
       if (!set || !set.accounts.some((a) => a.health === 'connected'))
         throw new Error(
-          'Choose a connected account. Reconnect it in social-set settings if needed.'
+          'Choose a connected account. Reconnect it in Settings › Publishing brands if needed.'
         )
       const instant = selectedInstant(local, zone, choice)
       if (picker && !selected) throw new Error('Choose content first.')
@@ -1295,7 +1312,7 @@ function PlanComposer({
       toast.success(
         schedule ? 'Publication scheduled.' : 'Draft planned. It will not publish automatically.'
       )
-      if (openEditor) router.push(`/write/${draft.id}`)
+      if (openEditor) router.push(`/publish/${draft.id}`)
     } catch (e) {
       setError(
         e instanceof Error ? e.message : 'Could not save. Retry without closing this composer.'
@@ -1562,7 +1579,7 @@ function PlanComposer({
  */
 function reviewScheduleHref(draftId: string, at: Date, zone: string): string {
   const wall = wallTime(at, zone)
-  return `/write/${draftId}?${new URLSearchParams({ panel: 'schedule', day: wall.slice(0, 10), time: wall.slice(11) })}`
+  return `/publish/${draftId}?${new URLSearchParams({ panel: 'schedule', day: wall.slice(0, 10), time: wall.slice(11) })}`
 }
 
 function PlanDetail({
@@ -1702,7 +1719,7 @@ function PlanDetail({
             </Button>
           ) : null}
           <Button asChild className="h-auto justify-start p-0" size={null} variant="link">
-            <Link href={`/write/${item.draftId}`}>Open in editor</Link>
+            <Link href={`/publish/${item.draftId}`}>Open in editor</Link>
           </Button>
           <TimeFields
             local={local}
@@ -1959,7 +1976,7 @@ function PlanDetail({
                   </p>
                 ))}
                 <Button asChild className="h-auto p-0" size={null} variant="link">
-                  <Link href={`/write/${item.draftId}?panel=backups`}>
+                  <Link href={`/publish/${item.draftId}?panel=backups`}>
                     Browse revisions in editor
                   </Link>
                 </Button>

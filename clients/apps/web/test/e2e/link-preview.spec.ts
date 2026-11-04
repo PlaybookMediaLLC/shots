@@ -12,7 +12,7 @@ test('batch drill-ins preserve results without fetching again, and compare swaps
   page,
 }) => {
   await createWorkspace(identity, page)
-  await app.open('/link-preview')
+  await app.open('/publish/link-checks')
   let requests = 0
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/v1/link-preview') requests++
@@ -62,7 +62,7 @@ test(
       await route.fulfill({ status: 404, body: '' })
     })
     await createWorkspace(identity, page)
-    await app.open(`/link-preview?url=${encodeURIComponent(first)}`)
+    await app.open(`/publish/link-checks?url=${encodeURIComponent(first)}`)
     await page.getByRole('tab', { name: 'Images', exact: true }).click()
     await page.getByLabel('Headline', { exact: true }).fill('TEST HEADLINE 123')
     await page.getByRole('button', { name: 'Paper colors' }).click()
@@ -157,7 +157,7 @@ test(
     await expect(page.getByRole('status').filter({ hasText: 'Results are for' })).toHaveCount(0)
     await expect(page).toHaveURL(/agent=facebook/)
     await page.getByRole('button', { name: 'Clear', exact: true }).first().click()
-    await expect(page).toHaveURL(/\/link-preview$/)
+    await expect(page).toHaveURL(/\/publish\/link-checks$/)
   }
 )
 
@@ -167,7 +167,7 @@ test('invalid automation input cannot produce a script, and error pages still ha
   page,
 }) => {
   await createWorkspace(identity, page)
-  await app.open(`/link-preview?url=${encodeURIComponent(`${source}/link-preview/missing`)}`)
+  await app.open(`/publish/link-checks?url=${encodeURIComponent(`${source}/link-preview/missing`)}`)
   await expect(page.getByText('The page returns HTTP 404', { exact: true })).toBeVisible()
   await page.getByRole('tab', { name: 'Automate', exact: true }).click()
   const copy = page.getByRole('button', { name: 'Copy', exact: true })

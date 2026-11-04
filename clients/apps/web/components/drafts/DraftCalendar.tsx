@@ -1,5 +1,6 @@
 'use client'
 
+import { socialSetHref } from '@/components/workspace/settings-sections'
 import * as React from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -101,7 +102,7 @@ export function DraftCalendar({
     const query = new URLSearchParams(params)
     if (value === 'all') query.delete(key)
     else query.set(key, value)
-    router.replace(`/write/plan?${query}`)
+    router.replace(`/publish/calendar?${query}`)
   }
   const matches = (item: {
     socialSetId?: string | null
@@ -128,7 +129,7 @@ export function DraftCalendar({
   const reviewDraft = (id: string, day: string, time = '09:00') => {
     if (!canPlan) return
     router.push(
-      `/write/${encodeURIComponent(id)}?${new URLSearchParams({ panel: 'schedule', day, time, ...(socialSetId ? { set: socialSetId } : {}) })}`
+      `/publish/${encodeURIComponent(id)}?${new URLSearchParams({ panel: 'schedule', day, time, ...(socialSetId ? { set: socialSetId } : {}) })}`
     )
   }
   const [over, setOver] = React.useState<string | null>(null)
@@ -138,7 +139,7 @@ export function DraftCalendar({
     query.set('view', mode)
     if (step === null) query.delete('week')
     else query.set('week', shiftCalendar(anchor ?? weekStart, view, step))
-    return `/write/plan?${query}`
+    return `/publish/calendar?${query}`
   }
   const commit = async (mutation: () => Promise<unknown>) => {
     if (pending.current) return
@@ -202,7 +203,7 @@ export function DraftCalendar({
         ...(time ? { time } : {}),
         ...(socialSetId ? { set: socialSetId } : {}),
       })
-      router.push(`/write/${draft.id}?${query}`)
+      router.push(`/publish/${draft.id}?${query}`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The draft could not be created.')
       setCreating(false)
@@ -429,11 +430,11 @@ export function DraftCalendar({
           </NativeSelect>
         ) : null}
         <Link
-          href={`/write/plan?${new URLSearchParams({ ...Object.fromEntries(params), scope: workspaceScope ? 'set' : 'workspace' })}`}
+          href={`/publish/calendar?${new URLSearchParams({ ...Object.fromEntries(params), scope: workspaceScope ? 'set' : 'workspace' })}`}
         >
           {workspaceScope ? 'Show this publishing brand' : 'All publishing brands'}
         </Link>
-        <Link href={`/write/settings${socialSetId ? `?set=${socialSetId}` : ''}`}>
+        <Link href={socialSetId ? socialSetHref(socialSetId, 'scheduling') : '/settings/publishing-brands'}>
           Schedule settings
         </Link>
         <span className="text-muted-foreground">Alt + ←/→: navigate · Alt + Home: today</span>
@@ -566,7 +567,7 @@ export function DraftCalendar({
                 <Link
                   className="block rounded-lg border border-dashed border-foreground/20 p-2 text-xs"
                   data-testid="calendar-planned"
-                  href={`/write/${item.draftId}`}
+                  href={`/publish/${item.draftId}`}
                   key={`planned-${item.draftId}`}
                 >
                   <span className="text-muted-foreground">
@@ -610,7 +611,7 @@ export function DraftCalendar({
                       data-testid="calendar-post"
                       draggable={movable}
                       href={
-                        post.campaignId ? `/campaigns/${post.campaignId}` : `/write/${post.draftId}`
+                        post.campaignId ? `/campaigns/${post.campaignId}` : `/publish/${post.draftId}`
                       }
                       onDragOver={(event) => {
                         if (movable && event.dataTransfer.types.includes(CALENDAR_DRAG))

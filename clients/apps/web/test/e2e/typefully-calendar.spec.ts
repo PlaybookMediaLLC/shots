@@ -33,7 +33,7 @@ test(
       page.locator(`[data-calendar-date="${at.toISOString().slice(0, 10)}"]`)
     const card = (text: string) =>
       page.getByTestId('calendar-post').filter({ hasText: text, visible: true })
-    await app.open(`/write/plan?view=month&week=${anchor.toISOString().slice(0, 10)}`)
+    await app.open(`/publish/calendar?view=month&week=${anchor.toISOString().slice(0, 10)}`)
     await expect(day(anchor)).toBeVisible()
     await expect(day(anchor)).toContainText('Calendar first')
     await expect(day(secondAt)).toContainText('Calendar second')
@@ -81,7 +81,7 @@ test(
     await expect(day(later)).toContainText('Calendar first')
     await page.screenshot({ path: '.context/shots/typefully-month.png', fullPage: true })
 
-    await app.open(`/write/${one}`)
+    await app.open(`/publish/${one}`)
     const queued = page
       .getByTestId('draft-post')
       .filter({ has: page.getByRole('button', { name: 'Publish now', exact: true }) })
@@ -124,7 +124,7 @@ test(
       // ISO, not a Date: node-postgres writes Dates in the host's time zone.
       [two, past.toISOString(), { likes: 12, replies: 3 }]
     )
-    await app.open(`/write/plan?view=month&week=${anchor.toISOString().slice(0, 10)}`)
+    await app.open(`/publish/calendar?view=month&week=${anchor.toISOString().slice(0, 10)}`)
     await page
       .getByRole('button', {
         name: `Create draft ${anchor.toISOString().slice(0, 10)}`,
@@ -139,7 +139,7 @@ test(
       .click()
     await page.getByRole('checkbox', { name: 'Open in editor' }).check()
     await page.getByRole('button', { name: 'Plan', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+$/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+$/)
     const copiedId = new URL(page.url()).pathname.split('/').pop()!
     expect(copiedId).not.toBe(two)
     await expect(draftEditor(page)).toContainText('Calendar second')
@@ -148,7 +148,7 @@ test(
       [copiedId]
     )
     expect(copied[0].count).toBe('0')
-    await app.open('/write/analyze/posting-times')
+    await app.open('/publish/analyze/posting-times')
     await expect(page.getByTestId('posting-times')).toContainText('1 measured posts')
     const weekday = past.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })
     await page.getByRole('button', { name: `Add ${weekday} suggested slot` }).click()

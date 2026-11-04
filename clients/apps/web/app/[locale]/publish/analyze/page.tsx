@@ -6,7 +6,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 
-export const metadata: Metadata = { title: 'Analyze' }
+export const metadata: Metadata = { title: 'Analyze · Publish' }
 
 export default async function AnalyzePage({
   params,
@@ -16,7 +16,7 @@ export default async function AnalyzePage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { locale } = await params
-  const access = await requireDraftsPageAccess(locale, '/write/analyze')
+  const access = await requireDraftsPageAccess(locale, '/publish/analyze')
   const sets = await listSocialSets(access.tenant)
   return (
     <PlatformShell
@@ -25,7 +25,6 @@ export default async function AnalyzePage({
     >
       <AnalyzeWorkspace
         sets={sets.map((s) => socialSetSchema.parse(s))}
-        campaignsEnabled={access.campaignWorkflowEnabled && access.hasPaidPlan}
         canManage={hasPermission(access.role, 'publish:manage')}
         initial={await searchParams}
       />

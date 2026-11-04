@@ -119,7 +119,7 @@ export async function acceptInvitation(page: Page, invitationId: string): Promis
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.getByRole('button', { name: 'Accept invitation' }).click(),
   ])
-  await expectPath(page, '/workspace')
+  await expectPath(page, '/settings')
 }
 
 export function getE2EUrl(path: string): string {

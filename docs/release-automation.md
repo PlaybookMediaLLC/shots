@@ -14,7 +14,7 @@ Browser state is never execution authority.
 | `/workflows/runs`      | Run history filtered by workflow, event, repository, status, and date    |
 | `/workflows/runs/[id]` | One run: evidence, pinned graph and path, receipts, outputs, recovery    |
 
-`/workspace/release-automation` redirects to `/workflows` with its query
+`/settings/release-automation` (and the old `/workspace/release-automation`) redirects to `/workflows` with its query
 string, and GitHub connection callbacks return to `/workflows`.
 
 ## Capability inventory

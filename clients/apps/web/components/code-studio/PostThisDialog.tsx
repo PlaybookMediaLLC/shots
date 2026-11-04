@@ -126,7 +126,7 @@ export function PostThisDialog({
             reply: reply ? { code, lang: file.lang } : undefined,
           }),
         },
-        (draftId) => router.push(`/write/${encodeURIComponent(draftId)}`)
+        (draftId) => router.push(`/publish/${encodeURIComponent(draftId)}`)
       )
     } catch (failure) {
       const message =

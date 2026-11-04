@@ -7,7 +7,7 @@ import { hasPermission } from '@/lib/auth/permissions'
 import { requireDraftsPageAccess } from '../drafts/page-access'
 import { loadWrite } from './write-data'
 
-export const metadata: Metadata = { title: 'Publish' }
+export const metadata: Metadata = { title: 'Drafts · Publish' }
 
 type WritePageProps = {
   params: Promise<{ locale: string }>
@@ -23,7 +23,7 @@ export default async function WritePage({ params, searchParams }: WritePageProps
   )
   const access = await requireDraftsPageAccess(
     locale,
-    `/write${returnParams.size ? `?${returnParams}` : ''}`
+    `/publish${returnParams.size ? `?${returnParams}` : ''}`
   )
   const canManageSets = hasPermission(access.role, 'workspace:update')
   const data = await loadWrite(access.tenant, query)

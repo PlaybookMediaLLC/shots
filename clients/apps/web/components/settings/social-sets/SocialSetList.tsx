@@ -319,7 +319,7 @@ export function SocialSetList({ canManage }: { canManage: boolean }) {
     return <p className="text-sm text-muted-foreground">Loading publishing brands…</p>
   if (isPlanRefusal(list.error)) {
     return (
-      <PlanRequired from="/workspace/social-sets">
+      <PlanRequired from="/settings/publishing-brands">
         Publishing brands, and the accounts and schedules they post with, need Pro.
       </PlanRequired>
     )

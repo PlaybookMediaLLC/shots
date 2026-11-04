@@ -91,7 +91,7 @@ export const SOCIAL_OAUTH_RETURN_COOKIE = 'shots-oauth-return'
 /** Only local brand settings or a draft can be an OAuth return destination. */
 export const socialOAuthReturnSchema = z
   .string()
-  .regex(/^\/(?:workspace\/social-sets|write)\/[a-z0-9]{10,32}$/)
+  .regex(/^\/(?:settings\/publishing-brands|publish)\/[a-z0-9]{10,32}$/)
 
 /**
  * Links open the connection start in the browser. A sign-in that is missing or
@@ -130,7 +130,7 @@ function connectedRedirect(
   const back = socialOAuthReturnSchema.safeParse(returnTo ?? decoded)
   const headers = new Headers({
     'Cache-Control': 'no-store',
-    Location: `${back.success ? back.data : '/workspace/channels'}?${new URLSearchParams({ connected: provider })}`,
+    Location: `${back.success ? back.data : '/settings/channels'}?${new URLSearchParams({ connected: provider })}`,
   })
   if (back.success)
     headers.append(

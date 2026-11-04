@@ -64,7 +64,7 @@ test('the workspace tour leads into the Publish tour on its page', async ({ app,
   await expect(card.getByText('Next tour: Publish your first post')).toBeVisible()
   await card.getByRole('button', { name: 'Start' }).click()
 
-  await app.expectPath('/write')
+  await app.expectPath('/publish')
   await expect(card.getByRole('heading', { name: 'Choose a publishing brand' })).toBeVisible()
   await expect(page.locator('[data-tour-id="write-brand"][data-product-tour-active]')).toBeVisible()
   await expect.poll(() => dismissedTips(page)).toContain('tour-workspace-v1')

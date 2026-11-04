@@ -8,7 +8,7 @@ import { requireDraftsPageAccess } from '../../../drafts/page-access'
 import { loadWrite } from '../../write-data'
 import { analyticsRange } from '@/lib/write/analytics'
 
-export const metadata = { title: 'Social analytics' }
+export const metadata = { title: 'Observations · Analyze · Publish' }
 
 /** Analyze provider observations for a social set the signed-in member may see. */
 export default async function AnalyzePage({
@@ -19,7 +19,7 @@ export default async function AnalyzePage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { locale } = await params
-  const access = await requireDraftsPageAccess(locale, '/write/analyze')
+  const access = await requireDraftsPageAccess(locale, '/publish/analyze')
   const query = await searchParams
   const data = await loadWrite(access.tenant, query)
   let range = analyticsRange()

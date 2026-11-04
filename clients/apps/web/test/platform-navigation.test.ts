@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  activeLink,
+  AREA_LINKS,
   areaLocked,
+  campaignLinks,
   matchesDestination,
   paidCapability,
   platformArea,
@@ -10,6 +13,7 @@ import {
   safeReturnPath,
   PLATFORM_DESTINATIONS,
 } from '@/lib/platform/navigation'
+import { palettePages, searchPages, visitedPages } from '@/components/platform-shell/palette-pages'
 import { SIGNED_IN_PATHS } from '@/lib/auth/sign-in-gate'
 import { followsTheme, parseNavigation } from '@/lib/settings/appearance'
 import {
@@ -27,16 +31,15 @@ test('canonical editors, aliases and localized routes select the owning job', ()
     ['/?editor=app-store', 'create'],
     ['/fr/canvas/abc', 'create'],
     ['/creative-sets/abc', 'create'],
-    ['/projects', 'library'],
-    ['/assets', 'library'],
     ['/library?type=store', 'library'],
-    ['/write/plan?set=abc', 'publish'],
+    ['/campaigns/deliveries', 'campaigns'],
+    ['/publish/calendar?set=abc', 'publish'],
     ['/de/drafts/abc', 'publish'],
-    ['/link-preview', 'publish'],
+    ['/publish/link-checks', 'publish'],
     ['/campaigns/a/copy#post-a', 'campaigns'],
     ['/releases/a', 'campaigns'],
     ['/workflows/runs/a', 'automate'],
-    ['/workspace/brand-kit', 'settings'],
+    ['/settings/brand-kit', 'settings'],
   ] as const)
     assert.equal(platformArea(path), area, path)
   for (const path of [
@@ -52,7 +55,7 @@ test('canonical editors, aliases and localized routes select the owning job', ()
 
 test('locale and supported return context survive without external redirects', () => {
   assert.equal(platformHref('/fr', '/home'), '/fr/home')
-  assert.equal(platformHref('/fr/canvas/a', '/write?set=b#c'), '/fr/write?set=b#c')
+  assert.equal(platformHref('/fr/canvas/a', '/publish?set=b#c'), '/fr/publish?set=b#c')
   assert.equal(platformHref('/fr/canvas/a', '/fr/library'), '/fr/library')
   assert.equal(platformHref('/canvas/a', '/home'), '/home')
   for (const unsafe of [
@@ -178,11 +181,11 @@ test('the plan page names the paid capability a free workspace asked for', () =>
   assert.equal(paidCapability('/?editor=app-store'), 'Store screenshots')
   assert.equal(paidCapability('/canvas/new'), 'Canvas')
   assert.equal(paidCapability('/compress-image'), 'Image tools')
-  assert.equal(paidCapability('/write/deliveries'), 'Campaign deliveries')
+  assert.equal(paidCapability('/campaigns/deliveries'), 'Campaigns')
   // There is no free plan: Publish is on Pro too (RFC 023, 2026-10-29).
-  assert.equal(paidCapability('/write'), 'Publish')
+  assert.equal(paidCapability('/publish'), 'Publish')
   // Home, Settings, and unsafe or missing destinations name nothing.
-  for (const from of ['/home', '/workspace', '//evil.test', 'https://evil.test', null])
+  for (const from of ['/home', '/settings', '//evil.test', 'https://evil.test', null])
     assert.equal(paidCapability(from), null, String(from))
 })
 
@@ -204,17 +207,56 @@ test('the in-app plan page follows the theme like the rest of the app', () => {
   assert.equal(followsTheme('/upgrade'), true)
 })
 
-test('Publish lists Campaign deliveries only where campaigns can be used', () => {
-  const labels = (campaigns: boolean) =>
-    publishLinks('?set=a', undefined, campaigns).map((item) => item.label)
-  assert.deepEqual(labels(true), [
-    'Drafts',
-    'Calendar',
-    'Analyze',
-    'Campaign deliveries',
-    'Link checks',
-  ])
-  assert.deepEqual(labels(false), ['Drafts', 'Calendar', 'Analyze', 'Link checks'])
+test('Campaigns lists Deliveries only where content drafts are rolled out', () => {
+  assert.deepEqual(
+    publishLinks('?set=a').map((item) => item.label),
+    ['Drafts', 'Calendar', 'Analyze', 'Link checks']
+  )
+  assert.deepEqual(
+    campaignLinks(true).map((item) => item.label),
+    ['All campaigns', 'Release inbox', 'Deliveries', 'Archived']
+  )
+  assert.deepEqual(
+    campaignLinks(false).map((item) => item.label),
+    ['All campaigns', 'Release inbox', 'Archived']
+  )
+})
+
+test('every sidebar item stays in its section, and each section opens its own first page', () => {
+  const sections = PLATFORM_DESTINATIONS.flatMap((destination) => {
+    const links =
+      destination.key === 'publish'
+        ? publishLinks()
+        : destination.key === 'campaigns'
+          ? campaignLinks(true)
+          : AREA_LINKS[destination.key]
+    return links ? [{ destination, links }] : []
+  })
+  assert.deepEqual(
+    sections.map((section) => section.destination.key),
+    ['create', 'campaigns', 'publish', 'library', 'automate']
+  )
+  for (const { destination, links } of sections) {
+    // A sub-item never changes which section the sidebar highlights.
+    for (const link of links)
+      assert.equal(platformArea(link.href), destination.key, `${destination.label} › ${link.label}`)
+    // The section opens its first page, which has its own name.
+    assert.equal(links[0]!.href, destination.href, destination.label)
+    assert.notEqual(links[0]!.label, destination.label, destination.label)
+  }
+})
+
+test('the highlighted page matches the address, query views included', () => {
+  const library = AREA_LINKS.library!
+  const on = (path: string, query = '') =>
+    activeLink(library, path, new URLSearchParams(query))?.label
+  assert.equal(on('/library'), 'Screenshots')
+  assert.equal(on('/library', 'type=canvas'), 'Canvas')
+  assert.equal(on('/library', 'view=brand'), 'Brand assets')
+  // An extra parameter, like a search, keeps the page it narrows.
+  assert.equal(on('/library', 'type=story&search=launch'), 'Story Sets')
+  assert.equal(on('/library', 'search=launch'), 'Screenshots')
+  assert.equal(on('/create'), undefined)
 })
 
 test('the plan locks an area as the sidebar shows it, for the sidebar and the product tours', () => {
@@ -237,4 +279,45 @@ test('the plan locks an area as the sidebar shows it, for the sidebar and the pr
     assert.equal(areaLocked(area, plan(true, true, true)), false, area)
   }
   assert.equal(areaLocked('settings', plan(false, false, false)), false)
+})
+
+test('search finds every page by name, with its section, and the pages visited before', () => {
+  const pages = palettePages({
+    campaignsEnabled: true,
+    draftsEnabled: true,
+    sectionLabel: (key) => PLATFORM_DESTINATIONS.find((item) => item.key === key)!.label,
+  })
+  const named = (query: string) =>
+    searchPages(pages, query).map((page) => `${page.label} · ${page.section}`)
+  assert.deepEqual(named('deliveries'), ['Deliveries · Campaigns'])
+  assert.deepEqual(named('runs'), ['Runs · Automate'])
+  assert.ok(named('billing').includes('Billing · Settings'))
+  // Settings pages also answer to their keywords.
+  assert.ok(named('timezone').includes('General · Settings'))
+  assert.deepEqual(named(''), [])
+  // Pages a workspace cannot open are not offered.
+  const without = palettePages({
+    campaignsEnabled: false,
+    draftsEnabled: false,
+    sectionLabel: String,
+  })
+  assert.equal(
+    without.some((page) => page.section === 'campaigns'),
+    false
+  )
+  assert.deepEqual(
+    without.filter((page) => page.section === 'publish').map((page) => page.label),
+    ['Link checks']
+  )
+  // Visits name their page once, newest first; drafts and other unnamed pages are skipped.
+  assert.deepEqual(
+    visitedPages(pages, [
+      '/library?view=brand',
+      '/publish/abc123def4',
+      '/home',
+      '/library?view=brand',
+      '/settings/billing',
+    ]).map((page) => page.label),
+    ['Brand assets', 'Home', 'Billing']
+  )
 })

@@ -39,7 +39,7 @@ export default async function UpgradePage({
     redirect(getLocalizedPath(locale, `/sign-in?callbackURL=${encodeURIComponent(self)}`))
   }
   if (!access.hasOrganization) redirect(getLocalizedPath(locale, '/onboarding'))
-  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/workspace'))
+  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/settings'))
   // A plan bought in another tab, or a stale link: go where they were headed.
   if (access.hasPaidPlan) redirect(getLocalizedPath(locale, requested || '/home'))
 

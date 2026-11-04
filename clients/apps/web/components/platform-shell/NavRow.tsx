@@ -21,6 +21,7 @@ export function NavRow({
   label,
   name = label,
   onNavigate,
+  section = false,
   tourId,
 }: {
   active: boolean
@@ -33,6 +34,8 @@ export function NavRow({
   /** The accessible name when it says more than the label; it starts with the label. */
   name?: string
   onNavigate?: () => void
+  /** Its pages are listed under it, so an active row marks the section and the page link is the current one. */
+  section?: boolean
   /** Where a product tour step points (`data-tour-id`). */
   tourId?: string
 }) {
@@ -40,7 +43,7 @@ export function NavRow({
     <SidebarLink
       data-platform-nav
       data-tour-id={tourId}
-      aria-current={active ? 'page' : undefined}
+      aria-current={active ? (section ? 'true' : 'page') : undefined}
       aria-label={collapsed || name !== label ? name : undefined}
       className={cn(
         'flex h-8 items-center gap-2.5 px-2.5',

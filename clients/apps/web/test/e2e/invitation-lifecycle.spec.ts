@@ -79,7 +79,7 @@ test(
       await signUp(member, memberPage)
       await memberPage.goto(getE2EUrl(`/accept-invitation?invitationId=${invitation.id}`))
       await memberPage.getByRole('button', { name: 'Accept invitation' }).click()
-      await expect.poll(() => new URL(memberPage.url()).pathname).toBe('/workspace')
+      await expect.poll(() => new URL(memberPage.url()).pathname).toBe('/settings')
       await memberPage.goto(getE2EUrl(`/accept-invitation?invitationId=${invitation.id}`))
       await expect(memberPage.getByText('This invitation has already been accepted.')).toBeVisible()
       await expect(memberPage.getByRole('button', { name: 'Accept invitation' })).toHaveCount(0)

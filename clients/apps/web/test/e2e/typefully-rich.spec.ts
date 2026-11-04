@@ -6,10 +6,10 @@ test(
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
-    await app.open('/write')
+    await app.open('/publish')
     await page.getByRole('button', { name: 'New draft of another kind' }).first().click()
     await page.getByRole('menuitem', { name: 'X Article', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     // Quick compose owns focus until it hands buffered text to the live editor.
     await expect(page.getByRole('dialog', { name: 'New draft', exact: true })).toHaveCount(0)
     await page.getByLabel('Article title', { exact: true }).fill('An article with structure')
@@ -91,9 +91,9 @@ test(
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
-    await app.open('/write')
+    await app.open('/publish')
     await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const editor = draftEditor(page)
     await editor.click()
     await settleSelection(page)

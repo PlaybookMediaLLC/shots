@@ -30,7 +30,7 @@ test('an owner can invite a viewer and remove their workspace access', async ({
 
     await memberPage.goto(getE2EUrl(`/accept-invitation?invitationId=${invitation.id}`))
     await memberPage.getByRole('button', { name: 'Accept invitation' }).click()
-    await expect.poll(() => new URL(memberPage.url()).pathname).toBe('/workspace')
+    await expect.poll(() => new URL(memberPage.url()).pathname).toBe('/settings')
 
     await memberPage.goto(getE2EUrl('/'))
     await expect(memberPage.getByRole('button', { exact: true, name: 'Export' })).toBeVisible()

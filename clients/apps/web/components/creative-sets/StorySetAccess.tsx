@@ -52,7 +52,7 @@ export function StorySetAccess() {
           {projects && projects.count > 0
             ? `You have ${projects.more ? 'at least ' : ''}${projects.count} saved ${projects.count === 1 ? 'project' : 'projects'} you can copy into Story Sets once access is enabled.`
             : 'You can keep working in Projects and copy a saved design into a Story Set once access is enabled.'}{' '}
-          <Link prefetch={false} href="/projects" className="underline underline-offset-4">
+          <Link prefetch={false} href="/library" className="underline underline-offset-4">
             View Projects
           </Link>
         </p>

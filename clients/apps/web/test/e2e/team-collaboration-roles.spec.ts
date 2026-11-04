@@ -79,7 +79,7 @@ test(
         await acceptInvitation(memberPage, invitation.id)
       }
 
-      await writer.goto(`/write/${draft.id}`)
+      await writer.goto(`/publish/${draft.id}`)
       await expect(
         writer.getByRole('button', { name: 'Connect account', exact: true })
       ).toHaveCount(0)
@@ -97,7 +97,7 @@ test(
         'pending'
       )
 
-      await approver.goto(`/write/${draft.id}`)
+      await approver.goto(`/publish/${draft.id}`)
       await expect(
         approver.getByRole('button', { name: 'Connect account', exact: true })
       ).toHaveCount(0)

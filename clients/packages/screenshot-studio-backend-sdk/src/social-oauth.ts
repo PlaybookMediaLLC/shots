@@ -26,7 +26,7 @@ export const socialOAuthStartOptionsSchema = z.strictObject({
   expectedConnectionId: z.string().min(1).max(160).optional(),
   returnPath: z
     .string()
-    .regex(/^\/(?:workspace\/social-sets|write)\/[a-z0-9]{10,32}$/)
+    .regex(/^\/(?:settings\/publishing-brands|publish)\/[a-z0-9]{10,32}$/)
     .optional(),
 })
 

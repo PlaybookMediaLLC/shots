@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import {
   AddBusinessIcon,
   AdminIcon,
@@ -37,7 +37,10 @@ import {
   settingsHref,
   settingsSectionAt,
 } from '@/components/workspace/settings-sections'
+import { settingsOrigin } from '@/components/platform-shell/PageVisits'
 import { withoutLocale } from '@/lib/settings/appearance'
+
+const noSubscription = () => () => {}
 
 const ICONS = {
   profile: PersonIcon,
@@ -66,7 +69,8 @@ const ICONS = {
 
 /**
  * Polar's settings sidebar, shown in place of the destinations on every
- * settings page: a way back, a search, and the sections grouped by owner.
+ * settings page: a way back to the page settings was opened from, a search,
+ * and the sections grouped by owner.
  * The compact rail keeps the icons, with each name in a tooltip.
  */
 export function SettingsNav({
@@ -80,6 +84,8 @@ export function SettingsNav({
   const pathname = usePathname()
   const [query, setQuery] = useState('')
   const current = settingsSectionAt(withoutLocale(pathname))?.id
+  // Settings pages never write the origin, so it only changes on the way in.
+  const origin = useSyncExternalStore(noSubscription, settingsOrigin, () => '/home')
   // The compact rail has no search box, so it always lists every section.
   const search = collapsed ? '' : query.trim().toLowerCase()
   const sections = SETTINGS_SECTIONS.filter(
@@ -96,9 +102,9 @@ export function SettingsNav({
         <NavRow
           active={false}
           collapsed={collapsed}
-          href="/home"
+          href={origin}
           icon={ArrowBackIcon}
-          label={t('settings')}
+          label={t('back')}
           name={t('leaveSettings')}
           onNavigate={onNavigate}
         />

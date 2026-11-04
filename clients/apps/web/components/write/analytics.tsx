@@ -244,7 +244,7 @@ export function SocialAnalytics({
                     <TableCell className="max-w-40 truncate py-2">
                       {row.draftId ? (
                         <Button asChild className="h-auto p-0" size={null} variant="link">
-                          <Link href={`/write/${row.draftId}`}>
+                          <Link href={`/publish/${row.draftId}`}>
                             {row.title || row.caption || row.subjectId}
                           </Link>
                         </Button>

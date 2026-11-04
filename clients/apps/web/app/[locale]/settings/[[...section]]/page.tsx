@@ -5,6 +5,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { WorkspaceSettings } from '@/components/workspace/WorkspaceSettings'
 import { findSettingsSection, findSocialSetPage } from '@/components/workspace/settings-sections'
 import { MCP_URL } from '@/lib/agents/mcp-clients'
+import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
 
 type WorkspacePageProps = {
@@ -23,7 +24,7 @@ export async function generateMetadata({ params }: WorkspacePageProps): Promise<
 
 /**
  * The section a path names. Every section is one segment, except a social
- * set's settings: /workspace/social-sets/{id}/{page}.
+ * set's settings: /settings/publishing-brands/{id}/{page}.
  */
 function resolveSection(segments: string[] | undefined) {
   const section = findSettingsSection(segments?.[0])
@@ -57,6 +58,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       organizationName={access.organization.name}
     >
       <WorkspaceSettings
+        draftsEnabled={contentDraftsEnabled()}
         email={access.session.user.email}
         mcpUrl={MCP_URL}
         name={access.session.user.name || ''}

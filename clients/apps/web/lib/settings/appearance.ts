@@ -20,9 +20,8 @@ export const THEMED_ROUTE_PREFIXES = [
   '/tools',
   '/create',
   '/library',
-  '/write',
+  '/publish',
   '/workflows',
-  '/link-preview',
   '/activity',
   '/assets',
   '/campaigns',
@@ -30,7 +29,7 @@ export const THEMED_ROUTE_PREFIXES = [
   '/p',
   '/projects',
   '/releases',
-  '/workspace',
+  '/settings',
   '/upgrade',
 ] as const
 
