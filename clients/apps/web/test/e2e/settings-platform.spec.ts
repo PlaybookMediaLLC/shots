@@ -59,7 +59,9 @@ test('personal settings are addressable, saved on the server and survive a reloa
   const email = page.getByRole('switch', { name: 'Email notifications' })
   await expect(email).toBeChecked()
   await email.click()
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
+  // The switch saves with the page's other preferences, not on its own.
+  await page.getByRole('button', { name: 'Save my preferences', exact: true }).click()
+  await expect(page.getByText('Your preferences are saved.', { exact: true })).toBeVisible()
   await app.reload()
   await expect(page.getByRole('switch', { name: 'Email notifications' })).not.toBeChecked()
   await expect(

@@ -227,7 +227,7 @@ test(
         'Private Alpha'
       )
       await page.getByLabel('Publishing brand name', { exact: true }).fill('Private Alpha saved')
-      await page.getByRole('button', { name: 'Save name', exact: true }).click()
+      await page.getByLabel('Publishing brand name', { exact: true }).press('Enter')
       await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
       await app.reload()
       await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(

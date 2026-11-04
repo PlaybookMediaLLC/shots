@@ -10,9 +10,15 @@ test('personal accent applies with contrast, survives reload and restores after 
   page.on('pageerror', (error) => errors.push(error.message))
   await app.open('/workspace/appearance')
   const color = page.getByLabel('Accent color', { exact: true })
+  // The accent saves when its picker closes.
+  const choose = async (hex: string) => {
+    await color.click()
+    await page.getByLabel('Hex color', { exact: true }).fill(hex)
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Escape')
+  }
   await expect(color).toBeEnabled()
-  await color.fill('#ffe500')
-  await page.getByRole('button', { name: 'Apply accent', exact: true }).click()
+  await choose('#ffe500')
   const accent = () => page.locator('html').evaluate((el) => el.style.getPropertyValue('--primary'))
   await expect.poll(accent).toBe('#ffe500')
   await expect
@@ -23,7 +29,7 @@ test('personal accent applies with contrast, survives reload and restores after 
     )
     .toBe('#ffe500')
   await app.reload()
-  await expect(color).toHaveValue('#ffe500')
+  await expect(color).toContainText('#ffe500')
   await expect.poll(accent).toBe('#ffe500')
   expect(
     await page.locator('html').evaluate((el) => el.style.getPropertyValue('--primary-foreground'))
@@ -33,8 +39,7 @@ test('personal accent applies with contrast, survives reload and restores after 
       ? route.fulfill({ status: 500, body: '{"error":"Save refused"}' })
       : route.continue()
   )
-  await color.fill('#220044')
-  await page.getByRole('button', { name: 'Apply accent', exact: true }).click()
+  await choose('#220044')
   await expect(page.getByRole('status').filter({ hasText: 'Not saved' })).toBeVisible()
   await expect.poll(accent).toBe('#ffe500')
   await page.unroute('**/api/v1/me/preferences')

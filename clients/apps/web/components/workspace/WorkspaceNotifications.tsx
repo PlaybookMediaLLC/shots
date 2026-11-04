@@ -78,8 +78,13 @@ function SettingsForm({
       ? 'delivery'
       : 'personal'
   )
-  const { preferences: personal } = usePreferences()
-  const preferencesDirty = JSON.stringify(preferences) !== JSON.stringify(settings.preferences)
+  const { preferences: personal, save: savePersonal } = usePreferences()
+  // The email switch is a personal preference; it saves with the rest of these preferences.
+  const [email, setEmail] = useState<boolean | null>(null)
+  const savedEmail = personal?.emailNotifications !== false
+  const emailDirty = email !== null && email !== savedEmail
+  const preferencesDirty =
+    emailDirty || JSON.stringify(preferences) !== JSON.stringify(settings.preferences)
   const policyDirty = JSON.stringify(policy) !== JSON.stringify(settings.policy)
   useUnsavedSettings(preferencesDirty || policyDirty)
   const [preferencesConflict, setPreferencesConflict] = useState(false)
@@ -173,6 +178,11 @@ function SettingsForm({
   }
   async function save(section: 'policy' | 'preferences') {
     await perform(section, async () => {
+      if (section === 'preferences' && emailDirty && email !== null) {
+        const result = await savePersonal({ emailNotifications: email })
+        if (!result.ok) throw new Error(result.error)
+        setEmail(null)
+      }
       const next = await notificationRequest(identity, `/${section}`, notificationSettingsSchema, {
         method: 'PUT',
         body: section === 'policy' ? policy : preferences,
@@ -324,9 +334,9 @@ function SettingsForm({
       <div hidden={panel !== 'personal'} className="space-y-8">
         <Section
           title="Email"
-          description="Saves automatically. Your switch for activity email in every workspace."
+          description="Your switch for activity email in every workspace. It saves with your preferences below."
         >
-          <EmailSwitch />
+          <EmailSwitch checked={email ?? savedEmail} disabled={!personal || !!busy} onCheckedChange={setEmail} />
         </Section>
 
         <Section
@@ -428,7 +438,7 @@ function SettingsForm({
                       value={preferences}
                       onChange={setPreferences}
                       settings={settings}
-                      emailEnabled={personal?.emailNotifications !== false}
+                      emailEnabled={email ?? savedEmail}
                     />
                   </div>
                 </DisclosureContent>
@@ -441,7 +451,7 @@ function SettingsForm({
               onChange={setPreferences}
               value={preferences}
               settings={settings}
-              emailEnabled={personal?.emailNotifications !== false}
+              emailEnabled={email ?? savedEmail}
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
@@ -465,7 +475,10 @@ function SettingsForm({
           busy={busy === 'preferences'}
           label="Save my preferences"
           onSave={() => void save('preferences')}
-          onDiscard={() => setPreferences(settings.preferences)}
+          onDiscard={() => {
+            setPreferences(settings.preferences)
+            setEmail(null)
+          }}
         />
       </div>
       <div hidden={panel !== 'personal'}>

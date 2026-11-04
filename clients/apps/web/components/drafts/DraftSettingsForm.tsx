@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import * as React from 'react'
 import { toast } from 'sonner'
+import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { Button } from '@/components/ui/button'
 import { draftsApi, type SettingsWire } from '@/lib/content-drafts/client'
 import { TimePicker } from '@/components/ui/time-picker'
@@ -25,18 +26,26 @@ export function DraftSettingsForm({
   const [slots, setSlots] = React.useState(settings.postingSlots)
   const [requireApproval, setRequireApproval] = React.useState(settings.requireApproval)
   const [adding, setAdding] = React.useState<Record<number, string>>({})
-  const [saving, setSaving] = React.useState(false)
-  const save = async () => {
-    setSaving(true)
-    try {
-      const saved = await draftsApi.saveSettings({ postingSlots: slots, requireApproval })
-      setSlots(saved.postingSlots)
-      toast.success('Saved.')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The settings could not be saved.')
-    } finally {
-      setSaving(false)
-    }
+  const [state, run] = useSaveState()
+  // Each change saves at once; a refused save puts the previous settings back.
+  const save = (next: { postingSlots: typeof slots; requireApproval: boolean }) => {
+    const previous = { postingSlots: slots, requireApproval }
+    setSlots(next.postingSlots)
+    setRequireApproval(next.requireApproval)
+    return run(async () => {
+      try {
+        const saved = await draftsApi.saveSettings(next)
+        setSlots(saved.postingSlots)
+        return { ok: true }
+      } catch (error) {
+        setSlots(previous.postingSlots)
+        setRequireApproval(previous.requireApproval)
+        return {
+          error: error instanceof Error ? error.message : 'The settings could not be saved.',
+          ok: false,
+        }
+      }
+    })
   }
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-10">
@@ -45,7 +54,9 @@ export function DraftSettingsForm({
         <p className="mt-1 text-sm text-muted-foreground">Times are in {settings.timeZone}.</p>
       </div>
       <section className="flex flex-col gap-3">
-        <h3 className="text-ui-lg font-medium text-foreground">Posting queue</h3>
+        <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
+          Posting queue <SaveStatus state={state} />
+        </h3>
         <p className="text-xs text-muted-foreground">
           These are the times of your first publishing brand. Each publishing brand now keeps its own queue,
           time zone and defaults; edit them in{' '}
@@ -71,7 +82,20 @@ export function DraftSettingsForm({
                         aria-label={`Remove ${name} ${slot.time}`}
                         className="text-muted-foreground hover:text-red-700 dark:hover:text-red-400"
                         onClick={() =>
-                          setSlots((current) => current.filter((item) => item !== slot))
+                          void save({
+                            postingSlots: slots.filter((item) => item !== slot),
+                            requireApproval,
+                          }).then((saved) => {
+                            if (saved)
+                              toast(`Removed ${name} ${slot.time}.`, {
+                                action: {
+                                  label: 'Undo',
+                                  onClick: () =>
+                                    void save({ postingSlots: [...slots], requireApproval }),
+                                },
+                                duration: 5000,
+                              })
+                          })
                         }
                         type="button"
                       >
@@ -94,12 +118,9 @@ export function DraftSettingsForm({
                       onClick={() => {
                         const time = adding[weekday]
                         if (!time) return
-                        setSlots((current) =>
-                          current.some((slot) => slot.weekday === weekday && slot.time === time)
-                            ? current
-                            : [...current, { time, weekday }]
-                        )
                         setAdding((current) => ({ ...current, [weekday]: '' }))
+                        if (slots.some((slot) => slot.weekday === weekday && slot.time === time)) return
+                        void save({ postingSlots: [...slots, { time, weekday }], requireApproval })
                       }}
                       type="button"
                     >
@@ -121,17 +142,10 @@ export function DraftSettingsForm({
             checked={requireApproval}
             className="shrink-0"
             disabled={!canManage}
-            onCheckedChange={(checked) => setRequireApproval((checked === true))}
+            onCheckedChange={(checked) => void save({ postingSlots: slots, requireApproval: checked === true })}
           />
         </Label>
       </section>
-      {canManage ? (
-        <div>
-          <Button disabled={saving} onClick={() => void save()}>
-            {saving ? 'Saving…' : 'Save settings'}
-          </Button>
-        </div>
-      ) : null}
     </div>
   )
 }

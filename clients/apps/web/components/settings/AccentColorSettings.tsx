@@ -1,28 +1,29 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from 'sonner'
 import { usePreferences } from './PreferencesProvider'
 import { SaveStatus, useSaveState } from './controls'
 import { Button } from '@/components/ui/button'
 import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 
-/** Save a personal accent; artwork and teammates keep their own colors. */
+/** The accent the picker shows when none is saved. */
+const STANDARD_ACCENT = '#527bc4'
+
+/**
+ * A personal accent; artwork and teammates keep their own colors. It saves
+ * when the picker closes, like the page's other settings; Reset can be undone.
+ */
 export function AccentColorSettings() {
   const { preferences, save, status } = usePreferences()
   const [state, run] = useSaveState()
   const disabled = status !== 'ready' || state === 'saving'
+  const saved = preferences?.accentColor ?? ''
   const [draft, setDraft] = useState<string | null>(null)
-  const accent = draft ?? (preferences?.accentColor || '#527bc4')
+  const accent = draft ?? (saved || STANDARD_ACCENT)
   return (
-    <form
-      className="grid gap-2"
-      onSubmit={(event) => {
-        event.preventDefault()
-        const accentColor = String(new FormData(event.currentTarget).get('accentColor'))
-        void run(() => save({ accentColor }))
-      }}
-    >
+    <div className="grid gap-2">
       <Label className="text-ui-lg font-medium" htmlFor="personal-accent">
         Accent color
       </Label>
@@ -35,23 +36,33 @@ export function AccentColorSettings() {
           disabled={disabled}
           id="personal-accent"
           onChange={setDraft}
+          onOpenChange={(open) => {
+            if (open || draft === null) return
+            const accentColor = draft
+            setDraft(null)
+            if (accentColor !== saved) void run(() => save({ accentColor }))
+          }}
           value={accent}
         />
-        <input name="accentColor" type="hidden" value={accent} />
-        <Button size="sm" disabled={disabled} type="submit">
-          Apply accent
-        </Button>
         <Button
           size="sm"
           variant="outline"
-          disabled={disabled || !preferences?.accentColor}
+          disabled={disabled || !saved}
           type="button"
-          onClick={() => void run(() => save({ accentColor: '' }))}
+          onClick={() =>
+            void run(() => save({ accentColor: '' })).then((reset) => {
+              if (reset)
+                toast('Accent reset to the standard palette.', {
+                  action: { label: 'Undo', onClick: () => void run(() => save({ accentColor: saved })) },
+                  duration: 5000,
+                })
+            })
+          }
         >
           Reset accent
         </Button>
         <SaveStatus state={state} />
       </div>
-    </form>
+    </div>
   )
 }

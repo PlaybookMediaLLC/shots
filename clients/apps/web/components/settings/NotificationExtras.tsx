@@ -1,7 +1,6 @@
 'use client'
 
 import { Group, PlanRequired, Row } from '@/components/platform-ui'
-import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { useSocialSets } from '@/components/settings/social-sets/api'
 import { NotificationPreferenceTable } from '@/components/settings/NotificationPreferenceTable'
@@ -14,26 +13,31 @@ import { SettingsRequestError, settingsErrorMessage } from '@/lib/settings/clien
 /**
  * The email master switch (RFC 024). It is a personal preference, so it holds
  * in every workspace; off, no activity email reaches you, while sign-in,
- * invitation and security messages still do.
+ * invitation and security messages still do. It saves with the page's other
+ * preferences.
  */
-export function EmailSwitch() {
-  const { preferences, save, status } = usePreferences()
-  const [state, run] = useSaveState()
+export function EmailSwitch({
+  checked,
+  disabled,
+  onCheckedChange,
+}: {
+  checked: boolean
+  disabled?: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  const { status } = usePreferences()
   return (
     <Group>
       <Row
         description="Off, no activity email reaches you from any workspace. Sign-in, invitation and security email still arrive."
         label="Email notifications"
       >
-        <div className="flex items-center gap-3">
-          <SaveStatus state={state} />
-          <Switch
-            aria-label="Email notifications"
-            checked={preferences?.emailNotifications ?? true}
-            disabled={status !== 'ready'}
-            onCheckedChange={(emailNotifications) => void run(() => save({ emailNotifications }))}
-          />
-        </div>
+        <Switch
+          aria-label="Email notifications"
+          checked={checked}
+          disabled={disabled || status !== 'ready'}
+          onCheckedChange={onCheckedChange}
+        />
       </Row>
       {status === 'error' ? (
         <p className="px-5 pb-4 text-sm text-red-700 dark:text-red-300" role="alert">

@@ -6,7 +6,6 @@ import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { Group, Pill, Row } from '@/components/platform-ui'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
-import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
 import { DeveloperId } from '@/components/settings/DeveloperId'
 import {
@@ -57,6 +56,7 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
           className="flex flex-wrap items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault()
+            if (!dirty || !trimmed) return
             void runName(() => save({ name: trimmed })).then((saved) => {
               if (saved) setName(trimmed)
             })
@@ -67,15 +67,13 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
             className="w-64"
             disabled={!canManage || nameState === 'saving'}
             maxLength={80}
+            // The name saves when you leave the field or press Enter, like the colour below.
+            onBlur={(event) => event.currentTarget.form?.requestSubmit()}
             onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setName(set.name)
+            }}
             value={name}
-          />
-          <SettingsSaveBar
-            dirty={dirty}
-            busy={nameState === 'saving'}
-            disabled={!canManage || !trimmed}
-            label="Save name"
-            onDiscard={() => setName(set.name)}
           />
           <SaveStatus state={nameState} />
         </form>
