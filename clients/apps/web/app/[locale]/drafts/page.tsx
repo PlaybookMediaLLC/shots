@@ -10,5 +10,5 @@ type DraftsPageProps = {
 export default async function DraftsPage({ params, searchParams }: DraftsPageProps) {
   const { locale } = await params
   const { socialSet } = await searchParams
-  redirect(getLocalizedPath(locale, socialSet ? `/write?set=${encodeURIComponent(socialSet)}` : '/write'))
+  redirect(getLocalizedPath(locale, socialSet ? `/publish?set=${encodeURIComponent(socialSet)}` : '/publish'))
 }

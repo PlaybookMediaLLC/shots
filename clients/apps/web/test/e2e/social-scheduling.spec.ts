@@ -261,7 +261,7 @@ test('X OAuth start binds its one-use callback to the active workspace', async (
     )
 
     await app.open(`/integrations/social/x?oauth_token=${state}&oauth_verifier=test-verifier`)
-    await expect(page).toHaveURL(/\/workspace\/channels\?connected=x$/)
+    await expect(page).toHaveURL(/\/settings\/channels\?connected=x$/)
     await expect(page.getByText('X is connected.')).toBeVisible()
 
     await expectOAuthConnection(organizationId, integrationId, state, 'x')

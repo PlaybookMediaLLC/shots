@@ -36,7 +36,7 @@ export function ImportDraft({
         setError('')
         try {
           const draft = await draftsApi.create({ socialSetId, body: importedBody(posts) })
-          router.replace(`/write/${draft.id}`)
+          router.replace(`/publish/${draft.id}`)
         } catch (error) {
           setError(error instanceof Error ? error.message : 'The draft could not be created.')
           setBusy(false)

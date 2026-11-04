@@ -159,7 +159,7 @@ func (s *Server) connectBluesky(w http.ResponseWriter, r *http.Request) {
 	}
 	path := original.ReturnPath
 	if start.Operation == socialoauthstart.OperationCREATE_SET && connection.SocialSetID != nil {
-		path = "/workspace/social-sets/" + *connection.SocialSetID
+		path = "/settings/publishing-brands/" + *connection.SocialSetID
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"completed": true, "connectionId": connection.ID, "socialSetId": connection.SocialSetID, "organizationId": actor.Organization, "returnPath": path})
 }

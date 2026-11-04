@@ -73,7 +73,7 @@ export async function productPageRedirect(
     return target
   }
   if (!access.hasOrganization) return to('/onboarding')
-  if (!access.isWorkspaceOperational) return to('/workspace')
+  if (!access.isWorkspaceOperational) return to('/settings')
   if (!access.hasPaidPlan) {
     // The in-app plan page names the tool and returns to it; public pricing drops both.
     const target = to('/upgrade')

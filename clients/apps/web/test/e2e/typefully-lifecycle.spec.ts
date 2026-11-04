@@ -45,7 +45,7 @@ test(
       (await (await fetch(`${notices}/sink`)).json()) as {
         slack: { channel: string; text: string }[]
       }
-    await app.open('/workspace/notifications')
+    await app.open('/settings/notifications')
     await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
     await page.getByRole('button', { name: 'Connect Slack', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Local Slack fixture' })).toBeVisible()
@@ -146,7 +146,7 @@ test(
         { timeout: 30_000 }
       )
       .toBe(17)
-    await app.open('/write/analyze/observations')
+    await app.open('/publish/analyze/observations')
     await expect(page.getByTestId('social-analytics')).toContainText('17')
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export CSV', exact: true }).click()

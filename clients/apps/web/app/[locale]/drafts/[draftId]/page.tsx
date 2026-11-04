@@ -8,5 +8,5 @@ type DraftPageProps = {
 /** A draft's old address opens it in Write (RFC 025). */
 export default async function DraftPage({ params }: DraftPageProps) {
   const { draftId, locale } = await params
-  redirect(getLocalizedPath(locale, `/write/${encodeURIComponent(draftId)}`))
+  redirect(getLocalizedPath(locale, `/publish/${encodeURIComponent(draftId)}`))
 }

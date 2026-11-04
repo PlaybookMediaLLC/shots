@@ -1,6 +1,6 @@
 'use client'
 
-import { OutwardIcon as ArrowUpRight } from '@/components/platform-shell/icons'
+import { ArrowForwardIcon as ArrowRight } from '@/components/platform-shell/icons'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { EmptyState } from '@/components/platform-ui'
 import { RecentIcon as Clock3 } from '@/components/platform-shell/icons'
@@ -40,10 +40,10 @@ export function RecentWork({
           <p className="mt-0.5 text-sm text-muted-foreground">Your most recently updated work.</p>
         </div>
         <SidebarLink
-          href={paidPlan ? '/library' : '/write'}
+          href={paidPlan ? '/library' : '/publish'}
           className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
         >
-          {paidPlan ? 'View library' : 'View drafts'} <ArrowUpRight size={14} aria-hidden="true" />
+          {paidPlan ? 'View library' : 'View drafts'} <ArrowRight size={14} aria-hidden="true" />
         </SidebarLink>
       </div>
       {query.isPending ? (
@@ -137,7 +137,7 @@ export function RecentWork({
               : 'Drafts you write in Publish appear here.'
           }
           action={
-            <ButtonLink href={paidPlan ? '/create' : '/write'}>
+            <ButtonLink href={paidPlan ? '/create' : '/publish'}>
               {paidPlan ? 'Create your first visual' : 'Write your first post'}
             </ButtonLink>
           }

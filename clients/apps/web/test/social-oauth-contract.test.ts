@@ -76,14 +76,14 @@ test('OAuth begin sends the exact reconnect target and attempt return path', asy
         provider: 'x',
         socialSetId: 'originalset1234',
         expectedConnectionId: 'original-connection',
-        returnPath: '/workspace/social-sets/originalset1234',
+        returnPath: '/settings/publishing-brands/originalset1234',
       })
       return Response.json({ url: 'https://api.x.com/oauth/authorize?oauth_token=fixture' })
     }
   )
   await client.beginSocialOAuth('x', 'originalset1234', {
     expectedConnectionId: 'original-connection',
-    returnPath: '/workspace/social-sets/originalset1234',
+    returnPath: '/settings/publishing-brands/originalset1234',
   })
 })
 

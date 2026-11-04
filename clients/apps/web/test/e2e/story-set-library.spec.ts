@@ -45,7 +45,7 @@ test(
     )
     await expect(page.getByRole('link', { name: 'View Projects' })).toHaveAttribute(
       'href',
-      '/projects'
+      '/library'
     )
     await expect(page.getByText(/You have 2 saved projects/)).toBeVisible()
     await expect(page.getByLabel('Example Story Set')).toBeVisible()
@@ -166,7 +166,7 @@ test(
     await chooseOption(page.getByRole('combobox', { name: 'Sort Story Sets' }), 'Name')
     await expect(page).toHaveURL(/sort=name/)
     await page.getByRole('link', { name: 'View Projects' }).click()
-    await expect(page).toHaveTitle(/Projects/)
+    await expect(page).toHaveTitle(/Screenshots · Library/)
     await page.goBack()
     await expect(search).toHaveValue('launch')
     await expect(page.getByRole('combobox', { name: 'Sort Story Sets' })).toContainText('Name')

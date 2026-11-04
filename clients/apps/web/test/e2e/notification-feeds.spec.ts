@@ -167,7 +167,7 @@ test(
         )
       ).toEqual(new Set(setIds))
 
-      await app.open('/workspace')
+      await app.open('/settings')
       const panel = page.getByRole('dialog', { name: 'Notifications', exact: true })
       const trigger = page.getByRole('button', { name: /^Notifications/ }).first()
       const activityURL = '**/api/workspace/notifications/inbox?view=activity&*'
@@ -268,7 +268,7 @@ test(
       )
       await panel.getByRole('tab', { name: 'Activity', exact: true }).click()
       await lateFetched.waiting
-      await sibling.goto('/workspace')
+      await sibling.goto('/settings')
       expect(
         (await requestJson(sibling, '/api/auth/organization/set-active', { organizationId: beta }))
           .status

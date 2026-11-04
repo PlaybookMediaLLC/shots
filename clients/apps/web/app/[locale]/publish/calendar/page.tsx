@@ -7,7 +7,7 @@ import { backendSDK, orNull } from '@/lib/backend/sdk'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 
-export const metadata: Metadata = { title: 'Calendar' }
+export const metadata: Metadata = { title: 'Calendar · Publish' }
 
 /** Personal calendar visibility is independent of the active Write social set. */
 export default async function WritePlanPage({
@@ -19,7 +19,7 @@ export default async function WritePlanPage({
 }) {
   const { locale } = await params
   const query = await searchParams
-  const access = await requireDraftsPageAccess(locale, '/write/plan')
+  const access = await requireDraftsPageAccess(locale, '/publish/calendar')
   const [sets, preferences, advanced] = await Promise.all([
     listSocialSets(access.tenant),
     orNull(backendSDK(access.tenant).getUserPreferences()),
@@ -34,6 +34,7 @@ export default async function WritePlanPage({
         <PlanWorkspace
           sets={sets.map((s) => socialSetSchema.parse(s))}
           canEdit={hasPermission(access.role, 'artifact:edit')}
+          canManageSets={hasPermission(access.role, 'workspace:update')}
           canPublish={hasPermission(access.role, 'publish:manage')}
           preferenceKey={`shots:plan:${access.organization.id}:${access.session.user.id}`}
           initialZone={sets[0]?.timeZone ?? 'UTC'}
@@ -41,7 +42,6 @@ export default async function WritePlanPage({
           initialDay={query.day ?? query.week}
           initialView={query.view}
           advancedScheduling={advanced.allowed}
-          campaignsEnabled={access.campaignWorkflowEnabled && access.hasPaidPlan}
         />
       </div>
     </PlatformShell>

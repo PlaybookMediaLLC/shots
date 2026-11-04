@@ -36,7 +36,7 @@ test('Better Auth role, remove and leave commands persist audit and revoke old s
   const org = z.object({ id: z.string() }).parse(created.body).id
   expect(await getActiveOrganizationId(page)).toBe(org)
   await grantWorkspacePlan(org, 'business')
-  await page.goto('/workspace/members', { waitUntil: 'domcontentloaded' })
+  await page.goto('/settings/members', { waitUntil: 'domcontentloaded' })
   const contexts = []
   const members = []
   try {

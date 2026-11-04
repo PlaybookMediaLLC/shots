@@ -5,6 +5,8 @@ import { WorkspaceSettingContent } from './WorkspaceSettingDetail'
 import { SETTINGS_SECTIONS, type SettingId, type SocialSetPage } from './settings-sections'
 
 export type WorkspaceSettingsProps = {
+  /** Content drafts are rolled out (PLATFORM_CONTENT_DRAFTS), so Publishing brands shows the approval switch. */
+  draftsEnabled: boolean
   email: string
   /** The public MCP server URL, shown under AI agents. */
   mcpUrl: string

@@ -703,7 +703,7 @@ function BrandDialog({ onClose, session, actions }: Props) {
         {kits && !kits.length ? (
           <p className="text-sm text-muted-foreground">
             No brand kits yet.{' '}
-            <Link className="underline" href="/workspace/brand">
+            <Link className="underline" href="/settings/brand-kit">
               Create one in Settings
             </Link>
             .

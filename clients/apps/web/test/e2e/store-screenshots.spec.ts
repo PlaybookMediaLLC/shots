@@ -136,11 +136,14 @@ test('Store screenshots is one click from any page, highlighted and titled, and 
   await app.expectPath('/create/store')
   await expect(page.getByRole('button', { name: 'Use the sample set' })).toBeVisible()
   await expect(page).toHaveTitle('Store screenshots · Create | Shots')
-  for (const name of ['Create', 'Store screenshots'])
-    await expect(sidebar.getByRole('link', { name, exact: true })).toHaveAttribute(
-      'aria-current',
-      'page'
-    )
+  // Create marks the section; Store screenshots, its page, is the current link.
+  await expect(sidebar.getByRole('link', { name: 'Create', exact: true })).toHaveAttribute(
+    'aria-current',
+    'true'
+  )
+  await expect(
+    sidebar.getByRole('link', { name: 'Store screenshots', exact: true })
+  ).toHaveAttribute('aria-current', 'page')
 
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page).toHaveURL(/\/create\/store\/[^/]+$/)

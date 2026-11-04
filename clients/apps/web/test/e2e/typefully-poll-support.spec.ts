@@ -17,7 +17,7 @@ test(
     })
     expect(result.status).toBe(201)
     const id = (result.body as { id: string }).id
-    await app.open(`/write/${id}`)
+    await app.open(`/publish/${id}`)
     await expect(draftEditor(page)).toContainText('Which change helps?')
     await page.getByRole('button', { name: 'Add a poll', exact: true }).click()
     await page.getByRole('button', { name: 'Add poll', exact: true }).click()

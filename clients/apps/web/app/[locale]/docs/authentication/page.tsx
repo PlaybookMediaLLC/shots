@@ -77,7 +77,7 @@ export default function AuthenticationPage() {
           Versioned <code>/api/v1</code> tenant endpoints require a workspace
           API key with the declared scope or a signed-in user session with the
           matching permission. Create a workspace API key in Settings →
-          Developer API (<code>/workspace/developers</code>).
+          Developer API (<code>/settings/developers</code>).
         </p>
 
         <div className="space-y-10">

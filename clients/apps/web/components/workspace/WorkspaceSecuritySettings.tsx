@@ -108,7 +108,7 @@ export function WorkspaceSecuritySettings({ twoFactorEnabled }: WorkspaceSecurit
             Contact your administrator to arrange password sign-in before changing authenticator
             settings. You can also protect your provider account with its own two-step verification.
           </p>
-          <Link className="text-sm underline" href="/workspace/account">
+          <Link className="text-sm underline" href="/settings/account">
             View your sign-in methods
           </Link>
         </Row>

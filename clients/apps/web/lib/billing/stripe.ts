@@ -104,7 +104,7 @@ async function workspaceSubscriptions(api: Stripe, organizationId: string) {
 }
 
 const appUrl = (path: string) => `${getAuthBaseUrl()}${path}`
-const returnUrl = () => appUrl('/workspace/billing')
+const returnUrl = () => appUrl('/settings/billing')
 
 let portalConfiguration: Promise<string> | null = null
 
