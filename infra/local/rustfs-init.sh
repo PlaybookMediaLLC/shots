@@ -13,6 +13,7 @@ if ! sign --head "$bucket_url" >/dev/null 2>&1; then
 fi
 
 # Browser uploads use a short-lived S3 signature issued by the Go backend.
-# RustFS must permit the local web origin to send its signed PUT request.
-printf '%s' '<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><CORSRule><AllowedOrigin>http://localhost:3000</AllowedOrigin><AllowedOrigin>http://127.0.0.1:3000</AllowedOrigin><AllowedOrigin>https://*.ngrok-free.app</AllowedOrigin><AllowedOrigin>https://*.ngrok.app</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' |
+# RustFS must permit the local web origins, the stack's and the social gate's,
+# to send their signed PUT requests.
+printf '%s' '<CORSConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><CORSRule><AllowedOrigin>http://localhost:3000</AllowedOrigin><AllowedOrigin>http://localhost:3010</AllowedOrigin><AllowedOrigin>http://127.0.0.1:3000</AllowedOrigin><AllowedOrigin>https://*.ngrok-free.app</AllowedOrigin><AllowedOrigin>https://*.ngrok.app</AllowedOrigin><AllowedMethod>GET</AllowedMethod><AllowedMethod>PUT</AllowedMethod><AllowedHeader>*</AllowedHeader><ExposeHeader>ETag</ExposeHeader><MaxAgeSeconds>3600</MaxAgeSeconds></CORSRule></CORSConfiguration>' |
   sign --request PUT --header 'Content-Type: application/xml' --data-binary @- "${bucket_url}?cors" >/dev/null
