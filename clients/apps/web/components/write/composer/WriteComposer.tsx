@@ -399,6 +399,24 @@ export function WriteComposer({
     () => ''
   )
   const bodyArea = React.useRef<HTMLDivElement>(null)
+  // Opening or closing a side panel changes the composer's width, so the sticky
+  // header can rewrap, and the browser then resets the draft's scroll to the
+  // top. The draft stays where it was scrolled.
+  const draftScroll = React.useRef(0)
+  React.useEffect(() => {
+    const main = bodyArea.current?.closest('main')
+    if (!main) return
+    const remember = () => {
+      draftScroll.current = main.scrollTop
+    }
+    remember()
+    main.addEventListener('scroll', remember, { passive: true })
+    return () => main.removeEventListener('scroll', remember)
+  }, [])
+  React.useLayoutEffect(() => {
+    const main = bodyArea.current?.closest('main')
+    if (main && main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
+  }, [panel])
   const [pasteNotice, setPasteNotice] = React.useState(false)
   const [toolDialog, setToolDialog] = React.useState<ToolDialog | null>(null)
   // Rewrite registers here, so a post's sparkle opens it beside that post.
