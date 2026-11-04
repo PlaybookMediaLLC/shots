@@ -66,6 +66,7 @@ test(
       'Reconnect X to check this account’s Articles access.'
     )
     const review = page.getByTestId('publish-review')
+    await review.getByText('More options', { exact: true }).click()
     await review.getByRole('button', { name: 'Auto-DM settings · prepared', exact: true }).click()
     const prepared = page.getByRole('dialog', { name: 'Prepare Auto-DM campaign', exact: true })
     await expect(prepared).toContainText('Delivery is off')

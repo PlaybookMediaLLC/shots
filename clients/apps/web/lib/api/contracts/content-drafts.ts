@@ -1,10 +1,11 @@
+import { publicationReceiptSchema } from 'screenshot-studio-backend-sdk'
 import { draftVersionsQuerySchema } from '@/lib/api/contracts/content-draft-concurrency'
 import { z } from 'zod'
 import { defineContract, timestampSchema } from '@/lib/api/contract'
 import { getMinimumPlan } from '@/lib/billing/plans'
 import { scheduledPostStatusSchema } from '@/lib/api/contracts/scheduled-posts'
 import { workspaceDocs } from '@/lib/api/contracts/workspace-docs'
-import { automationSchema, draftKindSchema } from '@/lib/write/document'
+import { automationSchema, draftKindSchema, draftChannelSchema } from '@/lib/write/document'
 import {
   contentDraftSortSchema,
   contentDraftViewSchema,
@@ -30,57 +31,53 @@ export const contentDraftIdSchema = z
 /** Plate JSON: the editor's value, a list of block nodes. */
 export const plateValueSchema = z.array(z.record(z.string(), z.unknown())).max(5_000)
 
-/** A platform a draft posts to. */
-const platformSchema = z.enum(['x', 'linkedin', 'instagram', 'threads', 'bluesky', 'mastodon'])
-
 /** A draft as the API returns it. */
-export const contentDraftSchema = z
-  .object({
-    assetIds: z.array(z.string()),
-    body: plateValueSchema,
-    /** Collaborative room generation; changes after an external body replacement. */
-    collabGeneration: z.number().int().nonnegative().default(0),
-    channelConnectionIds: z.array(z.string()),
-    createdAt: timestampSchema,
-    createdByUserId: z.string().nullable(),
-    /** Text a channel posts instead of the body's, by channel. */
-    channelText: z.record(z.string(), z.string()),
-    discussions: z.record(z.string(), z.unknown()),
-    id: z.string(),
-    organizationId: z.string(),
-    plainText: z.string(),
-    status: contentDraftStatusSchema,
-    title: z.string(),
-    updatedAt: timestampSchema,
-    updatedByUserId: z.string().nullable(),
-    version: z.number().int().min(1),
-    calendarVersion: z.number().int().min(1).default(1),
-    /** Review before scheduling; approval holds for `approvedVersion` only. */
-    approvedVersion: z.number().int().nullable(),
-    reviewNote: z.string().nullable(),
-    reviewStatus: z.enum(['none', 'pending', 'approved', 'changes_requested']),
-    reviewedByUserId: z.string().nullable(),
-    /** The read-and-comment link's token, while the link is on. */
-    shareToken: z.string().nullable(),
-    /** Comments guests left through that link. */
-    guestComments: z.array(
-      z.object({ createdAt: timestampSchema, name: z.string(), text: z.string() })
-    ),
-    /** The draft's live posts (lists only). */
-    publishedPosts: z.number().int(),
-    /**
-     * The draft's social set and what it copied from the set's defaults when it
-     * was created (RFC 024). Defaults keep an older backend's answer readable.
-     */
-    engagement: draftEngagementSchema,
-    naturalPostingTime: z.boolean().default(false),
-    suppressSlackOnPublish: z.boolean().optional(),
-    /** A calendar placement without scheduling, as an ISO 8601 instant. */
-    plannedFor: timestampSchema.nullable().default(null),
-    primaryPlatform: z.string().nullable().default(null),
-    socialSetId: z.string().nullable().default(null),
-  })
-  .extend(draftWriteFieldsSchema.shape)
+export const contentDraftSchema = z.object({
+  assetIds: z.array(z.string()),
+  body: plateValueSchema,
+  /** Collaborative room generation; changes after an external body replacement. */
+  collabGeneration: z.number().int().nonnegative().default(0),
+  channelConnectionIds: z.array(z.string()),
+  createdAt: timestampSchema,
+  createdByUserId: z.string().nullable(),
+  /** Text a channel posts instead of the body's, by channel. */
+  channelText: z.record(z.string(), z.string()),
+  discussions: z.record(z.string(), z.unknown()),
+  id: z.string(),
+  organizationId: z.string(),
+  plainText: z.string(),
+  status: contentDraftStatusSchema,
+  title: z.string(),
+  updatedAt: timestampSchema,
+  updatedByUserId: z.string().nullable(),
+  version: z.number().int().min(1),
+  calendarVersion: z.number().int().min(1).default(1),
+  /** Review before scheduling; approval holds for `approvedVersion` only. */
+  approvedVersion: z.number().int().nullable(),
+  reviewNote: z.string().nullable(),
+  reviewStatus: z.enum(['none', 'pending', 'approved', 'changes_requested']),
+  reviewedByUserId: z.string().nullable(),
+  /** The read-and-comment link's token, while the link is on. */
+  shareToken: z.string().nullable(),
+  /** Comments guests left through that link. */
+  guestComments: z.array(
+    z.object({ createdAt: timestampSchema, name: z.string(), text: z.string() })
+  ),
+  /** The draft's live posts (lists only). */
+  publishedPosts: z.number().int(),
+  /**
+   * The draft's social set and what it copied from the set's defaults when it
+   * was created (RFC 024). Defaults keep an older backend's answer readable.
+   */
+  engagement: draftEngagementSchema,
+  naturalPostingTime: z.boolean().default(false),
+  suppressSlackOnPublish: z.boolean().optional(),
+  /** A calendar placement without scheduling, as an ISO 8601 instant. */
+  plannedFor: timestampSchema.nullable().default(null),
+  primaryPlatform: z.string().nullable().default(null),
+  socialSetId: z.string().nullable().default(null),
+  ...draftWriteFieldsSchema.shape,
+})
 
 /** The fields a draft is created or updated with. */
 export const contentDraftFieldsSchema = draftWriteInputSchema.extend({
@@ -88,7 +85,7 @@ export const contentDraftFieldsSchema = draftWriteInputSchema.extend({
   body: plateValueSchema.optional(),
   channelConnectionIds: z.array(contentDraftIdSchema).max(10).optional(),
   /** Text a channel posts instead of the body's, by channel. */
-  channelText: z.partialRecord(platformSchema, z.string().max(100_000)).optional(),
+  channelText: z.partialRecord(draftChannelSchema, z.string().max(100_000)).optional(),
   /** Comment threads on the body and their authors' names. */
   discussions: z.record(z.string(), z.unknown()).optional(),
   plainText: z.string().max(100_000).optional(),
@@ -105,7 +102,7 @@ export const contentDraftCreateSchema = contentDraftFieldsSchema.extend({
   requestKey: contentDraftIdSchema.optional(),
   kind: draftKindSchema.optional(),
   /** The platform the body is written for; the set's primary platform when omitted. */
-  primaryPlatform: platformSchema.optional(),
+  primaryPlatform: draftChannelSchema.optional(),
   scratchpad: z.string().max(20_000).optional(),
   socialSetId: contentDraftIdSchema.optional(),
   /** Tags of the draft's set (an experiment). */
@@ -121,9 +118,9 @@ export const contentDraftUpdateSchema = contentDraftFieldsSchema.extend({
   status: contentDraftEditableStatusSchema.optional(),
   /** The draft's own choices, which start as copies of its set's defaults. */
   naturalPostingTime: z.boolean().optional(),
-  primaryPlatform: z.union([platformSchema, z.literal('')]).optional(),
+  primaryPlatform: draftChannelSchema.or(z.literal('')).optional(),
   /** An ISO 8601 instant, or an empty string to clear it. */
-  plannedFor: z.union([z.iso.datetime({ offset: true }), z.literal('')]).optional(),
+  plannedFor: z.iso.datetime({ offset: true }).or(z.literal('')).optional(),
 })
 
 /**
@@ -289,6 +286,7 @@ export const contentDraftPostSchema = z.object({
   /** A thread: its reply count and how many went out. */
   replies: z.number().int(),
   threadProgress: z.object({
+    publication: publicationReceiptSchema.optional(),
     quotes: z.array(z.object({ postId: z.string(), state: z.string() })).optional(),
     lastReplyId: z.string().optional(),
     posted: z.number().int(),

@@ -4,6 +4,9 @@ import { z } from 'zod'
 export const connectionProviderSchema = z.enum([
   'x',
   'linkedin',
+  'linkedin-page',
+  'tiktok',
+  'youtube',
   'threads',
   'mastodon',
   'mastodon-custom',

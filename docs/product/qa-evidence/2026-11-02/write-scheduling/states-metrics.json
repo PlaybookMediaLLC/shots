@@ -1,0 +1,44 @@
+{
+  "queue": [
+    {
+      "draft": "cmw0cvdbs001quj7ddc42ksnw",
+      "slotAt": "2026-11-03T14:00:00.000Z"
+    },
+    {
+      "draft": "cmw0cvdbs001quj7ddc42ksnw",
+      "slotAt": "2026-11-03T14:00:00.000Z"
+    },
+    {
+      "draft": "cmw0cws3p001uuj7dthjr2sdz",
+      "slotAt": "2026-11-04T14:00:00.000Z"
+    },
+    {
+      "draft": "cmw0cws3p001uuj7dthjr2sdz",
+      "slotAt": "2026-11-04T14:00:00.000Z"
+    }
+  ],
+  "queue-1440-light": {
+    "page": false,
+    "dialog": false
+  },
+  "queue-1024-light": {
+    "page": false,
+    "dialog": false
+  },
+  "queue-390-light": {
+    "page": false,
+    "dialog": false
+  },
+  "queue-1440-dark": {
+    "page": false,
+    "dialog": false
+  },
+  "queue-1024-dark": {
+    "page": false,
+    "dialog": false
+  },
+  "queue-390-dark": {
+    "page": false,
+    "dialog": false
+  }
+}

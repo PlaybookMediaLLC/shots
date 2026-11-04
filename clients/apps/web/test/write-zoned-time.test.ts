@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  committedMessage,
   isTimeZone,
   offsetLabel,
   readWhen,
@@ -55,4 +56,27 @@ test('typed times are read in the set’s zone, not the browser’s', () => {
   assert.equal(readWhen('tomorrow 9am', 'Asia/Tokyo', now), '2026-10-22T09:00')
   assert.equal(readWhen('in 3 hours', 'America/New_York', now), '2026-10-20T17:15')
   assert.equal(readWhen('not a time', 'UTC', now), null)
+})
+
+test('a confirmed schedule names the stored instant, its zone and offset, and a moved queue slot', () => {
+  const explicit = committedMessage(
+    [
+      { scheduledFor: '2026-11-04T15:00:00.000Z', slotAt: null },
+      { scheduledFor: '2026-11-04T15:00:00.000Z' },
+    ],
+    'America/New_York',
+    false
+  )
+  assert.match(explicit, /^Scheduled 2 posts for .*10:00.* · America\/New_York \(UTC−05:00\)\.$/)
+  assert.doesNotMatch(explicit, /slot/)
+  // A natural offset moves the instant off the 9:00 slot; both are disclosed.
+  const queued = committedMessage(
+    [{ scheduledFor: '2026-11-04T14:02:37.000Z', slotAt: '2026-11-04T14:00:00.000Z' }],
+    'America/New_York',
+    true
+  )
+  assert.match(
+    queued,
+    /^Added 1 post to the queue in the .*9:00.* slot, publishing .*9:02:37.*\(UTC−05:00\)\.$/
+  )
 })

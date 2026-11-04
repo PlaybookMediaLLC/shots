@@ -180,7 +180,11 @@ func (f *fakeStore) OAuthStart(_ context.Context, _ publishing.Actor, session, s
 	if state != f.oauthState || session != f.oauthSession || provider != f.oauthProvider {
 		return nil, publishing.ErrNotFound
 	}
-	return &ent.SocialOAuthStart{SecretReference: "SOCIAL_API_KEY", ExchangeStatus: f.oauthStatus}, nil
+	start := &ent.SocialOAuthStart{SecretReference: "SOCIAL_API_KEY", ExchangeStatus: f.oauthStatus}
+	if f.oauthReceipt != nil {
+		start.ExchangeReceipt = *f.oauthReceipt
+	}
+	return start, nil
 }
 func (f *fakeStore) AuthorizeSession(context.Context, string, string) (*ent.Session, error) {
 	return &ent.Session{}, f.authError
@@ -209,7 +213,7 @@ func (f *fakeStore) SaveOAuthExchange(_ context.Context, _ publishing.Actor, _, 
 	f.oauthStatus = socialoauthstart.ExchangeStatusEXCHANGED
 	return nil
 }
-func (f *fakeStore) RememberInstagramIntegration(context.Context, publishing.Actor, string, string, string) error {
+func (f *fakeStore) RememberInstagramIntegration(context.Context, publishing.Actor, string, string, string, ...string) error {
 	return nil
 }
 func (f *fakeStore) FinishOAuth(context.Context, publishing.Actor, string, string, string, string) (*ent.ChannelConnection, error) {
@@ -469,5 +473,61 @@ func TestListConnectionsNamesAccountsFromSocialAPI(t *testing.T) {
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"displayName":"Shots"`) ||
 		!strings.Contains(response.Body.String(), `"handle":"shots_app"`) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestVideoAndPageOAuthAuthorizationHosts(t *testing.T) {
+	for provider, host := range map[string]string{"linkedin-page": "www.linkedin.com", "tiktok": "www.tiktok.com", "youtube": "accounts.google.com"} {
+		t.Run(provider, func(t *testing.T) {
+			if !validOAuthProvider(provider) {
+				t.Fatal("provider missing")
+			}
+			if _, state, err := validatedAuthorizationURL("https://"+host+"/oauth?state=bound-state", provider); err != nil || state != "bound-state" {
+				t.Fatalf("state=%q error=%v", state, err)
+			}
+			if _, _, err := validatedAuthorizationURL("https://"+host+".evil.example/oauth?state=bound-state", provider); err == nil {
+				t.Fatal("untrusted host accepted")
+			}
+		})
+	}
+}
+
+func TestOAuthSelectionOnlyAcceptsOfferedPagesAndChannels(t *testing.T) {
+	for _, provider := range []string{"linkedin-page", "youtube", "instagram"} {
+		t.Run(provider, func(t *testing.T) {
+			store := &fakeStore{oauthState: "state", oauthSession: "session", oauthProvider: provider, oauthStatus: socialoauthstart.ExchangeStatusEXCHANGED,
+				oauthReceipt: &schema.SocialOAuthExchange{ID: "integration", Pages: []schema.SocialOAuthPage{{ID: "offered", PageID: "page"}}}}
+			verifier := &fakeVerifier{}
+			handler := New(store, &fakeScheduler{}, verifier, "secret")
+			call := func(account, page, session string) int {
+				request := httptest.NewRequest(http.MethodPost, "/v1/social-oauth/page", strings.NewReader(fmt.Sprintf(`{"provider":%q,"state":"state","integrationId":"integration","accountId":%q,"pageId":%q}`, provider, account, page)))
+				request.Header.Set("Authorization", "Bearer secret")
+				request.Header.Set("X-Organization-ID", "org-1")
+				request.Header.Set("X-User-ID", "user-1")
+				request.Header.Set("X-Session-ID", session)
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, request)
+				return response.Code
+			}
+			if got := call("arbitrary", "page", "session"); got != http.StatusBadRequest {
+				t.Fatalf("arbitrary account status=%d", got)
+			}
+			if got := call("offered", "arbitrary", "session"); got != http.StatusBadRequest {
+				t.Fatalf("arbitrary page status=%d", got)
+			}
+			if got := call("offered", "page", "other-session"); got != http.StatusForbidden {
+				t.Fatalf("foreign session status=%d", got)
+			}
+			if verifier.pageCalls != 0 {
+				t.Fatal("invalid selection reached provider")
+			}
+			if got := call("offered", "page", "session"); got != http.StatusOK {
+				t.Fatalf("offered selection status=%d", got)
+			}
+			store.oauthStatus = socialoauthstart.ExchangeStatusCOMPLETED
+			if got := call("offered", "page", "session"); got != http.StatusOK || verifier.pageCalls != 1 {
+				t.Fatal("completion replay repeated selection")
+			}
+		})
 	}
 }

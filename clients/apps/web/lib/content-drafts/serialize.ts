@@ -82,6 +82,8 @@ export const THREAD_CHANNELS: ReadonlySet<DraftChannel> = new Set([
  */
 export const DRAFT_CHANNEL_LIMITS: Record<DraftChannel, number> = {
   bluesky: 300,
+  tiktok: 2000,
+  youtube: 5000,
   instagram: 2_200,
   linkedin: 3_000,
   mastodon: 500,
@@ -158,6 +160,8 @@ type PlateNode = {
 
 const CONNECTION_CHANNELS: Record<string, DraftChannel> = {
   bluesky: 'bluesky',
+  tiktok: 'tiktok',
+  youtube: 'youtube',
   instagram: 'instagram',
   'instagram-standalone': 'instagram',
   linkedin: 'linkedin',
@@ -704,6 +708,8 @@ export function serializeDraft(
 
 const CHANNEL_NAMES: Record<DraftChannel, string> = {
   bluesky: 'Bluesky',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
   instagram: 'Instagram',
   linkedin: 'LinkedIn',
   mastodon: 'Mastodon',

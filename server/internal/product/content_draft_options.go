@@ -27,6 +27,14 @@ var (
 // checkPostOptions checks one post's settings against its channel. First is
 // whether it is the first post; images is how many images it carries.
 func checkPostOptions(channel string, options *postoptions.PublishOptions, first bool) error {
+	var youtube *postoptions.YouTubeOptions
+	var tiktok *postoptions.TikTokOptions
+	if options != nil {
+		youtube, tiktok = options.YouTube, options.TikTok
+	}
+	if err := postoptions.ValidateVideoOptions(channel, youtube, tiktok, true); err != nil {
+		return invalid(err.Error())
+	}
 	if options == nil || options.Empty() {
 		return nil
 	}

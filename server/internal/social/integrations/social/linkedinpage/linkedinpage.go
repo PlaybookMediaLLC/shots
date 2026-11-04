@@ -48,8 +48,9 @@ func (p *Provider) Info() integrations.Info {
 
 func (p *Provider) GenerateAuthURL(context.Context, *integrations.ClientInformation) (*integrations.GenerateAuthURLResponse, error) {
 	state := ids.Secure(6)
+	clientID, _ := p.Credentials()
 	return &integrations.GenerateAuthURLResponse{
-		URL: "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=" + os.Getenv("LINKEDIN_CLIENT_ID") +
+		URL: "https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=" + clientID +
 			"&redirect_uri=" + linkedin.EncodeURIComponent(os.Getenv("FRONTEND_URL")+"/integrations/social/linkedin-page") +
 			"&state=" + state + "&scope=" + linkedin.EncodeURIComponent(strings.Join(linkedin.PageOAuthScopes(), " ")),
 		CodeVerifier: ids.Secure(30),
@@ -61,6 +62,10 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 	details, err := p.ExchangeCodeForScopes(ctx, params.Code, os.Getenv("FRONTEND_URL")+"/integrations/social/linkedin-page", linkedin.PageOAuthScopes())
 	if err != nil {
 		return nil, err
+	}
+	// LinkedIn answers an unreadable profile (no r_basicprofile) without an id.
+	if details.ID == "" {
+		return nil, errors.New("linkedin page connection could not read the member profile")
 	}
 	// namespaced placeholder so the in-between row never collides with the
 	// personal LinkedIn channel row (same org + same member sub)

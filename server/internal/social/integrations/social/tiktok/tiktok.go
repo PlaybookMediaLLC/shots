@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ids"
@@ -401,14 +402,9 @@ func (p *Provider) CheckPostStatus(ctx context.Context, accessToken string, raw 
 			PostID:     "missing",
 		}, nil
 	case "PUBLISH_COMPLETE":
-		// the id only shows up once moderation approves the post - fall back to
-		// the profile URL and keep the publish_id (resolveReleaseId fixes it later)
+		// Moderation may finish before TikTok exposes the native receipt.
 		if publicPostID == "" {
-			return &integrations.PendingCheckResponse{
-				Status:     "completed",
-				ReleaseURL: "https://www.tiktok.com/@" + profile(integration),
-				PostID:     pending.PublishID,
-			}, nil
+			return stillPending, nil
 		}
 		return &integrations.PendingCheckResponse{
 			Status:     "completed",
@@ -649,6 +645,8 @@ func buildSourceInfoBody(post integrations.PostDetails, s *TikTokDTO, videoSize 
 		}
 		return map[string]any{"post_mode": mode, "media_type": "PHOTO", "source_info": source}
 	}
+	// Videos are streamed from the signed URL: TikTok can pull only from a
+	// verified domain, and a presigned R2 URL lives on the R2 API host.
 	size, count := ChunkPlan(videoSize)
 	return map[string]any{"source_info": map[string]any{
 		"source":            "FILE_UPLOAD",
@@ -695,16 +693,35 @@ func (p *Provider) PostPending(ctx context.Context, id, accessToken string, post
 	if err != nil {
 		return nil, err
 	}
-	res, err := p.Fetch(ctx, apiURL+"/v2/post/publish"+postingMethod(contentPostingMethod(settings), isPhoto), integrations.Request{
-		Method: http.MethodPost,
-		Headers: map[string]string{
-			"Content-Type":  "application/json; charset=UTF-8",
-			"Authorization": "Bearer " + accessToken,
-		},
-		Body: payload,
-	})
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL+"/v2/post/publish"+postingMethod(contentPostingMethod(settings), isPhoto), bytes.NewReader(payload))
 	if err != nil {
-		return nil, err
+		return nil, errors.New("TikTok publish request is unavailable")
+	}
+	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	// An init response can be lost after TikTok accepts it. Never repeat this mutation.
+	res, err := integrations.Do(request)
+	if err != nil {
+		var rejected *integrations.ResponseError
+		if errors.As(err, &rejected) && rejected.Status == http.StatusUnauthorized {
+			return nil, temporalx.RefreshToken("tiktok", "{}", "{}", "TikTok credentials must be refreshed")
+		}
+		if errors.As(err, &rejected) && rejected.Status >= 400 && rejected.Status < 500 && rejected.Status != 408 {
+			var response struct {
+				Error struct{ Code string } `json:"error"`
+			}
+			if json.Unmarshal(rejected.Body, &response) == nil {
+				for _, rule := range errorRules {
+					if response.Error.Code == rule.needle {
+						// Only fixed codes are safe: provider messages can echo credentials or signed URLs.
+						slog.WarnContext(ctx, "TikTok rejected publication", "provider_error_code", rule.needle)
+						return nil, temporalx.PublicationRejected("tiktok", rule.value)
+					}
+				}
+			}
+			return nil, temporalx.PublicationRejected("tiktok", "TikTok rejected the publish request; check the account grant and verified media domain")
+		}
+		return nil, temporalx.UnknownDelivery("tiktok", "TikTok publish acceptance is unknown; reconcile before resending")
 	}
 	var init struct {
 		Data *struct {
@@ -715,8 +732,8 @@ func (p *Provider) PostPending(ctx context.Context, id, accessToken string, post
 	if err := res.JSON(&init); err != nil {
 		return nil, err
 	}
-	if init.Data == nil {
-		return nil, errors.New("tiktok: publish init response has no data")
+	if init.Data == nil || init.Data.PublishID == "" {
+		return nil, temporalx.UnknownDelivery("tiktok", "TikTok returned no publish identity; reconcile before resending")
 	}
 
 	// Videos: stream the bytes to the upload_url returned by the init call.
@@ -757,7 +774,7 @@ func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []int
 	for range 27 { // ~9 minutes at 20s interval
 		check, err := p.CheckPostStatus(ctx, accessToken, response.PendingData, integration)
 		if err != nil {
-			return nil, err
+			return nil, temporalx.UnknownDelivery("tiktok", "TikTok accepted the request but its result could not be confirmed")
 		}
 		if check.Status == "completed" {
 			return []integrations.PostResponse{{
@@ -774,10 +791,10 @@ func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []int
 			break
 		}
 		if err := p.Sleep(ctx, pollInterval); err != nil {
-			return nil, err
+			return nil, temporalx.UnknownDelivery("tiktok", "TikTok accepted the request but confirmation was interrupted")
 		}
 	}
-	return nil, temporalx.BadBody("tiktok-error-upload", "{}", "{}", "TikTok refused to publish your post")
+	return nil, temporalx.UnknownDelivery("tiktok", "TikTok accepted the request but its final receipt is not available")
 }
 
 func (p *Provider) Analytics(ctx context.Context, id, accessToken string, days int) ([]integrations.AnalyticsData, error) {
@@ -1023,4 +1040,31 @@ func compact(body []byte) string {
 		return string(body)
 	}
 	return buf.String()
+}
+
+// CreatorInfo fetches the current account choices before a creator reviews or sends a video.
+func (p *Provider) CreatorInfo(ctx context.Context, token string) (*postoptions.TikTokCreator, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	var reply struct {
+		Data *struct {
+			Nickname        string   `json:"creator_nickname"`
+			PrivacyLevels   []string `json:"privacy_level_options"`
+			MaxDuration     int      `json:"max_video_post_duration_sec"`
+			CommentDisabled bool     `json:"comment_disabled"`
+			DuetDisabled    bool     `json:"duet_disabled"`
+			StitchDisabled  bool     `json:"stitch_disabled"`
+		} `json:"data"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := plainFetch(ctx, http.MethodPost, apiURL+"/v2/post/publish/creator_info/query/", map[string]string{"Authorization": "Bearer " + token, "Content-Type": "application/json"}, nil, &reply); err != nil {
+		return nil, errors.New("TikTok creator information is unavailable")
+	}
+	if reply.Error.Code != "ok" || reply.Data == nil || reply.Data.Nickname == "" || reply.Data.MaxDuration <= 0 || len(reply.Data.PrivacyLevels) == 0 {
+		return nil, errors.New("TikTok has not granted publishing access for this account")
+	}
+	d := reply.Data
+	return &postoptions.TikTokCreator{Nickname: d.Nickname, PrivacyLevels: d.PrivacyLevels, MaxDurationSeconds: d.MaxDuration, CommentDisabled: d.CommentDisabled, DuetDisabled: d.DuetDisabled, StitchDisabled: d.StitchDisabled}, nil
 }

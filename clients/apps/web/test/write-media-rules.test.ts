@@ -111,3 +111,19 @@ test('every destination names where its numbers come from and when they were rea
     assert.ok(rules.docs.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(rules.verifiedOn))
   }
 })
+
+test('video destinations require exactly one MP4 and refuse photos', () => {
+  for (const channel of ['tiktok', 'youtube'] as const) {
+    assert.equal(mediaProblems(channel, []).length > 0, true)
+    assert.equal(mediaProblems(channel, [{ mimeType: 'image/png' }]).length > 0, true)
+    assert.equal(mediaProblems(channel, [{ mimeType: 'image/*' }]).length > 0, true)
+    assert.equal(
+      mediaProblems(channel, [{ mimeType: 'video/mp4', durationMs: 5000, bytes: 1000 }]).length,
+      0
+    )
+    assert.equal(
+      mediaProblems(channel, [{ mimeType: 'video/mp4' }, { mimeType: 'video/mp4' }]).length > 0,
+      true
+    )
+  }
+})

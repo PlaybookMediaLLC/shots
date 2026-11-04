@@ -3,6 +3,7 @@ package tenantpublishing
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
@@ -44,6 +45,20 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		linkedin["who_can_reply_post"] != nil {
 		t.Fatalf("linkedin settings: %v", linkedin)
 	}
+	audience := false
+	for _, tc := range []struct {
+		platform string
+		options  *postoptions.PublishOptions
+		want     map[string]any
+	}{
+		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "unlisted", MadeForKids: &audience}}, map[string]any{"title": "Explicit title", "type": "unlisted", "selfDeclaredMadeForKids": "no"}},
+		{"tiktok", &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "PUBLIC_TO_EVERYONE", AllowComments: true, AllowStitch: true, CommercialContent: true, BrandOrganic: true, MadeWithAI: true, Consent: true}}, map[string]any{"content_posting_method": "DIRECT_POST", "privacy_level": "PUBLIC_TO_EVERYONE", "comment": true, "duet": false, "stitch": true, "brand_organic_toggle": true, "brand_content_toggle": false, "video_made_with_ai": true, "autoAddMusic": "no"}},
+	} {
+		if got := decode(t, must(postSettings(tc.platform, nil, tc.options, ""))); !reflect.DeepEqual(got, tc.want) {
+			t.Fatalf("%s settings: %v", tc.platform, got)
+		}
+	}
+
 }
 
 func TestAFinisherQuotesTheFirstPostOnlyOnceItIsLive(t *testing.T) {

@@ -1,3 +1,5 @@
+import type { PillTone } from '@/components/platform-ui'
+
 /**
  * How a scheduled destination reads to a person (RFC 013): its state,
  * including a queued post whose time passed without it starting, and why it
@@ -55,6 +57,48 @@ export function postState(
     case 'CANCELLED':
       return 'Cancelled'
   }
+}
+
+/**
+ * Each state's pill colour, the same in the composer, batch and calendar.
+ * Scheduled and Publishing are both in flight with nothing wrong; their
+ * words tell them apart.
+ */
+export const POST_STATE_TONE: Record<PostState, PillTone> = {
+  Cancelled: 'gray',
+  Failed: 'red',
+  'Needs check': 'yellow',
+  Overdue: 'yellow',
+  Published: 'green',
+  Publishing: 'blue',
+  Scheduled: 'blue',
+}
+
+/** Which state a draft shows first: the one that needs a person soonest. */
+const ATTENTION: PostState[] = [
+  'Needs check',
+  'Failed',
+  'Overdue',
+  'Publishing',
+  'Scheduled',
+  'Published',
+]
+
+/**
+ * A draft's destinations in one state, the one that needs attention first,
+ * with how many of its live destinations are in it. Cancelled posts (replaced
+ * or stopped) do not count; a draft with only those has none.
+ */
+export function draftPostsState(
+  posts: { status: ScheduledPostStatus; scheduledFor: string | Date }[],
+  now = Date.now()
+): { state: PostState; count: number; total: number } | null {
+  const states: PostState[] = posts
+    .map((post) => postState(post.status, post.scheduledFor, now))
+    .filter((state) => state !== 'Cancelled')
+  const state = ATTENTION.find((candidate) => states.includes(candidate))
+  if (!state) return null
+  return { state, count: states.filter((item) => item === state).length, total: states.length }
 }
 
 /** Why a destination did not publish, or null when nothing went wrong. */

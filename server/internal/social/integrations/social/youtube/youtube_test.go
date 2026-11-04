@@ -102,7 +102,11 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	p, srv := setup(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/video.mp4" && r.Method == http.MethodHead:
-			w.Header().Set("Content-Length", "10")
+			w.WriteHeader(http.StatusForbidden) // a GET-signed delivery URL refuses HEAD
+		case r.URL.Path == "/video.mp4" && r.Header.Get("Range") == "bytes=0-0":
+			w.Header().Set("Content-Range", "bytes 0-0/10")
+			w.WriteHeader(http.StatusPartialContent)
+			w.Write(video[:1])
 		case r.URL.Path == "/video.mp4":
 			if r.Header.Get("Range") != "bytes=0-9" {
 				t.Errorf("range %q", r.Header.Get("Range"))
@@ -145,7 +149,7 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	})
 	res, err := p.Post(context.Background(), "i", "tok", []integrations.PostDetails{{
 		ID: "p1", Message: "hello", Settings: settings,
-		Media: []integrations.MediaContent{{Type: "video", Path: srv.URL + "/video.mp4"}},
+		Media: []integrations.MediaContent{{Type: "video", Path: srv.URL + "/video.mp4?X-Amz-Signature=signed"}},
 	}}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -273,5 +277,38 @@ func TestAnalyticsMarksAverages(t *testing.T) {
 	}
 	if res[1].Data[0].Total != "12.5" || res[5].Data[0].Total != "3" || res[5].Data[0].Date != "2025-01-01" {
 		t.Fatalf("data %+v %+v", res[1].Data, res[5].Data)
+	}
+}
+
+func TestConfirmVideoRequiresProcessingAndSelectedChannel(t *testing.T) {
+	savedInterval := processingPollInterval
+	processingPollInterval = 0
+	t.Cleanup(func() { processingPollInterval = savedInterval })
+	for _, tc := range []struct {
+		name, body string
+		ok         bool
+	}{
+		{"processed", `{"items":[{"id":"video","snippet":{"channelId":"channel"},"status":{"uploadStatus":"processed","privacyStatus":"private"},"processingDetails":{"processingStatus":"succeeded"}}]}`, true},
+		{"pending", `{"items":[{"id":"video","snippet":{"channelId":"channel"},"status":{"uploadStatus":"uploaded","privacyStatus":"private"},"processingDetails":{"processingStatus":"processing"}}]}`, false},
+		{"wrong channel", `{"items":[{"id":"video","snippet":{"channelId":"other"},"status":{"uploadStatus":"processed","privacyStatus":"private"},"processingDetails":{"processingStatus":"succeeded"}}]}`, false},
+		{"malformed", `{"items":null}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requests := 0
+			p, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+				requests++
+				if r.Method != http.MethodGet || r.URL.Query().Get("id") != "video" {
+					t.Fatalf("unexpected mutation or identity")
+				}
+				io.WriteString(w, tc.body)
+			})
+			visibility, err := p.ConfirmVideo(context.Background(), "token", "video", "channel")
+			if (err == nil) != tc.ok || tc.ok && visibility != "private" {
+				t.Fatalf("visibility=%s err=%v", visibility, err)
+			}
+			if requests > 12 {
+				t.Fatalf("unbounded checks: %d", requests)
+			}
+		})
 	}
 }

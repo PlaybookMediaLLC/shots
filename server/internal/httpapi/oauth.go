@@ -65,7 +65,7 @@ func oauthIdentity(w http.ResponseWriter, r *http.Request) (publishing.Actor, st
 }
 
 func validOAuthProvider(provider string) bool {
-	return provider == "x" || provider == "instagram" || provider == "instagram-standalone" || provider == "linkedin" ||
+	return provider == "x" || provider == "instagram" || provider == "instagram-standalone" || provider == "linkedin" || provider == "linkedin-page" || provider == "tiktok" || provider == "youtube" ||
 		provider == "threads" || provider == "mastodon" || provider == "mastodon-custom" || e2eAuthorizationHost(provider) != ""
 }
 
@@ -88,8 +88,12 @@ func validatedAuthorizationURL(raw, provider string, instanceOrigin ...string) (
 	}
 	host := map[string]string{
 		"x": "api.x.com", "instagram": "www.facebook.com", "instagram-standalone": "www.instagram.com", "linkedin": "www.linkedin.com",
+		"linkedin-page": "www.linkedin.com", "tiktok": "www.tiktok.com", "youtube": "accounts.google.com",
 		"threads": "www.threads.net", "mastodon": "mastodon.social", "e2e": e2eHost,
 	}[provider]
+	if e2eHost != "" {
+		host = e2eHost
+	}
 	if provider == "mastodon-custom" {
 		if len(instanceOrigin) != 1 {
 			return "", "", errors.New("missing instance origin")
@@ -196,6 +200,7 @@ func (s *Server) exchangeSocialOAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 type oauthPageRequest struct {
+	Provider      string `json:"provider"`
 	State         string `json:"state"`
 	IntegrationID string `json:"integrationId"`
 	AccountID     string `json:"accountId"`
@@ -211,16 +216,34 @@ func (s *Server) selectSocialOAuthPage(w http.ResponseWriter, r *http.Request) {
 	if decodeJSON(r, &input) != nil || input.State == "" || len(input.State) > 512 ||
 		input.IntegrationID == "" || len(input.IntegrationID) > 160 || input.AccountID == "" ||
 		len(input.AccountID) > 160 || input.PageID == "" || len(input.PageID) > 160 {
-		writeError(w, http.StatusBadRequest, "invalid Instagram selection")
+		writeError(w, http.StatusBadRequest, "invalid account selection")
 		return
 	}
-	start, err := s.store.OAuthStart(r.Context(), actor, sessionID, input.State, "instagram", &input.IntegrationID)
+	if input.Provider == "" {
+		input.Provider = "instagram"
+	}
+	if !socialidentity.RequiresPageSelection(input.Provider) {
+		writeError(w, http.StatusBadRequest, "provider does not support account selection")
+		return
+	}
+	start, err := s.store.OAuthStart(r.Context(), actor, sessionID, input.State, input.Provider, &input.IntegrationID)
 	if err != nil {
 		writeOAuthStoreError(w, err)
 		return
 	}
 	if start.ExchangeStatus == socialoauthstart.ExchangeStatusCOMPLETED {
 		writeJSON(w, http.StatusOK, map[string]bool{"selected": true})
+		return
+	}
+	allowed := false
+	for _, page := range start.ExchangeReceipt.Pages {
+		if page.ID == input.AccountID && page.PageID == input.PageID {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		writeError(w, http.StatusBadRequest, "choose an account offered by this authorization")
 		return
 	}
 	binding, err := s.store.Binding(r.Context(), actor.Organization)
@@ -230,7 +253,7 @@ func (s *Server) selectSocialOAuthPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := exchanger.SelectInstagramPage(r.Context(), input.IntegrationID, input.AccountID, input.PageID, input.State); err != nil {
-		writeError(w, http.StatusBadGateway, "Instagram account selection failed")
+		writeError(w, http.StatusBadGateway, "provider account selection failed")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"selected": true})
@@ -319,11 +342,11 @@ func (s *Server) rememberSocialOAuth(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if input.Provider != "instagram" {
-		writeError(w, http.StatusBadRequest, "provider must be instagram")
+	if !socialidentity.RequiresPageSelection(input.Provider) {
+		writeError(w, http.StatusBadRequest, "provider does not support account selection")
 		return
 	}
-	if err := s.store.RememberInstagramIntegration(r.Context(), actor, sessionID, input.State, input.IntegrationID); err != nil {
+	if err := s.store.RememberInstagramIntegration(r.Context(), actor, sessionID, input.State, input.IntegrationID, input.Provider); err != nil {
 		writeOAuthStoreError(w, err)
 		return
 	}
@@ -340,7 +363,7 @@ func (s *Server) completeSocialOAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var expected *string
-	if input.Provider == "instagram" {
+	if socialidentity.RequiresPageSelection(input.Provider) {
 		expected = &input.IntegrationID
 	}
 	start, err := s.store.OAuthStart(r.Context(), actor, sessionID, input.State, input.Provider, expected)

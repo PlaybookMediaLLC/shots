@@ -46,7 +46,7 @@ import type {
   ContentBatch,
 } from '@/lib/api/contracts/content-batches'
 import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
-import { type PostState, postFailureReason, postState } from '@/lib/content-drafts/post-status'
+import { POST_STATE_TONE, postFailureReason, postState } from '@/lib/content-drafts/post-status'
 import { assetContentUrl } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
@@ -280,17 +280,6 @@ function itemStatus(item: BatchItem): { text: string; tone: PillTone } {
     pending: { text: 'In review', tone: 'yellow' },
   }
   return review[item.draft?.reviewStatus ?? ''] ?? { text: 'Draft', tone: 'blue' }
-}
-
-/** A destination's state, as the composer and calendar name it, as a pill colour. */
-const STATE_TONE: Record<PostState, PillTone> = {
-  Cancelled: 'gray',
-  Failed: 'red',
-  'Needs check': 'yellow',
-  Overdue: 'yellow',
-  Published: 'green',
-  Publishing: 'yellow',
-  Scheduled: 'blue',
 }
 
 /** A size people read: 1.2 MB. */
@@ -1477,7 +1466,9 @@ export function BatchWorkspace({
                                   {post ? (
                                     <span className="grid justify-items-start gap-1">
                                       <Pill
-                                        tone={STATE_TONE[postState(post.status, post.scheduledFor)]}
+                                        tone={
+                                          POST_STATE_TONE[postState(post.status, post.scheduledFor)]
+                                        }
                                       >
                                         {postState(post.status, post.scheduledFor)}
                                       </Pill>

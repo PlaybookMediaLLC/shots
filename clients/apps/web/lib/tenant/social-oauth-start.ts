@@ -62,19 +62,31 @@ export async function exchangeSocialOAuthCallback(
 
 export async function selectInstagramOAuthPage(
   headers: Headers,
-  input: { state: string; integrationId: string; accountId: string; pageId: string }
+  input: {
+    provider?: SocialOAuthProvider
+    state: string
+    integrationId: string
+    accountId: string
+    pageId: string
+  }
 ): Promise<void> {
-  const access = await getMatchingStart(headers, 'instagram', input.state, input.integrationId)
+  const access = await getMatchingStart(
+    headers,
+    input.provider ?? 'instagram',
+    input.state,
+    input.integrationId
+  )
   await access.selectInstagramOAuthPage(input)
 }
 
 export async function rememberInstagramIntegration(
   headers: Headers,
   state: string,
-  integrationId: string
+  integrationId: string,
+  provider: SocialOAuthProvider = 'instagram'
 ): Promise<void> {
-  const access = await getMatchingStart(headers, 'instagram', state)
-  await access.rememberInstagramIntegration(state, integrationId)
+  const access = await getMatchingStart(headers, provider, state)
+  await access.rememberInstagramIntegration(state, integrationId, provider)
 }
 
 export async function registerSocialOAuthDestination(
@@ -87,7 +99,7 @@ export async function registerSocialOAuthDestination(
     headers,
     provider,
     state,
-    provider === 'instagram' ? integrationId : undefined
+    ['instagram', 'linkedin-page', 'youtube'].includes(provider) ? integrationId : undefined
   )
   await access.completeSocialOAuth(provider, state, integrationId)
 }

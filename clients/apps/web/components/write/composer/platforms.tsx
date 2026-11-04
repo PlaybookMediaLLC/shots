@@ -60,8 +60,8 @@ export function PlatformTabs({
 }) {
   const channels = tabChannels(accounts, enabled, primary)
   return (
-    <div className="flex items-center gap-1 overflow-x-auto px-4 py-2" data-testid="platform-tabs">
-      <div aria-label="Platform being edited" className="flex items-center gap-1" role="tablist">
+    <div className="flex items-center gap-2 overflow-x-auto px-4 py-3" data-testid="platform-tabs">
+      <div aria-label="Platform being edited" className="flex items-center gap-2" role="tablist">
         {channels.map((channel) => {
           const account = accounts.find((item) => item.channel === channel)
           const publishing = account ? enabled.includes(account.id) : false
@@ -70,7 +70,7 @@ export function PlatformTabs({
             <Button
               aria-selected={active === channel}
               className={cn(
-                'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+                'flex h-8 items-center gap-2 rounded-full border px-3 text-xs transition-colors',
                 active === channel
                   ? 'border-input bg-foreground/[0.08] text-foreground'
                   : 'border-border text-muted-foreground hover:text-foreground'
@@ -85,18 +85,14 @@ export function PlatformTabs({
             >
               <ChannelIcon channel={channel} />
               {CHANNEL_META[channel].label}
-              <span
-                className={cn(
-                  'rounded-full px-1.5 text-[10px]',
-                  mode === 'primary'
-                    ? 'bg-sky-400/15 text-sky-700 dark:text-sky-200'
-                    : mode === 'manual'
-                      ? 'bg-amber-400/15 text-amber-700 dark:text-amber-200'
-                      : 'bg-foreground/[0.06] text-muted-foreground'
-                )}
-              >
-                {mode === 'primary' ? 'Main version' : mode === 'manual' ? 'Own text' : 'Use main version'}
-              </span>
+              {/* A synced version is the default, so only main and own text are named. */}
+              {mode === 'primary' ? (
+                <span className="text-[10px] text-muted-foreground">Main</span>
+              ) : mode === 'manual' ? (
+                <span className="rounded-full bg-amber-400/15 px-1.5 text-[10px] text-amber-700 dark:text-amber-200">
+                  Own text
+                </span>
+              ) : null}
               {!publishing ? (
                 <span className="text-[10px] text-muted-foreground">
                   {account ? '· off' : '· not connected'}

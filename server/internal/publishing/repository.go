@@ -530,7 +530,7 @@ func (r *Repository) draftMedia(ctx context.Context, organizationID string, ids 
 		if row.AltText != nil {
 			alt = *row.AltText
 		}
-		media = append(media, MediaAsset{AssetID: row.ID, Alt: alt, MediaType: row.MediaType, ObjectKey: row.ObjectKey})
+		media = append(media, MediaAsset{DurationMs: row.DurationMs, AssetID: row.ID, Alt: alt, MediaType: row.MediaType, ObjectKey: row.ObjectKey})
 	}
 	return media, false, nil
 }

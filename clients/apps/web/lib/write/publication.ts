@@ -1,6 +1,7 @@
 import { articleContent } from '@/lib/write/article'
 import type { Engagement } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
+import { youtubeOptionsSchema, tiktokOptionsSchema } from 'screenshot-studio-backend-sdk'
 import {
   type BlockImages,
   type SerializedCaption,
@@ -41,6 +42,8 @@ import { bodyFor, groupSettings, versionFor } from '@/lib/write/versions'
 
 /** A post's settings as the backend stores them on a scheduled post. */
 export const publishOptionsSchema = z.object({
+  youtube: youtubeOptionsSchema.optional(),
+  tiktok: tiktokOptionsSchema.optional(),
   photoTagIds: z
     .array(z.string().regex(/^[0-9]{1,19}$/))
     .max(10)
@@ -219,6 +222,47 @@ export function buildPublication(
   const settings = serialized.posts.map((post) => groups[post.group] ?? {})
   const [first, ...rest] = serialized.posts
   const problems = [...serialized.errors]
+  if (
+    channel === 'youtube' &&
+    (!options.youtube?.title.trim() ||
+      options.youtube.title.trim().length < 2 ||
+      !options.youtube.privacy ||
+      options.youtube.madeForKids === undefined)
+  )
+    problems.push('Choose a YouTube title, privacy and audience before scheduling.')
+  if (channel === 'tiktok') {
+    const creator = account.standing?.tiktokCreator
+    if (!creator)
+      problems.push(
+        'TikTok account permissions are unavailable. Refresh the account before scheduling.'
+      )
+    else if (options.tiktok) {
+      const choice = options.tiktok
+      if (!creator.privacyLevels.some((privacy) => privacy === choice.privacy))
+        problems.push('Choose a privacy setting permitted by this TikTok account.')
+      if (
+        (choice.allowComments && creator.commentDisabled) ||
+        (choice.allowDuet && creator.duetDisabled) ||
+        (choice.allowStitch && creator.stitchDisabled)
+      )
+        problems.push('TikTok account settings do not permit the selected interactions.')
+    }
+    if (
+      options.tiktok?.commercialContent &&
+      !options.tiktok.brandOrganic &&
+      !options.tiktok.brandedContent
+    )
+      problems.push('Indicate whether this TikTok content promotes your brand or another brand.')
+    if (
+      (options.tiktok?.brandOrganic || options.tiktok?.brandedContent) &&
+      !options.tiktok.commercialContent
+    )
+      problems.push('Enable commercial content disclosure for promotional content.')
+    if (!options.tiktok?.privacy || !options.tiktok.consent)
+      problems.push('Choose TikTok privacy and confirm publishing consent before scheduling.')
+    if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
+      problems.push('Branded TikTok content cannot be private.')
+  }
   if (channel === 'x')
     settings.forEach((setting, index) => {
       if (setting.photoTagIds?.length && (article || !serialized.posts[index]?.images))
@@ -289,6 +333,8 @@ export function buildPublication(
   }
   const firstOptions: PublishOptions = { ...postOptions(channel, settings[0] ?? {}, true) }
   if (channel === 'x' && photoTags(first).length) firstOptions.taggedUserIds = photoTags(first)
+  if (channel === 'youtube') firstOptions.youtube = options.youtube
+  if (channel === 'tiktok') firstOptions.tiktok = options.tiktok
   if (channel === 'x' && options.community) {
     firstOptions.communityId = options.community.id
     firstOptions.shareWithFollowers = options.community.shareWithFollowers ?? true

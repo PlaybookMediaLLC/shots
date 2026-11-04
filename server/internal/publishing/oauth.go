@@ -9,6 +9,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialoauthstart"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
 	"github.com/lucsky/cuid"
 )
@@ -88,13 +89,20 @@ func (r *Repository) OAuthStart(ctx context.Context, actor Actor, sessionID, sta
 	return start, nil
 }
 
-func (r *Repository) RememberInstagramIntegration(ctx context.Context, actor Actor, sessionID, state, integrationID string) error {
+func (r *Repository) RememberInstagramIntegration(ctx context.Context, actor Actor, sessionID, state, integrationID string, providers ...string) error {
 	tx, err := r.client.Tx(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	start, err := lockOAuthStart(ctx, tx, actor, sessionID, state, "instagram")
+	provider := "instagram"
+	if len(providers) > 0 {
+		provider = providers[0]
+	}
+	if !socialidentity.RequiresPageSelection(provider) {
+		return ErrConflict
+	}
+	start, err := lockOAuthStart(ctx, tx, actor, sessionID, state, provider)
 	if err != nil {
 		return err
 	}
@@ -119,7 +127,7 @@ func (r *Repository) FinishOAuth(ctx context.Context, actor Actor, sessionID, st
 	if err != nil {
 		return nil, err
 	}
-	if start.ExchangeReceipt.ID != integrationID || (provider == "instagram" && (start.IntegrationID == nil || *start.IntegrationID != integrationID)) {
+	if start.ExchangeReceipt.ID != integrationID || (socialidentity.RequiresPageSelection(provider) && (start.IntegrationID == nil || *start.IntegrationID != integrationID)) {
 		return nil, ErrConflict
 	}
 	if start.ExchangeStatus == socialoauthstart.ExchangeStatusCOMPLETED {

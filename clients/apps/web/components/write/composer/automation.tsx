@@ -73,7 +73,7 @@ export function AutomationControls({
   // stops following the engagement it copied from its set.
   const update = (next: Automation) => onChange(next)
   return (
-    <div className="grid gap-1.5 pl-7" data-testid="automation-controls">
+    <div className="grid gap-3" data-testid="automation-controls">
       <Row
         detail={
           retweeting

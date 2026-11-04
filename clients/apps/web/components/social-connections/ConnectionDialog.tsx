@@ -31,6 +31,9 @@ import {
 const providers = [
   { id: 'x', label: 'X / Twitter' },
   { id: 'linkedin', label: 'LinkedIn' },
+  { id: 'linkedin-page', label: 'LinkedIn Page' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'youtube', label: 'YouTube' },
   { id: 'mastodon', label: 'Mastodon' },
   { id: 'threads', label: 'Threads' },
   { id: 'bluesky', label: 'Bluesky' },
@@ -203,7 +206,20 @@ function ProviderForm({
           className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
           role="alert"
         >
-          {error}
+          {error}{' '}
+          {/* Connecting an account is sensitive: offer the step that clears the refusal. */}
+          {/fresh sign-in/i.test(error) ? (
+            <a
+              className="underline underline-offset-4"
+              href={`/sign-in?reauthenticate=1&callbackURL=${encodeURIComponent(window.location.pathname + window.location.search)}`}
+            >
+              Sign in again
+            </a>
+          ) : /two-factor/i.test(error) ? (
+            <a className="underline underline-offset-4" href="/workspace/security">
+              Turn on two-factor
+            </a>
+          ) : null}
         </p>
       ) : null}
       <Button

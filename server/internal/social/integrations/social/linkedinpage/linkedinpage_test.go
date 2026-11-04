@@ -76,23 +76,73 @@ func TestInfo(t *testing.T) {
 	}
 }
 
+// A Community Management app holds no OpenID product: the Page connection
+// uses its own app and reads the member through r_basicprofile only.
 func TestAuthenticate(t *testing.T) {
 	t.Setenv("FRONTEND_URL", "https://app.example")
+	t.Setenv("LINKEDIN_CLIENT_ID", "member-app")
+	t.Setenv("LINKEDIN_CLIENT_SECRET", "member-secret")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "page-app")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "page-secret")
 	calls := serve(t, map[string]http.HandlerFunc{
-		"POST /oauth/v2/accessToken": jsonReply(map[string]any{"access_token": "at", "expires_in": 60, "scope": strings.Join(linkedin.PageScopes, " ")}),
-		"GET /v2/userinfo":           jsonReply(map[string]any{"name": "Jane", "sub": "abc"}),
-		"GET /v2/me":                 jsonReply(map[string]any{"vanityName": "jane"}),
+		"POST /oauth/v2/accessToken": jsonReply(map[string]any{"access_token": "at", "refresh_token": "rt", "expires_in": 60, "scope": strings.Join(linkedin.PageScopes, ",")}),
+		"GET /v2/me":                 jsonReply(map[string]any{"id": "abc", "localizedFirstName": "Jane", "localizedLastName": "Doe", "vanityName": "jane"}),
 	})
-	got, err := New().Authenticate(context.Background(), integrations.AuthenticateParams{Code: "c", Refresh: "ignored"}, nil)
+	p := New()
+	got, err := p.Authenticate(context.Background(), integrations.AuthenticateParams{Code: "c", Refresh: "ignored"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.ID != "linkedin-page_abc" || got.Username != "jane" {
+	if got.ID != "linkedin-page_abc" || got.Name != "Jane Doe" || got.Username != "jane" {
 		t.Fatalf("got %+v", got)
 	}
-	if !strings.Contains(string((*calls)[0].body), "redirect_uri=https%3A%2F%2Fapp.example%2Fintegrations%2Fsocial%2Flinkedin-page&") &&
-		!strings.HasSuffix(string((*calls)[0].body), "redirect_uri=https%3A%2F%2Fapp.example%2Fintegrations%2Fsocial%2Flinkedin-page") {
-		t.Fatalf("form %s", (*calls)[0].body)
+	form := string((*calls)[0].body)
+	for _, part := range []string{"client_id=page-app", "client_secret=page-secret", "redirect_uri=https%3A%2F%2Fapp.example%2Fintegrations%2Fsocial%2Flinkedin-page"} {
+		if !strings.Contains(form, part) {
+			t.Fatalf("form %s missing %s", form, part)
+		}
+	}
+	if len(*calls) != 2 || (*calls)[1].uri != "/v2/me?projection=(id,localizedFirstName,localizedLastName,vanityName)" {
+		t.Fatalf("calls %+v", *calls)
+	}
+	url, err := p.GenerateAuthURL(context.Background(), nil)
+	if err != nil || !strings.Contains(url.URL, "client_id=page-app&") || strings.Contains(url.URL, "openid") || !strings.Contains(url.URL, "r_basicprofile") {
+		t.Fatalf("auth url %+v %v", url, err)
+	}
+	refreshed, err := p.RefreshToken(context.Background(), "rt")
+	if err != nil || refreshed.ID != "abc" || refreshed.AccessToken != "at" {
+		t.Fatalf("refresh %+v %v", refreshed, err)
+	}
+	if refreshForm := string((*calls)[2].body); !strings.Contains(refreshForm, "client_id=page-app") || !strings.Contains(refreshForm, "grant_type=refresh_token") {
+		t.Fatalf("refresh form %s", refreshForm)
+	}
+}
+
+func TestAuthenticateFallsBackToSharedApp(t *testing.T) {
+	t.Setenv("LINKEDIN_CLIENT_ID", "shared-app")
+	t.Setenv("LINKEDIN_CLIENT_SECRET", "shared-secret")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "")
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "page-secret")
+	if id, secret := New().Credentials(); id != "shared-app" || secret != "shared-secret" {
+		t.Fatalf("got %q %q", id, secret)
+	}
+	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "page-app")
+	if id, secret := linkedin.New().Credentials(); id != "shared-app" || secret != "shared-secret" {
+		t.Fatalf("member must keep the shared app, got %q %q", id, secret)
+	}
+}
+
+// An app without r_basicprofile gets an error body with no member id.
+func TestAuthenticateRejectsUnreadableProfile(t *testing.T) {
+	serve(t, map[string]http.HandlerFunc{
+		"POST /oauth/v2/accessToken": jsonReply(map[string]any{"access_token": "at", "scope": strings.Join(linkedin.PageScopes, ",")}),
+		"GET /v2/me": func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": 403, "message": "Not enough permissions"})
+		},
+	})
+	if got, err := New().Authenticate(context.Background(), integrations.AuthenticateParams{Code: "c"}, nil); err == nil {
+		t.Fatalf("accepted %+v", got)
 	}
 }
 

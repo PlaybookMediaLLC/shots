@@ -64,15 +64,16 @@ func (p *Provider) RefreshToken(context.Context, string) (*integrations.AuthToke
 	return nil, errors.New("the fake account credential cannot be refreshed")
 }
 
-func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []integrations.PostDetails, _ *ent.Integration) ([]integrations.PostResponse, error) {
+func (p *Provider) Post(ctx context.Context, id, accessToken string, posts []integrations.PostDetails, account *ent.Integration) ([]integrations.PostResponse, error) {
 	if len(posts) != 1 {
 		return nil, fmt.Errorf("fake social expects one post, got %d", len(posts))
 	}
 	body, err := json.Marshal(struct {
+		Platform    string                   `json:"platform"`
 		ID          string                   `json:"id"`
 		AccessToken string                   `json:"accessToken"`
 		Post        integrations.PostDetails `json:"post"`
-	}{ID: id, AccessToken: accessToken, Post: posts[0]})
+	}{Platform: account.ProviderIdentifier, ID: id, AccessToken: accessToken, Post: posts[0]})
 	if err != nil {
 		return nil, err
 	}

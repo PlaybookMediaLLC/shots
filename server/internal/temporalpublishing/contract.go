@@ -106,6 +106,7 @@ type PublishInput struct {
 }
 
 type PublishResult struct {
+	Progress    *postoptions.ThreadProgress `json:",omitempty"`
 	FailureCode string
 	NextAttempt int
 	Outcome     string
@@ -134,6 +135,7 @@ type CheckInput struct {
 }
 
 type CompleteInput struct {
+	Progress   *postoptions.ThreadProgress `json:",omitempty"`
 	AttemptID  string
 	Job        PreparedPublication
 	ProviderID string
@@ -150,6 +152,7 @@ type FailInput struct {
 }
 
 type MarkUnknownInput struct {
+	Progress      *postoptions.ThreadProgress `json:",omitempty"`
 	AttemptNumber int
 	PostID        string
 	RunID         string

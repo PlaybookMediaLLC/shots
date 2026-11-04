@@ -39,7 +39,7 @@ type Store interface {
 	ClaimOAuthExchange(context.Context, publishing.Actor, string, string, string) (*schema.SocialOAuthExchange, error)
 	SaveOAuthExchange(context.Context, publishing.Actor, string, string, string, schema.SocialOAuthExchange) error
 	OAuthStart(context.Context, publishing.Actor, string, string, string, *string) (*ent.SocialOAuthStart, error)
-	RememberInstagramIntegration(context.Context, publishing.Actor, string, string, string) error
+	RememberInstagramIntegration(context.Context, publishing.Actor, string, string, string, ...string) error
 	FinishOAuth(context.Context, publishing.Actor, string, string, string, string) (*ent.ChannelConnection, error)
 	CreateConnection(context.Context, publishing.Actor, publishing.CreateConnectionInput) (*ent.ChannelConnection, error)
 	ListConnections(context.Context, string) ([]*ent.ChannelConnection, error)

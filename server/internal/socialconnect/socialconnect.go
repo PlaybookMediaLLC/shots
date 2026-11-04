@@ -392,11 +392,16 @@ func (c *Connector) ExchangeOAuth(ctx context.Context, name, code, state string)
 		}
 		if fetch != nil {
 			if loaded, err := fetch(ctx, auth.AccessToken, nil, "", nil); err != nil {
-				slog.Error("Failed to fetch pages:", "error", err)
+				return fail, socialapi.NewError(http.StatusBadGateway, false, "provider account discovery failed")
 			} else if loaded != nil {
 				data, err := json.Marshal(loaded)
 				if err == nil {
 					err = json.Unmarshal(data, &result.Pages)
+					if err == nil && (name == "linkedin-page" || name == "youtube") {
+						for i := range result.Pages {
+							result.Pages[i].PageID = result.Pages[i].ID
+						}
+					}
 				}
 				if err != nil {
 					return fail, socialapi.NewError(http.StatusBadGateway, false, "social adapter returned invalid pages")
@@ -459,7 +464,7 @@ func (c *Connector) SelectInstagramPage(ctx context.Context, integrationID, acco
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(map[string]string{"id": accountID, "pageId": pageID, "state": state})
+	data, err := json.Marshal(map[string]string{"id": accountID, "page": pageID, "pageId": pageID, "state": state})
 	if err != nil {
 		return err
 	}

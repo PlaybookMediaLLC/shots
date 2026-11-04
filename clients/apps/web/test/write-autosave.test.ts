@@ -264,3 +264,54 @@ test('fast title updates remain local while an earlier save response arrives', a
   assert.equal(editor.state.saveState, 'saved')
   await editor.unmount()
 })
+
+test('a save conflict shows the newer version and keeps the local edit to restore on top of it', async (t) => {
+  const theirs = { ...draft, version: 5, title: 'Theirs', body: paragraph('Their text') }
+  const save = t.mock.method(
+    draftsApi,
+    'save',
+    async (_id: string, _input: DraftSave): Promise<DraftWire> => {
+      throw new DraftRequestError('This draft was saved elsewhere.', 409)
+    }
+  )
+  t.mock.method(draftsApi, 'get', async () => theirs)
+  const editor = await mount()
+  await act(async () => {
+    editor.state.update({ value: paragraph('My text') })
+    await assert.rejects(editor.state.flush(), /could not be saved/)
+  })
+  assert.deepEqual(editor.state.document.value, paragraph('Their text'))
+  assert.deepEqual(editor.state.conflict?.value, paragraph('My text'))
+  assert.equal(editor.state.saveState, 'saved')
+
+  save.mock.mockImplementation(async () => ({ ...theirs, version: 6 }))
+  await act(async () => editor.state.restoreConflict())
+  assert.equal(editor.state.conflict, null)
+  assert.deepEqual(editor.state.document.value, paragraph('My text'))
+  await act(async () => editor.state.flush())
+  assert.equal(save.mock.calls[1].arguments[1].baseVersion, 5)
+  assert.equal(save.mock.calls[1].arguments[1].plainText, 'My text')
+  assert.equal(editor.state.saveState, 'saved')
+  await editor.unmount()
+})
+
+test('a conflicting edit survives reopening the draft until it is discarded', async (t) => {
+  t.mock.method(draftsApi, 'save', async (): Promise<DraftWire> => {
+    throw new DraftRequestError('This draft was saved elsewhere.', 409)
+  })
+  t.mock.method(draftsApi, 'get', async () => ({ ...draft, version: 3 }))
+  const editor = await mount()
+  await act(async () => {
+    editor.state.update({ value: paragraph('Do not lose me') })
+    await assert.rejects(editor.state.flush())
+  })
+  await editor.unmount()
+  const reopened = await mount()
+  assert.deepEqual(reopened.state.conflict?.value, paragraph('Do not lose me'))
+  await act(async () => reopened.state.discardConflict())
+  assert.equal(reopened.state.conflict, null)
+  await reopened.unmount()
+  const again = await mount()
+  assert.equal(again.state.conflict, null)
+  await again.unmount()
+})

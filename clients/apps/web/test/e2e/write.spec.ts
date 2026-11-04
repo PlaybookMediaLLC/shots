@@ -72,8 +72,8 @@ test(
     const draftId = await newDraft(page)
 
     // The composer says who it publishes as, and every post shows its account.
-    await expect(page.getByTestId('platform-tab-x')).toContainText('Main version')
-    await expect(page.getByTestId('platform-tab-linkedin')).toContainText('Use main version')
+    await expect(page.getByTestId('platform-tab-x')).toContainText('Main')
+    await expect(page.getByTestId('platform-tab-linkedin')).not.toContainText('Own text')
 
     const editor = draftEditor(page)
     await editor.click()
@@ -173,6 +173,23 @@ test(
     expect(posts.map((post) => post.caption).join(' ')).not.toContain('Ask legal')
     await snap(page, 'write-scheduled')
 
+    // Queued posts keep what was scheduled: an edit afterwards says so until it replaces them.
+    await expect(page.getByTestId('draft-status')).toHaveText('Scheduled')
+    await expect(page.getByTestId('queued-snapshot')).toHaveCount(0)
+    await caretAtEndOf(page, editor.getByText('Launch day is here. Today!'))
+    await page.keyboard.type(' Updated.')
+    await expectSaved(page)
+    // Only X changed: LinkedIn has its own text.
+    await expect(page.getByTestId('queued-snapshot')).toHaveCount(1)
+    expect((await draftPosts(draftId)).map((post) => post.caption).join(' ')).not.toContain(
+      'Updated.'
+    )
+    await page.getByRole('button', { name: 'Replace queued posts with this version…' }).click()
+    await expect(schedule.getByRole('heading', { name: 'Reschedule' })).toBeVisible()
+    await expect(schedule.getByTestId('replaced-posts')).toContainText('moves to the new time')
+    await expect(schedule.getByRole('button', { name: 'Confirm reschedule' })).toBeVisible()
+    await page.keyboard.press('Escape')
+
     // The library: both posts in the queue; the draft found by its scratchpad, shown by its title.
     await app.open('/write?tab=queue')
     await expect(page.getByTestId('write-rail')).toContainText('Launch day is here. Today! 1/2')
@@ -261,6 +278,7 @@ test(
     const publish = page.getByTestId('publish-review')
     await expect(publish).toContainText('Publishing as')
     await expect(publish.getByTestId('review-destination')).toHaveCount(2)
+    await publish.getByText('More options', { exact: true }).click()
     await expect(publish.getByTestId('automation-auto-dm')).toContainText('authorized X messaging')
     await expect(publish.getByTestId('automation-auto-dm').getByRole('switch')).toBeDisabled()
     await publish.getByTestId('automation-auto-rt').getByRole('switch').click()
@@ -291,7 +309,7 @@ test(
       'FAILED',
     ])
     await app.reload()
-    const unknown = page.getByTestId('draft-post').filter({ hasText: 'Outcome unknown' })
+    const unknown = page.getByTestId('draft-post').filter({ hasText: 'Needs check' })
     while (await unknown.count()) {
       const remaining = await unknown.count()
       await expect(
@@ -352,8 +370,12 @@ test(
     await snap(page, 'write-phone-preview')
     await page.keyboard.press('Escape')
 
+    // Schedule stays in the header on a phone; Publish now is one menu away and still reviewed.
+    await expect(page.getByTestId('schedule-button')).toBeVisible()
+    await expect(page.getByTestId('publish-button')).toBeHidden()
+    await page.getByRole('button', { name: 'More draft actions' }).click()
+    await page.getByRole('menuitem', { name: 'Publish now…' }).click()
     // The final review still names the set and each account.
-    await page.getByTestId('publish-button').click()
     const publish = page.getByTestId('publish-review')
     await expect(publish).toContainText('Publishing as')
     await expect(publish.getByTestId('review-destination').first()).toContainText('@shots_')
@@ -624,7 +646,7 @@ test(
     const schedule = page.getByTestId('schedule-dialog')
     await expect(schedule.getByLabel('Time', { exact: true })).toBeVisible()
     await expect(schedule.getByLabel('When, in words')).toBeHidden()
-    await schedule.getByText('Advanced scheduling', { exact: true }).click()
+    await schedule.getByText('More options', { exact: true }).click()
     await schedule.getByLabel('When, in words').fill('definitely not a time')
     await expect(schedule.getByTestId('when-reading')).toContainText('Still selected:')
     await schedule.getByRole('button', { name: /^Tomorrow 9:00/ }).click()

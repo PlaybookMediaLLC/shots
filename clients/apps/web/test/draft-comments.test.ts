@@ -59,7 +59,10 @@ test('post and text anchors remain on their original post after content changes'
 
 test('anchored additions extend the original comment protocol without overlapping alternatives', () => {
   const anchor = { platform: 'x', postId: 'post-1', quote: 'Evidence' }
-  assert.deepEqual(draftCommentInputSchema.parse({ ...add, anchor }), { ...add, anchor })
+  for (const platform of ['x', 'tiktok', 'youtube']) {
+    const input = { ...add, anchor: { ...anchor, platform } }
+    assert.deepEqual(draftCommentInputSchema.parse(input), input)
+  }
   for (const action of [
     add,
     {

@@ -186,7 +186,39 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	}
 	// A content draft post without an image publishes as text (RFC 013); a
 	// LinkedIn document goes out as the post's one media (RFC 025).
+	var youtubeOptions *postoptions.YouTubeOptions
+	var tiktokOptions *postoptions.TikTokOptions
+	if input.Options != nil {
+		youtubeOptions, tiktokOptions = input.Options.YouTube, input.Options.TikTok
+	}
+	if err := postoptions.ValidateVideoOptions(input.Platform, youtubeOptions, tiktokOptions, true); err != nil {
+		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+	}
 	assets := input.Media()
+	if input.Platform == "tiktok" || input.Platform == "youtube" {
+		if len(assets) != 1 || assets[0].MediaType != "video/mp4" || len(input.Replies) > 0 || input.ReplyTo != "" || input.Poll != nil {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, "choose one MP4 video")
+		}
+	}
+	if input.Platform == "tiktok" {
+		reader, ok := provider.(interface {
+			CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error)
+		})
+		if !ok {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, "TikTok creator information unavailable")
+		}
+		creator, err := reader.CreatorInfo(ctx, account.Token)
+		if err != nil {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, false, "TikTok creator information unavailable")
+		}
+		duration := 0
+		if assets[0].DurationMs != nil {
+			duration = *assets[0].DurationMs
+		}
+		if err := creator.Check(input.Options.TikTok, duration); err != nil {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+		}
+	}
 	if input.Document != nil {
 		assets = []publishing.MediaAsset{*input.Document}
 	}
@@ -244,7 +276,34 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		response[0].Status != "posted" && response[0].Status != "success" && response[0].Status != "completed" {
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "provider returned no confirmed post receipt")
 	}
+	if input.Platform == "tiktok" {
+		id := response[0].PostID
+		if id == "" || strings.Trim(id, "0123456789") != "" || !strings.Contains(response[0].ReleaseURL, "/video/"+id) {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "TikTok has not returned a final video receipt")
+		}
+	}
+	var publication *postoptions.PublicationReceipt
+	if input.Platform == "tiktok" || input.Platform == "youtube" {
+		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
+	}
+	if input.Platform == "youtube" {
+		checker, ok := provider.(interface {
+			ConfirmVideo(context.Context, string, string, string) (string, error)
+		})
+		if !ok {
+			return socialapi.Receipt{PostID: response[0].PostID, Thread: postoptions.ThreadProgress{Publication: publication}}, socialapi.NewError(http.StatusBadGateway, true, "YouTube processing could not be confirmed")
+		}
+		visibility, confirmErr := checker.ConfirmVideo(ctx, account.Token, response[0].PostID, account.InternalID)
+		publication.Visibility = visibility
+		if confirmErr != nil {
+			return socialapi.Receipt{PostID: response[0].PostID, Thread: postoptions.ThreadProgress{Publication: publication}}, publicationOutcome(confirmErr)
+		}
+	}
+	if input.Platform == "tiktok" {
+		publication.Visibility = tiktokOptions.Privacy
+	}
 	progress := p.postReplies(ctx, provider, account, input, response[0].PostID)
+	progress.Publication = publication
 	if response[0].QuoteState != "" {
 		progress.Quotes = append(progress.Quotes, postoptions.QuoteReceipt{PostID: response[0].PostID, State: response[0].QuoteState})
 	}

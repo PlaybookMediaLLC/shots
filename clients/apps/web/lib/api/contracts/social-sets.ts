@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { draftChannelSchema } from '@/lib/write/document'
 import { workspaceDocs } from '@/lib/api/contracts/workspace-docs'
 import { socialAccountSchema } from 'screenshot-studio-backend-sdk'
 import type { SocialSet, SocialSetList, WritingSample } from 'screenshot-studio-backend-sdk'
@@ -29,15 +30,7 @@ export const engagementSchema = z.object({
 })
 
 /** A draft platform a default or guidance can name. */
-export const draftPlatformSchema = z.enum([
-  'x',
-  'linkedin',
-  'instagram',
-  'instagram-standalone',
-  'threads',
-  'bluesky',
-  'mastodon',
-])
+export const draftPlatformSchema = draftChannelSchema
 
 /** How a set writes; it refines the workspace brand voice. */
 export const styleGuideSchema = z.object({
@@ -59,6 +52,9 @@ export const writingAssistantStatusSchema = z.enum([
   'disabled',
   'attention',
 ])
+
+/** How many weekly posting slots a set may have; the backend enforces the same. */
+export const POSTING_SLOT_LIMIT = 50
 
 /** A weekly posting slot: a weekday (0 is Sunday) and a time as HH:MM. */
 export const weeklySlotSchema = z.object({
@@ -191,7 +187,7 @@ export const socialSetUpdateSchema = z
     engagementDefaults: engagementSchema.optional(),
     name: z.string().trim().min(1).max(80).optional(),
     naturalPostingTimes: z.boolean().optional(),
-    postingSlots: z.array(weeklySlotSchema).max(50).optional(),
+    postingSlots: z.array(weeklySlotSchema).max(POSTING_SLOT_LIMIT).optional(),
     primaryPlatform: z.union([draftPlatformSchema, z.literal('')]).optional(),
     publicProfile: z.boolean().optional(),
     timeZone: z.string().max(64).optional(),

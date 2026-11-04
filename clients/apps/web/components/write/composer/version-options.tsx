@@ -24,7 +24,8 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
-import { CAPABILITIES } from '@/lib/write/capabilities'
+import { CAPABILITIES, type AccountStanding } from '@/lib/write/capabilities'
+import { VideoOptions } from './video-options'
 import { type DraftFinisherWire, writeApi } from '@/lib/write/client'
 import {
   type DraftChannel,
@@ -56,6 +57,7 @@ const STYLE_EXAMPLES: Record<Numbering['style'], string> = {
  */
 export function VersionOptionsBar({
   captionLimit,
+  tiktokCreator,
   channel,
   onApplyFinisher,
   onChange,
@@ -66,6 +68,7 @@ export function VersionOptionsBar({
   uploadFile,
 }: {
   channel: DraftChannel
+  tiktokCreator?: AccountStanding['tiktokCreator']
   captionLimit?: number
   onApplyFinisher?: (text: string, quoteFirstPost: boolean) => void
   onChange: (options: VersionOptions) => void
@@ -78,8 +81,19 @@ export function VersionOptionsBar({
   const [dialog, setDialog] = React.useState<'numbering' | 'finisher' | 'community' | null>(null)
   const capabilities = CAPABILITIES[channel]
   const button =
-    'h-7 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:border-input hover:text-foreground'
+    'h-7 rounded-full border border-border px-3 text-xs text-muted-foreground hover:border-input hover:text-foreground'
   const tools: React.ReactNode[] = []
+  if (channel === 'tiktok' || channel === 'youtube')
+    tools.push(
+      <VideoOptions
+        key="video"
+        channel={channel}
+        options={options}
+        onChange={onChange}
+        disabled={readOnly}
+        creator={tiktokCreator}
+      />
+    )
   if (capabilities.thread) {
     tools.push(
       <Button
@@ -178,7 +192,7 @@ export function VersionOptionsBar({
   if (tools.length === 0) return null
   return (
     <div
-      className="flex flex-wrap items-center gap-1.5 px-4 pb-2"
+      className="flex flex-wrap items-center gap-2 pb-3"
       data-testid={`version-options-${channel}`}
     >
       {tools}

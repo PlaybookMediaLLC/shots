@@ -71,19 +71,41 @@ async function post(path, body) {
   if (!response.ok) throw new Error(`${path} returned ${response.status}: ${await response.text()}`)
   return response.json()
 }
-async function connect(code) {
-  const { url } = await post('/v1/social-oauth/begin', { provider: 'e2e' })
+async function connect(code, provider = 'e2e') {
+  const { url } = await post('/v1/social-oauth/begin', { provider })
   const state = new URL(url).searchParams.get('state')
   if (!state) throw new Error('Fake provider returned no OAuth state')
-  const { id } = await post('/v1/social-oauth/exchange', { code, provider: 'e2e', state })
+  const { id } = await post('/v1/social-oauth/exchange', { code, provider, state })
   if (typeof id !== 'string' || !id) throw new Error('The product API returned no destination ID')
+  if (provider === 'youtube') {
+    await post('/v1/social-oauth/remember', { provider, state, integrationId: id })
+    await post('/v1/social-oauth/page', {
+      provider,
+      state,
+      integrationId: id,
+      accountId: 'fixture-channel',
+      pageId: 'fixture-channel',
+    })
+  }
   return id
 }
 const destinationId = await connect('valid')
 const expiredDestinationId = await connect('expired')
+const tiktokDestinationId = await connect('valid', 'tiktok')
+const youtubeDestinationId = await connect('valid', 'youtube')
 
-await writeFile(output, JSON.stringify({ destinationId, expiredDestinationId, goOrganizationId }), {
-  mode: 0o600,
-})
+await writeFile(
+  output,
+  JSON.stringify({
+    destinationId,
+    expiredDestinationId,
+    goOrganizationId,
+    tiktokDestinationId,
+    youtubeDestinationId,
+  }),
+  {
+    mode: 0o600,
+  }
+)
 await chmod(output, 0o600)
 process.stdout.write('Isolated social organization and fake destinations ready.\n')
