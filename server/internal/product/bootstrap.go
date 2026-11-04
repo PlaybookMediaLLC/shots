@@ -18,7 +18,7 @@ import (
 var bootstrapFeatures = []string{
 	"asset:create", "asset:read", "asset:update", "asset:delete", "release:create", "source-app:create",
 	"workspace:use", "enterprise:audit-drain", "enterprise:sso", "enterprise:scim", "campaign:workflow",
-	"content:drafts", "workspace:paid", "content:scheduling-advanced", OnboardingFeature, CreativeSetsFeature, WhitelabelFeature,
+	"content:drafts", "workspace:paid", "content:scheduling-advanced", OnboardingFeature, CreativeSetsFeature, WhitelabelFeature, PermissionGroupsFeature,
 }
 
 type BootstrapSnapshot struct {
@@ -153,7 +153,7 @@ func evaluateBootstrapEntitlement(entitlement *ent.WorkspaceEntitlement, now tim
 		case "workspace:use", "content:drafts", "asset:create", "asset:read", "asset:update", "asset:delete",
 			"release:create", "source-app:create", "workspace:paid", "campaign:workflow", "content:scheduling-advanced":
 			allowed = plan != "free"
-		case "enterprise:audit-drain", "enterprise:sso", "enterprise:scim", WhitelabelFeature:
+		case "enterprise:audit-drain", "enterprise:sso", "enterprise:scim", WhitelabelFeature, PermissionGroupsFeature:
 			allowed = plan == "enterprise"
 		case CreativeSetsFeature:
 			allowed = plan != "free" && os.Getenv("PLATFORM_CREATIVE_SETS") == "enabled"

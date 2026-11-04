@@ -17,6 +17,7 @@ export async function requireDraftsPageAccess(locale: string, returnTo: string) 
   if (!contentDraftsEnabled() || !access.organization) notFound()
   // Reads run as the signed-in session, scoped to the active workspace.
   const tenant: OrganizationAccess = {
+    deniedPermissions: access.deniedPermissions,
     organizationId: access.organization.id,
     principal: {
       display: access.session.user.email,

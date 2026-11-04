@@ -16,7 +16,7 @@ import { NeedsAttention } from '@/components/platform-hub/NeedsAttention'
 import { RecentWork } from '@/components/platform-hub/RecentWork'
 import { TemplateHighlights } from '@/components/platform-hub/TemplateBrowser'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
+import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { roleLabels } from '@/lib/auth/role-descriptions'
 import { StartPostAction } from '@/components/platform-hub/StartPostAction'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
@@ -43,7 +43,7 @@ export default async function HomePage({
   const access = await requirePaidPageAccess(await headers(), locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
-  const can = (permission: Permission) => hasPermission(access.role, permission)
+  const can = (permission: Permission) => accessAllows(access, permission)
   const starters = [
     {
       title: 'Create a visual',

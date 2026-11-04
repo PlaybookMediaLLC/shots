@@ -165,6 +165,7 @@ function StoreScreenshotsLink({
 function Navigation({
   campaignsEnabled,
   collapsed,
+  deniedPermissions,
   draftsEnabled,
   draftsPlan,
   onNavigate,
@@ -173,6 +174,7 @@ function Navigation({
 }: {
   campaignsEnabled: boolean
   collapsed: boolean
+  deniedPermissions: readonly string[]
   draftsEnabled: boolean
   draftsPlan: boolean
   onNavigate?: () => void
@@ -193,6 +195,7 @@ function Navigation({
         draftsPlan={draftsPlan}
         onNavigate={onNavigate}
         paidPlan={paidPlan}
+        deniedPermissions={deniedPermissions}
         role={role}
       />
       {NAV_GROUPS.map((group, index) => (
@@ -412,6 +415,8 @@ export interface PlatformSidebarProps {
   draftsPlan?: boolean
   /** False without a paid plan, which marks the paid areas before they are opened. */
   paidPlan?: boolean
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions?: readonly string[]
   /** The member's workspace role; New offers what it may create. */
   role?: string
   variant: 'editor' | 'page'
@@ -475,6 +480,7 @@ function useNavigationExpanded(
 export function PlatformSidebar({
   brand = { name: 'Shots' },
   campaignsEnabled,
+  deniedPermissions = [],
   draftsEnabled = false,
   draftsPlan = true,
   initialNavigation = 'expanded',
@@ -534,6 +540,7 @@ export function PlatformSidebar({
             draftsEnabled={draftsEnabled}
             draftsPlan={draftsPlan}
             paidPlan={paidPlan}
+            deniedPermissions={deniedPermissions}
             role={role}
           />
         </div>
@@ -585,6 +592,7 @@ export function PlatformSidebar({
                   draftsEnabled={draftsEnabled}
                   draftsPlan={draftsPlan}
                   paidPlan={paidPlan}
+                  deniedPermissions={deniedPermissions}
                   role={role}
                   onNavigate={() => setMobileOpen(false)}
                 />

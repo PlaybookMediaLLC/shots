@@ -68,6 +68,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
@@ -1105,6 +1106,22 @@ func init() {
 	pageknowledge.DefaultUpdatedAt = pageknowledgeDescUpdatedAt.Default.(func() time.Time)
 	// pageknowledge.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	pageknowledge.UpdateDefaultUpdatedAt = pageknowledgeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	permissiongroupFields := schema.PermissionGroup{}.Fields()
+	_ = permissiongroupFields
+	// permissiongroupDescIsDefault is the schema descriptor for is_default field.
+	permissiongroupDescIsDefault := permissiongroupFields[4].Descriptor()
+	// permissiongroup.DefaultIsDefault holds the default value on creation for the is_default field.
+	permissiongroup.DefaultIsDefault = permissiongroupDescIsDefault.Default.(bool)
+	// permissiongroupDescCreatedAt is the schema descriptor for created_at field.
+	permissiongroupDescCreatedAt := permissiongroupFields[5].Descriptor()
+	// permissiongroup.DefaultCreatedAt holds the default value on creation for the created_at field.
+	permissiongroup.DefaultCreatedAt = permissiongroupDescCreatedAt.Default.(func() time.Time)
+	// permissiongroupDescUpdatedAt is the schema descriptor for updated_at field.
+	permissiongroupDescUpdatedAt := permissiongroupFields[6].Descriptor()
+	// permissiongroup.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	permissiongroup.DefaultUpdatedAt = permissiongroupDescUpdatedAt.Default.(func() time.Time)
+	// permissiongroup.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	permissiongroup.UpdateDefaultUpdatedAt = permissiongroupDescUpdatedAt.UpdateDefault.(func() time.Time)
 	platformautodmcampaignFields := schema.PlatformAutoDMCampaign{}.Fields()
 	_ = platformautodmcampaignFields
 	// platformautodmcampaignDescDisabled is the schema descriptor for disabled field.

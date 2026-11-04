@@ -3,7 +3,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { ImportDraft } from '@/components/write/import-draft'
 import { NewDraftMenu } from '@/components/write/library'
 import { WriteFrame } from '@/components/write/WriteFrame'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { requireDraftsPageAccess } from '../drafts/page-access'
 import { loadWrite } from './write-data'
 
@@ -25,9 +25,9 @@ export default async function WritePage({ params, searchParams }: WritePageProps
     locale,
     `/publish${returnParams.size ? `?${returnParams}` : ''}`
   )
-  const canManageSets = hasPermission(access.role, 'workspace:update')
+  const canManageSets = accessAllows(access, 'workspace:update')
   const data = await loadWrite(access.tenant, query)
-  const canEdit = hasPermission(access.role, 'artifact:edit')
+  const canEdit = accessAllows(access, 'artifact:edit')
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}
@@ -37,8 +37,8 @@ export default async function WritePage({ params, searchParams }: WritePageProps
         campaignsEnabled={access.campaignWorkflowEnabled && access.hasPaidPlan}
         canEdit={canEdit}
         canManageSets={canManageSets}
-        canPublish={hasPermission(access.role, 'publish:manage')}
-        canReview={hasPermission(access.role, 'release:approve')}
+        canPublish={accessAllows(access, 'publish:manage')}
+        canReview={accessAllows(access, 'release:approve')}
         data={data}
       >
         {canEdit && typeof query.new === 'string' ? (

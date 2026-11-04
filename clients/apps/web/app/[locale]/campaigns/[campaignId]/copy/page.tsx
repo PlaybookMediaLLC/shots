@@ -6,7 +6,7 @@ import { CopyBoard, type CopyChannel, type CopyPost } from '@/components/launch/
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { EmptyState, Section } from '@/components/platform-ui'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK } from '@/lib/backend/sdk'
 import { visualChoices } from '@/lib/launch/schedule'
 import {
@@ -206,10 +206,10 @@ export default async function CampaignCopyPage({ params }: CampaignCopyPageProps
           aiConfigured: isCampaignStudioConfigured(),
           campaignId: campaign.id,
           canApprove:
-            campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:approve'),
-          canEdit: campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:create'),
+            campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:approve'),
+          canEdit: campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:create'),
           canSchedule:
-            campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'publish:manage'),
+            campaign.status !== 'ARCHIVED' && accessAllows(access, 'publish:manage'),
         }}
         posts={posts}
       />

@@ -66,3 +66,18 @@ func TestPageAccessReturnsTheWhitelabel(t *testing.T) {
 		t.Fatalf("whitelabel dropped from page access: %+v", body)
 	}
 }
+
+func TestPageAccessReturnsDeniedPermissions(t *testing.T) {
+	snapshot := &product.PageAccessSnapshot{DeniedPermissions: []string{"publish:manage"}}
+	recorder := httptest.NewRecorder()
+	(&Server{configuration: pageSettingsFixture{snapshot: snapshot}}).pageAccess(recorder, httptest.NewRequest("GET", "/v1/page-access", nil))
+	var body struct {
+		DeniedPermissions []string `json:"deniedPermissions"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if len(body.DeniedPermissions) != 1 || body.DeniedPermissions[0] != "publish:manage" {
+		t.Fatalf("denied permissions dropped from page access: %+v", body)
+	}
+}

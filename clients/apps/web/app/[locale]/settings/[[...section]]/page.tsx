@@ -58,6 +58,7 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
       organizationName={access.organization.name}
     >
       <WorkspaceSettings
+        deniedPermissions={access.deniedPermissions}
         draftsEnabled={contentDraftsEnabled()}
         email={access.session.user.email}
         mcpUrl={MCP_URL}

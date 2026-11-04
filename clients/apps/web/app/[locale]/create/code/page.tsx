@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { CodeStudio } from '@/components/code-studio/CodeStudio'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 export const metadata = { title: 'Code Studio' }
@@ -15,7 +15,7 @@ export default async function NewCodeProjectPage({
 }) {
   const { locale } = await params
   const access = await requirePaidPageAccess(await headers(), locale, '/create/code')
-  const canEdit = hasPermission(access.role, 'artifact:edit')
+  const canEdit = accessAllows(access, 'artifact:edit')
   return (
     <PlatformShell
       variant="editor"

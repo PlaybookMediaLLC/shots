@@ -45,6 +45,15 @@ test('audit-control SDK forwards the sealed secret and the audit fingerprint', a
   await sdk.deleteAuditDrain('drain/1', audit)
   await sdk.getAuditRetention()
   await sdk.updateAuditRetention({ legalHold: true, retentionDays: 120 }, audit)
+  await sdk.listPermissionGroups()
+  await sdk.createPermissionGroup({ deniedPermissions: [], isDefault: false, name: 'Group' }, audit)
+  await sdk.updatePermissionGroup(
+    'group/1',
+    { deniedPermissions: [], isDefault: false, name: 'Group' },
+    audit
+  )
+  await sdk.setPermissionGroupMembers('group/1', ['member'], audit)
+  await sdk.deletePermissionGroup('group/1', audit)
   await sdk.getWhitelabel()
   await sdk.updateWhitelabel({ brandName: 'Acme' }, audit)
 
@@ -56,6 +65,11 @@ test('audit-control SDK forwards the sealed secret and the audit fingerprint', a
       'DELETE /v1/audit-drains/drain%2F1',
       'GET /v1/audit-retention',
       'PUT /v1/audit-retention',
+      'GET /v1/permission-groups',
+      'POST /v1/permission-groups',
+      'PUT /v1/permission-groups/group%2F1',
+      'PUT /v1/permission-groups/group%2F1/members',
+      'DELETE /v1/permission-groups/group%2F1',
       'GET /v1/whitelabel',
       'PUT /v1/whitelabel',
     ]

@@ -182,6 +182,14 @@ const SECTIONS = [
     title: 'SSO',
   },
   {
+    description: 'Restrict what groups of members may do, beyond their roles.',
+    group: 'advanced',
+    id: 'permission-groups',
+    keywords: 'access control restrict deny',
+    slug: 'permission-groups',
+    title: 'Permission groups',
+  },
+  {
     description: 'Your name, logo and colors in the signed-in app.',
     group: 'advanced',
     id: 'whitelabel',

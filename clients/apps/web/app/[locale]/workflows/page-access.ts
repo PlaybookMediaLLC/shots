@@ -3,7 +3,7 @@ import 'server-only'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 
 /**
  * Shared guard for the Workflows pages: signed in with a workspace. Every
@@ -18,7 +18,7 @@ export async function requireWorkflowPageAccess(locale: string) {
   }
   return {
     ...access,
-    canManage: hasPermission(access.role, 'workspace:update'),
+    canManage: accessAllows(access, 'workspace:update'),
     organization: access.organization,
   }
 }

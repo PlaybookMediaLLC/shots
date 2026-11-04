@@ -5,7 +5,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Page, Row } from '@/components/platform-ui'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { paidCapability, safeReturnPath } from '@/lib/platform/navigation'
 
 export const metadata = { title: 'Plans' }
@@ -45,7 +45,7 @@ export default async function UpgradePage({
 
   const capability = paidCapability(requested)
   const workspace = access.organization?.name ?? 'This workspace'
-  const canManage = hasPermission(access.role, 'billing:manage')
+  const canManage = accessAllows(access, 'billing:manage')
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}

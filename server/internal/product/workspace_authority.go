@@ -43,9 +43,12 @@ func lockWorkspaceMembership(ctx context.Context, tx *ent.Tx, actor Actor) error
 	return err
 }
 
-func workspaceAdministrator(ctx context.Context, tx *ent.Tx, actor Actor) error {
+func workspaceAdministrator(ctx context.Context, tx *ent.Tx, actor Actor, permission string) error {
 	if err := lockWorkspaceMembership(ctx, tx, actor); err != nil {
 		return err
 	}
-	return NewConfiguration(tx.Client()).Authorize(ctx, actor)
+	if err := NewConfiguration(tx.Client()).Authorize(ctx, actor); err != nil {
+		return err
+	}
+	return requireNotDenied(ctx, tx.Client(), actor, permission)
 }

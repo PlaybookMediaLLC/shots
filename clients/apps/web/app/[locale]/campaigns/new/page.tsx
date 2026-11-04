@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { CampaignSetupForm } from '@/components/campaigns/CampaignSetupForm'
 import { Page } from '@/components/platform-ui'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { getRequestId } from '@/lib/auth/access'
 import { listProductSurfaces } from '@/lib/tenant/product-surfaces'
 import { headers } from 'next/headers'
@@ -36,8 +36,8 @@ export default async function NewCampaignPage({ params }: NewCampaignPageProps) 
         width="sm"
       >
         <CampaignSetupForm
-          canCreate={hasPermission(access.role, 'release:create')}
-          canManageProducts={hasPermission(access.role, 'brand:manage')}
+          canCreate={accessAllows(access, 'release:create')}
+          canManageProducts={accessAllows(access, 'brand:manage')}
           surfaces={surfaces.map(({ environment, id, name, url }) => ({
             environment,
             id,

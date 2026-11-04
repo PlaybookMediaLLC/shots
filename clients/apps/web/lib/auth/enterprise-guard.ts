@@ -5,10 +5,13 @@ import { getAuditRequestMetadata } from '@/lib/audit/request'
 import { backendSDK, serviceBackend } from '@/lib/backend/sdk'
 import {
   AuthorizationError,
+  requireActiveOrganizationPermission,
   requireEnterpriseFeature,
+  requireOrganizationPermission,
   requireSensitiveOrganizationPermission,
   type OrganizationAccess,
 } from './access'
+import type { Permission } from './permissions'
 import { auth } from './server'
 
 type EnterpriseFeature = 'scimEnabled' | 'ssoEnabled'
@@ -102,6 +105,29 @@ async function getOrganizationId(
   }
 
   return getActiveOrganizationId(headers)
+}
+
+/**
+ * Better Auth endpoints that change workspace state without reaching a route
+ * or the backend. Their callers in the app go through tRPC, which checks these
+ * same permissions; here a direct request gets the same answer, including the
+ * member's permission group.
+ */
+const AUTH_ENDPOINT_PERMISSIONS: Readonly<Record<string, Permission>> = {
+  '/api/auth/api-key/create': 'brand:manage',
+  '/api/auth/api-key/delete': 'brand:manage',
+  '/api/auth/api-key/update': 'brand:manage',
+  '/api/auth/organization/update': 'workspace:update',
+}
+
+/** Refuses a direct request to one of those endpoints without the permission. */
+export async function authorizeAuthEndpointPermission(request: Request): Promise<void> {
+  const permission = AUTH_ENDPOINT_PERMISSIONS[new URL(request.url).pathname]
+  if (!permission || request.method !== 'POST') return
+  const { organizationId } = await getRequestBody(request)
+  await (organizationId
+    ? requireOrganizationPermission(request.headers, organizationId, permission)
+    : requireActiveOrganizationPermission(request.headers, permission))
 }
 
 export async function authorizeEnterpriseAuthRequest(

@@ -27309,6 +27309,7 @@
               "enterprise:sso",
               "enterprise:scim",
               "enterprise:white-label",
+              "enterprise:permission-groups",
               "campaign:workflow",
               "content:drafts",
               "onboarding:agent"

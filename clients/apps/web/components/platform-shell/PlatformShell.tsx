@@ -78,6 +78,7 @@ export async function PlatformShell({
           <PlatformSidebar
             brand={brandIdentity(access?.whitelabel)}
             campaignsEnabled={platformAccess.campaignsEnabled}
+            deniedPermissions={access?.deniedPermissions}
             draftsEnabled={platformAccess.draftsEnabled}
             draftsPlan={platformAccess.draftsPlan}
             initialNavigation={navigation}

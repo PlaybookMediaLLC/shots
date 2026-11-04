@@ -5,6 +5,8 @@ import { WorkspaceSettingContent } from './WorkspaceSettingDetail'
 import { SETTINGS_SECTIONS, type SettingId, type SocialSetPage } from './settings-sections'
 
 export type WorkspaceSettingsProps = {
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions: readonly string[]
   /** Content drafts are rolled out (PLATFORM_CONTENT_DRAFTS), so Publishing brands shows the approval switch. */
   draftsEnabled: boolean
   email: string

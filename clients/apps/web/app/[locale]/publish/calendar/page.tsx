@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { PlanWorkspace } from '@/components/plan/PlanWorkspace'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { socialSetSchema } from '@/lib/api/contracts/social-sets'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK, orNull } from '@/lib/backend/sdk'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
@@ -33,9 +33,9 @@ export default async function WritePlanPage({
       <div className="h-[calc(100dvh-4rem)] min-h-[480px]">
         <PlanWorkspace
           sets={sets.map((s) => socialSetSchema.parse(s))}
-          canEdit={hasPermission(access.role, 'artifact:edit')}
-          canManageSets={hasPermission(access.role, 'workspace:update')}
-          canPublish={hasPermission(access.role, 'publish:manage')}
+          canEdit={accessAllows(access, 'artifact:edit')}
+          canManageSets={accessAllows(access, 'workspace:update')}
+          canPublish={accessAllows(access, 'publish:manage')}
           preferenceKey={`shots:plan:${access.organization.id}:${access.session.user.id}`}
           initialZone={sets[0]?.timeZone ?? 'UTC'}
           initialWeekStart={preferences?.weekStart === 'sunday' ? 0 : 1}

@@ -113,6 +113,11 @@ type ConfigurationStore interface {
 	DeleteAuditDrain(context.Context, product.Actor, string, product.AuditRequest) error
 	GetAuditRetention(context.Context, product.Actor) (*product.AuditRetention, error)
 	UpdateAuditRetention(context.Context, product.Actor, product.AuditRetention, product.AuditRequest) (*product.AuditRetention, error)
+	ListPermissionGroups(context.Context, product.Actor) ([]product.PermissionGroupRecord, error)
+	CreatePermissionGroup(context.Context, product.Actor, product.PermissionGroupInput, product.AuditRequest) (*product.PermissionGroupRecord, error)
+	UpdatePermissionGroup(context.Context, product.Actor, string, product.PermissionGroupInput, product.AuditRequest) (*product.PermissionGroupRecord, error)
+	DeletePermissionGroup(context.Context, product.Actor, string, product.AuditRequest) error
+	SetPermissionGroupMembers(context.Context, product.Actor, string, []string, product.AuditRequest) (*product.PermissionGroupRecord, error)
 	GetWhitelabel(context.Context, product.Actor) (*whitelabel.Settings, error)
 	UpdateWhitelabel(context.Context, product.Actor, whitelabel.Settings, product.AuditRequest) (*whitelabel.Settings, error)
 	GetWebhookSource(context.Context, string) (*product.WebhookSource, error)
@@ -301,6 +306,7 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerLaunch(mux)
 		s.registerConversations(mux)
 		s.registerPlatformControls(mux)
+		s.registerPermissionGroups(mux)
 		s.registerGitHub(mux)
 		s.registerReleaseAutomation(mux)
 		s.registerFrontendDeployments(mux)
