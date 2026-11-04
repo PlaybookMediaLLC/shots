@@ -27308,6 +27308,7 @@
               "enterprise:audit-drain",
               "enterprise:sso",
               "enterprise:scim",
+              "enterprise:white-label",
               "campaign:workflow",
               "content:drafts",
               "onboarding:agent"

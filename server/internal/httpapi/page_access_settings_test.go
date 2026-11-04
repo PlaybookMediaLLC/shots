@@ -8,6 +8,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 type pageSettingsFixture struct {
@@ -47,5 +48,21 @@ func TestPageAccessPreservesDisabledAIAndWorkspacePreferences(t *testing.T) {
 		if _, exists := settings["ai_agent_enabled"]; exists {
 			t.Fatal("Ent wire fields escaped")
 		}
+	}
+}
+
+// The response is built by hand, so a snapshot field must be added to it too.
+func TestPageAccessReturnsTheWhitelabel(t *testing.T) {
+	snapshot := &product.PageAccessSnapshot{Whitelabel: &whitelabel.Settings{BrandName: "Acme"}}
+	recorder := httptest.NewRecorder()
+	(&Server{configuration: pageSettingsFixture{snapshot: snapshot}}).pageAccess(recorder, httptest.NewRequest("GET", "/v1/page-access", nil))
+	var body struct {
+		Whitelabel whitelabel.Settings `json:"whitelabel"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Whitelabel.BrandName != "Acme" {
+		t.Fatalf("whitelabel dropped from page access: %+v", body)
 	}
 }

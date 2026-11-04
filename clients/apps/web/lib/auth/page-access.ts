@@ -32,7 +32,7 @@ function backendPageDeletion(active: ListedWorkspace) {
 }
 
 async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSession) {
-  const { active, count, workspace, features } = await backendSDK({
+  const { active, count, workspace, features, whitelabel } = await backendSDK({
     organizationId: '',
     principal: {
       display: session.user.email,
@@ -60,6 +60,8 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
     organization: backendPageOrganization(active, workspace),
     role: active?.role ?? 'viewer',
     session,
+    // Set only while the plan grants it, so a lapsed plan shows Shots again.
+    whitelabel,
   }
 }
 

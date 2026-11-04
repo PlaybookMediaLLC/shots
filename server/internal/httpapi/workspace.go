@@ -469,5 +469,5 @@ func (s *Server) pageAccess(w http.ResponseWriter, r *http.Request) {
 	if result.Workspace != nil {
 		workspace = workspaceResponse(result.Workspace)
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"active": result.Active, "count": result.Count, "workspace": workspace, "features": result.Features})
+	writeJSON(w, http.StatusOK, map[string]any{"active": result.Active, "count": result.Count, "workspace": workspace, "features": result.Features, "whitelabel": result.Whitelabel})
 }

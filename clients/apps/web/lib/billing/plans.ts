@@ -81,6 +81,8 @@ export const workspaceFeatureSchema = z.enum([
   'enterprise:audit-drain',
   'enterprise:sso',
   'enterprise:scim',
+  // The organization's own name, logo and colors in the app.
+  'enterprise:white-label',
   // The campaign workflow. Every paid plan includes it; featureOverrides can
   // still grant or revoke it per workspace.
   'campaign:workflow',
@@ -158,6 +160,7 @@ const planFeatures = {
     'enterprise:audit-drain',
     'enterprise:sso',
     'enterprise:scim',
+    'enterprise:white-label',
     'campaign:workflow',
     'content:drafts',
     'onboarding:agent',
@@ -177,6 +180,7 @@ const minimumPlanByFeature: Record<WorkspaceFeature, WorkspacePlan> = {
   'enterprise:audit-drain': 'enterprise',
   'enterprise:sso': 'enterprise',
   'enterprise:scim': 'enterprise',
+  'enterprise:white-label': 'enterprise',
   'campaign:workflow': 'pro',
   'content:drafts': 'pro',
   'onboarding:agent': 'pro',

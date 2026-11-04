@@ -45,6 +45,8 @@ test('audit-control SDK forwards the sealed secret and the audit fingerprint', a
   await sdk.deleteAuditDrain('drain/1', audit)
   await sdk.getAuditRetention()
   await sdk.updateAuditRetention({ legalHold: true, retentionDays: 120 }, audit)
+  await sdk.getWhitelabel()
+  await sdk.updateWhitelabel({ brandName: 'Acme' }, audit)
 
   assert.deepEqual(
     requests.map((request) => `${request.method} ${request.path}`),
@@ -54,6 +56,8 @@ test('audit-control SDK forwards the sealed secret and the audit fingerprint', a
       'DELETE /v1/audit-drains/drain%2F1',
       'GET /v1/audit-retention',
       'PUT /v1/audit-retention',
+      'GET /v1/whitelabel',
+      'PUT /v1/whitelabel',
     ]
   )
   assert.equal(requests[1].headers.get('x-audit-ip-hash'), 'hash-1')

@@ -6,6 +6,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // PageAccessSnapshot contains only what the signed-in page gate needs.
@@ -15,6 +16,9 @@ type PageAccessSnapshot struct {
 	Count     int              `json:"count"`
 	Workspace *Workspace       `json:"workspace"`
 	Features  map[string]bool  `json:"features"`
+	// Whitelabel is the active organization's branding, set only while its
+	// plan grants the feature.
+	Whitelabel *whitelabel.Settings `json:"whitelabel"`
 }
 
 func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAccessSnapshot, error) {
@@ -61,5 +65,10 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 		return nil, err
 	}
 	_, _, result.Features = evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
+	if result.Features[WhitelabelFeature] {
+		if result.Whitelabel, err = c.storedWhitelabel(ctx, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
 }

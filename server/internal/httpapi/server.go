@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 type Store interface {
@@ -112,6 +113,8 @@ type ConfigurationStore interface {
 	DeleteAuditDrain(context.Context, product.Actor, string, product.AuditRequest) error
 	GetAuditRetention(context.Context, product.Actor) (*product.AuditRetention, error)
 	UpdateAuditRetention(context.Context, product.Actor, product.AuditRetention, product.AuditRequest) (*product.AuditRetention, error)
+	GetWhitelabel(context.Context, product.Actor) (*whitelabel.Settings, error)
+	UpdateWhitelabel(context.Context, product.Actor, whitelabel.Settings, product.AuditRequest) (*whitelabel.Settings, error)
 	GetWebhookSource(context.Context, string) (*product.WebhookSource, error)
 	IngestSourceRelease(context.Context, product.Actor, product.IngestSourceReleaseInput) (*product.SourceReleaseIngest, error)
 	CollectSourceChange(context.Context, product.Actor, product.CollectSourceChangeInput) (*product.SourceChangeCollect, error)

@@ -1873,6 +1873,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "ssoEnabled", Type: field.TypeBool, Default: false},
 		{Name: "scimEnabled", Type: field.TypeBool, Default: false},
+		{Name: "whitelabelSettings", Type: field.TypeJSON, Nullable: true},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
 	// OrganizationEnterpriseSettingsTable holds the schema information for the "organization_enterprise_settings" table.

@@ -27,6 +27,7 @@ import { WorkspaceProductSurfaces } from './WorkspaceProductSurfaces'
 import { WorkspaceRolesSettings } from './WorkspaceRolesSettings'
 import { WorkspaceSecuritySettings } from './WorkspaceSecuritySettings'
 import { WorkspaceSharedLinks } from './WorkspaceSharedLinks'
+import { WorkspaceWhitelabelSettings } from './WorkspaceWhitelabelSettings'
 import { hasPermission, type Permission } from '@/lib/auth/permissions'
 import type { WorkspaceSettingsProps } from './WorkspaceSettings'
 import type { SettingId } from './settings-sections'
@@ -110,6 +111,12 @@ const SETTINGS_CONTENT = {
     <WorkspaceIdentitySettings
       canManage={can('workspace:update')}
       isOwner={role === 'owner'}
+      organizationId={organization.id}
+    />
+  ),
+  whitelabel: ({ can, organization }) => (
+    <WorkspaceWhitelabelSettings
+      canManage={can('brand:manage')}
       organizationId={organization.id}
     />
   ),

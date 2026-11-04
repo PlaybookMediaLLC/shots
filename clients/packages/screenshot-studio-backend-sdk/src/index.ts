@@ -1663,6 +1663,15 @@ export type BackendAuditDrainInput = {
 
 export type BackendAuditRetention = { legalHold: boolean; retentionDays: number }
 
+/** An organization's app branding. An empty field keeps the Shots default. */
+export type BackendWhitelabelSettings = {
+  accentColor?: string
+  brandName?: string
+  faviconUrl?: string
+  logoUrl?: string
+  primaryColor?: string
+}
+
 /** Caller fingerprint recorded with an audit-control change. */
 export type BackendAuditRequest = { ipHash?: string | null; userAgentSummary?: string | null }
 
@@ -4331,6 +4340,18 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  async getWhitelabel() {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel')
+  }
+
+  async updateWhitelabel(input: BackendWhitelabelSettings, audit?: BackendAuditRequest) {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel', {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'PUT',
+    })
+  }
+
   /** Facade-only: resolves a source app before its webhook signature is verified. */
   async getWebhookSource(sourceAppId: string) {
     return this.request<BackendWebhookSource>(
@@ -4948,6 +4969,7 @@ export class ScreenshotStudioBackendSDK {
       count: number
       workspace: Workspace | null
       features: Record<string, boolean>
+      whitelabel: BackendWhitelabelSettings | null
     }>('v1/page-access')
   }
 

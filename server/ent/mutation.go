@@ -143,6 +143,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/thread"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 const (
@@ -56624,16 +56625,17 @@ func (m *OrganizationMutation) ResetEdge(name string) error {
 // OrganizationEnterpriseSettingsMutation represents an operation that mutates the OrganizationEnterpriseSettings nodes in the graph.
 type OrganizationEnterpriseSettingsMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *string
-	sso_enabled   *bool
-	scim_enabled  *bool
-	updated_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*OrganizationEnterpriseSettings, error)
-	predicates    []predicate.OrganizationEnterpriseSettings
+	op                  Op
+	typ                 string
+	id                  *string
+	sso_enabled         *bool
+	scim_enabled        *bool
+	whitelabel_settings *whitelabel.Settings
+	updated_at          *time.Time
+	clearedFields       map[string]struct{}
+	done                bool
+	oldValue            func(context.Context) (*OrganizationEnterpriseSettings, error)
+	predicates          []predicate.OrganizationEnterpriseSettings
 }
 
 var _ ent.Mutation = (*OrganizationEnterpriseSettingsMutation)(nil)
@@ -56812,6 +56814,55 @@ func (m *OrganizationEnterpriseSettingsMutation) ResetScimEnabled() {
 	m.scim_enabled = nil
 }
 
+// SetWhitelabelSettings sets the "whitelabel_settings" field.
+func (m *OrganizationEnterpriseSettingsMutation) SetWhitelabelSettings(w whitelabel.Settings) {
+	m.whitelabel_settings = &w
+}
+
+// WhitelabelSettings returns the value of the "whitelabel_settings" field in the mutation.
+func (m *OrganizationEnterpriseSettingsMutation) WhitelabelSettings() (r whitelabel.Settings, exists bool) {
+	v := m.whitelabel_settings
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWhitelabelSettings returns the old "whitelabel_settings" field's value of the OrganizationEnterpriseSettings entity.
+// If the OrganizationEnterpriseSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrganizationEnterpriseSettingsMutation) OldWhitelabelSettings(ctx context.Context) (v whitelabel.Settings, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWhitelabelSettings is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWhitelabelSettings requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWhitelabelSettings: %w", err)
+	}
+	return oldValue.WhitelabelSettings, nil
+}
+
+// ClearWhitelabelSettings clears the value of the "whitelabel_settings" field.
+func (m *OrganizationEnterpriseSettingsMutation) ClearWhitelabelSettings() {
+	m.whitelabel_settings = nil
+	m.clearedFields[organizationenterprisesettings.FieldWhitelabelSettings] = struct{}{}
+}
+
+// WhitelabelSettingsCleared returns if the "whitelabel_settings" field was cleared in this mutation.
+func (m *OrganizationEnterpriseSettingsMutation) WhitelabelSettingsCleared() bool {
+	_, ok := m.clearedFields[organizationenterprisesettings.FieldWhitelabelSettings]
+	return ok
+}
+
+// ResetWhitelabelSettings resets all changes to the "whitelabel_settings" field.
+func (m *OrganizationEnterpriseSettingsMutation) ResetWhitelabelSettings() {
+	m.whitelabel_settings = nil
+	delete(m.clearedFields, organizationenterprisesettings.FieldWhitelabelSettings)
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (m *OrganizationEnterpriseSettingsMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
@@ -56882,12 +56933,15 @@ func (m *OrganizationEnterpriseSettingsMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OrganizationEnterpriseSettingsMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.sso_enabled != nil {
 		fields = append(fields, organizationenterprisesettings.FieldSSOEnabled)
 	}
 	if m.scim_enabled != nil {
 		fields = append(fields, organizationenterprisesettings.FieldScimEnabled)
+	}
+	if m.whitelabel_settings != nil {
+		fields = append(fields, organizationenterprisesettings.FieldWhitelabelSettings)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, organizationenterprisesettings.FieldUpdatedAt)
@@ -56904,6 +56958,8 @@ func (m *OrganizationEnterpriseSettingsMutation) Field(name string) (ent.Value, 
 		return m.SSOEnabled()
 	case organizationenterprisesettings.FieldScimEnabled:
 		return m.ScimEnabled()
+	case organizationenterprisesettings.FieldWhitelabelSettings:
+		return m.WhitelabelSettings()
 	case organizationenterprisesettings.FieldUpdatedAt:
 		return m.UpdatedAt()
 	}
@@ -56919,6 +56975,8 @@ func (m *OrganizationEnterpriseSettingsMutation) OldField(ctx context.Context, n
 		return m.OldSSOEnabled(ctx)
 	case organizationenterprisesettings.FieldScimEnabled:
 		return m.OldScimEnabled(ctx)
+	case organizationenterprisesettings.FieldWhitelabelSettings:
+		return m.OldWhitelabelSettings(ctx)
 	case organizationenterprisesettings.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
 	}
@@ -56943,6 +57001,13 @@ func (m *OrganizationEnterpriseSettingsMutation) SetField(name string, value ent
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetScimEnabled(v)
+		return nil
+	case organizationenterprisesettings.FieldWhitelabelSettings:
+		v, ok := value.(whitelabel.Settings)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWhitelabelSettings(v)
 		return nil
 	case organizationenterprisesettings.FieldUpdatedAt:
 		v, ok := value.(time.Time)
@@ -56980,7 +57045,11 @@ func (m *OrganizationEnterpriseSettingsMutation) AddField(name string, value ent
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *OrganizationEnterpriseSettingsMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(organizationenterprisesettings.FieldWhitelabelSettings) {
+		fields = append(fields, organizationenterprisesettings.FieldWhitelabelSettings)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -56993,6 +57062,11 @@ func (m *OrganizationEnterpriseSettingsMutation) FieldCleared(name string) bool 
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *OrganizationEnterpriseSettingsMutation) ClearField(name string) error {
+	switch name {
+	case organizationenterprisesettings.FieldWhitelabelSettings:
+		m.ClearWhitelabelSettings()
+		return nil
+	}
 	return fmt.Errorf("unknown OrganizationEnterpriseSettings nullable field %s", name)
 }
 
@@ -57005,6 +57079,9 @@ func (m *OrganizationEnterpriseSettingsMutation) ResetField(name string) error {
 		return nil
 	case organizationenterprisesettings.FieldScimEnabled:
 		m.ResetScimEnabled()
+		return nil
+	case organizationenterprisesettings.FieldWhitelabelSettings:
+		m.ResetWhitelabelSettings()
 		return nil
 	case organizationenterprisesettings.FieldUpdatedAt:
 		m.ResetUpdatedAt()

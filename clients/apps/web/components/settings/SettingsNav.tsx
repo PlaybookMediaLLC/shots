@@ -63,6 +63,7 @@ const ICONS = {
   agents: AgentIcon,
   sso: LoginIcon,
   audit: ReceiptIcon,
+  whitelabel: ContrastIcon,
   api: CodeIcon,
   experimental: ScienceIcon,
 } satisfies Record<SettingId, NavIcon>

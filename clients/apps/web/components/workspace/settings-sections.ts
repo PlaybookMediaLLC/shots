@@ -182,6 +182,14 @@ const SECTIONS = [
     title: 'SSO',
   },
   {
+    description: 'Your name, logo and colors in the signed-in app.',
+    group: 'advanced',
+    id: 'whitelabel',
+    keywords: 'branding logo favicon theme colors',
+    slug: 'white-label',
+    title: 'White label',
+  },
+  {
     description: 'Searchable events, retention, and SIEM log drains.',
     group: 'advanced',
     id: 'audit',

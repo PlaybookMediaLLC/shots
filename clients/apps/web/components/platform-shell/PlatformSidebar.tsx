@@ -369,28 +369,37 @@ function SidebarFooter({
   )
 }
 
-function Brand({ collapsed }: { collapsed: boolean }) {
+function Brand({ brand, collapsed }: { brand: SidebarBrand; collapsed: boolean }) {
   return (
     <SidebarLink
       className="flex min-w-0 items-center gap-2.5 rounded-md"
       href="/home"
-      aria-label="Shots Home"
+      aria-label={`${brand.name} Home`}
     >
-      <Image
-        alt=""
-        className="size-6 rounded-md"
-        height={24}
-        src={publicImageUrl('/logo-mark.png')}
-        width={24}
-      />
+      {brand.logoUrl ? (
+        // An organization's own host, which next/image is not configured for.
+        <img alt="" className="size-6 rounded-md object-contain" src={brand.logoUrl} />
+      ) : (
+        <Image
+          alt=""
+          className="size-6 rounded-md"
+          height={24}
+          src={publicImageUrl('/logo-mark.png')}
+          width={24}
+        />
+      )}
       {collapsed ? null : (
-        <span className="truncate text-[15px] font-medium text-foreground">Shots</span>
+        <span className="truncate text-[15px] font-medium text-foreground">{brand.name}</span>
       )}
     </SidebarLink>
   )
 }
 
+type SidebarBrand = { logoUrl?: string; name: string }
+
 export interface PlatformSidebarProps {
+  /** The organization's white-label name and logo, or Shots'. */
+  brand?: SidebarBrand
   campaignsEnabled: boolean
   /** Show Drafts; content drafts are behind PLATFORM_CONTENT_DRAFTS. */
   draftsEnabled?: boolean
@@ -464,6 +473,7 @@ function useNavigationExpanded(
  * Mobile: a full drawer of the same links.
  */
 export function PlatformSidebar({
+  brand = { name: 'Shots' },
   campaignsEnabled,
   draftsEnabled = false,
   draftsPlan = true,
@@ -510,7 +520,7 @@ export function PlatformSidebar({
             collapsed ? 'flex-col gap-2' : 'h-8 justify-between gap-2 ps-2'
           )}
         >
-          <Brand collapsed={collapsed} />
+          <Brand brand={brand} collapsed={collapsed} />
           <div className={cn('flex items-center gap-0.5', collapsed && 'flex-col')}>
             <NotificationCenter initialIdentity={notificationIdentity} />
             <SearchButton />
@@ -542,7 +552,7 @@ export function PlatformSidebar({
           surface.base
         )}
       >
-        <Brand collapsed={false} />
+        <Brand brand={brand} collapsed={false} />
         <div className="ms-auto flex items-center gap-1">
           <ThemeToggle />
           <NotificationCenter initialIdentity={notificationIdentity} />
@@ -565,7 +575,7 @@ export function PlatformSidebar({
             >
               <SheetTitle className="sr-only">{t('navigation')}</SheetTitle>
               <div className="flex h-8 shrink-0 items-center justify-between gap-2 ps-2 pe-12">
-                <Brand collapsed={false} />
+                <Brand brand={brand} collapsed={false} />
                 <SearchButton />
               </div>
               <div className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1">
