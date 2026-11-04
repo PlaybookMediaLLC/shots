@@ -1,5 +1,7 @@
 # Post Bridge Bulk Tools: technical reverse engineering
 
+Implemented in Shots on 4 November 2026 as an extension of bulk batches; the rules it left open and what was deliberately not built are in [media scheduling](../../../media-scheduling.md#bulk-tools). This document stays a record of the inspection.
+
 Inspected 13 October 2026 in an authenticated Pro-plan workspace. This extends the [New Post analysis](../composer/post-bridge-new-post-technical-analysis.md) and [Content Studio analysis](../content-studio/post-bridge-content-studio-technical-analysis.md).
 
 ## 1. What the feature is

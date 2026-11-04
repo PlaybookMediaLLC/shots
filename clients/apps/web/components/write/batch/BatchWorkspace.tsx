@@ -793,7 +793,7 @@ export function BatchWorkspace({
   }
 
   const [gridOpen, setGridOpen] = React.useState(start === 'grid')
-  const showGrid = gridOpen || items.some((item) => item.grid && !item.draftId)
+  const showGrid = gridOpen || items.some((item) => item.grid)
 
   const [timesMode, setTimesMode] = React.useState<'queue' | 'spread'>('queue')
   const [spread, setSpread] = React.useState({ start: '', perDay: 2, spacing: 240, shift: 0 })
@@ -1594,7 +1594,7 @@ export function BatchWorkspace({
                           <p className="whitespace-pre-wrap text-muted-foreground">
                             {item.draft?.plainText || 'No caption'}
                           </p>
-                        ) : (
+                        ) : item.grid ? null : (
                           <div>
                             <FilePicker
                               accept={ACCEPT}

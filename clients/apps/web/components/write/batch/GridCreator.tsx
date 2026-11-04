@@ -134,7 +134,10 @@ export function GridCreator({
 }) {
   const trpc = useTRPCClient()
   const concepts = items.filter((item): item is Saved => Boolean(item.grid && !item.draftId))
-  const finished = concepts.filter((item) => item.media.some((entry) => entry.assetId))
+  // A saved draft's video can still be downloaded, though its concept no longer changes.
+  const finished = items.filter(
+    (item): item is Saved => Boolean(item.grid && item.media.some((entry) => entry.assetId))
+  )
   const [stage, setStage] = React.useState<Stage>(concepts.length ? 'customize' : 'inputs')
 
   const [captions, setCaptions] = React.useState([''])
@@ -400,11 +403,7 @@ export function GridCreator({
           <li key={key}>
             <Button
               aria-current={stage === key ? 'step' : undefined}
-              disabled={
-                running ||
-                (key !== 'inputs' && !concepts.length) ||
-                (key === 'render' && !concepts.length)
-              }
+              disabled={running || (key !== 'inputs' && !concepts.length)}
               size="sm"
               type="button"
               variant={stage === key ? 'default' : 'ghost'}
