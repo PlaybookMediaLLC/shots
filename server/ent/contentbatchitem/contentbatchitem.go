@@ -33,6 +33,8 @@ const (
 	FieldChannelConnectionIds = "channelConnectionIds"
 	// FieldTiming holds the string denoting the timing field in the database.
 	FieldTiming = "timing"
+	// FieldGrid holds the string denoting the grid field in the database.
+	FieldGrid = "grid"
 	// FieldDraftID holds the string denoting the draft_id field in the database.
 	FieldDraftID = "draftId"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -56,6 +58,7 @@ var Columns = []string{
 	FieldMedia,
 	FieldChannelConnectionIds,
 	FieldTiming,
+	FieldGrid,
 	FieldDraftID,
 	FieldCreatedAt,
 	FieldUpdatedAt,

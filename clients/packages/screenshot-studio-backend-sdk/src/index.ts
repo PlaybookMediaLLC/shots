@@ -1297,6 +1297,13 @@ export type BackendBatchMedia = {
   uploadAssetId?: string
 }
 
+/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+export type BackendBatchGrid = {
+  headline: string
+  musicAssetId?: string
+  slots: { assetId?: string; topic: string }[]
+}
+
 /** When a batch item is meant to go out: a local time in a zone, or the queue at a previewed slot. */
 export type BackendBatchTiming = {
   mode?: 'time' | 'queue'
@@ -1312,6 +1319,8 @@ export type BackendContentBatchItemInput = {
   channelConnectionIds: string[]
   importKey: string
   media: BackendBatchMedia[]
+  /** A grid video concept; its rendered video becomes the item's media. */
+  grid?: BackendBatchGrid
   /** The file or folder name the item came from, as the person knows it. */
   sourceKey?: string
   timing: BackendBatchTiming
@@ -1343,6 +1352,7 @@ export type BackendContentBatchItem = {
   })[]
   position: number
   posts: BackendContentDraftPost[]
+  grid?: BackendBatchGrid
   sourceKey?: string
   timing: BackendBatchTiming
 }
@@ -3258,7 +3268,10 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     itemId: string,
     input: Partial<
-      Pick<BackendContentBatchItemInput, 'caption' | 'channelConnectionIds' | 'media' | 'timing'>
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
     > & {
       position?: number
     }
@@ -3273,7 +3286,10 @@ export class ScreenshotStudioBackendSDK {
   async updateContentBatchItems(
     id: string,
     items: (Partial<
-      Pick<BackendContentBatchItemInput, 'caption' | 'channelConnectionIds' | 'media' | 'timing'>
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
     > & { itemId: string; position?: number })[]
   ) {
     return this.request<BackendContentBatch>(`v1/content-batches/${encodeURIComponent(id)}/items`, {

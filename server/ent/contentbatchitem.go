@@ -39,6 +39,8 @@ type ContentBatchItem struct {
 	ChannelConnectionIds []string `json:"channel_connection_ids,omitempty"`
 	// Timing holds the value of the "timing" field.
 	Timing schema.BatchTiming `json:"timing,omitempty"`
+	// Grid holds the value of the "grid" field.
+	Grid *schema.BatchGrid `json:"grid,omitempty"`
 	// DraftID holds the value of the "draft_id" field.
 	DraftID *string `json:"draft_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -53,7 +55,7 @@ func (*ContentBatchItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case contentbatchitem.FieldMedia, contentbatchitem.FieldChannelConnectionIds, contentbatchitem.FieldTiming:
+		case contentbatchitem.FieldMedia, contentbatchitem.FieldChannelConnectionIds, contentbatchitem.FieldTiming, contentbatchitem.FieldGrid:
 			values[i] = new([]byte)
 		case contentbatchitem.FieldPosition:
 			values[i] = new(sql.NullInt64)
@@ -148,6 +150,14 @@ func (_m *ContentBatchItem) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field timing: %w", err)
 				}
 			}
+		case contentbatchitem.FieldGrid:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field grid", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Grid); err != nil {
+					return fmt.Errorf("unmarshal field grid: %w", err)
+				}
+			}
 		case contentbatchitem.FieldDraftID:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field draft_id", values[i])
@@ -232,6 +242,9 @@ func (_m *ContentBatchItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("timing=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Timing))
+	builder.WriteString(", ")
+	builder.WriteString("grid=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Grid))
 	builder.WriteString(", ")
 	if v := _m.DraftID; v != nil {
 		builder.WriteString("draft_id=")

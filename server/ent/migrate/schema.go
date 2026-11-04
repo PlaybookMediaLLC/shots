@@ -880,6 +880,7 @@ var (
 		{Name: "media", Type: field.TypeJSON},
 		{Name: "channelConnectionIds", Type: field.TypeJSON},
 		{Name: "timing", Type: field.TypeJSON},
+		{Name: "grid", Type: field.TypeJSON, Nullable: true},
 		{Name: "draftId", Type: field.TypeString, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -903,7 +904,7 @@ var (
 			{
 				Name:    "contentbatchitem_draftId",
 				Unique:  true,
-				Columns: []*schema.Column{ContentBatchItemColumns[11]},
+				Columns: []*schema.Column{ContentBatchItemColumns[12]},
 			},
 		},
 	}

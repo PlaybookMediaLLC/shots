@@ -47,6 +47,20 @@ type BatchMedia struct {
 	UploadAssetID string `json:"uploadAssetId,omitempty"`
 }
 
+// BatchGridSlot is one cell of a grid video: its label and image.
+type BatchGridSlot struct {
+	Topic   string `json:"topic"`
+	AssetID string `json:"assetId,omitempty"`
+}
+
+// BatchGrid is a 2x2 grid video concept: a headline above four labelled images,
+// with an optional music track. The rendered video becomes the item's media.
+type BatchGrid struct {
+	Headline     string          `json:"headline"`
+	Slots        []BatchGridSlot `json:"slots"`
+	MusicAssetID string          `json:"musicAssetId,omitempty"`
+}
+
 // BatchTiming is when an item is meant to go out: a local time in an IANA zone
 // (Disambiguation picks a repeated hour), or the queue at a previewed slot.
 type BatchTiming struct {
@@ -82,6 +96,7 @@ func (ContentBatchItem) Fields() []ent.Field {
 		field.JSON("media", []BatchMedia{}).StorageKey("media"),
 		field.JSON("channel_connection_ids", []string{}).StorageKey("channelConnectionIds"),
 		field.JSON("timing", BatchTiming{}).StorageKey("timing"),
+		field.JSON("grid", &BatchGrid{}).StorageKey("grid").Optional(),
 		field.String("draft_id").StorageKey("draftId").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),

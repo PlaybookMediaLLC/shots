@@ -476,11 +476,11 @@ func init() {
 	// contentbatchitem.DefaultCaption holds the default value on creation for the caption field.
 	contentbatchitem.DefaultCaption = contentbatchitemDescCaption.Default.(string)
 	// contentbatchitemDescCreatedAt is the schema descriptor for created_at field.
-	contentbatchitemDescCreatedAt := contentbatchitemFields[12].Descriptor()
+	contentbatchitemDescCreatedAt := contentbatchitemFields[13].Descriptor()
 	// contentbatchitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentbatchitem.DefaultCreatedAt = contentbatchitemDescCreatedAt.Default.(func() time.Time)
 	// contentbatchitemDescUpdatedAt is the schema descriptor for updated_at field.
-	contentbatchitemDescUpdatedAt := contentbatchitemFields[13].Descriptor()
+	contentbatchitemDescUpdatedAt := contentbatchitemFields[14].Descriptor()
 	// contentbatchitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentbatchitem.DefaultUpdatedAt = contentbatchitemDescUpdatedAt.Default.(func() time.Time)
 	// contentbatchitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

@@ -235,6 +235,107 @@ func TestContentBatches(t *testing.T) {
 		}
 	})
 
+	t.Run("a grid concept is an item until it renders, and keeps what it shows", func(t *testing.T) {
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Grids"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		slots := func(ids ...string) []schema.BatchGridSlot {
+			out := []schema.BatchGridSlot{{Topic: "One"}, {Topic: "Two"}, {Topic: "Three"}, {Topic: "Four"}}
+			for i, id := range ids {
+				out[i].AssetID = id
+			}
+			return out
+		}
+		concept := item("grid", 0, "")
+		concept.Media = nil
+		concept.Grid = &schema.BatchGrid{Headline: "Four tools", Slots: slots()}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, []ContentBatchItemInput{concept}); err != nil {
+			t.Fatal(err)
+		}
+		entry := batch.Items[0]
+		if entry.Grid == nil || entry.Grid.Headline != "Four tools" || len(entry.Grid.Slots) != 4 {
+			t.Fatalf("concept: %+v", entry.Grid)
+		}
+		// Refused: the wrong shape, text that cannot render, and an unknown asset.
+		for name, grid := range map[string]*schema.BatchGrid{
+			"three slots":      {Headline: "Four tools", Slots: slots()[:3]},
+			"no headline":      {Headline: "  ", Slots: slots()},
+			"a long headline":  {Headline: strings.Repeat("a", batchGridHeadlineLimit+1), Slots: slots()},
+			"a long label":     {Headline: "Four tools", Slots: []schema.BatchGridSlot{{Topic: strings.Repeat("a", batchGridTopicLimit+1)}, {}, {}, {}}},
+			"an unknown image": {Headline: "Four tools", Slots: slots("cmissingasset000000000000")},
+			"unknown music":    {Headline: "Four tools", Slots: slots(), MusicAssetID: "cmissingasset000000000000"},
+		} {
+			if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: grid}); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+		// Another workspace's asset is refused like one that does not exist.
+		stranger := newTestWorkspace(t)
+		subscribe(t, ctx, repo, stranger.org, "pro")
+		signed, err := repo.SignAssetUpload(ctx, stranger.owner, AssetUploadInput{Bytes: photoBytes.Len(), ContentType: "image/jpeg", FileName: "theirs.jpg"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		objects.files[signed.Asset.ObjectKey] = photoBytes.Bytes()
+		if _, err := repo.CompleteAssetUpload(ctx, stranger.owner, signed.Asset.ID, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{
+			Grid: &schema.BatchGrid{Headline: "Four tools", Slots: slots(signed.Asset.ID)}}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("another workspace's image: %v", err)
+		}
+		// A concept without its video cannot become a draft.
+		if _, err := repo.CreateContentBatchItemDraft(ctx, owner, batch.ID, entry.ID, ContentDraftInput{PlainText: entry.Caption}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("draft before rendering: %v", err)
+		}
+		// What a concept shows stays in use, and is not retired, while the batch is open.
+		image, music := upload("slot.jpg", "image/jpeg", photoBytes.Bytes()), upload("music.jpg", "image/jpeg", photoBytes.Bytes())
+		filled := &schema.BatchGrid{Headline: "Four tools", Slots: slots(image), MusicAssetID: music}
+		video := []schema.BatchMedia{{AssetID: videos[0], FileName: "grid.mp4"}}
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: filled, Media: &video}); err != nil {
+			t.Fatal(err)
+		}
+		inUse := func(id string) bool {
+			t.Helper()
+			var used bool
+			if err := w.db.SQL.QueryRowContext(ctx, `SELECT platform_asset_in_use_v1($1,$2,false)`, w.org, id).Scan(&used); err != nil {
+				t.Fatal(err)
+			}
+			return used
+		}
+		if !inUse(image) || !inUse(music) {
+			t.Fatal("a concept's image or music can be retired while its batch is open")
+		}
+		// Changing what the video shows drops the video; saving the same concept keeps it.
+		same, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: filled})
+		if err != nil || len(same.Media) != 1 {
+			t.Fatalf("unchanged concept: %+v %v", same, err)
+		}
+		changed := &schema.BatchGrid{Headline: "Five tools", Slots: slots(image), MusicAssetID: music}
+		dropped, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: changed})
+		if err != nil || len(dropped.Media) != 0 {
+			t.Fatalf("changed concept kept its video: %+v %v", dropped, err)
+		}
+		// Once rendered, it is an ordinary post: it drafts, and its concept then stays put.
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Media: &video}); err != nil {
+			t.Fatal(err)
+		}
+		drafted, err := repo.CreateContentBatchItemDraft(ctx, owner, batch.ID, entry.ID, ContentDraftInput{Title: "Grid", PlainText: entry.Caption})
+		if err != nil || drafted.Draft == nil || drafted.Draft.AssetIDs[0] != videos[0] {
+			t.Fatalf("draft after rendering: %+v %v", drafted, err)
+		}
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, entry.ID, ContentBatchItemUpdate{Grid: changed}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("grid edit after drafting: %v", err)
+		}
+		if err := repo.ArchiveContentBatch(ctx, owner, batch.ID); err != nil {
+			t.Fatal(err)
+		}
+		if inUse(image) || inUse(music) {
+			t.Fatal("a closed batch still holds its concept's image and music")
+		}
+	})
+
 	t.Run("a bulk update applies to every item or to none", func(t *testing.T) {
 		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Captions"})
 		if err != nil {

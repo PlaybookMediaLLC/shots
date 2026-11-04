@@ -544,6 +544,16 @@ func CaptionContainsFold(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldContainsFold(FieldCaption, v))
 }
 
+// GridIsNil applies the IsNil predicate on the "grid" field.
+func GridIsNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldIsNull(FieldGrid))
+}
+
+// GridNotNil applies the NotNil predicate on the "grid" field.
+func GridNotNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNotNull(FieldGrid))
+}
+
 // DraftIDEQ applies the EQ predicate on the "draft_id" field.
 func DraftIDEQ(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldDraftID, v))

@@ -57,12 +57,37 @@ export const batchTimingSchema = z.object({
 /** One of {@link batchTimingSchema}. */
 export type BatchTiming = z.infer<typeof batchTimingSchema>
 
+/** The most characters of a grid video's headline; Go's `batchGridHeadlineLimit`. */
+export const GRID_HEADLINE_LIMIT = 60
+
+/** The most characters of a grid cell's label; Go's `batchGridTopicLimit`. */
+export const GRID_TOPIC_LIMIT = 100
+
+/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+export const batchGridSchema = z.object({
+  headline: z.string().trim().min(1).max(GRID_HEADLINE_LIMIT),
+  musicAssetId: contentDraftIdSchema.optional(),
+  slots: z
+    .array(
+      z.object({
+        assetId: contentDraftIdSchema.optional(),
+        topic: z.string().max(GRID_TOPIC_LIMIT),
+      })
+    )
+    .length(4),
+})
+
+/** One of {@link batchGridSchema}. */
+export type BatchGrid = z.infer<typeof batchGridSchema>
+
 /** A staged item; `importKey` makes a retry idempotent. */
 export const batchItemInputSchema = z.object({
   importKey: z.string().min(16).max(128),
   caption: z.string().max(100_000),
   media: z.array(batchMediaSchema).max(BATCH_MEDIA_LIMIT),
   channelConnectionIds: z.array(contentDraftIdSchema).max(10),
+  /** A grid video concept; its rendered video becomes the item's media. */
+  grid: batchGridSchema.optional(),
   /** The file or folder name the item came from; caption CSVs match on it. */
   sourceKey: z.string().max(255).optional(),
   timing: batchTimingSchema,
@@ -102,6 +127,7 @@ export const batchItemSchema = z.object({
     })
     .nullable(),
   draftId: z.string().nullable(),
+  grid: batchGridSchema.nullish(),
   id: z.string(),
   importKey: z.string(),
   media: z.array(batchMediaViewSchema),
@@ -195,7 +221,7 @@ export const addContentBatchItemsContract = defineContract({
 
 /** What a batch item update may change. */
 const batchItemUpdateSchema = batchItemInputSchema
-  .pick({ caption: true, channelConnectionIds: true, media: true, timing: true })
+  .pick({ caption: true, channelConnectionIds: true, grid: true, media: true, timing: true })
   .partial()
   .extend({
     position: z

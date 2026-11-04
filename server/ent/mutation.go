@@ -25771,6 +25771,7 @@ type ContentBatchItemMutation struct {
 	channel_connection_ids       *[]string
 	appendchannel_connection_ids []string
 	timing                       *schema.BatchTiming
+	grid                         **schema.BatchGrid
 	draft_id                     *string
 	created_at                   *time.Time
 	updated_at                   *time.Time
@@ -26294,6 +26295,55 @@ func (m *ContentBatchItemMutation) ResetTiming() {
 	m.timing = nil
 }
 
+// SetGrid sets the "grid" field.
+func (m *ContentBatchItemMutation) SetGrid(sg *schema.BatchGrid) {
+	m.grid = &sg
+}
+
+// Grid returns the value of the "grid" field in the mutation.
+func (m *ContentBatchItemMutation) Grid() (r *schema.BatchGrid, exists bool) {
+	v := m.grid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrid returns the old "grid" field's value of the ContentBatchItem entity.
+// If the ContentBatchItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentBatchItemMutation) OldGrid(ctx context.Context) (v *schema.BatchGrid, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrid: %w", err)
+	}
+	return oldValue.Grid, nil
+}
+
+// ClearGrid clears the value of the "grid" field.
+func (m *ContentBatchItemMutation) ClearGrid() {
+	m.grid = nil
+	m.clearedFields[contentbatchitem.FieldGrid] = struct{}{}
+}
+
+// GridCleared returns if the "grid" field was cleared in this mutation.
+func (m *ContentBatchItemMutation) GridCleared() bool {
+	_, ok := m.clearedFields[contentbatchitem.FieldGrid]
+	return ok
+}
+
+// ResetGrid resets all changes to the "grid" field.
+func (m *ContentBatchItemMutation) ResetGrid() {
+	m.grid = nil
+	delete(m.clearedFields, contentbatchitem.FieldGrid)
+}
+
 // SetDraftID sets the "draft_id" field.
 func (m *ContentBatchItemMutation) SetDraftID(s string) {
 	m.draft_id = &s
@@ -26449,7 +26499,7 @@ func (m *ContentBatchItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentBatchItemMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.batch_id != nil {
 		fields = append(fields, contentbatchitem.FieldBatchID)
 	}
@@ -26479,6 +26529,9 @@ func (m *ContentBatchItemMutation) Fields() []string {
 	}
 	if m.timing != nil {
 		fields = append(fields, contentbatchitem.FieldTiming)
+	}
+	if m.grid != nil {
+		fields = append(fields, contentbatchitem.FieldGrid)
 	}
 	if m.draft_id != nil {
 		fields = append(fields, contentbatchitem.FieldDraftID)
@@ -26517,6 +26570,8 @@ func (m *ContentBatchItemMutation) Field(name string) (ent.Value, bool) {
 		return m.ChannelConnectionIds()
 	case contentbatchitem.FieldTiming:
 		return m.Timing()
+	case contentbatchitem.FieldGrid:
+		return m.Grid()
 	case contentbatchitem.FieldDraftID:
 		return m.DraftID()
 	case contentbatchitem.FieldCreatedAt:
@@ -26552,6 +26607,8 @@ func (m *ContentBatchItemMutation) OldField(ctx context.Context, name string) (e
 		return m.OldChannelConnectionIds(ctx)
 	case contentbatchitem.FieldTiming:
 		return m.OldTiming(ctx)
+	case contentbatchitem.FieldGrid:
+		return m.OldGrid(ctx)
 	case contentbatchitem.FieldDraftID:
 		return m.OldDraftID(ctx)
 	case contentbatchitem.FieldCreatedAt:
@@ -26637,6 +26694,13 @@ func (m *ContentBatchItemMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetTiming(v)
 		return nil
+	case contentbatchitem.FieldGrid:
+		v, ok := value.(*schema.BatchGrid)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrid(v)
+		return nil
 	case contentbatchitem.FieldDraftID:
 		v, ok := value.(string)
 		if !ok {
@@ -26703,6 +26767,9 @@ func (m *ContentBatchItemMutation) AddField(name string, value ent.Value) error 
 // mutation.
 func (m *ContentBatchItemMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(contentbatchitem.FieldGrid) {
+		fields = append(fields, contentbatchitem.FieldGrid)
+	}
 	if m.FieldCleared(contentbatchitem.FieldDraftID) {
 		fields = append(fields, contentbatchitem.FieldDraftID)
 	}
@@ -26720,6 +26787,9 @@ func (m *ContentBatchItemMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ContentBatchItemMutation) ClearField(name string) error {
 	switch name {
+	case contentbatchitem.FieldGrid:
+		m.ClearGrid()
+		return nil
 	case contentbatchitem.FieldDraftID:
 		m.ClearDraftID()
 		return nil
@@ -26760,6 +26830,9 @@ func (m *ContentBatchItemMutation) ResetField(name string) error {
 		return nil
 	case contentbatchitem.FieldTiming:
 		m.ResetTiming()
+		return nil
+	case contentbatchitem.FieldGrid:
+		m.ResetGrid()
 		return nil
 	case contentbatchitem.FieldDraftID:
 		m.ResetDraftID()

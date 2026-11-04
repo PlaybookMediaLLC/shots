@@ -97,6 +97,12 @@ func (_c *ContentBatchItemCreate) SetTiming(v schema.BatchTiming) *ContentBatchI
 	return _c
 }
 
+// SetGrid sets the "grid" field.
+func (_c *ContentBatchItemCreate) SetGrid(v *schema.BatchGrid) *ContentBatchItemCreate {
+	_c.mutation.SetGrid(v)
+	return _c
+}
+
 // SetDraftID sets the "draft_id" field.
 func (_c *ContentBatchItemCreate) SetDraftID(v string) *ContentBatchItemCreate {
 	_c.mutation.SetDraftID(v)
@@ -310,6 +316,10 @@ func (_c *ContentBatchItemCreate) createSpec() (*ContentBatchItem, *sqlgraph.Cre
 	if value, ok := _c.mutation.Timing(); ok {
 		_spec.SetField(contentbatchitem.FieldTiming, field.TypeJSON, value)
 		_node.Timing = value
+	}
+	if value, ok := _c.mutation.Grid(); ok {
+		_spec.SetField(contentbatchitem.FieldGrid, field.TypeJSON, value)
+		_node.Grid = value
 	}
 	if value, ok := _c.mutation.DraftID(); ok {
 		_spec.SetField(contentbatchitem.FieldDraftID, field.TypeString, value)
