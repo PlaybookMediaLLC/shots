@@ -119,6 +119,7 @@ import { ComposerToolbar } from './composer-toolbar'
 import { SelectionToolbarPlugin } from './selection-toolbar'
 import { SlashMenuPlugin } from './slash-menu'
 import { HashtagPlugins, HashtagsContext } from './hashtags'
+import { QuietShortcutPlugins } from './quiet-shortcuts'
 import {
   SocialMentionPlugin,
   SocialMentionInputPlugins,
@@ -159,6 +160,7 @@ const WRITE_PLUGINS = [
   SlashMenuPlugin,
   SelectionToolbarPlugin,
   ...HashtagPlugins,
+  ...QuietShortcutPlugins,
 ]
 
 /** What the save state reads as. */
