@@ -142,7 +142,7 @@ test(
     await expect(page.getByText('Creating your first 7 posts')).toBeVisible()
 
     // After onboarding, a card in the corner of the app reports how far enrichment got.
-    await app.open('/workspace')
+    await app.open('/settings')
     const card = page.getByRole('complementary', { name: 'Profile enrichment' })
     await expect(card).toContainText('Your profile is enriched', { timeout: 30_000 })
     await expect(card.getByRole('progressbar', { name: 'Enrichment progress' })).toHaveAttribute(

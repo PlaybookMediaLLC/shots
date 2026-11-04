@@ -65,7 +65,7 @@ test(
         ).status
       ).toBe(200)
 
-      await app.open('/workspace/notifications')
+      await app.open('/settings/notifications')
       await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
       await page.getByRole('button', { name: 'Connect Slack', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'Local Slack fixture' })).toBeVisible()
@@ -75,7 +75,7 @@ test(
         await browserJson(page, '/api/workspace/notifications')
       ).connections[0]!
 
-      await memberPage.goto('/workspace/notifications')
+      await memberPage.goto('/settings/notifications')
       await expect(
         memberPage.getByRole('button', { name: 'Delivery & Slack', exact: true })
       ).toHaveCount(0)

@@ -249,9 +249,9 @@ const PLATFORM_LABELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X' }
 
 /** Open a new draft from the Write library; returns its id. */
 export async function openNewDraft(page: Page): Promise<string> {
-  await page.goto('/write')
+  await page.goto('/publish')
   await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/write\/[a-z0-9]+/)
+  await page.waitForURL(/\/publish\/[a-z0-9]+/)
   await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
   return new URL(page.url()).pathname.split('/').pop() ?? ''
 }
@@ -264,9 +264,9 @@ export async function openNewBatch(
   page: Page,
   app: { open(path: string): Promise<void>; reload(): Promise<void> }
 ): Promise<string> {
-  await app.open('/write/batches')
+  await app.open('/publish/batches')
   await page.getByRole('button', { name: 'Start a batch', exact: true }).click()
-  await page.waitForURL(/\/write\/batches\/[^/]+$/)
+  await page.waitForURL(/\/publish\/batches\/[^/]+$/)
   await app.reload()
   await expect(page.getByTestId('bulk-batch')).toBeVisible()
   return new URL(page.url()).pathname.split('/').pop() ?? ''

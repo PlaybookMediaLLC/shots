@@ -262,7 +262,7 @@ export function ShareDialog({
                 </Button>
                 <Button asChild size="sm" variant="outline">
                   <a
-                    href={`/link-preview?${new URLSearchParams({ url })}`}
+                    href={`/publish/link-checks?${new URLSearchParams({ url })}`}
                     rel="noopener noreferrer"
                     target="_blank"
                   >

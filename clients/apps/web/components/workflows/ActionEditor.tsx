@@ -152,7 +152,7 @@ export function ActionEditor({
               Create and publish a brand kit, then return to this tab.{' '}
               <Link
                 className="underline"
-                href={`/workspace/brand-kit?returnTo=${returnTo}`}
+                href={`/settings/brand-kit?returnTo=${returnTo}`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -188,7 +188,7 @@ export function ActionEditor({
                 Connect a destination in{' '}
                 <Link
                   className="underline"
-                  href={`/workspace/channels?returnTo=${returnTo}`}
+                  href={`/settings/channels?returnTo=${returnTo}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

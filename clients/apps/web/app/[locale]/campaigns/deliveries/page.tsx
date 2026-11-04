@@ -1,52 +1,47 @@
+import { campaignLinks } from '@/lib/platform/navigation'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page, Pill } from '@/components/platform-ui'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
-import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
+import { AreaNavigation } from '@/components/platform-hub/AreaNavigation'
 import { notFound, redirect } from 'next/navigation'
 import { upgradePath } from '@/lib/auth/page-access'
 import { getCampaign, listCampaigns } from '@/lib/tenant/campaigns'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 import { CampaignLocalTime } from '@/components/campaigns/CampaignLocalTime'
 
-export const metadata = { title: 'Campaign deliveries' }
+export const metadata = { title: 'Deliveries · Campaigns' }
 export default async function CampaignDeliveries({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ campaign?: string; set?: string }>
+  searchParams: Promise<{ campaign?: string }>
 }) {
   const [{ locale }, query] = await Promise.all([params, searchParams])
-  const access = await requireDraftsPageAccess(locale, '/write/deliveries')
+  const access = await requireDraftsPageAccess(locale, '/campaigns/deliveries')
   // Campaigns need Pro, like the Campaigns area itself.
   if (!access.campaignWorkflowEnabled) notFound()
-  if (!access.hasPaidPlan) redirect(upgradePath(locale, '/write/deliveries'))
+  if (!access.hasPaidPlan) redirect(upgradePath(locale, '/campaigns/deliveries'))
   const campaigns = await listCampaigns(access.tenant)
   const selected = campaigns.find((campaign) => campaign.id === query.campaign)
   const campaign = selected ? await getCampaign(access.tenant, selected.id) : null
-  const scope = query.set ? `?set=${encodeURIComponent(query.set)}` : ''
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}
       organizationName={access.organization.name}
     >
-      <WorkspaceNav
-        active="deliveries"
-        campaigns
-        returnTo={`/write/deliveries${scope}`}
-        scope={scope}
-      />
       <Page
-        title="Campaign deliveries"
-        description="Campaign posts keep their original review and approval history. The Drafts calendar covers freeform writing; choose a campaign to inspect its delivery states."
+        title="Deliveries"
+        description="Campaign posts keep their original review and approval history. Choose a campaign to see where each of its posts is in delivery; freeform posts are in Publish › Calendar."
       >
+        <AreaNavigation label="Campaigns" items={campaignLinks(true)} />
         <nav aria-label="Choose campaign" className="flex flex-wrap gap-2">
           {campaigns.map((item) => (
             <SidebarLink
               key={item.id}
               aria-current={item.id === selected?.id ? 'page' : undefined}
               className="rounded-lg border px-3 py-2 text-sm aria-[current=page]:bg-muted"
-              href={`/write/deliveries?campaign=${item.id}${query.set ? `&set=${encodeURIComponent(query.set)}` : ''}`}
+              href={`/campaigns/deliveries?campaign=${item.id}`}
             >
               {item.name}
               {item.status === 'ARCHIVED' ? ' · Archived' : ''}

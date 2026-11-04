@@ -8,7 +8,7 @@ import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
 import { requireDraftsPageAccess } from '../../../drafts/page-access'
 import { loadWrite } from '../../write-data'
 
-export const metadata = { title: 'Posting times' }
+export const metadata = { title: 'Posting times · Analyze · Publish' }
 
 /** Analyze engagement in the selected social set, retaining Write and Plan context. */
 export default async function PostingTimesPage({
@@ -19,7 +19,7 @@ export default async function PostingTimesPage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const { locale } = await params
-  const access = await requireDraftsPageAccess(locale, '/write/analyze/posting-times')
+  const access = await requireDraftsPageAccess(locale, '/publish/analyze/posting-times')
   const data = await loadWrite(access.tenant, await searchParams)
   const set = data.activeSet
   const now = new Date()

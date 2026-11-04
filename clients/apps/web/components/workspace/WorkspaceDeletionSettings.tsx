@@ -87,7 +87,7 @@ export function WorkspaceDeletionRecovery({
     setIsRestoring(true)
     try {
       await trpcClient.workspace.cancelDeletion.mutate()
-      window.location.assign('/workspace')
+      window.location.assign('/settings')
     } catch (requestError) {
       setError(getErrorMessage(requestError))
       setIsRestoring(false)

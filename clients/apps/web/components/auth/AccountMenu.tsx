@@ -200,17 +200,17 @@ export function AccountMenu({
               <>
                 <Link
                   className="rounded-md px-2 py-2 text-sm hover:bg-muted"
-                  href="/workspace/account"
+                  href="/settings/account"
                 >
                   Profile
                 </Link>
                 <Link
                   className="rounded-md px-2 py-2 text-sm hover:bg-muted"
-                  href="/workspace/appearance"
+                  href="/settings/appearance"
                 >
                   Preferences
                 </Link>
-                <Link className="rounded-md px-2 py-2 text-sm hover:bg-muted" href="/workspace">
+                <Link className="rounded-md px-2 py-2 text-sm hover:bg-muted" href="/settings">
                   Settings
                 </Link>
               </>

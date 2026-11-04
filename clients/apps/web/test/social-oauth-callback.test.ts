@@ -50,7 +50,7 @@ test('X maps its OAuth 1 callback fields to the backend exchange', async () => {
     }
   )
   assert.equal(result.status, 303)
-  assert.equal(result.headers.get('Location'), '/workspace/channels?connected=x')
+  assert.equal(result.headers.get('Location'), '/settings/channels?connected=x')
   assert.deepEqual(calls, [['token', 'verifier']])
 })
 
@@ -69,7 +69,7 @@ test('Instagram Login forwards code and state without exposing the backend respo
     }
   )
   assert.equal(result.status, 303)
-  assert.equal(result.headers.get('Location'), '/workspace/channels?connected=instagram-standalone')
+  assert.equal(result.headers.get('Location'), '/settings/channels?connected=instagram-standalone')
   assert.deepEqual(calls, [['state1', 'code1']])
 })
 
@@ -113,7 +113,7 @@ test('Facebook Login requires a linked Instagram account selection', async () =>
     }
   )
   assert.equal(selected.status, 303)
-  assert.equal(selected.headers.get('Location'), '/workspace/channels?connected=instagram')
+  assert.equal(selected.headers.get('Location'), '/settings/channels?connected=instagram')
   assert.deepEqual(selections, [
     {
       provider: 'instagram',
@@ -174,12 +174,12 @@ test('page selection rejects cross-origin form submission', async () => {
 })
 
 for (const path of [
-  '/write/abcdefghij1234',
-  '/workspace/social-sets/abcdefghij1234',
+  '/publish/abcdefghij1234',
+  '/settings/publishing-brands/abcdefghij1234',
   '//evil.example',
-  '/write/abcdefghij1234?next=https://evil.example',
+  '/publish/abcdefghij1234?next=https://evil.example',
   'https://evil.example',
-  '/write/../workspace',
+  '/publish/../workspace',
 ]) {
   test(`OAuth return destination is confined to local drafts and brand settings: ${path}`, async () => {
     const result = await completeSocialOAuth(
@@ -191,7 +191,7 @@ for (const path of [
     )
     assert.equal(
       result.headers.get('Location'),
-      `${['/write/abcdefghij1234', '/workspace/social-sets/abcdefghij1234'].includes(path) ? path : '/workspace/channels'}?connected=linkedin`
+      `${['/publish/abcdefghij1234', '/settings/publishing-brands/abcdefghij1234'].includes(path) ? path : '/settings/channels'}?connected=linkedin`
     )
   })
 }
@@ -204,26 +204,26 @@ test('malformed OAuth return cookie falls back to channels', async () => {
     'linkedin',
     { exchange: async () => ({ id: 'connected' }) }
   )
-  assert.equal(result.headers.get('Location'), '/workspace/channels?connected=linkedin')
+  assert.equal(result.headers.get('Location'), '/settings/channels?connected=linkedin')
 })
 
 test('the immutable attempt return path overrides a cookie changed by another tab', async () => {
   const response = await completeSocialOAuth(
     new Request('http://localhost/integrations/social/x?oauth_token=state&oauth_verifier=code', {
-      headers: { cookie: 'shots-oauth-return=%2Fwrite%2Fanotherdraft1234' },
+      headers: { cookie: 'shots-oauth-return=%2Fpublish%2Fanotherdraft1234' },
     }),
     'x',
     {
       exchange: async () => ({ id: 'verified-account', completed: true }),
       returnTo: async (state) => {
         assert.equal(state, 'state')
-        return '/workspace/social-sets/originalset1234'
+        return '/settings/publishing-brands/originalset1234'
       },
     }
   )
   assert.equal(
     response.headers.get('Location'),
-    '/workspace/social-sets/originalset1234?connected=x'
+    '/settings/publishing-brands/originalset1234?connected=x'
   )
 })
 

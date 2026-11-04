@@ -15,7 +15,7 @@ export const apiGuide = `Shots turns a software release into a reviewed launch: 
 
 ## Quickstart
 
-1. Create a workspace API key in **Settings → Developer API** (\`${BASE_URL}/workspace/developers\`). Give it only the scopes it needs. The key is shown once.
+1. Create a workspace API key in **Settings → Developer API** (\`${BASE_URL}/settings/developers\`). Give it only the scopes it needs. The key is shown once.
 2. Send it in the \`X-API-Key\` header:
 
 \`\`\`bash

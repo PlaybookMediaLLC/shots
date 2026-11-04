@@ -7,7 +7,7 @@ test('an owner creates an agent key whose snippets carry it, and the key cannot 
   app,
   page,
 }) => {
-  await app.open('/workspace/ai-agents')
+  await app.open('/settings/ai-agents')
 
   await expect(page.getByRole('heading', { name: 'MCP server' })).toBeVisible()
   await expect(page.getByLabel('Server URL', { exact: true })).toHaveValue(/\/mcp$/)

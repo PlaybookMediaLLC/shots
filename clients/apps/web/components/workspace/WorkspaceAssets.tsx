@@ -454,7 +454,7 @@ export function WorkspaceAssets({
                                   draftAssetNode(asset),
                                 ],
                               },
-                              (id) => router.push(`/write/${encodeURIComponent(id)}`)
+                              (id) => router.push(`/publish/${encodeURIComponent(id)}`)
                             )
                           }
                         >

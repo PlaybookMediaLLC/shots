@@ -87,7 +87,7 @@ export default async function ReleasePage({
         {release.screenshotAssetIds?.length ? (
           <p className="text-sm">
             {release.screenshotAssetIds.length} screenshot asset(s) retained.{' '}
-            <Link className="underline" href="/assets">
+            <Link className="underline" href="/library?view=assets">
               Open workspace assets
             </Link>
           </p>

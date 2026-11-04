@@ -89,7 +89,7 @@ test('removal invalidates an outstanding media link and stale audit and notifica
     ]) {
       expect((await browserRequest(member, path)).status, path).toBe(200)
     }
-    await app.open('/workspace/members')
+    await app.open('/settings/members')
     await expect(page.getByText(email, { exact: true })).toBeVisible()
     expect(
       (

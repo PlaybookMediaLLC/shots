@@ -27,10 +27,10 @@ test('a returning Checkout opens the app only once a paid plan is in good standi
 })
 
 test('Checkout keeps the page the buyer was sent from, whether they pay or cancel', () => {
-  assert.deepEqual(checkoutRedirects('/write?set=abc'), {
-    cancel: '/pricing?checkout=cancelled&returnTo=%2Fwrite%3Fset%3Dabc',
+  assert.deepEqual(checkoutRedirects('/publish?set=abc'), {
+    cancel: '/pricing?checkout=cancelled&returnTo=%2Fpublish%3Fset%3Dabc',
     success:
-      '/api/billing/checkout/return?session_id={CHECKOUT_SESSION_ID}&returnTo=%2Fwrite%3Fset%3Dabc',
+      '/api/billing/checkout/return?session_id={CHECKOUT_SESSION_ID}&returnTo=%2Fpublish%3Fset%3Dabc',
   })
   assert.deepEqual(checkoutRedirects(), {
     cancel: '/pricing?checkout=cancelled',
@@ -44,7 +44,7 @@ test('a paid buyer returns to the page they asked for, before onboarding or the 
     asked += 1
     return '/onboarding/product?checkout=success'
   }
-  assert.equal(await pathAfterCheckout('success', '/write', appPath), '/write')
+  assert.equal(await pathAfterCheckout('success', '/publish', appPath), '/publish')
   assert.equal(asked, 0)
   assert.equal(
     await pathAfterCheckout('success', undefined, appPath),
@@ -52,8 +52,8 @@ test('a paid buyer returns to the page they asked for, before onboarding or the 
   )
   // Pricing waits for the webhook, then opens the same page.
   assert.equal(
-    await pathAfterCheckout('pending', '/write', appPath),
-    '/pricing?checkout=pending&returnTo=%2Fwrite'
+    await pathAfterCheckout('pending', '/publish', appPath),
+    '/pricing?checkout=pending&returnTo=%2Fpublish'
   )
   assert.equal(await pathAfterCheckout('pending', undefined, appPath), '/pricing?checkout=pending')
 })
@@ -61,7 +61,7 @@ test('a paid buyer returns to the page they asked for, before onboarding or the 
 test('only an in-app path is carried through Checkout', () => {
   const body = (returnTo: string) =>
     createBillingSessionContract.body.safeParse({ plan: 'pro', returnTo }).success
-  assert.equal(body('/write?set=abc'), true)
+  assert.equal(body('/publish?set=abc'), true)
   for (const unsafe of ['//evil.test', 'https://evil.test', '/\\evil.test', 'write'])
     assert.equal(body(unsafe), false, unsafe)
   // The return route has already been paid for: it drops a bad value instead of failing.

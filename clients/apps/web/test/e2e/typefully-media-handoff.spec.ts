@@ -32,7 +32,7 @@ test(
       buffer: png,
     })
     const [id] = await saveBatchDrafts(page)
-    const url = `/write/${id}`
+    const url = `/publish/${id}`
     const before = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
       assetIds: string[]
     }
@@ -106,7 +106,7 @@ test(
     })
     expect(created.status).toBe(201)
     await page.setViewportSize({ width: 1600, height: 1000 })
-    await app.open(`/write/${(created.body as { id: string }).id}`)
+    await app.open(`/publish/${(created.body as { id: string }).id}`)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const resize = page.getByRole('separator', { name: 'Resize preview sidebar' })
     const initialWidth = Number(await resize.getAttribute('aria-valuenow'))

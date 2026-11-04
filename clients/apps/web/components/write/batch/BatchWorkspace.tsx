@@ -867,7 +867,7 @@ export function BatchWorkspace({
 
   const archive = async () => {
     await call(`${base}/archive`, { method: 'POST' })
-    window.location.assign('/write')
+    window.location.assign('/publish')
   }
 
   const accountName = (id: string) =>
@@ -900,7 +900,7 @@ export function BatchWorkspace({
             variant="outline"
             disabled={busy !== null}
             onClick={() => {
-              if (window.confirm('Close this batch? Its drafts and scheduled posts stay in Write.'))
+              if (window.confirm('Close this batch? Its drafts and scheduled posts stay in Publish.'))
                 void archive()
             }}
           >
@@ -1033,7 +1033,7 @@ export function BatchWorkspace({
                   ))
                 ) : (
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/workspace/social-sets">Connect an account</Link>
+                    <Link href="/settings/publishing-brands">Connect an account</Link>
                   </Button>
                 )}
               </Row>
@@ -1272,7 +1272,7 @@ export function BatchWorkspace({
                       <Pill tone={status.tone}>{status.text}</Pill>
                       {item.draftId ? (
                         <Button asChild size="sm" variant="ghost">
-                          <a href={`/write/${item.draftId}`} target="_blank" rel="noreferrer">
+                          <a href={`/publish/${item.draftId}`} target="_blank" rel="noreferrer">
                             Open draft
                             <OutwardIcon />
                           </a>
@@ -1506,7 +1506,7 @@ export function BatchWorkspace({
                     ) : (
                       <p className="text-xs text-muted-foreground">
                         This brand has no connected accounts.{' '}
-                        <Link className="underline" href="/workspace/social-sets">
+                        <Link className="underline" href="/settings/publishing-brands">
                           Connect one
                         </Link>{' '}
                         to check and schedule posts.

@@ -10,7 +10,7 @@ import { listContentBatches } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 
-export const metadata = { title: 'Bulk scheduling' }
+export const metadata = { title: 'Bulk scheduling · Publish' }
 
 /** Open bulk batches, and a way to start one in a publishing brand. */
 export default async function BatchesPage({
@@ -21,7 +21,7 @@ export default async function BatchesPage({
   searchParams: Promise<{ set?: string }>
 }) {
   const [{ locale }, query] = await Promise.all([params, searchParams])
-  const access = await requireDraftsPageAccess(locale, '/write/batches')
+  const access = await requireDraftsPageAccess(locale, '/publish/batches')
   const [{ batches }, sets] = await Promise.all([
     listContentBatches(access.tenant),
     listSocialSets(access.tenant),
@@ -52,7 +52,7 @@ export default async function BatchesPage({
               </Group>
             ) : (
               <Button asChild variant="outline" className="w-fit">
-                <Link href="/workspace/social-sets">Connect a social account to start a batch</Link>
+                <Link href="/settings/publishing-brands">Connect a social account to start a batch</Link>
               </Button>
             )}
           </Section>
@@ -65,7 +65,7 @@ export default async function BatchesPage({
                   key={batch.id}
                   layout="inline"
                   label={
-                    <SidebarLink className="hover:underline" href={`/write/batches/${batch.id}`}>
+                    <SidebarLink className="hover:underline" href={`/publish/batches/${batch.id}`}>
                       {batch.title}
                     </SidebarLink>
                   }

@@ -18,11 +18,11 @@ test(
     await expect(dialog.getByLabel('Open a new draft after scheduling')).toBeChecked()
     await dialog.getByRole('button', { name: /^Confirm schedule/ }).click()
     await page.waitForURL(
-      (url) => /\/write\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(original)
+      (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(original)
     )
     await expect(draftEditor(page)).not.toContainText('A scheduled post followed')
     await expect(page.getByTestId('platform-tab-x')).toBeVisible()
-    await app.open('/write?tab=queue')
+    await app.open('/publish?tab=queue')
     await expect(page.getByTestId('write-rail')).toContainText(
       'A scheduled post followed by a fresh draft'
     )
@@ -61,7 +61,7 @@ test(
     await expectSaved(page)
     await page.getByRole('button', { name: 'Open as quote draft', exact: true }).click()
     await page.waitForURL(
-      (url) => /\/write\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(original)
+      (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(original)
     )
     await expect(draftEditor(page)).toContainText('My commentary')
     await app.reload()

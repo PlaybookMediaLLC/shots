@@ -59,7 +59,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   })
   expect(sourceDraft.status, JSON.stringify(sourceDraft.body)).toBe(201)
   const sourceId = (sourceDraft.body as { id: string }).id
-  await app.open(`/write/plan?day=${day}`)
+  await app.open(`/publish/calendar?day=${day}`)
   await test.step('P01 Calendar retains shared Publish navigation', async () => {
     await expect(page.getByRole('link', { name: 'Analyze', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Drafts', exact: true }).first()).toBeVisible()
@@ -232,7 +232,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       body: { plannedFor, timeZone: 'UTC', baseCalendarVersion: overlapping.calendarVersion },
     })
     expect(planned.status, JSON.stringify(planned.body)).toBe(200)
-    await app.open(`/write/plan?day=${day}`)
+    await app.open(`/publish/calendar?day=${day}`)
     await page.getByLabel('Calendar view').selectOption('week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
     const other = page
@@ -418,7 +418,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(page.getByText('Original scheduling timezone:', { exact: false })).toBeVisible()
     // Plan never commits a schedule itself: it opens the draft's own review at that time.
     await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
-    await page.waitForURL(new RegExp(`/write/${draftId}\\?.*panel=schedule`))
+    await page.waitForURL(new RegExp(`/publish/${draftId}\\?.*panel=schedule`))
     const review = page.getByTestId('schedule-dialog')
     await expect(review.getByTestId('schedule-summary')).toContainText('America/New_York')
     await expect(review.getByTestId('destinations')).toBeVisible()
@@ -431,7 +431,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     )
     expect(scheduled.rows.length).toBeGreaterThan(0)
     expect(scheduled.rows.every((r) => r.status === 'SCHEDULED')).toBe(true)
-    await app.open(`/write/plan?day=${day}`)
+    await app.open(`/publish/calendar?day=${day}`)
     await expect(
       page.getByTestId('calendar-post').filter({ hasText: 'A planned post', visible: true })
     ).toBeVisible()
@@ -579,7 +579,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     'INSERT INTO analytics_snapshot (id,"organizationId","connectionId","subjectId",kind,"observedAt",counters,"payloadHash") VALUES ($1,$2,$3,$3,\'account\',$4,\'{"followers":1200000}\',$5)',
     [randomUUID(), workspace.id, workspace.channels.x, observed, randomUUID()]
   )
-  await app.open(`/write/analyze?account=${workspace.channels.x}&limit=1`)
+  await app.open(`/publish/analyze?account=${workspace.channels.x}&limit=1`)
   await test.step('A01 A06 A07 all seven areas show account scope and exact accessible totals', async () => {
     await expect(page.getByLabel('Analytics account')).toHaveValue(workspace.channels.x)
     for (const title of [

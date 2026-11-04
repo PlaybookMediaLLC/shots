@@ -75,7 +75,7 @@ export function SocialSetNotifications({
           Loading publishing brands…
         </p>
       ) : isPlanRefusal(sets.error) ? (
-        <PlanRequired from="/workspace/notifications">
+        <PlanRequired from="/settings/notifications">
           Publishing brands, and notifications for each, need Pro.
         </PlanRequired>
       ) : sets.isError ? (

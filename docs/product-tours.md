@@ -50,8 +50,8 @@ The framework follows the guided tour in the Canvas web app
 - The current step is kept for the browser tab, so a tour continues when it
   opens the page of its next step. Before it opens a page, it runs the same
   save guards as a sidebar link (`prepareLinkNavigation`).
-- A step `route` covers its page and the pages under it: `/write` also covers
-  an open draft at `/write/<id>`. When the person opens a page outside the
+- A step `route` covers its page and the pages under it: `/publish` also covers
+  an open draft at `/publish/<id>`. When the person opens a page outside the
   route, the tour ends. It is not marked as seen. A tour whose steps have no
   `route`, such as the workspace tour, continues on every page, because its
   elements are in the sidebar.

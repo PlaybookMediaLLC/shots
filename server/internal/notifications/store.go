@@ -528,12 +528,12 @@ func href(kind, id string, row map[string]any) string {
 	case "release_automation_run":
 		return "/workflows/runs/" + id
 	case "content_draft":
-		return "/drafts/" + id
+		return "/publish/" + id
 	case "scheduled_post":
 		if d, _ := row["contentDraftId"].(string); d != "" {
-			return "/drafts/" + url.PathEscape(d)
+			return "/publish/" + url.PathEscape(d)
 		}
-		return "/drafts/calendar"
+		return "/publish/calendar"
 	case "launch_run", "campaign_plan", "release_spec", "creative_variant":
 		if c, _ := row["campaignId"].(string); c != "" {
 			step := ""
@@ -550,15 +550,15 @@ func href(kind, id string, row map[string]any) string {
 		}
 		return "/campaigns"
 	case "asset":
-		return "/assets"
+		return "/library?view=assets"
 	case "project", "store_review":
-		return "/projects"
+		return "/library"
 	case "product_surface", "deployment_event":
-		return "/workspace/product-pages"
+		return "/settings/product-pages"
 	case "integration_connection", "channel_connection", "source_app":
-		return "/workspace/integrations"
+		return "/settings/integrations"
 	case "member", "invitation", "organization", "workspace":
-		return "/workspace/members"
+		return "/settings/members"
 	default:
 		return "/product/release-intake"
 	}

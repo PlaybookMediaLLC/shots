@@ -17,18 +17,21 @@ import {
   SidebarIcon,
 } from './icons'
 import {
+  AREA_LINKS,
+  type AreaLink,
   areaLocked,
+  campaignLinks,
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
   withPublishAccess,
 } from '@/lib/platform/navigation'
-import { AREA_LINKS, type AreaLink, AreaSubNav } from '@/components/platform-hub/AreaNavigation'
+import { AreaSubNav } from '@/components/platform-hub/AreaNavigation'
 import { SearchButton, ShellActions, ShellSearch } from './ShellActions'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { Suspense, useCallback, useState, useSyncExternalStore } from 'react'
 import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 import { AccountMenu } from '@/components/auth/AccountMenu'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -46,6 +49,7 @@ import { NavRow, type NavIcon } from './NavRow'
 import { ProductTourMenu } from './ProductTour'
 import { SidebarLink } from './SidebarLink'
 import { SettingsNav } from '@/components/settings/SettingsNav'
+import { RememberVisits } from './PageVisits'
 import { ThemeToggle } from './ThemeToggle'
 
 type NavItem = {
@@ -91,6 +95,7 @@ function NavLink({
   const t = useTranslations('platformNavigation')
   const pathname = usePathname()
   const active = platformArea(pathname) === platformArea(href)
+  const listed = active && subs && !collapsed && !locked
   return (
     <>
       <NavRow
@@ -109,9 +114,10 @@ function NavLink({
         label={t(key)}
         name={locked ? `${t(key)} (Pro)` : undefined}
         onNavigate={onNavigate}
+        section={Boolean(listed)}
         tourId={`nav-${key}`}
       />
-      {active && subs && !collapsed && !locked ? (
+      {listed ? (
         <AreaSubNav items={subs} label={t(key)} onNavigate={onNavigate} />
       ) : null}
     </>
@@ -169,9 +175,11 @@ function Navigation({
                 subs={
                   item.key === 'publish'
                     ? draftsEnabled
-                      ? publishLinks('', undefined, campaignsEnabled)
+                      ? publishLinks()
                       : undefined
-                    : AREA_LINKS[item.key]
+                    : item.key === 'campaigns'
+                      ? campaignLinks(draftsEnabled)
+                      : AREA_LINKS[item.key]
                 }
               />
             ))}
@@ -281,12 +289,15 @@ function SidebarFooter({
         )}
       >
         {collapsed || settings ? null : (
-          <SidebarLink
+          // The docs open beside the app, so reading them never leaves your work.
+          <a
             className="me-auto flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             href="/docs"
+            rel="noopener"
+            target="_blank"
           >
             Documentation <OutwardIcon aria-hidden="true" size={14} />
-          </SidebarLink>
+          </a>
         )}
         {/* The settings sidebar lists its own sections, not the places the tours show. */}
         {settings ? null : <ProductTourMenu />}
@@ -433,6 +444,9 @@ export function PlatformSidebar({
 
   return (
     <>
+      <Suspense fallback={null}>
+        <RememberVisits />
+      </Suspense>
       <ShellSearch
         campaignsEnabled={campaignsEnabled}
         // Posts are searched only where the plan can read them.

@@ -8,7 +8,7 @@ test('personal accent applies with contrast, survives reload and restores after 
 }) => {
   const errors: string[] = []
   page.on('pageerror', (error) => errors.push(error.message))
-  await app.open('/workspace/appearance')
+  await app.open('/settings/appearance')
   const color = page.getByLabel('Accent color', { exact: true })
   await expect(color).toBeEnabled()
   await color.fill('#ffe500')

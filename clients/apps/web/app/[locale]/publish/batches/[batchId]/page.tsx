@@ -7,7 +7,7 @@ import { getContentBatch } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../../drafts/page-access'
 
-export const metadata = { title: 'Bulk batch' }
+export const metadata = { title: 'Bulk batch · Publish' }
 
 /** One batch: its items, uploads, checks and results, reopened from the backend. */
 export default async function BatchPage({
@@ -18,7 +18,7 @@ export default async function BatchPage({
   const { locale, batchId } = await params
   const access = await requireDraftsPageAccess(
     locale,
-    `/write/batches/${encodeURIComponent(batchId)}`
+    `/publish/batches/${encodeURIComponent(batchId)}`
   )
   const [batch, sets] = await Promise.all([
     getContentBatch(access.tenant, batchId),
