@@ -102,7 +102,9 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   the caret's line (`gutter`) with no extra margin; the typed query is also
   written to the input node's `value` (outside undo history), so a save while
   the input is open keeps the text; the query applies synchronously instead
-  of in a `startTransition`, so Enter right after typing runs the best match.
+  of in a `startTransition`, so Enter right after typing runs the best match;
+  Backspace at the start of the query reads the caret from the input, since
+  Plate's tracked cursor state can lag a Backspace typed right after `/`.
 - `src/ui/remote-cursor-overlay.tsx`: carets of the same user's other tabs
   are not drawn; a collaborator's name shows for two seconds after their
   caret moves and on hover, then fades to the caret.

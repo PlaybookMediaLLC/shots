@@ -315,6 +315,19 @@ function InlineComboboxInput({
               refocus();
               return;
             }
+            // Backspace at the query's start removes the trigger. Read the caret from the
+            // input: Plate's tracked cursor state lags a keystroke typed right after "/".
+            const input = event.currentTarget;
+            if (
+              event.key === "Backspace" &&
+              !event.altKey && !event.ctrlKey && !event.metaKey &&
+              input.selectionStart === 0 && input.selectionEnd === 0
+            ) {
+              event.preventDefault();
+              cancelInput("backspace");
+              refocus();
+              return;
+            }
             if (
               event.key === " " &&
               (closeOnSpace === "always" || (closeOnSpace === "empty" && !value))
