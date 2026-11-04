@@ -8,7 +8,7 @@ test(
     await startWorkspace({ channels: ['x', 'linkedin'] })
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
-    await app.open('/write')
+    await app.open('/publish')
     // Hold creation so the first keystrokes necessarily precede the route and collab sync.
     await page.route('**/api/v1/content-drafts', async (route) => {
       if (route.request().method() === 'POST')
@@ -19,7 +19,7 @@ test(
     const early = page.getByRole('textbox', { name: 'New draft text' })
     await expect(early).toBeFocused()
     await page.keyboard.type('Hello world from QA')
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const id = new URL(page.url()).pathname.split('/').pop()!
     const editor = draftEditor(page)
     await expect(early).toBeHidden({ timeout: 60_000 })
@@ -168,7 +168,7 @@ test(
       .getByRole('alertdialog')
       .getByRole('button', { name: 'Delete drafts', exact: true })
       .click()
-    await expect(page).toHaveURL(/\/write(?:\?|$)/)
+    await expect(page).toHaveURL(/\/publish(?:\?|$)/)
     await expect(
       page.getByTestId('draft-row').filter({ hasText: 'Retry keeps this title' })
     ).toHaveCount(0)
@@ -203,7 +203,7 @@ test(
       .getByRole('dialog', { name: 'New draft' })
       .getByRole('button', { name: 'Retry' })
       .click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     await expect(early).toBeHidden({ timeout: 60_000 })
     await expect(draftEditor(page)).toContainText('Words typed straight away')
     await expectSaved(page)

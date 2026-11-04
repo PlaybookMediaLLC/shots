@@ -119,7 +119,7 @@ export function DeliverPanel({ link, render }: { link: ShareLink; render: () => 
       ) : integrations.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           Connect Slack, Notion, or Figma in{' '}
-          <Link className="underline" href="/workspace/integrations">
+          <Link className="underline" href="/settings/integrations">
             workspace integrations
           </Link>{' '}
           to send published designs there.

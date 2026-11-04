@@ -12,6 +12,8 @@ import type { AppRouter } from '@/lib/trpc/router'
 
 const { JSDOM } = createRequire(import.meta.url)('jsdom')
 const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost' })
+// jsdom lays nothing out; Radix Select scrolls its chosen option into view.
+dom.window.HTMLElement.prototype.scrollIntoView = () => {}
 const globals = Object.getOwnPropertyDescriptors(globalThis)
 const browser = {
   window: dom.window,
@@ -19,6 +21,25 @@ const browser = {
   document: dom.window.document,
   navigator: dom.window.navigator,
   getComputedStyle: dom.window.getComputedStyle.bind(dom.window),
+  // Radix Select checks whether it sits in a form and portals its menu; Collapsible measures on the next frame.
+  ...Object.fromEntries(
+    [
+      'CustomEvent',
+      'DocumentFragment',
+      'Element',
+      'Event',
+      'FocusEvent',
+      'HTMLElement',
+      'HTMLFormElement',
+      'KeyboardEvent',
+      'MouseEvent',
+      'MutationObserver',
+      'Node',
+    ].map((name) => [name, dom.window[name]])
+  ),
+  requestAnimationFrame: (callback: (time: number) => void) =>
+    setTimeout(() => callback(Date.now()), 0),
+  cancelAnimationFrame: (id: ReturnType<typeof setTimeout>) => clearTimeout(id),
   fetch: backend,
   IS_REACT_ACT_ENVIRONMENT: true,
 }
@@ -225,6 +246,23 @@ async function type(selector: string, value: string) {
   await act(async () => field.dispatchEvent(new dom.window.Event(event, { bubbles: true })))
 }
 
+/** Pick a Select option with the keyboard, as jsdom has no pointer: open, then Enter on the option. */
+async function choose(selector: string, name: RegExp) {
+  const key = (target: Element) =>
+    act(async () => {
+      ;(target as HTMLElement).focus()
+      target.dispatchEvent(new dom.window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }))
+    })
+  await key(element(selector))
+  await settle()
+  const option = [...document.querySelectorAll('[role="option"]')].find((item) =>
+    name.test(item.textContent ?? '')
+  )
+  assert.ok(option, `missing option ${name}`)
+  await key(option)
+  await settle()
+}
+
 async function click(name: string) {
   const button = [...document.querySelectorAll('button')].find((item) => item.textContent === name)
   assert.ok(button, `missing button ${name}`)
@@ -280,7 +318,7 @@ test('a save refused before the newer revision was fetched offers the reload', a
 test('preview and save submit the same normalized policy', async () => {
   revisions = [savedPolicy]
   await mount()
-  await type('#production-observation', 'observation')
+  await choose('#production-observation', /^deployment_status · 1 · /)
   await type('#production-environments', ' production \n')
   await type('#production-refs', '')
   await type('#production-jobs', 'deploy\n\n')

@@ -216,7 +216,7 @@ function ProviderForm({
               Sign in again
             </a>
           ) : /two-factor/i.test(error) ? (
-            <a className="underline underline-offset-4" href="/workspace/security">
+            <a className="underline underline-offset-4" href="/settings/security">
               Turn on two-factor
             </a>
           ) : null}

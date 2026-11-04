@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { ApprovalSetting } from '@/components/drafts/ApprovalSetting'
 import { AccountSettings } from '@/components/settings/AccountSettings'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { DeveloperTools } from '@/components/settings/DeveloperTools'
@@ -77,7 +78,7 @@ const SETTINGS_CONTENT = {
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
-  'social-sets': ({ can, socialSet }) =>
+  'social-sets': ({ can, draftsEnabled, socialSet }) =>
     socialSet ? (
       <SocialSetSettings
         id={socialSet.id}
@@ -90,7 +91,10 @@ const SETTINGS_CONTENT = {
         }}
       />
     ) : (
-      <SocialSetList canManage={can('workspace:update')} />
+      <>
+        <SocialSetList canManage={can('workspace:update')} />
+        {draftsEnabled ? <ApprovalSetting canManage={can('publish:manage')} /> : null}
+      </>
     ),
   channels: ({ can }) => <ChannelConnections canManage={can('connection:manage')} />,
   integrations: ({ can }) => (

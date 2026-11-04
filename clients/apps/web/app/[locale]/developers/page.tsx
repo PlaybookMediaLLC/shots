@@ -165,7 +165,7 @@ export default function DevelopersPage() {
             </h2>
             <p className="leading-relaxed text-muted-foreground">
               Create a workspace API key in Settings → Developer API
-              (<code>/workspace/developers</code>). Utility endpoints such as{" "}
+              (<code>/settings/developers</code>). Utility endpoints such as{" "}
               <code>/api/screenshot</code> accept a key with the artifact:read scope in{" "}
               <code>X-API-Key</code> or a signed-in session, and per-IP limits
               apply on top. Workspace-scoped <code>/api/v1</code> operations

@@ -60,5 +60,5 @@ export class ShotsClient {
     const to = new Date(Date.now() + 90 * 86400_000).toISOString()
     return z.object({items: z.array(z.object({id:z.string(),draftId:z.string(),draftTitle:z.string(),caption:z.string(),platform:z.string(),status:z.string(),scheduledFor:z.string()}))}).parse(await this.request(`/api/v1/content-draft-posts?${new URLSearchParams({from, to})}`)).items
   }
-  draftURL(id: string) { return `${this.origin}/write/${encodeURIComponent(id)}` }
+  draftURL(id: string) { return `${this.origin}/publish/${encodeURIComponent(id)}` }
 }

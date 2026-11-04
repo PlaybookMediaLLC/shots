@@ -105,6 +105,20 @@ func (_u *UserPreferenceUpdate) SetNillableWeekStart(v *userpreference.WeekStart
 	return _u
 }
 
+// SetTimeFormat sets the "time_format" field.
+func (_u *UserPreferenceUpdate) SetTimeFormat(v userpreference.TimeFormat) *UserPreferenceUpdate {
+	_u.mutation.SetTimeFormat(v)
+	return _u
+}
+
+// SetNillableTimeFormat sets the "time_format" field if the given value is not nil.
+func (_u *UserPreferenceUpdate) SetNillableTimeFormat(v *userpreference.TimeFormat) *UserPreferenceUpdate {
+	if v != nil {
+		_u.SetTimeFormat(*v)
+	}
+	return _u
+}
+
 // SetTextDirection sets the "text_direction" field.
 func (_u *UserPreferenceUpdate) SetTextDirection(v userpreference.TextDirection) *UserPreferenceUpdate {
 	_u.mutation.SetTextDirection(v)
@@ -264,6 +278,11 @@ func (_u *UserPreferenceUpdate) check() error {
 			return &ValidationError{Name: "week_start", err: fmt.Errorf(`ent: validator failed for field "UserPreference.week_start": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TimeFormat(); ok {
+		if err := userpreference.TimeFormatValidator(v); err != nil {
+			return &ValidationError{Name: "time_format", err: fmt.Errorf(`ent: validator failed for field "UserPreference.time_format": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TextDirection(); ok {
 		if err := userpreference.TextDirectionValidator(v); err != nil {
 			return &ValidationError{Name: "text_direction", err: fmt.Errorf(`ent: validator failed for field "UserPreference.text_direction": %w`, err)}
@@ -301,6 +320,9 @@ func (_u *UserPreferenceUpdate) sqlSave(ctx context.Context) (_node int, err err
 	}
 	if value, ok := _u.mutation.WeekStart(); ok {
 		_spec.SetField(userpreference.FieldWeekStart, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.TimeFormat(); ok {
+		_spec.SetField(userpreference.FieldTimeFormat, field.TypeEnum, value)
 	}
 	if value, ok := _u.mutation.TextDirection(); ok {
 		_spec.SetField(userpreference.FieldTextDirection, field.TypeEnum, value)
@@ -426,6 +448,20 @@ func (_u *UserPreferenceUpdateOne) SetWeekStart(v userpreference.WeekStart) *Use
 func (_u *UserPreferenceUpdateOne) SetNillableWeekStart(v *userpreference.WeekStart) *UserPreferenceUpdateOne {
 	if v != nil {
 		_u.SetWeekStart(*v)
+	}
+	return _u
+}
+
+// SetTimeFormat sets the "time_format" field.
+func (_u *UserPreferenceUpdateOne) SetTimeFormat(v userpreference.TimeFormat) *UserPreferenceUpdateOne {
+	_u.mutation.SetTimeFormat(v)
+	return _u
+}
+
+// SetNillableTimeFormat sets the "time_format" field if the given value is not nil.
+func (_u *UserPreferenceUpdateOne) SetNillableTimeFormat(v *userpreference.TimeFormat) *UserPreferenceUpdateOne {
+	if v != nil {
+		_u.SetTimeFormat(*v)
 	}
 	return _u
 }
@@ -602,6 +638,11 @@ func (_u *UserPreferenceUpdateOne) check() error {
 			return &ValidationError{Name: "week_start", err: fmt.Errorf(`ent: validator failed for field "UserPreference.week_start": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.TimeFormat(); ok {
+		if err := userpreference.TimeFormatValidator(v); err != nil {
+			return &ValidationError{Name: "time_format", err: fmt.Errorf(`ent: validator failed for field "UserPreference.time_format": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TextDirection(); ok {
 		if err := userpreference.TextDirectionValidator(v); err != nil {
 			return &ValidationError{Name: "text_direction", err: fmt.Errorf(`ent: validator failed for field "UserPreference.text_direction": %w`, err)}
@@ -656,6 +697,9 @@ func (_u *UserPreferenceUpdateOne) sqlSave(ctx context.Context) (_node *UserPref
 	}
 	if value, ok := _u.mutation.WeekStart(); ok {
 		_spec.SetField(userpreference.FieldWeekStart, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.TimeFormat(); ok {
+		_spec.SetField(userpreference.FieldTimeFormat, field.TypeEnum, value)
 	}
 	if value, ok := _u.mutation.TextDirection(); ok {
 		_spec.SetField(userpreference.FieldTextDirection, field.TypeEnum, value)

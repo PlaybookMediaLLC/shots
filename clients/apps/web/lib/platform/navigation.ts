@@ -6,11 +6,11 @@ export const PLATFORM_DESTINATIONS = [
   { href: '/home', label: 'Home', key: 'home' },
   { href: '/create', label: 'Create', key: 'create' },
   { href: '/campaigns', label: 'Campaigns', key: 'campaigns' },
-  { href: '/write', label: 'Publish', key: 'publish' },
+  { href: '/publish', label: 'Publish', key: 'publish' },
   { href: '/library', label: 'Library', key: 'library' },
   { href: '/workflows', label: 'Automate', key: 'automate' },
   { href: '/activity', label: 'Activity', key: 'activity' },
-  { href: '/workspace', label: 'Settings', key: 'settings' },
+  { href: '/settings', label: 'Settings', key: 'settings' },
 ] as const
 
 export type PlatformArea = (typeof PLATFORM_DESTINATIONS)[number]['key']
@@ -70,17 +70,87 @@ export function matchesDestination(key: PlatformArea, label: string, query: stri
   )
 }
 
+/** One page of an area, as a link. */
+export type AreaLink = { href: string; label: string }
+
+/** One row of Library categories: each kind of project, then reusable resources. */
+export const LIBRARY_LINKS = [
+  { href: '/library', label: 'Screenshots' },
+  { href: '/library?type=canvas', label: 'Canvas' },
+  { href: '/library?type=story', label: 'Story Sets' },
+  { href: '/library?type=store', label: 'Store screenshots' },
+  { href: '/library?view=assets', label: 'Assets' },
+  { href: '/library?view=brand', label: 'Brand assets' },
+]
+const CAMPAIGN_LINKS = [
+  { href: '/campaigns', label: 'All campaigns' },
+  { href: '/campaigns/releases', label: 'Release inbox' },
+  { href: '/campaigns/deliveries', label: 'Deliveries' },
+  { href: '/campaigns?status=ARCHIVED', label: 'Archived' },
+]
+export const AUTOMATE_LINKS = [
+  { href: '/workflows', label: 'Workflows' },
+  { href: '/workflows/runs', label: 'Runs' },
+  { href: '/workflows/deployments', label: 'Deployments' },
+  { href: '/workflows?view=sources', label: 'Sources' },
+]
+export const CREATE_LINKS = [
+  { href: '/create', label: 'New' },
+  { href: '/create?view=recent', label: 'Recent' },
+  { href: '/create?view=templates', label: 'Templates' },
+  { href: '/create?view=tools', label: 'Tools' },
+]
+
+/** Campaigns' pages; Deliveries lists posts, so it needs content drafts (PLATFORM_CONTENT_DRAFTS). */
+export function campaignLinks(draftsEnabled: boolean): AreaLink[] {
+  return draftsEnabled
+    ? CAMPAIGN_LINKS
+    : CAMPAIGN_LINKS.filter((link) => link.href !== '/campaigns/deliveries')
+}
+
 /**
- * One Publish vocabulary for every page in the area; `scope` keeps the publishing brand.
- * Campaign deliveries only shows where campaigns can be used (a paid plan in the rollout).
+ * Each area's pages, for the sidebar and the page tabs. Publish's pages carry
+ * the publishing brand and Campaigns' depend on drafts, so they come from
+ * `publishLinks` and `campaignLinks` instead.
  */
-export function publishLinks(scope = '', returnTo = `/write${scope}`, campaigns = true) {
+export const AREA_LINKS: Partial<Record<PlatformArea, AreaLink[]>> = {
+  automate: AUTOMATE_LINKS,
+  create: CREATE_LINKS,
+  library: LIBRARY_LINKS,
+}
+
+/**
+ * The link among `items` a page (a pathname without its locale) is on: its
+ * path and query match, a link without a query only wins when no more
+ * specific sibling matches, and failing both, the link to this path.
+ */
+export function activeLink<T extends { href: string }>(
+  items: readonly T[],
+  pathname: string,
+  params: URLSearchParams
+): T | undefined {
+  const matches = (href: string) => {
+    const [path, query] = href.split('?')
+    return (
+      pathname === path &&
+      [...new URLSearchParams(query)].every(([key, value]) => params.get(key) === value)
+    )
+  }
+  return (
+    items.find((item) => item.href.includes('?') && matches(item.href)) ??
+    items.find((item) => matches(item.href)) ??
+    // A link that only carries context, like a publishing brand, still marks its page.
+    items.find((item) => item.href.split('?')[0] === pathname)
+  )
+}
+
+/** One Publish vocabulary for every page in the area; `scope` keeps the publishing brand. */
+export function publishLinks(scope = '') {
   return [
-    { href: `/write${scope}`, label: 'Drafts' },
-    { href: `/write/plan${scope}`, label: 'Calendar' },
-    { href: `/write/analyze${scope}`, label: 'Analyze' },
-    ...(campaigns ? [{ href: `/write/deliveries${scope}`, label: 'Campaign deliveries' }] : []),
-    { href: `/link-preview?returnTo=${encodeURIComponent(returnTo)}`, label: 'Link checks' },
+    { href: `/publish${scope}`, label: 'Drafts' },
+    { href: `/publish/calendar${scope}`, label: 'Calendar' },
+    { href: `/publish/analyze${scope}`, label: 'Analyze' },
+    { href: `/publish/link-checks${scope}`, label: 'Link checks' },
   ]
 }
 
@@ -89,7 +159,7 @@ export function withPublishAccess<T extends { href: string; key: string }>(
   item: T,
   draftsEnabled: boolean
 ): T {
-  return item.key === 'publish' && !draftsEnabled ? { ...item, href: '/link-preview' } : item
+  return item.key === 'publish' && !draftsEnabled ? { ...item, href: '/publish/link-checks' } : item
 }
 
 const ROUTES: [PlatformArea, string[]][] = [
@@ -108,11 +178,11 @@ const ROUTES: [PlatformArea, string[]][] = [
     ],
   ],
   ['campaigns', ['/campaigns', '/releases']],
-  ['publish', ['/write', '/drafts', '/link-preview']],
-  ['library', ['/library', '/projects', '/assets']],
+  ['publish', ['/publish', '/drafts']],
+  ['library', ['/library']],
   ['automate', ['/workflows']],
   ['activity', ['/activity']],
-  ['settings', ['/workspace']],
+  ['settings', ['/settings']],
 ]
 
 /** Match complete path segments, including localized legacy URLs. */
@@ -164,7 +234,6 @@ export function paidCapability(from: string | null | undefined): string | null {
     ['/tweet', 'Post images'],
     ['/projects', 'Library'],
     ['/assets', 'Library'],
-    ['/write/deliveries', 'Campaign deliveries'],
   ]
   const tool = tools.find(([route]) => path === route || path.startsWith(`${route}/`))
   if (tool) return tool[1]

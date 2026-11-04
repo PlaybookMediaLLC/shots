@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { WriteData } from '@/app/[locale]/write/write-data'
+import type { WriteData } from '@/app/[locale]/publish/write-data'
 import { libraryDraft, libraryQuery } from '@/lib/write/library'
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
@@ -272,7 +272,7 @@ export function draftHref(id: string, setId?: string | null, panel?: string): st
   const query = new URLSearchParams()
   if (setId) query.set('set', setId)
   if (panel) query.set('panel', panel)
-  return `/write/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
+  return `/publish/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
 }
 
 /** "now", "5m", "3h", "2d", then a date: how long ago something happened. */

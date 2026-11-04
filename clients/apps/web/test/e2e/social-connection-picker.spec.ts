@@ -80,7 +80,7 @@ test(
       await createWorkspace(identity, page)
       await enableTwoFactor(page, identity.password)
       organizationId = await bindTestGoOrganization(page)
-      await app.open('/workspace/social-sets?picker=preserve')
+      await app.open('/settings/publishing-brands?picker=preserve')
       await expect(page.getByText('No publishing brands yet', { exact: true })).toBeVisible()
       expect(await list()).toHaveLength(0)
       const originalURL = page.url()
@@ -158,7 +158,7 @@ test(
       // Switch in another tab while the first tab is still at the provider.
       const otherTab = await context.newPage()
       try {
-        await otherTab.goto('/workspace/social-sets')
+        await otherTab.goto('/settings/publishing-brands')
         const other = await apiRequest(otherTab, '/api/auth/organization/create', {
           method: 'POST',
           body: { name: 'Another product', slug: `callback-${randomUUID()}` },
@@ -214,7 +214,7 @@ test(
       } finally {
         await otherTab.close()
       }
-      await expect(page).toHaveURL(/\/workspace\/social-sets\/[a-z0-9]+\?connected=x$/)
+      await expect(page).toHaveURL(/\/settings\/publishing-brands\/[a-z0-9]+\?connected=x$/)
       const sets = await list()
       expect(sets).toHaveLength(1)
       const created = socialSetSchema.parse(sets[0])

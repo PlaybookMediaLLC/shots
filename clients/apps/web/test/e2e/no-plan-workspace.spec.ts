@@ -30,7 +30,7 @@ test.describe('a workspace without a plan', () => {
     )
     await expect(
       navigation.getByRole('link', { exact: true, name: 'Publish (Pro)' })
-    ).toHaveAttribute('href', '/upgrade?from=%2Fwrite')
+    ).toHaveAttribute('href', '/upgrade?from=%2Fpublish')
 
     // New → Post opens the plan page, not a composer that cannot save.
     await page.getByRole('button', { exact: true, name: 'New' }).click()
@@ -41,7 +41,7 @@ test.describe('a workspace without a plan', () => {
     // Choosing a plan goes straight to the plan cards, not through Billing.
     await expect(page.getByRole('link', { exact: true, name: 'Choose a plan' })).toHaveAttribute(
       'href',
-      '/pricing?returnTo=%2Fwrite'
+      '/pricing?returnTo=%2Fpublish'
     )
 
     await page.getByRole('button', { exact: true, name: 'Search and commands' }).first().click()
@@ -59,7 +59,11 @@ test.describe('a workspace without a plan', () => {
     for (const [section, notice, from] of [
       ['Shared links', 'Publishing designs at a link needs Pro.', 'shared-links'],
       ['Integrations', 'Delivering designs to Slack, Notion and Figma needs Pro.', 'integrations'],
-      ['Publishing brands', 'Publishing brands, and the accounts and schedules', 'social-sets'],
+      [
+        'Publishing brands',
+        'Publishing brands, and the accounts and schedules',
+        'publishing-brands',
+      ],
       [
         'Notifications',
         'Publishing brands, and notifications for each, need Pro.',
@@ -72,7 +76,7 @@ test.describe('a workspace without a plan', () => {
       await expect(plan, section).toHaveCount(1)
       await expect(plan.getByRole('link', { exact: true, name: 'See plans' })).toHaveAttribute(
         'href',
-        `/upgrade?from=%2Fworkspace%2F${from}`
+        `/upgrade?from=%2Fsettings%2F${from}`
       )
       await expect(page.getByText('Loading…', { exact: true }), section).toHaveCount(0)
     }

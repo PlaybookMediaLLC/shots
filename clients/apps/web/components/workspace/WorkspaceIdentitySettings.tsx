@@ -187,13 +187,13 @@ export function WorkspaceIdentitySettings({
                   ? 'Active'
                   : 'Required'}{' '}
             ·{' '}
-            <Link className="underline" href="/workspace/billing">
+            <Link className="underline" href="/settings/billing">
               View billing
             </Link>
           </li>
           <li>
             Two-factor authentication: {twoFactor ? 'Enabled' : 'Required'} ·{' '}
-            <Link className="underline" href="/workspace/security">
+            <Link className="underline" href="/settings/security">
               Security settings
             </Link>
           </li>

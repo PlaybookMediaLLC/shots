@@ -11,7 +11,6 @@ import { ChatIcon as MessageSquare } from '@phosphor-icons/react/dist/ssr/Chat'
 import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sidebar'
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
-import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
 import { InfoIcon } from '@phosphor-icons/react/dist/ssr/Info'
 import { ScissorsIcon } from '@phosphor-icons/react/dist/ssr/Scissors'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
@@ -32,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Sheet,
   SheetContent,
@@ -42,7 +42,7 @@ import {
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { DraftPosts } from '@/components/drafts/DraftPosts'
 import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/DraftEditor'
-import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
+import { BrandSettingsButton, openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
 import { appendPost, movePost, postRanges, splitPostAtCaret } from '@/components/drafts/thread'
@@ -227,7 +227,6 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
-    data,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -528,7 +527,7 @@ export function WriteComposer({
       if (newDraft)
         void draftsApi
           .create({ socialSetId: draft.socialSetId ?? undefined })
-          .then((next) => router.push(`/write/${next.id}`))
+          .then((next) => router.push(`/publish/${next.id}`))
           .catch(() =>
             toast.error(
               'Scheduled successfully, but the next draft could not be opened. Create one from the sidebar.'
@@ -1084,12 +1083,7 @@ export function WriteComposer({
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
                   {set ? (
                     <span className="hidden md:contents">
-                      <DraftSettingsDrawer
-                        advancedScheduling={data.advancedScheduling}
-                        canManage={canPublish}
-                        canWrite={canEdit}
-                        socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}
-                      />
+                      <BrandSettingsButton id={set.id} name={set.name} />
                     </span>
                   ) : null}
                 </>
@@ -1178,11 +1172,7 @@ export function WriteComposer({
                       {set ? (
                         <DropdownMenuItem
                           className="md:hidden"
-                          onSelect={() => {
-                            const url = new URL(window.location.href)
-                            url.searchParams.set('settings', 'scheduling')
-                            window.history.pushState(null, '', url)
-                          }}
+                          onSelect={() => openBrandSettings('scheduling', set.id)}
                         >
                           Brand settings…
                         </DropdownMenuItem>
@@ -1362,7 +1352,7 @@ export function WriteComposer({
                     target: { url },
                     body: bodyFor(document.value as PlateBody, document.versions, active),
                   })
-                  router.push(`/write/${next.id}`)
+                  router.push(`/publish/${next.id}`)
                 })().catch((error) =>
                   toast.error(
                     error instanceof Error ? error.message : 'The quote draft could not be created.'
@@ -1371,10 +1361,9 @@ export function WriteComposer({
               }}
             />
           ) : null}
-          <details
-            className="group/options mx-4 mt-1 mb-3 overflow-hidden rounded-xl border border-border bg-card"
-            onToggle={(event) => {
-              const open = event.currentTarget.open
+          <Disclosure
+            className="mx-4 mt-1 mb-3 overflow-hidden rounded-xl border border-border bg-card"
+            onOpenChange={(open) => {
               setOptionsOpen(open)
               try {
                 localStorage.setItem(POST_OPTIONS_KEY, open ? 'open' : 'closed')
@@ -1384,13 +1373,10 @@ export function WriteComposer({
             }}
             open={optionsOpen}
           >
-            <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 bg-background px-4 py-2.5 text-caption font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
-              <CaretRightIcon
-                aria-hidden
-                className="size-3.5 transition-transform group-open/options:rotate-90 motion-reduce:transition-none"
-              />
+            <DisclosureTrigger className="select-none bg-background px-4 py-2.5 text-caption font-medium text-[var(--fg-tertiary)] hover:text-foreground">
               Post options
-            </summary>
+            </DisclosureTrigger>
+            <DisclosureContent>
             <VersionOptionsBar
               tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
               channel={active}
@@ -1432,7 +1418,8 @@ export function WriteComposer({
                 onChange={(options) => setOptions(active, options)}
               />
             ) : null}
-          </details>
+            </DisclosureContent>
+          </Disclosure>
             </>
           )}
           <div
@@ -1721,7 +1708,7 @@ export function WriteComposer({
                     try {
                       await flush()
                       window.location.assign(
-                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/write/${initial.id}` })}`
+                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
                       )
                     } catch (error) {
                       toast.error(

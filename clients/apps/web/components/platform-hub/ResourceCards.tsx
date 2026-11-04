@@ -1,4 +1,4 @@
-import { OutwardIcon as ArrowUpRight } from '@/components/platform-shell/icons'
+import { ArrowForwardIcon as ArrowRight } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Stage, Window } from '@/components/platform-landing/primitives'
 import { PageSpread, type SpreadPage } from '@/components/platform-ui/page-spread'
@@ -34,7 +34,7 @@ export function ResourceCards({
                 ) : (
                   <Window
                     className="w-[80%] transition-transform duration-300 group-hover:-translate-y-1"
-                    meta={<ArrowUpRight size={14} aria-hidden="true" />}
+                    meta={<ArrowRight size={14} aria-hidden="true" />}
                     title={item.scope.split(' · ')[0]}
                   >
                     <span className="block px-4 py-5 text-start">
@@ -54,7 +54,7 @@ export function ResourceCards({
                 <span className="block truncate font-medium">{item.title}</span>
                 <span className="block truncate text-xs text-muted-foreground">{item.scope}</span>
               </span>
-              <ArrowUpRight
+              <ArrowRight
                 size={16}
                 aria-hidden="true"
                 className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
@@ -66,52 +66,3 @@ export function ResourceCards({
     </ul>
   )
 }
-
-export const BRAND_RESOURCES: Parameters<typeof ResourceCards>[0]['items'] = [
-  {
-    title: 'Visual brand kits',
-    description:
-      'Manage and publish versioned colors, typography and visual rules. Existing approved work keeps its pinned version.',
-    href: '/workspace/brand-kit',
-    scope: 'Workspace · Versioned visual kit',
-    pages: [{ kind: 'logo' }, { kind: 'swatches' }, { kind: 'type' }],
-  },
-  {
-    title: 'Brand voice',
-    description:
-      'Workspace writing defaults and prohibited terms. Publishing brand overrides and draft instructions retain their existing inheritance.',
-    href: '/workspace/brand-kit',
-    scope: 'Workspace · Brand voice',
-    pages: [{ kind: 'doc' }, { kind: 'quote', ratio: '1:1' }],
-  },
-  {
-    title: 'Products',
-    description: 'Manage product facts that inform briefs and content.',
-    href: '/workspace/product',
-    scope: 'Workspace · Product context',
-    pages: [{ kind: 'product' }, { kind: 'chart', ratio: '1:1' }],
-    add: true,
-  },
-  {
-    title: 'Product pages',
-    description: 'Keep product page sources available for evidence and reusable context.',
-    href: '/workspace/product-pages',
-    scope: 'Workspace · Product sources',
-    pages: [
-      { kind: 'web', ratio: '4:3' },
-      { kind: 'web', ratio: '4:3' },
-    ],
-    add: true,
-  },
-  {
-    title: 'Publishing brands',
-    description: 'Choose publishing identities, connected channels and their defaults.',
-    href: '/workspace/social-sets',
-    scope: 'Publishing brand · Delivery configuration',
-    pages: [
-      { kind: 'profile', ratio: '9:16' },
-      { kind: 'hero', ratio: '1:1' },
-      { kind: 'phone', ratio: '9:16' },
-    ],
-  },
-]

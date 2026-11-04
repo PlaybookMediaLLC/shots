@@ -240,7 +240,7 @@ export function ManagePlatformsDialog({
                     {account.health !== 'connected' ? (
                       <a
                         className="mt-1 block text-label text-amber-700 dark:text-amber-300 underline"
-                        href="/workspace/channels"
+                        href="/settings/channels"
                       >
                         Reconnect in workspace settings
                       </a>

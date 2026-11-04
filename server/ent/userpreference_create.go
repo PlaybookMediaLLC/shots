@@ -90,6 +90,20 @@ func (_c *UserPreferenceCreate) SetNillableWeekStart(v *userpreference.WeekStart
 	return _c
 }
 
+// SetTimeFormat sets the "time_format" field.
+func (_c *UserPreferenceCreate) SetTimeFormat(v userpreference.TimeFormat) *UserPreferenceCreate {
+	_c.mutation.SetTimeFormat(v)
+	return _c
+}
+
+// SetNillableTimeFormat sets the "time_format" field if the given value is not nil.
+func (_c *UserPreferenceCreate) SetNillableTimeFormat(v *userpreference.TimeFormat) *UserPreferenceCreate {
+	if v != nil {
+		_c.SetTimeFormat(*v)
+	}
+	return _c
+}
+
 // SetTextDirection sets the "text_direction" field.
 func (_c *UserPreferenceCreate) SetTextDirection(v userpreference.TextDirection) *UserPreferenceCreate {
 	_c.mutation.SetTextDirection(v)
@@ -243,6 +257,10 @@ func (_c *UserPreferenceCreate) defaults() {
 		v := userpreference.DefaultWeekStart
 		_c.mutation.SetWeekStart(v)
 	}
+	if _, ok := _c.mutation.TimeFormat(); !ok {
+		v := userpreference.DefaultTimeFormat
+		_c.mutation.SetTimeFormat(v)
+	}
 	if _, ok := _c.mutation.TextDirection(); !ok {
 		v := userpreference.DefaultTextDirection
 		_c.mutation.SetTextDirection(v)
@@ -304,6 +322,14 @@ func (_c *UserPreferenceCreate) check() error {
 	if v, ok := _c.mutation.WeekStart(); ok {
 		if err := userpreference.WeekStartValidator(v); err != nil {
 			return &ValidationError{Name: "week_start", err: fmt.Errorf(`ent: validator failed for field "UserPreference.week_start": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.TimeFormat(); !ok {
+		return &ValidationError{Name: "time_format", err: errors.New(`ent: missing required field "UserPreference.time_format"`)}
+	}
+	if v, ok := _c.mutation.TimeFormat(); ok {
+		if err := userpreference.TimeFormatValidator(v); err != nil {
+			return &ValidationError{Name: "time_format", err: fmt.Errorf(`ent: validator failed for field "UserPreference.time_format": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.TextDirection(); !ok {
@@ -389,6 +415,10 @@ func (_c *UserPreferenceCreate) createSpec() (*UserPreference, *sqlgraph.CreateS
 	if value, ok := _c.mutation.WeekStart(); ok {
 		_spec.SetField(userpreference.FieldWeekStart, field.TypeEnum, value)
 		_node.WeekStart = value
+	}
+	if value, ok := _c.mutation.TimeFormat(); ok {
+		_spec.SetField(userpreference.FieldTimeFormat, field.TypeEnum, value)
+		_node.TimeFormat = value
 	}
 	if value, ok := _c.mutation.TextDirection(); ok {
 		_spec.SetField(userpreference.FieldTextDirection, field.TypeEnum, value)

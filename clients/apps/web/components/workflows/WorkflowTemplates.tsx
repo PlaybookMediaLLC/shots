@@ -375,7 +375,7 @@ export function WorkflowTemplates() {
                 <Row label="Visual brand kit required">
                   <Link
                     className="underline"
-                    href="/workspace/brand-kit?returnTo=%2Fworkflows%2Fnew"
+                    href="/settings/brand-kit?returnTo=%2Fworkflows%2Fnew"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -414,7 +414,7 @@ export function WorkflowTemplates() {
                     Connect a destination in{' '}
                     <Link
                       className="underline"
-                      href="/workspace/channels?returnTo=%2Fworkflows%2Fnew"
+                      href="/settings/channels?returnTo=%2Fworkflows%2Fnew"
                     >
                       Channels
                     </Link>{' '}

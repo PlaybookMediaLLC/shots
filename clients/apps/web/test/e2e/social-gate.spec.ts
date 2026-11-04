@@ -353,7 +353,7 @@ test('the backend worker publishes draft photos, video, and ordered images once 
           method: 'POST',
         })
         expect(incomplete.status).toBe(409)
-        await page.goto(`/write/${id}`)
+        await page.goto(`/publish/${id}`)
         if (draft.channel === 'youtube') {
           await page.getByLabel('YouTube title', { exact: true }).fill('Fixture video')
           await page.getByRole('combobox', { name: 'YouTube privacy' }).click()

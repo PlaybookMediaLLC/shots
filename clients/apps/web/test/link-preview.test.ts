@@ -569,10 +569,10 @@ test('URL lists preserve lines, reject malformed inputs, and keep query punctuat
 
 test('NAV-03: a finished check keeps a safe way back and the brand, never an external one', async () => {
   const { checkAddress } = await import('@/components/link-preview/client')
-  const opened = `https://shots.test/link-preview?returnTo=${encodeURIComponent('/write/deliveries?set=brand')}&set=brand&url=old`
+  const opened = `https://shots.test/publish/link-checks?returnTo=${encodeURIComponent('/campaigns/deliveries?set=brand')}&set=brand&url=old`
   const address = new URL(checkAddress(opened, 'https://linear.app/', 'facebook'))
-  assert.equal(address.pathname, '/link-preview')
-  assert.equal(address.searchParams.get('returnTo'), '/write/deliveries?set=brand')
+  assert.equal(address.pathname, '/publish/link-checks')
+  assert.equal(address.searchParams.get('returnTo'), '/campaigns/deliveries?set=brand')
   assert.equal(address.searchParams.get('set'), 'brand')
   assert.equal(address.searchParams.get('url'), 'https://linear.app/')
   assert.equal(address.searchParams.get('agent'), 'facebook')
@@ -580,7 +580,7 @@ test('NAV-03: a finished check keeps a safe way back and the brand, never an ext
     assert.equal(
       new URL(
         checkAddress(
-          `https://shots.test/link-preview?returnTo=${encodeURIComponent(unsafe)}`,
+          `https://shots.test/publish/link-checks?returnTo=${encodeURIComponent(unsafe)}`,
           'https://linear.app/',
           'default'
         )

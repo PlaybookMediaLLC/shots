@@ -85,7 +85,7 @@ test(
     await page.getByRole('button', { name: 'Open as quote draft', exact: true }).click()
     await page.waitForURL(
       (current) =>
-        /\/write\/[a-z0-9]+/.test(current.pathname) && !current.pathname.endsWith(original)
+        /\/publish\/[a-z0-9]+/.test(current.pathname) && !current.pathname.endsWith(original)
     )
     const id = new URL(page.url()).pathname.split('/').pop()!
     await expect(draftEditor(page)).toContainText('My perspective on this release')

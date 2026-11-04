@@ -52,14 +52,16 @@ test('personal settings are addressable, saved on the server and survive a reloa
   // Each section is its own address, so back and forward move between them.
   await openWorkspaceSetting(page, 'Notifications')
   await page.goBack()
-  await expect(page).toHaveURL(/\/workspace\/appearance$/)
+  await expect(page).toHaveURL(/\/settings\/appearance$/)
   await page.goForward()
-  await expect(page).toHaveURL(/\/workspace\/notifications$/)
+  await expect(page).toHaveURL(/\/settings\/notifications$/)
 
   const email = page.getByRole('switch', { name: 'Email notifications' })
   await expect(email).toBeChecked()
   await email.click()
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
+  // The switch saves with the page's other preferences, not on its own.
+  await page.getByRole('button', { name: 'Save my preferences', exact: true }).click()
+  await expect(page.getByText('Your preferences are saved.', { exact: true })).toBeVisible()
   await app.reload()
   await expect(page.getByRole('switch', { name: 'Email notifications' })).not.toBeChecked()
   await expect(
@@ -68,17 +70,17 @@ test('personal settings are addressable, saved on the server and survive a reloa
   await expect(page.getByText('Slack is unavailable.', { exact: false }).first()).toBeVisible()
 
   await openWorkspaceSetting(page, 'Account')
-  await page.getByLabel('Search display time zone').fill('Tokyo')
   await chooseOption(
     page.getByRole('combobox', { exact: true, name: 'Display time zone' }),
-    /^Tokyo · Asia\/Tokyo · /
+    /^Tokyo · UTC\+09:00/,
+    'Tokyo'
   )
   await page.getByRole('button', { name: 'Save time zone', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
   await app.reload()
   await expect(
     page.getByRole('combobox', { exact: true, name: 'Display time zone' })
-  ).toContainText('Asia/Tokyo')
+  ).toContainText('Tokyo · UTC+09:00')
 
   // The registry says what each experiment is, and promoted or unavailable
   // ones cannot be switched.
@@ -127,7 +129,7 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
 
-    await app.open('/workspace/social-sets')
+    await app.open('/settings/publishing-brands')
     await expect(
       page.getByRole('heading', { exact: true, level: 1, name: 'Publishing brands' })
     ).toBeVisible()
@@ -147,25 +149,25 @@ test(
 
     // A new set posts weekdays at 9:00. A second weekday time makes two rows
     // of five: ten weekly slots, as the server saved them.
-    await app.open(`/workspace/social-sets/${setId}/scheduling`)
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 weekly posting slots')
-    await page.getByLabel('Search scheduling time zone').fill('Paris')
+    await app.open(`/settings/publishing-brands/${setId}/scheduling`)
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 of 50 weekly posting slots')
     await chooseOption(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' }),
-      /^Paris · Europe\/Paris · /
+      /^Paris · UTC/,
+      'Paris'
     )
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
-    await chooseOption(page.getByLabel('Time to add'), /^1:00\sPM$/)
+    await page.getByLabel('Time to add', { exact: true }).fill('1p')
     await page.getByRole('button', { name: 'Add time' }).click()
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 weekly posting slots')
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect.poll(() => slotCount(setId)).toBe(10)
     await app.reload()
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 weekly posting slots')
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' })
-    ).toContainText('Europe/Paris')
+    ).toContainText('Paris · UTC')
 
-    await app.open('/workspace/brand-kit')
+    await app.open('/settings/brand-kit')
     await page
       .getByLabel('Product description', { exact: true })
       .fill('Social publishing for teams')
@@ -173,7 +175,7 @@ test(
     await page.getByLabel('Tone', { exact: true }).fill('Direct and concrete')
     await page.getByRole('button', { name: 'Save brand voice', exact: true }).click()
     await expect(page.getByText('Brand voice saved.', { exact: true })).toBeVisible()
-    await app.open(`/workspace/social-sets/${setId}/writing-assistant`)
+    await app.open(`/settings/publishing-brands/${setId}/writing-assistant`)
     await expect(page.getByText(/Workspace default: Direct and concrete/)).toBeVisible()
     await page.getByLabel('Tone', { exact: true }).fill('Playful')
     await page.getByRole('button', { name: 'Save style guide', exact: true }).click()
@@ -190,7 +192,7 @@ test(
 
     // Settings open beside a draft without losing what was typed, and the
     // editor runs text in the direction Appearance chose.
-    await app.open('/workspace/appearance')
+    await app.open('/settings/appearance')
     await page.getByRole('radio', { name: /^Right to left/ }).check()
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await openNewDraft(page)
@@ -216,14 +218,14 @@ test('a public profile is served only while it is turned on', async ({
 }) => {
   await startWorkspace({ channels: ['x', 'linkedin'] })
 
-  await app.open('/workspace/social-sets')
+  await app.open('/settings/publishing-brands')
   await page
     .getByRole('link', { name: /^Settings for / })
     .first()
     .click()
-  await page.waitForURL(/\/workspace\/social-sets\/[a-z0-9]+/)
+  await page.waitForURL(/\/settings\/publishing-brands\/[a-z0-9]+/)
   const setId = new URL(page.url()).pathname.split('/')[3] ?? ''
-  await app.open(`/workspace/social-sets/${setId}/public-profile`)
+  await app.open(`/settings/publishing-brands/${setId}/public-profile`)
   const toggle = page.getByRole('switch', { name: 'Make profile public' })
   await toggle.click()
   await expect(toggle).toBeChecked()

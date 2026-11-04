@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { deleteWebhookContract, listWebhookDeliveriesContract, listWebhooksContract, webhookDeliverySchema, webhookEventSchema, webhookSchema, webhookWithSecretSchema } from '@/lib/api/contracts/outbound-webhooks'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { SettingsRequestError, settingsErrorMessage, settingsRequest } from '@/lib/settings/client'
@@ -376,7 +377,7 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
         <div className="grid gap-4">
           {secret ? <SecretNotice onDone={() => setSecret(null)} secret={secret} /> : null}
           {planRequired ? (
-            <PlanRequired from="/workspace/developers">Outbound webhooks need Pro.</PlanRequired>
+            <PlanRequired from="/settings/developers">Outbound webhooks need Pro.</PlanRequired>
           ) : webhooks.isError ? (
             <p className="text-sm text-red-700 dark:text-red-300" role="alert">
               {unavailable
@@ -384,7 +385,7 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
                 : settingsErrorMessage(webhooks.error)}
             </p>
           ) : null}
-          {unavailable ? <details className="text-xs text-muted-foreground"><summary>Administrator setup details</summary><p>Configure PLATFORM_WEBHOOK_ENCRYPTION_KEY on the server to protect signing secrets.</p></details> : null}
+          {unavailable ? <Disclosure className="text-xs text-muted-foreground"><DisclosureTrigger>Administrator setup details</DisclosureTrigger><DisclosureContent><p>Configure PLATFORM_WEBHOOK_ENCRYPTION_KEY on the server to protect signing secrets.</p></DisclosureContent></Disclosure> : null}
           {webhooks.data ? (
             webhooks.data.items.length > 0 ? (
               <Group>
@@ -397,22 +398,24 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
             )
           ) : null}
           {unavailable || planRequired ? null : <AddWebhook onCreated={setSecret} />}
-          <details className="rounded-xl border border-border p-4 text-sm">
-            <summary className="cursor-pointer font-medium text-foreground">Verify a delivery</summary>
-            <div className="mt-3 grid gap-2 text-muted-foreground">
-              <p>
-                Each request carries <code>X-Shots-Event</code>, <code>X-Shots-Event-Id</code>, <code>X-Shots-Timestamp</code> and{' '}
-                <code>X-Shots-Signature</code>. The signature is <code>v1=</code> and the hex HMAC-SHA256, keyed with your secret, of the event
-                ID, a dot, the timestamp, a dot, and the raw body. After a rotation it lists two signatures, comma-separated; accept either.
-              </p>
-              <pre className="overflow-x-auto rounded bg-foreground/[0.05] p-3 text-xs text-foreground">{`const expected = 'v1=' + createHmac('sha256', secret)
-  .update(\`\${eventId}.\${timestamp}.\${rawBody}\`).digest('hex')
-const ok = header.split(',').some((part) =>
-  part.length === expected.length && timingSafeEqual(Buffer.from(part), Buffer.from(expected)))
-// Reject a timestamp older than five minutes, and skip an event ID you already handled.`}</pre>
-              <p>Answer with any 2xx status within ten seconds. Other answers are retried for about ten hours, then stop until you retry them here.</p>
-            </div>
-          </details>
+          <Disclosure className="rounded-xl border border-border p-4 text-sm">
+            <DisclosureTrigger className="font-medium text-foreground">Verify a delivery</DisclosureTrigger>
+            <DisclosureContent>
+              <div className="mt-3 grid gap-2 text-muted-foreground">
+                <p>
+                  Each request carries <code>X-Shots-Event</code>, <code>X-Shots-Event-Id</code>, <code>X-Shots-Timestamp</code> and{' '}
+                  <code>X-Shots-Signature</code>. The signature is <code>v1=</code> and the hex HMAC-SHA256, keyed with your secret, of the event
+                  ID, a dot, the timestamp, a dot, and the raw body. After a rotation it lists two signatures, comma-separated; accept either.
+                </p>
+                <pre className="overflow-x-auto rounded bg-foreground/[0.05] p-3 text-xs text-foreground">{`const expected = 'v1=' + createHmac('sha256', secret)
+    .update(\`\${eventId}.\${timestamp}.\${rawBody}\`).digest('hex')
+  const ok = header.split(',').some((part) =>
+    part.length === expected.length && timingSafeEqual(Buffer.from(part), Buffer.from(expected)))
+  // Reject a timestamp older than five minutes, and skip an event ID you already handled.`}</pre>
+                <p>Answer with any 2xx status within ten seconds. Other answers are retried for about ten hours, then stop until you retry them here.</p>
+              </div>
+            </DisclosureContent>
+          </Disclosure>
         </div>
       )}
     </Section>

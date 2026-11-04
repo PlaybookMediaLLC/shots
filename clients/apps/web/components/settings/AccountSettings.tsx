@@ -44,7 +44,7 @@ function SignInEmail({ email }: { email: string }) {
     if (!parsed.success) return
     setSending(true)
     const { error } = await authClient.changeEmail({
-      callbackURL: '/workspace/account',
+      callbackURL: '/settings/account',
       newEmail: parsed.data,
     })
     setSending(false)
@@ -108,6 +108,7 @@ function DisplayTimeZone() {
       <TimeZonePicker
         allowBrowser
         disabled={status !== 'ready' || state === 'saving'}
+        hideLabel
         label="Display time zone"
         onChange={(timeZone) => setDraft({ timeZone })}
         value={value}

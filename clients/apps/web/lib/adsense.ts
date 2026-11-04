@@ -13,6 +13,6 @@ const AD_FREE_PATH = new RegExp(
 /** True for editor workspaces, with or without a locale prefix, where ads must never appear. */
 export function isAdFreePath(pathname: string): boolean {
   const path = withoutLocale(pathname);
-  const platform = ['/home', '/create', '/library', '/projects', '/assets', '/canvas', '/creative-sets', '/campaigns', '/releases', '/write', '/drafts', '/workflows', '/workspace', '/activity', '/link-preview', '/upgrade'];
+  const platform = ['/home', '/create', '/library', '/projects', '/assets', '/canvas', '/creative-sets', '/campaigns', '/releases', '/publish', '/drafts', '/workflows', '/settings', '/activity', '/upgrade'];
   return AD_FREE_PATH.test(pathname) || platform.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }

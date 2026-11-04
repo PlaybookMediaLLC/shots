@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   apiRequest,
+  chooseOption,
   db,
   draftEditor,
   expect,
@@ -390,14 +391,14 @@ test(
     // Navigate through the actual draft rail, so the pending-save guard runs.
     // An open preview hides the rail below 1536px wide, so it closes first.
     if (await panel.isVisible()) await toggle.click()
-    await page.locator(`a[href^="/write/${first}"]`).first().click()
+    await page.locator(`a[href^="/publish/${first}"]`).first().click()
     await expect(editor).toContainText('Rapid-edit-marker-0123456789')
     if (!(await panel.isVisible())) await toggle.click()
     await expect(panel).not.toContainText('Second draft must stay isolated.')
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     await expect(panel).toContainText('Rapid-edit-marker-0123456789')
     await toggle.click()
-    await page.locator(`a[href^="/write/${second}"]`).first().click()
+    await page.locator(`a[href^="/publish/${second}"]`).first().click()
     await expect(editor).toContainText('Second draft must stay isolated.')
     await expect(editor).not.toContainText('Alpha one two')
     expect(errors).toEqual([])
@@ -474,7 +475,7 @@ test(
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('Second post with copied media.')
     await editorMore(page, 'Manage media')
-    await manager.getByLabel('Destination post').first().selectOption('1')
+    await chooseOption(manager.getByLabel('Destination post').first(), 'Post 2')
     await manager.getByRole('button', { name: 'Move', exact: true }).first().click()
     await expect(
       manager.getByRole('region', { name: 'Post 2 media' }).locator('[data-attachment-id]')

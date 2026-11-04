@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
@@ -131,7 +132,7 @@ export function WriteRail() {
               {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
               <Link
                 data-tour-id="write-bulk"
-                href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
+                href={`/publish/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
               >
                 Bulk schedule
               </Link>
@@ -144,12 +145,17 @@ export function WriteRail() {
         <div className="min-w-0 flex-1">
           <SocialSetSwitcher />
         </div>
-        <Link
-          className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
-          href={data.activeSet ? `/write/settings?set=${data.activeSet.id}` : '/write/settings'}
-        >
-          Settings
-        </Link>
+        {data.activeSet ? (
+          <Button
+            className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => openBrandSettings('scheduling')}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            Settings
+          </Button>
+        ) : null}
       </div>
       {/* Underlined tabs: the current one is medium weight over a 2px line. */}
       <div
@@ -1010,7 +1016,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
                         await beforeLeaveRef.current?.()
                         await draftsApi.remove(draft.id)
                         hideDraft(draft.id)
-                        if (activeId === draft.id) router.replace('/write')
+                        if (activeId === draft.id) router.replace('/publish')
                         else router.refresh()
                       },
                       'Draft deleted.',
@@ -1133,7 +1139,7 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
     else toast.success(`${label}: ${selected.length} drafts.`)
     setProgress(null)
     onDone()
-    if (removedActive) router.replace(data.activeSet ? `/write?set=${data.activeSet.id}` : '/write')
+    if (removedActive) router.replace(data.activeSet ? `/publish?set=${data.activeSet.id}` : '/publish')
     else router.refresh()
   }
   const version = (id: string) => data.library.find((draft) => draft.id === id)

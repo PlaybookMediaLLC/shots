@@ -26,8 +26,15 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -119,14 +126,11 @@ function LocalTimeFields({
           if (next) onChange((current) => `${next}T${current.split('T')[1] || time || '09:00'}`)
         }}
       />
-      <Input
+      <TimePicker
         aria-label={`${label} time`}
-        className="w-36"
         disabled={disabled}
-        type="time"
         value={time}
-        onChange={(event) => {
-          const next = event.target.value
+        onChange={(next) => {
           if (day && next) onChange((current) => `${current.split('T')[0] || day}T${next}`)
         }}
       />
@@ -867,7 +871,7 @@ export function BatchWorkspace({
 
   const archive = async () => {
     await call(`${base}/archive`, { method: 'POST' })
-    window.location.assign('/write')
+    window.location.assign('/publish')
   }
 
   const accountName = (id: string) =>
@@ -900,7 +904,7 @@ export function BatchWorkspace({
             variant="outline"
             disabled={busy !== null}
             onClick={() => {
-              if (window.confirm('Close this batch? Its drafts and scheduled posts stay in Write.'))
+              if (window.confirm('Close this batch? Its drafts and scheduled posts stay in Publish.'))
                 void archive()
             }}
           >
@@ -1033,7 +1037,7 @@ export function BatchWorkspace({
                   ))
                 ) : (
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/workspace/social-sets">Connect an account</Link>
+                    <Link href="/settings/publishing-brands">Connect an account</Link>
                   </Button>
                 )}
               </Row>
@@ -1169,14 +1173,18 @@ export function BatchWorkspace({
               <div className="flex flex-wrap items-end gap-3">
                 <Label className="grid gap-1 font-normal">
                   Plan
-                  <NativeSelect
-                    aria-label="Batch time mode"
+                  <Select
                     value={timesMode}
-                    onChange={(event) => setTimesMode(event.target.value as 'queue' | 'spread')}
+                    onValueChange={(value) => setTimesMode(value as 'queue' | 'spread')}
                   >
-                    <NativeSelectOption value="queue">Fill the queue</NativeSelectOption>
-                    <NativeSelectOption value="spread">Spread over days</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Batch time mode">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="queue">Fill the queue</SelectItem>
+                      <SelectItem value="spread">Spread over days</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 {timesMode === 'spread' ? (
                   <>
@@ -1272,7 +1280,7 @@ export function BatchWorkspace({
                       <Pill tone={status.tone}>{status.text}</Pill>
                       {item.draftId ? (
                         <Button asChild size="sm" variant="ghost">
-                          <a href={`/write/${item.draftId}`} target="_blank" rel="noreferrer">
+                          <a href={`/publish/${item.draftId}`} target="_blank" rel="noreferrer">
                             Open draft
                             <OutwardIcon />
                           </a>
@@ -1506,7 +1514,7 @@ export function BatchWorkspace({
                     ) : (
                       <p className="text-xs text-muted-foreground">
                         This brand has no connected accounts.{' '}
-                        <Link className="underline" href="/workspace/social-sets">
+                        <Link className="underline" href="/settings/publishing-brands">
                           Connect one
                         </Link>{' '}
                         to check and schedule posts.

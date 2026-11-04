@@ -89,7 +89,7 @@ test(
     const loadAlpha = page.waitForRequest(
       (request) => request.url().endsWith('/api/v1/social-sets') && request.method() === 'GET'
     )
-    await app.open('/workspace/social-sets')
+    await app.open('/settings/publishing-brands')
     await expect(
       page.getByRole('link', { name: 'Settings for Private Alpha', exact: true })
     ).toBeVisible()
@@ -140,7 +140,7 @@ test(
 
     const sibling = await context.newPage()
     try {
-      await sibling.goto('/workspace/social-sets')
+      await sibling.goto('/settings/publishing-brands')
       expect(
         (
           await requestJson(sibling, '/api/auth/organization/set-active', {
@@ -192,7 +192,7 @@ test(
       await cancelledCreation
       releaseResponse()
       await delivered
-      await expect(page).toHaveURL(/\/workspace\/social-sets$/)
+      await expect(page).toHaveURL(/\/settings\/publishing-brands$/)
       await expect(page.getByRole('dialog')).toHaveCount(0)
       await expect(
         page.getByRole('link', { name: 'Settings for Delayed Alpha creation', exact: true })
@@ -227,15 +227,17 @@ test(
         'Private Alpha'
       )
       await page.getByLabel('Publishing brand name', { exact: true }).fill('Private Alpha saved')
-      await page.getByRole('button', { name: 'Save name', exact: true }).click()
+      await page.getByLabel('Publishing brand name', { exact: true }).press('Enter')
       await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
       await app.reload()
       await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(
         'Private Alpha saved'
       )
-      await app.open(`/workspace/social-sets/${alpha.set.id}/writing-assistant`)
+      await app.open(`/settings/publishing-brands/${alpha.set.id}/writing-assistant`)
       await expect(
-        page.locator('summary').filter({ hasText: 'Private writing sample for Private Alpha.' })
+        page
+          .locator('[data-slot="disclosure-trigger"]')
+          .filter({ hasText: 'Private writing sample for Private Alpha.' })
       ).toBeVisible()
       await page.screenshot({
         path: '.context/social-set-scoped-settings.png',

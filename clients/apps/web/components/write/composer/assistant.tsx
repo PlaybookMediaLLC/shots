@@ -5,8 +5,15 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { call } from '@/lib/content-drafts/client'
 import { WRITING_PROMPTS } from '@/lib/write/prompt-library'
@@ -106,36 +113,38 @@ export function AssistantPanel({
         </Button>
       </p>
       <p className="text-xs text-muted-foreground">
-        Workspace defaults → Social-set overrides → Your instructions for this draft. Prohibited
+        Workspace defaults → Publishing brand overrides → Your instructions for this draft. Prohibited
         terms always apply.
       </p>
       <Label className="grid gap-1 text-xs">
         Prompt library
-        <NativeSelect
-          aria-label="Prompt library"
-          value=""
-          onChange={(event) => setMessage(event.target.value)}
-        >
-          <NativeSelectOption value="">Choose an instruction…</NativeSelectOption>
-          {STARTERS.map((starter) => (
-            <NativeSelectOption key={starter} value={starter}>
-              {starter}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Select value="" onValueChange={(value) => setMessage(value)}>
+          <SelectTrigger aria-label="Prompt library">
+            <SelectValue placeholder="Choose an instruction…" />
+          </SelectTrigger>
+          <SelectContent>
+            {STARTERS.map((starter) => (
+              <SelectItem key={starter} value={starter}>
+                {starter}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Label>
-      <details className="rounded-lg border border-border p-3">
-        <summary className="cursor-pointer">Writing prompts and examples</summary>
-        <p className="my-2 text-xs text-muted-foreground">Examples show a structure. Use your own facts and experience.</p>
-        <ul className="grid gap-3">
-          {WRITING_PROMPTS.map((prompt) => (
-            <li key={prompt.id}>
-              <Button type="button" variant="outline" size="sm" onClick={() => setMessage(prompt.instruction)}>{prompt.title}</Button>
-              <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{prompt.example}</p>
-            </li>
-          ))}
-        </ul>
-      </details>
+      <Disclosure className="rounded-lg border border-border p-3">
+        <DisclosureTrigger>Writing prompts and examples</DisclosureTrigger>
+        <DisclosureContent>
+          <p className="my-2 text-xs text-muted-foreground">Examples show a structure. Use your own facts and experience.</p>
+          <ul className="grid gap-3">
+            {WRITING_PROMPTS.map((prompt) => (
+              <li key={prompt.id}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setMessage(prompt.instruction)}>{prompt.title}</Button>
+                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{prompt.example}</p>
+              </li>
+            ))}
+          </ul>
+        </DisclosureContent>
+      </Disclosure>
       {turns.length === 0 ? (
         <VoiceMemo draftId={draftId} channel={channel} onUse={setMessage} />
       ) : null}

@@ -103,7 +103,7 @@ export function SocialSetSwitcher() {
                 activeId !== 'analyze' &&
                 set.id !== data.activeSet?.id
               )
-                router.push(`/write?set=${encodeURIComponent(set.id)}`)
+                router.push(`/publish?set=${encodeURIComponent(set.id)}`)
               else setQuery({ q: undefined, set: set.id, tag: undefined })
             }}
           >
@@ -135,7 +135,7 @@ export function SocialSetSwitcher() {
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem asChild>
-              <Link href="/workspace/social-sets">New publishing brand…</Link>
+              <Link href="/settings/publishing-brands">New publishing brand…</Link>
             </DropdownMenuItem>
           </>
         ) : null}

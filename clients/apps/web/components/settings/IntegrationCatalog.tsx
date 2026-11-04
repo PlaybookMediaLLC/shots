@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Pill, Section } from '@/components/platform-ui'
 import { OutwardIcon } from '@/components/platform-shell/icons'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { useTRPCClient } from '@/lib/trpc/react'
@@ -64,7 +65,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
 
   const entries: Entry[] = [
     {
-      action: { href: '/workspace/ai-agents', label: 'Set up' },
+      action: { href: '/settings/ai-agents', label: 'Set up' },
       authorization:
         'OAuth consent by a workspace owner or admin; it mints a scoped workspace key.',
       name: 'Claude',
@@ -75,7 +76,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       status: agentStatus('claude'),
     },
     {
-      action: { href: '/workspace/ai-agents', label: 'Set up' },
+      action: { href: '/settings/ai-agents', label: 'Set up' },
       authorization: 'OAuth consent by a workspace owner or admin.',
       name: 'ChatGPT',
       purpose: 'The same Shots tools from ChatGPT connectors.',
@@ -84,7 +85,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       status: agentStatus('chatgpt'),
     },
     {
-      action: { href: '/workspace/ai-agents', label: 'Show the server URL' },
+      action: { href: '/settings/ai-agents', label: 'Show the server URL' },
       authorization: 'OAuth, or a workspace API key in the X-API-Key header.',
       name: 'MCP',
       purpose:
@@ -117,7 +118,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       status: 'not_available',
     },
     {
-      action: { href: '/workspace/notifications', label: 'Notification settings' },
+      action: { href: '/settings/notifications', label: 'Notification settings' },
       authorization: 'A Slack app install by a workspace owner or admin.',
       name: 'Slack',
       purpose: 'Activity notifications in a channel, and published designs delivered to Slack.',
@@ -129,7 +130,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       status: connected('SLACK') ? 'connected' : missing('SLACK') ? 'not_configured' : 'available',
     },
     {
-      action: { href: '/workspace/developers', label: 'Create a webhook' },
+      action: { href: '/settings/developers', label: 'Create a webhook' },
       authorization: 'A webhook URL from Zapier, and an API key for actions.',
       name: 'Zapier',
       purpose:
@@ -183,21 +184,23 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
                 </p>
                 <div className="mt-0.5 grid gap-1 text-xs text-muted-foreground">
                   <span>{entry.purpose}</span>
-                  <details>
-                    <summary className="cursor-pointer">Access and setup details</summary>
-                    <p>
-                      <strong className="font-medium text-foreground/80">Access:</strong>{' '}
-                      {entry.authorization}
-                    </p>
-                    <span>
-                      <strong className="font-medium text-foreground/80">Scopes:</strong>{' '}
-                      {entry.scopes}
-                    </span>
-                    <span>
-                      <strong className="font-medium text-foreground/80">Setup:</strong>{' '}
-                      {entry.setup}
-                    </span>
-                  </details>
+                  <Disclosure>
+                    <DisclosureTrigger>Access and setup details</DisclosureTrigger>
+                    <DisclosureContent>
+                      <p>
+                        <strong className="font-medium text-foreground/80">Access:</strong>{' '}
+                        {entry.authorization}
+                      </p>
+                      <span>
+                        <strong className="font-medium text-foreground/80">Scopes:</strong>{' '}
+                        {entry.scopes}
+                      </span>
+                      <span>
+                        <strong className="font-medium text-foreground/80">Setup:</strong>{' '}
+                        {entry.setup}
+                      </span>
+                    </DisclosureContent>
+                  </Disclosure>
                 </div>
               </div>
               {entry.status === 'not_configured' ? (

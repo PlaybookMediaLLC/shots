@@ -425,7 +425,7 @@ warm_e2e_routes() {
   wait_for_redirect_or_ok "${app_url%/}/drafts/warm-up" "Screenshot Studio draft composer route"
   # Legacy /drafts only compiles its redirect, not the current writing routes.
   wait_for_redirect_or_ok "${app_url%/}/write" "Screenshot Studio writing library route"
-  wait_for_redirect_or_ok "${app_url%/}/write/warm-up" "Screenshot Studio writing composer route"
+  wait_for_redirect_or_ok "${app_url%/}/publish/warm-up" "Screenshot Studio writing composer route"
   wait_for_redirect_or_ok "${app_url%/}/two-factor" "Screenshot Studio two-factor route"
   wait_for_redirect_or_ok "${app_url%/}/onboarding" "Screenshot Studio onboarding route"
   wait_for_redirect_or_ok "${app_url%/}/workspace" "Screenshot Studio workspace route"

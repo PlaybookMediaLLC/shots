@@ -115,7 +115,7 @@ export function BlueskyForm({
           preserved.
         </p>
         <Button asChild>
-          <Link href={completed.returnPath || '/workspace/social-sets'}>Open publishing brand</Link>
+          <Link href={completed.returnPath || '/settings/publishing-brands'}>Open publishing brand</Link>
         </Button>
       </div>
     )

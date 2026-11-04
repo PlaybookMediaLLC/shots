@@ -3,7 +3,13 @@ import * as React from 'react'
 import { useEditorRef, useEditorSelector } from '@shots/platejs-editor/platejs/react'
 import type { TElement } from '@shots/platejs-editor/platejs'
 import { Button } from '@/components/ui/button'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -278,18 +284,18 @@ function AttachmentRow({
       >
         ↓
       </Button>
-      <NativeSelect
-        aria-label="Destination post"
-        size="sm"
-        value={destination}
-        onChange={(event) => setDestination(Number(event.target.value))}
-      >
-        {Array.from({ length: postCount }, (_, index) => (
-          <NativeSelectOption value={index} key={index}>
-            Post {index + 1}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      <Select value={String(destination)} onValueChange={(value) => setDestination(Number(value))}>
+        <SelectTrigger aria-label="Destination post" size="sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: postCount }, (_, index) => (
+            <SelectItem value={String(index)} key={index}>
+              Post {index + 1}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button
         size="sm"
         variant="outline"

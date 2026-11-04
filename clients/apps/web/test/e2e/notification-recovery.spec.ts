@@ -57,7 +57,7 @@ for (const scenario of ['expired', 'uncertain'] as const) {
         })
       )
       await grantWorkspacePlan(workspace.id, 'pro')
-      await app.open('/workspace/notifications')
+      await app.open('/settings/notifications')
       await page.getByRole('switch', { name: 'Personal Slack messages', exact: true }).uncheck()
       await page.getByRole('button', { name: 'Save my preferences', exact: true }).click()
       await expect(page.getByText('Your preferences are saved.', { exact: true })).toBeVisible()
