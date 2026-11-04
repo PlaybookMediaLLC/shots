@@ -48,8 +48,8 @@ export function SuggestionLeaf(props: PlateLeafProps<TSuggestionText>) {
         onMouseLeave: () => setOption("hoverId", null),
       }}
       className={cn(
-        "border-b-2 border-b-brand/[.24] bg-brand/[.08] text-brand/80 no-underline transition-colors duration-200",
-        (hasActive || hasHover) && "border-b-brand/[.60] bg-brand/[.13]",
+        "border-b-2 border-b-primary/[.24] bg-primary/[.08] text-primary/80 no-underline transition-colors duration-200",
+        (hasActive || hasHover) && "border-b-primary/[.60] bg-primary/[.13]",
         hasRemove &&
           "border-b-gray-300 bg-gray-300/25 text-foreground line-through",
         (hasActive || hasHover) &&
@@ -100,10 +100,10 @@ function SuggestionLineBreakContent({
   return (
     <span
       className={cn(
-        "absolute border-b-2 border-b-brand/[.24] bg-brand/[.08] text-justify text-brand/80 no-underline transition-colors duration-200",
+        "absolute border-b-2 border-b-primary/[.24] bg-primary/[.08] text-justify text-primary/80 no-underline transition-colors duration-200",
         isInsert &&
           (isActive || isHover) &&
-          "border-b-brand/[.60] bg-brand/[.13]",
+          "border-b-primary/[.60] bg-primary/[.13]",
         isRemove &&
           "border-b-gray-300 bg-gray-300/25 text-foreground line-through",
         isRemove &&

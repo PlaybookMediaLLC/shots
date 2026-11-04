@@ -239,6 +239,23 @@ export function draftEditor(page: Page) {
   return page.getByRole('textbox', { name: 'Draft body' })
 }
 
+/** Choose an item from the editor toolbar's More menu (insert, media tools, import and export). */
+export async function editorMore(page: Page, item: string): Promise<void> {
+  await page
+    .getByRole('toolbar', { name: 'Draft tools' })
+    .getByRole('button', { name: 'More', exact: true })
+    .click()
+  // An item's name can go on with how it publishes ("Table Publishes as image").
+  const name = new RegExp(`^${item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`)
+  await page.getByRole('menuitem', { name }).click()
+}
+
+/** Open post `number`'s More menu in its bar; returns the menu, to choose an item or check one. */
+export async function postMenu(page: Page, number: number): Promise<Locator> {
+  await page.getByRole('button', { name: `More for post ${number}`, exact: true }).click()
+  return page.getByRole('menu')
+}
+
 /** Wait until autosave has written every change. */
 export async function expectSaved(page: Page): Promise<void> {
   await expect(page.getByTestId('save-state')).toHaveText('Saved', { timeout: 20_000 })

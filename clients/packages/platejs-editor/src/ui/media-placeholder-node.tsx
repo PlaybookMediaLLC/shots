@@ -89,7 +89,7 @@ export const PlaceholderElement = withHOC(
           {!(progressing && isImage) && (
             <button
               className={cn(
-                "flex cursor-pointer select-none items-center rounded-none bg-muted p-3 pr-9 transition-bg-ease hover:bg-primary/10"
+                "flex cursor-pointer select-none items-center rounded-md bg-muted p-3 pr-9 transition-colors hover:bg-primary/10"
               )}
               contentEditable={false}
               type="button"
@@ -383,7 +383,7 @@ function ImageProgress({
       {/* biome-ignore lint/performance/noImgElement: object URL previews use a native img in this framework-agnostic package. */}
       <img
         alt={file.name}
-        className="h-auto w-full rounded-none object-cover"
+        className="h-auto w-full rounded-md object-cover"
         height={200}
         ref={imageRef}
         src={objectUrl}

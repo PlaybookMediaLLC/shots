@@ -36,7 +36,7 @@ const getNavigationAttributes = (
   "data-nav-cycle": navigationHighlight
     ? String(navigationHighlight.cycle)
     : undefined,
-  "data-nav-highlight": navigationHighlight?.variant,
+  "data-nav-primary": navigationHighlight?.variant,
   "data-nav-pulse": navigationHighlight
     ? String(navigationHighlight.pulse)
     : undefined,
@@ -100,7 +100,7 @@ export function FootnoteReferenceElement(
         <HoverCardTrigger asChild>
           <button
             className={cn(
-              "focus-ring cursor-pointer rounded-none font-medium text-primary text-xs group-data-[nav-target=true]/footnote-ref:bg-highlight/30",
+              "cursor-pointer rounded-md font-medium text-primary text-xs group-data-[nav-target=true]/footnote-ref:bg-primary/30",
               selected && focused && "ring-2 ring-ring"
             )}
             onClick={(event) => {
@@ -157,7 +157,7 @@ export function FootnoteDefinitionElement(
         navigationHighlight
       )}
       className={cn(
-        "mt-1.5 flex items-start gap-2 data-[nav-target=true]:bg-highlight/30",
+        "mt-1.5 flex items-start gap-2 data-[nav-target=true]:bg-primary/30",
         isDuplicate && "border border-amber-500/30 bg-amber-500/5 p-2"
       )}
     >
@@ -236,7 +236,7 @@ export function FootnoteInputElement(props: PlateElementProps) {
   const canCreate = !identifiers.includes(proposedIdentifier);
 
   return (
-    <PlateElement {...props} as="span">
+    <PlateElement {...props} as="span" className="rounded-sm bg-accent px-0.5 text-accent-foreground">
       <InlineCombobox
         element={element}
         filter={false}
