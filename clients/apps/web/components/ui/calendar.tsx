@@ -5,15 +5,17 @@ import { CaretRightIcon as ChevronRight } from '@phosphor-icons/react/dist/ssr/C
 import type * as React from 'react'
 import { DayPicker } from 'react-day-picker'
 import { buttonVariants } from '@/components/ui/button'
+import { useWeekStartsOn } from '@/components/ui/format-preferences'
 import { cn } from '@/lib/utils'
 
-/** A month calendar (react-day-picker 9) in the app's design. */
+/** A month calendar (react-day-picker 9) in the app's design; weeks start on the person's chosen day. */
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
   ...props
 }: React.ComponentProps<typeof DayPicker>) {
+  const weekStartsOn = useWeekStartsOn()
   return (
     <DayPicker
       className={cn('p-3', className)}
@@ -52,6 +54,7 @@ function Calendar({
           ),
       }}
       showOutsideDays={showOutsideDays}
+      weekStartsOn={weekStartsOn}
       {...props}
     />
   )

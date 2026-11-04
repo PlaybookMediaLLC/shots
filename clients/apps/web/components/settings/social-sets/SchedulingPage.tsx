@@ -109,6 +109,7 @@ export function SchedulingPage({
         >
           <TimeZonePicker
             disabled={!canManageSet}
+            hideLabel
             label="Scheduling time zone"
             onChange={(timeZone) => void runZone(() => save({ timeZone }))}
             value={set.timeZone}

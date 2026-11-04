@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { domToPng } from 'modern-screenshot'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DatePicker } from '@/components/ui/date-picker'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,7 +28,6 @@ import {
 } from '@/components/ui/dialog'
 import { AnalyzeNav, WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import {
-  analyticsQuerySchema,
   analyticsSettingsSchema,
   type AnalyticsQuery,
   type AnalyticsReport,
@@ -82,11 +81,6 @@ export function AnalyzeWorkspace({
   const [query, setQuery] = React.useState<AnalyticsQuery>(() =>
     initialQuery(initial, selectedAccount?.timeZone ?? 'UTC')
   )
-  const [form, setForm] = React.useState({
-    from: query.from,
-    to: query.to,
-    timeZone: query.timeZone,
-  })
   const [preset, setPreset] = React.useState(initial.from ? 'Custom' : '1 month')
   const [metric, setMetric] = React.useState(
     initial.metric && METRICS[initial.metric] ? initial.metric : ''
@@ -222,21 +216,6 @@ export function AnalyzeWorkspace({
           })
         )
     })
-  const applyDates = () => {
-    const parsed = analyticsQuerySchema.safeParse({
-      ...query,
-      ...form,
-      asOf: undefined,
-      cursor: '',
-    })
-    if (!parsed.success || !isTimeZone(form.timeZone)) {
-      setFormError('Choose valid dates, From on or before To, and an IANA timezone.')
-      return
-    }
-    setFormError('')
-    setPreset('Custom')
-    update(form)
-  }
   if (!publicToken && !accounts.length)
     return (
       <div>
@@ -319,57 +298,30 @@ export function AnalyzeWorkspace({
             </Button>
           ) : null}
         </header>
-        <form
-          className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            applyDates()
-          }}
-        >
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
           <Label className="grid gap-1.5">
             Period
-            <NativeSelect
-              aria-label="Date preset"
-              value={preset}
-              onChange={(e) => {
-                setPreset(e.target.value)
-                if (e.target.value !== 'Custom') {
-                  const range = presetRange(e.target.value, query.timeZone)
-                  update(range)
-                  setForm((f) => ({ ...f, from: range.from, to: range.to }))
-                }
+            <DateRangePicker
+              aria-label="Date range"
+              onChange={(range) => {
+                setPreset('Custom')
+                update(range)
               }}
-            >
-              {PRESETS.map((p) => (
-                <NativeSelectOption key={p}>{p}</NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Label>
-          <Label className="grid gap-1.5">
-            From
-            <DatePicker
-              aria-label="From"
-              value={form.from}
-              onChange={(day) => setForm((f) => ({ ...f, from: day }))}
-            />
-          </Label>
-          <Label className="grid gap-1.5">
-            To
-            <DatePicker
-              aria-label="To"
-              value={form.to}
-              onChange={(day) => setForm((f) => ({ ...f, to: day }))}
+              onPreset={(label) => {
+                setPreset(label)
+                update(presetRange(label, query.timeZone))
+              }}
+              preset={preset}
+              presets={PRESETS.filter((label) => label !== 'Custom')}
+              value={{ from: query.from, to: query.to }}
             />
           </Label>
           <TimeZonePicker
             className="w-56"
             label="Timezone"
-            onChange={(timeZone) => setForm((f) => ({ ...f, timeZone }))}
-            value={form.timeZone}
+            onChange={(timeZone) => update({ timeZone })}
+            value={query.timeZone}
           />
-          <Button variant="outline" type="submit">
-            Apply range
-          </Button>
           <Label className="grid gap-1.5">
             Grouping
             <NativeSelect
@@ -382,7 +334,7 @@ export function AnalyzeWorkspace({
               <NativeSelectOption value="monthly">Monthly</NativeSelectOption>
             </NativeSelect>
           </Label>
-        </form>
+        </div>
         {formError ? <p role="alert">{formError}</p> : null}
         {error ? (
           <div role="alert" className="rounded border p-6">

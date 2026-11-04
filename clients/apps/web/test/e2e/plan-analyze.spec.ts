@@ -181,7 +181,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(page.getByRole('button', { name: 'Day', exact: true })).toContainText(
       format(new Date(`${day}T12:00`), 'PP')
     )
-    await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00')
+    await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00 PM')
     await expect(page.getByRole('checkbox', { name: 'Open in editor' })).toBeChecked()
     await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Article')
     await page.getByRole('button', { name: 'Plan draft', exact: true }).click()
@@ -697,25 +697,38 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByLabel('Analytics account')).toHaveValue(account)
   })
   await test.step('A09 A10 A11 A12 dates grouping and explicit scope stay synchronized', async () => {
-    await expect(page.getByLabel('Date preset').locator('option')).toHaveCount(11)
-    await page.getByLabel('Date preset').selectOption('1 year')
+    const range = page.getByRole('button', { name: 'Date range', exact: true })
+    const preset = async (name: string) => {
+      await range.click()
+      await page
+        .getByRole('group', { name: 'Presets' })
+        .getByRole('button', { name, exact: true })
+        .click()
+    }
+    await range.click()
+    await expect(page.getByRole('group', { name: 'Presets' }).getByRole('button')).toHaveCount(10)
+    await page.keyboard.press('Escape')
+    await preset('1 year')
     await expect(page.getByLabel('Grouping')).toHaveValue('monthly')
-    await page.getByLabel('Date preset').selectOption('1 month')
+    await preset('1 month')
     await expect(page.getByLabel('Grouping')).toHaveValue('daily')
-    // A From after To: 40 days out is past the preset's end (today).
-    await page.getByLabel('From', { exact: true }).click()
-    const laterDay = page
-      .getByRole('button', { name: format(new Date(Date.now() + 40 * 86_400_000), 'PPPP') })
+    // Picking the later day first still gives a valid range, applied with no Apply button.
+    const today = new Date()
+    const earlier = new Date(Date.now() - 3 * 86_400_000)
+    await range.click()
+    await page
+      .getByRole('button', { name: format(today, 'PPPP') })
       .first()
-    while (!(await laterDay.isVisible()))
-      await page.getByRole('button', { name: 'Go to the Next Month' }).click()
-    await laterDay.click()
-    await page.getByRole('button', { name: 'Apply range' }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'Choose valid dates' })).toContainText(
-      'valid dates'
-    )
-    await page.getByLabel('Date preset').selectOption('7 days')
-    await page.getByRole('button', { name: 'Apply range' }).click()
+      .click()
+    await page
+      .getByRole('button', { name: format(earlier, 'PPPP') })
+      .first()
+      .click()
+    await expect(page).toHaveURL(new RegExp(`from=${format(earlier, 'yyyy-MM-dd')}`))
+    await expect(page).toHaveURL(new RegExp(`to=${format(today, 'yyyy-MM-dd')}`))
+    await expect(range).toContainText(format(today, 'MMM d, yyyy'))
+    await preset('7 days')
+    await expect(range).toContainText('7 days')
   })
   await test.step('A13 A14 A15 A16 A17 A18 A34 A35 expanded chart works independently of post data', async () => {
     await page

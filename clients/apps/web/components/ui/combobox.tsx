@@ -4,7 +4,7 @@ import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
 import { CheckIcon } from '@phosphor-icons/react/dist/ssr/Check'
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/ssr/MagnifyingGlass'
 import { Command } from 'cmdk'
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { selectTriggerClassName } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
@@ -59,6 +59,7 @@ export function Combobox({
 }) {
   const [open, setOpen] = useState(false)
   const listId = useId()
+  const listRef = useRef<HTMLDivElement>(null)
   const list = typeof options === 'function' ? (open ? options() : []) : options
   const shown = valueLabel ?? list.find((option) => option.value === value)?.label
 
@@ -105,12 +106,14 @@ export function Combobox({
           <div className="flex items-center gap-2 border-b px-3">
             <MagnifyingGlassIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             <Command.Input
+              // A new search starts at its best match, not wherever the list was scrolled.
+              onValueChange={() => listRef.current?.scrollTo({ top: 0 })}
               autoFocus
               className="h-9 w-full min-w-0 bg-transparent text-sm outline-hidden placeholder:text-muted-foreground"
               placeholder={searchPlaceholder}
             />
           </div>
-          <Command.List className="max-h-80 overflow-y-auto p-1" id={listId}>
+          <Command.List className="max-h-80 overflow-y-auto p-1" id={listId} ref={listRef}>
             <Command.Empty className="px-2 py-6 text-center text-sm text-muted-foreground">
               {emptyText}
             </Command.Empty>

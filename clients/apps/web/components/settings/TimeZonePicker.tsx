@@ -33,6 +33,7 @@ export function TimeZonePicker({
   allowBrowser,
   className,
   disabled,
+  hideLabel,
   label,
   onChange,
   size,
@@ -42,6 +43,8 @@ export function TimeZonePicker({
   allowBrowser?: boolean
   className?: string
   disabled?: boolean
+  /** The row around it already shows the label; keep it for screen readers only. */
+  hideLabel?: boolean
   label: string
   onChange: (zone: string) => void
   size?: 'default' | 'sm'
@@ -81,7 +84,7 @@ export function TimeZonePicker({
 
   return (
     <div className={cn('grid w-full min-w-0 gap-1 text-sm', className)}>
-      <Label className="font-medium text-foreground" htmlFor={id}>
+      <Label className={cn('font-medium text-foreground', hideLabel && 'sr-only')} htmlFor={id}>
         {label}
       </Label>
       <Combobox

@@ -240,6 +240,7 @@ export function WorkspaceGeneralSettings({
               label="Timezone"
             >
               <TimeZonePicker
+                hideLabel
                 label="Timezone"
                 value={values.timeZone}
                 onChange={(timeZone) => update({ timeZone })}

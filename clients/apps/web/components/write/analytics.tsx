@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { SocialObservation, BackendBestTime } from 'screenshot-studio-backend-sdk'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Accordion,
   AccordionContent,
@@ -10,7 +11,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
-import { DatePicker } from '@/components/ui/date-picker'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
@@ -51,8 +52,7 @@ export function SocialAnalytics({
   const [channel, setChannel] = useState('all')
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   const [metric, setMetric] = useState('likes')
-  const [from, setFrom] = useState(range.start)
-  const [to, setTo] = useState(range.end)
+  const router = useRouter()
   const rows = useMemo(
     () => observations.filter((row) => channel === 'all' || row.platform === channel),
     [observations, channel]
@@ -96,20 +96,18 @@ export function SocialAnalytics({
           canManage={canManage}
         />
       )}
-      <form className="flex flex-wrap items-end gap-3" method="get">
-        {socialSetId ? <input type="hidden" name="set" value={socialSetId} /> : null}
-        <Label className="grid gap-1.5">
-          From <DatePicker aria-label="Analytics from" value={from} onChange={setFrom} />
-          <input type="hidden" name="from" value={from} />
-        </Label>
-        <Label className="grid gap-1.5">
-          Through <DatePicker aria-label="Analytics through" value={to} onChange={setTo} />
-          <input type="hidden" name="to" value={to} />
-        </Label>
-        <Button variant="outline" type="submit">
-          Apply dates
-        </Button>
-      </form>
+      <Label className="grid w-fit gap-1.5">
+        Dates
+        <DateRangePicker
+          aria-label="Analytics dates"
+          onChange={({ from, to }) =>
+            router.replace(
+              `?${new URLSearchParams({ ...(socialSetId ? { set: socialSetId } : {}), from, to })}`
+            )
+          }
+          value={{ from: range.start, to: range.end }}
+        />
+      </Label>
       {rangeError ? <p role="alert">{rangeError}</p> : null}
       <div className="flex flex-wrap items-end gap-3">
         <Label className="grid gap-1.5">
