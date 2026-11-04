@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,6 +20,16 @@ import (
 )
 
 const tenantPrefix = "TENANT_"
+
+// socialCredentialKeys let the worker open sealed channel tokens and refresh
+// them. Production sets them without a TENANT_ twin; see
+// infra/digitalocean/consolidate-live-spec.py.
+var socialCredentialKeys = []string{
+	"PLATFORM_SOCIAL_ENCRYPTION_KEY", "PLATFORM_SOCIAL_ENCRYPTION_PREVIOUS_KEY",
+	"LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET",
+	"X_API_KEY", "X_API_SECRET", "TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET",
+	"FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET",
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -113,11 +124,11 @@ func publishingEnv(environ []string) ([]string, error) {
 			result = append(result, name+"="+value)
 		}
 	}
-	// Both processes share the telemetry settings and the image's version; a
-	// TENANT_ twin still wins.
+	// Both processes share the telemetry settings, the image's version and the
+	// social credentials; a TENANT_ twin still wins.
 	for _, item := range environ {
 		key, _, _ := strings.Cut(item, "=")
-		if (strings.HasPrefix(key, "OTEL_") || key == "SERVICE_VERSION") && !hasEnv(result, key) {
+		if (strings.HasPrefix(key, "OTEL_") || key == "SERVICE_VERSION" || slices.Contains(socialCredentialKeys, key)) && !hasEnv(result, key) {
 			result = append(result, item)
 		}
 	}
