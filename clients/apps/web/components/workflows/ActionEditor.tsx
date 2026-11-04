@@ -37,6 +37,7 @@ function blankAction(type: AutomationActionType): AutomationAction {
   if (type === 'generate_copy') return { type, creditLimit: 25 }
   if (type === 'render_creatives') return { type, templateIds: ['layout-browser-launch'] }
   if (type === 'create_canvas') return { type, recipeIds: ['feature-announcement', 'social-pack'] }
+  if (type === 'render_code_visual') return { type, readSourceCode: false }
   return { type }
 }
 
@@ -287,6 +288,24 @@ export function ActionEditor({
           <p className="text-xs leading-5 text-muted-foreground">
             Creatives are drafts on the campaign. A reviewer approves a design before it can be
             scheduled with a post.
+          </p>
+        </>
+      ) : null}
+      {action.type === 'render_code_visual' ? (
+        <>
+          <Label className="flex items-start gap-2 text-sm font-normal">
+            <Checkbox
+              checked={action.readSourceCode === true}
+              onCheckedChange={(checked) => onChange({ ...action, readSourceCode: checked === true })}
+            />
+            <span>
+              Allow this action to read the merged pull request’s code. Shots reads the diff only
+              when this workflow runs, and keeps it only in the Code Studio project it makes.
+            </span>
+          </Label>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Runs on the pull request trigger. The image is a draft on the campaign; a reviewer
+            approves it before it is posted.
           </p>
         </>
       ) : null}

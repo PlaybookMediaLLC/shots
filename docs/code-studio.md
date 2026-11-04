@@ -89,6 +89,10 @@ with an optional voice-over. Post this can attach the MP4.
 - Embeds: a share link can carry a frozen copy of one slide. Its embed page
   shows the code as real, selectable text with a Copy button, and embed
   routes may be framed by other sites.
+- Automate › Render a code visual: on the merged pull request trigger, with
+  the owner's consent, the worker turns the change's first three files into a
+  diff project, renders it and attaches it to the run's campaign as a
+  `code-visual` for review. A retry reuses the project and image.
 - Campaigns › Visuals › Code highlights lists the release's pull requests and
   commits. Each opens Code Studio with the link ready to import (nothing is
   read until the member imports it), and Export › Add image to campaign
@@ -109,10 +113,16 @@ Shots reads source code only when a person explicitly asks:
    member; nothing is stored until they save a project, and then only in it.
    Importing needs an editing role. The audit log (`product.code_imported`)
    records the repository, link kind and file count, never code.
-2. **Release automation stays as RFC 016 describes:** titles, bodies, labels
-   and changed paths only. A future Automate action that renders code from a
-   diff must be turned on per action by a workflow owner, and it stores code
-   only in the code project it creates.
+2. **Owner-enabled automation.** Release automation stays as RFC 016
+   describes (titles, bodies, labels and changed paths) except for one
+   action, **Render a code visual** (`render_code_visual`). A workflow owner
+   must tick "Allow this action to read the merged pull request's code"
+   (`readSourceCode: true`), the graph validator refuses the action without
+   it, and only the pull request trigger can use it. When it runs, the worker
+   reads the merged pull request's diff with the workspace's installation,
+   sends its first three changed files to the web over the signed internal
+   route, and the code is kept only in the Code Studio project it creates.
+   The run records the project's ID, never code.
 
 Rendering happens in the browser. A code project leaves the browser only when
 it is saved, posted, embedded or rendered through the API.
@@ -129,8 +139,6 @@ it is saved, posted, embedded or rendered through the API.
 
 ## Not built yet
 
-- An Automate action that renders a code visual from a release's diff into a
-  campaign.
 - A server-side render queue for long or 4K videos. Headless Chromium usually
   lacks an H.264 encoder, so it needs a worker with FFmpeg and render quotas.
 - Real command execution for terminal recordings. It needs an isolated

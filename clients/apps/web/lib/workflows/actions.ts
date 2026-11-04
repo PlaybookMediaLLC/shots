@@ -102,6 +102,21 @@ export const WORKFLOW_ACTIONS = {
     paid: false,
     humanApproval: false,
   },
+  render_code_visual: {
+    type: 'render_code_visual',
+    label: 'Render a code visual',
+    description:
+      'Reads the merged pull request’s diff (only with your consent), turns its first changed files into a Code Studio project, renders it and attaches the image to the campaign for review.',
+    input: 'campaignId',
+    output: 'campaignId',
+    minSchemaVersion: 2,
+    permission: ADMIN,
+    integrations: ['GitHub App access to the repository’s code', 'Design renderer'],
+    entitlement: 'campaign:workflow',
+    retry: 'Up to 3 attempts, 5 minutes each. A retry reuses the code project and image.',
+    paid: false,
+    humanApproval: false,
+  },
   create_canvas: {
     type: 'create_canvas',
     label: 'Create a canvas',

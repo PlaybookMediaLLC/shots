@@ -111,7 +111,9 @@ an explicit request. When a member imports a file permalink, pull request,
 commit or gist, the backend reads that link with the workspace's installation
 (or anonymously for public code), returns it to that member and stores
 nothing; the code is kept only in a project the member saves. The audit log
-records the repository and link kind, never the code. See
+records the repository and link kind, never the code. The one automation
+that reads a diff, Automate's **Render a code visual**, runs only where a
+workflow owner explicitly allowed it on that action. See
 [Code Studio](../code-studio.md#source-code-policy).
 
 ### Installation mapping
