@@ -13,6 +13,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
@@ -210,11 +211,11 @@ export function BulkScheduleDialog({
                       value={start.slice(0, 10)}
                       onChange={(day) => setStart(`${day}T${start.slice(11)}`)}
                     />
-                    <Input
+                    <TimePicker
                       aria-label="Start time"
-                      type="time"
+                      className="w-full"
                       value={start.slice(11)}
-                      onChange={(event) => setStart(`${start.slice(0, 10)}T${event.target.value}`)}
+                      onChange={(time) => setStart(`${start.slice(0, 10)}T${time}`)}
                     />
                   </span>
                 </Label>

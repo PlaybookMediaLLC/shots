@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { TimePicker } from '@/components/ui/time-picker'
 import { LocalePicker } from '@/components/settings/LocalePicker'
 import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
@@ -249,15 +250,14 @@ export function WorkspaceGeneralSettings({
               description="When scheduled posts go out by default."
               label={label('workspace-default-publish-time', 'Default publishing time')}
             >
-              <Input
-                className={field}
+              <TimePicker
+                className="w-40"
                 value={values.defaultPublishTime}
-                onChange={(event) => update({ defaultPublishTime: event.target.value })}
+                onChange={(defaultPublishTime) => update({ defaultPublishTime })}
                 disabled={!canManage}
                 id="workspace-default-publish-time"
                 name="defaultPublishTime"
                 required
-                type="time"
               />
             </Row>
           </Group>

@@ -2,12 +2,18 @@ import { expect, type Locator } from '@playwright/test'
 import { contrastRatio } from '@/lib/launch/brand'
 
 /**
- * Pick an option of a Select (the design system's, on Radix): open it, then
+ * Pick an option of a Select or Combobox (the design system's): open it, then
  * click the option by its visible name, as a person would. Native
- * `selectOption` does not work on it.
+ * `selectOption` does not work on them.
  */
-export async function chooseOption(select: Locator, name: string | RegExp): Promise<void> {
+export async function chooseOption(
+  select: Locator,
+  name: string | RegExp,
+  /** Typed into a Combobox's search field first, as a person narrows a long list. */
+  search?: string
+): Promise<void> {
   await select.click()
+  if (search) await select.page().keyboard.type(search)
   const option = select.page().getByRole('option', { exact: typeof name === 'string', name })
   await option.click()
   // Closed again: other listboxes on the page are not this select's.

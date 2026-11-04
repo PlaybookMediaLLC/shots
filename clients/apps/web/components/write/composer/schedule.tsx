@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SegmentedControl } from '@/components/ui/segmented-control'
@@ -45,7 +46,7 @@ import {
   resolveLocalTime,
   wallTime,
 } from '@/lib/write/zoned-time'
-import { browserTimeZone } from '@/components/settings/TimeZonePicker'
+import { browserTimeZone } from '@/lib/time-zones'
 import { AutomationControls } from './automation'
 import { AutoDmDraft } from './auto-dm-draft'
 import type { PreviewItem } from './preview'
@@ -376,13 +377,13 @@ export function ScheduleDialog({
                 </Label>
                 <Label className="grid content-start gap-1.5 text-xs text-muted-foreground">
                   Time
-                  <Input
+                  <TimePicker
                     aria-label="Time"
-                    onChange={(event) => {
-                      setTime(event.target.value)
+                    className="w-full"
+                    onChange={(next) => {
+                      setTime(next)
                       setDisambiguation(null)
                     }}
-                    type="time"
                     value={time}
                   />
                 </Label>

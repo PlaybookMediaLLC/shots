@@ -6,6 +6,7 @@ import { domToPng } from 'modern-screenshot'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -360,14 +361,12 @@ export function AnalyzeWorkspace({
               onChange={(day) => setForm((f) => ({ ...f, to: day }))}
             />
           </Label>
-          <Label className="grid gap-1.5">
-            Timezone
-            <Input
-              aria-label="Analytics timezone"
-              value={form.timeZone}
-              onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
-            />
-          </Label>
+          <TimeZonePicker
+            className="w-56"
+            label="Timezone"
+            onChange={(timeZone) => setForm((f) => ({ ...f, timeZone }))}
+            value={form.timeZone}
+          />
           <Button variant="outline" type="submit">
             Apply range
           </Button>
@@ -1056,14 +1055,7 @@ function GoalDialog({
           />
           Exclude weekend publications
         </Label>
-        <Label className="grid gap-1.5">
-          Goal timezone
-          <Input
-            aria-label="Goal timezone"
-            value={zone}
-            onChange={(e) => setZone(e.target.value)}
-          />
-        </Label>
+        <TimeZonePicker label="Goal timezone" onChange={setZone} value={zone} />
         <p className="text-xs">
           Weeks begin Monday. A period in progress does not break the streak. Failed, scheduled, and
           planned content never qualifies.

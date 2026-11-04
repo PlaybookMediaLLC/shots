@@ -12,6 +12,7 @@ import {
   useState,
 } from 'react'
 import type { z } from 'zod'
+import { FormatPreferencesProvider } from '@/components/ui/format-preferences'
 import {
   userPreferencesSchema,
   type userPreferencesUpdateSchema,
@@ -116,6 +117,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         ...(update.theme ? { theme: update.theme } : {}),
         ...(update.navigation ? { navigation: update.navigation } : {}),
         ...(update.weekStart ? { weekStart: update.weekStart } : {}),
+        ...(update.timeFormat ? { timeFormat: update.timeFormat } : {}),
         ...(update.textDirection ? { textDirection: update.textDirection } : {}),
         ...(update.showScrollbars === undefined ? {} : { showScrollbars: update.showScrollbars }),
         ...(update.developerMode === undefined ? {} : { developerMode: update.developerMode }),
@@ -153,7 +155,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
         status: query.isError ? 'error' : preferences ? 'ready' : 'loading',
       }}
     >
-      {children}
+      <FormatPreferencesProvider
+        timeFormat={preferences?.timeFormat ?? 'auto'}
+        weekStartsOn={
+          preferences ? (preferences.weekStart === 'sunday' ? 0 : 1) : undefined
+        }
+      >
+        {children}
+      </FormatPreferencesProvider>
     </PreferencesContext>
   )
 }

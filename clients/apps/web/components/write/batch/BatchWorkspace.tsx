@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import {
@@ -119,14 +120,11 @@ function LocalTimeFields({
           if (next) onChange((current) => `${next}T${current.split('T')[1] || time || '09:00'}`)
         }}
       />
-      <Input
+      <TimePicker
         aria-label={`${label} time`}
-        className="w-36"
         disabled={disabled}
-        type="time"
         value={time}
-        onChange={(event) => {
-          const next = event.target.value
+        onChange={(next) => {
           if (day && next) onChange((current) => `${current.split('T')[0] || day}T${next}`)
         }}
       />

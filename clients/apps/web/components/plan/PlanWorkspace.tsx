@@ -21,6 +21,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { TimePicker } from '@/components/ui/time-picker'
 import {
   Dialog,
   DialogContent,
@@ -715,36 +717,13 @@ export function PlanWorkspace({
                 ? readable(anchor, { month: 'long', year: 'numeric' })
                 : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
             </h1>
-            <Label className="text-xs font-normal text-muted-foreground">
-              Display timezone
-              <Input
-                aria-label="Display timezone"
-                className="h-8 w-48 text-foreground"
-                list="plan-zones"
-                defaultValue={prefs.zone}
-                key={prefs.zone}
-                onBlur={(e) => {
-                  if (isTimeZone(e.target.value)) setPref({ zone: e.target.value })
-                  else {
-                    e.target.value = prefs.zone
-                    toast.error('Choose a valid IANA timezone.')
-                  }
-                }}
-              />
-            </Label>
-            <datalist id="plan-zones">
-              {[
-                ...new Set([
-                  'UTC',
-                  'America/New_York',
-                  'Europe/London',
-                  'Asia/Tokyo',
-                  ...sets.map((s) => s.timeZone),
-                ]),
-              ].map((z) => (
-                <NativeSelectOption key={z}>{z}</NativeSelectOption>
-              ))}
-            </datalist>
+            <TimeZonePicker
+              className="w-56 text-xs"
+              label="Display timezone"
+              onChange={(zone) => setPref({ zone })}
+              size="sm"
+              value={prefs.zone}
+            />
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -1103,34 +1082,15 @@ function TimeFields({
             value={local.slice(0, 10)}
             onChange={(day) => onLocal(`${day}T${local.slice(11)}`)}
           />
-          <Input
+          <TimePicker
             className="w-full"
             aria-label="Time"
-            type="time"
             value={local.slice(11)}
-            onChange={(e) => onLocal(`${local.slice(0, 10)}T${e.target.value}`)}
-            step="60"
-            list="quarter-hours"
+            onChange={(time) => onLocal(`${local.slice(0, 10)}T${time}`)}
           />
         </span>
-        <datalist id="quarter-hours">
-          {Array.from({ length: 96 }, (_, i) => (
-            <NativeSelectOption
-              key={i}
-              value={`${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`}
-            />
-          ))}
-        </datalist>
       </Label>
-      <Label className="grid gap-1.5">
-        Scheduling timezone{' '}
-        <Input
-          className="w-full"
-          aria-label="Scheduling timezone"
-          value={zone}
-          onChange={(e) => onZone(e.target.value)}
-        />
-      </Label>
+      <TimeZonePicker label="Scheduling timezone" onChange={onZone} value={zone} />
       <Label className="grid gap-1.5">
         Repeated hour{' '}
         <NativeSelect

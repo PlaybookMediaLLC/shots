@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { format } from 'date-fns'
-import { apiRequest, db, enableDraftTags, expect, test } from './framework'
+import { apiRequest, chooseOption, db, enableDraftTags, expect, test } from './framework'
 
 test.use({ actionTimeout: 30000 })
 
@@ -92,10 +92,10 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       'true'
     )
     await page.getByTestId('available-slot').first().click()
-    await expect(page.getByLabel('Scheduling timezone', { exact: true })).toHaveValue(
-      'America/New_York'
-    )
-    await expect(page.getByLabel('Time', { exact: true })).toHaveValue('09:15')
+    await expect(
+      page.getByRole('combobox', { exact: true, name: 'Scheduling timezone' })
+    ).toContainText('New York')
+    await expect(page.getByLabel('Time', { exact: true })).toHaveValue('9:15 AM')
     await page.keyboard.press('Escape')
     await page.getByLabel('Calendar view').selectOption('week')
     await expect(page.getByTestId('available-slot').first()).toBeVisible()
@@ -369,8 +369,11 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(card).toBeVisible()
   })
   await test.step('P22 P23 changing display zones preserves the stored UTC placement', async () => {
-    await page.getByLabel('Display timezone', { exact: true }).fill('Asia/Tokyo')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^Tokyo · /,
+      'Tokyo'
+    )
     expect(
       (
         await db.query('SELECT "plannedFor" FROM content_draft WHERE id=$1', [draftId])
@@ -378,8 +381,11 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toBe(plannedFor)
     // Restore the display zone: in Tokyo a post late on a month's last day
     // shows in the next month, outside the calendar the later steps read.
-    await page.getByLabel('Display timezone', { exact: true }).fill('America/New_York')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^New York · /,
+      'New York'
+    )
   })
   await test.step('P34 P36 a move has a durable inverse and stale replay cannot overwrite it', async () => {
     const target = new Date(Date.parse(plannedFor) + 86400000).toISOString()
@@ -504,12 +510,14 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toEqual([{ status: 'PUBLISHED', remotePostId: 'history-fixture' }])
   })
   await test.step('P40 mobile queue and keyboard controls are usable', async () => {
-    await page.getByLabel('Display timezone', { exact: true }).focus()
+    // Typing in a picker's search field is text, not a calendar shortcut.
+    const zone = page.getByRole('combobox', { exact: true, name: 'Display timezone' })
+    await zone.click()
     await page.keyboard.press('w')
     await expect(page.getByLabel('Calendar view')).toHaveValue('month')
+    await page.keyboard.press('Escape')
     // West of New York, so the planned post keeps its day (and month) on screen.
-    await page.getByLabel('Display timezone', { exact: true }).fill('America/Los_Angeles')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(zone, /^Los Angeles · /, 'Los Angeles')
     await page.locator('body').click({ position: { x: 1270, y: 10 } })
     await page.keyboard.press('v')
     await expect(page.getByLabel('Calendar view')).toHaveValue('week')

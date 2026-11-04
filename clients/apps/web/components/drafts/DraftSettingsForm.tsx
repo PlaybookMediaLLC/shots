@@ -5,7 +5,7 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { draftsApi, type SettingsWire } from '@/lib/content-drafts/client'
-import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 
@@ -82,13 +82,10 @@ export function DraftSettingsForm({
                 ))}
                 {canManage ? (
                   <span className="ml-auto flex items-center gap-1">
-                    <Input
+                    <TimePicker
                       aria-label={`New ${name} time`}
-                      className="h-7 rounded-md border border-foreground/[0.08] bg-transparent px-1 text-xs text-foreground"
-                      onChange={(event) =>
-                        setAdding((current) => ({ ...current, [weekday]: event.target.value }))
-                      }
-                      type="time"
+                      className="w-32"
+                      onChange={(time) => setAdding((current) => ({ ...current, [weekday]: time }))}
                       value={adding[weekday] ?? ''}
                     />
                     <Button variant="custom" size={null}
