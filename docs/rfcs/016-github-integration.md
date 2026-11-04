@@ -65,8 +65,10 @@ Marketing-worthy change detected.
 
 - Automatic screenshot capture from deployments. RFC 029 covers that.
 - Automatic publishing.
-- Reading file contents or diffs. Titles, bodies, labels, and changed paths
-  only.
+- Reading file contents or diffs for release intake and automation. Titles,
+  bodies, labels, and changed paths only. (Amended 2026-11-04: Code Studio
+  reads the code behind a link a member imports; see
+  [Code Studio](../code-studio.md#source-code-policy).)
 - Issue tracking, code review, or any non-marketing GitHub feature.
 
 ## GitHub App
@@ -97,11 +99,20 @@ to pushes. The consequence is a product promise: the integration
 tracks merged pull requests, not every commit to a branch. A direct push to
 the watched branch produces nothing.
 
-"We never read your source code" is therefore a policy, not a permission:
-the App could read file contents, and the platform never calls a contents
-endpoint. It reads release notes, PR titles, bodies, labels, and changed file
-paths only. A team that wants the guarantee enforced by permission can use a
-hand-made repository webhook, which needs no App permissions.
+"Release automation never reads your source code" is therefore a policy, not
+a permission: the App could read file contents, and release intake never
+calls a contents endpoint. It reads release notes, PR titles, bodies, labels,
+and changed file paths only. A team that wants the guarantee enforced by
+permission can use a hand-made repository webhook, which needs no App
+permissions.
+
+**Amendment (2026-11-04):** Code Studio is the one reader of code, and only on
+an explicit request. When a member imports a file permalink, pull request,
+commit or gist, the backend reads that link with the workspace's installation
+(or anonymously for public code), returns it to that member and stores
+nothing; the code is kept only in a project the member saves. The audit log
+records the repository and link kind, never the code. See
+[Code Studio](../code-studio.md#source-code-policy).
 
 ### Installation mapping
 
@@ -429,7 +440,7 @@ noise.
 6. A `chore:` PR is filtered before classification.
 7. A PR labeled `no-marketing` produces nothing.
 8. A PR body containing injected instructions changes no control flow.
-9. No prompt ever contains file contents or a diff.
+9. No release-automation prompt ever contains file contents or a diff.
 10. Accepting a suggestion runs Workflow 2 and produces a `DRAFT` campaign.
 11. Dismissing records a reason and updates no product context.
 12. Three related PRs within 24 hours produce one suggestion.

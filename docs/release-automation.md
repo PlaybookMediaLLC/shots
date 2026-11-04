@@ -288,7 +288,8 @@ unresolved evidence cannot select the false branch. PR paths start as pending.
 The activity paginates all paths, verifies GitHub's reported changed-file count,
 and rejects incomplete, duplicate, truncated, or over-3,000-file results. The
 bounded result is persisted before evaluation. No repository file contents or
-diffs are read. Recorded-event previews use only recorded evidence and clearly
+diffs are read. (Code Studio imports, which a member starts by pasting a link,
+are separate: see [Code Studio](code-studio.md#source-code-policy).) Recorded-event previews use only recorded evidence and clearly
 report pending enrichment; examples are labeled as examples. Predicted actions
 describe their outputs but never fabricate product IDs or approval.
 
