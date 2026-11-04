@@ -123,3 +123,114 @@ test('a forged review link shows nothing', async ({ app, page }) => {
   await app.open('/review/eyJmYWtlIjp0cnVlfQ~forged-signature-value')
   await expect(page.getByText('You can comment; you cannot edit')).toHaveCount(0)
 })
+
+test('Store screenshots is one click from any page, highlighted and titled, and old links land on it', async ({
+  app,
+  identity,
+  page,
+}) => {
+  await createWorkspace(identity, page)
+  await app.open('/home')
+  const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+  await sidebar.getByRole('link', { name: 'Store screenshots', exact: true }).click()
+  await app.expectPath('/create/store')
+  await expect(page.getByRole('button', { name: 'Use the sample set' })).toBeVisible()
+  await expect(page).toHaveTitle('Store screenshots · Create | Shots')
+  for (const name of ['Create', 'Store screenshots'])
+    await expect(sidebar.getByRole('link', { name, exact: true })).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+
+  await page.getByRole('button', { name: 'Use the sample set' }).click()
+  await expect(page).toHaveURL(/\/create\/store\/[^/]+$/)
+  const id = new URL(page.url()).pathname.split('/').pop()!
+  await expect(
+    sidebar.getByRole('link', { name: 'Store screenshots', exact: true })
+  ).toHaveAttribute('aria-current', 'page')
+
+  await app.open(`/?project=abc&editor=app-store&storeProject=${id}`)
+  await app.expectPath(`/create/store/${id}`)
+  await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
+  expect(new URL(page.url()).search).toBe('')
+  await app.open('/?editor=app-store')
+  await app.expectPath(`/create/store/${id}`)
+})
+
+test('reopening the last project never reports an error the person did not cause', async ({
+  app,
+  identity,
+  page,
+}) => {
+  await createWorkspace(identity, page)
+  await app.open('/create/store')
+  await expect(page.getByRole('button', { name: 'Use the sample set' })).toBeVisible()
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('shots-store-studio', 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(['projects', 'meta'], 'readwrite')
+      transaction.objectStore('projects').put({
+        id: 'unreadable',
+        name: 'Unreadable set',
+        updatedAt: Date.now(),
+        slideCount: 1,
+        thumbnail: null,
+        document: { version: 2, id: 'unreadable' },
+      })
+      transaction.objectStore('meta').put('unreadable', 'lastProjectId')
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+    })
+    database.close()
+  })
+  await app.reload()
+  await expect(page.getByRole('heading', { name: 'Your projects' })).toBeVisible()
+  await expect(page.getByText('On this browser ·')).toBeVisible()
+  await expect(page.getByText('Could not open the project')).toHaveCount(0)
+  // Opening it on purpose still says why it cannot open.
+  await page.getByRole('button', { name: /^Unreadable set/ }).click()
+  await expect(page.getByText('Could not open the project')).toBeVisible()
+})
+
+test(
+  'a project saved to the workspace autosaves there, lists in Library and opens on another browser',
+  { tag: '@journey' },
+  async ({ app, browser, identity, page }) => {
+    await createWorkspace(identity, page)
+    await app.open('/create/store')
+    await page.getByRole('button', { name: 'Use the sample set' }).click()
+    await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
+    await editHeading(page, 'Saved everywhere')
+    await page.getByRole('button', { name: 'Save to workspace', exact: true }).click()
+    const saved = page.getByRole('status').filter({ hasText: /^Saved to workspace$/ })
+    await expect(saved).toBeVisible({ timeout: 60_000 })
+    const id = new URL(page.url()).pathname.split('/').pop()!
+
+    const autosaved = page.waitForResponse(
+      (response) => response.url().includes('storeProject.updateDocument') && response.ok()
+    )
+    await editHeading(page, 'Saved twice')
+    await autosaved
+    await expect(saved).toBeVisible()
+
+    // A second browser profile has the session but none of this browser's projects.
+    const other = await browser.newContext({ storageState: await page.context().storageState() })
+    const second = await other.newPage()
+    await second.goto(new URL('/library?type=store', page.url()).href)
+    const listed = second
+      .getByRole('region', { name: 'Store screenshot projects' })
+      .locator(`a[href$="/create/store/${id}"]`)
+    await expect(listed).toHaveCount(1)
+    await expect(listed).toContainText('In this workspace')
+    await listed.click()
+    await expect(second.locator('[data-store-canvas-slide]')).toContainText('Saved twice')
+    await expect(
+      second.getByRole('status').filter({ hasText: /^Saved to workspace$/ })
+    ).toBeVisible()
+    await other.close()
+  }
+)

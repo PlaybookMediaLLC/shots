@@ -34,6 +34,7 @@ import { StoreWorkspaceLoading } from '../StoreWorkspaceLoading'
 import { ActiveSceneProvider } from './active-scene'
 import { StudioActionsProvider, type StudioActions, type StudioDialog } from './actions'
 import { useAutosave } from './autosave'
+import { useWorkspaceSync, WorkspaceSaveStatus } from './workspace-sync'
 import { EditorCanvas } from './canvas/EditorCanvas'
 import { ApplyStyleDialog, ResetSlideDialog, ShortcutsDialog } from './dialogs/BasicDialogs'
 import { ChecksDialog } from './dialogs/ChecksDialog'
@@ -51,6 +52,11 @@ import { SlideThumbnail } from './SlideThumbnail'
 import { StudioHeader } from './StudioHeader'
 import type { StoreApi } from 'zustand/vanilla'
 import { Input } from '@/components/ui/input'
+import { TRPCClientError } from '@trpc/client'
+import { SidebarLink } from '@/components/platform-shell/SidebarLink'
+import { useHydratedSession } from '@/lib/auth/client'
+import { pullStoreProject, writeWorkspaceLink } from '@/lib/store-screenshots/workspace'
+import { useTRPCClient } from '@/lib/trpc/react'
 
 /**
  * The store screenshot studio. Opens the last project (or migrates the old
@@ -106,6 +112,7 @@ function EditorLayout({
   onProjectDeleted: () => void
 }): React.JSX.Element {
   const autosave = useAutosave(store, store.getState().document.revision)
+  const workspace = useWorkspaceSync(store)
   const [dialog, setDialog] = React.useState<StudioDialog | null>(initialImport.length ? 'import' : null)
   const [importFilesQueue, setImportFilesQueue] = React.useState<File[]>(initialImport)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
@@ -189,6 +196,7 @@ function EditorLayout({
             onLoadTheirs={() => void autosave.loadTheirs()}
             onSaveVersion={() => setDialog('versions')}
             onStartOver={() => setConfirmDelete(true)}
+            workspaceStatus={<WorkspaceSaveStatus sync={workspace} />}
           />
           {isMobile ? (
             <div className="flex shrink-0 gap-2 border-b border-foreground/10 px-3 py-1.5">
@@ -414,9 +422,17 @@ function StartScreen({ projects, onStart, onOpen, onImport }: { projects: Projec
           </div>
           {projects.length ? (
             <section className="mt-10" aria-labelledby="recent-projects">
-              <h2 id="recent-projects" className="text-ui-lg font-semibold">
-                Your projects
-              </h2>
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <h2 id="recent-projects" className="text-ui-lg font-semibold">
+                  Your projects
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  On this browser ·{' '}
+                  <SidebarLink href="/library?type=store" className="underline underline-offset-2 hover:text-foreground">
+                    Projects saved to your workspace are in Library
+                  </SidebarLink>
+                </p>
+              </div>
               <ul className="mt-3 grid gap-3 sm:grid-cols-4">
                 {projects.map((project) => (
                   <li key={project.id}>
@@ -435,52 +451,107 @@ function StartScreen({ projects, onStart, onOpen, onImport }: { projects: Projec
   )
 }
 
-/** The studio entry point. */
-export function StoreStudio({ initialHasSavedProject = false, projectParam = 'project' }: { initialHasSavedProject?: boolean; projectParam?: 'project' | 'storeProject' }): React.JSX.Element {
+/**
+ * The studio entry point. On `/create/store` the open project is the path's
+ * last segment (`basePath` and `projectId`); elsewhere it is `?project=`.
+ */
+export function StoreStudio({
+  initialHasSavedProject = false,
+  basePath,
+  projectId,
+}: {
+  initialHasSavedProject?: boolean
+  /** The studio's localized route, when the project belongs in the path. */
+  basePath?: string
+  /** The project the route names. */
+  projectId?: string
+}): React.JSX.Element {
+  const client = useTRPCClient()
+  const { data: session, isPending: sessionPending } = useHydratedSession()
+  const organizationId = session?.session.activeOrganizationId ?? null
   const [opened, setOpened] = React.useState<Opened | null>(null)
+  const openedIdRef = React.useRef<string | null>(null)
   const [projects, setProjects] = React.useState<ProjectSummary[] | null>(null)
   const [pendingImport, setPendingImport] = React.useState<File[]>([])
 
-  const open = React.useCallback(async (id: string) => {
+  const setProjectUrl = React.useCallback(
+    (id: string | null) => {
+      const url = new URL(window.location.href)
+      if (basePath) {
+        // An open that finishes after the person left the studio must not move their page.
+        if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return
+        url.pathname = id ? `${basePath}/${encodeURIComponent(id)}` : basePath
+      } else if (id) url.searchParams.set('project', id)
+      else url.searchParams.delete('project')
+      window.history.replaceState(null, '', url)
+    },
+    [basePath]
+  )
+
+  /** Open a project. `quiet` when the studio reopened it on its own: a failure then shows the list, not an error. */
+  const open = React.useCallback(async (id: string, quiet = false) => {
     try {
       const loaded = await loadProject(id)
       if (!loaded) throw new Error('That project no longer exists.')
+      openedIdRef.current = id
       setOpened({ document: loaded.document, revision: loaded.document.revision })
-      const url = new URL(window.location.href)
-      url.searchParams.set(projectParam, id)
-      window.history.replaceState(null, '', url)
+      setProjectUrl(id)
     } catch (cause) {
-      toast.error('Could not open the project', { description: cause instanceof Error ? cause.message : undefined })
+      if (quiet) console.error(cause)
+      else toast.error('Could not open the project', { description: cause instanceof Error ? cause.message : undefined })
       setProjects(await listProjects().catch(() => []))
     }
-  }, [projectParam])
+  }, [setProjectUrl])
+
+  /** A project saved to the workspace from another browser: copy it here, then open it. */
+  const openFromWorkspace = React.useCallback(async (id: string, workspaceId: string) => {
+    try {
+      const pulled = await pullStoreProject(client, id)
+      await saveProject(pulled.document, 0, null)
+      await writeWorkspaceLink(workspaceId, id, pulled.link)
+      await open(id)
+    } catch (cause) {
+      const missing = cause instanceof TRPCClientError && cause.data?.code === 'NOT_FOUND'
+      toast.error('Could not open the project', {
+        description: missing ? 'It is not on this browser or in your workspace.' : cause instanceof Error ? cause.message : undefined,
+      })
+      setProjects(await listProjects().catch(() => []))
+    }
+  }, [client, open])
 
   const create = React.useCallback(async (kind: NewProjectKind) => {
     try {
       const document = kind === 'starter' ? createStarterDocument() : createScratchDocument()
       const saved = await saveProject(document, 0, null)
+      openedIdRef.current = saved.id
       setOpened({ document: saved, revision: saved.revision })
-      const url = new URL(window.location.href)
-      url.searchParams.set(projectParam, saved.id)
-      window.history.replaceState(null, '', url)
+      setProjectUrl(saved.id)
     } catch {
       toast.error('Could not create the project', { description: 'Free some browser storage and try again.' })
     }
-  }, [projectParam])
+  }, [setProjectUrl])
 
   React.useEffect(() => {
+    // Which workspace a project might be saved in is known once the session is.
+    if (sessionPending) return
     let active = true
     void (async () => {
       try {
         const imported = await importLegacyProject()
         if (imported) toast.success('Your screenshot set was upgraded', { description: 'It now lives in your project library with version history.' })
-        const requested = new URL(window.location.href).searchParams.get(projectParam)
+        const requested = basePath ? (projectId ?? null) : new URL(window.location.href).searchParams.get('project')
         const last = requested ?? (await getMeta<string>('lastProjectId'))
         const list = await listProjects()
         if (!active) return
         const target = (last && list.find((project) => project.id === last)) || (imported ? list.find((project) => project.id === imported.id) : null)
-        if (target) await open(target.id)
-        else setProjects(list)
+        // Shown again with its project still open, the studio keeps the session it has.
+        if (target && target.id === openedIdRef.current) setProjectUrl(target.id)
+        else if (target) await open(target.id, !requested)
+        else if (requested && organizationId) await openFromWorkspace(requested, organizationId)
+        else {
+          if (requested) toast.error('Could not open the project', { description: 'It is not on this browser.' })
+          setProjects(list)
+        }
       } catch (cause) {
         console.error(cause)
         if (active) setProjects([])
@@ -489,7 +560,7 @@ export function StoreStudio({ initialHasSavedProject = false, projectParam = 'pr
     return () => {
       active = false
     }
-  }, [open, projectParam])
+  }, [basePath, open, openFromWorkspace, organizationId, projectId, sessionPending, setProjectUrl])
 
   if (opened) {
     return (
@@ -501,11 +572,10 @@ export function StoreStudio({ initialHasSavedProject = false, projectParam = 'pr
         onNewProject={(kind) => { setPendingImport([]); void create(kind) }}
         onProjectDeleted={async () => {
           setPendingImport([])
+          openedIdRef.current = null
           setOpened(null)
           setProjects(await listProjects().catch(() => []))
-          const url = new URL(window.location.href)
-          url.searchParams.delete(projectParam)
-          window.history.replaceState(null, '', url)
+          setProjectUrl(null)
         }}
       />
     )

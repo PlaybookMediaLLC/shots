@@ -2065,7 +2065,7 @@ var (
 		{Name: "id", Type: field.TypeString},
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "name", Type: field.TypeString},
-		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas"}, Default: "story-set"},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas", "store"}, Default: "story-set"},
 		{Name: "document", Type: field.TypeJSON},
 		{Name: "documentVersion", Type: field.TypeInt},
 		{Name: "revision", Type: field.TypeInt, Default: 1},

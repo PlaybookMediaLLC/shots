@@ -15,15 +15,22 @@ import {
   PublishIcon,
   SettingsIcon,
   SidebarIcon,
+  StoreIcon,
 } from './icons'
 import {
   areaLocked,
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
-import { AREA_LINKS, type AreaLink, AreaSubNav } from '@/components/platform-hub/AreaNavigation'
+import {
+  AREA_LINKS,
+  type AreaLink,
+  AreaSubNav,
+  useActiveAreaLink,
+} from '@/components/platform-hub/AreaNavigation'
 import { SearchButton, ShellActions, ShellSearch } from './ShellActions'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
@@ -113,8 +120,35 @@ function NavLink({
       />
       {active && subs && !collapsed && !locked ? (
         <AreaSubNav items={subs} label={t(key)} onNavigate={onNavigate} />
+      ) : key === 'create' && !locked ? (
+        <StoreScreenshotsLink collapsed={collapsed} label={t(key)} onNavigate={onNavigate} />
       ) : null}
     </>
+  )
+}
+
+/** Store screenshots stays pinned under Create, one click from every page and in the icon rail. */
+function StoreScreenshotsLink({
+  collapsed,
+  label,
+  onNavigate,
+}: {
+  collapsed: boolean
+  label: string
+  onNavigate?: () => void
+}) {
+  const active = useActiveAreaLink([STORE_SCREENSHOTS]) === STORE_SCREENSHOTS.href
+  return collapsed ? (
+    <NavRow
+      active={active}
+      collapsed
+      href={STORE_SCREENSHOTS.href}
+      icon={StoreIcon}
+      label={STORE_SCREENSHOTS.label}
+      onNavigate={onNavigate}
+    />
+  ) : (
+    <AreaSubNav items={[STORE_SCREENSHOTS]} label={label} onNavigate={onNavigate} />
   )
 }
 

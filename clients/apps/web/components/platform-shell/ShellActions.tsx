@@ -33,6 +33,7 @@ import {
   matchesDestination,
   PLATFORM_DESTINATIONS,
   platformArea,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
 import { SidebarLink } from './SidebarLink'
@@ -42,7 +43,7 @@ import { SidebarLink } from './SidebarLink'
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
   { href: '/?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
   { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
-  { href: '/?editor=app-store', label: 'Store screenshots', paid: true },
+  { ...STORE_SCREENSHOTS, paid: true },
   { href: '/write', label: 'Post', paid: false, permission: 'artifact:edit' },
   { href: '/campaigns/new', label: 'Campaign', paid: true, permission: 'release:create' },
   { href: '/workflows/new', label: 'Workflow', paid: true, permission: 'workspace:update' },
@@ -227,6 +228,8 @@ export function ShellSearch({
       (campaignsEnabled || item.key !== 'campaigns') &&
       matchesDestination(item.key, t(item.key), query)
   ).map((item) => withPublishAccess(item, draftsEnabled))
+  // The studio is a place of its own inside Create, found by the same words.
+  const storeShown = matchesDestination('create', STORE_SCREENSHOTS.label, query)
   const searchesWork = draftsEnabled || paidPlan
   // Work is found by its name or words too, a moment after typing stops.
   const [term, setTerm] = useState('')
@@ -307,6 +310,14 @@ export function ShellSearch({
               </SidebarLink>
             </Button>
           ))}
+          {storeShown ? (
+            <Button asChild className={link} variant="ghost">
+              <SidebarLink href={STORE_SCREENSHOTS.href} onClick={() => setOpen(false)}>
+                {STORE_SCREENSHOTS.label}
+                <span className="shrink-0 text-xs text-muted-foreground">Create</span>
+              </SidebarLink>
+            </Button>
+          ) : null}
           {query.trim()
             ? workItems.map((item) => (
                 <Button asChild className={link} key={`${item.type}-${item.id}`} variant="ghost">
@@ -327,7 +338,7 @@ export function ShellSearch({
               </Button>
             </p>
           ) : null}
-          {query.trim() && !items.length && !workItems.length && !failed ? (
+          {query.trim() && !items.length && !storeShown && !workItems.length && !failed ? (
             <p role="status" className="p-3 text-sm text-muted-foreground">
               {searchesWork && (!searching || found.isFetching)
                 ? 'Searching…'

@@ -5,6 +5,7 @@ import { AreaNavigation, CREATE_LINKS } from '@/components/platform-hub/AreaNavi
 import { ResourceCards } from '@/components/platform-hub/ResourceCards'
 import { TemplateBrowser } from '@/components/platform-hub/TemplateBrowser'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
+import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 
 export const metadata = { title: 'Create' }
 export default async function CreatePage({
@@ -71,9 +72,9 @@ export default async function CreatePage({
                       add: true,
                     },
                     {
-                      title: 'Build store screenshots',
+                      title: STORE_SCREENSHOTS.label,
                       description: 'Prepare store listings across devices, sizes and languages.',
-                      href: '/?editor=app-store',
+                      href: STORE_SCREENSHOTS.href,
                       scope: 'App Store studio · On this browser',
                       pages: [
                         { kind: 'phone', ratio: '9:16' },

@@ -1,15 +1,13 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { EditorWorkspace } from '@/components/platform-shell/EditorWorkspace'
-import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { PlatformShell } from '@/components/platform-shell/PlatformShell'
+import { permanentRedirect, redirect } from 'next/navigation'
 import {
   getLocalizedPath,
   getPageAccess,
   unpaidLandingPath,
   upgradePath,
 } from '@/lib/auth/page-access'
+import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { OG_DEFAULTS } from '@/lib/seo/metadata'
 
 export const metadata: Metadata = {
@@ -95,6 +93,11 @@ export default async function EditorPage({ params, searchParams }: EditorPagePro
   const [{ locale }, requestHeaders] = await Promise.all([params, headers()])
   const query = await searchParams
   if (typeof query.new === 'string') redirect(getLocalizedPath(locale, `/write?${new URLSearchParams({new: query.new})}`))
+  // The store studio moved to its own route; old links, with or without a project, land there.
+  if (query.editor === 'app-store') {
+    const project = typeof query.storeProject === 'string' ? `/${encodeURIComponent(query.storeProject)}` : ''
+    permanentRedirect(getLocalizedPath(locale, `${STORE_SCREENSHOTS.href}${project}`))
+  }
   const access = await getPageAccess(requestHeaders)
   const search = new URLSearchParams()
   for (const [key, value] of Object.entries(query))
@@ -111,15 +114,6 @@ export default async function EditorPage({ params, searchParams }: EditorPagePro
     redirect(upgradePath(locale, `/?${search}`))
   }
 
-  return (
-    <PlatformShell
-      campaignsEnabled={access.campaignWorkflowEnabled}
-      organizationName={access.organization?.name}
-      variant="editor"
-    >
-      <ErrorBoundary>
-        <EditorWorkspace />
-      </ErrorBoundary>
-    </PlatformShell>
-  )
+  // The editors layout renders the screenshot editor.
+  return null
 }

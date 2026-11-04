@@ -15,6 +15,9 @@ export const PLATFORM_DESTINATIONS = [
 
 export type PlatformArea = (typeof PLATFORM_DESTINATIONS)[number]['key']
 
+/** The App Store and Google Play studio, one name and route on every surface; projects open at `/create/store/<id>`. */
+export const STORE_SCREENSHOTS = { href: '/create/store', label: 'Store screenshots' } as const
+
 /** What the workspace's plan and rollout flags open, as the sidebar shows it. */
 export const platformAccessSchema = z.object({
   campaignsEnabled: z.boolean(),
@@ -159,6 +162,7 @@ export function paidCapability(from: string | null | undefined): string | null {
   const tools: [string, string][] = [
     ['/canvas', 'Canvas'],
     ['/creative-sets', 'Story Sets'],
+    [STORE_SCREENSHOTS.href, STORE_SCREENSHOTS.label],
     ['/store-screenshots', 'Store screenshots'],
     ['/code', 'Code images'],
     ['/tweet', 'Post images'],

@@ -2,7 +2,7 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
-import type { PlatformArea } from '@/lib/platform/navigation'
+import { STORE_SCREENSHOTS, type PlatformArea } from '@/lib/platform/navigation'
 import { withoutLocale } from '@/lib/settings/appearance'
 import { cn } from '@/lib/utils'
 
@@ -78,8 +78,13 @@ export function AreaSubNav({
  */
 export function useActiveAreaLink(items: { href: string }[]): string | undefined {
   const currentPath = withoutLocale(usePathname())
+  // A store project (`/create/store/<id>`) is a page of Store screenshots.
   const pathname =
-    currentPath === '/projects' || currentPath === '/assets' ? '/library' : currentPath
+    currentPath === '/projects' || currentPath === '/assets'
+      ? '/library'
+      : currentPath.startsWith(`${STORE_SCREENSHOTS.href}/`)
+        ? STORE_SCREENSHOTS.href
+        : currentPath
   const searchParams = useSearchParams()
   const params = new URLSearchParams(searchParams.toString())
   if (currentPath === '/assets') params.set('view', 'assets')
@@ -103,7 +108,7 @@ export const LIBRARY_LINKS = [
   { href: '/library', label: 'Screenshots' },
   { href: '/library?type=canvas', label: 'Canvas' },
   { href: '/library?type=story', label: 'Story Sets' },
-  { href: '/library?type=store', label: 'Store screenshots' },
+  { href: '/library?type=store', label: STORE_SCREENSHOTS.label },
   { href: '/library?view=assets', label: 'Assets' },
   { href: '/library?view=templates', label: 'Templates' },
   { href: '/library?view=brand', label: 'Brand resources' },
@@ -121,6 +126,7 @@ export const AUTOMATE_LINKS = [
 ]
 export const CREATE_LINKS = [
   { href: '/create', label: 'Start' },
+  STORE_SCREENSHOTS,
   { href: '/library', label: 'Recent' },
   { href: '/create?view=templates', label: 'Templates' },
   { href: '/create?view=tools', label: 'Tools' },

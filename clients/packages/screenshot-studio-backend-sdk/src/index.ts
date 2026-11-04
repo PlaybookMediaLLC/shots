@@ -1418,8 +1418,8 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, or a canvas workspace of artboards. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards, or a store screenshot project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'store'
 
 /** A cloud creativeSet: an editor composition with revision-checked writes. */
 export type BackendCreativeSet = {
@@ -1429,7 +1429,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas document names itself (`kind: 'canvas'`); every other document is a Story Set. */
+  /** A canvas or store document names itself (`kind: 'canvas'` or `'store'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string

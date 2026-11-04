@@ -9,7 +9,9 @@ import {
   platformHref,
   safeReturnPath,
   PLATFORM_DESTINATIONS,
+  STORE_SCREENSHOTS,
 } from '@/lib/platform/navigation'
+import { CREATE_LINKS, LIBRARY_LINKS } from '@/components/platform-hub/AreaNavigation'
 import { SIGNED_IN_PATHS } from '@/lib/auth/sign-in-gate'
 import { followsTheme, parseNavigation } from '@/lib/settings/appearance'
 import {
@@ -25,6 +27,8 @@ test('canonical editors, aliases and localized routes select the owning job', ()
   for (const [path, area] of [
     ['/?project=abc', 'create'],
     ['/?editor=app-store', 'create'],
+    ['/create/store', 'create'],
+    ['/fr/create/store/abc', 'create'],
     ['/fr/canvas/abc', 'create'],
     ['/creative-sets/abc', 'create'],
     ['/projects', 'library'],
@@ -174,6 +178,8 @@ test('the plan page names the paid capability a free workspace asked for', () =>
     'The screenshot editor'
   )
   assert.equal(paidCapability('/?editor=app-store'), 'Store screenshots')
+  assert.equal(paidCapability('/create/store'), 'Store screenshots')
+  assert.equal(paidCapability('/create/store/abc'), 'Store screenshots')
   assert.equal(paidCapability('/canvas/new'), 'Canvas')
   assert.equal(paidCapability('/compress-image'), 'Image tools')
   assert.equal(paidCapability('/write/deliveries'), 'Campaign deliveries')
@@ -235,4 +241,16 @@ test('the plan locks an area as the sidebar shows it, for the sidebar and the pr
     assert.equal(areaLocked(area, plan(true, true, true)), false, area)
   }
   assert.equal(areaLocked('settings', plan(false, false, false)), false)
+})
+
+test('Store screenshots has one name and route on every Create and Library surface', () => {
+  assert.deepEqual(STORE_SCREENSHOTS, { href: '/create/store', label: 'Store screenshots' })
+  assert.deepEqual(CREATE_LINKS.slice(0, 2), [
+    { href: '/create', label: 'Start' },
+    STORE_SCREENSHOTS,
+  ])
+  assert.ok(LIBRARY_LINKS.some((link) => link.label === STORE_SCREENSHOTS.label))
+  // Search finds the studio by the words people use for it.
+  for (const query of ['store', 'app store', 'screenshot'])
+    assert.ok(matchesDestination('create', STORE_SCREENSHOTS.label, query), query)
 })
