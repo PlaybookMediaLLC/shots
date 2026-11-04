@@ -108,6 +108,7 @@ import {
   type ScheduleContext,
 } from './schedule'
 import { optionsSummary } from './video-options'
+import { socialSetHref } from '@/components/workspace/settings-sections'
 import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
@@ -1308,6 +1309,13 @@ export function WriteComposer({
             enabled={enabled}
             onManage={canEdit ? () => setDialog('manage') : undefined}
             onSelect={setTab}
+            over={items
+              .filter((item) =>
+                item.publication.serialized.posts.some(
+                  (post) => post.length > item.publication.serialized.limit
+                )
+              )
+              .map((item) => item.account.channel)}
             options={
               accounts.length > 0 ? (
                 <OptionsChip
@@ -1494,13 +1502,13 @@ export function WriteComposer({
               className={cn('mb-6 flex flex-wrap justify-end gap-3', POST_COLUMN)}
               data-testid="platform-counters"
             >
-              {/* An editor shows the edited platform's count in each post's header. */}
+              {/* One limit per tab: the edited platform's, when its posts show none in their headers. */}
               {items
                 .filter(
                   (item) =>
-                    item.account.channel !== active ||
-                    (active !== primary && versionOfTab.mode !== 'manual') ||
-                    item.publication.serialized.posts.length === 0
+                    item.account.channel === active &&
+                    ((active !== primary && versionOfTab.mode !== 'manual') ||
+                      item.publication.serialized.posts.length === 0)
                 )
                 .map((item) => {
                   const over = item.publication.serialized.posts.some(
@@ -1681,6 +1689,12 @@ export function WriteComposer({
               })
             }
             onClose={() => setDialog(null)}
+            onPreview={(channel) => {
+              setDialog(null)
+              setTab(channel)
+              setPanel('preview')
+            }}
+            defaultsHref={set ? socialSetHref(set.id, 'new-draft') : undefined}
             primary={primary}
             value={document.value as PlateBody}
             versions={document.versions}

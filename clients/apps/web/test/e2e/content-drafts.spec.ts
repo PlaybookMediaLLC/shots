@@ -129,7 +129,10 @@ test(
     await page.keyboard.type(` ${'x'.repeat(260)}`)
     // X is being edited, so its count is in the post's header.
     await expect(page.getByTestId('post-length-1')).toHaveText(/^3\d\d \/ 280$/)
-    await expect(page.getByTestId('counter-linkedin')).toHaveText(/ \/ 3000$/)
+    // Each tab shows only its own limit; another platform over its limit marks its tab.
+    await expect(page.getByTestId('counter-linkedin')).toHaveCount(0)
+    await expect(page.getByTestId('platform-over-x')).toBeVisible()
+    await expect(page.getByTestId('platform-over-linkedin')).toHaveCount(0)
     await inPreview(page, async () => {
       await previewOf(page, 'x')
       await expect(page.getByTestId('preview-panel').getByRole('alert')).toContainText(

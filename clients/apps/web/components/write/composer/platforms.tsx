@@ -55,6 +55,7 @@ export function PlatformTabs({
   onManage,
   onSelect,
   options,
+  over = [],
   primary,
   versions,
 }: {
@@ -63,6 +64,8 @@ export function PlatformTabs({
   enabled: string[]
   onManage?: () => void
   onSelect: (channel: DraftChannel) => void
+  /** Platforms whose text runs over their limit; each tab shows only its own count. */
+  over?: DraftChannel[]
   /** The edited platform's options chip, at the row's end. */
   options?: React.ReactNode
   primary: DraftChannel
@@ -102,6 +105,14 @@ export function PlatformTabs({
                 <span className="rounded-full bg-amber-400/15 px-1.5 text-[10px] text-amber-700 dark:text-amber-200">
                   Own text
                 </span>
+              ) : null}
+              {over.includes(channel) ? (
+                <span
+                  aria-label="Over its character limit"
+                  className="size-1.5 rounded-full bg-red-500"
+                  data-testid={`platform-over-${channel}`}
+                  role="img"
+                />
               ) : null}
               {!publishing ? (
                 <span className="text-[10px] text-muted-foreground">
@@ -199,11 +210,15 @@ export function ManagePlatformsDialog({
   onChange,
   onClose,
   onConnect,
+  onPreview,
+  defaultsHref,
   primary,
   value,
   versions,
 }: {
   accounts: ComposerAccount[]
+  /** The brand's new-draft settings, where its default platforms are chosen. */
+  defaultsHref?: string
   draftVersion: number
   enabled: string[]
   kind: DraftKind
@@ -214,6 +229,8 @@ export function ManagePlatformsDialog({
   }) => void
   onClose: () => void
   onConnect?: (provider: string) => Promise<void>
+  /** Show a platform's post in the preview beside the draft. */
+  onPreview?: (channel: DraftChannel) => void
   primary: DraftChannel
   value: PlateBody
   versions: PlatformVersions
@@ -274,6 +291,20 @@ export function ManagePlatformsDialog({
                             : ''}
                         </span>
                       </span>
+                      {account.channel === primary ? (
+                        <span className="text-[10px] text-muted-foreground">Main</span>
+                      ) : null}
+                      {on && onPreview ? (
+                        <Button
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          onClick={() => onPreview(account.channel)}
+                          size={null}
+                          type="button"
+                          variant="custom"
+                        >
+                          Preview
+                        </Button>
+                      ) : null}
                       <Switch
                         aria-label={`Publish to ${CHANNEL_META[account.channel].label}`}
                         checked={on}
@@ -366,7 +397,17 @@ export function ManagePlatformsDialog({
               ))}
             </div>
           ) : accounts.length === 0 ? <p className="text-sm text-muted-foreground">Ask an admin or publisher to connect an account.</p> : null}
-          <DialogFooter>
+          <DialogFooter className="items-center sm:justify-between">
+            {defaultsHref ? (
+              <a
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                href={defaultsHref}
+              >
+                Change default platforms
+              </a>
+            ) : (
+              <span />
+            )}
             <Button onClick={onClose} type="button">
               Done
             </Button>
