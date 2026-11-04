@@ -520,7 +520,7 @@ func (s *Server) createConnection(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, connectionResponse(connection))
+	writeJSON(w, http.StatusCreated, connectionResponse(r.Context(), connection))
 }
 
 func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
@@ -533,7 +533,7 @@ func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
 	connections = s.fillProfiles(r.Context(), organizationID, connections)
 	items := make([]any, 0, len(connections))
 	for _, connection := range connections {
-		items = append(items, connectionResponse(connection))
+		items = append(items, connectionResponse(r.Context(), connection))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -711,13 +711,13 @@ func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) 
 	}, true
 }
 
-func connectionResponse(connection *ent.ChannelConnection) map[string]any {
+func connectionResponse(ctx context.Context, connection *ent.ChannelConnection) map[string]any {
 	return map[string]any{
 		"id": connection.ID, "externalAccountId": connection.ExternalAccountID,
 		"platform": connection.Platform, "provider": connection.Provider,
 		"providerSettings": connection.ProviderSettings, "status": connection.Status,
 		"createdAt": connection.CreatedAt, "updatedAt": connection.UpdatedAt,
-		"displayName": connection.DisplayName, "handle": connection.Handle, "avatarUrl": connection.AvatarURL,
+		"displayName": connection.DisplayName, "handle": connection.Handle, "avatarUrl": product.BrowserAvatar(ctx, connection.AvatarURL),
 	}
 }
 
