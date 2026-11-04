@@ -23,7 +23,7 @@ automation; Code Studio connects code visuals to them.
 | Old tool | `/code` redirects to `/create/code`; an old `#…` link opens as a new project |
 | Renderer | `components/code-studio/CodeScene.tsx`, a Shiki-based scene used by the editor, every export, the server render and embeds |
 | Document | `lib/code-studio/document.ts` (`codeDocumentSchema`, version 1) |
-| Storage | a creative set of kind `code` (`platform_creative_set`, migration `20261104090000_platform_code_projects.sql`) |
+| Storage | a creative set of kind `code` (`platform_creative_set`, migration `20261104092000_platform_code_projects.sql`) |
 
 A code project reuses the creative-set lifecycle: revision-checked autosave,
 conflict merge, local recovery, duplicate and archive. The backend bounds the
