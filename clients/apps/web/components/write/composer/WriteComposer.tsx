@@ -770,14 +770,12 @@ export function WriteComposer({
           className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-ui-lg font-medium text-foreground ring-4 ring-card sm:flex"
           data-post-avatar
         >
-          {/* A provider avatar that fails to load falls back to the account's initial. */}
+          {/* With no avatar, or one that fails to load, the account gets a face of its own. */}
           <Avatar className="size-full">
             {account?.avatarUrl ? (
               <AvatarImage alt="" className="object-cover" src={account.avatarUrl} />
             ) : null}
-            <AvatarFallback className="bg-transparent">
-              {(account?.displayName ?? set?.name ?? 'W').slice(0, 1).toUpperCase()}
-            </AvatarFallback>
+            <AvatarFallback name={account?.displayName ?? account?.handle ?? set?.name ?? 'Shots'} />
           </Avatar>
         </span>
         <p className="min-w-0 flex-1 truncate text-sm">
