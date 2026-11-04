@@ -44,7 +44,7 @@ const captions = (page: Page) =>
 
 test(
   'a parent folder becomes posts, captions apply in bulk, and all of it survives a reload',
-  { tag: '@journey' },
+  { tag: ['@journey', '@smoke'] },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
     await openNewBatch(page, app)
@@ -192,7 +192,7 @@ test(
 test(
   'grid videos go from captions to an MP4 that schedules like any post',
   // The scripted image model only runs under next dev.
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@dev-server', '@journey', '@smoke'] },
   async ({ app, page, startWorkspace }) => {
     test.setTimeout(600_000)
     await startWorkspace({ channels: ['x', 'linkedin'] })
