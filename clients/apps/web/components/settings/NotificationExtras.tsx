@@ -63,7 +63,7 @@ export function SocialSetNotifications({
   return (
     <div className="grid gap-3">
       <div>
-        <h3 className="text-sm font-medium text-foreground">By publishing brand</h3>
+        <h3 className="text-ui-lg font-medium text-foreground">By publishing brand</h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Choose each channel independently. These choices override publishing defaults for this
           set. A private set&apos;s activity reaches only its owner. Workspace rules and your email
@@ -93,7 +93,7 @@ export function SocialSetNotifications({
               key={set.id}
               aria-label={`${set.name} (${set.id}) notification preferences`}
             >
-              <legend className="flex items-center gap-2 text-sm font-medium">
+              <legend className="flex items-center gap-2 text-ui-lg font-medium">
                 <span
                   aria-hidden
                   className="size-2.5 rounded-full"

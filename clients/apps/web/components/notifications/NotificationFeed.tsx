@@ -175,7 +175,7 @@ export function NotificationFeed({
             ) : (
               <MailOpen className="size-7 text-muted-foreground/50" />
             )}
-            <p className="text-sm font-medium">No notifications</p>
+            <p className="text-ui-lg font-medium">No notifications</p>
             <p className="max-w-60 text-xs leading-relaxed text-muted-foreground">
               {view === 'archive'
                 ? 'Restore archived updates to their original feed.'

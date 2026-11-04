@@ -641,7 +641,7 @@ export function CopyBoard({
         >
           {channels.map((channel) => (
             <Tabs.Trigger
-              className="flex shrink-0 items-center gap-2 rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 data-[state=active]:bg-foreground/[0.08] data-[state=active]:text-foreground"
+              className="flex shrink-0 items-center gap-2 rounded-md px-3 py-1 text-ui-lg font-medium text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/30 data-[state=active]:bg-foreground/[0.08] data-[state=active]:text-foreground"
               key={channel.value}
               value={channel.value}
             >

@@ -391,7 +391,7 @@ function SettingsForm({
                 key={group}
                 open={group === 'reviews'}
               >
-                <summary className="cursor-pointer px-5 py-4 text-sm font-medium capitalize">
+                <summary className="cursor-pointer px-5 py-4 text-ui-lg font-medium capitalize">
                   {group === 'publishing' ? 'Publishing defaults' : group}
                 </summary>
                 <div className="px-5 pb-4">
@@ -601,7 +601,7 @@ function SettingsForm({
               description="Owners and administrators choose which categories each channel can deliver. Email categories start disabled. New workspace policies enable published-post Slack notices when Slack is connected."
             >
               <fieldset className="mb-4 flex flex-wrap gap-5" disabled={!!busy}>
-                <legend className="mb-3 text-sm font-medium">Available channels</legend>
+                <legend className="mb-3 text-ui-lg font-medium">Available channels</legend>
                 {(['inApp', 'email', 'slack'] as const).map((channel) => (
                   <Label key={channel} className="flex items-center gap-2 text-sm">
                     <Checkbox
@@ -627,7 +627,7 @@ function SettingsForm({
                     key={group}
                     open={group === 'reviews'}
                   >
-                    <summary className="cursor-pointer px-5 py-4 text-sm font-medium capitalize">
+                    <summary className="cursor-pointer px-5 py-4 text-ui-lg font-medium capitalize">
                       {group}
                     </summary>
                     <div className="overflow-x-auto px-5 pb-4">
@@ -725,7 +725,7 @@ function SettingsForm({
                 <Group>
                   {deliveries.data?.deliveries.map((delivery) => (
                     <div className="border-b border-border p-5 last:border-0" key={delivery.id}>
-                      <p className="text-sm font-medium">
+                      <p className="text-ui-lg font-medium">
                         {settings.catalogue.find((event) => event.id === delivery.kind)?.label ??
                           'Test notification'}{' '}
                         · {delivery.channel}

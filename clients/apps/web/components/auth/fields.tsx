@@ -15,7 +15,7 @@ type AuthFieldProps = ComponentProps<typeof Input> & { hint?: ReactNode; id: str
 export function AuthField({ className, hint, id, label, ...props }: AuthFieldProps) {
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium text-foreground/80" htmlFor={id}>
+      <Label className="text-ui-lg font-medium text-foreground/80" htmlFor={id}>
         {label}
       </Label>
       <Input className={cn(authInputClassName, className)} id={id} {...props} />

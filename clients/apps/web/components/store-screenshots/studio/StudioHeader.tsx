@@ -99,7 +99,7 @@ export function StudioHeader({
             className="h-8 w-48 rounded-md border border-foreground/20 bg-background px-2 text-sm outline-none"
           />
         ) : (
-          <Button variant="custom" size={null} type="button" onClick={() => setRenaming(true)} title="Rename project" className="max-w-56 truncate rounded-md px-1.5 py-1 text-sm font-medium hover:bg-foreground/[0.05]">
+          <Button variant="custom" size={null} type="button" onClick={() => setRenaming(true)} title="Rename project" className="max-w-56 truncate rounded-md px-1.5 py-1 text-ui-lg font-medium hover:bg-foreground/[0.05]">
             {name}
           </Button>
         )}

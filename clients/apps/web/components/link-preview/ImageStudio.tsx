@@ -394,7 +394,7 @@ export function ImageStudio({
   return (
     <section className={cn(PANEL, 'space-y-5 p-5')}>
       <div>
-        <h3 className="text-sm font-medium text-foreground">Create a preview image</h3>
+        <h3 className="text-ui-lg font-medium text-foreground">Create a preview image</h3>
         <p className="text-xs text-muted-foreground">
           A 1200 × 630 JPEG under 600 KB from the page&apos;s own copy, in your brand color or a preset.
         </p>

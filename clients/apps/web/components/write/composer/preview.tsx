@@ -386,7 +386,7 @@ function Poll({
       className="mt-2 grid gap-1.5 rounded-xl border border-border p-3"
       data-testid={`preview-poll-${channel}`}
     >
-      {question ? <p className="text-sm font-medium text-foreground">{question}</p> : null}
+      {question ? <p className="text-ui-lg font-medium text-foreground">{question}</p> : null}
       {poll.options.map((option, index) => (
         <span
           className="rounded-full border border-sky-400/50 px-3 py-1 text-center text-sm text-sky-700 dark:text-sky-300"
@@ -517,7 +517,7 @@ function LinkedInPost({ item, target }: { item: PreviewItem; target: DraftTarget
       <header className="flex items-center gap-2">
         <Avatar account={account} size="size-12" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold">
+          <p className="truncate text-ui-lg font-semibold">
             {account.displayName ?? account.handle ?? 'LinkedIn'}
           </p>
           <p className="text-[11px] text-muted-foreground">

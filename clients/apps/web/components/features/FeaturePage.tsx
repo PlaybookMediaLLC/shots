@@ -48,7 +48,7 @@ const ctaClassName =
 
 const relatedLinkClass = cn(
   CARD_CLASS,
-  "group flex items-center justify-between gap-2 rounded-xl px-4 py-3.5 text-sm font-medium text-foreground transition-shadow duration-200 hover:ring-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
+  "group flex items-center justify-between gap-2 rounded-xl px-4 py-3.5 text-ui-lg font-medium text-foreground transition-shadow duration-200 hover:ring-foreground/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/70",
 );
 
 /** Shared shell for every /features/* page: hero, preview well, capability grid, how-it-works, alternatives, FAQ, related links. */
@@ -117,7 +117,7 @@ export function FeaturePage({
                     className="mt-0.5 size-5 shrink-0 text-foreground"
                   />
                   <div>
-                    <h3 className="text-sm font-semibold text-foreground">
+                    <h3 className="text-ui-lg font-semibold text-foreground">
                       {capability.title}
                     </h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -137,7 +137,7 @@ export function FeaturePage({
                   <span className="flex size-7 items-center justify-center rounded-full bg-foreground/[0.08] text-xs font-semibold text-foreground">
                     {index + 1}
                   </span>
-                  <h3 className="mt-4 text-sm font-semibold text-foreground">
+                  <h3 className="mt-4 text-ui-lg font-semibold text-foreground">
                     {step.title}
                   </h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
@@ -162,7 +162,7 @@ export function FeaturePage({
                       key={comparison.slug}
                       className={cn(CARD_CLASS, "flex flex-col p-5")}
                     >
-                      <h3 className="text-sm font-semibold text-foreground">
+                      <h3 className="text-ui-lg font-semibold text-foreground">
                         {faq.q}
                       </h3>
                       <p className="mt-1.5 flex-1 text-sm leading-relaxed text-muted-foreground">
@@ -170,7 +170,7 @@ export function FeaturePage({
                       </p>
                       <Link
                         href={`/compare/${comparison.slug}`}
-                        className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground underline underline-offset-4"
+                        className="mt-4 inline-flex items-center gap-1 text-ui-lg font-medium text-foreground underline underline-offset-4"
                       >
                         Full {comparison.competitorName} comparison
                         <ArrowRight01Icon size={14} aria-hidden="true" />

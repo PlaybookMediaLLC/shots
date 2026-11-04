@@ -217,7 +217,7 @@ function WorkspaceSwitcher({
       {collapsed ? null : (
         <>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium text-foreground">
+            <span className="block truncate text-ui-lg font-medium text-foreground">
               {organizationName}
             </span>
             <span className="block truncate text-xs text-muted-foreground">

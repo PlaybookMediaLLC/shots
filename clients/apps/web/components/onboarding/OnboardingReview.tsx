@@ -215,7 +215,7 @@ function ReviewField({
     <li className="flex flex-col gap-2 border-b border-foreground/[0.06] py-3 last:border-b-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Label
-          className="text-sm font-medium text-foreground"
+          className="text-ui-lg font-medium text-foreground"
           htmlFor={editing ? id : undefined}
           id={labelId}
         >

@@ -162,7 +162,7 @@ export function SharePanel({
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">Tracked links</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">Tracked links</h3>
           <CopyAll text={all} />
         </div>
         <ul className={cn(PANEL, 'divide-y divide-white/[0.07]')}>
@@ -170,7 +170,7 @@ export function SharePanel({
             const { intent, name } = CHANNELS[channel]
             return (
               <li key={channel} className="flex flex-wrap items-center gap-3 px-4 py-2.5">
-                <span className="w-20 shrink-0 text-sm font-medium text-foreground">{name}</span>
+                <span className="w-20 shrink-0 text-ui-lg font-medium text-foreground">{name}</span>
                 <code className="order-last w-full break-all font-mono text-xs text-muted-foreground sm:order-none sm:w-auto sm:min-w-0 sm:flex-1">
                   {link}
                 </code>

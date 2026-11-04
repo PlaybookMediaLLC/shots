@@ -300,7 +300,7 @@ export function ShareDialog({
 
             {link.access === 'PUBLIC' ? (
               <div className="grid gap-2">
-                <span className="text-sm font-medium">Post</span>
+                <span className="text-ui-lg font-medium">Post</span>
                 <div className="flex flex-wrap gap-2">
                   {INTENTS.map((channel) => {
                     const intent = CHANNELS[channel].intent

@@ -177,7 +177,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
               key={entry.name}
             >
               <div className="min-w-0 md:max-w-[60%]">
-                <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                <p className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
                   {entry.name}
                   <Pill tone={status.tone}>{status.label}</Pill>
                 </p>

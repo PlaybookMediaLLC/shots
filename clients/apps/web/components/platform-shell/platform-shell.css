@@ -20,6 +20,23 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* The console type scale (app/globals.css) on pages, overlays and the sidebar:
+   13px UI text, and text-sm is that 13px step. On body, so portaled menus
+   match. The editor keeps its own sizes. */
+:is(
+    body:has(.platform-shell[data-platform-variant='page']),
+    .platform-overlay,
+    [data-platform-sidebar]
+  ) {
+  --text-sm: var(--text-ui);
+  --text-sm--line-height: var(--text-ui--line-height);
+}
+
+:is(.platform-shell[data-platform-variant='page'], .platform-overlay, [data-platform-sidebar]) {
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
+}
+
 /* Polar's dashboard palette (orbit tokens): settings groups sit one step
    below the panel, and controls one step above it. */
 .platform-shell,
@@ -68,9 +85,9 @@
 [data-platform-sidebar] :where([data-platform-nav], [data-platform-action]) {
   min-width: 0;
   border-radius: 999px;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: var(--text-ui--line-height);
   transition:
     background-color var(--platform-duration) var(--platform-ease),
     border-color var(--platform-duration) var(--platform-ease),
@@ -116,18 +133,18 @@
 
 /* Polar's section labels: small, medium weight, muted, sentence case. */
 .platform-eyebrow {
-  font-size: 0.75rem;
+  font-size: var(--text-caption);
   font-weight: 500;
   color: var(--muted-foreground);
 }
 
-/* Polar's type (see platform-font.ts): 450 body weight, open tracking, and
+/* Polar's type (see platform-font.ts): 400 body weight, open tracking, and
    medium-weight headings without tightening. Set on body for portaled overlays. */
 body:has([data-platform-shell]) {
   --font-sans: var(--font-platform), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-family: var(--font-sans);
   font-optical-sizing: auto;
-  font-weight: 450;
+  font-weight: 400;
   letter-spacing: 0.015em;
   text-rendering: optimizeLegibility;
 }

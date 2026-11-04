@@ -192,7 +192,7 @@ export function PipelineSteps({
               >
                 {step.done ? <Tick02Icon size={14} /> : index + 1}
               </span>
-              <h3 className="text-sm font-medium text-foreground">{step.title}</h3>
+              <h3 className="text-ui-lg font-medium text-foreground">{step.title}</h3>
               <span className="ml-auto">
                 <Pill tone={step.status.tone}>{step.status.label}</Pill>
               </span>

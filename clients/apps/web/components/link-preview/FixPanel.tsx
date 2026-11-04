@@ -118,7 +118,7 @@ function AiCopy({
     <section className={cn(PANEL, 'space-y-4 p-5')}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-medium text-foreground">Write it with AI</h3>
+          <h3 className="text-ui-lg font-medium text-foreground">Write it with AI</h3>
           <p className="text-xs text-muted-foreground">
             Three title and description options from what the page says. Uses your workspace&apos;s AI
             credits.
@@ -138,7 +138,7 @@ function AiCopy({
               className="flex flex-col gap-2 rounded-xl bg-white/[0.03] p-4 ring-1 ring-white/[0.08]"
             >
               <p className="text-[11px] uppercase tracking-wide text-sky-300">{variant.angle}</p>
-              <p className="text-sm font-medium text-foreground">{variant.title}</p>
+              <p className="text-ui-lg font-medium text-foreground">{variant.title}</p>
               <p className="flex-1 text-sm text-muted-foreground">{variant.description}</p>
               <p className="text-[11px] tabular-nums text-muted-foreground">
                 {characterCount(variant.title)} / 60 · {characterCount(variant.description)} / 160
@@ -200,7 +200,7 @@ export function FixPanel({
         <section className={cn(PANEL, 'space-y-4 p-5')}>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-medium text-foreground">Try changes</h3>
+              <h3 className="text-ui-lg font-medium text-foreground">Try changes</h3>
               <p className="text-xs text-muted-foreground">
                 Every preview on this page updates as you type.
               </p>
@@ -263,7 +263,7 @@ export function FixPanel({
       <section className={cn(PANEL, 'space-y-4 p-5')}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-medium text-foreground">Recommended tags</h3>
+            <h3 className="text-ui-lg font-medium text-foreground">Recommended tags</h3>
             <p className="text-xs text-muted-foreground">
               The full set, with your edits, for your stack. JSON-LD adds structured data for
               search. Replace anything marked TODO.
@@ -282,7 +282,7 @@ export function FixPanel({
                   aria-pressed={snippet.format === format.format}
                   onClick={() => setFormat(snippet)}
                   className={cn(
-                    'rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+                    'rounded-md px-3 py-1 text-ui-lg font-medium text-muted-foreground transition-colors',
                     snippet.format === format.format && 'bg-background text-foreground shadow-sm'
                   )}
                 >
@@ -310,7 +310,7 @@ export function FixPanel({
       </section>
 
       <section className="space-y-3">
-        <h3 className="text-sm font-medium text-foreground">
+        <h3 className="text-ui-lg font-medium text-foreground">
           Copy, social, and image issues left{changed ? ' with your edits' : ''}
         </h3>
         <IssueList issues={remaining} />

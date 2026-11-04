@@ -413,7 +413,7 @@ export function CompressVideoApp() {
 
       <div className={cn(CARD_CLASS, 'p-2', dragging && 'ring-foreground/40')}>
         <div className="flex items-center justify-between gap-3 px-3 pb-2 pt-2">
-          <p className="min-w-0 truncate text-sm font-medium text-foreground" title={source.file.name}>
+          <p className="min-w-0 truncate text-ui-lg font-medium text-foreground" title={source.file.name}>
             {source.file.name}
             <span className="font-normal text-muted-foreground">
               {' '}

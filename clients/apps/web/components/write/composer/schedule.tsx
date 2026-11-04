@@ -442,7 +442,7 @@ export function ScheduleDialog({
             className="grid gap-0.5 rounded-lg bg-foreground/[0.04] px-4 py-3"
             data-testid="schedule-summary"
           >
-            <p className="text-sm font-medium text-foreground">{headline}</p>
+            <p className="text-ui-lg font-medium text-foreground">{headline}</p>
             {chosen ? (
               <p className="text-xs text-muted-foreground">
                 {queue ? 'Next free slot · ' : ''}

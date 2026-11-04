@@ -177,7 +177,7 @@ export function EditorAiPanel() {
                 variant="custom"
                 size={null}
                 className={cn(
-                  'rounded-md px-2.5 py-1 text-sm font-medium',
+                  'rounded-md px-2.5 py-1 text-ui-lg font-medium',
                   tab === value ? 'bg-muted text-foreground' : 'text-muted-foreground'
                 )}
                 key={value}

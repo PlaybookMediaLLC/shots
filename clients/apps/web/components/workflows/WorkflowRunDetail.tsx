@@ -476,7 +476,7 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
         </div>
         {event.snapshot.notes ? (
           <div>
-            <h3 className="mb-2 text-sm font-medium">Release notes (Markdown source)</h3>
+            <h3 className="mb-2 text-ui-lg font-medium">Release notes (Markdown source)</h3>
             <pre className="max-h-64 overflow-auto rounded-2xl p-4 text-xs whitespace-pre-wrap text-muted-foreground ring-1 ring-border">
               {event.snapshot.notes}
             </pre>

@@ -161,7 +161,7 @@ function TemplateDetail({
         <Button variant="custom" size={null}
           type="button"
           onClick={handleApply}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-sm font-semibold text-background outline-none transition-[opacity,transform] duration-150 ease-out hover:opacity-90 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-foreground px-5 text-ui-lg font-semibold text-background outline-none transition-[opacity,transform] duration-150 ease-out hover:opacity-90 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <MagicWand01Icon size={16} />
           Use Template

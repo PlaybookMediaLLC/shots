@@ -20,7 +20,7 @@ function Calendar({
       classNames={{
         button_next: cn(buttonVariants({ variant: 'ghost' }), 'size-7 p-0'),
         button_previous: cn(buttonVariants({ variant: 'ghost' }), 'size-7 p-0'),
-        caption_label: 'text-sm font-medium',
+        caption_label: 'text-ui-lg font-medium',
         day: 'size-9 p-0 text-center text-sm',
         day_button: cn(
           buttonVariants({ variant: 'ghost' }),

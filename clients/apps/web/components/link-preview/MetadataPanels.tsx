@@ -101,7 +101,7 @@ export function IssueList({ issues }: { issues: LinkPreviewIssue[] }) {
             <Pill tone={SEVERITY_TONE[issue.severity]}>{SEVERITY_LABEL[issue.severity]}</Pill>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">{issue.title}</p>
+            <p className="text-ui-lg font-medium text-foreground">{issue.title}</p>
             <p className="mt-0.5 text-sm text-muted-foreground">{issue.fix}</p>
           </div>
         </li>
@@ -150,7 +150,7 @@ export function OverviewPanel({ issues, preview }: PanelProps & { issues: LinkPr
       </div>
       <p className="text-xs text-muted-foreground">Start at 100: each error deducts 40 points, warnings deduct 10 each (up to 40), and suggestions deduct 1 each (up to 9). The minimum score is 0.</p>
       <section className="space-y-3">
-        <h3 className="text-sm font-medium text-foreground">
+        <h3 className="text-ui-lg font-medium text-foreground">
           What to fix{' '}
           <span className="text-muted-foreground">
             · {issues.length} {issues.length === 1 ? 'item' : 'items'}, {count(info)} suggestions
@@ -165,7 +165,7 @@ export function OverviewPanel({ issues, preview }: PanelProps & { issues: LinkPr
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className={cn(PANEL, 'p-6')}>
-      <h3 className="mb-2 text-sm font-medium text-foreground">{title}</h3>
+      <h3 className="mb-2 text-ui-lg font-medium text-foreground">{title}</h3>
       <dl>{children}</dl>
     </section>
   )
@@ -656,7 +656,7 @@ export function TechnicalPanel({ preview }: PanelProps) {
       )}
       {response && response.hops.length > 1 && (
         <section className={cn(PANEL, 'p-6')}>
-          <h3 className="mb-3 text-sm font-medium text-foreground">
+          <h3 className="mb-3 text-ui-lg font-medium text-foreground">
             Redirect chain · {response.hops.length - 1} redirect
             {response.hops.length > 2 ? 's' : ''}
           </h3>
@@ -722,7 +722,7 @@ export function TechnicalPanel({ preview }: PanelProps) {
       {preview.robotsTxt !== undefined && <RobotsViewer preview={preview} />}
       {response?.headers && Object.keys(response.headers).length > 0 && (
         <section className={cn(PANEL, 'p-6')}>
-          <h3 className="mb-3 text-sm font-medium text-foreground">Response headers</h3>
+          <h3 className="mb-3 text-ui-lg font-medium text-foreground">Response headers</h3>
           <dl className="grid gap-x-6 gap-y-1.5 font-mono text-xs sm:grid-cols-[minmax(10rem,auto)_1fr]">
             {Object.entries(response.headers)
               .sort(([a], [b]) => a.localeCompare(b))
@@ -778,7 +778,7 @@ function RobotsViewer({ preview }: PanelProps) {
   return (
     <section className={cn(PANEL, 'p-6')}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-foreground">robots.txt</h3>
+        <h3 className="text-ui-lg font-medium text-foreground">robots.txt</h3>
         {preview.robotsFile && link(preview.robotsFile, 'Open', 'text-xs')}
       </div>
       {lines.join('').trim() ? (
@@ -833,7 +833,7 @@ export function RawPanel({ preview }: PanelProps) {
               aria-pressed={html === (format === 'HTML')}
               onClick={() => setHtml(format === 'HTML')}
               className={cn(
-                'rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors',
+                'rounded-md px-3 py-1 text-ui-lg font-medium text-muted-foreground transition-colors',
                 html === (format === 'HTML') && 'bg-background text-foreground shadow-sm'
               )}
             >

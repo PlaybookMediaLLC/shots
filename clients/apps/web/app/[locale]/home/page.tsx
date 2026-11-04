@@ -139,7 +139,7 @@ export default async function HomePage({
                     </span>
                   </Stage>
                   <span className="min-w-0">
-                    <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
                       {title}
                       {pro ? <span className="platform-pro-badge">Pro</span> : null}
                     </span>
@@ -202,7 +202,7 @@ export default async function HomePage({
               <Shapes size={19} className="text-muted-foreground" aria-hidden="true" />
             </span>
             <span>
-              <span className="flex items-center gap-2 text-sm font-medium">
+              <span className="flex items-center gap-2 text-ui-lg font-medium">
                 Brand resources
                 {paid ? null : <span className="platform-pro-badge">Pro</span>}
               </span>

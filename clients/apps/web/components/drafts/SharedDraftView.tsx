@@ -81,7 +81,7 @@ export function SharedDraftView({
         {text || 'This draft is empty.'}
       </article>
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-foreground">Comments</h2>
+        <h2 className="text-ui-lg font-medium text-foreground">Comments</h2>
         {comments.length === 0 ? (
           <p className="text-sm text-muted-foreground">No comments yet.</p>
         ) : (

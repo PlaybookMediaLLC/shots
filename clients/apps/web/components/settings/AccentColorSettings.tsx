@@ -20,7 +20,7 @@ export function AccentColorSettings() {
         void run(() => save({ accentColor }))
       }}
     >
-      <Label className="text-sm font-medium" htmlFor="personal-accent">
+      <Label className="text-ui-lg font-medium" htmlFor="personal-accent">
         Accent color
       </Label>
       <p className="text-xs text-muted-foreground">

@@ -37,7 +37,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
             return (
               <li className="flex items-center gap-3 rounded-xl border border-border px-4 py-3" key={`${account.platform}-${index}`}>
                 {channel ? <ChannelIcon channel={channel} className="size-5" /> : null}
-                <span className="text-sm font-medium">{account.displayName ?? account.platform}</span>
+                <span className="text-ui-lg font-medium">{account.displayName ?? account.platform}</span>
                 {account.handle ? <span className="text-sm text-muted-foreground">@{account.handle}</span> : null}
               </li>
             )

@@ -462,7 +462,7 @@ export function RecipeGallery({ onPick }: { onPick: (recipe: CanvasRecipe) => vo
                   className="flex min-w-0 flex-col rounded-lg border p-3 text-left hover:bg-foreground/[0.03] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
                 >
                   <RecipePreview recipe={recipe} />
-                  <span className="block text-sm font-medium">{CANVAS_RECIPES[recipe].name}</span>
+                  <span className="block text-ui-lg font-medium">{CANVAS_RECIPES[recipe].name}</span>
                   <span className="mt-1 block text-xs text-muted-foreground">
                     {CANVAS_RECIPES[recipe].description}
                   </span>

@@ -126,7 +126,7 @@ export function WorkspaceAgentSettings({
         >
           {newKey ? (
             <div className="flex flex-col gap-3 rounded-2xl bg-emerald-500/5 p-5 ring-1 ring-emerald-500/20">
-              <p className="text-sm font-medium text-foreground">
+              <p className="text-ui-lg font-medium text-foreground">
                 Copy this key now. It cannot be shown again; the configurations below include it
                 until you leave this page.
               </p>
@@ -306,7 +306,7 @@ function ClientGuide({
     <Group>
       <Row>
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium text-foreground">{client.name}</p>
+          <p className="text-ui-lg font-medium text-foreground">{client.name}</p>
           <p className="text-xs text-muted-foreground">{client.location}</p>
         </div>
         <pre className="overflow-x-auto rounded-lg bg-black/30 p-3 font-mono text-xs leading-relaxed text-foreground ring-1 ring-foreground/[0.08]">

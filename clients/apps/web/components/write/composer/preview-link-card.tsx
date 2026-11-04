@@ -64,7 +64,7 @@ export function PreviewLinkCard({ text }: { text: string }) {
       ) : null}
       <div className="p-3">
         <p className="text-xs text-muted-foreground">{card.siteName || new URL(url).hostname}</p>
-        <p className="line-clamp-2 text-sm font-medium text-foreground">{card.title || url}</p>
+        <p className="line-clamp-2 text-ui-lg font-medium text-foreground">{card.title || url}</p>
         {card.description ? (
           <p className="line-clamp-2 text-xs text-muted-foreground">{card.description}</p>
         ) : null}

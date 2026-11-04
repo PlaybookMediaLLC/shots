@@ -76,7 +76,7 @@ export function ChoiceGroup<Value extends string>({
   return (
     <fieldset className="grid gap-2" disabled={disabled}>
       <div className="flex items-center justify-between gap-3">
-        <legend className="text-sm font-medium text-foreground">{legend}</legend>
+        <legend className="text-ui-lg font-medium text-foreground">{legend}</legend>
         {status ? <SaveStatus state={status} /> : null}
       </div>
       <RadioGroup

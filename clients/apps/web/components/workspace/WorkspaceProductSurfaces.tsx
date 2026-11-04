@@ -347,7 +347,7 @@ function SurfaceRow({
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-medium text-foreground">{surface.name}</h3>
+            <h3 className="text-ui-lg font-medium text-foreground">{surface.name}</h3>
             <code className="font-mono text-xs text-muted-foreground">{surface.slug}</code>
             <Pill tone={freshness.tone}>{freshness.label}</Pill>
           </div>

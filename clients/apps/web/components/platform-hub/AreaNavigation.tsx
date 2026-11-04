@@ -57,7 +57,7 @@ export function AreaSubNav({
         <SidebarLink
           aria-current={item.href === active ? 'page' : undefined}
           className={cn(
-            'text-sm font-medium transition-colors',
+            'text-ui-lg font-medium transition-colors',
             item.href === active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
           )}
           href={item.href}

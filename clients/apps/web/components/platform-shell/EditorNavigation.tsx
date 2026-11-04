@@ -61,7 +61,7 @@ function EditorNavigationContent({
         aria-label="Editor"
         data-keep-selection
         className={cn(
-          'group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg border px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg border px-2 text-ui-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           active
             ? cn(surface.panel, surface.border, 'text-foreground shadow-xs')
             : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -108,7 +108,7 @@ function EditorNavigationContent({
                 aria-current={active === id ? 'page' : undefined}
                 onClick={onNavigate}
                 className={cn(
-                  'rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'rounded-md text-ui-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   collapsed
                     ? cn(
                         'grid size-8 place-items-center rounded-lg border',

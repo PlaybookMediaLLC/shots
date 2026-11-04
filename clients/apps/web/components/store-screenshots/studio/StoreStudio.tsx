@@ -414,14 +414,14 @@ function StartScreen({ projects, onStart, onOpen, onImport }: { projects: Projec
           </div>
           {projects.length ? (
             <section className="mt-10" aria-labelledby="recent-projects">
-              <h2 id="recent-projects" className="text-sm font-semibold">
+              <h2 id="recent-projects" className="text-ui-lg font-semibold">
                 Your projects
               </h2>
               <ul className="mt-3 grid gap-3 sm:grid-cols-4">
                 {projects.map((project) => (
                   <li key={project.id}>
                     <Button variant="custom" size={null} type="button" onClick={() => onOpen(project.id)} className="w-full rounded-lg border border-foreground/10 p-3 text-left hover:bg-foreground/[0.03]">
-                      <span className="block truncate text-sm font-medium">{project.name}</span>
+                      <span className="block truncate text-ui-lg font-medium">{project.name}</span>
                       <span className="text-[11px] text-muted-foreground">{project.slideCount} slides</span>
                     </Button>
                   </li>

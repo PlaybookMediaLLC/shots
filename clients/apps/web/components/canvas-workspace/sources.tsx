@@ -258,7 +258,7 @@ export function ReleasePicker({
       >
         ← All releases
       </Button>
-      <p className="text-sm font-medium">{release.title}</p>
+      <p className="text-ui-lg font-medium">{release.title}</p>
       {release.benefitStatement ? (
         <p className="text-xs text-muted-foreground">{release.benefitStatement}</p>
       ) : null}

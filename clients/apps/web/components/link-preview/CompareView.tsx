@@ -241,7 +241,7 @@ export function CompareView({ agent, initialUrl = '' }: { agent: LinkPreviewAgen
 
               <section className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-foreground">
+                  <h3 className="text-ui-lg font-medium text-foreground">
                     Tags · {differences} difference{differences === 1 ? '' : 's'}
                   </h3>
                   <Label className="flex items-center gap-2 text-xs text-muted-foreground">

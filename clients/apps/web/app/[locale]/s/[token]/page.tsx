@@ -71,7 +71,7 @@ export default async function SharePage({ params }: SharePageProps) {
             workspace if you belong to several.
           </p>
           <Link
-            className="mt-4 inline-flex h-9 items-center rounded-lg bg-white px-4 text-sm font-medium text-neutral-900"
+            className="mt-4 inline-flex h-9 items-center rounded-lg bg-white px-4 text-ui-lg font-medium text-neutral-900"
             href={`/sign-in?callbackURL=${encodeURIComponent(`/s/${token}`)}`}
           >
             Sign in
