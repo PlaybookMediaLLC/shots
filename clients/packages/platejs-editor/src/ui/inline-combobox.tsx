@@ -19,8 +19,14 @@ import {
   useHTMLInputCursorState,
 } from "@platejs/combobox/react";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { Point, TElement } from "platejs";
-import { useComposedRef, useEditorRef } from "platejs/react";
+import type { YjsConfig } from "@platejs/yjs";
+import { KEYS, type Point, type TElement } from "platejs";
+import {
+  useComposedRef,
+  useEditorRef,
+  useReadOnly,
+  useSelected,
+} from "platejs/react";
 import type {
   ComponentProps,
   HTMLAttributes,
@@ -46,6 +52,7 @@ type FilterFn = (
 
 type InlineComboboxContextValue = {
   filter: FilterFn | false;
+  owner: boolean;
   inputProps: UseComboboxInputResult["props"];
   inputRef: RefObject<HTMLInputElement | null>;
   removeInput: UseComboboxInputResult["removeInput"];
@@ -57,6 +64,15 @@ type InlineComboboxContextValue = {
 const InlineComboboxContext = createContext<InlineComboboxContextValue | null>(
   null
 );
+
+/**
+ * How long a menu's owner must stay absent, while this editor is connected,
+ * before this editor removes the menu. It is longer than the 30 s longest
+ * reconnect delay and the 30 s awareness timeout, so a network drop does not
+ * remove a menu that is still in use.
+ */
+const ORPHAN_GRACE_MS = 45_000;
+const ORPHAN_CHECK_MS = 5_000;
 
 const defaultFilter: FilterFn = (
   { group, keywords = [], label, value },
@@ -156,8 +172,66 @@ function InlineCombobox({
     };
   }, [editor, element]);
 
+  // In a shared draft, a collaborator's open menu reaches every editor. The
+  // editor that typed it has its caret, collapsed, in the menu when it appears,
+  // and only that editor owns it: it takes focus, shows the menu and can close
+  // it. Another person's keys, clicks or selection cannot close it.
+  const readOnly = useReadOnly();
+  const selected = useSelected();
+  const [owner] = useState(
+    () => selected && !readOnly && editor.api.isCollapsed()
+  );
+
+  // The owner writes its collaboration client on the menu. When that client
+  // leaves the draft with the menu open (a closed tab), each other editor
+  // removes the menu, so no "/" is left behind. Editors that are not shared
+  // skip this.
+  useEffect(() => {
+    if (!editor.plugins[KEYS.yjs]) return;
+    const { awareness } = editor.getOptions<YjsConfig>({ key: KEYS.yjs });
+    const client = element.ownerClient;
+    const at = () => editor.api.findPath(element);
+    if (owner) {
+      const path = at();
+      if (path && client === undefined)
+        editor.tf.setNodes({ ownerClient: awareness.clientID }, { at: path });
+      return;
+    }
+    if (readOnly) return;
+    let cancelled = false;
+    let absentSince: number | null = null;
+    const remove = () =>
+      // Out of this editor's undo history: its next undo is its own edit.
+      void import("@slate-yjs/core").then(({ YHistoryEditor }) => {
+        const path = at();
+        if (cancelled || !path || editor.api.node(path)?.[0] !== element)
+          return;
+        const drop = () => editor.tf.removeNodes({ at: path });
+        if (YHistoryEditor.isYHistoryEditor(editor))
+          YHistoryEditor.withoutSaving(editor, drop);
+        else editor.tf.withoutSaving(drop);
+      });
+    // Count the owner's absence only while this editor is connected: offline,
+    // it cannot see who is connected.
+    const check = () => {
+      const { _isConnected } = editor.getOptions<YjsConfig>({ key: KEYS.yjs });
+      const present =
+        typeof client === "number" && awareness.getStates().has(client);
+      if (!_isConnected || present) absentSince = null;
+      else if (absentSince === null) absentSince = Date.now();
+      else if (Date.now() - absentSince >= ORPHAN_GRACE_MS) remove();
+    };
+    const timer = setInterval(check, ORPHAN_CHECK_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [editor, element, owner, readOnly]);
+
   const { props: inputProps, removeInput } = useComboboxInput({
+    autoFocus: owner,
     cancelInputOnBlur: false,
+    cancelInputOnDeselect: owner,
     cursorState,
     ref: inputRef,
     onCancelInput: (cause) => {
@@ -182,12 +256,13 @@ function InlineCombobox({
       filter,
       inputProps,
       inputRef,
+      owner,
       removeInput,
       setHasEmpty,
       showTrigger,
       trigger,
     }),
-    [trigger, showTrigger, filter, inputProps, removeInput]
+    [trigger, showTrigger, filter, inputProps, owner, removeInput]
   );
 
   const store = useComboboxStore({
@@ -206,6 +281,7 @@ function InlineCombobox({
     <span contentEditable={false}>
       <AriakitComboboxProvider
         open={
+          owner &&
           (items.length > 0 || hasEmpty) &&
           (!hideWhenNoValue || value.length > 0)
         }
@@ -227,6 +303,7 @@ function InlineComboboxInput({
   const {
     inputProps,
     inputRef: contextRef,
+    owner,
     showTrigger,
     trigger,
   } = useInlineComboboxContext();
@@ -254,6 +331,7 @@ function InlineComboboxInput({
             "absolute top-0 left-0 size-full bg-transparent outline-hidden",
             className
           )}
+          disabled={!owner}
           ref={ref}
           value={value}
           {...inputProps}
