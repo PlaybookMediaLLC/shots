@@ -224,7 +224,7 @@ test('mobile editor navigation works with the keyboard and browser back', async 
   await expect(page).toHaveURL(/\/create$/)
   await page
     .getByRole('main')
-    .getByRole('link', { name: /^Store screenshots.*Prepare store listings/ })
+    .getByRole('link', { name: /^Store screenshots App Store studio/ })
     .press('Enter')
   await expect(page.getByRole('button', { name: 'Use the sample set' })).toBeVisible()
   await expect(page).toHaveTitle('Store screenshots · Create | Shots')
