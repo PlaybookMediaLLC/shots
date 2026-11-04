@@ -305,6 +305,8 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 	}
 	providerErr := &socialapi.Error{}
 	if !errors.As(err, &providerErr) {
+		// The failure code cannot carry this error, so log it for diagnosis.
+		slog.ErrorContext(ctx, "publication failed without a provider status", "post", input.Job.PostID, "platform", input.Job.Platform, "error", err)
 		return PublishResult{FailureCode: "UNKNOWN", Outcome: OutcomeFailed}, nil
 	}
 	failureCode := publishing.ProviderFailureCode(providerErr.Status, providerErr.UnknownDelivery)
