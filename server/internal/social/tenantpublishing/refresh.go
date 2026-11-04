@@ -15,8 +15,7 @@ import (
 )
 
 // TokenRefreshWindow is how long before expiry a channel token is renewed.
-// Threads, Instagram and LinkedIn issue tokens for about 60 days; a week leaves
-// many hourly runs to retry before a channel lapses.
+// Long-lived tokens leave a week for retries; video providers renew near expiry.
 const TokenRefreshWindow = 7 * 24 * time.Hour
 
 // tokenRefreshBatch bounds one run; the next scheduled run takes the rest.
@@ -34,10 +33,11 @@ func newRefresh(client *socialent.Client, manager *integrations.Manager) *social
 // asks for a reconnect; a temporary failure leaves it for the next run.
 func (p *Publisher) RefreshSocialTokens(ctx context.Context) (int, error) {
 	due, err := p.channels.Integration.Query().Where(
-		integration.TokenExpirationLTE(p.currentTime().Add(TokenRefreshWindow)),
-		// Threads and Instagram tokens always renew; LinkedIn only for apps granted refresh tokens.
-		integration.Or(integration.ProviderIdentifierIn("threads", "instagram-standalone"),
-			integration.And(integration.ProviderIdentifier("linkedin"), integration.RefreshTokenNotNil())),
+		integration.Or(
+			integration.And(integration.ProviderIdentifierIn("threads", "instagram-standalone", "linkedin", "linkedin-page"), integration.TokenExpirationLTE(p.currentTime().Add(TokenRefreshWindow))),
+			integration.And(integration.ProviderIdentifierIn("youtube", "tiktok"), integration.TokenExpirationLTE(p.currentTime().Add(15*time.Minute))),
+		),
+		integration.Or(integration.ProviderIdentifierIn("threads", "instagram-standalone"), integration.RefreshTokenNotNil()),
 		integration.DeletedAtIsNil(), integration.Disabled(false), integration.RefreshNeeded(false), integration.InBetweenSteps(false),
 		integration.HasOrganizationWith(organization.DeletedAtIsNil()),
 		func(s *sql.Selector) {

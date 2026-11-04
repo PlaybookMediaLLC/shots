@@ -14,3 +14,44 @@ GET /api/v1/content-drafts removed the required property `items/items/tags` from
 POST /api/v1/content-drafts removed the required property `tags` from the response with the `201` status
 GET /api/v1/content-drafts/{id} removed the required property `tags` from the response with the `200` status
 PATCH /api/v1/content-drafts/{id} removed the required property `tags` from the response with the `200` status
+
+# RFC 042: drafts publish to TikTok and YouTube. The platform version channel
+# enums gain `tiktok` and `youtube`, and a draft can hold eight versions.
+# Additive: existing values and limits stay valid.
+GET /api/v1/content-drafts added the new `tiktok` enum value to the `items/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `tiktok` enum value to the `pinned/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `youtube` enum value to the `items/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts added the new `youtube` enum value to the `pinned/items/platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts the `items/items/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+GET /api/v1/content-drafts the `pinned/items/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+GET /api/v1/content-drafts/{id} added the new `tiktok` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts/{id} added the new `youtube` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+GET /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+GET /api/v1/social-connection-availability added the new `linkedin-page` enum value to the `providers/items/provider` response property for the response status `200`
+GET /api/v1/social-connection-availability added the new `tiktok` enum value to the `providers/items/provider` response property for the response status `200`
+GET /api/v1/social-connection-availability added the new `youtube` enum value to the `providers/items/provider` response property for the response status `200`
+GET /api/v1/social-connection-availability the `providers` response property's maxItems was increased from `9` to `12` for the response status `200`
+PATCH /api/v1/content-drafts/{id} added the new `tiktok` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id} added the new `youtube` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id} the `platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties added the new `tiktok` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties added the new `youtube` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+PATCH /api/v1/content-drafts/{id}/properties the `platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+POST /api/v1/calendar/mutations added the new `tiktok` enum value to the `drafts/items/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/calendar/mutations added the new `youtube` enum value to the `drafts/items/platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/calendar/mutations the `drafts/items/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+POST /api/v1/content-drafts added the new `tiktok` enum value to the `platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts added the new `youtube` enum value to the `platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts the `platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `201`
+POST /api/v1/content-drafts/{id}/copy added the new `tiktok` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/copy added the new `youtube` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/copy the `draft/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate added the new `tiktok` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate added the new `youtube` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/duplicate the `draft/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `201`
+POST /api/v1/content-drafts/{id}/plan added the new `tiktok` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/content-drafts/{id}/plan added the new `youtube` enum value to the `platformVersions/versions/items/channel` response property for the response status `200`
+POST /api/v1/content-drafts/{id}/plan the `platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `200`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `tiktok` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover added the new `youtube` enum value to the `draft/platformVersions/versions/items/channel` response property for the response status `201`
+POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover the `draft/platformVersions/versions` response property's maxItems was increased from `6` to `8` for the response status `201`

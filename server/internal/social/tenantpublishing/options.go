@@ -38,7 +38,24 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 		if options.ShareWithFollowers && (platform != "x" || options.CommunityID == "") {
 			return nil, fmt.Errorf("share to timeline requires an X community")
 		}
+		if err := postoptions.ValidateVideoOptions(platform, options.YouTube, options.TikTok, true); err != nil {
+			return nil, err
+		}
 		switch platform {
+		case "youtube":
+			settings["title"] = options.YouTube.Title
+			settings["type"] = options.YouTube.Privacy
+			settings["selfDeclaredMadeForKids"] = "no"
+			if *options.YouTube.MadeForKids {
+				settings["selfDeclaredMadeForKids"] = "yes"
+			}
+		case "tiktok":
+			o := options.TikTok
+			settings["content_posting_method"] = "DIRECT_POST"
+			settings["privacy_level"] = o.Privacy
+			settings["comment"], settings["duet"], settings["stitch"] = o.AllowComments, o.AllowDuet, o.AllowStitch
+			settings["brand_organic_toggle"], settings["brand_content_toggle"] = o.BrandOrganic, o.BrandedContent
+			settings["video_made_with_ai"], settings["autoAddMusic"] = o.MadeWithAI, "no"
 		case "x":
 			if options.QuoteFirstPost && rootID == "" && options.QuoteRemoteID == "" {
 				return nil, fmt.Errorf("the first post has no confirmed provider identity")
@@ -145,12 +162,22 @@ func pollFor(poll *postoptions.Poll, options *postoptions.PublishOptions) *integ
 // AccountStanding projects verified account capabilities. Editable settings
 // and workspace plans never establish account-specific publishing access.
 func (p *Publisher) AccountStanding(ctx context.Context, organizationID, destinationID, platform, secretReference string) (product.AccountStanding, error) {
-	if platform != "x" && platform != "mastodon-custom" {
+	if platform != "x" && platform != "mastodon-custom" && platform != "tiktok" {
 		return product.AccountStanding{}, nil
 	}
-	account, _, _, err := p.account(ctx, organizationID, destinationID, platform, secretReference, nil)
+	account, provider, _, err := p.account(ctx, organizationID, destinationID, platform, secretReference, nil)
 	if err != nil {
 		return product.AccountStanding{}, err
+	}
+	if platform == "tiktok" {
+		reader, ok := provider.(interface {
+			CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error)
+		})
+		if !ok {
+			return product.AccountStanding{}, fmt.Errorf("TikTok creator information unavailable")
+		}
+		creator, err := reader.CreatorInfo(ctx, account.Token)
+		return product.AccountStanding{TikTokCreator: creator}, err
 	}
 	if platform == "mastodon-custom" {
 		quotes := socialidentity.CanQuoteMastodon(*account.VerifiedCapabilities, account.VerifiedScopes)

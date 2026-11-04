@@ -236,6 +236,7 @@ export async function draftTargets(
         channel,
         connectionId: channelConnectionId,
         standing: {
+          tiktokCreator: accounts.get(channelConnectionId)?.tiktokCreator,
           maxWeightedCharacters: accounts.get(channelConnectionId)?.xCaptionLimit,
           articles: accounts.get(channelConnectionId)?.xArticles,
           xQuotes: accounts.get(channelConnectionId)?.xQuotes,

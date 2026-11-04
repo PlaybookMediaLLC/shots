@@ -16,6 +16,12 @@ import (
 )
 
 func TestOAuthGrantAndConnectionUseEntInOnePublicSchema(t *testing.T) {
+	for _, provider := range []string{"instagram", "linkedin-page", "youtube"} {
+		t.Run(provider, func(t *testing.T) { testOAuthSelectionGrant(t, provider) })
+	}
+}
+
+func testOAuthSelectionGrant(t *testing.T, provider string) {
 	url := os.Getenv("PUBLISHING_TEST_DATABASE_URL")
 	if url == "" {
 		t.Skip("PUBLISHING_TEST_DATABASE_URL is not set")
@@ -66,7 +72,7 @@ func TestOAuthGrantAndConnectionUseEntInOnePublicSchema(t *testing.T) {
 	if _, err := db.SQL.ExecContext(ctx, `UPDATE member SET role='publisher' WHERE id=$1`, "member_"+id); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.StartOAuth(ctx, actor, "session_"+id, state, "instagram", "SOCIAL_API_KEY_TEST", OAuthStartOptions{}); err != nil {
+	if err := repo.StartOAuth(ctx, actor, "session_"+id, state, provider, "SOCIAL_API_KEY_TEST", OAuthStartOptions{}); err != nil {
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatal(err)
 		}
@@ -76,37 +82,42 @@ func TestOAuthGrantAndConnectionUseEntInOnePublicSchema(t *testing.T) {
 	if _, err := db.SQL.ExecContext(ctx, `UPDATE member SET role='admin' WHERE id=$1`, "member_"+id); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.StartOAuth(ctx, actor, "session_"+id, state, "instagram", "SOCIAL_API_KEY_TEST", OAuthStartOptions{}); err != nil {
+	if err := repo.StartOAuth(ctx, actor, "session_"+id, state, provider, "SOCIAL_API_KEY_TEST", OAuthStartOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.OAuthStart(ctx, actor, "session-2", state, "instagram", nil); !errors.Is(err, ErrUnauthorized) {
+	if _, err := repo.OAuthStart(ctx, actor, "session-2", state, provider, nil); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("another session read OAuth grant: %v", err)
 	}
-	if _, err := repo.ClaimOAuthExchange(ctx, actor, "session_"+id, state, "instagram"); err != nil {
+	if _, err := repo.ClaimOAuthExchange(ctx, actor, "session_"+id, state, provider); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.SaveOAuthExchange(ctx, actor, "session_"+id, state, "instagram", schema.SocialOAuthExchange{ID: "destination-1"}); err != nil {
+	if err := repo.SaveOAuthExchange(ctx, actor, "session_"+id, state, provider, schema.SocialOAuthExchange{ID: "destination-1"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.RememberInstagramIntegration(ctx, actor, "session_"+id, state, "destination-1"); err != nil {
+	if err := repo.RememberInstagramIntegration(ctx, actor, "session_"+id, state, "destination-1", provider); err != nil {
 		t.Fatal(err)
+	}
+	foreign := actor
+	foreign.Organization = "another-tenant"
+	if _, err := repo.OAuthStart(ctx, foreign, "session_"+id, state, provider, nil); err == nil {
+		t.Fatal("another tenant read OAuth grant")
 	}
 	wrongDestination := "destination-2"
-	if _, err := repo.OAuthStart(ctx, actor, "session_"+id, state, "instagram", &wrongDestination); !errors.Is(err, ErrNotFound) {
+	if _, err := repo.OAuthStart(ctx, actor, "session_"+id, state, provider, &wrongDestination); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("wrong destination matched OAuth grant: %v", err)
 	}
-	connection, err := repo.FinishOAuth(ctx, actor, "session_"+id, state, "instagram", "destination-1")
+	connection, err := repo.FinishOAuth(ctx, actor, "session_"+id, state, provider, "destination-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if connection.OrganizationID != organizationID || connection.Platform != "instagram" || connection.ExternalAccountID != "destination-1" {
+	if connection.OrganizationID != organizationID || connection.Platform != provider || connection.ExternalAccountID != "destination-1" {
 		t.Fatalf("unexpected connection: %#v", connection)
 	}
-	receipt, err := repo.OAuthStart(ctx, actor, "session_"+id, state, "instagram", nil)
+	receipt, err := repo.OAuthStart(ctx, actor, "session_"+id, state, provider, nil)
 	if err != nil || receipt.ExchangeStatus != socialoauthstart.ExchangeStatusCOMPLETED {
 		t.Fatalf("completed receipt missing: %+v %v", receipt, err)
 	}
-	replay, err := repo.FinishOAuth(ctx, actor, "session_"+id, state, "instagram", "destination-1")
+	replay, err := repo.FinishOAuth(ctx, actor, "session_"+id, state, provider, "destination-1")
 	if err != nil || replay.ID != connection.ID {
 		t.Fatalf("completion replay: %+v %v", replay, err)
 	}

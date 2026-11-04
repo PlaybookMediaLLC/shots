@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import limits from '../../../../../server/internal/medialimits/limits.json'
-import type { DraftChannel } from '@/lib/write/document'
+import { draftChannelSchema, type DraftChannel } from '@/lib/write/document'
 
 /**
  * Each destination's media rules (RFC 042), read from the same file Go
@@ -38,10 +38,7 @@ export type DestinationMedia = z.infer<typeof destinationSchema>
 
 /** Every draft channel's media rules, with the provider pages they come from. */
 export const DESTINATION_MEDIA: Record<DraftChannel, DestinationMedia> = z
-  .record(
-    z.enum(['x', 'linkedin', 'instagram', 'threads', 'bluesky', 'mastodon']),
-    destinationSchema
-  )
+  .record(draftChannelSchema, destinationSchema)
   .parse(limits.destinations)
 
 /** What Shots knows of one attachment; unknown facts are left to the backend. */
@@ -60,6 +57,8 @@ const LABELS: Record<DraftChannel, string> = {
   linkedin: 'LinkedIn',
   mastodon: 'Mastodon',
   threads: 'Threads',
+  tiktok: 'TikTok',
+  youtube: 'YouTube',
   x: 'X',
 }
 
@@ -111,6 +110,7 @@ export function mediaProblems(channel: DraftChannel, media: MediaFacts[]): strin
         ]
       gifs++
     } else if (item.mimeType.startsWith('image/')) {
+      if (rules.images.length === 0) return [`${label} requires one MP4 video; remove the image.`]
       if (known && !rules.images.includes(item.mimeType))
         return [
           `${label} takes ${formatNames(rules.images)} images; ${name} is ${formatNames([item.mimeType])}.`,

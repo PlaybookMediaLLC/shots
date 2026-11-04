@@ -123,6 +123,9 @@ export function connectHref(
 export const CONNECT_PROVIDERS = [
   { label: 'X', platform: 'x', provider: 'x' },
   { label: 'LinkedIn', platform: 'linkedin', provider: 'linkedin' },
+  { label: 'LinkedIn Page', platform: 'linkedin-page', provider: 'linkedin-page' },
+  { label: 'TikTok', platform: 'tiktok', provider: 'tiktok' },
+  { label: 'YouTube', platform: 'youtube', provider: 'youtube' },
   { label: 'Instagram', platform: 'instagram-standalone', provider: 'instagram-standalone' },
   { label: 'Threads', platform: 'threads', provider: 'threads' },
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },

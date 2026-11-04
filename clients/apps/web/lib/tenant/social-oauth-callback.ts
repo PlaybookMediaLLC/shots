@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
+import { isTrustedRequestOrigin } from '@/lib/security/request-origin'
 import {
   socialOAuthProviderSchema,
   socialOAuthExchangeSchema,
@@ -29,6 +30,7 @@ export type InstagramSelection = {
 }
 
 const pageChoiceSchema = z.object({
+  provider: socialOAuthProviderSchema.default('instagram'),
   accountId: z.string().min(1),
   expiresAt: z.number().int(),
   integrationId: z.string().min(1),
@@ -154,7 +156,13 @@ export async function completeSocialOAuth(
 
   const connected = socialOAuthExchangeSchema.safeParse(await completion.exchange(state, code))
   if (!connected.success) return connectionFailed(providerName)
-  if (providerName !== 'instagram' || connected.data.completed) {
+  if (
+    !['instagram', 'linkedin-page', 'youtube'].includes(providerName) ||
+    connected.data.completed ||
+    (providerName !== 'instagram' && !connected.data.pages)
+  ) {
+    if (!connected.data.completed && ['linkedin-page', 'youtube'].includes(providerName))
+      await completion.onPageChoice?.(state, connected.data.id)
     await completion.onConnected?.(state, connected.data.id)
     if (completion.redirect) return completion.redirect(state)
     return connectedRedirect(providerName, request, await completion.returnTo?.(state))
@@ -162,7 +170,7 @@ export async function completeSocialOAuth(
 
   const pages = connected.data.pages ?? []
   if (pages.length === 0) {
-    return new Response('No linked Instagram professional account was found.', { status: 409 })
+    return new Response('No eligible account was found for this provider.', { status: 409 })
   }
   await completion.onPageChoice?.(state, connected.data.id)
   const secret = pickerSecret()
@@ -171,6 +179,7 @@ export async function completeSocialOAuth(
     .map((page) => {
       const value = signChoice(
         {
+          provider: providerName,
           accountId: page.id,
           expiresAt: Date.now() + 10 * 60 * 1000,
           integrationId: connected.data.id,
@@ -183,7 +192,7 @@ export async function completeSocialOAuth(
     })
     .join('<br>')
   return new Response(
-    `<!doctype html><html><head><meta charset="utf-8"><title>Select Instagram account</title></head><body><main><h1>Select an Instagram account</h1><form method="post">${options}<br><button type="submit">Connect account</button></form></main></body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><title>Select account</title></head><body><main><h1>Select an account</h1><form method="post">${options}<br><button type="submit">Connect account</button></form></main></body></html>`,
     {
       headers: {
         'Cache-Control': 'no-store',
@@ -199,22 +208,22 @@ export async function completeSocialOAuth(
 
 export async function selectInstagramAccount(
   request: Request,
-  selection: InstagramSelection = {}
+  selection: InstagramSelection = {},
+  provider: SocialOAuthProvider = 'instagram'
 ): Promise<Response> {
   const origin = request.headers.get('origin')
-  if (origin !== new URL(request.url).origin)
-    return new Response('Invalid origin.', { status: 403 })
+  if (!isTrustedRequestOrigin(origin)) return new Response('Invalid origin.', { status: 403 })
   const secret = pickerSecret()
   if (!secret) return new Response('Social connection is not configured.', { status: 503 })
   const data = await request.formData().catch(() => null)
   const rawChoice = data?.get('choice')
   const choice = typeof rawChoice === 'string' ? verifyChoice(rawChoice, secret) : null
-  if (!choice)
+  if (!choice || choice.provider !== provider)
     return new Response('Account selection expired. Please start again.', { status: 400 })
   if (!selection.selectPage)
     return new Response('Social connection is not configured.', { status: 503 })
   await selection.selectPage(choice)
   await selection.onSelected?.(choice.state, choice.integrationId)
   if (selection.redirect) return selection.redirect(choice.state)
-  return connectedRedirect('instagram', request, await selection.returnTo?.(choice.state))
+  return connectedRedirect(provider, request, await selection.returnTo?.(choice.state))
 }

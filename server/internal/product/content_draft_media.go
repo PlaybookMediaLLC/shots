@@ -18,7 +18,7 @@ import (
 // reject. The composer reads the same rules.
 
 var draftChannelLabels = map[string]string{
-	"x": "X", "linkedin": "LinkedIn", "instagram": "Instagram", "threads": "Threads", "bluesky": "Bluesky", "mastodon": "Mastodon",
+	"tiktok": "TikTok", "youtube": "YouTube", "x": "X", "linkedin": "LinkedIn", "instagram": "Instagram", "threads": "Threads", "bluesky": "Bluesky", "mastodon": "Mastodon",
 }
 
 // draftMediaLimit is how many attachments one post on a channel takes.

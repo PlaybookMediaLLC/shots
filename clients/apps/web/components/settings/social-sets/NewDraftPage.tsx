@@ -21,7 +21,12 @@ type Engagement = SocialSetRecord['engagementDefaults']
 function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
   const save = useSaveSocialSet(set.id)
   const [state, run] = useSaveState()
-  const connected = set.accounts.filter((account) => account.health !== 'removed')
+  const connected = set.accounts
+    .filter((account) => account.health !== 'removed')
+    .flatMap((account) => {
+      const platform = channelForPlatform(account.platform)
+      return platform ? [{ ...account, platform }] : []
+    })
   const enabled = set.defaultPlatforms.filter((platform) =>
     connected.some((account) => account.platform === platform)
   )

@@ -61,9 +61,21 @@ func NewS3StoreFromEnvironment() (*S3Store, error) {
 	if os.Getenv("R2_ENDPOINT") == "" && os.Getenv("R2_BUCKET_NAME") == "" {
 		return nil, nil
 	}
-	return NewS3Store(os.Getenv("R2_ENDPOINT"), os.Getenv("R2_BROWSER_ENDPOINT"),
+	store, err := NewS3Store(os.Getenv("R2_ENDPOINT"), os.Getenv("R2_BROWSER_ENDPOINT"),
 		os.Getenv("R2_REGION"), os.Getenv("R2_BUCKET_NAME"),
 		os.Getenv("R2_ACCESS_KEY_ID"), os.Getenv("R2_SECRET_ACCESS_KEY"))
+	if err != nil || os.Getenv("R2_DELIVERY_ENDPOINT") == "" {
+		return store, err
+	}
+	// Providers need a public signing origin even when storage reads stay internal.
+	delivery, err := NewS3Store(os.Getenv("R2_DELIVERY_ENDPOINT"), "",
+		os.Getenv("R2_REGION"), os.Getenv("R2_BUCKET_NAME"),
+		os.Getenv("R2_ACCESS_KEY_ID"), os.Getenv("R2_SECRET_ACCESS_KEY"))
+	if err != nil {
+		return nil, err
+	}
+	store.deliverySigner = delivery.deliverySigner
+	return store, nil
 }
 
 // SignUpload signs a write-once PUT: the caller must send If-None-Match: *,

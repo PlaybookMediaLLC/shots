@@ -581,3 +581,23 @@ test('an uploaded file blocks scheduling unless it is the LinkedIn document', ()
   assert.deepEqual(buildPublication(document, linkedin).problems, [])
   assert.match(buildPublication(document, x).problems.join(), /uploaded file or audio/)
 })
+
+test('video publication keeps explicit privacy and refuses missing choices', () => {
+  const youtube = { title: 'Local canary', privacy: 'private' as const, madeForKids: false }
+  const versions = withOptions(readVersions(undefined), 'youtube', { youtube })
+  const result = buildPublication(
+    draft({ body: [p('Video caption')], platformVersions: versions }),
+    { channel: 'youtube', connectionId: 'cy0000000001' }
+  )
+  assert.deepEqual(result.target.options?.youtube, youtube)
+  const missing = buildPublication(draft({ body: [p('Video caption')] }), {
+    channel: 'youtube',
+    connectionId: 'cy0000000001',
+  })
+  assert.ok(missing.problems.some((problem) => problem.includes('audience')))
+  const unavailable = buildPublication(draft({ body: [p('Video caption')] }), {
+    channel: 'tiktok',
+    connectionId: 'ct0000000001',
+  })
+  assert.ok(unavailable.problems.some((problem) => problem.includes('permissions are unavailable')))
+})

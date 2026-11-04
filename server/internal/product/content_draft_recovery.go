@@ -3,12 +3,14 @@ package product
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
@@ -19,8 +21,10 @@ import (
 // retried until a person has checked the platform and said which it is.
 
 var (
-	xStatusID   = regexp.MustCompile(`/status/([0-9]{1,30})`)
-	linkedInURN = regexp.MustCompile(`urn:li:(?:share|ugcPost|activity):[0-9]{1,30}`)
+	xStatusID       = regexp.MustCompile(`/status/([0-9]{1,30})`)
+	linkedInURN     = regexp.MustCompile(`urn:li:(?:share|ugcPost|activity):[0-9]{1,30}`)
+	tikTokVideoPath = regexp.MustCompile(`^/@([A-Za-z0-9_.]{1,24})/video/([1-9][0-9]{0,29})/?$`)
+	youTubeVideoID  = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
 )
 
 // draftPostForRecovery loads a draft post the actor may see, for a publisher.
@@ -147,6 +151,9 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 	update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusEQ(scheduledpost.StatusUNKNOWN_DELIVERY))
 	action := "post.reconciled_not_live"
 	if input.Live {
+		if input.URL == "" && (post.Edges.ChannelConnection.Platform == "tiktok" || post.Edges.ChannelConnection.Platform == "youtube") {
+			return nil, invalid("Enter the live video's URL to confirm its publication.")
+		}
 		action = "post.reconciled_live"
 		update.SetStatus(scheduledpost.StatusPUBLISHED).SetPublishedAt(time.Now().UTC())
 		remote := ""
@@ -156,8 +163,49 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 			if match := xStatusID.FindStringSubmatch(input.URL); match != nil {
 				remote = match[1]
 			}
-		case platform == "linkedin":
+		case platform == "linkedin" || platform == "linkedin-page":
 			remote = linkedInURN.FindString(input.URL)
+		case platform == "tiktok" || platform == "youtube":
+			parsed, err := url.Parse(input.URL)
+			if err != nil || parsed.Scheme != "https" || parsed.User != nil {
+				return nil, invalid("That URL is not a post on this channel.")
+			}
+			receipt := postoptions.PublicationReceipt{}
+			if platform == "tiktok" && (parsed.Host == "www.tiktok.com" || parsed.Host == "tiktok.com") {
+				if match := tikTokVideoPath.FindStringSubmatch(parsed.EscapedPath()); match != nil {
+					if handle := post.Edges.ChannelConnection.Handle; handle != nil && *handle != "" &&
+						!strings.EqualFold(strings.TrimPrefix(*handle, "@"), match[1]) {
+						return nil, invalid("That URL is not a post on this channel.")
+					}
+					remote = match[2]
+					receipt.URL = "https://www.tiktok.com/@" + match[1] + "/video/" + remote
+					if options := post.PublishOptions.TikTok; options != nil {
+						receipt.Visibility = options.Privacy
+					}
+				}
+			}
+			if platform == "youtube" {
+				switch {
+				case (parsed.Host == "www.youtube.com" || parsed.Host == "youtube.com") && parsed.Path == "/watch":
+					remote = parsed.Query().Get("v")
+				case parsed.Host == "youtu.be":
+					remote = strings.TrimPrefix(parsed.EscapedPath(), "/")
+				}
+				if !youTubeVideoID.MatchString(remote) {
+					remote = ""
+				} else {
+					receipt.URL = "https://www.youtube.com/watch?v=" + remote
+					if options := post.PublishOptions.YouTube; options != nil {
+						receipt.Visibility = options.Privacy
+					}
+				}
+			}
+			if remote != "" {
+				receipt.RemoteID = remote
+				progress := post.ThreadProgress
+				progress.Publication = &receipt
+				update.SetThreadProgress(progress)
+			}
 		case strings.HasPrefix(input.URL, "https://"):
 			remote = input.URL
 		}

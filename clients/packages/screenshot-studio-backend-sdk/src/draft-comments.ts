@@ -38,7 +38,16 @@ export const draftCommentInputSchema = z.xor([
     commentId,
     threadId: commentId.optional(),
     anchor: z.strictObject({
-      platform: z.enum(['x', 'linkedin', 'threads', 'mastodon', 'bluesky', 'instagram']),
+      platform: z.enum([
+        'x',
+        'linkedin',
+        'threads',
+        'mastodon',
+        'bluesky',
+        'instagram',
+        'tiktok',
+        'youtube',
+      ]),
       postId: commentId,
       quote: z.string().min(1).max(5000).optional(),
     }),

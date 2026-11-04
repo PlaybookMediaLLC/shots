@@ -436,6 +436,67 @@ func TestWritePublishing(t *testing.T) {
 		}
 	})
 
+	t.Run("video reconciliation retains native identity and a usable receipt without republishing", func(t *testing.T) {
+		w.addMember(t, "viewer", "viewer")
+		for _, item := range []struct {
+			platform, inputURL, canonicalURL, remoteID, visibility string
+			options                                                postoptions.PublishOptions
+			invalidURLs                                            []string
+		}{
+			{"tiktok", "https://www.tiktok.com/@canary/video/7704057968177761550?share=discarded", "https://www.tiktok.com/@canary/video/7704057968177761550", "7704057968177761550", "SELF_ONLY",
+				postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "SELF_ONLY", Consent: true}},
+				[]string{"", "https://example.com/@canary/video/7704057968177761550", "https://www.tiktok.com.evil.test/@canary/video/7704057968177761550", "https://www.tiktok.com/@canary", "https://www.tiktok.com/@other/video/7704057968177761550", "https://www.tiktok.com/@canary/video/v_pub_session", "https://user@www.tiktok.com/@canary/video/7704057968177761550", "https://www.tiktok.com/@canary/video/7704057968177761550/extra", "http://www.tiktok.com/@canary/video/7704057968177761550"}},
+			{"youtube", "https://youtu.be/abcdefghijk?share=discarded", "https://www.youtube.com/watch?v=abcdefghijk", "abcdefghijk", "private",
+				postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Privacy: "private"}},
+				[]string{"", "https://example.com/watch?v=abcdefghijk", "https://www.youtube.com/@canary", "https://www.youtube.com/watch?v=bad", "https://user@www.youtube.com/watch?v=abcdefghijk"}},
+		} {
+			t.Run(item.platform, func(t *testing.T) {
+				connection := connect(item.platform, "reconcile-"+item.platform+"-"+w.id, nil)
+				if err := w.db.Client.ChannelConnection.UpdateOneID(connection).SetHandle("@canary").Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
+				d := draft(ContentDraftInput{})
+				post, err := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).
+					SetContentDraftID(d.ID).SetChannelConnectionID(connection).SetScheduledFor(time.Now().UTC()).
+					SetStatus(scheduledpost.StatusUNKNOWN_DELIVERY).SetCaption("Reconciliation canary").SetIdempotencyKey(cuid.New()).
+					SetFailureCode(publishing.FailureUnknownDelivery).SetPublishOptions(item.options).
+					SetThreadProgress(postoptions.ThreadProgress{Total: 1}).Save(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, badURL := range item.invalidURLs {
+					if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: badURL}); !errors.Is(err, ErrInvalidInput) {
+						t.Fatalf("accepted invalid %s URL %q: %v", item.platform, badURL, err)
+					}
+				}
+				if _, err := repo.ReconcileContentDraftPost(ctx, w.actor("viewer"), post.ID, ReconcileInput{Live: true, URL: item.inputURL}); err == nil {
+					t.Fatal("viewer reconciled publication")
+				}
+				live, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.inputURL})
+				if err != nil || live.Status != "PUBLISHED" || live.URL == nil || *live.URL != item.canonicalURL || live.FailureCode != nil {
+					t.Fatalf("live=%+v err=%v", live, err)
+				}
+				stored, err := w.db.Client.ScheduledPost.Get(ctx, post.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				receipt := stored.ThreadProgress.Publication
+				if stored.RemotePostID == nil || *stored.RemotePostID != item.remoteID || receipt == nil || receipt.RemoteID != item.remoteID || receipt.URL != item.canonicalURL || receipt.Visibility != item.visibility || stored.ThreadProgress.Total != 1 {
+					t.Fatalf("incorrect persisted identity: %+v", stored)
+				}
+				if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.inputURL}); !errors.Is(err, publishing.ErrConflict) {
+					t.Fatalf("duplicate reconciliation: %v", err)
+				}
+				if _, err := repo.RetryContentDraftPost(ctx, owner, post.ID); !errors.Is(err, publishing.ErrConflict) {
+					t.Fatalf("reconciled video retried: %v", err)
+				}
+				if count := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).CountX(ctx); count != 1 {
+					t.Fatalf("created %d posts", count)
+				}
+			})
+		}
+	})
+
 	t.Run("P39 cross-provider partial success retains the confirmed receipt when retrying the failed target", func(t *testing.T) {
 		d := draft(ContentDraftInput{PlainText: "partial publication"})
 		result, e := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Version: d.Version, Targets: append(target("X succeeded", x), target("LinkedIn failed", linkedin)...)})

@@ -21,7 +21,9 @@ test('voice memo validation rejects forged formats, URLs and oversized audio', (
     mediaType: 'audio/wav',
     audio: wav.toString('base64'),
   }
-  assert.equal(voiceMemoSchema.safeParse(input).success, true)
+  for (const channel of ['x', 'tiktok', 'youtube']) {
+    assert.equal(voiceMemoSchema.safeParse({ ...input, channel }).success, true)
+  }
   assert.equal(
     voiceMemoSchema.safeParse({ ...input, audio: 'https://example.org/memo.wav' }).success,
     false

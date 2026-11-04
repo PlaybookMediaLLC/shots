@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -296,5 +298,116 @@ func TestValidate(t *testing.T) {
 	}
 	if got := d.Validate(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestHostedVideoUsesVerifiedPullSource(t *testing.T) {
+	post := integrations.PostDetails{Media: []integrations.MediaContent{{Path: "https://media.example.test/canary.mp4?signature=private", Type: "video"}}}
+	source := buildSourceInfoBody(post, &TikTokDTO{}, 123)["source_info"].(map[string]any)
+	if source["source"] != "PULL_FROM_URL" || source["video_url"] != post.Media[0].Path || source["video_size"] != nil {
+		t.Fatal("hosted video must use URL pull")
+	}
+}
+
+func TestPublishInitNeverRepeatsUncertainMutation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		status  int
+		body    string
+		failure string
+	}{
+		{"rate limit", 429, `{}`, temporalx.TypePublicationRejected},
+		{"server error", 500, `{}`, temporalx.TypeUnknownDelivery},
+		{"missing identity", 200, `{"data":{}}`, temporalx.TypeUnknownDelivery},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.WriteHeader(tc.status)
+				io.WriteString(w, tc.body)
+			})
+			path := filepath.Join(t.TempDir(), "clip.mp4")
+			if err := os.WriteFile(path, []byte("video bytes"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := p.PostPending(context.Background(), "id", "token", []integrations.PostDetails{{Media: []integrations.MediaContent{{Path: path, Type: "video"}}}}, profilePtr("fixture"))
+			if calls != 1 || temporalx.FailureType(err) != tc.failure {
+				t.Fatalf("calls=%d failure=%s", calls, temporalx.FailureType(err))
+			}
+		})
+	}
+}
+
+func TestPublishRejectionLogsOnlyRecognizedCodes(t *testing.T) {
+	for _, code := range []string{"url_ownership_unverified", "privacy_level_option_mismatch", "private-token", "url_ownership_unverified private-token"} {
+		t.Run(code, func(t *testing.T) {
+			var logs bytes.Buffer
+			previous := slog.Default()
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+			calls := 0
+			p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": "private-token https://media.test/video.mp4?signature=private"}})
+			})
+			path := filepath.Join(t.TempDir(), "clip.mp4")
+			if err := os.WriteFile(path, []byte("video bytes"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			_, err := p.PostPending(context.Background(), "id", "private-token", []integrations.PostDetails{{Media: []integrations.MediaContent{{Path: path, Type: "video"}}}}, profilePtr("fixture"))
+			if calls != 1 || temporalx.FailureType(err) != temporalx.TypePublicationRejected {
+				t.Fatalf("calls=%d failure=%s", calls, temporalx.FailureType(err))
+			}
+			if strings.Contains(logs.String()+err.Error(), "private") || strings.Contains(logs.String()+err.Error(), "https://") {
+				t.Fatal("provider data escaped into diagnostics")
+			}
+			known := code == "url_ownership_unverified" || code == "privacy_level_option_mismatch"
+			if strings.Contains(logs.String(), `"provider_error_code":"`+code+`"`) != known {
+				t.Fatal("recognized rejection code was not preserved exactly")
+			}
+		})
+	}
+}
+
+func TestPostWaitsForNativeReceiptWithoutRepeatingInit(t *testing.T) {
+	for _, finalReceipt := range []bool{true, false} {
+		t.Run(fmt.Sprint(finalReceipt), func(t *testing.T) {
+			old := pollInterval
+			pollInterval = 0
+			t.Cleanup(func() { pollInterval = old })
+			initCalls, checks := 0, 0
+			p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/video.mp4":
+					w.Header().Set("Content-Length", "5")
+					io.WriteString(w, "video")
+				case "/v2/post/publish/video/init/":
+					initCalls++
+					io.WriteString(w, `{"data":{"publish_id":"session"}}`)
+				case "/v2/post/publish/status/fetch/":
+					checks++
+					if finalReceipt && checks > 1 {
+						io.WriteString(w, `{"data":{"status":"PUBLISH_COMPLETE","publicaly_available_post_id":["7234567890123456789"]}}`)
+					} else {
+						io.WriteString(w, `{"data":{"status":"PUBLISH_COMPLETE"}}`)
+					}
+				default:
+					t.Errorf("unexpected request %s", r.URL.Path)
+				}
+			})
+			result, err := p.Post(context.Background(), "id", "token", []integrations.PostDetails{{Settings: json.RawMessage(`{"content_posting_method":"DIRECT_POST","privacy_level":"SELF_ONLY"}`), Media: []integrations.MediaContent{{Path: apiURL + "/video.mp4", Type: "video"}}}}, profilePtr("fixture"))
+			if initCalls != 1 {
+				t.Fatalf("init calls=%d", initCalls)
+			}
+			if finalReceipt {
+				if err != nil || len(result) != 1 || result[0].PostID != "7234567890123456789" || checks != 2 {
+					t.Fatalf("result=%v checks=%d err=%v", result, checks, err)
+				}
+			} else if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || checks != 27 {
+				t.Fatalf("failure=%s checks=%d", temporalx.FailureType(err), checks)
+			}
+		})
 	}
 }

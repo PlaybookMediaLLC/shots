@@ -3,7 +3,7 @@ package socialidentity
 // ConnectionProviders is the product connection catalog, including unavailable
 // branches and the legacy adapters needed to reconnect existing accounts.
 func ConnectionProviders() []string {
-	return []string{"x", "linkedin", "threads", "mastodon", "mastodon-custom", "bluesky", "instagram", "instagram-standalone", "substack"}
+	return []string{"x", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom", "bluesky", "instagram", "instagram-standalone", "substack"}
 }
 
 // ProviderAvailability describes configuration readiness, never account health
@@ -41,4 +41,9 @@ func (a ConnectionAvailability) Validate() error {
 		}
 	}
 	return nil
+}
+
+// RequiresPageSelection identifies OAuth adapters with an intermediate destination choice.
+func RequiresPageSelection(provider string) bool {
+	return provider == "instagram" || provider == "linkedin-page" || provider == "youtube"
 }

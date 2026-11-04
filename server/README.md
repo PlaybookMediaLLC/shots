@@ -123,7 +123,10 @@ Both services require `DATABASE_URL` and connect to Temporal with
 orchestrator also requires:
 
 - `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`
-  (and optional `R2_REGION`, `R2_BROWSER_ENDPOINT`) for private tenant media
+  (and optional `R2_REGION`, `R2_BROWSER_ENDPOINT`, `R2_DELIVERY_ENDPOINT`) for private tenant media.
+  `R2_DELIVERY_ENDPOINT` overrides only the origin used to sign provider media
+  delivery URLs; it defaults to `R2_ENDPOINT`. Use it when internal storage
+  access and the public HTTPS delivery origin differ.
 - `SOCIAL_API_URL` and an allow-listed API key reference for social OAuth and
   destination verification. They are held by the product backend, not the web.
   Without `SOCIAL_API_URL` the product API connects channels in process
