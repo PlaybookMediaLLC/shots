@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { TimeZonePicker, browserTimeZone } from '@/components/settings/TimeZonePicker'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { browserTimeZone } from '@/lib/time-zones'
 import { Input } from '@/components/ui/input'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { workspaceCreateSchema } from '@/lib/workspace/input-schemas'

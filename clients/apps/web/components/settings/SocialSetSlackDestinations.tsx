@@ -3,8 +3,17 @@
 import { useSocialSets } from '@/components/settings/social-sets/api'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { NotificationSettings } from '@/lib/notifications/schema'
+
+/** The menu's stand-in for an empty value, which a Select item cannot hold. */
+const NONE = '__none'
 
 /** Override the shared Slack channel for each workspace-visible publishing brand. */
 export function SocialSetSlackDestinations({policy,channels,disabled,onChange}:{
@@ -25,16 +34,25 @@ export function SocialSetSlackDestinations({policy,channels,disabled,onChange}:{
     <p className="text-xs text-muted-foreground">Use the workspace channel, pick a channel in the connected Slack workspace, or turn shared-channel notices off. Private brands never send to shared channels.</p>
     {shared.map((set) => <Label key={set.id} className="grid gap-1 text-sm">
       {set.name}
-      <NativeSelect aria-label={`Slack channel for ${set.name}`} value={policy.socialSetSlackChannels?.[set.id]?.channelId ?? '__inherit'} onChange={(event) => {
+      <Select
+        value={(policy.socialSetSlackChannels?.[set.id]?.channelId ?? '__inherit') || NONE}
+        onValueChange={(choice) => {
+        const value = choice === NONE ? '' : choice
         const next={...policy.socialSetSlackChannels}
-        if(event.target.value==='__inherit') delete next[set.id]
-        else next[set.id]={channelId:event.target.value,channelName:''}
+        if(value==='__inherit') delete next[set.id]
+        else next[set.id]={channelId:value,channelName:''}
         onChange({...policy,socialSetSlackChannels:next})
-      }}>
-        <NativeSelectOption value="__inherit">Workspace channel</NativeSelectOption>
-        <NativeSelectOption value="">No shared-channel notices</NativeSelectOption>
-        {channels.map((channel) => <NativeSelectOption key={channel.id} value={channel.id} disabled={!channel.isMember || channel.isArchived}>#{channel.name}{!channel.isMember?' — invite the app first':''}</NativeSelectOption>)}
-      </NativeSelect>
+      }}
+      >
+        <SelectTrigger aria-label={`Slack channel for ${set.name}`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__inherit">Workspace channel</SelectItem>
+          <SelectItem value={NONE}>No shared-channel notices</SelectItem>
+          {channels.map((channel) => <SelectItem key={channel.id} value={channel.id} disabled={!channel.isMember || channel.isArchived}>#{channel.name}{!channel.isMember?' — invite the app first':''}</SelectItem>)}
+        </SelectContent>
+      </Select>
     </Label>)}
   </fieldset>
 }

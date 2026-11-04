@@ -28,6 +28,8 @@ type UserPreference struct {
 	Navigation userpreference.Navigation `json:"navigation,omitempty"`
 	// WeekStart holds the value of the "week_start" field.
 	WeekStart userpreference.WeekStart `json:"week_start,omitempty"`
+	// TimeFormat holds the value of the "time_format" field.
+	TimeFormat userpreference.TimeFormat `json:"time_format,omitempty"`
 	// TextDirection holds the value of the "text_direction" field.
 	TextDirection userpreference.TextDirection `json:"text_direction,omitempty"`
 	// ShowScrollbars holds the value of the "show_scrollbars" field.
@@ -58,7 +60,7 @@ func (*UserPreference) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case userpreference.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case userpreference.FieldID, userpreference.FieldTimeZone, userpreference.FieldAccentColor, userpreference.FieldTheme, userpreference.FieldNavigation, userpreference.FieldWeekStart, userpreference.FieldTextDirection:
+		case userpreference.FieldID, userpreference.FieldTimeZone, userpreference.FieldAccentColor, userpreference.FieldTheme, userpreference.FieldNavigation, userpreference.FieldWeekStart, userpreference.FieldTimeFormat, userpreference.FieldTextDirection:
 			values[i] = new(sql.NullString)
 		case userpreference.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -113,6 +115,12 @@ func (_m *UserPreference) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field week_start", values[i])
 			} else if value.Valid {
 				_m.WeekStart = userpreference.WeekStart(value.String)
+			}
+		case userpreference.FieldTimeFormat:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field time_format", values[i])
+			} else if value.Valid {
+				_m.TimeFormat = userpreference.TimeFormat(value.String)
 			}
 		case userpreference.FieldTextDirection:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -218,6 +226,9 @@ func (_m *UserPreference) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("week_start=")
 	builder.WriteString(fmt.Sprintf("%v", _m.WeekStart))
+	builder.WriteString(", ")
+	builder.WriteString("time_format=")
+	builder.WriteString(fmt.Sprintf("%v", _m.TimeFormat))
 	builder.WriteString(", ")
 	builder.WriteString("text_direction=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TextDirection))

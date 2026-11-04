@@ -11,6 +11,7 @@ import {
   requestJson,
   signUpViaApi,
   test,
+  openDisclosureFor,
 } from './framework'
 import { notificationPageSchema, notificationSettingsSchema } from '../../lib/notifications/schema'
 
@@ -141,7 +142,7 @@ test(
       expect((await sink()).channelPages).toContain('page-two')
       await page.getByRole('button', { name: /^Workspace rules/ }).click()
       const workspaceEmail = page.getByLabel('Source connected: workspace email', { exact: true })
-      await workspaceEmail.locator('xpath=ancestor::details').locator('summary').click()
+      await openDisclosureFor(workspaceEmail)
       await workspaceEmail.check()
       await page.getByLabel('Source connected: workspace slack', { exact: true }).check()
       await page.getByRole('button', { name: 'Save workspace policy' }).click()
@@ -342,7 +343,7 @@ test(
       const personalEmail = page.getByLabel('Source connected: your email preference', {
         exact: true,
       })
-      await personalEmail.locator('xpath=ancestor::details').locator('summary').click()
+      await openDisclosureFor(personalEmail)
       await personalEmail.uncheck()
       await page.getByRole('button', { name: 'Save my preferences' }).click()
       await expect(page.getByText('Your preferences are saved.')).toBeVisible()

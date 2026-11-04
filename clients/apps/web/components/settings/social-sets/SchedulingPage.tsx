@@ -8,10 +8,12 @@ import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useTwelveHour } from '@/components/ui/format-preferences'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TimePicker } from '@/components/ui/time-picker'
 import { POSTING_SLOT_LIMIT } from '@/lib/api/contracts/social-sets'
+import { formatTimeOfDay } from '@/lib/time-of-day'
 import { upcomingSlots } from '@/lib/write/calendar'
 import { offsetLabel } from '@/lib/write/zoned-time'
 import { type SocialSetRecord, useSaveSocialSet } from './api'
@@ -19,19 +21,6 @@ import { type SocialSetRecord, useSaveSocialSet } from './api'
 type Slot = SocialSetRecord['postingSlots'][number]
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
-
-/** Every time of day in 15-minute steps, as HH:MM. */
-const QUARTER_HOURS = Array.from({ length: 96 }, (_, index) => {
-  const hours = String(Math.floor(index / 4)).padStart(2, '0')
-  const minutes = String((index % 4) * 15).padStart(2, '0')
-  return `${hours}:${minutes}`
-})
-
-/** A time as people read it, such as 5:00 PM. */
-function readableTime(time: string): string {
-  const [hours, minutes] = time.split(':').map(Number)
-  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-}
 
 /** The weekly count: every enabled day and time, not just the rows. */
 export function weeklySlotCount(slots: Slot[]): number {
@@ -64,6 +53,8 @@ export function SchedulingPage({
   const [zoneState, runZone] = useSaveState()
   const [naturalState, runNatural] = useSaveState()
   const [adding, setAdding] = useState('')
+  const twelveHour = useTwelveHour()
+  const readableTime = (time: string) => formatTimeOfDay(time, twelveHour)
   // A time whose last weekday was unticked keeps its row until it is removed.
   const [kept, setKept] = useState<string[]>([])
 
@@ -118,6 +109,7 @@ export function SchedulingPage({
         >
           <TimeZonePicker
             disabled={!canManageSet}
+            hideLabel
             label="Scheduling time zone"
             onChange={(timeZone) => void runZone(() => save({ timeZone }))}
             value={set.timeZone}
@@ -210,18 +202,7 @@ export function SchedulingPage({
                   addTime()
                 }}
               >
-                <Select disabled={!canManage} onValueChange={setAdding} value={adding}>
-                  <SelectTrigger aria-label="Time to add" className="w-36 bg-card">
-                    <SelectValue placeholder="Choose a time…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {QUARTER_HOURS.filter((time) => !times.includes(time)).map((time) => (
-                      <SelectItem key={time} value={time}>
-                        {readableTime(time)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <TimePicker aria-label="Time to add" disabled={!canManage} onChange={setAdding} value={adding} />
                 <Button disabled={!canManage || !adding || full} type="submit" variant="outline">
                   Add time
                 </Button>

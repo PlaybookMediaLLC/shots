@@ -1898,31 +1898,31 @@ func init() {
 	// userpreference.DefaultAccentColor holds the default value on creation for the accent_color field.
 	userpreference.DefaultAccentColor = userpreferenceDescAccentColor.Default.(string)
 	// userpreferenceDescShowScrollbars is the schema descriptor for show_scrollbars field.
-	userpreferenceDescShowScrollbars := userpreferenceFields[7].Descriptor()
+	userpreferenceDescShowScrollbars := userpreferenceFields[8].Descriptor()
 	// userpreference.DefaultShowScrollbars holds the default value on creation for the show_scrollbars field.
 	userpreference.DefaultShowScrollbars = userpreferenceDescShowScrollbars.Default.(bool)
 	// userpreferenceDescDeveloperMode is the schema descriptor for developer_mode field.
-	userpreferenceDescDeveloperMode := userpreferenceFields[8].Descriptor()
+	userpreferenceDescDeveloperMode := userpreferenceFields[9].Descriptor()
 	// userpreference.DefaultDeveloperMode holds the default value on creation for the developer_mode field.
 	userpreference.DefaultDeveloperMode = userpreferenceDescDeveloperMode.Default.(bool)
 	// userpreferenceDescEmailNotifications is the schema descriptor for email_notifications field.
-	userpreferenceDescEmailNotifications := userpreferenceFields[9].Descriptor()
+	userpreferenceDescEmailNotifications := userpreferenceFields[10].Descriptor()
 	// userpreference.DefaultEmailNotifications holds the default value on creation for the email_notifications field.
 	userpreference.DefaultEmailNotifications = userpreferenceDescEmailNotifications.Default.(bool)
 	// userpreferenceDescDismissedTips is the schema descriptor for dismissed_tips field.
-	userpreferenceDescDismissedTips := userpreferenceFields[10].Descriptor()
+	userpreferenceDescDismissedTips := userpreferenceFields[11].Descriptor()
 	// userpreference.DefaultDismissedTips holds the default value on creation for the dismissed_tips field.
 	userpreference.DefaultDismissedTips = userpreferenceDescDismissedTips.Default.([]string)
 	// userpreferenceDescExperiments is the schema descriptor for experiments field.
-	userpreferenceDescExperiments := userpreferenceFields[11].Descriptor()
+	userpreferenceDescExperiments := userpreferenceFields[12].Descriptor()
 	// userpreference.DefaultExperiments holds the default value on creation for the experiments field.
 	userpreference.DefaultExperiments = userpreferenceDescExperiments.Default.(map[string]bool)
 	// userpreferenceDescVersion is the schema descriptor for version field.
-	userpreferenceDescVersion := userpreferenceFields[12].Descriptor()
+	userpreferenceDescVersion := userpreferenceFields[13].Descriptor()
 	// userpreference.DefaultVersion holds the default value on creation for the version field.
 	userpreference.DefaultVersion = userpreferenceDescVersion.Default.(int)
 	// userpreferenceDescUpdatedAt is the schema descriptor for updated_at field.
-	userpreferenceDescUpdatedAt := userpreferenceFields[13].Descriptor()
+	userpreferenceDescUpdatedAt := userpreferenceFields[14].Descriptor()
 	// userpreference.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	userpreference.DefaultUpdatedAt = userpreferenceDescUpdatedAt.Default.(func() time.Time)
 	// userpreference.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

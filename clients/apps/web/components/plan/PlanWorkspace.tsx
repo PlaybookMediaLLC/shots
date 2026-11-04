@@ -19,8 +19,16 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { TimePicker } from '@/components/ui/time-picker'
 import {
   Dialog,
   DialogContent,
@@ -732,36 +740,13 @@ export function PlanWorkspace({
                 ? readable(anchor, { month: 'long', year: 'numeric' })
                 : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
             </h1>
-            <Label className="text-xs font-normal text-muted-foreground">
-              Display timezone
-              <Input
-                aria-label="Display timezone"
-                className="h-8 w-48 text-foreground"
-                list="plan-zones"
-                defaultValue={prefs.zone}
-                key={prefs.zone}
-                onBlur={(e) => {
-                  if (isTimeZone(e.target.value)) setPref({ zone: e.target.value })
-                  else {
-                    e.target.value = prefs.zone
-                    toast.error('Choose a valid IANA timezone.')
-                  }
-                }}
-              />
-            </Label>
-            <datalist id="plan-zones">
-              {[
-                ...new Set([
-                  'UTC',
-                  'America/New_York',
-                  'Europe/London',
-                  'Asia/Tokyo',
-                  ...sets.map((s) => s.timeZone),
-                ]),
-              ].map((z) => (
-                <NativeSelectOption key={z}>{z}</NativeSelectOption>
-              ))}
-            </datalist>
+            <TimeZonePicker
+              className="w-56 text-xs"
+              label="Display timezone"
+              onChange={(zone) => setPref({ zone })}
+              size="sm"
+              value={prefs.zone}
+            />
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -844,16 +829,19 @@ export function PlanWorkspace({
               <PopoverContent align="end" className="grid w-56 gap-3 p-3">
                 <Label className="grid gap-1.5">
                   Density{' '}
-                  <NativeSelect
-                    aria-label="Card density"
+                  <Select
                     value={prefs.density}
-                    onChange={(e) =>
-                      setPref({ density: e.target.value as PlanPreferences['density'] })
-                    }
+                    onValueChange={(value) =>
+                      setPref({ density: value as PlanPreferences['density'] })}
                   >
-                    <NativeSelectOption value="expanded">Expanded</NativeSelectOption>
-                    <NativeSelectOption value="compact">Compact</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Card density">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="expanded">Expanded</SelectItem>
+                      <SelectItem value="compact">Compact</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="font-normal">
                   <Checkbox
@@ -871,14 +859,18 @@ export function PlanWorkspace({
                 </Label>
                 <Label className="grid gap-1.5">
                   Week starts{' '}
-                  <NativeSelect
-                    aria-label="Week starts"
-                    value={prefs.weekStart}
-                    onChange={(e) => setPref({ weekStart: Number(e.target.value) as 0 | 1 })}
+                  <Select
+                    value={String(prefs.weekStart)}
+                    onValueChange={(value) => setPref({ weekStart: Number(value) as 0 | 1 })}
                   >
-                    <NativeSelectOption value="0">Sunday</NativeSelectOption>
-                    <NativeSelectOption value="1">Monday</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Week starts">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Sunday</SelectItem>
+                      <SelectItem value="1">Monday</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 {focused ? (
                   <Label className="font-normal">
@@ -891,16 +883,20 @@ export function PlanWorkspace({
                 ) : null}
               </PopoverContent>
             </Popover>
-            <NativeSelect
-              aria-label="Calendar view"
+            <Select
               disabled={!hydrated}
               value={prefs.view}
-              onChange={(e) => setPref({ view: e.target.value as PlanPreferences['view'] })}
+              onValueChange={(value) => setPref({ view: value as PlanPreferences['view'] })}
             >
-              <NativeSelectOption value="flex">Flex</NativeSelectOption>
-              <NativeSelectOption value="month">Month</NativeSelectOption>
-              <NativeSelectOption value="week">Week</NativeSelectOption>
-            </NativeSelect>
+              <SelectTrigger aria-label="Calendar view">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="flex">Flex</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+              </SelectContent>
+            </Select>
             <Button
               variant="outline"
               size="sm"
@@ -1120,45 +1116,27 @@ function TimeFields({
             value={local.slice(0, 10)}
             onChange={(day) => onLocal(`${day}T${local.slice(11)}`)}
           />
-          <Input
+          <TimePicker
             className="w-full"
             aria-label="Time"
-            type="time"
             value={local.slice(11)}
-            onChange={(e) => onLocal(`${local.slice(0, 10)}T${e.target.value}`)}
-            step="60"
-            list="quarter-hours"
+            onChange={(time) => onLocal(`${local.slice(0, 10)}T${time}`)}
           />
         </span>
-        <datalist id="quarter-hours">
-          {Array.from({ length: 96 }, (_, i) => (
-            <NativeSelectOption
-              key={i}
-              value={`${String(Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`}
-            />
-          ))}
-        </datalist>
       </Label>
-      <Label className="grid gap-1.5">
-        Scheduling timezone{' '}
-        <Input
-          className="w-full"
-          aria-label="Scheduling timezone"
-          value={zone}
-          onChange={(e) => onZone(e.target.value)}
-        />
-      </Label>
+      <TimeZonePicker label="Scheduling timezone" onChange={onZone} value={zone} />
       <Label className="grid gap-1.5">
         Repeated hour{' '}
-        <NativeSelect
-          aria-label="Repeated hour"
-          value={choice}
-          onChange={(e) => onChoice(e.target.value as typeof choice)}
-        >
-          <NativeSelectOption value="reject">Ask me to choose</NativeSelectOption>
-          <NativeSelectOption value="earlier">Earlier occurrence</NativeSelectOption>
-          <NativeSelectOption value="later">Later occurrence</NativeSelectOption>
-        </NativeSelect>
+        <Select value={choice} onValueChange={(value) => onChoice(value as typeof choice)}>
+          <SelectTrigger aria-label="Repeated hour">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="reject">Ask me to choose</SelectItem>
+            <SelectItem value="earlier">Earlier occurrence</SelectItem>
+            <SelectItem value="later">Later occurrence</SelectItem>
+          </SelectContent>
+        </Select>
       </Label>
       <p className="text-xs text-muted-foreground">
         Today: {zonedDayKey(new Date(), isTimeZone(zone) ? zone : 'UTC')}. Any minute is supported.
@@ -1337,9 +1315,7 @@ function PlanComposer({
         </DialogHeader>
         <Label className="grid gap-1.5">
           Social account{' '}
-          <NativeSelect
-            aria-label="Composer social account"
-            className="w-full"
+          <Select
             value={setId}
             disabled={
               busy ||
@@ -1347,20 +1323,25 @@ function PlanComposer({
               reuseKey.current !== null ||
               created.current !== null
             }
-            onChange={(e) => {
-              setSetId(e.target.value)
-              setZone(sets.find((s) => s.id === e.target.value)?.timeZone ?? 'UTC')
+            onValueChange={(value) => {
+              setSetId(value)
+              setZone(sets.find((s) => s.id === value)?.timeZone ?? 'UTC')
               setTagIds([])
               setSelected(null)
               setKind('standard')
             }}
           >
-            {sets.map((s) => (
-              <NativeSelectOption key={s.id} value={s.id}>
-                {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+            <SelectTrigger aria-label="Composer social account" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sets.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         <Button
           variant="outline"
@@ -1450,17 +1431,21 @@ function PlanComposer({
           <>
             <Label className="grid gap-1.5">
               Post type{' '}
-              <NativeSelect
-                aria-label="Post type"
+              <Select
                 value={kind}
                 disabled={busy || creationInput.current !== null}
-                onChange={(e) => setKind(e.target.value as typeof kind)}
+                onValueChange={(value) => setKind(value as typeof kind)}
               >
-                <NativeSelectOption value="standard">Post or thread</NativeSelectOption>
-                {set?.accounts.some((a) => channelForPlatform(a.platform) === 'x') ? (
-                  <NativeSelectOption value="article">X Article</NativeSelectOption>
-                ) : null}
-              </NativeSelect>
+                <SelectTrigger aria-label="Post type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Post or thread</SelectItem>
+                  {set?.accounts.some((a) => channelForPlatform(a.platform) === 'x') ? (
+                    <SelectItem value="article">X Article</SelectItem>
+                  ) : null}
+                </SelectContent>
+              </Select>
             </Label>
             {kind === 'article' ? (
               <Input
@@ -1732,13 +1717,12 @@ function PlanDetail({
           {item.deliveryStatus === 'SCHEDULED' && swapCandidates.length > 0 ? (
             <Label className="grid gap-1.5">
               Swap queue position
-              <NativeSelect
-                aria-label={`Swap queue position for ${item.text || item.title}`}
+              <Select
                 disabled={busy || !canPublish}
                 value=""
-                onChange={(event) => {
+                onValueChange={(value) => {
                   const other = swapCandidates.find(
-                    (candidate) => candidate.id === event.target.value
+                    (candidate) => candidate.id === value
                   )
                   if (other)
                     void run(() =>
@@ -1746,13 +1730,17 @@ function PlanDetail({
                     )
                 }}
               >
-                <NativeSelectOption value="">Choose a scheduled post…</NativeSelectOption>
-                {swapCandidates.map((candidate) => (
-                  <NativeSelectOption key={candidate.id} value={candidate.id}>
-                    {candidate.text || candidate.title} · {new Date(candidate.at).toLocaleString()}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger aria-label={`Swap queue position for ${item.text || item.title}`}>
+                  <SelectValue placeholder="Choose a scheduled post…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {swapCandidates.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.text || candidate.title} · {new Date(candidate.at).toLocaleString()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Label>
           ) : null}
           <div className="flex flex-wrap gap-2">
@@ -1846,13 +1834,18 @@ function PlanDetail({
           </div>
           <Label className="grid gap-1.5">
             Copy to publishing brand{' '}
-            <NativeSelect value={copySet} onChange={(e) => setCopySet(e.target.value)}>
-              {sets.map((s) => (
-                <NativeSelectOption key={s.id} value={s.id}>
-                  {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Select value={copySet} onValueChange={(value) => setCopySet(value)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sets.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Label>
           <Button
             variant="outline"

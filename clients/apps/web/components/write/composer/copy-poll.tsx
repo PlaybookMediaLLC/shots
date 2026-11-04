@@ -3,7 +3,13 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -51,17 +57,20 @@ export function CopyPollDialog({
         </DialogHeader>
         <Label>
           Destination{' '}
-          <NativeSelect
-            aria-label="Poll destination"
+          <Select
             disabled={prepared}
             value={target}
-            onChange={(event) => setTarget(event.target.value as DraftChannel)}
+            onValueChange={(value) => setTarget(value as DraftChannel)}
           >
-            <NativeSelectOption value="">Choose a channel</NativeSelectOption>
-            {supported.map((item) => (
-              <NativeSelectOption key={item.channel}>{item.channel}</NativeSelectOption>
-            ))}
-          </NativeSelect>
+            <SelectTrigger aria-label="Poll destination">
+              <SelectValue placeholder="Choose a channel" />
+            </SelectTrigger>
+            <SelectContent>
+              {supported.map((item) => (
+                <SelectItem key={item.channel} value={item.channel}>{item.channel}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         {!supported.length && <p>No other connected channel has verified poll support.</p>}
         {target && (
