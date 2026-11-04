@@ -10,6 +10,7 @@ import {
   rankCommands,
 } from '@/components/write/composer/commands'
 import type { RefineApi } from '@/components/write/composer/refine'
+import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import { normalizeMentions } from '@/lib/write/normalize-mentions'
 import { postBreak } from '@/lib/write/versions'
 
@@ -139,4 +140,40 @@ test('the characters past a post’s limit are marked from its end, and a split 
     [['1.0', [2, 3]]]
   )
   assert.equal(overflowRanges(body, {}, 'x').size, 0)
+})
+
+test('an old draft’s document formatting converts to the plain text it publishes, in one step', () => {
+  const value = [
+    postBreak(),
+    { type: 'h2', children: [{ text: 'Title' }] },
+    { type: 'callout', children: [p('Note'), p('More')] },
+    { type: 'toc', children: [{ text: '' }] },
+    { type: 'column_group', children: [{ type: 'column', children: [p('Left')] }] },
+    {
+      type: 'p',
+      children: [
+        { text: 'Red', color: '#f00' },
+        { text: ' plain', bold: true },
+      ],
+    },
+  ] as Value
+  const editor = createPlateEditor({ plugins: [PostBreakPlugin], value })
+  assert.equal(legacyCount(editor.children), 6)
+  convertLegacyBlocks(editor)
+  assert.equal(legacyCount(editor.children), 0)
+  assert.deepEqual(
+    editor.children
+      .slice(1)
+      .map((node) => [node.type, editor.api.string(editor.api.findPath(node)!)]),
+    [
+      ['p', 'Title'],
+      ['p', 'Note'],
+      ['p', 'More'],
+      ['p', 'Left'],
+      ['p', 'Red plain'],
+    ]
+  )
+  assert.equal((editor.children[5].children as { bold?: boolean }[])[1].bold, true)
+  editor.undo()
+  assert.equal(legacyCount(editor.children), 6)
 })

@@ -46,7 +46,7 @@ export function CommandRow({ command }: { command: Command }) {
         </span>
       ) : null}
       {command.shortcut ? (
-        <kbd className="shrink-0 rounded-sm border border-border px-1 font-sans text-label text-muted-foreground">
+        <kbd className="shrink-0 rounded-sm border border-border px-1 font-sans text-label text-muted-foreground pointer-coarse:hidden">
           {keys.label(command.shortcut)}
         </kbd>
       ) : null}
@@ -100,7 +100,16 @@ function SlashMenu(props: PlateElementProps) {
         value={query}
       >
         <InlineComboboxInput aria-label="Command" />
-        <InlineComboboxContent aria-label="Commands" variant="slash">
+        <InlineComboboxContent
+          aria-label="Commands"
+          // On touch the menu is a sheet along the bottom, above the keyboard.
+          className="pointer-coarse:max-h-[45dvh] pointer-coarse:w-full pointer-coarse:min-w-0 pointer-coarse:max-w-none pointer-coarse:rounded-b-none"
+          variant="slash"
+          wrapperProps={{
+            className:
+              'pointer-coarse:fixed! pointer-coarse:inset-x-0! pointer-coarse:top-auto! pointer-coarse:bottom-[var(--keyboard-inset,0px)]! pointer-coarse:w-auto! pointer-coarse:min-w-0! pointer-coarse:transform-none!',
+          }}
+        >
           {typed ? (
             ranked.length ? (
               rows(ranked, 'match')

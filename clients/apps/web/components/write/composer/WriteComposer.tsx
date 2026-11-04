@@ -12,6 +12,7 @@ import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sideba
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
 import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
+import { InfoIcon } from '@phosphor-icons/react/dist/ssr/Info'
 import { ScissorsIcon } from '@phosphor-icons/react/dist/ssr/Scissors'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
@@ -72,6 +73,7 @@ import {
   type VersionOptions,
 } from '@/lib/write/document'
 import { buildPublication } from '@/lib/write/publication'
+import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
   adaptBody,
   bodyFor,
@@ -975,6 +977,7 @@ export function WriteComposer({
             </span>
             <Input
               aria-label="Draft title"
+              hidden={focus}
               className="h-8 min-w-20 max-w-64 flex-1 truncate border-transparent bg-transparent text-ui-lg font-medium text-foreground focus:text-foreground"
               disabled={!canEdit}
               maxLength={200}
@@ -1087,7 +1090,7 @@ export function WriteComposer({
               <Button
                 ref={shareButton}
                 aria-label="Share"
-                className={cn('hidden lg:inline-flex', panel && 'size-8 px-0')}
+                className={cn('hidden', !focus && 'lg:inline-flex', panel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
                 title={`Share (${mod}⌥S)`}
@@ -1098,7 +1101,7 @@ export function WriteComposer({
               {canPublish && server.status !== 'archived' ? (
                 <>
                   <Button
-                    className="hidden sm:inline-flex"
+                    className={cn('hidden', !focus && 'sm:inline-flex')}
                     data-testid="publish-button"
                     onClick={() => setDialog('publish')}
                     size="sm"
@@ -1286,7 +1289,7 @@ export function WriteComposer({
               </Button>
             </div>
           ) : null}
-          {accounts.length === 0 ? (
+          {accounts.length === 0 && !focus ? (
             <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-foreground">
               <span>
                 {canManageSets
@@ -1302,6 +1305,9 @@ export function WriteComposer({
               ) : null}
             </div>
           ) : null}
+          {/* Focus mode (⌘⇧F) keeps the posts and Schedule; everything else steps away. */}
+          {focus ? null : (
+            <>
           <PlatformTabs
             accounts={accounts}
             active={active}
@@ -1419,12 +1425,35 @@ export function WriteComposer({
               />
             ) : null}
           </details>
+            </>
+          )}
           <div
             className="relative flex-1"
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
           >
+            {canEdit &&
+            legacyCount(active === primary ? document.value : versionOfTab.body) > 0 ? (
+              <div
+                className={cn(
+                  'mb-2 flex flex-wrap items-center gap-2 text-caption text-muted-foreground',
+                  POST_COLUMN
+                )}
+                data-testid="legacy-formatting"
+                role="status"
+              >
+                <InfoIcon aria-hidden className="size-4 shrink-0" />
+                <span>Headings, callouts and colored text in this draft post as plain text.</span>
+                <Button
+                  onClick={() => editor.current && convertLegacyBlocks(editor.current)}
+                  size="sm"
+                  variant="outline"
+                >
+                  Convert to text
+                </Button>
+              </div>
+            ) : null}
             {active === primary ? (
               <DraftEditor
                 {...editorProps}
@@ -1519,6 +1548,8 @@ export function WriteComposer({
                 value={document.value as PlateBody}
               />
             )}
+            {focus ? null : (
+              <>
             <div
               className={cn('mb-6 flex flex-wrap justify-end gap-3', POST_COLUMN)}
               data-testid="platform-counters"
@@ -1574,6 +1605,8 @@ export function WriteComposer({
               }
               posts={posts}
             />
+              </>
+            )}
             <div className="h-32" />
           </div>
         </div>

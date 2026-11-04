@@ -857,12 +857,14 @@ function DraftEditorSession({
   React.useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) return
-    const resize = () =>
-      setKeyboardInset(
-        window.matchMedia('(max-width: 639px)').matches
-          ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-          : 0
-      )
+    const resize = () => {
+      const inset = window.matchMedia('(max-width: 639px)').matches
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0
+      setKeyboardInset(inset)
+      // Sheets that open from the bottom (the slash menu on touch) sit above the keyboard too.
+      document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`)
+    }
     resize()
     viewport.addEventListener('resize', resize)
     viewport.addEventListener('scroll', resize)

@@ -21,7 +21,9 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { MobileDrawer } from '@/components/ui/responsive-popover'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import type { DocumentActions } from '@/components/drafts/DraftEditor'
 import type { DraftChannel } from '@/lib/write/document'
@@ -42,6 +44,17 @@ const LibraryAssetPicker = dynamic(
     ),
   { ssr: false }
 )
+
+const noSubscription = () => () => {}
+
+/** Whether the main pointer is a finger, where menus open as sheets from the bottom. */
+export function useCoarsePointer(): boolean {
+  return React.useSyncExternalStore(
+    noSubscription,
+    () => window.matchMedia('(pointer: coarse)').matches,
+    () => false
+  )
+}
 
 /** Commands the toolbar shows as their own buttons, so More leaves them out. */
 const ON_TOOLBAR = new Set(['insert-media', 'insert-emoji'])
@@ -74,6 +87,7 @@ export function ComposerToolbar({
 }) {
   const editor = useEditorRef()
   const keys = useKeys()
+  const coarse = useCoarsePointer()
   const refine = useRefine()
   const composer = React.useContext(ComposerCommandsContext)
   const files = React.useRef<Record<string, HTMLInputElement | null>>({})
@@ -101,26 +115,46 @@ export function ComposerToolbar({
     onTool(null)
     editor.tf.focus()
   }
-  const item = (command: Command) => {
-    const Icon = command.icon
-    return (
-      <DropdownMenuItem
-        key={command.id}
-        onSelect={() => {
-          rememberCommand(command.id)
-          command.run()
-        }}
-      >
-        <Icon aria-hidden />
-        <span className="flex-1">{command.label}</span>
-        {command.badge ? (
-          <span className="text-label text-muted-foreground">{command.badge}</span>
-        ) : command.shortcut ? (
-          <DropdownMenuShortcut aria-hidden>{keys.label(command.shortcut)}</DropdownMenuShortcut>
-        ) : null}
-      </DropdownMenuItem>
-    )
-  }
+  // More's rows, in sections: the registry's inserts, media tools, import and export.
+  type Row = { badge?: string; icon: Command['icon']; key: string; label: string; run: () => void; shortcut?: string }
+  const sections: Row[][] = [
+    commands.map((command) => ({
+      badge: command.badge,
+      icon: command.icon,
+      key: command.id,
+      label: command.label,
+      run: () => {
+        rememberCommand(command.id)
+        command.run()
+      },
+      shortcut: command.shortcut ? keys.label(command.shortcut) : undefined,
+    })),
+    [
+      { icon: LinkSimpleIcon, key: 'link-image', label: 'Image from link', run: () => onTool('link-image') },
+      { icon: SlidersHorizontalIcon, key: 'media', label: 'Manage media', run: () => onTool('media') },
+      { icon: ClosedCaptioningIcon, key: 'alt', label: 'Alt text', run: () => onTool('alt') },
+    ],
+    [
+      ...actions.imports.map((file) => ({
+        icon: FileArrowUpIcon,
+        key: file.label,
+        label: file.label,
+        run: () => files.current[file.label]?.click(),
+      })),
+      ...actions.exports.map((file) => ({
+        icon: DownloadSimpleIcon,
+        key: file.label,
+        label: file.label,
+        run: () => void file.run(),
+      })),
+    ],
+  ]
+  const [sheet, setSheet] = React.useState(false)
+  const trigger = (
+    <ToolbarButton aria-label="More" tooltip="More: insert, media, import and export">
+      <DotsThreeIcon aria-hidden />
+    </ToolbarButton>
+  )
   return (
     <>
       <Popover onOpenChange={(open) => onTool(open ? 'emoji' : null)} open={tool === 'emoji'}>
@@ -164,47 +198,61 @@ export function ComposerToolbar({
           </ToolbarButton>
         </RefineMenu>
       ) : null}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <ToolbarButton aria-label="More" tooltip="More: insert, media, import and export">
-            <DotsThreeIcon aria-hidden />
-          </ToolbarButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          className="max-h-[min(30rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto"
-          onCloseAutoFocus={(event) => event.preventDefault()}
-          side="top"
+      {coarse ? (
+        // On touch, the same rows as a sheet from the bottom, above the keyboard.
+        <MobileDrawer
+          description="Insert, media tools, import and export"
+          onOpenChange={setSheet}
+          open={sheet}
+          title="More"
+          trigger={trigger}
         >
-          {commands.map(item)}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onTool('link-image')}>
-            <LinkSimpleIcon aria-hidden />
-            Image from link
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onTool('media')}>
-            <SlidersHorizontalIcon aria-hidden />
-            Manage media
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onTool('alt')}>
-            <ClosedCaptioningIcon aria-hidden />
-            Alt text
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {actions.imports.map((file) => (
-            <DropdownMenuItem key={file.label} onSelect={() => files.current[file.label]?.click()}>
-              <FileArrowUpIcon aria-hidden />
-              {file.label}
-            </DropdownMenuItem>
-          ))}
-          {actions.exports.map((file) => (
-            <DropdownMenuItem key={file.label} onSelect={() => void file.run()}>
-              <DownloadSimpleIcon aria-hidden />
-              {file.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <div className="grid gap-px px-2 pb-3">
+            {sections.flat().map((row) => (
+              <Button
+                className="h-11 justify-start gap-3 px-3 text-ui-lg font-normal"
+                key={row.key}
+                onClick={() => {
+                  setSheet(false)
+                  row.run()
+                }}
+                variant="ghost"
+              >
+                <row.icon aria-hidden className="size-5 text-muted-foreground" />
+                <span className="flex-1 text-left">{row.label}</span>
+                {row.badge ? <span className="text-label text-muted-foreground">{row.badge}</span> : null}
+              </Button>
+            ))}
+          </div>
+        </MobileDrawer>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="max-h-[min(30rem,var(--radix-dropdown-menu-content-available-height))] w-64 overflow-y-auto"
+            onCloseAutoFocus={(event) => event.preventDefault()}
+            side="top"
+          >
+            {sections.map((rows, index) => (
+              <React.Fragment key={index}>
+                {index ? <DropdownMenuSeparator /> : null}
+                {rows.map((row) => (
+                  <DropdownMenuItem key={row.key} onSelect={row.run}>
+                    <row.icon aria-hidden />
+                    <span className="flex-1">{row.label}</span>
+                    {row.badge ? (
+                      <span className="text-label text-muted-foreground">{row.badge}</span>
+                    ) : row.shortcut ? (
+                      <DropdownMenuShortcut aria-hidden>{row.shortcut}</DropdownMenuShortcut>
+                    ) : null}
+                  </DropdownMenuItem>
+                ))}
+              </React.Fragment>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {actions.imports.map((file) => (
         <Input
           accept={file.accept}

@@ -77,3 +77,11 @@
 .draft-prose[contenteditable='true']:focus-visible {
   outline: none;
 }
+
+/* Compact display (⌘⇧H) tightens the space between lines and posts; type keeps its size. */
+.write-compact .draft-prose .slate-p {
+  padding-block: 0;
+}
+.write-compact .draft-prose .slate-post_break:not(:first-child) {
+  padding-top: 2rem;
+}
