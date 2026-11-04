@@ -193,9 +193,8 @@ nobody knows a draft waits for review.
 
 ### What exists
 
-Publish › Calendar (`components/plan/PlanWorkspace.tsx`) replaced the drafts week
-calendar and offers month, week and flexible views. `ListContentDraftPostsBetween`
-already reads any date range.
+`components/plan/PlanWorkspace.tsx` shows a flex, month or week grid.
+`ListContentDraftPostsBetween` already reads any date range.
 
 ### Work
 
