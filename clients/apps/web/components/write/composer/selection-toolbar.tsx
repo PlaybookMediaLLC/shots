@@ -36,7 +36,7 @@ function SelectionTools() {
   const refine = useRefine()
   const { mod } = useKeys()
   return (
-    <FloatingToolbar>
+    <FloatingToolbar aria-label="Selected text tools">
       <ToolbarGroup>
         <Mark label="Bold" nodeType={KEYS.bold} shortcut={`${mod}B`} />
         <Mark label="Italic" nodeType={KEYS.italic} shortcut={`${mod}I`} />
