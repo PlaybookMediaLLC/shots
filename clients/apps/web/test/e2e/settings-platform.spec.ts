@@ -73,7 +73,6 @@ test('personal settings are addressable, saved on the server and survive a reloa
     page.getByRole('combobox', { exact: true, name: 'Display time zone' }),
     /^Tokyo · Asia\/Tokyo · /
   )
-  await page.getByRole('button', { name: 'Save time zone', exact: true }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
   await app.reload()
   await expect(

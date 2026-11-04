@@ -92,15 +92,12 @@ function SignInEmail({ email }: { email: string }) {
 function DisplayTimeZone() {
   const { preferences, save, status } = usePreferences()
   const [state, run] = useSaveState()
-  const [draft, setDraft] = useState<{ timeZone: string | null } | null>(null)
-  const value = draft ? draft.timeZone || null : preferences?.timeZone ?? null
-  const dirty = value !== (preferences?.timeZone ?? null)
   return (
     <Row
       description="How times show to you in lists, notifications and the composer. Each publishing brand keeps its own scheduling time zone, and changing this one reschedules nothing."
       label={
         <span className="flex items-center gap-2">
-          Display time zone <SaveStatus state={dirty ? 'idle' : state} />
+          Display time zone <SaveStatus state={state} />
         </span>
       }
       layout="stacked"
@@ -109,16 +106,9 @@ function DisplayTimeZone() {
         allowBrowser
         disabled={status !== 'ready' || state === 'saving'}
         label="Display time zone"
-        onChange={(timeZone) => setDraft({ timeZone })}
-        value={value}
+        onChange={(timeZone) => void run(() => save({ timeZone }))}
+        value={preferences?.timeZone ?? null}
       />
-      <div className="flex items-center gap-2">
-        <Button disabled={!dirty || state === 'saving'} onClick={async () => {
-          if (await run(() => save({ timeZone: value ?? '' }))) setDraft(null)
-        }}>Save time zone</Button>
-        <Button variant="outline" disabled={!dirty || state === 'saving'} onClick={() => setDraft(null)}>Discard</Button>
-        {dirty ? <span className="text-xs text-muted-foreground">Unsaved time zone</span> : null}
-      </div>
     </Row>
   )
 }
