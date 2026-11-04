@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Value } from '@shots/platejs-editor/platejs'
 import { createPlateEditor } from '@shots/platejs-editor/platejs/react'
+import { overflowRanges, overflowStart } from '@/components/drafts/over-limit'
 import { duplicatePost, PostBreakPlugin, postRanges } from '@/components/drafts/thread'
 import {
   type CommandContext,
@@ -124,4 +125,18 @@ test('half-typed inputs never persist: a slash command is dropped, emoji keep th
     { text: '' },
     { text: ':fir' },
   ])
+})
+
+test('the characters past a post’s limit are marked from its end, and a split starts at that word', () => {
+  const body = [postBreak(), p('Short'), postBreak(), p('One two three'), p('four five')] as Value
+  // Post 2 is six characters over: "r five"; the split moves the whole word "four" on.
+  const ranges = overflowRanges(body, { 2: 6 }, 'tiktok')
+  assert.deepEqual([...ranges.entries()], [['4.0', [3, 9]]])
+  assert.deepEqual(overflowStart(body, 2, { 2: 6 }, 'tiktok'), { offset: 0, path: [4, 0] })
+  // X weighs a CJK character as two, so one character covers an excess of two.
+  assert.deepEqual(
+    [...overflowRanges([postBreak(), p('ab漢')] as Value, { 1: 2 }, 'x')],
+    [['1.0', [2, 3]]]
+  )
+  assert.equal(overflowRanges(body, {}, 'x').size, 0)
 })

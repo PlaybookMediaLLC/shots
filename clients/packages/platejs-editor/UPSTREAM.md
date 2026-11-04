@@ -99,7 +99,18 @@ Post editor (the Write brief: one look with the app, a social slash menu):
   Enter does; `closeOnSpace` (`empty`: a space right after the trigger types
   it as text; `always`: a space ends the query); the host's `onKeyDown` is
   composed with Plate's instead of replacing it; the popover sits 8px below
-  the caret's line (`gutter`) with no extra margin.
+  the caret's line (`gutter`) with no extra margin; the typed query is also
+  written to the input node's `value` (outside undo history), so a save while
+  the input is open keeps the text.
+- `src/ui/remote-cursor-overlay.tsx`: carets of the same user's other tabs
+  are not drawn; a collaborator's name shows for two seconds after their
+  caret moves and on hover, then fades to the caret.
+  `src/collaboration/index.ts`: the selection tint uses `color-mix`, so any
+  CSS color works (an `hsl()` color plus "33" was invalid and drew nothing).
+- `src/ui/media-image-node.tsx`: an image with alt text shows an "ALT"
+  badge (Phosphor `ClosedCaptioning`) at its corner.
+- `package.json`, `src/exports/platejs-combobox.ts`: a `./@platejs/combobox`
+  subpath export, so the app can build its own trigger comboboxes (`#`).
 - `src/lib/utils.ts`: `cn` knows the host's type scale (`text-label`,
   `text-caption`, `text-ui`, `text-body`, ...) as font sizes, so merging one
   with a text color no longer drops it.

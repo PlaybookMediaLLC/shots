@@ -141,8 +141,15 @@ function InlineCombobox({
       if (!hasValueProp) {
         setValueState(newValue);
       }
+      // The query is kept on the node too, so a save while it is open keeps the
+      // typed text (the host turns the input into "#query" text); not an undo step.
+      const path = editor.api.findPath(element);
+      if (path)
+        editor.tf.withoutSaving(() =>
+          editor.tf.setNodes({ value: newValue }, { at: path })
+        );
     },
-    [setValueProp, hasValueProp]
+    [editor, element, setValueProp, hasValueProp]
   );
 
   const insertPoint = useRef<Point | null>(null);
@@ -295,14 +302,28 @@ function InlineComboboxInput({
           onKeyDown={(event) => {
             props.onKeyDown?.(event);
             if (event.defaultPrevented) return;
+            // Slate still counts the editor as focused while this input has focus, so
+            // its focus() would do nothing and the next keystroke would land in the
+            // removed input. Hand focus to the editable directly, in this keystroke.
+            const refocus = () =>
+              editor.api.toDOMNode(editor)?.focus({ preventScroll: true });
+            // An open-ended query (a hashtag) with nothing highlighted: Enter ends it and breaks the line.
+            if (event.key === "Enter" && closeOnSpace === "always" && !store.getState().activeId) {
+              event.preventDefault();
+              cancelInput("manual");
+              editor.tf.insertBreak();
+              refocus();
+              return;
+            }
             if (
               event.key === " " &&
               (closeOnSpace === "always" || (closeOnSpace === "empty" && !value))
             ) {
               event.preventDefault();
               // Cancelling puts the trigger and query back as text; the space follows it.
-              cancelInput("manual", true);
+              cancelInput("manual");
               editor.tf.insertText(" ");
+              refocus();
               return;
             }
             inputProps.onKeyDown(event);

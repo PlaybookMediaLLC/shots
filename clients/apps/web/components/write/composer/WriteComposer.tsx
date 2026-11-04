@@ -12,6 +12,7 @@ import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sideba
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
 import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
+import { ScissorsIcon } from '@phosphor-icons/react/dist/ssr/Scissors'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { toast } from 'sonner'
@@ -43,7 +44,8 @@ import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/Dr
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
-import { appendPost, movePost, postRanges } from '@/components/drafts/thread'
+import { appendPost, movePost, postRanges, splitPostAtCaret } from '@/components/drafts/thread'
+import { overflowStart, type PostExcess, setOverLimit } from '@/components/drafts/over-limit'
 import { POST_COLUMN } from '@/components/drafts/layout'
 import {
   DraftRequestError,
@@ -114,6 +116,7 @@ import { ComposerCommandsContext, type ComposerTool, type Snippet } from './comm
 import { ComposerToolbar } from './composer-toolbar'
 import { SelectionToolbarPlugin } from './selection-toolbar'
 import { SlashMenuPlugin } from './slash-menu'
+import { HashtagPlugins, HashtagsContext } from './hashtags'
 import {
   SocialMentionPlugin,
   SocialMentionInputPlugins,
@@ -153,6 +156,7 @@ const WRITE_PLUGINS = [
   ...SocialMentionInputPlugins,
   SlashMenuPlugin,
   SelectionToolbarPlugin,
+  ...HashtagPlugins,
 ]
 
 /** What the save state reads as. */
@@ -725,6 +729,28 @@ export function WriteComposer({
       </p>
     </div>
   )
+  // Each post's characters over the limit; a platform without threads publishes the
+  // posts as one caption, whose overflow is the last post's tail.
+  // shortcut: that tail can start in an earlier post; mark across posts if writers ask.
+  const captionLimit = activePublication.serialized.limit
+  const postCount = postRanges((editorInstance?.children ?? []) as Value).length
+  const excess: PostExcess = Object.fromEntries(
+    activePublication.serialized.posts
+      .filter((post) => post.length > captionLimit)
+      .map((post) => [CAPABILITIES[active].thread ? post.group : postCount, post.length - captionLimit])
+  )
+  const excessKey = JSON.stringify(excess)
+  React.useEffect(() => {
+    if (editorInstance) setOverLimit(editorInstance, active, JSON.parse(excessKey) as PostExcess)
+  }, [active, editorInstance, excessKey])
+  const splitAtLimit = (number: number) => {
+    const current = editor.current
+    const point = current && overflowStart(current.children, number, excess, active)
+    if (!current || !point) return
+    current.tf.select(point)
+    splitPostAtCaret(current)
+    current.tf.focus()
+  }
   const postCounter = (number: number, inUse: boolean) => {
     const post = activePublication.serialized.posts.find((item) => item.group === number)
     if (!post) return null
@@ -760,6 +786,13 @@ export function WriteComposer({
     placeholder: PLACEHOLDERS[active] ?? `Write your ${CHANNEL_META[active].label} post…`,
     postTools: {
       counter: postCounter,
+      menu: (number: number) =>
+        excess[number] && CAPABILITIES[active].thread ? (
+          <DropdownMenuItem onSelect={() => splitAtLimit(number)}>
+            <ScissorsIcon aria-hidden />
+            Split at the limit
+          </DropdownMenuItem>
+        ) : null,
       refine: aiEnabled
         ? (number: number, button: React.ReactElement) => (
             <RefineMenu align="end" at={`post-${number}`} side="bottom">
@@ -949,17 +982,24 @@ export function WriteComposer({
               placeholder="Untitled draft"
               value={document.title}
             />
-            <span
-              className={cn(
-                'shrink-0 text-xs',
-                saveState === 'error' || saveState === 'offline'
-                  ? 'text-amber-700 dark:text-amber-300'
-                  : 'text-muted-foreground'
-              )}
-              data-testid="save-state"
-              role="status"
-            >
-              {SAVE_LABELS[saveState]}
+            {/* The everyday labels share one cell sized to the widest, so the header never shifts. */}
+            <span className="grid shrink-0 text-xs [&>*]:col-start-1 [&>*]:row-start-1">
+              {(['saving', 'saved', 'unsaved'] as const).map((state) => (
+                <span aria-hidden className="invisible" key={state}>
+                  {SAVE_LABELS[state]}
+                </span>
+              ))}
+              <span
+                className={cn(
+                  saveState === 'error' || saveState === 'offline'
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-muted-foreground'
+                )}
+                data-testid="save-state"
+                role="status"
+              >
+                {SAVE_LABELS[saveState]}
+              </span>
             </span>
             {saveState === 'error' || saveState === 'offline' ? (
               <Button
@@ -1328,7 +1368,7 @@ export function WriteComposer({
                 // The choice then lasts only as long as this composer.
               }
             }}
-            open={optionsOpen || pasteNotice}
+            open={optionsOpen}
           >
             <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 bg-background px-4 py-2.5 text-caption font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
               <CaretRightIcon
@@ -1768,6 +1808,7 @@ export function WriteComposer({
     <SocialMentionContext.Provider
       value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
     >
+      <HashtagsContext.Provider value={vocabulary.hashtags}>
       <ComposerCommandsContext.Provider
         value={{
           addMedia,
@@ -1802,6 +1843,7 @@ export function WriteComposer({
           )}
         </PostSettingRequestContext.Provider>
       </ComposerCommandsContext.Provider>
+      </HashtagsContext.Provider>
     </SocialMentionContext.Provider>
   )
 }

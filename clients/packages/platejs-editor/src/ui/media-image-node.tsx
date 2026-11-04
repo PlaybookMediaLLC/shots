@@ -17,6 +17,7 @@ import {
   withHOC,
 } from "platejs/react";
 import React, { useEffect, useMemo, useState } from "react";
+import { ClosedCaptioningIcon } from "@phosphor-icons/react/dist/ssr/ClosedCaptioning";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 
 import { cn } from "../lib/utils";
@@ -158,6 +159,16 @@ export const ImageElement = withHOC(
                 )}
 
                 {loading && <ImagePlaceholder file={currentUploadingFile} />}
+                {/* The image has a description for screen readers (alt text). */}
+                {typeof props.element.alt === "string" && props.element.alt ? (
+                  <span
+                    className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-sm bg-foreground/75 px-1.5 py-0.5 font-medium text-background text-label"
+                    title={props.element.alt}
+                  >
+                    <ClosedCaptioningIcon aria-hidden className="size-3.5" />
+                    ALT
+                  </span>
+                ) : null}
               </div>
 
               <MediaToolbar />

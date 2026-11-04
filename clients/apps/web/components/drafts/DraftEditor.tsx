@@ -41,9 +41,10 @@ import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
 import { useKeys } from '@/components/write/shortcuts'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
-import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
+import { divLinesAsParagraphs, plainPaste } from '@/lib/content-drafts/paste'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
+import { OverLimitPlugin } from './over-limit'
 import {
   insertPostBreak,
   leaveHeader,
@@ -235,19 +236,21 @@ function CommentColumn({ children }: { children: React.ReactNode }) {
       }}
       onPasteCapture={(event) => {
         const clipboard = event.clipboardData
-        const html = clipboard.files.length ? '' : clipboard.getData('text/html')
-        const lines = html ? divLinesAsParagraphs(html) : null
+        // A copy from a draft keeps its posts, media and marks; files go to uploads.
+        const internal = clipboard.types.includes('application/x-slate-fragment')
+        const html = clipboard.files.length || internal ? '' : clipboard.getData('text/html')
         // A paste over a selection replaces it through Plate's own handling.
         const header = editor.api.isCollapsed() && leaveHeader(editor)
-        if (!lines && !header) return
+        if (!html && !header) return
         // Handled here, so Slate's own paste handler below does not insert it again.
         event.preventDefault()
         event.stopPropagation()
-        if (!lines) return editor.tf.insertData(clipboard)
+        if (!html) return editor.tf.insertData(clipboard)
+        // Rich text from elsewhere arrives as clean lines, as the post will publish.
+        const text = clipboard.getData('text/plain')
         const data = new DataTransfer()
-        for (const type of clipboard.types)
-          if (type !== 'Files')
-            data.setData(type, type === 'text/html' ? lines : clipboard.getData(type))
+        if (text) data.setData('text/plain', plainPaste(text))
+        else data.setData('text/html', divLinesAsParagraphs(html) ?? html)
         editor.tf.insertData(data)
       }}
     >
@@ -291,8 +294,8 @@ function DiscussionsWatcher({ onChange }: { onChange: (discussions: DraftDiscuss
   return null
 }
 
-/** Who else is in the draft right now, from the session's awareness. */
-function Presence() {
+/** Who else is in the draft right now, from the session's awareness; not you in another tab. */
+function Presence({ userId }: { userId: string }) {
   const editor = useEditorRef()
   const awareness = editor.getOptions(YjsPlugin).awareness
   const [people, setPeople] = React.useState<{ color: string; key: string; name: string }[]>([])
@@ -303,7 +306,7 @@ function Presence() {
       for (const state of awareness.getStates().values()) {
         const data = (state as { data?: { color?: string; name?: string; userId?: string } }).data
         const key = data?.userId ?? data?.name
-        if (data?.name && key && !byPerson.has(key))
+        if (data?.name && key && key !== userId && !byPerson.has(key))
           byPerson.set(key, { color: data.color ?? 'gray', key, name: data.name })
       }
       setPeople([...byPerson.values()])
@@ -311,7 +314,7 @@ function Presence() {
     update()
     awareness.on('change', update)
     return () => awareness.off('change', update)
-  }, [awareness])
+  }, [awareness, userId])
   return (
     // Who else is here sits above the post, at the column's right edge.
     <div className="flex flex-wrap justify-end gap-1.5 px-6 py-2" data-testid="presence">
@@ -621,7 +624,9 @@ function DraftEditorSession({
       excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts'].filter(
         (key) => !hosted.some((plugin) => plugin.key === key)
       ),
-      additionalPlugins: live ? [PostBreakPlugin, ...hosted, live] : [PostBreakPlugin, ...hosted],
+      additionalPlugins: live
+        ? [PostBreakPlugin, OverLimitPlugin, ...hosted, live]
+        : [PostBreakPlugin, OverLimitPlugin, ...hosted],
       // Comments and suggestions are authored by the signed-in member, not
       // the upstream demo users.
       overridePlugins: [
@@ -885,7 +890,7 @@ function DraftEditorSession({
             }}
             readOnly={readOnly || waitingForConnection}
           >
-            {collaboration ? <Presence /> : null}
+            {collaboration ? <Presence userId={user.id} /> : null}
             <DiscussionsWatcher onChange={onDiscussionsChange} />
             {!collaboration || live ? (
               <CommentColumn>
