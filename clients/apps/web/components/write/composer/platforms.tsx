@@ -70,7 +70,7 @@ export function PlatformTabs({
             <Button
               aria-selected={active === channel}
               className={cn(
-                'flex h-8 items-center gap-2 rounded-full border px-3 text-xs transition-colors',
+                'flex h-8 items-center gap-2 rounded-md border px-3 text-ui transition-colors',
                 active === channel
                   ? 'border-input bg-foreground/[0.08] text-foreground'
                   : 'border-border text-muted-foreground hover:text-foreground'
@@ -109,7 +109,7 @@ export function PlatformTabs({
       </div>
       {onManage ? (
         <Button
-          className="ml-1 text-xs text-muted-foreground hover:text-foreground"
+          className="ml-1 text-ui text-muted-foreground hover:text-foreground"
           onClick={onManage}
           size={null}
           type="button"
@@ -250,7 +250,7 @@ export function ManagePlatformsDialog({
                         <Button
                           aria-pressed={version.mode === 'synced'}
                           className={cn(
-                            'rounded-full border px-2 py-0.5',
+                            'rounded-md border px-2 py-1',
                             version.mode === 'synced'
                               ? 'border-sky-400/50 text-sky-700 dark:text-sky-200'
                               : 'border-border text-muted-foreground'
@@ -265,7 +265,7 @@ export function ManagePlatformsDialog({
                         <Button
                           aria-pressed={version.mode === 'manual'}
                           className={cn(
-                            'rounded-full border px-2 py-0.5',
+                            'rounded-md border px-2 py-1',
                             version.mode === 'manual'
                               ? 'border-amber-400/50 text-amber-700 dark:text-amber-200'
                               : 'border-border text-muted-foreground'

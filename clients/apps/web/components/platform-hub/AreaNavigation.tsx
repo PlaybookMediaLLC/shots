@@ -40,7 +40,7 @@ export function AreaNavigation({ label, items }: { label: string; items: AreaLin
   )
 }
 
-/** Polar's sub-pages: the active area's pages under its sidebar row, on a hairline. */
+/** The active area's pages under its sidebar row: a flat group headed by the area's name. */
 export function AreaSubNav({
   items,
   label,
@@ -52,14 +52,14 @@ export function AreaSubNav({
 }) {
   const active = useActiveAreaLink(items)
   return (
-    <nav aria-label={label} className="my-2 ms-4 grid gap-2 border-s border-border ps-4">
+    // A flat group under the area's name, between hairlines, in the nav row style.
+    <nav aria-label={label} className="my-2 grid gap-px border-y border-border py-3">
+      <p className="platform-eyebrow mb-1 px-2">{label}</p>
       {items.map((item) => (
         <SidebarLink
           aria-current={item.href === active ? 'page' : undefined}
-          className={cn(
-            'text-ui-lg font-medium transition-colors',
-            item.href === active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
-          )}
+          className="flex h-8 items-center px-2"
+          data-platform-nav
           href={item.href}
           key={item.href}
           onClick={onNavigate}

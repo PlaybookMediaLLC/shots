@@ -425,7 +425,7 @@ export function ScheduleDialog({
                 {quickPicks.map((option) => (
                   <Button
                     aria-pressed={instant?.getTime() === option.at.getTime()}
-                    className="h-7 rounded-full px-3 text-xs aria-pressed:border-foreground/40 aria-pressed:bg-foreground/[0.06]"
+                    className="h-8 rounded-md px-3 text-ui aria-pressed:border-foreground/40 aria-pressed:bg-foreground/[0.06]"
                     key={option.label}
                     onClick={() => setInstant(option.at)}
                     size={null}
@@ -522,7 +522,7 @@ export function ScheduleDialog({
                   <div className="flex flex-wrap gap-2">
                     {bestTimes.map((best) => (
                       <Button
-                        className="h-7 rounded-full px-3 text-xs"
+                        className="h-8 rounded-md px-3 text-ui"
                         key={best.at}
                         onClick={() => setInstant(new Date(best.at))}
                         size={null}

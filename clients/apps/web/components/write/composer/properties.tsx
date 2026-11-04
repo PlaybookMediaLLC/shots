@@ -209,7 +209,7 @@ export function PropertiesPanel({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    className="h-6 rounded-full border border-border px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                    className="h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:text-foreground"
                     size={null}
                     type="button"
                     variant="custom"

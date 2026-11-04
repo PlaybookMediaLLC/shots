@@ -315,7 +315,7 @@ function FrameLayout({
   return (
     <DraftsDrawerContext.Provider value={() => setDrawer(true)}>
       <div
-        className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col md:h-[calc(100vh-1rem-2px)]"
+        className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col md:h-full"
         data-testid="write-frame"
       >
         {/* On a phone an open draft keeps the whole screen; its header leads back to the list. */}

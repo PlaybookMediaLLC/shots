@@ -39,8 +39,8 @@ export function NavRow({
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed || name !== label ? name : undefined}
       className={cn(
-        'flex h-8 items-center gap-2.5 px-2.5',
-        collapsed && 'mx-auto size-9 justify-center px-0'
+        'flex h-8 items-center gap-2 px-2',
+        collapsed && 'mx-auto size-8 justify-center px-0'
       )}
       href={href}
       onClick={onNavigate}
@@ -48,7 +48,7 @@ export function NavRow({
       <Icon
         aria-hidden="true"
         className="shrink-0"
-        size={20}
+        size={16}
         weight={active ? 'fill' : 'regular'}
       />
       {collapsed ? null : <span className="truncate">{label}</span>}

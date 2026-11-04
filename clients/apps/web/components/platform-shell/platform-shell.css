@@ -1,13 +1,13 @@
-/* Authenticated chrome: the landing page's global tokens, pill navigation and
-   pill actions, with Polar's typography. Keep these rules out of canvas and
-   export geometry. */
+/* Authenticated chrome, after console.x.com: compact 13px type, 32px
+   controls with 6px corners, flat cards and hairline borders. Keep these
+   rules out of canvas and export geometry. */
 .platform-shell,
 .platform-overlay {
-  --platform-nav-expanded: 15rem;
+  --platform-nav-expanded: 14.875rem; /* 238px */
   --platform-nav-compact: 4.75rem;
   --platform-header-height: 3.5rem;
   --platform-form-width: 55rem;
-  --platform-control-radius: 0.75rem;
+  --platform-control-radius: 6px;
   --platform-ease: cubic-bezier(0.2, 0, 0, 1);
   --platform-duration: 160ms;
   --nav-cta-bg: var(--primary);
@@ -17,17 +17,16 @@
   font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
 }
 
 /* The console type scale (app/globals.css) on pages, overlays and the sidebar:
    13px UI text, and text-sm is that 13px step. On body, so portaled menus
    match. The editor keeps its own sizes. */
 :is(
-    body:has(.platform-shell[data-platform-variant='page']),
-    .platform-overlay,
-    [data-platform-sidebar]
-  ) {
+  body:has(.platform-shell[data-platform-variant='page']),
+  .platform-overlay,
+  [data-platform-sidebar]
+) {
   --text-sm: var(--text-ui);
   --text-sm--line-height: var(--text-ui--line-height);
 }
@@ -37,28 +36,55 @@
   line-height: var(--text-ui--line-height);
 }
 
-/* Polar's dashboard palette (orbit tokens): settings groups sit one step
-   below the panel, and controls one step above it. */
-.platform-shell,
-.platform-overlay {
-  --platform-group: oklch(0.985 0.002 247.839); /* gray-50 */
-  --platform-control: #ffffff;
+/* The console palette on pages, on body so portaled menus and dialogs
+   match. --background is bg-page, --foreground fg-primary,
+   --muted-foreground fg-secondary and --fg-tertiary fg-tertiary. The editor
+   keeps its own surfaces. */
+body:has(.platform-shell[data-platform-variant='page']) {
+  --background: #fafafa;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --sidebar: #ffffff;
+  --border: #eaeaea;
+  --input: #eaeaea;
+  --sidebar-border: #eaeaea;
+  --divider: #f2f2f2;
+  --foreground: #0a0a0a;
+  --card-foreground: #0a0a0a;
+  --popover-foreground: #0a0a0a;
+  --sidebar-foreground: #0a0a0a;
+  --muted-foreground: #666666;
+  --fg-tertiary: #8f8f8f;
+  --destructive: #d11a28;
+  --danger: #d11a28;
+  --success: #007e50;
 }
 
-/* Dark pages use Polar's neutral greys instead of pure black. The editor
-   keeps its own surfaces. Muted text stays at polar-400 for 4.5:1 contrast. */
-.dark :is(.platform-shell[data-platform-variant='page'], .platform-overlay) {
-  --background: hsl(0 0% 3.5%); /* polar-950: sidebar and page */
-  --sidebar: hsl(0 0% 3.5%);
-  --card: hsl(0 0% 6.5%); /* polar-900: the content panel */
-  --popover: hsl(0 0% 6.5%);
-  --muted: hsl(0 0% 9.5%); /* polar-800 */
-  --secondary: hsl(0 0% 9.5%);
-  --accent: hsl(0 0% 9.5%);
-  --border: hsl(0 0% 13%); /* polar-700 */
-  --muted-foreground: hsl(0 0% 52%); /* polar-400 */
-  --platform-group: hsl(0 0% 6.5%); /* polar-900 */
-  --platform-control: hsl(0 0% 9.5%); /* polar-800 */
+.dark body:has(.platform-shell[data-platform-variant='page']) {
+  --background: #000000;
+  --card: #0a0a0a;
+  --popover: #0a0a0a;
+  --sidebar: #0a0a0a;
+  --border: #1f1f1f;
+  --input: #1f1f1f;
+  --sidebar-border: #1f1f1f;
+  --divider: #1f1f1f;
+  --foreground: #ededed;
+  --card-foreground: #ededed;
+  --popover-foreground: #ededed;
+  --sidebar-foreground: #ededed;
+  --muted-foreground: #a1a1a1;
+  --fg-tertiary: #737373;
+  /* The dark theme keeps its danger and success colours. */
+  --destructive: #ff453a;
+  --danger: #ff453a;
+  --success: #6ee7b7; /* emerald-300 */
+}
+
+.platform-shell,
+.platform-overlay {
+  --platform-group: var(--card);
+  --platform-control: var(--card);
 }
 
 .platform-shell [data-platform-scroll] {
@@ -84,7 +110,7 @@
 
 [data-platform-sidebar] :where([data-platform-nav], [data-platform-action]) {
   min-width: 0;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: var(--text-ui);
   font-weight: 500;
   line-height: var(--text-ui--line-height);
@@ -94,19 +120,43 @@
     color var(--platform-duration) var(--platform-ease);
 }
 
-/* Polar's navigation rows: muted until hovered, the current page raised as
-   a card above the sidebar (NavList's active item). */
+/* Navigation rows: body text until hovered. The current page is medium
+   weight with a short bar at its left edge, and no fill. */
 [data-platform-sidebar] [data-platform-nav] {
-  border: 1px solid transparent;
-  border-radius: 0.5rem;
+  position: relative;
+  border-radius: 6px;
+  background: transparent;
   color: var(--muted-foreground);
+  font-weight: 400;
 }
 
 [data-platform-sidebar] [data-platform-nav][aria-current='page'] {
-  border-color: var(--border);
-  background: var(--card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   color: var(--foreground);
+  font-weight: 500;
+}
+
+[data-platform-sidebar] [data-platform-nav][aria-current='page']::before {
+  position: absolute;
+  inset-block: 8px;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--foreground);
+  content: '';
+}
+
+/* An open area's row leaves the bar to its current page in the group below. */
+[data-platform-sidebar] [data-platform-nav][aria-current='page']:has(+ nav)::before {
+  display: none;
+}
+
+/* The page variant draws the sidebar as its own card beside the content card. */
+@media (min-width: 768px) {
+  .platform-shell[data-platform-variant='page'] [data-platform-sidebar] {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+  }
 }
 
 /* The expanded sidebar lists the open area's pages (Polar's NavList), so the
@@ -131,22 +181,25 @@
   background: var(--card);
 }
 
-/* Polar's section labels: small, medium weight, muted, sentence case. */
+/* Group labels: 12/16.2px, medium weight, tertiary, sentence case. */
 .platform-eyebrow {
   font-size: var(--text-caption);
   font-weight: 500;
-  color: var(--muted-foreground);
+  line-height: var(--text-caption--line-height);
+  color: var(--fg-tertiary, var(--muted-foreground));
 }
 
-/* Polar's type (see platform-font.ts): 400 body weight, open tracking, and
-   medium-weight headings without tightening. Set on body for portaled overlays. */
+/* Variable Inter (app/layout.tsx) at 400, with normal tracking and the
+   browser's own smoothing and optical sizing. Set on body for portaled
+   overlays. Pages use tabular figures. */
 body:has([data-platform-shell]) {
-  --font-sans: var(--font-platform), Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-family: var(--font-sans);
-  font-optical-sizing: auto;
   font-weight: 400;
-  letter-spacing: 0.015em;
-  text-rendering: optimizeLegibility;
+  letter-spacing: normal;
+}
+
+html:has(.platform-shell[data-platform-variant='page']) {
+  font-feature-settings: 'tnum';
 }
 
 body:has([data-platform-shell]) :where(h1, h2, h3, h4) {
@@ -218,7 +271,9 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   border-color: var(--input);
   border-radius: var(--platform-control-radius);
   background-color: var(--platform-control);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
+  box-shadow: none;
+  font-size: var(--text-ui);
+  line-height: var(--text-ui--line-height);
   transition:
     border-color var(--platform-duration) var(--platform-ease),
     box-shadow var(--platform-duration) var(--platform-ease),
@@ -273,12 +328,28 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   color: var(--muted-foreground);
 }
 
+/* Single-line fields are 32px high. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  :where([data-slot='input'], [data-slot='select-trigger'], [data-slot='native-select']):not(
+    [type='radio'],
+    [type='checkbox'],
+    [type='range'],
+    [type='color'],
+    [type='file']
+  ) {
+  height: 2rem;
+}
+
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
   :is([data-slot='button'], [data-slot$='-trigger'][data-variant]):not([data-variant='custom']):not(
     [data-variant='integration']
   ) {
+  border: 1px solid transparent;
   border-radius: var(--platform-control-radius);
+  box-shadow: none;
+  font-size: var(--text-ui);
   font-weight: 500;
+  line-height: var(--text-ui--line-height);
   transition-property: background-color, border-color, color, box-shadow;
   transition-duration: var(--platform-duration);
   transition-timing-function: var(--platform-ease);
@@ -290,19 +361,105 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     [data-variant='secondary']
   ) {
   border-color: var(--border);
-  background: var(--card);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  background: transparent;
+  color: var(--foreground);
 }
 
-/* One-line actions are the landing page's pills; card-sized buttons keep corners.
-   A button that opens a dialog, sheet or popover carries the trigger's slot
-   (Radix replaces data-slot), so it is matched by its button variant instead. */
+/* Primary: fg-primary fill with bg-page text. One per view. */
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-  :is([data-slot='button'], [data-slot$='-trigger'][data-variant]):not(
-    [data-variant='custom'],
-    [data-variant='integration']
+  :is([data-slot='button'], [data-slot$='-trigger'][data-variant])[data-variant='default'] {
+  background: var(--foreground);
+  color: var(--background);
+  text-shadow: none;
+}
+
+/* Danger: text only. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  :is([data-slot='button'], [data-slot$='-trigger'][data-variant])[data-variant='destructive'] {
+  background: transparent;
+  color: var(--destructive);
+}
+
+/* One-line actions are 32px high with 12px sides; icon buttons are 32px
+   square. Card-sized buttons keep their own height. A button that opens a
+   dialog, sheet or popover carries the trigger's slot (Radix replaces
+   data-slot), so it is matched by its button variant instead. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  :is([data-slot='button'], [data-slot$='-trigger'][data-variant]):is(
+    [data-size='default'],
+    [data-size='sm'],
+    [data-size='lg']
   ):not([class*='h-auto'], [class*='h-full'], [class*='whitespace-normal']) {
-  border-radius: 999px;
+  height: 2rem;
+  padding-inline: 12px;
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  :is([data-slot='button'], [data-slot$='-trigger'][data-variant])[data-size^='icon'] {
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Underlined tabs: 40px, no fill, a 2px fg-primary line under the current one. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay) [data-slot='tabs-list'] {
+  height: auto;
+  gap: 0;
+  padding: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  [data-slot='tabs-trigger'] {
+  flex: none;
+  height: 40px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: var(--text-ui);
+  font-weight: 400;
+  line-height: var(--text-ui--line-height);
+  box-shadow: none;
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  [data-slot='tabs-trigger'][data-state='active'] {
+  background: transparent;
+  color: var(--foreground);
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--foreground);
+}
+
+/* Cards: 14.4px corners, a hairline, no shadow or blur. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay) [data-slot='card'] {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14.4px;
+  background: var(--card);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Badges: 11/12px, medium weight, a soft tint instead of a solid fill. */
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay) [data-slot='badge'] {
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: var(--text-label--line-height);
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  [data-slot='badge']:is([data-variant='default'], [data-variant='secondary']) {
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+  color: var(--foreground);
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  [data-slot='badge'][data-variant='destructive'] {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
 }
 
 .platform-shell[data-platform-variant='page'] :where(th, td, time) {
@@ -362,6 +519,22 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     ):hover {
     border-color: color-mix(in srgb, var(--foreground) 30%, transparent);
     background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  }
+
+  :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+    [data-slot='button'][data-variant='default']:not(:disabled, [aria-disabled='true']):hover {
+    background: color-mix(in srgb, var(--foreground) 85%, var(--background));
+    box-shadow: none;
+  }
+
+  :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+    [data-slot='button'][data-variant='destructive']:not(:disabled, [aria-disabled='true']):hover {
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  }
+
+  :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+    [data-slot='tabs-trigger']:not([data-state='active'], :disabled):hover {
+    color: var(--foreground);
   }
 }
 
