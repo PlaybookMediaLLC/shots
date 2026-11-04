@@ -4,7 +4,7 @@ import { useWriteRouter } from '@/components/write/write-context'
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { PLATFORM_DESTINATIONS } from '@/lib/platform/navigation'
+import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { createWritingDraft } from './pending-draft'
 import {
   CommandDialog,
@@ -112,6 +112,12 @@ export default function CommandPalette({
               </CommandItem>
             )
           )}
+          <CommandItem
+            value={`destination ${STORE_SCREENSHOTS.label}`}
+            onSelect={() => go(() => router.push(STORE_SCREENSHOTS.href))}
+          >
+            {STORE_SCREENSHOTS.label}
+          </CommandItem>
         </CommandGroup>
         {results.length > 0 ? (
           <CommandGroup heading="Drafts">

@@ -54,7 +54,7 @@ test('App Store save failure keeps the open project and does not report success'
   app,
   page,
 }) => {
-  await app.open('/store-screenshots')
+  await app.open('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
   await page.evaluate(() => {
@@ -81,7 +81,7 @@ test('App Store save failure keeps the open project and does not report success'
 })
 
 test('App Store canvas and editing controls remain usable on a phone', async ({ app, page }) => {
-  await app.open('/store-screenshots')
+  await app.open('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })
@@ -110,16 +110,16 @@ test('App Store canvas and editing controls remain usable on a phone', async ({ 
 })
 
 /**
- * The canvas shortcut opens App Store screenshots in place; Back returns to the
- * screenshot editor, which stays mounted with its own session.
+ * The canvas shortcut opens Store screenshots at /create/store; Back returns to
+ * the screenshot editor. Both share one layout, so each stays mounted with its own session.
  */
 async function switchEditor(page: Page, section: 'Screenshot editor' | 'App Store Screenshots') {
   if (section === 'App Store Screenshots') {
     await page.getByRole('link', { name: /^Create App Store screenshots/ }).click()
-    await expect(page).toHaveURL(/[?&]editor=app-store/)
+    await expect(page).toHaveURL(/\/create\/store(\/|$)/)
   } else {
     await page.goBack()
-    await expect(page).not.toHaveURL(/[?&]editor=app-store/)
+    await expect(page).not.toHaveURL(/\/create\/store/)
   }
 }
 
@@ -153,9 +153,8 @@ test(
     await expect
       .poll(() => uploaded.evaluate((img: HTMLImageElement) => img.naturalWidth))
       .toBeGreaterThan(0)
-    const storeId = new URL(page.url()).searchParams.get('storeProject')
-    expect(storeId).toBeTruthy()
-    expect(new URL(page.url()).searchParams.get('project')).toBe(projectId)
+    await expect(page).toHaveURL(/\/create\/store\/[^/]+$/)
+    const storeId = new URL(page.url()).pathname.split('/').pop()
 
     await switchEditor(page, 'Screenshot editor')
     await expect(page.getByLabel('Text content', { exact: true })).toHaveValue('Main editor audit')
@@ -183,7 +182,7 @@ test(
       page.getByRole('status').filter({ hasText: /^Saved on this browser$/ })
     ).toBeVisible()
     await page.screenshot({ path: '.context/editor-audit/integrated-desktop.png' })
-    await expect(page).toHaveURL(/[?&]editor=app-store/)
+    await expect(page).toHaveURL(new RegExp(`/create/store/${storeId}$`))
     await page.screenshot({
       path: '.context/editor-audit/integrated-navigation.png',
       animations: 'disabled',
@@ -223,17 +222,24 @@ test('mobile editor navigation works with the keyboard and browser back', async 
   await navigation.getByRole('link', { name: 'Create', exact: true }).press('Enter')
   await expect(navigation).toBeHidden()
   await expect(page).toHaveURL(/\/create$/)
-  await page.getByRole('link', { name: /^Build store screenshots/ }).press('Enter')
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: /^Store screenshots App Store studio/ })
+    .press('Enter')
   await expect(page.getByRole('button', { name: 'Use the sample set' })).toBeVisible()
+  await expect(page).toHaveTitle('Store screenshots · Create | Shots')
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390)
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
-  // The editor is in Create but is none of its listed pages, so the row marks the section.
+  // Store screenshots is one of Create's pages: the row marks the section, the page link is current.
   await expect(navigation.getByRole('link', { name: 'Create', exact: true })).toHaveAttribute(
     'aria-current',
     'true'
   )
+  await expect(
+    navigation.getByRole('link', { name: 'Store screenshots', exact: true })
+  ).toHaveAttribute('aria-current', 'page')
   await page.keyboard.press('Escape')
   await page.goBack()
   await expect(page).toHaveURL(/\/create$/)
@@ -411,7 +417,7 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
 }) => {
   await app.openEditor()
   await page.getByRole('link', { name: /^Create App Store screenshots/ }).press('Enter')
-  await expect(page).toHaveURL(/[?&]editor=app-store/)
+  await expect(page).toHaveURL(/\/create\/store$/)
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   // Settings is one link; as in Polar, its sections replace the destinations there.
   const workspace = page.getByRole('navigation', { name: 'Workspace', exact: true })

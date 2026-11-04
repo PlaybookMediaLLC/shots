@@ -15,6 +15,7 @@ import {
   PublishIcon,
   SettingsIcon,
   SidebarIcon,
+  StoreIcon,
 } from './icons'
 import {
   AREA_LINKS,
@@ -24,9 +25,10 @@ import {
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
-import { AreaSubNav } from '@/components/platform-hub/AreaNavigation'
+import { AreaSubNav, useActiveAreaLink } from '@/components/platform-hub/AreaNavigation'
 import { SearchButton, ShellActions, ShellSearch } from './ShellActions'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
@@ -96,6 +98,9 @@ function NavLink({
   const pathname = usePathname()
   const active = platformArea(pathname) === platformArea(href)
   const listed = active && subs && !collapsed && !locked
+  // Store screenshots is pinned under Create; when it is the page, Create is its section.
+  const pinned = key === 'create' && !locked && !listed
+  const storeActive = useActiveAreaLink([STORE_SCREENSHOTS]) === STORE_SCREENSHOTS.href
   return (
     <>
       <NavRow
@@ -114,13 +119,46 @@ function NavLink({
         label={t(key)}
         name={locked ? `${t(key)} (Pro)` : undefined}
         onNavigate={onNavigate}
-        section={Boolean(listed)}
+        section={Boolean(listed) || (pinned && storeActive)}
         tourId={`nav-${key}`}
       />
       {listed ? (
         <AreaSubNav items={subs} label={t(key)} onNavigate={onNavigate} />
+      ) : pinned ? (
+        <StoreScreenshotsLink
+          active={storeActive}
+          collapsed={collapsed}
+          label={t(key)}
+          onNavigate={onNavigate}
+        />
       ) : null}
     </>
+  )
+}
+
+/** Store screenshots stays pinned under Create, one click from every page and in the icon rail. */
+function StoreScreenshotsLink({
+  active,
+  collapsed,
+  label,
+  onNavigate,
+}: {
+  active: boolean
+  collapsed: boolean
+  label: string
+  onNavigate?: () => void
+}) {
+  return collapsed ? (
+    <NavRow
+      active={active}
+      collapsed
+      href={STORE_SCREENSHOTS.href}
+      icon={StoreIcon}
+      label={STORE_SCREENSHOTS.label}
+      onNavigate={onNavigate}
+    />
+  ) : (
+    <AreaSubNav items={[STORE_SCREENSHOTS]} label={label} onNavigate={onNavigate} />
   )
 }
 

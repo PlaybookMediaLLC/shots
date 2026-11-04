@@ -113,7 +113,10 @@ test(
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: '.context/ux-redesign/settings-mobile.png', fullPage: true })
     await app.open('/library?type=store')
-    await expect(page.getByText('On this browser only.', { exact: false })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'On this browser', exact: true })).toBeVisible()
+    await expect(
+      page.getByText('These projects belong to this browser profile.', { exact: false })
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Open navigation' }).click()
     await expect(page.getByRole('dialog', { name: 'Navigation', exact: true })).toBeVisible()
     await page

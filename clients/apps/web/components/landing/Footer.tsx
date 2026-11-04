@@ -13,7 +13,7 @@ interface FooterProps {
 
 const navCol1 = [
   { href: "/editor", label: "Screenshot Editor" },
-  { href: "/store-screenshots", label: "App store screenshots" },
+  { href: "/create/store", label: "App store screenshots" },
   { href: "/code", label: "Code to image" },
   { href: "/tweet", label: "Tweet to image" },
   { href: "/mockup-generator", label: "Mockup generator" },
