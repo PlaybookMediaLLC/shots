@@ -139,6 +139,8 @@ func creativeSetAction(kind platformcreativeset.Kind, action string) string {
 	switch kind {
 	case platformcreativeset.KindCanvas:
 		return "product.canvas_" + action
+	case platformcreativeset.KindStore:
+		return "product.store_project_" + action
 	case platformcreativeset.KindCode:
 		return "product.code_project_" + action
 	}
@@ -209,6 +211,8 @@ func (c *Configuration) CreateCreativeSet(ctx context.Context, actor Actor, id, 
 	switch kind {
 	case platformcreativeset.KindCanvas:
 		created = "Canvas created"
+	case platformcreativeset.KindStore:
+		created = "Store screenshots created"
 	case platformcreativeset.KindCode:
 		created = "Code project created"
 	}
@@ -271,7 +275,7 @@ func (c *Configuration) ListCreativeSets(ctx context.Context, actor Actor, query
 	if query.Kind != "" {
 		kind = platformcreativeset.Kind(query.Kind)
 		if platformcreativeset.KindValidator(kind) != nil {
-			return nil, invalid("List story-set, canvas or code documents.")
+			return nil, invalid("List story-set, canvas, store or code documents.")
 		}
 	}
 	rows := c.client.PlatformCreativeSet.Query().Where(platformcreativeset.OrganizationID(actor.OrganizationID), platformcreativeset.Archived(query.Archived), platformcreativeset.KindEQ(kind))

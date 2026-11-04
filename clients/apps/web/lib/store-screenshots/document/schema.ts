@@ -23,8 +23,8 @@ export const REFERENCE_SLIDE_WIDTH = 1320
 /** A six-digit hex color such as `#1A2B3C`. */
 export const hexColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i, 'Use a six-digit hex color.')
 
-/** Stable identifier for a slide, layer, asset, or project. */
-export const idSchema = z.string().min(1).max(64)
+/** Stable identifier for a slide, layer, asset, or project. Bundled asset ids embed their URL (`public:<src>`). */
+export const idSchema = z.string().min(1).max(512)
 
 /** Background fill kinds. */
 export const backgroundKindSchema = z.enum(['solid', 'linear', 'image'])

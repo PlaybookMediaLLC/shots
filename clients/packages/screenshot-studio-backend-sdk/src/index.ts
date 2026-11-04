@@ -1427,13 +1427,13 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards or a Code Studio project. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'code'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards, a store screenshot project or a Code Studio project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'store' | 'code'
 
 /** One file of a code import: whole code, or a unified patch of a change. */
 export type BackendCodeImportFile = { name: string; code?: string; patch?: string; status?: string }
 
-/** What a GitHub link holds, for Code Studio (RFC 053). */
+/** What a GitHub link holds, for Code Studio (docs/code-studio.md). */
 export type BackendCodeImport = {
   kind: 'github-file' | 'github-pull' | 'github-commit' | 'gist'
   url: string
@@ -1453,7 +1453,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas or code document names itself (`kind: 'canvas'` or `'code'`); every other document is a Story Set. */
+  /** A canvas, store or code document names itself (`kind: 'canvas'`, `'store'` or `'code'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string
@@ -3782,6 +3782,13 @@ export class ScreenshotStudioBackendSDK {
   /** Permanently remove a canvas and its versions; delivered assets are retained. */
   async deleteCanvas(id: string) {
     return this.request<{ deleted: boolean }>(`v1/canvases/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /** Permanently remove a workspace's store screenshot project and its versions; browser copies stay. */
+  async deleteStoreProject(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/store-projects/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
   }

@@ -89,6 +89,7 @@ const DefaultKind = KindStorySet
 const (
 	KindStorySet Kind = "story-set"
 	KindCanvas   Kind = "canvas"
+	KindStore    Kind = "store"
 	KindCode     Kind = "code"
 )
 
@@ -99,7 +100,7 @@ func (k Kind) String() string {
 // KindValidator is a validator for the "kind" field enum values. It is called by the builders before save.
 func KindValidator(k Kind) error {
 	switch k {
-	case KindStorySet, KindCanvas, KindCode:
+	case KindStorySet, KindCanvas, KindStore, KindCode:
 		return nil
 	default:
 		return fmt.Errorf("platformcreativeset: invalid enum value for kind field: %q", k)

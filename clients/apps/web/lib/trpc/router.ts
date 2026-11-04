@@ -2,6 +2,7 @@ import { frontendDeploymentsRouter } from './routers/frontend-deployments'
 import { creativeSetRouter } from './routers/creative-set'
 import { canvasRouter } from './routers/canvas'
 import { codeProjectRouter } from './routers/code-project'
+import { storeProjectRouter } from './routers/store-project'
 import 'server-only'
 
 import { router } from './init'
@@ -61,6 +62,7 @@ export const appRouter = router({
   scheduledPost: scheduledPostRouter,
   shareLink: shareLinkRouter,
   sourceApp: sourceAppRouter,
+  storeProject: storeProjectRouter,
   workspace: workspaceRouter,
 })
 

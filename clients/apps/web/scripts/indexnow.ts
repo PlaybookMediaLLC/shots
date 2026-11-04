@@ -46,6 +46,9 @@ function routePattern(file: string): RegExp | undefined {
   const match = PAGE_FILE.exec(file);
   if (!match) return undefined;
   const route = `/${match[1] ?? ""}`
+    // Route groups such as `(editors)` organize files without adding a URL segment.
+    .replace(/\([^/)]+\)(?:\/|$)/g, "")
+    .replace(/\/\[\[\.\.\.[^\]]+\]\]/g, "(?:/.+)?")
     .replace(/\[\.\.\.[^\]]+\]/g, ".+")
     .replace(/\[[^\]]+\]/g, "[^/]+");
   return new RegExp(`^${route}$`);

@@ -12,6 +12,9 @@ import {
   platformHref,
   safeReturnPath,
   PLATFORM_DESTINATIONS,
+  CREATE_LINKS,
+  LIBRARY_LINKS,
+  STORE_SCREENSHOTS,
 } from '@/lib/platform/navigation'
 import { palettePages, searchPages, visitedPages } from '@/components/platform-shell/palette-pages'
 import { SIGNED_IN_PATHS } from '@/lib/auth/sign-in-gate'
@@ -29,6 +32,8 @@ test('canonical editors, aliases and localized routes select the owning job', ()
   for (const [path, area] of [
     ['/?project=abc', 'create'],
     ['/?editor=app-store', 'create'],
+    ['/create/store', 'create'],
+    ['/fr/create/store/abc', 'create'],
     ['/fr/canvas/abc', 'create'],
     ['/creative-sets/abc', 'create'],
     ['/library?type=store', 'library'],
@@ -179,6 +184,8 @@ test('the plan page names the paid capability a free workspace asked for', () =>
     'The screenshot editor'
   )
   assert.equal(paidCapability('/?editor=app-store'), 'Store screenshots')
+  assert.equal(paidCapability('/create/store'), 'Store screenshots')
+  assert.equal(paidCapability('/create/store/abc'), 'Store screenshots')
   assert.equal(paidCapability('/canvas/new'), 'Canvas')
   assert.equal(paidCapability('/compress-image'), 'Image tools')
   assert.equal(paidCapability('/campaigns/deliveries'), 'Campaigns')
@@ -279,6 +286,19 @@ test('the plan locks an area as the sidebar shows it, for the sidebar and the pr
     assert.equal(areaLocked(area, plan(true, true, true)), false, area)
   }
   assert.equal(areaLocked('settings', plan(false, false, false)), false)
+})
+
+test('Store screenshots has one name and route on every Create and Library surface', () => {
+  assert.deepEqual(STORE_SCREENSHOTS, { href: '/create/store', label: 'Store screenshots' })
+  assert.deepEqual(CREATE_LINKS.slice(0, 2), [{ href: '/create', label: 'New' }, STORE_SCREENSHOTS])
+  assert.ok(LIBRARY_LINKS.some((link) => link.label === STORE_SCREENSHOTS.label))
+  // Search lists the studio as a page of Create.
+  const pages = palettePages({ campaignsEnabled: true, draftsEnabled: true, sectionLabel: String })
+  assert.ok(
+    searchPages(pages, 'store').some(
+      (page) => page.href === STORE_SCREENSHOTS.href && page.section === 'create'
+    )
+  )
 })
 
 test('search finds every page by name, with its section, and the pages visited before', () => {

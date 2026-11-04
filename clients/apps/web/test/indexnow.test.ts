@@ -16,7 +16,7 @@ const SITEMAP = [
 ].map((path) => `${SITE}${path}`);
 const SOURCES = new Map([
   [
-    "app/[locale]/page.tsx",
+    "app/[locale]/(editors)/page.tsx",
     'import { Footer } from "@/components/landing/Footer";\nimport { OG } from "@/lib/seo/metadata";',
   ],
   [
@@ -54,6 +54,10 @@ function changed(...files: string[]): string[] {
 
 test("a changed page submits only its own URL", () => {
   assert.deepEqual(changed("app/[locale]/code/page.tsx"), ["/code"]);
+});
+
+test("a page in a route group submits its URL without the group", () => {
+  assert.deepEqual(changed("app/[locale]/(editors)/page.tsx"), ["/"]);
 });
 
 test("a data file submits every page that imports it, through cycles and dynamic routes", () => {

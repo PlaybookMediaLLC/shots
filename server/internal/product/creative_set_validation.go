@@ -29,7 +29,8 @@ func (c *Configuration) requireCreativeSetCreation(ctx context.Context, actor Ac
 }
 
 // requireCreativeCreation gates new rows. Story Sets stay behind their rollout
-// feature; a canvas (RFC 032) and a code project (RFC 053) are part of the paid workspace.
+// feature; a canvas (RFC 032), a store screenshot project and a code project
+// (docs/code-studio.md) are part of the paid workspace.
 func (c *Configuration) requireCreativeCreation(ctx context.Context, actor Actor, kind platformcreativeset.Kind) error {
 	if kind == platformcreativeset.KindStorySet {
 		return c.requireCreativeSetCreation(ctx, actor)
@@ -50,12 +51,15 @@ func number(value any) float64 {
 	return -1
 }
 
-// creativeSetKind is the row kind a document belongs to: a canvas or a code
-// project names itself, and every earlier document is a Story Set.
+// creativeSetKind is the row kind a document belongs to: a canvas, a store
+// project and a code project name themselves, and every earlier document is a
+// Story Set.
 func creativeSetKind(document map[string]any) platformcreativeset.Kind {
 	switch document["kind"] {
 	case string(platformcreativeset.KindCanvas):
 		return platformcreativeset.KindCanvas
+	case string(platformcreativeset.KindStore):
+		return platformcreativeset.KindStore
 	case string(platformcreativeset.KindCode):
 		return platformcreativeset.KindCode
 	}
@@ -67,15 +71,38 @@ func creativeDocumentAssetIDs(document map[string]any) ([]string, error) {
 	switch creativeSetKind(document) {
 	case platformcreativeset.KindCanvas:
 		return canvasAssetIDs(document)
+	case platformcreativeset.KindStore:
+		return storeProjectAssetIDs(document)
 	case platformcreativeset.KindCode:
 		return codeDocumentAssetIDs(document)
 	}
 	return creativeSetAssetIDs(document)
 }
 
+// A store screenshot project is one store group with no Story Set bindings,
+// every image already copied to workspace storage.
+func storeProjectAssetIDs(document map[string]any) ([]string, error) {
+	encoded, err := json.Marshal(document)
+	if err != nil || len(encoded) > 8<<20 {
+		return nil, invalid("Use a store screenshot project under 8 MB.")
+	}
+	if err := validateCreativeStoreGroups([]any{document}, nil); err != nil {
+		return nil, err
+	}
+	ids := map[string]bool{}
+	if !collectDesignAssetIDs(document, ids) {
+		return nil, ErrInvalidInput
+	}
+	result := make([]string, 0, len(ids))
+	for id := range ids {
+		result = append(result, id)
+	}
+	return result, nil
+}
+
 var assetReference = regexp.MustCompile(`^asset:([0-9a-fA-F-]{36})$`)
 
-// codeDocumentAssetIDs checks a Code Studio document's envelope (RFC 053). The web
+// codeDocumentAssetIDs checks a Code Studio document's envelope (docs/code-studio.md). The web
 // validates every field; this bounds what any client can store. Code text is never
 // scanned for references, so a snippet may contain "blob:" or "asset:" freely. The
 // only asset a code project uses is its footer logo.
