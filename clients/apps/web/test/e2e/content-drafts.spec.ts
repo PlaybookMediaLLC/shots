@@ -298,8 +298,13 @@ test(
     // Blocks insert after the block holding the caret.
     await caretAtEndOf(page, draftEditor(page).getByText('Pricing', { exact: true }))
     await editorMore(page, 'Math')
-    await draftEditor(page).getByRole('button', { name: 'Add a Tex equation' }).click()
-    await page.getByPlaceholder(/f\(x\) =/).fill('E = mc^2')
+    // The new block opens its equation editor right away, focused.
+    await expect(
+      draftEditor(page).getByRole('button', { name: 'Add a Tex equation' })
+    ).toBeVisible()
+    const tex = page.getByPlaceholder(/f\(x\) =/)
+    await expect(tex).toBeFocused()
+    await tex.fill('E = mc^2')
     await page.getByRole('button', { name: 'Done' }).click()
     await expect(draftEditor(page).locator('.katex').first()).toBeVisible()
 
