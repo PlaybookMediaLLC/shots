@@ -1,11 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { domToPng } from 'modern-screenshot'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -82,6 +84,7 @@ export function AnalyzeWorkspace({
     initialQuery(initial, selectedAccount?.timeZone ?? 'UTC')
   )
   const [preset, setPreset] = React.useState(initial.from ? 'Custom' : '1 month')
+  const [definitionsOpen, setDefinitionsOpen] = React.useState(false)
   const [metric, setMetric] = React.useState(
     initial.metric && METRICS[initial.metric] ? initial.metric : ''
   )
@@ -212,7 +215,7 @@ export function AnalyzeWorkspace({
           await domToPng(chart.current, {
             backgroundColor: '#ffffff',
             scale: 2,
-            filter: (node) => !(node instanceof HTMLElement && node.tagName === 'DETAILS'),
+            filter: (node) => !(node instanceof HTMLElement && node.dataset.slot === 'disclosure'),
           })
         )
     })
@@ -449,15 +452,17 @@ export function AnalyzeWorkspace({
                         Observed through {report.asOf}. {report.metrics[metric].definition}
                       </p>
                     </div>
-                    <details className="mt-4">
-                      <summary>About {METRICS[metric]}</summary>
+                    <Disclosure className="mt-4">
+                      <DisclosureTrigger>About {METRICS[metric]}</DisclosureTrigger>
+                      <DisclosureContent>
                       <p>{report.metrics[metric].definition}</p>
                       <p>
                         Change compares the preceding equal number of calendar days. A zero or
                         missing baseline has no percentage comparison.{' '}
                         {report.metrics[metric].missing} posts lack this metric.
                       </p>
-                    </details>
+                      </DisclosureContent>
+                    </Disclosure>
                   </>
                 ) : (
                   <p role="status">
@@ -501,11 +506,11 @@ export function AnalyzeWorkspace({
                       <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
                         <a
                           href={`#definition-${id}`}
-                          onClick={() => {
-                            const details = document
-                              .getElementById(`definition-${id}`)
-                              ?.closest('details')
-                            if (details) details.open = true
+                          onClick={(event) => {
+                            // Open the definitions first, then go to the one asked for.
+                            event.preventDefault()
+                            flushSync(() => setDefinitionsOpen(true))
+                            document.getElementById(`definition-${id}`)?.scrollIntoView()
                           }}
                         >
                           Metric definition
@@ -655,8 +660,13 @@ export function AnalyzeWorkspace({
                 </Button>
               </div>
             </section>
-            <details className="text-sm">
-              <summary>Metric definitions and coverage</summary>
+            <Disclosure
+              className="text-sm"
+              onOpenChange={setDefinitionsOpen}
+              defaultOpen={definitionsOpen}
+            >
+              <DisclosureTrigger>Metric definitions and coverage</DisclosureTrigger>
+              <DisclosureContent>
               {Object.entries(METRICS).map(([id, title]) => (
                 <div key={id} id={`definition-${id}`} className="my-3">
                   <h3 className="font-semibold">{title}</h3>
@@ -671,7 +681,8 @@ export function AnalyzeWorkspace({
                 are never assumed to include other thread posts. Follower history starts with actual
                 observations. No missing interval is backfilled.
               </p>
-            </details>
+              </DisclosureContent>
+            </Disclosure>
           </>
         )}
         {row ? (

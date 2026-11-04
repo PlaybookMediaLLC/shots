@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Table,
   TableBody,
@@ -105,30 +106,32 @@ export function MetricChart({
           ? `${points[active].at}: ${formatValue(points[active].value)} · ${points[active].samples} observations`
           : 'Focus or hover over a point for its value. Gaps indicate missing observations.'}
       </figcaption>
-      <details className="mt-3 text-sm">
-        <summary>Chart data</summary>
-        <div className="max-h-64 overflow-auto">
-          <Table className="w-full">
-            <TableCaption className="sr-only">Exact chart values</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">Interval</TableHead>
-                <TableHead scope="col">Value</TableHead>
-                <TableHead scope="col">Observations</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {points.map((p) => (
-                <TableRow key={p.at}>
-                  <TableHead scope="row">{p.at}</TableHead>
-                  <TableCell>{formatValue(p.value)}</TableCell>
-                  <TableCell>{p.samples}</TableCell>
+      <Disclosure className="mt-3 text-sm">
+        <DisclosureTrigger>Chart data</DisclosureTrigger>
+        <DisclosureContent>
+          <div className="max-h-64 overflow-auto">
+            <Table className="w-full">
+              <TableCaption className="sr-only">Exact chart values</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead scope="col">Interval</TableHead>
+                  <TableHead scope="col">Value</TableHead>
+                  <TableHead scope="col">Observations</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </details>
+              </TableHeader>
+              <TableBody>
+                {points.map((p) => (
+                  <TableRow key={p.at}>
+                    <TableHead scope="row">{p.at}</TableHead>
+                    <TableCell>{formatValue(p.value)}</TableCell>
+                    <TableCell>{p.samples}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </DisclosureContent>
+      </Disclosure>
     </figure>
   )
 }

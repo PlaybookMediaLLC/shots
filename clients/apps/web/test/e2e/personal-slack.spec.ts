@@ -10,6 +10,7 @@ import {
   requestJson,
   signUpViaApi,
   test,
+  openDisclosureFor,
 } from './framework'
 import { notificationSettingsSchema } from '../../lib/notifications/schema'
 
@@ -120,7 +121,7 @@ test(
         'New comment on your draft: your Slack DM preference',
         { exact: true }
       )
-      await dmPreference.locator('xpath=ancestor::details').locator('summary').click()
+      await openDisclosureFor(dmPreference)
       await dmPreference.check()
       await memberPage.getByRole('button', { name: 'Save my preferences', exact: true }).click()
       await expect(memberPage.getByText('Your preferences are saved.')).toBeVisible()

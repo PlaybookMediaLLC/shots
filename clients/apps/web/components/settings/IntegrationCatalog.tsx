@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { Pill, Section } from '@/components/platform-ui'
 import { OutwardIcon } from '@/components/platform-shell/icons'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { useTRPCClient } from '@/lib/trpc/react'
@@ -183,21 +184,23 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
                 </p>
                 <div className="mt-0.5 grid gap-1 text-xs text-muted-foreground">
                   <span>{entry.purpose}</span>
-                  <details>
-                    <summary className="cursor-pointer">Access and setup details</summary>
-                    <p>
-                      <strong className="font-medium text-foreground/80">Access:</strong>{' '}
-                      {entry.authorization}
-                    </p>
-                    <span>
-                      <strong className="font-medium text-foreground/80">Scopes:</strong>{' '}
-                      {entry.scopes}
-                    </span>
-                    <span>
-                      <strong className="font-medium text-foreground/80">Setup:</strong>{' '}
-                      {entry.setup}
-                    </span>
-                  </details>
+                  <Disclosure>
+                    <DisclosureTrigger>Access and setup details</DisclosureTrigger>
+                    <DisclosureContent>
+                      <p>
+                        <strong className="font-medium text-foreground/80">Access:</strong>{' '}
+                        {entry.authorization}
+                      </p>
+                      <span>
+                        <strong className="font-medium text-foreground/80">Scopes:</strong>{' '}
+                        {entry.scopes}
+                      </span>
+                      <span>
+                        <strong className="font-medium text-foreground/80">Setup:</strong>{' '}
+                        {entry.setup}
+                      </span>
+                    </DisclosureContent>
+                  </Disclosure>
                 </div>
               </div>
               {entry.status === 'not_configured' ? (

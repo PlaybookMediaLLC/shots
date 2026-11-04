@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Textarea } from '@/components/ui/textarea'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { call } from '@/lib/content-drafts/client'
 import { validateVoiceMemo } from '@/lib/write/voice-memo'
 import type { DraftChannel } from '@/lib/write/document'
@@ -32,8 +33,9 @@ export function VoiceMemo({draftId,channel,onUse}: {draftId:string;channel:Draft
       setTranscript(result.transcript)
     } catch (cause) {setError(cause instanceof Error ? cause.message : 'Transcription failed. Your draft is unchanged.')} finally {setBusy(false)}
   }
-  return <details className="rounded-lg border border-border p-3">
-    <summary className="cursor-pointer">Voice memo</summary>
+  return <Disclosure className="rounded-lg border border-border p-3">
+    <DisclosureTrigger>Voice memo</DisclosureTrigger>
+    <DisclosureContent>
     <p className="my-2 text-xs text-muted-foreground">Upload up to 10 MB of audio. Transcription uses workspace AI credits. Review the text before sending it to the assistant.</p>
     <FileDropZone accept={{'audio/*':['.mp3','.wav','.m4a','.ogg']}} busy={busy} hint="MP3, WAV, M4A or OGG, up to 10 MB." label="Voice memo audio" maxSize={10 * 1024 * 1024} onFiles={([next]) => {setFile(next ?? null);setTranscript('');setError('')}} onRemove={() => {setFile(null);setTranscript('')}} preview={file ? <span className="truncate text-xs">{file.name}</span> : null} />
     <Button type="button" size="sm" className="mt-2" disabled={!file || busy} onClick={() => void transcribe()}>{busy ? 'Transcribing…' : 'Transcribe audio'}</Button>
@@ -42,5 +44,6 @@ export function VoiceMemo({draftId,channel,onUse}: {draftId:string;channel:Draft
       <Textarea aria-label="Review voice transcript" rows={5} maxLength={7_600} value={transcript} onChange={event => setTranscript(event.target.value)} />
       <Button type="button" size="sm" variant="outline" disabled={!transcript.trim()} onClick={() => onUse(`Help me turn these voice notes into a draft. Use only these facts and ask about anything unclear.\n\n${transcript.trim()}`)}>Use reviewed transcript</Button>
     </div>}
-  </details>
+    </DisclosureContent>
+  </Disclosure>
 }

@@ -235,7 +235,9 @@ test(
       )
       await app.open(`/workspace/social-sets/${alpha.set.id}/writing-assistant`)
       await expect(
-        page.locator('summary').filter({ hasText: 'Private writing sample for Private Alpha.' })
+        page
+          .locator('[data-slot="disclosure-trigger"]')
+          .filter({ hasText: 'Private writing sample for Private Alpha.' })
       ).toBeVisible()
       await page.screenshot({
         path: '.context/social-set-scoped-settings.png',

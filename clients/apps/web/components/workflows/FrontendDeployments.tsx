@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 
 const providers = {
@@ -702,67 +703,69 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             separately. Historical entries never trigger live alerts.
           </p>
           {history.data?.items.map((item) => (
-            <details key={item.id} className="rounded-lg border p-4">
-              <summary className="cursor-pointer">
+            <Disclosure key={item.id} className="rounded-lg border p-4">
+              <DisclosureTrigger>
                 {states[(item.current?.decision ?? item.decision).state]} · {item.observation.kind}{' '}
                 · {item.observation.deploymentId || item.observation.runId || 'Check evidence'}{' '}
                 {item.historical ? '· Historical' : ''}
-              </summary>
-              <div className="mt-3 space-y-2 text-sm">
-                <p>{(item.current?.decision ?? item.decision).reason}</p>
-                {item.current ? (
-                  <p className="text-muted-foreground">
-                    At receipt: {states[item.decision.state]} — {item.decision.reason} Current
-                    activation evaluated: {item.current.updatedAt}.
+              </DisclosureTrigger>
+              <DisclosureContent>
+                <div className="mt-3 space-y-2 text-sm">
+                  <p>{(item.current?.decision ?? item.decision).reason}</p>
+                  {item.current ? (
+                    <p className="text-muted-foreground">
+                      At receipt: {states[item.decision.state]} — {item.decision.reason} Current
+                      activation evaluated: {item.current.updatedAt}.
+                    </p>
+                  ) : null}
+                  <p>
+                    Policy v{item.policyVersion} · {item.observation.provider} ·{' '}
+                    {item.observation.projectId} ·{' '}
+                    {item.observation.environment || 'Environment unknown'}
                   </p>
-                ) : null}
-                <p>
-                  Policy v{item.policyVersion} · {item.observation.provider} ·{' '}
-                  {item.observation.projectId} ·{' '}
-                  {item.observation.environment || 'Environment unknown'}
-                </p>
-                <p>
-                  Revision: {item.observation.revision || 'Not reported'}. Build:{' '}
-                  {item.observation.build || 'Unknown'}. Production:{' '}
-                  {item.observation.production || 'Unknown'}. Checks:{' '}
-                  {(item.current?.decision ?? item.decision).checks || 'Unknown'}.
-                </p>
-                <p>
-                  Occurred: {item.observation.occurredAt}. Received: {item.receivedAt}. Processed:{' '}
-                  {item.processedAt}.
-                </p>
-                {item.observation.activationObservedAt ? (
-                  <p>Production change observed: {item.observation.activationObservedAt}</p>
-                ) : null}
-                {item.observation.evidence?.map((line) => (
-                  <p key={line}>{line}</p>
-                ))}
-                {item.observation.url.startsWith('https://') ? (
-                  <a
-                    className="underline"
-                    href={item.observation.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open provider evidence
-                  </a>
-                ) : null}
-                <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted p-3">
-                  {JSON.stringify(
-                    {
-                      checks: (item.current?.observation ?? item.observation).checks,
-                      policy: item.policy,
-                      providerEventId: item.observation.providerEventId,
-                      activationId: item.observation.activationId,
-                      runId: item.observation.runId,
-                      runAttempt: item.observation.runAttempt,
-                    },
-                    null,
-                    2
-                  )}
-                </pre>
-              </div>
-            </details>
+                  <p>
+                    Revision: {item.observation.revision || 'Not reported'}. Build:{' '}
+                    {item.observation.build || 'Unknown'}. Production:{' '}
+                    {item.observation.production || 'Unknown'}. Checks:{' '}
+                    {(item.current?.decision ?? item.decision).checks || 'Unknown'}.
+                  </p>
+                  <p>
+                    Occurred: {item.observation.occurredAt}. Received: {item.receivedAt}. Processed:{' '}
+                    {item.processedAt}.
+                  </p>
+                  {item.observation.activationObservedAt ? (
+                    <p>Production change observed: {item.observation.activationObservedAt}</p>
+                  ) : null}
+                  {item.observation.evidence?.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                  {item.observation.url.startsWith('https://') ? (
+                    <a
+                      className="underline"
+                      href={item.observation.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open provider evidence
+                    </a>
+                  ) : null}
+                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted p-3">
+                    {JSON.stringify(
+                      {
+                        checks: (item.current?.observation ?? item.observation).checks,
+                        policy: item.policy,
+                        providerEventId: item.observation.providerEventId,
+                        activationId: item.observation.activationId,
+                        runId: item.observation.runId,
+                        runAttempt: item.observation.runAttempt,
+                      },
+                      null,
+                      2
+                    )}
+                  </pre>
+                </div>
+              </DisclosureContent>
+            </Disclosure>
           ))}
           {history.data?.items.length === 0 ? <p>No evidence received yet.</p> : null}
         </section>

@@ -19,6 +19,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { requestJson, getErrorMessage } from '@/components/workspace/settings-client'
 import { useTRPC } from '@/lib/trpc/react'
 
@@ -581,12 +582,14 @@ export function GitHubProduction({
                 </dd>
               </div>
             </dl>
-            <details>
-              <summary>Provider evidence</summary>
-              <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">
-                {JSON.stringify(selectedObservation.evidence, null, 2)}
-              </pre>
-            </details>
+            <Disclosure>
+              <DisclosureTrigger>Provider evidence</DisclosureTrigger>
+              <DisclosureContent>
+                <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">
+                  {JSON.stringify(selectedObservation.evidence, null, 2)}
+                </pre>
+              </DisclosureContent>
+            </Disclosure>
           </div>
         ) : null}
         <div className="flex gap-2">
@@ -616,19 +619,23 @@ export function GitHubProduction({
             </Button>
           ) : null}
         </div>
-        <details>
-          <summary>Policy revision history</summary>
-          {state.data?.policies.map((version) => (
-            <details key={version.id} className="my-2">
-              <summary>
-                Revision {version.revision} · {version.id} · {version.createdAt}
-              </summary>
-              <pre className="overflow-auto whitespace-pre-wrap text-xs">
-                {JSON.stringify(version.policy, null, 2)}
-              </pre>
-            </details>
-          ))}
-        </details>
+        <Disclosure>
+          <DisclosureTrigger>Policy revision history</DisclosureTrigger>
+          <DisclosureContent>
+            {state.data?.policies.map((version) => (
+              <Disclosure key={version.id} className="my-2">
+                <DisclosureTrigger>
+                  Revision {version.revision} · {version.id} · {version.createdAt}
+                </DisclosureTrigger>
+                <DisclosureContent>
+                  <pre className="overflow-auto whitespace-pre-wrap text-xs">
+                    {JSON.stringify(version.policy, null, 2)}
+                  </pre>
+                </DisclosureContent>
+              </Disclosure>
+            ))}
+          </DisclosureContent>
+        </Disclosure>
       </section>
       <section className="space-y-3 rounded-lg border p-5" aria-label="Delivery recovery">
         <h2 className="text-lg font-semibold">Delivery recovery and history gaps</h2>

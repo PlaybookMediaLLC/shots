@@ -53,3 +53,10 @@ export async function contrastOf(element: Locator): Promise<number> {
   })
   return contrastRatio(text, background)
 }
+
+/** Open the Disclosure section a control sits in, as a person clicks its title row. */
+export async function openDisclosureFor(control: Locator): Promise<void> {
+  await control
+    .locator('xpath=ancestor::*[@data-slot="disclosure"][1]/*[@data-slot="disclosure-trigger"]')
+    .click()
+}

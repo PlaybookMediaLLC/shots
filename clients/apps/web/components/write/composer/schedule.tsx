@@ -1,7 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import { CaretRightIcon as CaretRight } from '@phosphor-icons/react/dist/ssr/CaretRight'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   socialSetKey,
@@ -25,6 +24,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Switch } from '@/components/ui/switch'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { LocalTime } from '@/components/drafts/local-time'
 import {
@@ -695,16 +695,12 @@ export function ScheduleDialog({
 /** Settings most schedules never touch, folded away so the dialog stays short. */
 function MoreOptions({ children }: { children: React.ReactNode }) {
   return (
-    <details className="group rounded-lg border border-border">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg px-4 py-3 text-sm text-foreground select-none hover:bg-foreground/[0.03] [&::-webkit-details-marker]:hidden">
-        <CaretRight
-          aria-hidden
-          className="size-3.5 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
-        />
+    <Disclosure className="rounded-lg border border-border">
+      <DisclosureTrigger className="rounded-lg px-4 py-3 text-sm text-foreground select-none hover:bg-foreground/[0.03]">
         More options
-      </summary>
-      <div className="grid gap-5 border-t border-border p-4">{children}</div>
-    </details>
+      </DisclosureTrigger>
+      <DisclosureContent className="grid gap-5 border-t border-border p-4">{children}</DisclosureContent>
+    </Disclosure>
   )
 }
 

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Group, Pill, PlanRequired, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import {
   type Integration,
@@ -142,19 +143,21 @@ export function WorkspaceIntegrations({ canManage }: { canManage: boolean }) {
                       Unavailable — contact your administrator to enable {PROVIDER_NAMES[provider]}.
                     </p>
                     {canManage ? (
-                      <details className="text-xs text-muted-foreground">
-                        <summary className="cursor-pointer">Administrator setup details</summary>
-                        <p className="mt-2">
-                          Ask the server operator to configure{' '}
-                          {status.missing.map((name, index) => (
-                            <span key={name}>
-                              {index > 0 ? ', ' : ''}
-                              <code>{name}</code>
-                            </span>
-                          ))}
-                          . Setup instructions: docs/integrations.md.
-                        </p>
-                      </details>
+                      <Disclosure className="text-xs text-muted-foreground">
+                        <DisclosureTrigger>Administrator setup details</DisclosureTrigger>
+                        <DisclosureContent>
+                          <p className="mt-2">
+                            Ask the server operator to configure{' '}
+                            {status.missing.map((name, index) => (
+                              <span key={name}>
+                                {index > 0 ? ', ' : ''}
+                                <code>{name}</code>
+                              </span>
+                            ))}
+                            . Setup instructions: docs/integrations.md.
+                          </p>
+                        </DisclosureContent>
+                      </Disclosure>
                     ) : null}
                   </div>
                 ) : canManage ? (
