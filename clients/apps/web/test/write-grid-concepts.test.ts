@@ -32,10 +32,7 @@ test('input is checked in the order a person fills it in', () => {
 })
 
 test('captions take turns, and each concept draws four different items', () => {
-  const concepts = assembleConcepts(
-    { captions: ['One', ' ', 'Two'], count: 3, items },
-    seeded()
-  )
+  const concepts = assembleConcepts({ captions: ['One', ' ', 'Two'], count: 3, items }, seeded())
   assert.deepEqual(
     concepts.map((concept) => concept.headline),
     ['One', 'Two', 'One']
@@ -54,7 +51,10 @@ test('readiness and the missing count follow the slots', () => {
   const [concept] = assembleConcepts({ captions: ['A'], count: 1, items }, seeded())
   assert.equal(gridReady(concept!), false)
   assert.equal(missingImages([concept!, concept!]), 8)
-  const full = [0, 1, 2, 3].reduce((grid, at) => withSlot(grid, at, { assetId: `i${at}` }), concept!)
+  const full = [0, 1, 2, 3].reduce(
+    (grid, at) => withSlot(grid, at, { assetId: `i${at}` }),
+    concept!
+  )
   assert.equal(gridReady(full), true)
   assert.equal(missingImages([full, concept!]), 4)
 })
@@ -90,6 +90,9 @@ test('the last cell setting writes only the bottom right, and blank keeps it', (
 test('every preset can make concepts as it stands', () => {
   for (const preset of GRID_PRESETS) {
     assert.equal(gridInputProblem(preset), null, preset.name)
-    assert.ok(preset.captions.every((caption) => caption.length <= 60), preset.name)
+    assert.ok(
+      preset.captions.every((caption) => caption.length <= 60),
+      preset.name
+    )
   }
 })

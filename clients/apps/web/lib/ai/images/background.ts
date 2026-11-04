@@ -51,14 +51,15 @@ const imageResponseSchema = z.object({
   usage: z.object({ cost: z.number().optional() }).optional(),
 })
 
-async function callImageModel(request: BackgroundRequest): Promise<Buffer> {
+/** Draw an image from a finished prompt, charged to the workspace's AI credits. */
+export async function callImageModel(prompt: string, aspect: string): Promise<Buffer> {
   const key = process.env.OPENROUTER_API_KEY
   if (!key) throw new BackgroundGenerationError('AI is not configured for this environment.')
   const record = await aiCreditMeter.admit()
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     body: JSON.stringify({
-      image_config: { aspect_ratio: request.aspect },
-      messages: [{ content: backgroundPrompt(request), role: 'user' }],
+      image_config: { aspect_ratio: aspect },
+      messages: [{ content: prompt, role: 'user' }],
       modalities: ['image', 'text'],
       model: process.env.PLATFORM_AI_IMAGE_MODEL?.trim() || DEFAULT_IMAGE_MODEL,
       provider: OPENROUTER_PROVIDER_PREFERENCES,
@@ -95,8 +96,8 @@ async function callImageModel(request: BackgroundRequest): Promise<Buffer> {
  * A deterministic stand-in for tests (PLATFORM_AI_SCRIPTED=1, never in
  * production): a soft gradient in the palette, so the flow runs offline.
  */
-function scriptedImage(
-  request: BackgroundRequest,
+export function scriptedImage(
+  request: Pick<BackgroundRequest, 'palette'>,
   size: { height: number; width: number }
 ): Buffer {
   const [from = '#4f46e5', to = '#ec4899'] = request.palette
@@ -115,7 +116,7 @@ export async function generateBackground(
   const size = backgroundSize(request.aspect)
   const source = isScriptedModelEnabled()
     ? scriptedImage(request, size)
-    : await callImageModel(request)
+    : await callImageModel(backgroundPrompt(request), request.aspect)
   const body = await sharp(source)
     .resize(size.width, size.height, { fit: 'cover', position: 'attention' })
     .webp({ quality: 90 })

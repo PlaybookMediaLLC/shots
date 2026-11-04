@@ -47,7 +47,11 @@ export default async function BatchPage({
         accounts={accounts}
         canPublish={hasPermission(access.role, 'publish:manage')}
         initial={contentBatchSchema.parse(batch)}
-        start={query.start === 'videos' || query.start === 'images' ? query.start : undefined}
+        start={
+          query.start === 'videos' || query.start === 'images' || query.start === 'grid'
+            ? query.start
+            : undefined
+        }
       />
     </PlatformShell>
   )

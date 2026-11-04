@@ -90,6 +90,11 @@ export function captionProblem(source: string, accounts: readonly BatchAccount[]
   }
 }
 
+/** A grid video concept whose video is not made yet; it cannot become a draft. */
+export function waitingToRender(item: Pick<BatchItem, 'draftId' | 'grid' | 'media'>) {
+  return Boolean(item.grid && !item.draftId && !item.media.length)
+}
+
 /** A YouTube title for an item: its caption's first line, else the name of its file. */
 function videoTitle(item: BatchItem) {
   const name = (item.sourceKey || item.media[0]?.fileName || '').replace(/\.[^.]+$/, '')

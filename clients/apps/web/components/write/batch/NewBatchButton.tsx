@@ -21,6 +21,11 @@ const TOOLS = [
     label: 'Image posts',
     start: 'images',
   },
+  {
+    description: 'Up to 30 videos of four labelled images, ready to schedule.',
+    label: 'Grid videos',
+    start: 'grid',
+  },
 ] as const
 
 /** Start a batch in a publishing brand and open it. */
@@ -79,7 +84,7 @@ export function NewBatchButton({
       <Button type="submit" disabled={busy || !title.trim() || !setId}>
         Start a batch
       </Button>
-      <div className="grid w-full gap-3 sm:grid-cols-2" data-testid="bulk-tools">
+      <div className="grid w-full gap-3 sm:grid-cols-3" data-testid="bulk-tools">
         {TOOLS.map((tool) => (
           <Button
             key={tool.start}

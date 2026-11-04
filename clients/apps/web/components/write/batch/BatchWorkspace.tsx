@@ -64,6 +64,7 @@ import {
   spreadTimings,
   stagedChecks,
   stagedVersions,
+  waitingToRender,
 } from '@/lib/write/batch'
 import {
   channelProblem,
@@ -84,6 +85,7 @@ import { expandSpintax } from '@/lib/write/spintax'
 import { VideoOptions } from '../composer/video-options'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
+import { GridCreator } from './GridCreator'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
 const ACCEPT =
@@ -116,7 +118,7 @@ function mediaInput({
 }
 
 /** Which tool a batch was started for; it narrows what the page offers first. */
-export type BatchStart = 'videos' | 'images'
+export type BatchStart = 'videos' | 'images' | 'grid'
 type Upload = { progress: number; error?: string }
 
 /** A path a person can read: '2026-11-03 09:30 (Europe/Paris)'. */
@@ -272,6 +274,7 @@ function MediaTile({
 
 /** Where a post stands before scheduling: saved or not, and its review. */
 function itemStatus(item: BatchItem): { text: string; tone: PillTone } {
+  if (waitingToRender(item)) return { text: 'Not rendered', tone: 'gray' }
   if (!item.draftId) return { text: 'Not saved', tone: 'gray' }
   const review: Record<string, { text: string; tone: PillTone }> = {
     approved: { text: 'Approved', tone: 'green' },
@@ -741,9 +744,9 @@ export function BatchWorkspace({
     setBusy(null)
   }
 
-  /** Change many captions as one operation; a refusal leaves every caption as it was. */
-  const applyCaptions = async (changes: { caption: string; itemId: string }[]) => {
-    setBusy('captions')
+  /** Change many items as one operation; a refusal leaves every item as it was. */
+  const applyChanges = async (changes: ({ itemId: string } & Record<string, unknown>)[]) => {
+    setBusy('bulk')
     try {
       await settled()
       const next = await call<ContentBatch>(`${base}/items`, {
@@ -752,13 +755,45 @@ export function BatchWorkspace({
       })
       setBatch(next)
       itemsRef.current = next.items ?? []
-      toast.success(`${changes.length} caption${changes.length === 1 ? '' : 's'} applied.`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The captions could not be applied.')
     } finally {
       setBusy(null)
     }
   }
+
+  const applyCaptions = async (changes: { caption: string; itemId: string }[]) => {
+    try {
+      await applyChanges(changes)
+      toast.success(`${changes.length} caption${changes.length === 1 ? '' : 's'} applied.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The captions could not be applied.')
+    }
+  }
+
+  const applyGrids = async (changes: ({ itemId: string } & Record<string, unknown>)[]) => {
+    try {
+      await applyChanges(changes)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The videos could not be changed.')
+    }
+  }
+
+  /** Stage grid concepts as posts. */
+  const addConcepts = async (inputs: BatchItemInput[]) => {
+    setBusy('add')
+    try {
+      const next = await call<ContentBatch>(`${base}/items`, {
+        body: { items: inputs },
+        method: 'POST',
+      })
+      setBatch(next)
+      itemsRef.current = next.items ?? []
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const [gridOpen, setGridOpen] = React.useState(start === 'grid')
+  const showGrid = gridOpen || items.some((item) => item.grid && !item.draftId)
 
   const [timesMode, setTimesMode] = React.useState<'queue' | 'spread'>('queue')
   const [spread, setSpread] = React.useState({ start: '', perDay: 2, spacing: 240, shift: 0 })
@@ -808,7 +843,8 @@ export function BatchWorkspace({
     await settled()
     let failed = 0
     for (const item of itemsRef.current) {
-      if (item.draftId || item.media.some((entry) => !entry.assetId)) continue
+      if (item.draftId || item.media.some((entry) => !entry.assetId) || waitingToRender(item))
+        continue
       try {
         const posts = importedPosts(item.caption)
         const body = importedBody(posts.length ? posts : [''])
@@ -996,7 +1032,9 @@ export function BatchWorkspace({
     const account = unsavedAccounts.find((candidate) => candidate.channel === channel)
     return account ? [{ channel, creator: account.tiktokCreator }] : []
   })
-  const ready = unsaved.filter((item) => item.media.every((entry) => entry.assetId))
+  const ready = unsaved.filter(
+    (item) => item.media.every((entry) => entry.assetId) && !waitingToRender(item)
+  )
   const drafted = items.filter((item) => item.draftId)
   const checked = Object.keys(verdicts).length > 0
   // The next step is the primary action; the others stay available as outline.
@@ -1124,6 +1162,16 @@ export function BatchWorkspace({
                     >
                       Add an empty post
                     </Button>
+                    {!showGrid ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setGridOpen(true)}
+                      >
+                        Create grid videos
+                      </Button>
+                    ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {chosen.length
@@ -1343,6 +1391,17 @@ export function BatchWorkspace({
               </div>
             ) : null}
           </Section>
+        ) : null}
+
+        {showGrid ? (
+          <GridCreator
+            disabled={busy !== null}
+            items={items}
+            sharedAccounts={sharedAccounts}
+            onAdd={addConcepts}
+            onApply={applyGrids}
+            onUpdate={updateItem}
+          />
         ) : null}
 
         {videoChannels.length ? (
