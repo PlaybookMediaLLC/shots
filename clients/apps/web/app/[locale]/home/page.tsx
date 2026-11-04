@@ -20,6 +20,9 @@ import { requirePaidPageAccess } from '@/lib/auth/page-access'
 import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { roleLabels } from '@/lib/auth/role-descriptions'
 import { StartPostAction } from '@/components/platform-hub/StartPostAction'
+import { QueueNudge } from '@/components/platform-hub/QueueNudge'
+import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
+import { sessionTenant } from '../drafts/page-access'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 export const metadata = { title: 'Home' }
@@ -41,10 +44,30 @@ export default async function HomePage({
     redirect(platformHref(locale === 'en' ? '/' : `/${locale}`, `/?${search}`))
   }
   // A contract that grants drafts without a paid plan gets Home too; paid starters lead to the plan page.
-  const access = await requirePaidPageAccess(await headers(), locale, '/home', 'content:drafts')
+  const requestHeaders = await headers()
+  const access = await requirePaidPageAccess(requestHeaders, locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
   const can = (permission: Permission) => hasPermission(access.role, permission)
+  // Drafts queued for the next seven days; Home nudges below three. A failed read shows nothing.
+  const now = new Date()
+  const queued =
+    paid && contentDraftsEnabled() && access.organization
+      ? await listContentDraftPostsBetween(
+          sessionTenant(access, access.organization.id, requestHeaders),
+          now,
+          new Date(now.getTime() + 7 * 86_400_000)
+        )
+          .then(
+            (posts) =>
+              new Set(
+                posts
+                  .filter((post) => post.status === 'SCHEDULED' || post.status === 'PROCESSING')
+                  .map((post) => post.draftId)
+              ).size
+          )
+          .catch(() => null)
+      : null
   const starters = [
     {
       title: 'Create a visual',
@@ -165,6 +188,7 @@ export default async function HomePage({
           </ul>
         </section>
 
+        {queued !== null && queued < 3 ? <QueueNudge queued={queued} /> : null}
         <div className="home-work platform-home">
           <RecentWork
             organizationId={access.organization!.id}

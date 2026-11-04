@@ -23,6 +23,14 @@ export type WriteLibrary = WriteData
 export type WriteSet = WriteData['sets'][number]
 
 /** A draft row in the library. */
+/** One action of the open draft, as the command palette lists it. */
+export type DraftCommand = {
+  label: string
+  run: () => void
+  /** The shortcut that runs it, as the composer shows it. */
+  shortcut?: string
+}
+
 export type LibraryDraft = WriteData['library'][number]
 
 /** A set's tag in the library. */
@@ -44,6 +52,8 @@ type WriteContextValue = {
   beforeLeaveRef: React.MutableRefObject<(() => Promise<void>) | null>
   /** Opens the mounted composer's preview without navigation or an editor remount. */
   openPreviewRef: React.MutableRefObject<(() => void) | null>
+  /** The open draft's actions, as its composer offers them, for the command palette. */
+  draftCommandsRef: React.MutableRefObject<DraftCommand[]>
   /** Archives or restores the open draft through its composer, which keeps its version. */
   archiveRef: React.MutableRefObject<((status: 'draft' | 'archived') => Promise<void>) | null>
   saved: Record<string, DraftLine>
@@ -88,6 +98,7 @@ export function WriteProvider({
   const params = useSearchParams()
   const beforeLeaveRef = React.useRef<(() => Promise<void>) | null>(null)
   const openPreviewRef = React.useRef<(() => void) | null>(null)
+  const draftCommandsRef = React.useRef<DraftCommand[]>([])
   const archiveRef = React.useRef<((status: 'draft' | 'archived') => Promise<void>) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   React.useEffect(() => {
@@ -223,6 +234,7 @@ export function WriteProvider({
   const value = React.useMemo(
     () => ({
       beforeLeaveRef,
+      draftCommandsRef,
       openPreviewRef,
       archiveRef,
       hideDraft,

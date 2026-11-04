@@ -24,7 +24,13 @@ import { createWritingDraft } from './pending-draft'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
 import { type Shortcut, useKeys, useShortcuts } from './shortcuts'
-import { draftHref, useWrite, type WriteLibrary, WriteProvider } from './write-context'
+import {
+  type DraftCommand,
+  draftHref,
+  useWrite,
+  type WriteLibrary,
+  WriteProvider,
+} from './write-context'
 
 // The palette loads on first use: it is not part of reading a draft.
 const CommandPalette = dynamic(() => import('./CommandPalette'), { ssr: false })
@@ -140,10 +146,12 @@ function FrameLayout({
 }) {
   const router = useWriteRouter()
   const keys = useKeys()
-  const { beforeLeaveRef, canEdit, data } = useWrite()
+  const { beforeLeaveRef, canEdit, data, draftCommandsRef } = useWrite()
   const [railOpen, setRailOpen] = React.useState(true)
   const [drawer, setDrawer] = React.useState(false)
   const [palette, setPalette] = React.useState(false)
+  // The open draft's actions as they were when the palette opened.
+  const [draftCommands, setDraftCommands] = React.useState<DraftCommand[]>([])
   const [reference, setReference] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
   const [keyboardInset, setKeyboardInset] = React.useState(0)
@@ -199,11 +207,12 @@ function FrameLayout({
   React.useEffect(() => {
     const show = () => {
       rememberLauncher()
+      setDraftCommands(draftCommandsRef.current)
       setPalette(true)
     }
     window.addEventListener('shots:search-write', show)
     return () => window.removeEventListener('shots:search-write', show)
-  }, [rememberLauncher])
+  }, [draftCommandsRef, rememberLauncher])
   const step = (delta: number) => {
     const ids = data.library.map((draft) => draft.id)
     const index = activeId ? ids.indexOf(activeId) : -1
@@ -309,6 +318,8 @@ function FrameLayout({
   React.useEffect(() => {
     const timer = setTimeout(() => {
       void import('@/components/drafts/DraftEditor')
+      // Loaded ahead, so the palette's input is there for the first keystroke.
+      void import('./CommandPalette')
     }, 0)
     return () => clearTimeout(timer)
   }, [])
@@ -377,6 +388,7 @@ function FrameLayout({
       {palette ? (
         <CommandPalette
           campaignsEnabled={campaignsEnabled}
+          draftCommands={draftCommands}
           onClose={() => {
             setPalette(false)
             restoreFocus()

@@ -15,9 +15,21 @@ export async function requireDraftsPageAccess(locale: string, returnTo: string) 
   const requestHeaders = await headers()
   const access = await requirePaidPageAccess(requestHeaders, locale, returnTo, 'content:drafts')
   if (!contentDraftsEnabled() || !access.organization) notFound()
-  // Reads run as the signed-in session, scoped to the active workspace.
-  const tenant: OrganizationAccess = {
-    organizationId: access.organization.id,
+  return {
+    ...access,
+    organization: access.organization,
+    tenant: sessionTenant(access, access.organization.id, requestHeaders),
+  }
+}
+
+/** A page's reads as the signed-in session, scoped to its active workspace. */
+export function sessionTenant(
+  access: Awaited<ReturnType<typeof requirePaidPageAccess>>,
+  organizationId: string,
+  requestHeaders: Headers
+): OrganizationAccess {
+  return {
+    organizationId,
     principal: {
       display: access.session.user.email,
       kind: 'session',
@@ -27,5 +39,4 @@ export async function requireDraftsPageAccess(locale: string, returnTo: string) 
     requestId: getRequestId(requestHeaders),
     role: normalizeOrganizationRole(access.role),
   }
-  return { ...access, organization: access.organization, tenant }
 }

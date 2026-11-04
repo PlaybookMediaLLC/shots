@@ -478,7 +478,6 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel>New post</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => void create('standard')}>
             Post or thread
           </DropdownMenuItem>
@@ -686,7 +685,8 @@ function DraftRow({
             {draft.kind !== 'standard' ? (
               <span className="mr-1 text-muted-foreground">{KIND_LABELS[draft.kind]} ·</span>
             ) : null}
-            {shown.title}
+            {/* The first line names the draft; a title shows only when someone gave one. */}
+            {shown.title && shown.title !== 'Untitled draft' ? shown.title : null}
           </span>
           <span className="flex shrink-0 items-center gap-1">
             {channels.map((channel) => (

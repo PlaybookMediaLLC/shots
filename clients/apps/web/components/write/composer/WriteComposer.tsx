@@ -206,6 +206,7 @@ export function WriteComposer({
   const trpcClient = useTRPCClient()
   const {
     beforeLeaveRef,
+    draftCommandsRef,
     openPreviewRef,
     archiveRef,
     canEdit,
@@ -525,6 +526,54 @@ export function WriteComposer({
       : undefined,
   }
   const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next))
+  // The palette lists this draft's actions with their shortcuts, as its menus do.
+  React.useEffect(() => {
+    const live = canPublish && server.status !== 'archived'
+    draftCommandsRef.current = [
+      ...(live
+        ? [
+            { label: 'Schedule…', run: () => setDialog('schedule') },
+            {
+              label: 'Add to the next free slot',
+              run: () => setDialog('queue'),
+              shortcut: `${mod}⌥↵`,
+            },
+            { label: 'Publish now…', run: () => setDialog('publish'), shortcut: `${mod}⇧↵` },
+          ]
+        : []),
+      { label: 'Post options', run: () => setPanel('options') },
+      { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
+      ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
+      { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}⌥S` },
+      { label: 'View automatic backups', run: () => setDialog('backups') },
+      ...(canEdit
+        ? [
+            {
+              label: server.pinnedAt ? 'Unpin draft' : 'Pin draft',
+              run: () => void pin(),
+              shortcut: `${mod}⇧P`,
+            },
+          ]
+        : []),
+      { label: 'Focus mode', run: () => setFocus((current) => !current), shortcut: `${mod}⇧F` },
+      {
+        label: 'Compact display',
+        run: () => setCompact((current) => !current),
+        shortcut: `${mod}⇧H`,
+      },
+      ...(canEdit
+        ? [
+            {
+              label: server.status === 'archived' ? 'Restore from archive' : 'Archive draft',
+              run: () => void archive(server.status === 'archived' ? 'draft' : 'archived'),
+            },
+          ]
+        : []),
+    ]
+    return () => {
+      draftCommandsRef.current = []
+    }
+  })
   // Blockers show beside Schedule once there is something to post, not on an empty draft.
   const blockers = items.some((item) => item.publication.serialized.posts.length > 0)
     ? scheduleBlockers(context)
@@ -956,15 +1005,17 @@ export function WriteComposer({
           <header className="sticky top-0 z-20 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/90 px-3 py-2 backdrop-blur">
             <DraftsDrawerButton />
             {set ? (
+              // The brand's dot shows only beside its name: alone, it read as a save indicator.
               <span
-                className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex"
+                className={cn(
+                  'hidden items-center gap-1.5 text-xs text-muted-foreground',
+                  !panel && 'xl:flex'
+                )}
                 data-testid="composer-identity"
                 title={`Writing as ${set.name}`}
               >
                 <SetDot color={set.color} />
-                <span className={cn('max-w-32 truncate', panel ? 'hidden' : 'hidden 2xl:inline')}>
-                  {set.name}
-                </span>
+                <span className="max-w-32 truncate">{set.name}</span>
               </span>
             ) : null}
             <span className="flex items-center gap-1 text-muted-foreground md:hidden">

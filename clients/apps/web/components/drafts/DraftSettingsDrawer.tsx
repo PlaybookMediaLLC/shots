@@ -4,7 +4,6 @@ import { SlidersHorizontalIcon as Settings2 } from '@phosphor-icons/react/dist/s
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { z } from 'zod'
-import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { useSocialSet } from '@/components/settings/social-sets/api'
 import { NewDraftPage } from '@/components/settings/social-sets/NewDraftPage'
 import { SchedulingPage } from '@/components/settings/social-sets/SchedulingPage'
@@ -15,8 +14,12 @@ import { socialSetHref } from '@/components/workspace/settings-sections'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { cn } from '@/lib/utils'
 
-/** The settings a writer can open beside a draft. */
-const drawerPageSchema = z.enum(['scheduling', 'new-draft', 'writing-assistant', 'appearance'])
+/**
+ * The brand settings a writer can open beside a draft. Personal preferences
+ * (theme, navigation, calendar start, text direction) live in workspace
+ * settings, under Appearance.
+ */
+const drawerPageSchema = z.enum(['scheduling', 'new-draft', 'writing-assistant'])
 
 type DrawerPage = z.infer<typeof drawerPageSchema>
 
@@ -24,7 +27,6 @@ const PAGES: { page: DrawerPage; title: string }[] = [
   { page: 'scheduling', title: 'Scheduling' },
   { page: 'new-draft', title: 'New draft' },
   { page: 'writing-assistant', title: 'Writing Assistant' },
-  { page: 'appearance', title: 'Appearance' },
 ]
 
 /** Opens or moves the drawer through the address, so back and forward work. */
@@ -96,9 +98,8 @@ export function DraftSettingsDrawer({
             ))}
           </nav>
           <div className="grid gap-4 p-4">
-            {page === 'appearance' ? <AppearanceSettings /> : null}
-            {page !== 'appearance' && set.isPending ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
-            {page !== 'appearance' && set.isError ? (
+            {set.isPending ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+            {set.isError ? (
               <p className="text-sm text-red-700 dark:text-red-300" role="alert">
                 {settingsErrorMessage(set.error)}
               </p>
@@ -108,6 +109,9 @@ export function DraftSettingsDrawer({
             {set.data && page === 'writing-assistant' ? <WritingAssistantPage canWrite={canWrite} set={set.data} /> : null}
             <Link className="text-sm underline" href={socialSetHref(socialSet.id)}>
               All settings for {socialSet.name}
+            </Link>
+            <Link className="text-sm text-muted-foreground underline" href="/workspace/appearance">
+              Theme and text direction are in your Appearance settings
             </Link>
           </div>
         </SheetContent>

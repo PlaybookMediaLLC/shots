@@ -446,7 +446,7 @@ export function PlanWorkspace({
       }
       className={`block h-auto w-full min-w-0 rounded-lg border p-2 text-left text-xs font-normal whitespace-normal shadow-sm ${weekly ? 'h-full overflow-hidden' : ''} ${item.status === 'Planned' ? 'border-dashed border-violet-400' : item.status === 'Published' ? 'border-emerald-500' : item.status === 'Failed' ? 'border-red-500' : item.status === 'Needs check' || item.status === 'Overdue' ? 'border-amber-500' : 'border-sky-500'} bg-background`}
     >
-      <span className="block truncate text-muted-foreground">
+      <span className="line-clamp-2 break-words text-muted-foreground">
         {new Date(item.at).toLocaleTimeString(undefined, {
           hour: 'numeric',
           minute: '2-digit',
@@ -465,7 +465,7 @@ export function PlanWorkspace({
           })}
         </span>
       ) : null}
-      <strong className="block truncate">
+      <strong className="line-clamp-2 break-words">
         {sets.find((s) => s.id === item.setId)?.name ?? 'Account'}{' '}
         {prefs.platforms ? `· ${item.platform}` : ''}
       </strong>
@@ -506,7 +506,7 @@ export function PlanWorkspace({
                 // The zone stays in the name and tooltip; in the cell it wrapped into the next day.
                 aria-label={`Available · ${slot.displayTime} (${prefs.zone})`}
                 title={`Available · ${slot.displayTime} (${prefs.zone})`}
-                className="block h-auto w-full truncate rounded border border-dashed p-2 text-xs font-normal text-muted-foreground"
+                className="block h-auto w-full rounded border border-dashed p-2 text-xs font-normal break-words whitespace-normal text-muted-foreground"
                 onClick={() =>
                   setCompose({
                     day: slot.localDay,
@@ -972,7 +972,9 @@ export function PlanWorkspace({
                       dateTime={day}
                       aria-current={day === today ? 'date' : undefined}
                       className={
-                        day === today ? 'rounded-full bg-sky-600 px-2 py-1 text-white' : ''
+                        day === today
+                          ? 'rounded-full bg-sky-600 px-2 py-1 whitespace-nowrap text-white'
+                          : 'whitespace-nowrap'
                       }
                     >
                       {readable(day, { weekday: 'short', day: 'numeric' })}
