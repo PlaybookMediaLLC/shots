@@ -3745,6 +3745,13 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /** Permanently remove a workspace's store screenshot project and its versions; browser copies stay. */
+  async deleteStoreProject(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/store-projects/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
   async archiveCreativeSet(id: string, archived = true) {
     return this.request<{ archived: boolean }>(
       `v1/creative-sets/${encodeURIComponent(id)}/archive?archived=${archived}`,

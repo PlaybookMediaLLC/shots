@@ -10,6 +10,7 @@ import {
 } from '@/lib/store-screenshots/workspace-schema'
 import {
   createStoreProject,
+  deleteStoreProject,
   getStoreProject,
   listStoreProjects,
   updateStoreProjectDocument,
@@ -21,8 +22,8 @@ const READ: TenantAccessRequirement = { apiKeyScope: 'artifact:read', permission
 const EDIT: TenantAccessRequirement = { apiKeyScope: 'asset:write', permission: 'artifact:edit' }
 
 /**
- * Store screenshot projects saved to the workspace: Library's list, and the
- * studio's first save, autosave and download on another device. A document
+ * Store screenshot projects saved to the workspace: Library's list and delete,
+ * and the studio's first save, autosave and download on another device. A document
  * write based on an older revision fails with `CONFLICT`.
  */
 export const storeProjectRouter = router({
@@ -42,4 +43,12 @@ export const storeProjectRouter = router({
   updateDocument: tenantProcedure(EDIT)
     .input(storeProjectDocumentInputSchema)
     .mutation(({ ctx, input }) => updateStoreProjectDocument(ctx.tenant, input)),
+  /** Remove the workspace copy; each browser keeps its own until it is deleted there. */
+  delete: tenantProcedure(EDIT)
+    .input(storeProjectRefInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (!(await deleteStoreProject(ctx.tenant, input.projectId)))
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Store project not found.' })
+      return { deleted: true }
+    }),
 })

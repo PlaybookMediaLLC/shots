@@ -174,7 +174,18 @@ function EditorLayout({
 
   useEditorShortcuts(store, actions, () => void autosave.saveNow().then((saved) => { if (saved) toast.success('Saved') }))
 
-  const deleteCurrent = async () => {
+  /** Delete this browser's copy; `everywhere` deletes the workspace copy first, and stops if that fails. */
+  const deleteCurrent = async (everywhere: boolean) => {
+    if (everywhere) {
+      try {
+        await workspace.deleteWorkspaceCopy()
+      } catch (cause) {
+        toast.error('Could not delete the workspace copy', {
+          description: `${cause instanceof Error ? cause.message : 'Try again.'} Nothing was deleted.`,
+        })
+        return
+      }
+    }
     if (await autosave.deleteCurrent()) onProjectDeleted()
   }
 
@@ -306,7 +317,7 @@ function EditorLayout({
               onNewProject(kind)
             })
           }}
-          onDeleteCurrent={deleteCurrent}
+          onDeleteCurrent={() => deleteCurrent(false)}
         />
         {dialog === 'versions' ? (
           <VersionsDialog
@@ -333,10 +344,11 @@ function EditorLayout({
         />
         {confirmDelete ? (
           <DeleteProjectConfirm
+            saved={workspace.linked}
             onCancel={() => setConfirmDelete(false)}
-            onConfirm={async () => {
+            onConfirm={async (everywhere) => {
               setConfirmDelete(false)
-              await deleteCurrent()
+              await deleteCurrent(everywhere)
             }}
           />
         ) : null}
@@ -345,19 +357,36 @@ function EditorLayout({
   )
 }
 
-function DeleteProjectConfirm({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }): React.JSX.Element {
+/** Confirm a delete. A project saved to the workspace can go from this browser only, or everywhere. */
+function DeleteProjectConfirm({ onCancel, onConfirm, saved }: { onCancel: () => void; onConfirm: (everywhere: boolean) => void; saved: boolean }): React.JSX.Element {
+  const destructive = 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
   return (
     <AlertDialog open onOpenChange={(open) => !open && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this project?</AlertDialogTitle>
-          <AlertDialogDescription>Every slide, version, and image only this project uses is removed from this browser. This cannot be undone.</AlertDialogDescription>
+          <AlertDialogDescription>
+            {saved
+              ? 'It is also saved to your workspace. Delete it from this browser only, or everywhere: the workspace copy and its versions go too, so it leaves Library on every device. Other browsers keep a copy they already opened. This cannot be undone.'
+              : 'Every slide, version, and image only this project uses is removed from this browser. This cannot be undone.'}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={onConfirm}>
-            Delete project
-          </AlertDialogAction>
+          {saved ? (
+            <>
+              <AlertDialogAction className="border border-destructive bg-transparent text-destructive hover:bg-destructive/10" onClick={() => onConfirm(false)}>
+                Delete from this browser
+              </AlertDialogAction>
+              <AlertDialogAction className={destructive} onClick={() => onConfirm(true)}>
+                Delete everywhere
+              </AlertDialogAction>
+            </>
+          ) : (
+            <AlertDialogAction className={destructive} onClick={() => onConfirm(false)}>
+              Delete project
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -451,18 +480,13 @@ function StartScreen({ projects, onStart, onOpen, onImport }: { projects: Projec
   )
 }
 
-/**
- * The studio entry point. On `/create/store` the open project is the path's
- * last segment (`basePath` and `projectId`); elsewhere it is `?project=`.
- */
+/** The studio entry point, at `/create/store`; the open project is the path's last segment. */
 export function StoreStudio({
-  initialHasSavedProject = false,
   basePath,
   projectId,
 }: {
-  initialHasSavedProject?: boolean
-  /** The studio's localized route, when the project belongs in the path. */
-  basePath?: string
+  /** The studio's localized route. */
+  basePath: string
   /** The project the route names. */
   projectId?: string
 }): React.JSX.Element {
@@ -477,12 +501,9 @@ export function StoreStudio({
   const setProjectUrl = React.useCallback(
     (id: string | null) => {
       const url = new URL(window.location.href)
-      if (basePath) {
-        // An open that finishes after the person left the studio must not move their page.
-        if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return
-        url.pathname = id ? `${basePath}/${encodeURIComponent(id)}` : basePath
-      } else if (id) url.searchParams.set('project', id)
-      else url.searchParams.delete('project')
+      // An open that finishes after the person left the studio must not move their page.
+      if (url.pathname !== basePath && !url.pathname.startsWith(`${basePath}/`)) return
+      url.pathname = id ? `${basePath}/${encodeURIComponent(id)}` : basePath
       window.history.replaceState(null, '', url)
     },
     [basePath]
@@ -539,7 +560,7 @@ export function StoreStudio({
       try {
         const imported = await importLegacyProject()
         if (imported) toast.success('Your screenshot set was upgraded', { description: 'It now lives in your project library with version history.' })
-        const requested = basePath ? (projectId ?? null) : new URL(window.location.href).searchParams.get('project')
+        const requested = projectId ?? null
         const last = requested ?? (await getMeta<string>('lastProjectId'))
         const list = await listProjects()
         if (!active) return
@@ -580,7 +601,7 @@ export function StoreStudio({
       />
     )
   }
-  if (!projects) return <StoreWorkspaceLoading variant={initialHasSavedProject ? 'editor' : 'templates'} />
+  if (!projects) return <StoreWorkspaceLoading variant="templates" />
   return (
     <StartScreen
       projects={projects}

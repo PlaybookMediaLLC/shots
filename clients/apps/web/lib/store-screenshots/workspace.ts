@@ -1,6 +1,6 @@
 'use client'
 
-import type { TRPCClient } from '@trpc/client'
+import { TRPCClientError, type TRPCClient } from '@trpc/client'
 import { z } from 'zod'
 import type { AppRouter } from '@/lib/trpc/router'
 import { loadStoreAsset, uploadStoreGroupAssets } from '@/lib/creative-sets/store-assets'
@@ -107,4 +107,18 @@ export async function pullStoreProject(
       assetMap: group.assetMap,
     },
   }
+}
+
+/** Delete the workspace copy and forget this browser's link to it. One already gone counts as deleted. */
+export async function deleteWorkspaceCopy(
+  client: TRPCClient<AppRouter>,
+  organizationId: string,
+  projectId: string
+): Promise<void> {
+  try {
+    await client.storeProject.delete.mutate({ projectId })
+  } catch (cause) {
+    if (!(cause instanceof TRPCClientError && cause.data?.code === 'NOT_FOUND')) throw cause
+  }
+  await writeWorkspaceLink(organizationId, projectId, null)
 }

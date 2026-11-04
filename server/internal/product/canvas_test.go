@@ -116,6 +116,37 @@ func TestStoreProjectLifecycle(t *testing.T) {
 	if result, err := w.repo.DeleteAsset(w.ctx, w.owner, media); err != nil || result != AssetInUse {
 		t.Fatalf("store image deletion=%s %v", result, err)
 	}
+
+	// Deleting the workspace copy takes its versions with it, and only for its own kind and workspace.
+	canvasID := cuid.New()
+	if _, err := w.repo.CreateCreativeSet(w.ctx, w.owner, canvasID, "Board", canvasFixture(media)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.owner, canvasID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("a canvas was deleted as a store project: %v", err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, foreign.owner, id); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("cross-tenant delete: %v", err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.actor("viewer"), id); err == nil {
+		t.Fatal("a viewer deleted a store project")
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.owner, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.GetCreativeSet(w.ctx, w.owner, id); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("deleted store project still reads: %v", err)
+	}
+	if count, err := w.db.Client.PlatformCreativeSetVersion.Query().Where(platformcreativesetversion.CreativeSetID(id)).Count(w.ctx); err != nil || count != 0 {
+		t.Fatalf("versions left=%d err=%v", count, err)
+	}
+	if count, err := w.db.Client.AuditLog.Query().Where(auditlog.Action("product.store_project_deleted"), auditlog.EntityID(id)).Count(w.ctx); err != nil || count != 1 {
+		t.Fatalf("delete audit entries=%d err=%v", count, err)
+	}
+	// Saving the same project again after a delete starts a new copy.
+	if again, err := w.repo.CreateCreativeSet(w.ctx, w.owner, id, "Launch", storeProjectFixture(media)); err != nil || again.Revision != 1 {
+		t.Fatalf("re-save=%+v err=%v", again, err)
+	}
 }
 
 func TestCanvasValidation(t *testing.T) {

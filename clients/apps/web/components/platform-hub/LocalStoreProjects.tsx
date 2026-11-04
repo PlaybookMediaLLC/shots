@@ -2,15 +2,37 @@
 
 import { useEffect, useState } from 'react'
 import { useInfiniteQuery } from '@tanstack/react-query'
-import { StoreIcon as DeviceMobileIcon } from '@/components/platform-shell/icons'
+import { toast } from 'sonner'
+import {
+  StoreIcon as DeviceMobileIcon,
+  MoreIcon as MoreHorizontalIcon,
+} from '@/components/platform-shell/icons'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { EmptyState } from '@/components/platform-ui'
 import { listProjects, type ProjectSummary } from '@/lib/store-screenshots/persistence/projects'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useHydratedSession } from '@/lib/auth/client'
 import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
-import { useTRPC } from '@/lib/trpc/react'
+import { deleteWorkspaceCopy } from '@/lib/store-screenshots/workspace'
+import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 
 const projectHref = (id: string) => `${STORE_SCREENSHOTS.href}/${encodeURIComponent(id)}`
 
@@ -18,8 +40,13 @@ const projectHref = (id: string) => `${STORE_SCREENSHOTS.href}/${encodeURICompon
  * Store screenshot projects: those saved to the workspace, which open on any
  * device, then those only on this browser. Listing never copies or changes them.
  */
-export function LocalStoreProjects() {
+export function LocalStoreProjects({ canEdit }: { canEdit: boolean }) {
   const trpc = useTRPC()
+  const client = useTRPCClient()
+  const { data: session } = useHydratedSession()
+  const organizationId = session?.session.activeOrganizationId ?? null
+  const [deleting, setDeleting] = useState<{ projectId: string; name: string } | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
   const saved = useInfiniteQuery(
     trpc.storeProject.list.infiniteQueryOptions({}, { getNextPageParam: (page) => page.nextCursor })
   )
@@ -72,25 +99,50 @@ export function LocalStoreProjects() {
         <ul className="studio-grid">
           {shownSaved.map((item) => (
             <li className="studio-shot" key={item.projectId}>
-              <SidebarLink href={projectHref(item.projectId)} className="block">
-                <span className="studio-shot-media">
-                  <span className="grid size-full place-items-center text-sm text-muted-foreground">
-                    {item.slideCount} slides
-                  </span>
-                  <span aria-hidden="true" className="studio-shot-overlay">
+              <div className="studio-shot-media">
+                <span className="grid size-full place-items-center text-sm text-muted-foreground">
+                  {item.slideCount} slides
+                </span>
+                <span aria-hidden="true" className="studio-shot-overlay">
+                  {item.name}
+                </span>
+                <SidebarLink
+                  aria-label={`Open ${item.name}`}
+                  href={projectHref(item.projectId)}
+                  className="absolute inset-0 z-[2] rounded-[inherit]"
+                />
+              </div>
+              <div className="studio-shot-meta">
+                <span className="min-w-0 flex-1">
+                  <SidebarLink
+                    href={projectHref(item.projectId)}
+                    className="block truncate font-medium hover:underline"
+                  >
                     {item.name}
+                  </SidebarLink>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {STORE_SCREENSHOTS.label} · In this workspace ·{' '}
+                    {item.updatedAt.toLocaleDateString()}
                   </span>
                 </span>
-                <span className="studio-shot-meta">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{item.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {STORE_SCREENSHOTS.label} · In this workspace ·{' '}
-                      {item.updatedAt.toLocaleDateString()}
-                    </span>
-                  </span>
-                </span>
-              </SidebarLink>
+                {canEdit ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button aria-label={`Actions for ${item.name}`} size="icon" variant="ghost">
+                        <MoreHorizontalIcon size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => setDeleting({ projectId: item.projectId, name: item.name })}
+                      >
+                        Delete from workspace…
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
@@ -169,6 +221,48 @@ export function LocalStoreProjects() {
           action={<ButtonLink href={STORE_SCREENSHOTS.href}>Open {STORE_SCREENSHOTS.label}</ButtonLink>}
         />
       )}
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && !deletePending && setDeleting(null)}
+      >
+        <AlertDialogContent className="sm:max-w-[420px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="break-words">
+              Delete “{deleting?.name}” from the workspace?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The workspace copy and its versions are deleted, so it leaves Library on every device.
+              Browsers that opened it keep their own copy. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletePending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletePending || !organizationId}
+              onClick={(event) => {
+                event.preventDefault()
+                if (!deleting || !organizationId) return
+                setDeletePending(true)
+                void deleteWorkspaceCopy(client, organizationId, deleting.projectId)
+                  .then(async () => {
+                    toast.success(`Deleted “${deleting.name}” from the workspace.`)
+                    setDeleting(null)
+                    await saved.refetch()
+                  })
+                  .catch((cause: unknown) =>
+                    toast.error('Could not delete the workspace copy', {
+                      description: cause instanceof Error ? cause.message : undefined,
+                    })
+                  )
+                  .finally(() => setDeletePending(false))
+              }}
+            >
+              {deletePending ? 'Deleting…' : 'Delete from workspace'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   )
 }

@@ -54,7 +54,7 @@ test('App Store save failure keeps the open project and does not report success'
   app,
   page,
 }) => {
-  await app.open('/store-screenshots')
+  await app.open('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
   await page.evaluate(() => {
@@ -81,7 +81,7 @@ test('App Store save failure keeps the open project and does not report success'
 })
 
 test('App Store canvas and editing controls remain usable on a phone', async ({ app, page }) => {
-  await app.open('/store-screenshots')
+  await app.open('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   await expect(page.locator('[data-store-canvas-slide]')).toBeVisible()
   await page.setViewportSize({ width: 390, height: 844 })

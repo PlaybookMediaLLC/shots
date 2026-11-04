@@ -96,7 +96,7 @@ ${primaryToolLines}
 - Product overview: ${BASE_URL}/landing
 - Pricing: ${BASE_URL}/pricing
 - Design partners (launch intelligence early access): ${BASE_URL}/design-partners
-- App Store Screenshot Maker: ${BASE_URL}/store-screenshots
+- Store screenshots (App Store and Google Play, signed in): ${BASE_URL}/create/store
 - Code to Image: ${BASE_URL}/code
 - Mockup Generator: ${BASE_URL}/mockup-generator
 - Image Tools Hub: ${BASE_URL}/tools

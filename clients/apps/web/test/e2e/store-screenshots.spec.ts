@@ -4,7 +4,7 @@ import { createWorkspace, type E2EIdentity, expect, type Page, test } from './fr
 
 async function openStudio(identity: E2EIdentity, page: Page) {
   await createWorkspace(identity, page)
-  await page.goto('/store-screenshots')
+  await page.goto('/create/store')
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   const canvas = page.locator('[data-store-canvas-slide]')
   await expect(canvas).toBeVisible()
@@ -155,6 +155,10 @@ test('Store screenshots is one click from any page, highlighted and titled, and 
   expect(new URL(page.url()).search).toBe('')
   await app.open('/?editor=app-store')
   await app.expectPath(`/create/store/${id}`)
+  // The retired standalone page and its project links land in the same place.
+  await app.open(`/store-screenshots?project=${id}`)
+  await app.expectPath(`/create/store/${id}`)
+  expect(new URL(page.url()).search).toBe('')
 })
 
 test('reopening the last project never reports an error the person did not cause', async ({
@@ -221,16 +225,35 @@ test(
     const other = await browser.newContext({ storageState: await page.context().storageState() })
     const second = await other.newPage()
     await second.goto(new URL('/library?type=store', page.url()).href)
-    const listed = second
-      .getByRole('region', { name: 'Store screenshot projects' })
-      .locator(`a[href$="/create/store/${id}"]`)
+    const library = second.getByRole('region', { name: 'Store screenshot projects' })
+    const listed = library.locator(`a[href$="/create/store/${id}"][aria-label^="Open "]`)
     await expect(listed).toHaveCount(1)
-    await expect(listed).toContainText('In this workspace')
+    const name = (await listed.getAttribute('aria-label'))!.replace(/^Open /, '')
+    await expect(library.getByText(/In this workspace/)).toBeVisible()
     await listed.click()
     await expect(second.locator('[data-store-canvas-slide]')).toContainText('Saved twice')
     await expect(
       second.getByRole('status').filter({ hasText: /^Saved to workspace$/ })
     ).toBeVisible()
+
+    // Deleting the workspace copy takes it out of Library; this browser keeps its own copy.
+    await second.goto(new URL('/library?type=store', page.url()).href)
+    await library.getByRole('button', { name: `Actions for ${name}` }).click()
+    await second.getByRole('menuitem', { name: 'Delete from workspace…' }).click()
+    await second
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Delete from workspace' })
+      .click()
+    await expect(second.getByText(`Deleted “${name}” from the workspace.`)).toBeVisible()
+    await expect(listed).toHaveCount(0)
+    // This browser's own copy is still listed, now only under On this browser.
+    await expect(library.locator(`a[href$="/create/store/${id}"]`)).toBeVisible()
     await other.close()
+
+    // The first browser finds the copy gone instead of failing to save, and keeps its project.
+    await app.reload()
+    await expect(page.getByText('This project is no longer in your workspace')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save to workspace', exact: true })).toBeVisible()
+    await expect(page.locator('[data-store-canvas-slide]')).toContainText('Saved twice')
   }
 )

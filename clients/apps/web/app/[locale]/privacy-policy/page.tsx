@@ -268,10 +268,7 @@ export default function PrivacyPolicyPage() {
           <Section id="cookies" title="Cookies">
             <p className="mb-3 leading-relaxed text-muted-foreground">
               We use secure authentication and session cookies for signed-in users. We also set{' '}
-              <Code>NEXT_LOCALE</Code> to remember your language choice, and{' '}
-              <Code>shots-store-active</Code> only when you have an App Store screenshot
-              project open, so the page can restore it on your next visit. That cookie holds the
-              value 1 and no identifier.
+              <Code>NEXT_LOCALE</Code> to remember your language choice.
             </p>
             <p className="mb-3 leading-relaxed text-muted-foreground">
               The following third parties may set cookies or similar identifiers when you visit the

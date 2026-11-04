@@ -98,3 +98,8 @@ export async function updateStoreProjectDocument(
     })
   )
 }
+
+/** Delete the workspace copy of a project; false when this workspace has none. Browser copies stay. */
+export async function deleteStoreProject(context: TenantContext, projectId: string) {
+  return (await orNull(backendSDK(context).deleteStoreProject(rowId(context, projectId)))) !== null
+}

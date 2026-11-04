@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { useHydratedSession } from '@/lib/auth/client'
 import { createVersion } from '@/lib/store-screenshots/persistence/projects'
 import {
+  deleteWorkspaceCopy,
   documentHash,
   pullStoreProject,
   pushStoreProject,
@@ -65,6 +66,18 @@ export function useWorkspaceSync(store: StoreApi<EditorState>) {
     [organizationId]
   )
 
+  /** The workspace copy was deleted elsewhere: stop syncing and say so; this browser's copy stays. */
+  const forget = React.useCallback(
+    async (projectId: string) => {
+      await link(projectId, null)
+      setStatus('off')
+      toast('This project is no longer in your workspace', {
+        description: 'It is still on this browser. Save it to the workspace again to share it.',
+      })
+    },
+    [link, setStatus]
+  )
+
   /** Replace the open document with the workspace copy, keeping this browser's copy as a version. */
   const adoptRemote = React.useCallback(
     async (keepLocal: boolean) => {
@@ -99,13 +112,17 @@ export function useWorkspaceSync(store: StoreApi<EditorState>) {
             setStatus('conflict')
             return
           }
+          if (current && errorCode(cause) === 'NOT_FOUND') {
+            await forget(document.id)
+            return
+          }
           setStatus(first ? 'off' : 'error')
           toast.error('Could not save to your workspace', {
             description: `${message(cause) ?? 'Try again.'} The project is still saved on this browser.`,
           })
         }
       }),
-    [client, link, queue, setStatus, store]
+    [client, forget, link, queue, setStatus, store]
   )
 
   // Compare with the workspace copy on open, and again whenever the studio is shown.
@@ -134,17 +151,13 @@ export function useWorkspaceSync(store: StoreApi<EditorState>) {
         }
       } catch (cause) {
         if (errorCode(cause) === 'NOT_FOUND') {
-          await link(document.id, null)
-          setStatus('off')
-          toast('This project is no longer in your workspace', {
-            description: 'It is still on this browser. Save it to the workspace again to share it.',
-          })
+          await forget(document.id)
           return
         }
         setStatus('error')
       }
     })
-  }, [adoptRemote, client, link, organizationId, push, queue, setStatus, store])
+  }, [adoptRemote, client, forget, organizationId, push, queue, setStatus, store])
 
   React.useEffect(() => {
     let previous = store.getState().document
@@ -166,6 +179,18 @@ export function useWorkspaceSync(store: StoreApi<EditorState>) {
   return {
     /** Null outside a workspace, where there is nothing to save to. */
     status: organizationId ? status : null,
+    /** Whether the project has a workspace copy (or is still being compared with one). */
+    linked: Boolean(organizationId) && status !== 'off',
+    /** Delete the workspace copy after any write in flight; this browser's copy stays. Throws on failure. */
+    deleteWorkspaceCopy: () =>
+      queue(async () => {
+        if (timerRef.current) clearTimeout(timerRef.current)
+        timerRef.current = null
+        if (!organizationId) return
+        await deleteWorkspaceCopy(client, organizationId, store.getState().document.id)
+        linkRef.current = null
+        setStatus('off')
+      }),
     save: () => void push(true),
     retry: () => {
       if (statusRef.current === 'error') setStatus('pending')
