@@ -22,10 +22,18 @@ test(
     await page.getByLabel('Auto-Retweet likes', { exact: true }).fill('7')
     await page.getByRole('switch', { name: 'Auto-Plug', exact: true }).check()
     await page.getByLabel('Auto-Plug likes', { exact: true }).fill('9')
-    await page
-      .getByLabel('Auto-Plug reply text', { exact: true })
-      .fill('The release guide is ready')
-    await page.getByRole('button', { name: 'Save engagement defaults', exact: true }).click()
+    // The defaults save once complete: here, when the reply text is filled in and left.
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        response.ok() &&
+        response.request().postDataJSON()?.engagementDefaults?.autoPlug?.text ===
+          'The release guide is ready'
+    )
+    const reply = page.getByLabel('Auto-Plug reply text', { exact: true })
+    await reply.fill('The release guide is ready')
+    await reply.blur()
+    await saved
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await app.reload()
     await expect(page.getByLabel('Auto-Plug reply text', { exact: true })).toHaveValue(
