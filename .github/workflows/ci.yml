@@ -230,6 +230,9 @@ jobs:
       - run: npm run build --prefix clients/integrations/raycast
       - run: npm ci --prefix clients/integrations/zapier
       - run: npm test --prefix clients/integrations/zapier
+      # Code Studio clients have no dependencies; their tests use only Node.
+      - run: npm test --prefix clients/integrations/cli
+      - run: npm test --prefix clients/integrations/vscode
 
   # The public contract: the committed OpenAPI document and typed client must
   # match the zod contracts, and a pull request may not break the document
