@@ -193,8 +193,8 @@ nobody knows a draft waits for review.
 
 ### What exists
 
-`components/drafts/DraftCalendar.tsx` shows one week. `ListContentDraftPostsBetween`
-already reads any date range.
+Publish › Calendar (`components/plan/PlanWorkspace.tsx`) replaced the week-only
+`DraftCalendar`. `ListContentDraftPostsBetween` already reads any date range.
 
 ### Work
 
