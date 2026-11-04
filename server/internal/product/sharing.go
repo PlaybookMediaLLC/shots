@@ -12,6 +12,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/integrationconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sharelink"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/notifications"
@@ -44,6 +45,8 @@ type ShareLinkInput struct {
 	PosterAssetID *string    `json:"posterAssetId"`
 	ProjectID     *string    `json:"projectId"`
 	Title         string     `json:"title"`
+	// Code is a Code Studio document to embed as text; it is frozen at creation.
+	Code map[string]any `json:"code,omitempty"`
 }
 
 // ShareLinkUpdate changes a link's text or access. A nil field is left as is;
@@ -80,17 +83,18 @@ type ShareLinkRecord struct {
 // PublicShareLink is what a share page may show: no IDs beyond the workspace
 // it belongs to, which the facade needs to check workspace-only access.
 type PublicShareLink struct {
-	Access          string     `json:"access"`
-	AltText         *string    `json:"altText"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	Description     *string    `json:"description"`
-	ExpiresAt       *time.Time `json:"expiresAt"`
-	Height          *int       `json:"height"`
-	MediaType       string     `json:"mediaType"`
-	OrganizationID  string     `json:"organizationId"`
-	PosterMediaType *string    `json:"posterMediaType"`
-	Title           string     `json:"title"`
-	Width           *int       `json:"width"`
+	Access          string         `json:"access"`
+	AltText         *string        `json:"altText"`
+	CreatedAt       time.Time      `json:"createdAt"`
+	Description     *string        `json:"description"`
+	ExpiresAt       *time.Time     `json:"expiresAt"`
+	Height          *int           `json:"height"`
+	MediaType       string         `json:"mediaType"`
+	OrganizationID  string         `json:"organizationId"`
+	PosterMediaType *string        `json:"posterMediaType"`
+	Title           string         `json:"title"`
+	Width           *int           `json:"width"`
+	Code            map[string]any `json:"code,omitempty"`
 }
 
 func newShareToken() (string, error) {
@@ -186,6 +190,19 @@ func (c *Configuration) CreateShareLink(ctx context.Context, actor Actor, input 
 			return nil, publishing.ErrNotFound
 		}
 	}
+	if input.Code != nil {
+		// An embed is public text: it may hold only code, never a workspace asset.
+		if creativeSetKind(input.Code) != platformcreativeset.KindCode {
+			return nil, invalid("Embed a Code Studio document.")
+		}
+		ids, err := codeDocumentAssetIDs(input.Code)
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) > 0 {
+			return nil, invalid("Remove the footer logo before embedding code.")
+		}
+	}
 	token, err := newShareToken()
 	if err != nil {
 		return nil, err
@@ -196,6 +213,9 @@ func (c *Configuration) CreateShareLink(ctx context.Context, actor Actor, input 
 		SetAccess(sharelink.Access(input.Access)).SetNillableExpiresAt(input.ExpiresAt)
 	if actor.IsSession() && actor.UserID != "" {
 		create.SetCreatedByUserID(actor.UserID)
+	}
+	if input.Code != nil {
+		create.SetCode(input.Code)
 	}
 	row, err := create.Save(ctx)
 	if err != nil {
@@ -398,7 +418,7 @@ func (c *Configuration) ResolveShareLink(ctx context.Context, token string) (*Pu
 	}
 	result := &PublicShareLink{Access: string(row.Access), AltText: row.AltText, CreatedAt: row.CreatedAt,
 		Description: row.Description, ExpiresAt: row.ExpiresAt, Height: media.Height, MediaType: media.MediaType,
-		OrganizationID: row.OrganizationID, Title: row.Title, Width: media.Width}
+		OrganizationID: row.OrganizationID, Title: row.Title, Width: media.Width, Code: row.Code}
 	if row.PosterAssetID != nil {
 		poster, err := c.client.Asset.Query().Where(asset.ID(*row.PosterAssetID), asset.OrganizationID(row.OrganizationID),
 			asset.StatusEQ(asset.StatusUPLOADED)).Only(ctx)

@@ -10,8 +10,9 @@ import { ProjectLibrary } from '@/components/projects/ProjectLibrary'
 import { CanvasLibrary } from '@/components/canvas-workspace/CanvasLibrary'
 import { StorySetLibrary } from '@/components/creative-sets/StorySetLibrary'
 import { WorkspaceAssets } from '@/components/workspace/WorkspaceAssets'
+import { CodeLibrary } from '@/components/code-studio/CodeLibrary'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 type LibraryPageProps = {
@@ -30,7 +31,7 @@ export async function generateMetadata({ searchParams }: LibraryPageProps): Prom
 export default async function LibraryPage({ params, searchParams }: LibraryPageProps) {
   const [{ locale }, query] = await Promise.all([params, searchParams])
   const access = await requirePaidPageAccess(await headers(), locale, '/library')
-  const canEdit = hasPermission(access.role, 'artifact:edit')
+  const canEdit = accessAllows(access, 'artifact:edit')
   const view = ['assets', 'brand'].includes(query.view ?? '') ? query.view : 'projects'
   return (
     <PlatformShell
@@ -56,6 +57,8 @@ export default async function LibraryPage({ params, searchParams }: LibraryPageP
               <StorySetLibrary embedded canEdit={canEdit} canCreate={access.creativeSetsEnabled} />
             ) : query.type === 'store' ? (
               <LocalStoreProjects canEdit={canEdit} />
+            ) : query.type === 'code' ? (
+              <CodeLibrary canEdit={canEdit} />
             ) : (
               <div className="grid gap-4">
                 <p className="text-sm text-muted-foreground">

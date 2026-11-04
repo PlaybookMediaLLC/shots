@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { StorySetEditor } from '@/components/creative-sets/StorySetEditor'
 
@@ -26,7 +26,7 @@ export default async function StorySetPage({
         collabUrl={process.env.PLATFORM_COLLAB_URL || null}
         user={{ id: access.session.user.id, name: access.session.user.name }}
         workspaceId={access.organization!.id}
-        canEdit={hasPermission(access.role, 'artifact:edit')}
+        canEdit={accessAllows(access, 'artifact:edit')}
         canCreate={access.creativeSetsEnabled}
       />
     </PlatformShell>

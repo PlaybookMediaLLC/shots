@@ -256,6 +256,8 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 			outputs, err = c.automationRenderCreatives(ctx, org, id, nodeID, event, input, node.Action)
 		case "create_canvas":
 			outputs, err = c.automationCreateCanvas(ctx, org, id, nodeID, input, node.Action)
+		case "render_code_visual":
+			outputs, err = c.automationRenderCodeVisual(ctx, org, id, nodeID, source, event, input, node.Action)
 		case "submit_review":
 			var result *CampaignPostTransition
 			result, err = c.TransitionCampaignPosts(ctx, actor, input.CampaignID, CampaignPostDecision{Decision: "submit", PostIDs: input.PostIDs, IdempotencyKey: key})
@@ -309,6 +311,9 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 	}
 	if outputs.CanvasID != "" {
 		run.Outputs.CanvasID = outputs.CanvasID
+	}
+	if outputs.CodeProjectID != "" {
+		run.Outputs.CodeProjectID = outputs.CodeProjectID
 	}
 	if outputs.CreditsCharged > 0 {
 		// Sum receipts rather than increment: a late duplicate completion of

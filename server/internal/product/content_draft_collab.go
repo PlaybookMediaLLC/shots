@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
@@ -78,6 +79,19 @@ type CollabGrant struct {
 // ErrCollabUnavailable means the backend has no collaboration signing key.
 var ErrCollabUnavailable = errors.New("collaboration is not configured")
 
+// collabWritable reports whether a member may edit: the role allows it, and no
+// permission group denies artifact:edit. The collab server has no web gate.
+func collabWritable(ctx context.Context, client *ent.Client, organizationID, userID, role string) (bool, error) {
+	if !workspaceroles.Allows(role, contentDraftEditRoles...) {
+		return false, nil
+	}
+	denied, err := deniedPermissions(ctx, client, organizationID, userID, role)
+	if err != nil {
+		return false, err
+	}
+	return !slices.Contains(denied, "artifact:edit"), nil
+}
+
 // memberAccess is what a workspace member's current role allows, or an error
 // when they are no longer a member.
 func memberAccess(ctx context.Context, client *ent.Client, organizationID, userID string) (collab.Access, error) {
@@ -88,7 +102,11 @@ func memberAccess(ctx context.Context, client *ent.Client, organizationID, userI
 	if err != nil {
 		return "", err
 	}
-	if workspaceroles.Allows(row.Role, contentDraftEditRoles...) {
+	writable, err := collabWritable(ctx, client, organizationID, userID, row.Role)
+	if err != nil {
+		return "", err
+	}
+	if writable {
 		return collab.AccessWrite, nil
 	}
 	return collab.AccessRead, nil
@@ -187,7 +205,11 @@ func (c *Configuration) collabClaims(ctx context.Context, token, documentName, d
 			return collab.Claims{}, publishing.ErrNotFound
 		}
 	}
-	if !workspaceroles.Allows(role, contentDraftEditRoles...) {
+	writable, err := collabWritable(ctx, c.client, claims.OrganizationID, claims.UserID, role)
+	if err != nil {
+		return collab.Claims{}, err
+	}
+	if !writable {
 		claims.Access = collab.AccessRead
 	}
 	return claims, nil

@@ -17,6 +17,8 @@ const (
 	FieldSSOEnabled = "ssoEnabled"
 	// FieldScimEnabled holds the string denoting the scim_enabled field in the database.
 	FieldScimEnabled = "scimEnabled"
+	// FieldWhitelabelSettings holds the string denoting the whitelabel_settings field in the database.
+	FieldWhitelabelSettings = "whitelabelSettings"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updatedAt"
 	// Table holds the table name of the organizationenterprisesettings in the database.
@@ -28,6 +30,7 @@ var Columns = []string{
 	FieldID,
 	FieldSSOEnabled,
 	FieldScimEnabled,
+	FieldWhitelabelSettings,
 	FieldUpdatedAt,
 }
 

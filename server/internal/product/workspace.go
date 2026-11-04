@@ -26,8 +26,10 @@ func (c *Configuration) AuthorizeSession(ctx context.Context, actor Actor) error
 }
 
 type ActiveAccess struct {
-	OrganizationID string `json:"organizationId"`
-	Role           string `json:"role"`
+	// DeniedPermissions is what the member's permission group subtracts from Role.
+	DeniedPermissions []string `json:"deniedPermissions"`
+	OrganizationID    string   `json:"organizationId"`
+	Role              string   `json:"role"`
 }
 
 func (c *Configuration) GetActiveAccess(ctx context.Context, actor Actor) (*ActiveAccess, error) {
@@ -58,7 +60,11 @@ func (c *Configuration) GetActiveAccess(ctx context.Context, actor Actor) (*Acti
 	if role == "member" {
 		role = "viewer"
 	}
-	return &ActiveAccess{OrganizationID: organizationID, Role: role}, nil
+	denied, err := deniedPermissions(ctx, c.client, organizationID, actor.UserID, role)
+	if err != nil {
+		return nil, err
+	}
+	return &ActiveAccess{DeniedPermissions: denied, OrganizationID: organizationID, Role: role}, nil
 }
 
 func (c *Configuration) AuthorizeSensitive(ctx context.Context, actor Actor) error {

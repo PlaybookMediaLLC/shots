@@ -30,6 +30,8 @@ func (ShareLink) Fields() []ent.Field {
 		field.String("title").StorageKey("title"),
 		field.String("description").StorageKey("description").Optional().Nillable(),
 		field.String("alt_text").StorageKey("altText").Optional().Nillable(),
+		// A frozen Code Studio document (RFC 053) for a live, copyable code embed.
+		field.JSON("code", map[string]any{}).StorageKey("code").Optional().Immutable(),
 		field.Enum("access").StorageKey("access").Values("PUBLIC", "WORKSPACE").Default("PUBLIC"),
 		field.Time("expires_at").StorageKey("expiresAt").Optional().Nillable(),
 		field.Time("revoked_at").StorageKey("revokedAt").Optional().Nillable(),

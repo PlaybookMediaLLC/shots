@@ -64,6 +64,7 @@ test('the action registry covers every executor action and wires outputs to inpu
     'create_campaign',
     'generate_copy',
     'render_creatives',
+    'render_code_visual',
   ])
   assert.deepEqual(producersOf('create_campaign'), ['create_release'])
   assert.deepEqual(producersOf('create_release'), [])

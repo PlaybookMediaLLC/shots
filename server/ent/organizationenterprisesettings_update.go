@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // OrganizationEnterpriseSettingsUpdate is the builder for updating OrganizationEnterpriseSettings entities.
@@ -53,6 +54,26 @@ func (_u *OrganizationEnterpriseSettingsUpdate) SetNillableScimEnabled(v *bool) 
 	if v != nil {
 		_u.SetScimEnabled(*v)
 	}
+	return _u
+}
+
+// SetWhitelabelSettings sets the "whitelabel_settings" field.
+func (_u *OrganizationEnterpriseSettingsUpdate) SetWhitelabelSettings(v whitelabel.Settings) *OrganizationEnterpriseSettingsUpdate {
+	_u.mutation.SetWhitelabelSettings(v)
+	return _u
+}
+
+// SetNillableWhitelabelSettings sets the "whitelabel_settings" field if the given value is not nil.
+func (_u *OrganizationEnterpriseSettingsUpdate) SetNillableWhitelabelSettings(v *whitelabel.Settings) *OrganizationEnterpriseSettingsUpdate {
+	if v != nil {
+		_u.SetWhitelabelSettings(*v)
+	}
+	return _u
+}
+
+// ClearWhitelabelSettings clears the value of the "whitelabel_settings" field.
+func (_u *OrganizationEnterpriseSettingsUpdate) ClearWhitelabelSettings() *OrganizationEnterpriseSettingsUpdate {
+	_u.mutation.ClearWhitelabelSettings()
 	return _u
 }
 
@@ -118,6 +139,12 @@ func (_u *OrganizationEnterpriseSettingsUpdate) sqlSave(ctx context.Context) (_n
 	if value, ok := _u.mutation.ScimEnabled(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldScimEnabled, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.WhitelabelSettings(); ok {
+		_spec.SetField(organizationenterprisesettings.FieldWhitelabelSettings, field.TypeJSON, value)
+	}
+	if _u.mutation.WhitelabelSettingsCleared() {
+		_spec.ClearField(organizationenterprisesettings.FieldWhitelabelSettings, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -166,6 +193,26 @@ func (_u *OrganizationEnterpriseSettingsUpdateOne) SetNillableScimEnabled(v *boo
 	if v != nil {
 		_u.SetScimEnabled(*v)
 	}
+	return _u
+}
+
+// SetWhitelabelSettings sets the "whitelabel_settings" field.
+func (_u *OrganizationEnterpriseSettingsUpdateOne) SetWhitelabelSettings(v whitelabel.Settings) *OrganizationEnterpriseSettingsUpdateOne {
+	_u.mutation.SetWhitelabelSettings(v)
+	return _u
+}
+
+// SetNillableWhitelabelSettings sets the "whitelabel_settings" field if the given value is not nil.
+func (_u *OrganizationEnterpriseSettingsUpdateOne) SetNillableWhitelabelSettings(v *whitelabel.Settings) *OrganizationEnterpriseSettingsUpdateOne {
+	if v != nil {
+		_u.SetWhitelabelSettings(*v)
+	}
+	return _u
+}
+
+// ClearWhitelabelSettings clears the value of the "whitelabel_settings" field.
+func (_u *OrganizationEnterpriseSettingsUpdateOne) ClearWhitelabelSettings() *OrganizationEnterpriseSettingsUpdateOne {
+	_u.mutation.ClearWhitelabelSettings()
 	return _u
 }
 
@@ -260,6 +307,12 @@ func (_u *OrganizationEnterpriseSettingsUpdateOne) sqlSave(ctx context.Context) 
 	}
 	if value, ok := _u.mutation.ScimEnabled(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldScimEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.WhitelabelSettings(); ok {
+		_spec.SetField(organizationenterprisesettings.FieldWhitelabelSettings, field.TypeJSON, value)
+	}
+	if _u.mutation.WhitelabelSettingsCleared() {
+		_spec.ClearField(organizationenterprisesettings.FieldWhitelabelSettings, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldUpdatedAt, field.TypeTime, value)

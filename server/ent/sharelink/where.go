@@ -689,6 +689,16 @@ func AltTextContainsFold(v string) predicate.ShareLink {
 	return predicate.ShareLink(sql.FieldContainsFold(FieldAltText, v))
 }
 
+// CodeIsNil applies the IsNil predicate on the "code" field.
+func CodeIsNil() predicate.ShareLink {
+	return predicate.ShareLink(sql.FieldIsNull(FieldCode))
+}
+
+// CodeNotNil applies the NotNil predicate on the "code" field.
+func CodeNotNil() predicate.ShareLink {
+	return predicate.ShareLink(sql.FieldNotNull(FieldCode))
+}
+
 // AccessEQ applies the EQ predicate on the "access" field.
 func AccessEQ(v Access) predicate.ShareLink {
 	return predicate.ShareLink(sql.FieldEQ(FieldAccess, v))

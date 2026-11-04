@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { StorySetLibrary } from '@/components/creative-sets/StorySetLibrary'
 
@@ -17,7 +17,7 @@ export default async function StorySetsPage({ params }: { params: Promise<{ loca
     >
       <StorySetLibrary
         canCreate={access.creativeSetsEnabled}
-        canEdit={hasPermission(access.role, 'artifact:edit')}
+        canEdit={accessAllows(access, 'artifact:edit')}
       />
     </PlatformShell>
   )

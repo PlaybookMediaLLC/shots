@@ -25,6 +25,7 @@ type CreativeSetStore interface {
 	GetCreativeSetVersion(context.Context, product.Actor, string, string) (*product.CreativeSetVersionRecord, error)
 	CreateCreativeSetVersion(context.Context, product.Actor, string, string, ...int) (*product.CreativeSetVersionRecord, error)
 	RestoreCreativeSetVersion(context.Context, product.Actor, string, string, int) (*product.CreativeSetRecord, error)
+	ImportCode(context.Context, product.Actor, string) (*product.CodeImport, error)
 }
 
 func (s *Server) registerCreativeSets(mux *http.ServeMux) {
@@ -43,6 +44,28 @@ func (s *Server) registerCreativeSets(mux *http.ServeMux) {
 	mux.Handle("POST /v1/creative-sets/{id}/versions", s.authenticateProduct(http.HandlerFunc(s.createCreativeSetVersion)))
 	mux.Handle("GET /v1/creative-sets/{id}/versions/{versionId}", s.authenticateProduct(http.HandlerFunc(s.getCreativeSetVersion)))
 	mux.Handle("POST /v1/creative-sets/{id}/versions/{versionId}/restore", s.authenticateProduct(http.HandlerFunc(s.restoreCreativeSetVersion)))
+	mux.Handle("POST /v1/code-imports", s.authenticateProduct(http.HandlerFunc(s.importCode)))
+}
+
+// importCode reads a GitHub link a member pasted into Code Studio (RFC 053).
+func (s *Server) importCode(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		URL string `json:"url"`
+	}
+	if err := decodeJSONLimit(r, &input, 8<<10); err != nil || input.URL == "" {
+		writeError(w, http.StatusBadRequest, "invalid code import request")
+		return
+	}
+	result, err := s.configuration.ImportCode(r.Context(), workspaceActor(r), input.URL)
+	if err != nil {
+		if errors.Is(err, product.ErrGitHubUnavailable) {
+			writeError(w, http.StatusServiceUnavailable, "GitHub could not be reached. Try again shortly.")
+			return
+		}
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) attachCreativeSetDelivery(w http.ResponseWriter, r *http.Request) {

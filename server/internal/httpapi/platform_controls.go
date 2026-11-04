@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // registerPlatformControls exposes audit drains, audit retention, source
@@ -16,6 +17,8 @@ func (s *Server) registerPlatformControls(mux *http.ServeMux) {
 	mux.Handle("DELETE /v1/audit-drains/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteAuditDrain)))
 	mux.Handle("GET /v1/audit-retention", s.authenticateProduct(http.HandlerFunc(s.getAuditRetention)))
 	mux.Handle("PUT /v1/audit-retention", s.authenticateProduct(http.HandlerFunc(s.updateAuditRetention)))
+	mux.Handle("GET /v1/whitelabel", s.authenticateProduct(http.HandlerFunc(s.getWhitelabel)))
+	mux.Handle("PUT /v1/whitelabel", s.authenticateProduct(http.HandlerFunc(s.updateWhitelabel)))
 	mux.Handle("GET /v1/internal/source-apps/{id}/webhook", s.authenticateService(http.HandlerFunc(s.getWebhookSource)))
 	mux.Handle("POST /v1/source-releases", s.authenticateProduct(http.HandlerFunc(s.ingestSourceRelease)))
 	mux.Handle("POST /v1/internal/outbox-events/{id}/replay", s.authenticateService(http.HandlerFunc(s.replayOutboxEvent)))
@@ -102,6 +105,33 @@ func (s *Server) updateAuditRetention(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, policy)
+}
+
+func (s *Server) getWhitelabel(w http.ResponseWriter, r *http.Request) {
+	settings, err := s.configuration.GetWhitelabel(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) updateWhitelabel(w http.ResponseWriter, r *http.Request) {
+	var input whitelabel.Settings
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	audit, ok := auditRequest(w, r)
+	if !ok {
+		return
+	}
+	settings, err := s.configuration.UpdateWhitelabel(r.Context(), workspaceActor(r), input, audit)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
 }
 
 func (s *Server) getWebhookSource(w http.ResponseWriter, r *http.Request) {

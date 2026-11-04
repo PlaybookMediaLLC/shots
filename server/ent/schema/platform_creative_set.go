@@ -24,8 +24,9 @@ func (PlatformCreativeSet) Fields() []ent.Field {
 		field.String("id").StorageKey("id").Immutable(),
 		field.String("organization_id").StorageKey("organizationId").Immutable(),
 		field.String("name").StorageKey("name"),
-		// A canvas workspace (RFC 032), a Story Set or a store screenshot project; a row never changes kind.
-		field.Enum("kind").StorageKey("kind").NamedValues("StorySet", "story-set", "Canvas", "canvas", "Store", "store").Default("story-set").Immutable(),
+		// A canvas workspace (RFC 032), a Story Set, a store screenshot project or a
+		// Code Studio project (docs/code-studio.md); a row never changes kind.
+		field.Enum("kind").StorageKey("kind").NamedValues("StorySet", "story-set", "Canvas", "canvas", "Store", "store", "Code", "code").Default("story-set").Immutable(),
 		field.JSON("document", map[string]any{}).StorageKey("document"),
 		field.Int("document_version").StorageKey("documentVersion"),
 		field.Int("revision").StorageKey("revision").Default(1),

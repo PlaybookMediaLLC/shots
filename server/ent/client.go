@@ -78,6 +78,8 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroupmember"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmoptout"
@@ -270,6 +272,10 @@ type Client struct {
 	OutboxEvent *OutboxEventClient
 	// PageKnowledge is the client for interacting with the PageKnowledge builders.
 	PageKnowledge *PageKnowledgeClient
+	// PermissionGroup is the client for interacting with the PermissionGroup builders.
+	PermissionGroup *PermissionGroupClient
+	// PermissionGroupMember is the client for interacting with the PermissionGroupMember builders.
+	PermissionGroupMember *PermissionGroupMemberClient
 	// PlatformAutoDMCampaign is the client for interacting with the PlatformAutoDMCampaign builders.
 	PlatformAutoDMCampaign *PlatformAutoDMCampaignClient
 	// PlatformAutoDMDelivery is the client for interacting with the PlatformAutoDMDelivery builders.
@@ -462,6 +468,8 @@ func (c *Client) init() {
 	c.OrganizationEnterpriseSettings = NewOrganizationEnterpriseSettingsClient(c.config)
 	c.OutboxEvent = NewOutboxEventClient(c.config)
 	c.PageKnowledge = NewPageKnowledgeClient(c.config)
+	c.PermissionGroup = NewPermissionGroupClient(c.config)
+	c.PermissionGroupMember = NewPermissionGroupMemberClient(c.config)
 	c.PlatformAutoDMCampaign = NewPlatformAutoDMCampaignClient(c.config)
 	c.PlatformAutoDMDelivery = NewPlatformAutoDMDeliveryClient(c.config)
 	c.PlatformAutoDMOptOut = NewPlatformAutoDMOptOutClient(c.config)
@@ -676,6 +684,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		OrganizationEnterpriseSettings:  NewOrganizationEnterpriseSettingsClient(cfg),
 		OutboxEvent:                     NewOutboxEventClient(cfg),
 		PageKnowledge:                   NewPageKnowledgeClient(cfg),
+		PermissionGroup:                 NewPermissionGroupClient(cfg),
+		PermissionGroupMember:           NewPermissionGroupMemberClient(cfg),
 		PlatformAutoDMCampaign:          NewPlatformAutoDMCampaignClient(cfg),
 		PlatformAutoDMDelivery:          NewPlatformAutoDMDeliveryClient(cfg),
 		PlatformAutoDMOptOut:            NewPlatformAutoDMOptOutClient(cfg),
@@ -817,6 +827,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		OrganizationEnterpriseSettings:  NewOrganizationEnterpriseSettingsClient(cfg),
 		OutboxEvent:                     NewOutboxEventClient(cfg),
 		PageKnowledge:                   NewPageKnowledgeClient(cfg),
+		PermissionGroup:                 NewPermissionGroupClient(cfg),
+		PermissionGroupMember:           NewPermissionGroupMemberClient(cfg),
 		PlatformAutoDMCampaign:          NewPlatformAutoDMCampaignClient(cfg),
 		PlatformAutoDMDelivery:          NewPlatformAutoDMDeliveryClient(cfg),
 		PlatformAutoDMOptOut:            NewPlatformAutoDMOptOutClient(cfg),
@@ -922,13 +934,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
 		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
 		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
-		c.PageKnowledge, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
-		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
-		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -969,13 +981,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
 		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
 		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
-		c.PageKnowledge, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
-		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
-		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -1124,6 +1136,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OutboxEvent.mutate(ctx, m)
 	case *PageKnowledgeMutation:
 		return c.PageKnowledge.mutate(ctx, m)
+	case *PermissionGroupMutation:
+		return c.PermissionGroup.mutate(ctx, m)
+	case *PermissionGroupMemberMutation:
+		return c.PermissionGroupMember.mutate(ctx, m)
 	case *PlatformAutoDMCampaignMutation:
 		return c.PlatformAutoDMCampaign.mutate(ctx, m)
 	case *PlatformAutoDMDeliveryMutation:
@@ -9706,6 +9722,272 @@ func (c *PageKnowledgeClient) mutate(ctx context.Context, m *PageKnowledgeMutati
 	}
 }
 
+// PermissionGroupClient is a client for the PermissionGroup schema.
+type PermissionGroupClient struct {
+	config
+}
+
+// NewPermissionGroupClient returns a client for the PermissionGroup from the given config.
+func NewPermissionGroupClient(c config) *PermissionGroupClient {
+	return &PermissionGroupClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `permissiongroup.Hooks(f(g(h())))`.
+func (c *PermissionGroupClient) Use(hooks ...Hook) {
+	c.hooks.PermissionGroup = append(c.hooks.PermissionGroup, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `permissiongroup.Intercept(f(g(h())))`.
+func (c *PermissionGroupClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PermissionGroup = append(c.inters.PermissionGroup, interceptors...)
+}
+
+// Create returns a builder for creating a PermissionGroup entity.
+func (c *PermissionGroupClient) Create() *PermissionGroupCreate {
+	mutation := newPermissionGroupMutation(c.config, OpCreate)
+	return &PermissionGroupCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PermissionGroup entities.
+func (c *PermissionGroupClient) CreateBulk(builders ...*PermissionGroupCreate) *PermissionGroupCreateBulk {
+	return &PermissionGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PermissionGroupClient) MapCreateBulk(slice any, setFunc func(*PermissionGroupCreate, int)) *PermissionGroupCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PermissionGroupCreateBulk{err: fmt.Errorf("calling to PermissionGroupClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PermissionGroupCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PermissionGroupCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PermissionGroup.
+func (c *PermissionGroupClient) Update() *PermissionGroupUpdate {
+	mutation := newPermissionGroupMutation(c.config, OpUpdate)
+	return &PermissionGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PermissionGroupClient) UpdateOne(_m *PermissionGroup) *PermissionGroupUpdateOne {
+	mutation := newPermissionGroupMutation(c.config, OpUpdateOne, withPermissionGroup(_m))
+	return &PermissionGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PermissionGroupClient) UpdateOneID(id string) *PermissionGroupUpdateOne {
+	mutation := newPermissionGroupMutation(c.config, OpUpdateOne, withPermissionGroupID(id))
+	return &PermissionGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PermissionGroup.
+func (c *PermissionGroupClient) Delete() *PermissionGroupDelete {
+	mutation := newPermissionGroupMutation(c.config, OpDelete)
+	return &PermissionGroupDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PermissionGroupClient) DeleteOne(_m *PermissionGroup) *PermissionGroupDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PermissionGroupClient) DeleteOneID(id string) *PermissionGroupDeleteOne {
+	builder := c.Delete().Where(permissiongroup.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PermissionGroupDeleteOne{builder}
+}
+
+// Query returns a query builder for PermissionGroup.
+func (c *PermissionGroupClient) Query() *PermissionGroupQuery {
+	return &PermissionGroupQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePermissionGroup},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PermissionGroup entity by its id.
+func (c *PermissionGroupClient) Get(ctx context.Context, id string) (*PermissionGroup, error) {
+	return c.Query().Where(permissiongroup.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PermissionGroupClient) GetX(ctx context.Context, id string) *PermissionGroup {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PermissionGroupClient) Hooks() []Hook {
+	return c.hooks.PermissionGroup
+}
+
+// Interceptors returns the client interceptors.
+func (c *PermissionGroupClient) Interceptors() []Interceptor {
+	return c.inters.PermissionGroup
+}
+
+func (c *PermissionGroupClient) mutate(ctx context.Context, m *PermissionGroupMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PermissionGroupCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PermissionGroupUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PermissionGroupUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PermissionGroupDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PermissionGroup mutation op: %q", m.Op())
+	}
+}
+
+// PermissionGroupMemberClient is a client for the PermissionGroupMember schema.
+type PermissionGroupMemberClient struct {
+	config
+}
+
+// NewPermissionGroupMemberClient returns a client for the PermissionGroupMember from the given config.
+func NewPermissionGroupMemberClient(c config) *PermissionGroupMemberClient {
+	return &PermissionGroupMemberClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `permissiongroupmember.Hooks(f(g(h())))`.
+func (c *PermissionGroupMemberClient) Use(hooks ...Hook) {
+	c.hooks.PermissionGroupMember = append(c.hooks.PermissionGroupMember, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `permissiongroupmember.Intercept(f(g(h())))`.
+func (c *PermissionGroupMemberClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PermissionGroupMember = append(c.inters.PermissionGroupMember, interceptors...)
+}
+
+// Create returns a builder for creating a PermissionGroupMember entity.
+func (c *PermissionGroupMemberClient) Create() *PermissionGroupMemberCreate {
+	mutation := newPermissionGroupMemberMutation(c.config, OpCreate)
+	return &PermissionGroupMemberCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PermissionGroupMember entities.
+func (c *PermissionGroupMemberClient) CreateBulk(builders ...*PermissionGroupMemberCreate) *PermissionGroupMemberCreateBulk {
+	return &PermissionGroupMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PermissionGroupMemberClient) MapCreateBulk(slice any, setFunc func(*PermissionGroupMemberCreate, int)) *PermissionGroupMemberCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PermissionGroupMemberCreateBulk{err: fmt.Errorf("calling to PermissionGroupMemberClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PermissionGroupMemberCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PermissionGroupMemberCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PermissionGroupMember.
+func (c *PermissionGroupMemberClient) Update() *PermissionGroupMemberUpdate {
+	mutation := newPermissionGroupMemberMutation(c.config, OpUpdate)
+	return &PermissionGroupMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PermissionGroupMemberClient) UpdateOne(_m *PermissionGroupMember) *PermissionGroupMemberUpdateOne {
+	mutation := newPermissionGroupMemberMutation(c.config, OpUpdateOne, withPermissionGroupMember(_m))
+	return &PermissionGroupMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PermissionGroupMemberClient) UpdateOneID(id string) *PermissionGroupMemberUpdateOne {
+	mutation := newPermissionGroupMemberMutation(c.config, OpUpdateOne, withPermissionGroupMemberID(id))
+	return &PermissionGroupMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PermissionGroupMember.
+func (c *PermissionGroupMemberClient) Delete() *PermissionGroupMemberDelete {
+	mutation := newPermissionGroupMemberMutation(c.config, OpDelete)
+	return &PermissionGroupMemberDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PermissionGroupMemberClient) DeleteOne(_m *PermissionGroupMember) *PermissionGroupMemberDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PermissionGroupMemberClient) DeleteOneID(id string) *PermissionGroupMemberDeleteOne {
+	builder := c.Delete().Where(permissiongroupmember.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PermissionGroupMemberDeleteOne{builder}
+}
+
+// Query returns a query builder for PermissionGroupMember.
+func (c *PermissionGroupMemberClient) Query() *PermissionGroupMemberQuery {
+	return &PermissionGroupMemberQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePermissionGroupMember},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PermissionGroupMember entity by its id.
+func (c *PermissionGroupMemberClient) Get(ctx context.Context, id string) (*PermissionGroupMember, error) {
+	return c.Query().Where(permissiongroupmember.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PermissionGroupMemberClient) GetX(ctx context.Context, id string) *PermissionGroupMember {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PermissionGroupMemberClient) Hooks() []Hook {
+	return c.hooks.PermissionGroupMember
+}
+
+// Interceptors returns the client interceptors.
+func (c *PermissionGroupMemberClient) Interceptors() []Interceptor {
+	return c.inters.PermissionGroupMember
+}
+
+func (c *PermissionGroupMemberClient) mutate(ctx context.Context, m *PermissionGroupMemberMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PermissionGroupMemberCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PermissionGroupMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PermissionGroupMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PermissionGroupMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PermissionGroupMember mutation op: %q", m.Op())
+	}
+}
+
 // PlatformAutoDMCampaignClient is a client for the PlatformAutoDMCampaign schema.
 type PlatformAutoDMCampaignClient struct {
 	config
@@ -17619,12 +17901,13 @@ type (
 		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
 		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
 		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
-		PageKnowledge, PlatformAutoDMCampaign, PlatformAutoDMDelivery,
-		PlatformAutoDMOptOut, PlatformAutoDMRecipient, PlatformCreativeSet,
-		PlatformCreativeSetVersion, PlatformDraftImport, PlatformNotificationDelivery,
-		PlatformNotificationInbox, PlatformNotificationPolicy,
-		PlatformNotificationPreference, PlatformNotificationSeenAction,
-		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
+		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAutoDMCampaign,
+		PlatformAutoDMDelivery, PlatformAutoDMOptOut, PlatformAutoDMRecipient,
+		PlatformCreativeSet, PlatformCreativeSetVersion, PlatformDraftImport,
+		PlatformNotificationDelivery, PlatformNotificationInbox,
+		PlatformNotificationPolicy, PlatformNotificationPreference,
+		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
@@ -17654,12 +17937,13 @@ type (
 		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
 		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
 		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
-		PageKnowledge, PlatformAutoDMCampaign, PlatformAutoDMDelivery,
-		PlatformAutoDMOptOut, PlatformAutoDMRecipient, PlatformCreativeSet,
-		PlatformCreativeSetVersion, PlatformDraftImport, PlatformNotificationDelivery,
-		PlatformNotificationInbox, PlatformNotificationPolicy,
-		PlatformNotificationPreference, PlatformNotificationSeenAction,
-		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
+		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAutoDMCampaign,
+		PlatformAutoDMDelivery, PlatformAutoDMOptOut, PlatformAutoDMRecipient,
+		PlatformCreativeSet, PlatformCreativeSetVersion, PlatformDraftImport,
+		PlatformNotificationDelivery, PlatformNotificationInbox,
+		PlatformNotificationPolicy, PlatformNotificationPreference,
+		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,

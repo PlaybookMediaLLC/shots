@@ -765,6 +765,30 @@ func (f PageKnowledgeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PageKnowledgeMutation", m)
 }
 
+// The PermissionGroupFunc type is an adapter to allow the use of ordinary
+// function as PermissionGroup mutator.
+type PermissionGroupFunc func(context.Context, *ent.PermissionGroupMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PermissionGroupFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PermissionGroupMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PermissionGroupMutation", m)
+}
+
+// The PermissionGroupMemberFunc type is an adapter to allow the use of ordinary
+// function as PermissionGroupMember mutator.
+type PermissionGroupMemberFunc func(context.Context, *ent.PermissionGroupMemberMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PermissionGroupMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PermissionGroupMemberMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PermissionGroupMemberMutation", m)
+}
+
 // The PlatformAutoDMCampaignFunc type is an adapter to allow the use of ordinary
 // function as PlatformAutoDMCampaign mutator.
 type PlatformAutoDMCampaignFunc func(context.Context, *ent.PlatformAutoDMCampaignMutation) (ent.Value, error)

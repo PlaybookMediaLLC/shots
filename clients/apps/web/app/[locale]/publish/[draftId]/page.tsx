@@ -5,7 +5,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { WriteComposer } from '@/components/write/composer/WriteComposer'
 import { WriteFrame } from '@/components/write/WriteFrame'
 import { contentDraftPostSchema, contentDraftSchema } from '@/lib/api/contracts/content-drafts'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import {
   createContentDraftCollabToken,
   getContentDraft,
@@ -27,7 +27,7 @@ type WriteDraftPageProps = {
 export default async function WriteDraftPage({ params, searchParams }: WriteDraftPageProps) {
   const { draftId, locale } = await params
   const access = await requireDraftsPageAccess(locale, `/publish/${draftId}`)
-  const canManageSets = hasPermission(access.role, 'workspace:update')
+  const canManageSets = accessAllows(access, 'workspace:update')
   // Real-time co-editing runs when the collaboration server is configured.
   const collabUrl = process.env.PLATFORM_COLLAB_URL || null
   // Every read starts at once; only the library's draft list waits for the draft's set.
@@ -47,7 +47,7 @@ export default async function WriteDraftPage({ params, searchParams }: WriteDraf
     collabUrl ? createContentDraftCollabToken(access.tenant, draftId).catch(() => null) : null,
   ])
   if (!draft) notFound()
-  const canEdit = hasPermission(access.role, 'artifact:edit')
+  const canEdit = accessAllows(access, 'artifact:edit')
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}
@@ -58,8 +58,8 @@ export default async function WriteDraftPage({ params, searchParams }: WriteDraf
         activeId={draft.id}
         canEdit={canEdit}
         canManageSets={canManageSets}
-        canPublish={hasPermission(access.role, 'publish:manage')}
-        canReview={hasPermission(access.role, 'release:approve')}
+        canPublish={accessAllows(access, 'publish:manage')}
+        canReview={accessAllows(access, 'release:approve')}
         data={data}
       >
         <WriteComposer

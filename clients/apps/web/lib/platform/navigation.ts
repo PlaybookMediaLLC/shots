@@ -82,6 +82,7 @@ export const LIBRARY_LINKS = [
   { href: '/library?type=canvas', label: 'Canvas' },
   { href: '/library?type=story', label: 'Story Sets' },
   { href: '/library?type=store', label: STORE_SCREENSHOTS.label },
+  { href: '/library?type=code', label: 'Code' },
   { href: '/library?view=assets', label: 'Assets' },
   { href: '/library?view=brand', label: 'Brand assets' },
 ]
@@ -238,7 +239,8 @@ export function paidCapability(from: string | null | undefined): string | null {
     ['/creative-sets', 'Story Sets'],
     [STORE_SCREENSHOTS.href, STORE_SCREENSHOTS.label],
     ['/store-screenshots', 'Store screenshots'],
-    ['/code', 'Code images'],
+    ['/create/code', 'Code Studio'],
+    ['/code', 'Code Studio'],
     ['/tweet', 'Post images'],
     ['/projects', 'Library'],
     ['/assets', 'Library'],

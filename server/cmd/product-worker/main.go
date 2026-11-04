@@ -170,7 +170,8 @@ func main() {
 	// Batch submits schedule here, so this store judges an account as the API does.
 	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore).WithAccountStanding(provider)
 	if github != nil {
-		automationStore.WithGitHubApp(github)
+		// render_code_visual reads a merged pull request's diff only where its owner allowed it.
+		automationStore.WithGitHubApp(github).WithCodeReader(github)
 	}
 	// Paid workflow copy needs a model and the credit meter that bills it;
 	// without both this worker never advertises the ai capability.

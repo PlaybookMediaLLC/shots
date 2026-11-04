@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { BatchWorkspace } from '@/components/write/batch/BatchWorkspace'
 import { contentBatchSchema } from '@/lib/api/contracts/content-batches'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { getContentBatch } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
 import { captionLimit } from '@/lib/write/capabilities'
@@ -45,7 +45,7 @@ export default async function BatchPage({
     >
       <BatchWorkspace
         accounts={accounts}
-        canPublish={hasPermission(access.role, 'publish:manage')}
+        canPublish={accessAllows(access, 'publish:manage')}
         initial={contentBatchSchema.parse(batch)}
         start={
           query.start === 'videos' || query.start === 'images' || query.start === 'grid'

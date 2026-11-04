@@ -1908,6 +1908,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "ssoEnabled", Type: field.TypeBool, Default: false},
 		{Name: "scimEnabled", Type: field.TypeBool, Default: false},
+		{Name: "whitelabelSettings", Type: field.TypeJSON, Nullable: true},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
 	// OrganizationEnterpriseSettingsTable holds the schema information for the "organization_enterprise_settings" table.
@@ -1985,6 +1986,47 @@ var (
 				Name:    "pageknowledge_organizationId_runId",
 				Unique:  false,
 				Columns: []*schema.Column{PageKnowledgeColumns[1], PageKnowledgeColumns[2]},
+			},
+		},
+	}
+	// PermissionGroupColumns holds the columns for the "permission_group" table.
+	PermissionGroupColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "deniedPermissions", Type: field.TypeJSON},
+		{Name: "isDefault", Type: field.TypeBool, Default: false},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PermissionGroupTable holds the schema information for the "permission_group" table.
+	PermissionGroupTable = &schema.Table{
+		Name:       "permission_group",
+		Columns:    PermissionGroupColumns,
+		PrimaryKey: []*schema.Column{PermissionGroupColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "permissiongroup_organizationId_name",
+				Unique:  true,
+				Columns: []*schema.Column{PermissionGroupColumns[1], PermissionGroupColumns[2]},
+			},
+		},
+	}
+	// PermissionGroupMemberColumns holds the columns for the "permission_group_member" table.
+	PermissionGroupMemberColumns = []*schema.Column{
+		{Name: "memberId", Type: field.TypeString},
+		{Name: "permissionGroupId", Type: field.TypeString},
+	}
+	// PermissionGroupMemberTable holds the schema information for the "permission_group_member" table.
+	PermissionGroupMemberTable = &schema.Table{
+		Name:       "permission_group_member",
+		Columns:    PermissionGroupMemberColumns,
+		PrimaryKey: []*schema.Column{PermissionGroupMemberColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "permissiongroupmember_permissionGroupId",
+				Unique:  false,
+				Columns: []*schema.Column{PermissionGroupMemberColumns[1]},
 			},
 		},
 	}
@@ -2100,7 +2142,7 @@ var (
 		{Name: "id", Type: field.TypeString},
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "name", Type: field.TypeString},
-		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas", "store"}, Default: "story-set"},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas", "store", "code"}, Default: "story-set"},
 		{Name: "document", Type: field.TypeJSON},
 		{Name: "documentVersion", Type: field.TypeInt},
 		{Name: "revision", Type: field.TypeInt, Default: 1},
@@ -3106,6 +3148,7 @@ var (
 		{Name: "title", Type: field.TypeString},
 		{Name: "description", Type: field.TypeString, Nullable: true},
 		{Name: "altText", Type: field.TypeString, Nullable: true},
+		{Name: "code", Type: field.TypeJSON, Nullable: true},
 		{Name: "access", Type: field.TypeEnum, Enums: []string{"PUBLIC", "WORKSPACE"}, Default: "PUBLIC"},
 		{Name: "expiresAt", Type: field.TypeTime, Nullable: true},
 		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
@@ -3127,7 +3170,7 @@ var (
 			{
 				Name:    "sharelink_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{ShareLinkColumns[1], ShareLinkColumns[13]},
+				Columns: []*schema.Column{ShareLinkColumns[1], ShareLinkColumns[14]},
 			},
 		},
 	}
@@ -3810,6 +3853,8 @@ var (
 		OrganizationEnterpriseSettingsTable,
 		OutboxEventTable,
 		PageKnowledgeTable,
+		PermissionGroupTable,
+		PermissionGroupMemberTable,
 		PlatformAutoDmCampaignTable,
 		PlatformAutoDmDeliveryTable,
 		PlatformAutoDmOptOutTable,
@@ -4063,6 +4108,12 @@ func init() {
 	}
 	PageKnowledgeTable.Annotation = &entsql.Annotation{
 		Table: "page_knowledge",
+	}
+	PermissionGroupTable.Annotation = &entsql.Annotation{
+		Table: "permission_group",
+	}
+	PermissionGroupMemberTable.Annotation = &entsql.Annotation{
+		Table: "permission_group_member",
 	}
 	PlatformAutoDmCampaignTable.Annotation = &entsql.Annotation{
 		Table: "platform_auto_dm_campaign",

@@ -116,6 +116,10 @@ func main() {
 	}
 	if github != nil {
 		configuration.WithGitHubApp(github)
+		configuration.WithCodeReader(github)
+	} else {
+		// Without the App, Code Studio still imports public repositories and gists.
+		configuration.WithCodeReader(githubapp.NewPublic())
 	}
 	// The MCP server counts per-key calls on the same Redis; nil skips them.
 	var limiter product.QuotaCounter

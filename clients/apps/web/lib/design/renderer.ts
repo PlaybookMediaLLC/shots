@@ -87,6 +87,12 @@ export type DesignRenderer = {
   ) => Promise<RenderedDesign>
   /** Print canvas artboards to one PDF, a page per artboard at its own size. */
   printCanvas: (canvasId: string, organizationId: string, artboardIds: string[]) => Promise<Buffer>
+  /** Render one slide of a Code Studio project (RFC 053) as a PNG, as the studio exports it. */
+  renderCode: (
+    projectId: string,
+    organizationId: string,
+    options: { slide: number; scale: 1 | 2 | 3 }
+  ) => Promise<RenderedDesign>
 }
 
 type ExportResult = { base64: string; height: number; mediaType?: string; width: number }
@@ -172,6 +178,24 @@ export async function createDesignRenderer(): Promise<DesignRenderer> {
         if (failure) throw new CanvasPrintRefusedError(failure)
         // Each artboard is a named page at its own size; text and shapes stay vector.
         return await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      } finally {
+        await context.close()
+      }
+    },
+    renderCode: async (projectId, organizationId, { slide, scale }) => {
+      const { context, page } = await openPage()
+      try {
+        const url = new URL(`/render/code/${projectId}`, getRenderBaseUrl())
+        url.searchParams.set('token', createRenderToken(`code:${projectId}`, organizationId))
+        url.searchParams.set('slide', String(slide))
+        url.searchParams.set('scale', String(scale))
+        const response = await page.goto(url.toString(), { timeout: RENDER_TIMEOUT_MS })
+        if (!response?.ok())
+          throw new Error(`Code render page returned ${response?.status() ?? 'no response'}.`)
+        await page.waitForFunction(() => window.__codeReady === true, undefined, {
+          timeout: RENDER_TIMEOUT_MS,
+        })
+        return toRenderedDesign(await page.evaluate(() => window.__exportCode!()), { format: 'png' })
       } finally {
         await context.close()
       }

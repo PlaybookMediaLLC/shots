@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { CampaignBrief } from '@/components/campaigns/CampaignBrief'
 import { PipelineSteps } from '@/components/launch/PipelineSteps'
 import { RevisionHistory } from '@/components/launch/RevisionHistory'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { latestLaunchRuns } from '@/lib/launch/runs'
 import { getCampaignPlans, getReleaseSpecs, listRevisions } from '@/lib/launch/store'
 import { getCampaign } from '@/lib/tenant/campaigns'
@@ -38,7 +38,7 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
     <>
       <PipelineSteps
         campaignId={campaign.id}
-        canEdit={campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:create')}
+        canEdit={campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:create')}
         hasRelease={Boolean(campaign.release)}
         plan={plans}
         produced={{ designs: designs.length, posts: campaign.posts.length }}
@@ -58,8 +58,8 @@ export default async function CampaignPage({ params }: CampaignPageProps) {
               postCount: campaign.posts.length,
               status: campaign.status,
             }}
-            canApprove={hasPermission(access.role, 'release:approve')}
-            canEdit={hasPermission(access.role, 'release:create')}
+            canApprove={accessAllows(access, 'release:approve')}
+            canEdit={accessAllows(access, 'release:create')}
             productSurface={campaign.productSurface}
             release={
               campaign.release && {

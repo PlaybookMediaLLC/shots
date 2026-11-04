@@ -5,7 +5,7 @@ import { SpecEditor } from '@/components/launch/spec/SpecEditor'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { EmptyState } from '@/components/platform-ui'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { latestLaunchRuns } from '@/lib/launch/runs'
 import { getReleaseSpecs, getSpecById } from '@/lib/launch/store'
 import { getCampaign } from '@/lib/tenant/campaigns'
@@ -68,8 +68,8 @@ export default async function SpecPage({ params, searchParams }: SpecPageProps) 
         .filter(Boolean)
         .join('\n\n')}
       campaignId={campaign.id}
-      canApprove={campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:approve')}
-      canEdit={campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:create')}
+      canApprove={campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:approve')}
+      canEdit={campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:create')}
       lastRunError={runFailed ? (run.error ?? 'The last draft failed.') : null}
       latestId={specs.latest?.id ?? null}
       spec={

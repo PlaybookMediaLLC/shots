@@ -182,6 +182,22 @@ const SECTIONS = [
     title: 'SSO',
   },
   {
+    description: 'Restrict what groups of members may do, beyond their roles.',
+    group: 'advanced',
+    id: 'permission-groups',
+    keywords: 'access control restrict deny',
+    slug: 'permission-groups',
+    title: 'Permission groups',
+  },
+  {
+    description: 'Your name, logo and colors in the signed-in app.',
+    group: 'advanced',
+    id: 'whitelabel',
+    keywords: 'branding logo favicon theme colors',
+    slug: 'white-label',
+    title: 'White label',
+  },
+  {
     description: 'Searchable events, retention, and SIEM log drains.',
     group: 'advanced',
     id: 'audit',

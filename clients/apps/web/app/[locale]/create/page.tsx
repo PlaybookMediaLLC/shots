@@ -43,10 +43,11 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
               view === 'tools'
                 ? [
                     {
-                      title: 'Code image',
-                      description: 'Compose a code snippet as a shareable image.',
-                      href: '/code',
-                      scope: 'Code editor',
+                      title: 'Code Studio',
+                      description:
+                        'Turn a snippet, diff or pull request into an image, carousel or video, then post it.',
+                      href: '/create/code',
+                      scope: 'Code Studio · Save to workspace',
                     },
                     {
                       title: 'Tweet image',

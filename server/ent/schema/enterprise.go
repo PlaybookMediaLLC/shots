@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // SupportAccessGrant is the authorization projection for a time-bound grant.
@@ -31,7 +32,8 @@ func (SupportAccessGrant) Indexes() []ent.Index {
 	return []ent.Index{index.Fields("organization_id", "expires_at"), index.Fields("user_id", "expires_at")}
 }
 
-// OrganizationEnterpriseSettings controls enterprise identity features.
+// OrganizationEnterpriseSettings controls enterprise identity features and
+// the organization's white-label branding.
 type OrganizationEnterpriseSettings struct{ ent.Schema }
 
 func (OrganizationEnterpriseSettings) Annotations() []schema.Annotation {
@@ -42,6 +44,7 @@ func (OrganizationEnterpriseSettings) Fields() []ent.Field {
 		field.String("id").StorageKey("organizationId").Immutable(),
 		field.Bool("sso_enabled").StorageKey("ssoEnabled").Default(false),
 		field.Bool("scim_enabled").StorageKey("scimEnabled").Default(false),
+		field.JSON("whitelabel_settings", whitelabel.Settings{}).StorageKey("whitelabelSettings").Optional(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}
 }

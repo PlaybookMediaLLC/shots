@@ -12,6 +12,7 @@ import * as billing from '@/lib/api/contracts/billing'
 import * as blueskyConnections from '@/lib/api/contracts/bluesky-connections'
 import * as campaigns from '@/lib/api/contracts/campaigns'
 import * as canvases from '@/lib/api/contracts/canvases'
+import * as codeProjects from '@/lib/api/contracts/code-projects'
 import * as contentDrafts from '@/lib/api/contracts/content-drafts'
 import * as draftMedia from '@/lib/api/contracts/draft-media'
 import * as draftCollaboration from '@/lib/api/contracts/draft-collaboration'
@@ -19,6 +20,8 @@ import * as contentDraftPlatform from '@/lib/api/contracts/content-draft-platfor
 import * as writeAi from '@/lib/api/contracts/write-ai'
 import * as draftBatch from '@/lib/api/contracts/draft-batch'
 import * as contentBatchRuns from '@/lib/api/contracts/content-batch-runs'
+import * as permissionGroups from '@/lib/api/contracts/permission-groups'
+import * as whitelabel from '@/lib/api/contracts/whitelabel'
 import * as contentBatches from '@/lib/api/contracts/content-batches'
 import * as socialAnalytics from '@/lib/api/contracts/social-analytics'
 import * as draftComments from '@/lib/api/contracts/draft-comments'
@@ -60,10 +63,13 @@ const contracts = new Map<string, RouteContract>(
     approvals,
     assets,
     audit,
+    whitelabel,
+    permissionGroups,
     billing,
     blueskyConnections,
     campaigns,
     canvases,
+    codeProjects,
     contentDraftPlatform,
     draftMedia,
     draftCollaboration,
