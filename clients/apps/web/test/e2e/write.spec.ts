@@ -284,6 +284,19 @@ test(
     await assistant.getByRole('button', { name: 'Add as a new post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expectSaved(page)
+    // After three answers with no style guide, the assistant offers its voice setup.
+    await expect(assistant.getByRole('button', { name: 'Set up its voice' })).toHaveCount(0)
+    for (const [index, question] of ['Make it shorter.', 'Add a question at the end.'].entries()) {
+      await assistant.getByLabel('Ask the assistant').fill(question)
+      await assistant.getByRole('button', { name: 'Send', exact: true }).click()
+      await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(index + 2, {
+        timeout: 60_000,
+      })
+    }
+    await assistant.getByRole('button', { name: 'Set up its voice' }).click()
+    await expect(page.getByTestId('assistant-setup')).toBeVisible()
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click()
+    await expect(page.getByTestId('assistant-panel')).toBeVisible()
 
     // The review names every account and the follow-ups; Auto-DM is off, with why.
     await page.getByTestId('publish-button').click()
