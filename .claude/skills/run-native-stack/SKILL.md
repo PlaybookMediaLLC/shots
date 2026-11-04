@@ -16,7 +16,7 @@ host processes, on the ports `dev/compose.yaml` publishes.
 ## Start
 
 ```bash
-dev/native-stack up      # Postgres, Redis, Temporal, Go migrations and API, next dev
+dev/native-stack up      # Postgres, Redis, Temporal, Go migrations and API, collab, next dev
 dev/native-stack login   # dev@localhost.test with a Pro workspace, as make up creates
 dev/native-stack status
 ```
@@ -25,6 +25,7 @@ dev/native-stack status
 | --- | --- |
 | Web (`next dev`) | http://localhost:3000 |
 | Go product API | http://127.0.0.1:8080, MCP on 3100 |
+| Collab server | ws://127.0.0.1:1234 |
 | Temporal dev server | 127.0.0.1:7233 |
 | Postgres | 127.0.0.1:54329, user `postgres`, trust auth |
 | Redis | 127.0.0.1:63799 |
@@ -34,10 +35,9 @@ dev/native-stack status
 - `up` skips services that already answer, so it is safe to rerun.
 - Web changes hot-reload. After a Go change, run `down`, then `up`.
 - `next dev` compiles each route on its first request; allow minutes.
-- Not running: RustFS (uploads and asset storage), the collab server (draft
-  co-editing), the publishing orchestrator (scheduled posts) and the render
-  browser. A page that needs one fails; report that rather than patching
-  around it.
+- Not running: RustFS (uploads and asset storage), the publishing
+  orchestrator (scheduled posts) and the render browser. A page that needs
+  one fails; report that rather than patching around it.
 
 ## Drive and Screenshot
 
@@ -73,6 +73,30 @@ const app = 'http://localhost:3000'
   with `git diff <base> -- <files> | git apply -R`, let the dev server
   reload, capture, restore with `git checkout -- <files>`, and confirm
   `git status` is clean.
+
+## Run an End-to-End Spec
+
+The suite's channels go through its social API mock, so start the backend
+pointed at it. Stop only the backend; `up` restarts it and skips the rest:
+
+```bash
+kill "$(cat .local/native/backend.pid)"
+E2E_SOCIAL_API_URL=http://127.0.0.1:5679/api/public/v1 dev/native-stack up
+```
+
+Then run the spec from `clients/apps/web` with the variables `e2e_npm` in
+`dev/studio` sets:
+
+```bash
+set -a; . ../../../.local/dev.env; set +a
+E2E_BASE_URL=http://localhost:3000 E2E_DATABASE_URL="$HOST_DATABASE_URL" \
+  E2E_MAINTENANCE_SECRET="$CLEANUP_SECRET" E2E_WEBHOOK_SECRET="$CLEANUP_SECRET" \
+  E2E_REDIS_URL=redis://127.0.0.1:63799 E2E_COMPOSE_LOGS=false \
+  npx playwright test test/e2e/<file>.spec.ts
+```
+
+`next dev` serves both Playwright projects. A test that needs a service
+listed as not running fails here; run it with `make e2e` where Docker works.
 
 ## Stop
 
