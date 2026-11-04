@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/ssr/ArrowLeft'
 import { ArrowUUpLeftIcon } from '@phosphor-icons/react/dist/ssr/ArrowUUpLeft'
 import { ArrowUUpRightIcon } from '@phosphor-icons/react/dist/ssr/ArrowUUpRight'
@@ -289,7 +289,9 @@ function DraftWorkspace({
       })
       writeDraft(null)
       trackEvent('code_studio_save', { slides: document.slides.length })
-      router.replace(`/create/code/${id}`)
+      // A campaign handoff continues on the saved project.
+      const campaign = new URLSearchParams(window.location.search).get('campaign')
+      router.replace(`/create/code/${id}${campaign ? `?${new URLSearchParams({ campaign })}` : ''}`)
     } catch (failure) {
       toast.error('Could not save the project', {
         description:
@@ -515,6 +517,15 @@ function Workspace({
   const [embedding, setEmbedding] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const capture = useSceneCapture()
+  const params = useSearchParams()
+  const campaignId = /^c[a-z0-9]{8,40}$/.test(params.get('campaign') ?? '')
+    ? params.get('campaign')
+    : null
+  const importUrl = params.get('import')
+  React.useEffect(() => {
+    // A Code highlights link prefills the import; nothing is read until the member imports it.
+    if (importUrl && canEdit) setImporting(true)
+  }, [importUrl, canEdit])
   const logo = document.style.footer.logo
   const logoUrl = logo ? assetContentUrl(logo.slice('asset:'.length)) : undefined
   const renderVideo = useVideoRenderer(document, capture, logoUrl)
@@ -656,6 +667,33 @@ function Workspace({
                   Save image to Library
                 </DropdownMenuItem>
               ) : null}
+              {campaignId && canEdit ? (
+                <DropdownMenuItem
+                  onSelect={() =>
+                    run('campaign', async () => {
+                      const { assetId } = await saveExportToWorkspace({
+                        blob: await renderSlide(current),
+                        fileName: `${stem}.png`,
+                        classification: 'export',
+                        trpcClient: client,
+                      })
+                      await client.codeProject.addToCampaign.mutate({
+                        assetId,
+                        campaignId,
+                        caption: slide.caption || name || undefined,
+                      })
+                      toast.success('Added to the campaign', {
+                        action: {
+                          label: 'View visuals',
+                          onClick: () => window.location.assign(`/campaigns/${campaignId}/assets`),
+                        },
+                      })
+                    })
+                  }
+                >
+                  Add image to campaign
+                </DropdownMenuItem>
+              ) : null}
               {document.slides.length > 1 ? (
                 <>
                   <DropdownMenuSeparator />
@@ -787,6 +825,7 @@ function Workspace({
         />
       ) : null}
       <ImportCodeDialog
+        initialUrl={importUrl ?? ''}
         open={importing}
         onOpenChange={setImporting}
         document={document}

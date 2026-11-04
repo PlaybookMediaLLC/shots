@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { syncTokenKeys, toKeyedTokens, type KeyedTokensInfo } from '@shikijs/magic-move/core'
+import type { ThemedToken } from 'shiki/core'
 import { lineDiff } from '@/lib/code-studio/diff'
 import {
   activeFile,
@@ -9,12 +10,18 @@ import {
   type CodeFile,
   type CodeStyle,
 } from '@/lib/code-studio/document'
-import { cachedLines, plainLines } from '@/lib/code-studio/highlight'
 import { CODE_FONT_SIZE, CODE_LINE_HEIGHT, windowHeight } from '@/lib/code-studio/layout'
 import { frameAt, morphTokens, placeTokens, typedLengths } from '@/lib/code-studio/timeline'
-import { CodeScene, gutterWidth, lookFor, rowStyle, Tokens, type Look } from './CodeScene'
+import {
+  CodeScene,
+  gutterWidth,
+  lookFor,
+  rowStyle,
+  Tokens,
+  useHighlighted,
+  type Look,
+} from './CodeScene'
 
-const lines = (file: CodeFile) => cachedLines(file.code, file.lang) ?? plainLines(file.code)
 const plain = (file: CodeFile | undefined) =>
   !!file && file.tape === undefined && file.base === undefined
 
@@ -32,20 +39,27 @@ function charWidth(font: string): number {
   return width
 }
 
-const pairs = new Map<string, { from: KeyedTokensInfo; to: KeyedTokensInfo }>()
+type Pair = { from: KeyedTokensInfo; to: KeyedTokensInfo }
+const pairs = new WeakMap<ThemedToken[][], WeakMap<ThemedToken[][], Pair>>()
 
-/** Keyed tokens for a pair of states, matched once and reused for every frame. */
-function matched(from: CodeFile, to: CodeFile) {
-  const key = `${from.lang}\u0000${from.code}\u0001${to.lang}\u0000${to.code}`
-  let pair = pairs.get(key)
-  if (!pair) {
-    pair = syncTokenKeys(
-      toKeyedTokens(from.code, lines(from), 'a'),
-      toKeyedTokens(to.code, lines(to), 'b')
-    )
-    if (pairs.size > 50) pairs.delete(pairs.keys().next().value!)
-    pairs.set(key, pair)
-  }
+/**
+ * Keyed tokens for a pair of states, matched once per pair of highlighted
+ * line arrays (which the highlight cache keeps stable) and reused every frame.
+ */
+function matched(
+  from: CodeFile,
+  fromLines: ThemedToken[][],
+  to: CodeFile,
+  toLines: ThemedToken[][]
+): Pair {
+  const known = pairs.get(fromLines)?.get(toLines)
+  if (known) return known
+  const pair = syncTokenKeys(
+    toKeyedTokens(from.code, fromLines, 'a'),
+    toKeyedTokens(to.code, toLines, 'b')
+  )
+  if (!pairs.has(fromLines)) pairs.set(fromLines, new WeakMap())
+  pairs.get(fromLines)!.set(toLines, pair)
   return pair
 }
 
@@ -63,7 +77,9 @@ function MorphBody({
   look: Look
   progress: number
 }) {
-  const pair = matched(from, to)
+  const fromLines = useHighlighted(from.code, from.lang)
+  const toLines = useHighlighted(to.code, to.lang)
+  const pair = matched(from, fromLines, to, toLines)
   const tokens = morphTokens(placeTokens(pair.from.tokens), placeTokens(pair.to.tokens), progress)
   const before = from.code.split('\n').length
   const after = to.code.split('\n').length
@@ -133,7 +149,7 @@ function TypeBody({
   look: Look
   progress: number
 }) {
-  const tokens = lines(file)
+  const tokens = useHighlighted(file.code, file.lang)
   const text = file.code.split('\n')
   const shown = typedLengths(before, file.code, progress)
   const added = new Set(

@@ -26,6 +26,8 @@ export type ImportCodeDialogProps = {
   document: CodeDocument
   slideIndex: number
   onImport: (document: CodeDocument, slide: number) => void
+  /** A link to prefill, such as a pull request from a campaign's release. */
+  initialUrl?: string
 }
 
 /**
@@ -39,10 +41,11 @@ export function ImportCodeDialog({
   document,
   slideIndex,
   onImport,
+  initialUrl = '',
 }: ImportCodeDialogProps) {
   const client = useTRPCClient()
   const id = React.useId()
-  const [url, setUrl] = React.useState('')
+  const [url, setUrl] = React.useState(initialUrl)
   const [mode, setMode] = React.useState<ImportMode>('diff')
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)

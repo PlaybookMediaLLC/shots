@@ -170,3 +170,18 @@ export async function createCodeProjectFromCode(
   })
   return { ...project, url: studioUrl(project.id) }
 }
+
+/**
+ * Link an exported code image to a campaign as a `code-visual` asset, so it is
+ * reviewed with the campaign's other visuals. The backend checks the campaign,
+ * the asset and the member's role in this workspace.
+ */
+export async function addCodeVisualToCampaign(
+  context: Parameters<typeof backendSDK>[0],
+  input: { assetId: string; campaignId: string; caption?: string }
+) {
+  return backendSDK(context).linkCampaignAsset(input.campaignId, input.assetId, {
+    caption: input.caption ?? null,
+    kind: 'code-visual',
+  })
+}

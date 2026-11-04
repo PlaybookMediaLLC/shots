@@ -64,3 +64,10 @@ export const codeCaptionInputSchema = z.object({
   document: codeDocumentSchema,
   slide: z.number().int().min(0).max(49),
 })
+
+/** Input of `codeProject.addToCampaign`: an exported image to link to a campaign's visuals. */
+export const codeCampaignLinkInputSchema = z.object({
+  assetId: z.uuid(),
+  campaignId: z.string().cuid(),
+  caption: z.string().trim().max(4_000).optional(),
+})

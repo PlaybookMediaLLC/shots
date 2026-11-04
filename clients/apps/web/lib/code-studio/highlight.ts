@@ -29,6 +29,15 @@ async function getHighlighter(): Promise<HighlighterCore> {
 
 const cache = new Map<string, ThemedToken[][]>()
 const CACHE_LIMIT = 300
+const listeners = new Set<() => void>()
+
+/** Hear about newly highlighted code, for `useSyncExternalStore`. */
+export function subscribeHighlights(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
 
 function cacheKey(code: string, lang: string) {
   return `${lang}\u0000${code}`
@@ -69,6 +78,7 @@ export async function highlightLines(code: string, lang: string): Promise<Themed
   }
   if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value!)
   cache.set(key, lines)
+  for (const listener of listeners) listener()
   return lines
 }
 

@@ -3,6 +3,7 @@ import 'server-only'
 import { TRPCError } from '@trpc/server'
 import type { TenantAccessRequirement } from '@/lib/api/access-requirements'
 import {
+  codeCampaignLinkInputSchema,
   codeCaptionInputSchema,
   codeImportInputSchema,
   codeProjectArchiveInputSchema,
@@ -17,6 +18,7 @@ import {
   archiveCodeProject,
   createCodeProject,
   duplicateCodeProject,
+  addCodeVisualToCampaign,
   getCodeProject,
   importCode,
   listCodeProjects,
@@ -72,6 +74,10 @@ export const codeProjectRouter = router({
   importLink: tenantProcedure(EDIT)
     .input(codeImportInputSchema)
     .mutation(({ ctx, input }) => importCode(ctx.tenant, input.url)),
+  /** Link an exported code image to a campaign's visuals, for review with the rest. */
+  addToCampaign: organizationProcedure('release:create')
+    .input(codeCampaignLinkInputSchema)
+    .mutation(({ ctx, input }) => addCodeVisualToCampaign(ctx.access, input)),
   /** Write a caption for a slide, charged to AI credits. */
   caption: organizationProcedure('artifact:edit')
     .input(codeCaptionInputSchema)

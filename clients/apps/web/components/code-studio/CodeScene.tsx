@@ -29,6 +29,7 @@ import {
   highlightLines,
   paletteVariables,
   plainLines,
+  subscribeHighlights,
 } from '@/lib/code-studio/highlight'
 import {
   CAPTION_HEIGHT,
@@ -50,23 +51,23 @@ const INTER = 'Inter, "Inter Fallback", Arial, Helvetica, sans-serif'
 
 /**
  * Highlighted lines for code: synchronous once highlighted (exports warm the
- * cache first), plain lines until the grammar is ready.
+ * cache first), plain lines until the grammar is ready. The cache is read
+ * through `useSyncExternalStore`, so a compiled component re-renders when it fills.
  */
 export function useHighlighted(code: string, lang: string): ThemedToken[][] {
-  const [, loaded] = React.useReducer((count: number) => count + 1, 0)
-  const hit = cachedLines(code, lang)
+  const lines = React.useSyncExternalStore(
+    subscribeHighlights,
+    () => cachedLines(code, lang),
+    () => null
+  )
   React.useEffect(() => {
     if (cachedLines(code, lang)) return
-    let live = true
-    void highlightLines(code, lang).then(
-      () => live && loaded(),
-      () => undefined
+    void highlightLines(code, lang).catch((error: unknown) =>
+      // The code stays readable in plain text; the warning says why it has no colors.
+      console.warn('Code highlighting failed', error)
     )
-    return () => {
-      live = false
-    }
   }, [code, lang])
-  return hit ?? plainLines(code)
+  return lines ?? plainLines(code)
 }
 
 /** The line-number column's width for a number of lines. */

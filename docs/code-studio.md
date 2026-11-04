@@ -89,6 +89,10 @@ with an optional voice-over. Post this can attach the MP4.
 - Embeds: a share link can carry a frozen copy of one slide. Its embed page
   shows the code as real, selectable text with a Copy button, and embed
   routes may be framed by other sites.
+- Campaigns › Visuals › Code highlights lists the release's pull requests and
+  commits. Each opens Code Studio with the link ready to import (nothing is
+  read until the member imports it), and Export › Add image to campaign
+  links the image as a `code-visual` for review with the other visuals.
 - `shots code file.ts --lines 10-20 [--png out.png] [--open]`
   (`clients/integrations/cli`) and a VS Code extension, "Shots: Send
   selection to Shots" (`clients/integrations/vscode`). Both call the public
@@ -126,7 +130,7 @@ it is saved, posted, embedded or rendered through the API.
 ## Not built yet
 
 - An Automate action that renders a code visual from a release's diff into a
-  campaign, and a Campaigns "Code highlights" panel.
+  campaign.
 - A server-side render queue for long or 4K videos. Headless Chromium usually
   lacks an H.264 encoder, so it needs a worker with FFmpeg and render quotas.
 - Real command execution for terminal recordings. It needs an isolated
