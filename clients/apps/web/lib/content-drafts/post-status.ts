@@ -103,7 +103,8 @@ export function draftPostsState(
 
 /**
  * A draft's posts without the failures a newer post of the same destination
- * replaced: a retry is a new post, so the failure before it is history. The
+ * replaced: a retry is a new post, so the failure before it is history. An
+ * unconfirmed post always stays: it may be live until someone checks. The
  * backend's list counts read the same way.
  */
 export function currentPosts<
@@ -115,7 +116,7 @@ export function currentPosts<
 >(posts: T[]): T[] {
   return posts.filter(
     (post) =>
-      (post.status !== 'FAILED' && post.status !== 'UNKNOWN_DELIVERY') ||
+      post.status !== 'FAILED' ||
       !posts.some(
         (other) =>
           other.channelConnectionId === post.channelConnectionId &&

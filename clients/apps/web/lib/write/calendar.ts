@@ -72,11 +72,10 @@ export function queueDays<T extends { at: string }>(
   postingSlots: { time: string; weekday: number }[],
   zone: string,
   items: T[],
-  now = new Date(),
-  count = 7
+  now = new Date()
 ): { day: string; free: string[]; items: T[]; slots: number }[] {
   const [year, month, date] = wallTime(now, zone).slice(0, 10).split('-').map(Number)
-  return Array.from({ length: count }, (_, offset) => {
+  return Array.from({ length: 7 }, (_, offset) => {
     const day = new Date(Date.UTC(year, month - 1, date + offset)).toISOString().slice(0, 10)
     const held = items.filter((item) => wallTime(new Date(item.at), zone).slice(0, 10) === day)
     return {

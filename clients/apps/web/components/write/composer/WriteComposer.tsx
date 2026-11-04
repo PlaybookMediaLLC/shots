@@ -108,7 +108,6 @@ import {
   ScheduleDialog,
   type ScheduleContext,
 } from './schedule'
-import { optionsSummary } from './video-options'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
@@ -174,8 +173,6 @@ const SAVE_LABELS: Record<SaveState, string> = {
  * Previews, the review and the schedule all use the publication the backend
  * receives.
  */
-
-/** This browser's choice to keep the composer's post options open. */
 
 export function WriteComposer({
   aiEnabled,
@@ -388,11 +385,7 @@ export function WriteComposer({
   const [toolDialog, setToolDialog] = React.useState<ToolDialog | null>(null)
   // Rewrite registers here, so a post's sparkle opens it beside that post.
   const refineAt = React.useRef<((anchor: HTMLElement) => void) | null>(null)
-  const tools = (writing: DraftChannel[]) =>
-    toolMenuItems(
-      setToolDialog,
-      Boolean(server.socialSetId ?? set?.id) && mentionLookups(writing).length > 0
-    )
+
   const renderBlocks = async (): Promise<BlockImages> => {
     if (pendingBlocks.length === 0 || !services.uploadFile) return []
     if (active !== primary || !bodyArea.current) {
@@ -476,16 +469,20 @@ export function WriteComposer({
     },
     onToggle: toggle,
     cancelPosts: async (postIds) => {
-      try {
-        for (const scheduledPostId of postIds)
-          await trpcClient.scheduledPost.cancel.mutate({ scheduledPostId })
-        toast.success('Undone. Nothing from that schedule will publish.')
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'The schedule could not be undone.')
-      } finally {
-        await refreshPosts()
-        router.refresh()
+      // Every post is tried; a refusal (such as a sign-in that is too old) is named.
+      const results = await Promise.allSettled(
+        postIds.map((scheduledPostId) => trpcClient.scheduledPost.cancel.mutate({ scheduledPostId }))
+      )
+      const failed = results.filter((result) => result.status === 'rejected')
+      if (failed.length === 0) toast.success('Undone. Nothing from that schedule will publish.')
+      else {
+        const reason = (failed[0] as PromiseRejectedResult).reason
+        toast.error(
+          `${failed.length} of ${postIds.length} posts are still queued. ${reason instanceof Error ? reason.message : 'Cancel them from the draft.'}`
+        )
       }
+      await refreshPosts().catch(() => undefined)
+      router.refresh()
     },
     requireApproval,
     scheduled: posts.filter((post) => post.status === 'SCHEDULED'),
@@ -526,63 +523,22 @@ export function WriteComposer({
       : undefined,
   }
   const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next))
-  // The palette lists this draft's actions with their shortcuts, as its menus do.
-  React.useEffect(() => {
-    const live = canPublish && server.status !== 'archived'
-    draftCommandsRef.current = [
-      ...(live
-        ? [
-            { label: 'Schedule…', run: () => setDialog('schedule') },
-            {
-              label: 'Add to the next free slot',
-              run: () => setDialog('queue'),
-              shortcut: `${mod}⌥↵`,
-            },
-            { label: 'Publish now…', run: () => setDialog('publish'), shortcut: `${mod}⇧↵` },
-          ]
-        : []),
-      { label: 'Post options', run: () => setPanel('options') },
-      { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
-      ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
-      { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}⌥S` },
-      { label: 'View automatic backups', run: () => setDialog('backups') },
-      ...(canEdit
-        ? [
-            {
-              label: server.pinnedAt ? 'Unpin draft' : 'Pin draft',
-              run: () => void pin(),
-              shortcut: `${mod}⇧P`,
-            },
-          ]
-        : []),
-      { label: 'Focus mode', run: () => setFocus((current) => !current), shortcut: `${mod}⇧F` },
-      {
-        label: 'Compact display',
-        run: () => setCompact((current) => !current),
-        shortcut: `${mod}⇧H`,
-      },
-      ...(canEdit
-        ? [
-            {
-              label: server.status === 'archived' ? 'Restore from archive' : 'Archive draft',
-              run: () => void archive(server.status === 'archived' ? 'draft' : 'archived'),
-            },
-          ]
-        : []),
-    ]
-    return () => {
-      draftCommandsRef.current = []
-    }
-  })
   // Blockers show beside Schedule once there is something to post, not on an empty draft.
   const blockers = items.some((item) => item.publication.serialized.posts.length > 0)
-    ? scheduleBlockers(context)
+    ? scheduleBlockers({
+        approved,
+        canPublish: canPublish && server.status !== 'archived',
+        conflict: conflict !== null,
+        draft: server,
+        items,
+        requireApproval,
+        saveState,
+      })
     : []
   const jumpTo = (blocker: ScheduleBlocker) => {
     if (!blocker.channel) return
     if (channels.includes(blocker.channel)) setTab(blocker.channel)
-    const options = versionFor(document.versions, blocker.channel).options ?? {}
-    if (optionsSummary(blocker.channel, options).needsInput) setPanel('options')
+    if (blocker.options) setPanel('options')
     else editor.current?.tf.focus()
   }
   React.useEffect(() => {
@@ -722,6 +678,54 @@ export function WriteComposer({
       toast.error(error instanceof Error ? error.message : 'The draft did not change.')
     }
   }
+  // The palette lists this draft's actions with their shortcuts, as its menus do.
+  React.useEffect(() => {
+    const live = canPublish && server.status !== 'archived'
+    draftCommandsRef.current = [
+      ...(live
+        ? [
+            { label: 'Schedule…', run: () => setDialog('schedule') },
+            {
+              label: 'Add to the next free slot',
+              run: () => setDialog('queue'),
+              shortcut: `${mod}⌥↵`,
+            },
+            { label: 'Publish now…', run: () => setDialog('publish'), shortcut: `${mod}⇧↵` },
+          ]
+        : []),
+      { label: 'Post options', run: () => setPanel('options') },
+      { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
+      ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
+      { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}⌥S` },
+      { label: 'View automatic backups', run: () => setDialog('backups') },
+      ...(canEdit
+        ? [
+            {
+              label: server.pinnedAt ? 'Unpin draft' : 'Pin draft',
+              run: () => void pin(),
+              shortcut: `${mod}⇧P`,
+            },
+          ]
+        : []),
+      { label: 'Focus mode', run: () => setFocus((current) => !current), shortcut: `${mod}⇧F` },
+      {
+        label: 'Compact display',
+        run: () => setCompact((current) => !current),
+        shortcut: `${mod}⇧H`,
+      },
+      ...(canEdit
+        ? [
+            {
+              label: server.status === 'archived' ? 'Restore from archive' : 'Archive draft',
+              run: () => void archive(server.status === 'archived' ? 'draft' : 'archived'),
+            },
+          ]
+        : []),
+    ]
+    return () => {
+      draftCommandsRef.current = []
+    }
+  })
   React.useEffect(() => {
     archiveRef.current = archive
     return () => {
@@ -855,6 +859,14 @@ export function WriteComposer({
   }
   // The destinations' state that needs attention first; a plan only when nothing is queued.
   const status = draftStatus(server, draftPostsState(currentPosts(posts)))
+  // The toolbar menus' composer tools: the main editor writes for every platform, a version for one.
+  const canMention = (writing: DraftChannel[]) =>
+    Boolean(server.socialSetId ?? set?.id) && mentionLookups(writing).length > 0
+  const mainTools = toolMenuItems(
+    setToolDialog,
+    canMention(items.map((item) => item.account.channel))
+  )
+  const versionTools = toolMenuItems(setToolDialog, canMention([active]))
   // Thread splitting for the edited platform; only the instance told about a paste splits it.
   const threadTools =
     canEdit &&
@@ -1378,6 +1390,7 @@ export function WriteComposer({
             options={
               accounts.length > 0 ? (
                 <OptionsChip
+                  blocked={activePublication.optionProblems.length > 0}
                   channel={active}
                   onClick={() => togglePanel('options')}
                   open={panel === 'options'}
@@ -1486,8 +1499,8 @@ export function WriteComposer({
                     setId={server.socialSetId ?? set?.id ?? null}
                   />
                 }
-                toolbarMediaItems={tools(items.map((item) => item.account.channel)).media}
-                toolbarMoreItems={tools(items.map((item) => item.account.channel)).more}
+                toolbarMediaItems={mainTools.media}
+                toolbarMoreItems={mainTools.more}
               />
             ) : versionOfTab.mode === 'manual' ? (
               <>
@@ -1534,8 +1547,8 @@ export function WriteComposer({
                       setId={server.socialSetId ?? set?.id ?? null}
                     />
                   }
-                  toolbarMediaItems={tools([active]).media}
-                  toolbarMoreItems={tools([active]).more}
+                  toolbarMediaItems={versionTools.media}
+                  toolbarMoreItems={versionTools.more}
                 />
               </>
             ) : (
@@ -1859,7 +1872,6 @@ export function WriteComposer({
   )
 }
 
-/** Panel titles. */
 /** What blocks scheduling, beside Schedule; each item opens where it is fixed. */
 function Blockers({
   blockers,
@@ -1906,6 +1918,7 @@ function Blockers({
   )
 }
 
+/** Panel titles. */
 const PANEL_TITLES: Record<Panel, string> = {
   assistant: 'Writing assistant',
   comments: 'Comments',
@@ -2000,7 +2013,6 @@ function TargetBanner({ draft }: { draft: DraftWire }) {
   )
 }
 
-/** The bottom toolbar's Write tools: mentions looked up on the platform, and emoji. */
 /** A tool the toolbar's Media or More menu opened. */
 type ToolDialog = 'alt' | 'gif' | 'link' | 'manage' | 'mention'
 
@@ -2028,6 +2040,7 @@ function toolMenuItems(
   }
 }
 
+/** The bottom toolbar's Write tools: mentions looked up on the platform, and emoji. */
 function ToolbarExtras({
   onDescriptionSaved,
   aiEnabled,

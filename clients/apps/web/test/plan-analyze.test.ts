@@ -557,14 +557,22 @@ test('a draft reads as the state that needs attention first, never hiding a fail
 test('every surface reads a draft with the same status words, from its current posts', () => {
   const now = Date.parse('2026-11-04T12:00:00Z')
   const later = '2026-11-05T12:00:00Z'
-  const post = (id: string, status: 'FAILED' | 'PUBLISHED' | 'CANCELLED', createdAt: string) => ({
+  const post = (
+    id: string,
+    status: 'FAILED' | 'PUBLISHED' | 'CANCELLED' | 'UNKNOWN_DELIVERY' | 'SCHEDULED',
+    createdAt: string
+  ) => ({
     channelConnectionId: id,
     createdAt,
     scheduledFor: later,
     status,
   })
-  // The demo draft: TikTok failed twice; both are its current state.
-  const demo = [post('tiktok', 'FAILED', '2026-11-04T04:25:00Z')]
+  // The demo draft: TikTok failed, then its retry failed; the retry is its current state.
+  const demo = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'FAILED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(currentPosts(demo).length, 1)
   const header = draftStatus(
     { plannedFor: null, status: 'scheduled' },
     draftPostsState(currentPosts(demo), now)
@@ -593,6 +601,12 @@ test('every surface reads a draft with the same status words, from its current p
     post('tiktok', 'CANCELLED', '2026-11-04T04:40:00Z'),
   ]
   assert.equal(draftPostsState(currentPosts(cancelled), now)?.state, 'Failed')
+  // An unconfirmed post may be live: a newer post never hides it.
+  const unconfirmed = [
+    post('tiktok', 'UNKNOWN_DELIVERY', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'SCHEDULED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(unconfirmed), now)?.state, 'Needs check')
   assert.equal(
     listedAttention({ attentionPosts: 2, checkPosts: 1, publishedPosts: 1, queuedPosts: 0 })?.state,
     'Needs check'

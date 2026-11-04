@@ -62,8 +62,9 @@ test(
       if (!header || !body) return { controls: -1, top: -1 }
       const top = header.getBoundingClientRect().bottom
       const bottom = body.getBoundingClientRect().top
+      const composer = document.querySelector('[data-testid="write-composer"]')
       const controls = [
-        ...document.querySelectorAll(
+        ...(composer ?? document).querySelectorAll(
           'input:not([type=hidden]),select,textarea,[role=checkbox],[role=combobox]'
         ),
       ].filter((element) => {
@@ -145,6 +146,8 @@ test(
     await openNewDraft(page)
     await page.keyboard.type('x'.repeat(290))
     await expectSaved(page)
+    // From another tab, a blocker opens the platform it belongs to.
+    await page.getByTestId('platform-tab-bluesky').click()
     await page.getByTestId('blockers-button').click()
     const blockers = page.getByTestId('blockers')
     await expect(blockers).toContainText('X: 290 of 280 characters')
@@ -165,9 +168,16 @@ test(
     await page.screenshot({ path: '.context/shots/publish-queue-1440.png' })
     await slot.getByRole('button', { name: '+ New' }).click()
     await page.waitForURL(/day=\d{4}-\d{2}-\d{2}&time=\d{2}:\d{2}/)
-    const time = new URL(page.url()).searchParams.get('time') ?? ''
+    const slotUrl = new URL(page.url())
+    const day = slotUrl.searchParams.get('day') ?? ''
+    const time = slotUrl.searchParams.get('time') ?? ''
     await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
     await page.getByTestId('schedule-button').click()
+    // The dialog opens on that slot's day and time, not on its own defaults.
+    const [year, month, date] = day.split('-').map(Number)
+    await expect(page.getByLabel('Day', { exact: true })).toHaveText(
+      new Date(year, month - 1, date).toLocaleDateString('en-US', { dateStyle: 'medium' })
+    )
     await expect(page.getByLabel('Time', { exact: true })).toHaveValue(time)
   }
 )

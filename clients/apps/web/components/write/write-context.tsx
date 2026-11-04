@@ -22,7 +22,6 @@ export type WriteLibrary = WriteData
 /** A brand as the browser holds it. */
 export type WriteSet = WriteData['sets'][number]
 
-/** A draft row in the library. */
 /** One action of the open draft, as the command palette lists it. */
 export type DraftCommand = {
   label: string
@@ -31,6 +30,7 @@ export type DraftCommand = {
   shortcut?: string
 }
 
+/** A draft row in the library. */
 export type LibraryDraft = WriteData['library'][number]
 
 /** A set's tag in the library. */

@@ -6,7 +6,8 @@ import { cache } from 'react'
 import type { ListedWorkspace, Workspace } from 'screenshot-studio-backend-sdk'
 import { backendSDK } from '@/lib/backend/sdk'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
-import { getRequestId } from './access'
+import { getRequestId, type OrganizationAccess } from './access'
+import { normalizeOrganizationRole } from './permissions'
 import { auth } from './server'
 
 type SignedInSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>
@@ -139,4 +140,23 @@ export async function requirePaidPageAccess(
   if (!(feature === 'content:drafts' ? access.hasBasicScheduling : access.hasPaidPlan))
     redirect(upgradePath(locale, returnTo))
   return access
+}
+
+/** A page's reads as the signed-in session, scoped to its active workspace. */
+export function sessionTenant(
+  access: Awaited<ReturnType<typeof requirePaidPageAccess>>,
+  organizationId: string,
+  requestHeaders: Headers
+): OrganizationAccess {
+  return {
+    organizationId,
+    principal: {
+      display: access.session.user.email,
+      kind: 'session',
+      sessionId: access.session.session.id,
+      userId: access.session.user.id,
+    },
+    requestId: getRequestId(requestHeaders),
+    role: normalizeOrganizationRole(access.role),
+  }
 }

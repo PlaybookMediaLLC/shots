@@ -2,9 +2,7 @@ import 'server-only'
 
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
-import { getRequestId, type OrganizationAccess } from '@/lib/auth/access'
-import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { normalizeOrganizationRole } from '@/lib/auth/permissions'
+import { requirePaidPageAccess, sessionTenant } from '@/lib/auth/page-access'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 /**
@@ -19,24 +17,5 @@ export async function requireDraftsPageAccess(locale: string, returnTo: string) 
     ...access,
     organization: access.organization,
     tenant: sessionTenant(access, access.organization.id, requestHeaders),
-  }
-}
-
-/** A page's reads as the signed-in session, scoped to its active workspace. */
-export function sessionTenant(
-  access: Awaited<ReturnType<typeof requirePaidPageAccess>>,
-  organizationId: string,
-  requestHeaders: Headers
-): OrganizationAccess {
-  return {
-    organizationId,
-    principal: {
-      display: access.session.user.email,
-      kind: 'session',
-      sessionId: access.session.session.id,
-      userId: access.session.user.id,
-    },
-    requestId: getRequestId(requestHeaders),
-    role: normalizeOrganizationRole(access.role),
   }
 }

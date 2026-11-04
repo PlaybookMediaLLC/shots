@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import {
   Dialog,
   DialogContent,
@@ -149,11 +150,14 @@ export function PlatformTabs({
  * comments on". It opens them beside the draft, so no form sits above the text.
  */
 export function OptionsChip({
+  blocked,
   channel,
   onClick,
   open,
   options,
 }: {
+  /** Something in these options blocks scheduling. */
+  blocked: boolean
   channel: DraftChannel
   onClick: () => void
   open: boolean
@@ -161,13 +165,13 @@ export function OptionsChip({
 }) {
   const summary = optionsSummary(channel, options)
   const label = CHANNEL_META[channel].label
-  const text = summary.text ? `${label}: ${summary.text}` : `${label} options`
+  const text = summary ? `${label}: ${summary}` : `${label} options`
   return (
     <Button
       aria-expanded={open}
       className={cn(
         'h-8 gap-1.5 text-ui',
-        summary.needsInput && 'text-amber-700 dark:text-amber-300'
+        blocked && 'text-amber-700 dark:text-amber-300'
       )}
       data-testid="options-chip"
       onClick={onClick}
@@ -175,9 +179,7 @@ export function OptionsChip({
       title="Post options for this platform"
       variant="outline"
     >
-      {summary.needsInput ? (
-        <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-      ) : null}
+      {blocked ? <span aria-hidden className="size-1.5 rounded-full bg-amber-500" /> : null}
       {text}
     </Button>
   )
@@ -399,12 +401,12 @@ export function ManagePlatformsDialog({
           ) : accounts.length === 0 ? <p className="text-sm text-muted-foreground">Ask an admin or publisher to connect an account.</p> : null}
           <DialogFooter className="items-center sm:justify-between">
             {defaultsHref ? (
-              <a
+              <SidebarLink
                 className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
                 href={defaultsHref}
               >
                 Change default platforms
-              </a>
+              </SidebarLink>
             ) : (
               <span />
             )}

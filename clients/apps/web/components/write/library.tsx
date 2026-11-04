@@ -1252,9 +1252,19 @@ function QueueList() {
   const { beforeLeaveRef, canEdit, data } = useWrite()
   const set = data.activeSet
   const zone = set?.timeZone ?? 'UTC'
-  const days = queueDays(set?.postingSlots ?? [], zone, data.queue)
+  const hydrated = useHydrated()
+  // Slots depend on the clock, so they are read after hydration, as LocalTime does.
+  const days = React.useMemo(
+    () => (hydrated ? queueDays(set?.postingSlots ?? [], zone, data.queue) : []),
+    [data.queue, hydrated, set?.postingSlots, zone]
+  )
   const shown = new Set(days.flatMap((day) => day.items.map((item) => item.id)))
-  const later = data.queue.filter((item) => !shown.has(item.id))
+  // Overdue and unconfirmed posts from before today lead: they need a look first.
+  const first = days[0]?.day
+  const earlier = first
+    ? data.queue.filter((item) => !shown.has(item.id) && wallTime(new Date(item.at), zone) < first)
+    : []
+  const later = data.queue.filter((item) => !shown.has(item.id) && !earlier.includes(item))
   const free = days.reduce((total, day) => total + day.free.length, 0)
   const total = days.reduce((sum, day) => sum + day.slots, 0)
   const newAt = (day: string, time: string) =>
@@ -1267,6 +1277,15 @@ function QueueList() {
       beforeLeaveRef.current ?? undefined
     ).catch((error: unknown) =>
       toast.error(error instanceof Error ? error.message : 'The draft could not be created.')
+    )
+  // The server and the first client render agree: the plain list, soonest first.
+  if (!hydrated)
+    return (
+      <ul data-testid="queue">
+        {data.queue.map((item) => (
+          <QueueItem item={item} key={item.id} />
+        ))}
+      </ul>
     )
   return (
     <div data-testid="queue">
@@ -1287,6 +1306,18 @@ function QueueList() {
           </Link>
         ) : null}
       </div>
+      {earlier.length > 0 ? (
+        <section aria-label="Needs a look">
+          <h3 className="px-4 pt-3 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+            Needs a look
+          </h3>
+          <ul>
+            {earlier.map((item) => (
+              <QueueItem item={item} key={item.id} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {days.map(({ day, free: open, items }) =>
         items.length === 0 && open.length === 0 ? null : (
           <section aria-label={day} key={day}>

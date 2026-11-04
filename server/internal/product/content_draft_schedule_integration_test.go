@@ -285,6 +285,41 @@ func TestContentDraftScheduling(t *testing.T) {
 		}
 	})
 
+	t.Run("the list counts a replaced failure as history and an unconfirmed post always", func(t *testing.T) {
+		counted, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{PlainText: "Counted", Title: "Counted"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		post := func(channel, status, age string) {
+			t.Helper()
+			exec(`INSERT INTO scheduled_post (id,"organizationId","channelConnectionId","contentDraftId","scheduledFor",status,caption,"idempotencyKey","createdAt","updatedAt")
+				VALUES ($1,$2,$3,$4,now()+interval '1 day',$5::"ScheduledPostStatus",'x',$1,now()-$6::interval,now())`,
+				cuid.New(), org, channel, counted.ID, status, age)
+		}
+		// X: a failure a retry published. LinkedIn: an unconfirmed post with a newer one.
+		// Instagram: a failure whose retry was cancelled, so it needs attention again.
+		post(xChannel, "FAILED", "2 hours")
+		post(xChannel, "PUBLISHED", "1 hour")
+		post(linkedinChannel, "UNKNOWN_DELIVERY", "2 hours")
+		post(linkedinChannel, "SCHEDULED", "1 hour")
+		post(instagramChannel, "FAILED", "2 hours")
+		post(instagramChannel, "CANCELLED", "1 hour")
+		page, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{Limit: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page.Items {
+			if item.ID != counted.ID {
+				continue
+			}
+			if item.AttentionPosts != 2 || item.CheckPosts != 1 || item.PublishedPosts != 1 || item.QueuedPosts != 1 {
+				t.Fatalf("attention=%d check=%d published=%d queued=%d", item.AttentionPosts, item.CheckPosts, item.PublishedPosts, item.QueuedPosts)
+			}
+			return
+		}
+		t.Fatalf("draft %s not listed", counted.ID)
+	})
+
 	t.Run("a draft with posts cannot be deleted", func(t *testing.T) {
 		if err := repo.DeleteContentDraft(ctx, owner, draft.ID); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("delete err=%v", err)

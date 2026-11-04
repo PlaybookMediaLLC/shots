@@ -112,6 +112,21 @@ const (
 	FailureUnknownDelivery = "UNKNOWN_DELIVERY"
 	// A person checked an unknown delivery and found it was not published.
 	FailureNotLive = "NOT_LIVE"
+	// The publisher refused before the post was published, for a named cause.
+	// The account must be reconnected.
+	FailureAccountReconnect = "ACCOUNT_RECONNECT"
+	// The platform did not return the account's posting permissions.
+	FailureProviderPermissions = "PROVIDER_PERMISSIONS"
+	// The account cannot post with the chosen post options.
+	FailurePostOptions = "POST_OPTIONS"
+	// The video is longer than the account may post.
+	FailureVideoTooLong = "VIDEO_TOO_LONG"
+	// The platform does not take this media.
+	FailureMediaUnsupported = "MEDIA_UNSUPPORTED"
+	// Shots' publishing service is not configured or reachable.
+	FailurePublisherUnavailable = "PUBLISHER_UNAVAILABLE"
+	// Shots failed before the handoff, with no provider status.
+	FailurePublisherError = "PUBLISHER_ERROR"
 )
 
 // StalledPost is a claimed post that has made no progress for a while.

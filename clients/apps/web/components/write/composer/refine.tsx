@@ -110,10 +110,13 @@ export function RefineButton({
   // Rewrite opens where it was asked for: at a post's sparkle, else at this button.
   const trigger = React.useRef<HTMLButtonElement>(null)
   const anchor = React.useRef<HTMLElement | null>(null)
+  const element = () => (anchor.current?.isConnected ? anchor.current : trigger.current)
+  // contextElement lets the popover follow its post as the draft scrolls.
   const virtual = React.useRef({
-    getBoundingClientRect: () =>
-      (anchor.current?.isConnected ? anchor.current : trigger.current)?.getBoundingClientRect() ??
-      new DOMRect(),
+    getBoundingClientRect: () => element()?.getBoundingClientRect() ?? new DOMRect(),
+    get contextElement() {
+      return element() ?? undefined
+    },
   })
   const openMenu = () => {
     const current = editor.current

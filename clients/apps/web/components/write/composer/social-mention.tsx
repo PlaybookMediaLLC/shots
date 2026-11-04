@@ -256,7 +256,16 @@ export function MentionPicker({
       <PopoverAnchor asChild>
         <span aria-hidden className="self-stretch" />
       </PopoverAnchor>
-      <PopoverContent className="grid w-80 gap-2 p-3" data-testid="mention-picker" side="top">
+      <PopoverContent
+        className="grid w-80 gap-2 p-3"
+        data-testid="mention-picker"
+        // It has no trigger to return to: closing hands focus back to the post.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          editor.current?.tf.focus()
+        }}
+        side="top"
+      >
         <div className="flex gap-1">
           {lookups.map((item) => (
             <Button

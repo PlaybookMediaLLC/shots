@@ -32,7 +32,7 @@ import {
   WriteProvider,
 } from './write-context'
 
-// The palette loads on first use: it is not part of reading a draft.
+// The palette is not part of reading a draft: it loads after the page, ahead of first use.
 const CommandPalette = dynamic(() => import('./CommandPalette'), { ssr: false })
 
 /** The shortcuts the reference lists, with where each applies. */

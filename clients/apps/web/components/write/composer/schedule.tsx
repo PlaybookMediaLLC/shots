@@ -92,14 +92,22 @@ export type ScheduleContext = {
   cancelPosts?: (postIds: string[]) => Promise<void>
 }
 
-/** One thing that blocks scheduling, and the platform it belongs to, if any. */
-export type ScheduleBlocker = { channel?: DraftChannel; text: string }
+/**
+ * One thing that blocks scheduling, the platform it belongs to, if any, and
+ * whether it is fixed in that platform's post options.
+ */
+export type ScheduleBlocker = { channel?: DraftChannel; options?: boolean; text: string }
 
 /**
  * What blocks scheduling every destination, checked live as the draft
  * changes: the header shows these beside Schedule, and the dialogs list them.
  */
-export function scheduleBlockers(context: ScheduleContext): ScheduleBlocker[] {
+export function scheduleBlockers(
+  context: Pick<
+    ScheduleContext,
+    'approved' | 'canPublish' | 'conflict' | 'draft' | 'items' | 'requireApproval' | 'saveState'
+  >
+): ScheduleBlocker[] {
   const problems: ScheduleBlocker[] = []
   if (context.conflict)
     problems.push({
@@ -119,7 +127,11 @@ export function scheduleBlockers(context: ScheduleContext): ScheduleBlocker[] {
       problems.push({ channel, text: `${CHANNEL_META[channel].label}: reconnect the account first.` })
     }
     for (const problem of item.publication.problems)
-      problems.push({ channel, text: `${CHANNEL_META[channel].label}: ${problem}` })
+      problems.push({
+        channel,
+        options: item.publication.optionProblems.includes(problem),
+        text: `${CHANNEL_META[channel].label}: ${problem}`,
+      })
   }
   if (context.requireApproval && !context.approved) {
     problems.push({
@@ -275,7 +287,9 @@ export function ScheduleDialog({
       })
       context.versionRef.current = result.draft.version
       context.onDone({ ...result, newDraft: continueWriting })
-      const cancel = context.cancelPosts
+      // Undo cancels what this schedule queued. A reschedule replaced earlier posts,
+      // which Undo cannot bring back, so it offers none.
+      const cancel = rescheduling ? undefined : context.cancelPosts
       toast.success(
         result.created
           ? committedMessage(result.posts, zone, queue)
@@ -358,8 +372,15 @@ export function ScheduleDialog({
         className="max-h-[92dvh] max-w-[calc(100%-1rem)] gap-6 overflow-y-auto p-5 sm:max-w-lg sm:p-6"
         data-testid="schedule-dialog"
         onKeyDown={(event) => {
-          // ⌘↵ confirms, so the next free slot is a keyboard-only path.
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && confirmable) {
+          // ⌘↵ alone confirms, so the next free slot is a keyboard-only path. ⌘⇧↵ and
+          // ⌘⌥↵ are the composer's publish-review and queue shortcuts: never a schedule.
+          if (
+            event.key === 'Enter' &&
+            (event.metaKey || event.ctrlKey) &&
+            !event.shiftKey &&
+            !event.altKey &&
+            confirmable
+          ) {
             event.preventDefault()
             void schedule()
           }

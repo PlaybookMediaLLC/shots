@@ -247,7 +247,6 @@ export async function expectSaved(page: Page): Promise<void> {
 /** How the composer names each platform. */
 const PLATFORM_LABELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X' }
 
-/** Open a new draft from the Write library; returns its id. */
 /**
  * Run a tool from the draft toolbar's Media menu (upload, Library, link,
  * GIF) or its More menu (inserts, mention, alt text, media manager,
@@ -258,6 +257,7 @@ export async function toolbarTool(page: Page, menu: 'Media' | 'More tools', tool
   await page.getByRole('menuitem', { name: tool, exact: true }).click()
 }
 
+/** Open a new draft from the Write library; returns its id. */
 export async function openNewDraft(page: Page): Promise<string> {
   await page.goto('/write')
   await page.getByTestId('new-draft').first().click()

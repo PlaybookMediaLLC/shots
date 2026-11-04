@@ -901,7 +901,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	}
 	byDraft := map[string]*summary{}
 	// A failure needs attention only while it is its destination's newest
-	// post: a retry is a new post, so the failure it replaced is history.
+	// post: a retry is a new post, so the failure it replaced is history. An
+	// unconfirmed post always counts: it may be live until someone checks.
 	seen := map[[2]string]bool{}
 	for _, post := range posts {
 		destination := [2]string{*post.ContentDraftID, post.ChannelConnectionID}
@@ -922,10 +923,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 				item.next = &at
 			}
 		case scheduledpost.StatusUNKNOWN_DELIVERY:
-			if !replaced {
-				item.attention++
-				item.check++
-			}
+			item.attention++
+			item.check++
 		default:
 			if !replaced {
 				item.attention++

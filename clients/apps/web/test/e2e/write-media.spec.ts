@@ -543,6 +543,9 @@ test(
     await expectSaved(page)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const panel = page.getByTestId('preview-panel')
+    // The preview starts on a phone; these baselines are the desktop column.
+    await panel.getByRole('combobox', { name: 'Preview device' }).click()
+    await page.getByRole('option', { name: 'Desktop', exact: true }).click()
     await expect(panel.getByRole('button', { name: 'Show more', exact: true })).toBeVisible()
     await expect(panel).toHaveScreenshot('x-desktop-collapsed.png', {
       animations: 'disabled',

@@ -145,7 +145,7 @@ func failureCodeFor(ctx context.Context, job PreparedPublication, err error) str
 	providerErr := &socialapi.Error{}
 	if !errors.As(err, &providerErr) {
 		slog.ErrorContext(ctx, "publication failed without a provider status", "post", job.PostID, "platform", job.Platform, "error", err)
-		return "PUBLISHER_ERROR"
+		return publishing.FailurePublisherError
 	}
 	if providerErr.Code != "" && !providerErr.UnknownDelivery {
 		return providerErr.Code
@@ -315,9 +315,7 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 		return PublishResult{Outcome: OutcomePending, ProviderID: providerID}, nil
 	}
 	providerErr := &socialapi.Error{}
-	if !errors.As(err, &providerErr) {
-		return PublishResult{FailureCode: failureCodeFor(ctx, input.Job, err), Outcome: OutcomeFailed}, nil
-	}
+	errors.As(err, &providerErr)
 	failureCode := failureCodeFor(ctx, input.Job, err)
 	if providerErr.UnknownDelivery {
 		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown, ProviderID: providerID, Progress: progress}, nil

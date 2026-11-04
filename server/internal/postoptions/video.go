@@ -75,13 +75,18 @@ type TikTokCreator struct {
 	StitchDisabled     bool     `json:"stitchDisabled"`
 }
 
-// ErrVideoTooLong is Check's refusal of a video outside the account's allowance.
-var ErrVideoTooLong = errors.New("video exceeds the TikTok account duration allowance or has no verified duration")
+// Check's refusals that need their own fix: a video outside the account's
+// allowance, and creator permissions that are missing or do not cover the
+// chosen privacy.
+var (
+	ErrVideoTooLong       = errors.New("video exceeds the TikTok account duration allowance or has no verified duration")
+	ErrCreatorPermissions = errors.New("TikTok publishing permissions are unavailable; refresh the account before scheduling")
+)
 
 // Check refuses unavailable account controls and media outside the creator's allowance.
 func (c *TikTokCreator) Check(o *TikTokOptions, durationMs int) error {
 	if c == nil || o == nil || c.MaxDurationSeconds <= 0 || !slices.Contains(c.PrivacyLevels, o.Privacy) {
-		return fmt.Errorf("TikTok publishing permissions are unavailable; refresh the account before scheduling")
+		return ErrCreatorPermissions
 	}
 	if durationMs <= 0 || durationMs > c.MaxDurationSeconds*1000 {
 		return ErrVideoTooLong

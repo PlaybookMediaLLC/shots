@@ -15,7 +15,7 @@ import type { AccountStanding } from '@/lib/write/capabilities'
 import type { VersionOptions } from '@/lib/write/document'
 
 /** TikTok's privacy levels as a person reads them. */
-export const TIKTOK_PRIVACY_LABELS: Record<string, string> = {
+const TIKTOK_PRIVACY_LABELS: Record<string, string> = {
   FOLLOWER_OF_CREATOR: 'Followers',
   MUTUAL_FOLLOW_FRIENDS: 'Friends',
   PUBLIC_TO_EVERYONE: 'Everyone',
@@ -29,31 +29,28 @@ const YOUTUBE_PRIVACY_LABELS: Record<string, string> = {
 }
 
 /**
- * A platform's options in a few words for its chip, and whether a choice the
- * platform requires is still missing. TikTok asks for privacy and consent on
- * every post, so they are never filled in for the writer.
+ * A platform's options in a few words for its chip. TikTok asks for privacy
+ * and consent on every post, so they are never filled in for the writer.
+ * Whether they block scheduling is the publication's `optionProblems`.
  */
-export function optionsSummary(
-  channel: string,
-  options: VersionOptions
-): { text: string; needsInput: boolean } {
+export function optionsSummary(channel: string, options: VersionOptions): string {
   if (channel === 'tiktok') {
     const value = options.tiktok
-    if (!value?.privacy) return { needsInput: true, text: 'Choose privacy' }
+    if (!value?.privacy) return 'Choose privacy'
     const parts = [
       TIKTOK_PRIVACY_LABELS[value.privacy] ?? value.privacy,
       value.allowComments ? 'comments on' : 'comments off',
     ]
     if (!value.consent) parts.push('consent needed')
-    return { needsInput: !value.consent, text: parts.join(' · ') }
+    return parts.join(' · ')
   }
   if (channel === 'youtube') {
     const value = options.youtube
     if (!value?.privacy || !value.title.trim() || value.madeForKids === undefined)
-      return { needsInput: true, text: 'Title, privacy and audience needed' }
-    return { needsInput: false, text: YOUTUBE_PRIVACY_LABELS[value.privacy] ?? value.privacy }
+      return 'Title, privacy and audience needed'
+    return YOUTUBE_PRIVACY_LABELS[value.privacy] ?? value.privacy
   }
-  return { needsInput: false, text: '' }
+  return ''
 }
 
 /** Explicit metadata travels with the reviewed platform version. */

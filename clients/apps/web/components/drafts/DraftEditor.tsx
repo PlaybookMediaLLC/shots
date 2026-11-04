@@ -393,7 +393,12 @@ function MoreMenu({
             <MoreHorizontalIcon aria-hidden className="size-4" />
           </ToolbarButton>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top">
+        {/* Focus stays where the chosen tool puts it: the editor after an insert, a picker it opens. */}
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+        >
           {children}
           <DropdownMenuSeparator />
           {files.map((file) => (

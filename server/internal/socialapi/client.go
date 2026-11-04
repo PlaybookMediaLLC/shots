@@ -187,7 +187,8 @@ func NewError(status int, unknownDelivery bool, message string) *Error {
 	return &Error{Status: status, UnknownDelivery: unknownDelivery, message: message}
 }
 
-// NewCodedError is a refusal with a named cause: nothing reached the provider.
+// NewCodedError is a definite refusal with a named cause: the post was not
+// published, so the receipt keeps the cause instead of only the status.
 func NewCodedError(status int, code, message string) *Error {
 	return &Error{Status: status, Code: code, message: message}
 }
@@ -405,11 +406,11 @@ func (c *Client) Publish(ctx context.Context, input PublishInput) (string, error
 		}
 	}
 	if !publishing.IsSecretReference(input.SecretReference) {
-		return "", &Error{Code: "PUBLISHER_UNAVAILABLE", message: "invalid social API credential reference"}
+		return "", &Error{Code: publishing.FailurePublisherUnavailable, message: "invalid social API credential reference"}
 	}
 	token, ok := os.LookupEnv(input.SecretReference)
 	if !ok || token == "" {
-		return "", &Error{Code: "PUBLISHER_UNAVAILABLE", message: "Social API credentials are unavailable"}
+		return "", &Error{Code: publishing.FailurePublisherUnavailable, message: "Social API credentials are unavailable"}
 	}
 	// A content draft post without an image publishes as text (RFC 013).
 	images, err := c.uploadAll(ctx, token, input.OrganizationID, input.Media())
@@ -512,11 +513,11 @@ func (c *Client) UploadAsset(ctx context.Context, input PublishInput) (string, e
 
 func (c *Client) Status(ctx context.Context, input StatusInput) (StatusResult, error) {
 	if !publishing.IsSecretReference(input.SecretReference) {
-		return StatusResult{}, &Error{Code: "PUBLISHER_UNAVAILABLE", message: "invalid social API credential reference"}
+		return StatusResult{}, &Error{Code: publishing.FailurePublisherUnavailable, message: "invalid social API credential reference"}
 	}
 	token, ok := os.LookupEnv(input.SecretReference)
 	if !ok || token == "" {
-		return StatusResult{}, &Error{Code: "PUBLISHER_UNAVAILABLE", message: "Social API credentials are unavailable"}
+		return StatusResult{}, &Error{Code: publishing.FailurePublisherUnavailable, message: "Social API credentials are unavailable"}
 	}
 	now := time.Now().UTC()
 	query := url.Values{

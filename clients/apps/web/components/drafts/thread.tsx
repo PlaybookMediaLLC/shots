@@ -108,11 +108,15 @@ export function deletePost(editor: PlateEditor, number: number): void {
   })
 }
 
-/** Put the caret at the end of post `number`, to insert into it there. */
-export function selectPostEnd(editor: PlateEditor, number: number): void {
+/**
+ * Put the caret at the end of post `number`, to insert into it there. A tool
+ * that opens its own popover passes `focus: false`: refocusing the editor
+ * would close that popover.
+ */
+export function selectPostEnd(editor: PlateEditor, number: number, focus = true): void {
   const [start, end] = postRanges(editor.children)[number - 1]
   if (end - 1 > start) editor.tf.select(editor.api.end([end - 1]))
-  editor.tf.focus()
+  if (focus) editor.tf.focus()
 }
 
 /** A post's settings, set on the break that starts it. */
@@ -373,7 +377,7 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
               aria-label={`Rewrite post ${number}`}
               className={button}
               onClick={(event) => {
-                selectPostEnd(editor, number)
+                selectPostEnd(editor, number, false)
                 tools.refine?.(event.currentTarget)
               }}
               title="Rewrite this post (⌘⇧E)"
