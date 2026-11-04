@@ -645,10 +645,8 @@ func buildSourceInfoBody(post integrations.PostDetails, s *TikTokDTO, videoSize 
 		}
 		return map[string]any{"post_mode": mode, "media_type": "PHOTO", "source_info": source}
 	}
-	// Server-hosted media must be pulled from a TikTok-verified domain or prefix.
-	if source, err := url.Parse(mediaPath(post)); err == nil && (source.Scheme == "https" || source.Scheme == "http") {
-		return map[string]any{"source_info": map[string]any{"source": "PULL_FROM_URL", "video_url": mediaPath(post)}}
-	}
+	// Videos are streamed from the signed URL: TikTok can pull only from a
+	// verified domain, and a presigned R2 URL lives on the R2 API host.
 	size, count := ChunkPlan(videoSize)
 	return map[string]any{"source_info": map[string]any{
 		"source":            "FILE_UPLOAD",
