@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
   SheetContent,
@@ -314,9 +315,10 @@ export function WriteComposer({
             : null
   )
   const [focus, setFocus] = React.useState(false)
+  // The preview starts on a phone, where most posts are read.
   const [previewSelection, setPreviewSelection] = React.useState<PreviewSelection>({
     channel: null,
-    device: 'desktop',
+    device: 'iPhone 16',
   })
   const focusRoot = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
@@ -686,12 +688,15 @@ export function WriteComposer({
           className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-ui-lg font-medium text-foreground ring-4 ring-card sm:flex"
           data-post-avatar
         >
-          {account?.avatarUrl ? (
-            // biome-ignore lint/performance/noImgElement: a provider avatar URL
-            <img alt="" className="size-full object-cover" src={account.avatarUrl} />
-          ) : (
-            (account?.displayName ?? set?.name ?? 'W').slice(0, 1).toUpperCase()
-          )}
+          {/* A provider avatar that fails to load falls back to the account's initial. */}
+          <Avatar className="size-full">
+            {account?.avatarUrl ? (
+              <AvatarImage alt="" className="object-cover" src={account.avatarUrl} />
+            ) : null}
+            <AvatarFallback className="bg-transparent">
+              {(account?.displayName ?? set?.name ?? 'W').slice(0, 1).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
         </span>
         <p className="min-w-0 flex-1 truncate text-sm">
           <span className="font-medium text-foreground">
@@ -1564,7 +1569,8 @@ export function WriteComposer({
         {panel && !focus && !narrow && !params.has('settings') ? (
           <aside
             aria-label={PANEL_TITLES[panel]}
-            className="relative min-w-64 max-w-[48vw] overflow-y-auto border-l border-border animate-in fade-in duration-150"
+            // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
+            className="sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 max-w-[48vw] self-start overflow-y-auto border-l border-border animate-in fade-in duration-150"
             data-composer-panel
             style={{ width: panelWidth }}
           >

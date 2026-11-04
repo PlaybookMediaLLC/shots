@@ -435,6 +435,7 @@ export function DraftsDrawerButton() {
     <Button
       aria-label="Drafts"
       className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:text-foreground md:hidden"
+      data-drafts-drawer-button
       onClick={openDrawer}
       size={null}
       type="button"
