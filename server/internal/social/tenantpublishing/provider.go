@@ -83,7 +83,8 @@ func (r EntIntegrationLookup) FindIntegration(ctx context.Context, orgID, destin
 		integration.ProviderIdentifier(platform), integration.DeletedAtIsNil(),
 	).Only(ctx)
 	if socialent.IsNotFound(err) {
-		return nil, socialapi.NewError(http.StatusNotFound, false, "social destination was not found")
+		// The account was removed on the social side: reconnecting it is the fix.
+		return nil, socialapi.NewCodedError(http.StatusNotFound, publishing.FailureAccountReconnect, "social destination was not found")
 	}
 	return item, err
 }

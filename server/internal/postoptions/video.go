@@ -76,8 +76,8 @@ type TikTokCreator struct {
 }
 
 // Check's refusals that need their own fix: a video outside the account's
-// allowance, and creator permissions that are missing or do not cover the
-// chosen privacy.
+// allowance, and creator permissions that are missing. A chosen privacy the
+// account no longer offers is fixed in the post's options, like any other.
 var (
 	ErrVideoTooLong       = errors.New("video exceeds the TikTok account duration allowance or has no verified duration")
 	ErrCreatorPermissions = errors.New("TikTok publishing permissions are unavailable; refresh the account before scheduling")
@@ -85,8 +85,11 @@ var (
 
 // Check refuses unavailable account controls and media outside the creator's allowance.
 func (c *TikTokCreator) Check(o *TikTokOptions, durationMs int) error {
-	if c == nil || o == nil || c.MaxDurationSeconds <= 0 || !slices.Contains(c.PrivacyLevels, o.Privacy) {
+	if c == nil || o == nil || c.MaxDurationSeconds <= 0 {
 		return ErrCreatorPermissions
+	}
+	if !slices.Contains(c.PrivacyLevels, o.Privacy) {
+		return fmt.Errorf("the TikTok account no longer offers the chosen privacy")
 	}
 	if durationMs <= 0 || durationMs > c.MaxDurationSeconds*1000 {
 		return ErrVideoTooLong
