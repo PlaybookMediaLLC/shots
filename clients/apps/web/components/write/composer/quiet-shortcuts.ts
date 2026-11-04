@@ -1,3 +1,4 @@
+import type { AnyPlatePlugin } from '@shots/platejs-editor/platejs/react'
 import { BasicBlocksKit, BasicMarksKit, CodeBlockKit } from '@shots/platejs-editor/plugins'
 
 /**
@@ -8,7 +9,10 @@ import { BasicBlocksKit, BasicMarksKit, CodeBlockKit } from '@shots/platejs-edit
  */
 const QUIET = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code_block', 'superscript', 'highlight'])
 
+// Typed as any plugin: checking calls on a union of the kits' plugin types is costly.
+const KIT: AnyPlatePlugin[] = [...BasicBlocksKit, ...BasicMarksKit, ...CodeBlockKit]
+
 /** The kit's plugins for those keys, unchanged except for their shortcut. */
-export const QuietShortcutPlugins = [...BasicBlocksKit, ...BasicMarksKit, ...CodeBlockKit]
-  .filter((plugin) => QUIET.has(plugin.key))
-  .map((plugin) => plugin.configure({ shortcuts: { toggle: null } }))
+export const QuietShortcutPlugins: AnyPlatePlugin[] = KIT.filter((plugin) =>
+  QUIET.has(plugin.key)
+).map((plugin) => plugin.configure({ shortcuts: { toggle: null } }))

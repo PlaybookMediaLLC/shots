@@ -153,8 +153,12 @@ type Dialog =
   | 'paste'
   | null
 
-/** Plugins Write adds to the editor; stable, so the editor is built once. */
-const WRITE_PLUGINS = [
+/**
+ * Plugins Write adds to the editor; stable, so the editor is built once. Typed
+ * loosely on purpose: inferring one union of all their plugin types doubled
+ * the type checker's memory (CI's typecheck ran out of heap).
+ */
+const WRITE_PLUGINS: unknown[] = [
   SocialMentionPlugin,
   ...SocialMentionInputPlugins,
   SlashMenuPlugin,
