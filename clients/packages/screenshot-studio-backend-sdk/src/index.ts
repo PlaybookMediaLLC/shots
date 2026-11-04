@@ -3143,6 +3143,10 @@ export class ScreenshotStudioBackendSDK {
   async mutateCalendar(input: unknown) {
     return this.request<unknown>('v1/calendar/mutations', { body: input, method: 'POST' })
   }
+  /** How many accounts the workspace holds and may hold; a null limit means none. */
+  async socialConnectionCapacity() {
+    return this.request<{ held: number; limit: number | null }>('v1/social-connection-capacity')
+  }
   /** A workspace's date-only notes on the days from..to, inclusive. */
   async listCalendarNotes(from: string, to: string) {
     const params = new URLSearchParams({ from, to })

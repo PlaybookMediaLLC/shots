@@ -6583,6 +6583,68 @@
         ]
       }
     },
+    "/api/v1/social-connection-capacity": {
+      "get": {
+        "x-shots-entitlement": {
+          "feature": "workspace:use",
+          "minimumPlan": "pro",
+          "quota": "api:write:minute"
+        },
+        "description": "Counts active accounts across the workspace. A workspace whose plan does not stand may hold none. Capacity is rechecked when an account connects.",
+        "operationId": "getSocialConnectionCapacity",
+        "responses": {
+          "200": {
+            "description": "The current count and limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SocialConnectionCapacity"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "A signed-in workspace session is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Read social account capacity",
+        "tags": [
+          "Publishing"
+        ]
+      }
+    },
     "/api/v1/bluesky-connection-attempts": {
       "post": {
         "x-shots-entitlement": {
@@ -19028,6 +19090,33 @@
         "required": [
           "version",
           "providers"
+        ],
+        "additionalProperties": false
+      },
+      "SocialConnectionCapacity": {
+        "type": "object",
+        "properties": {
+          "held": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "held",
+          "limit"
         ],
         "additionalProperties": false
       },

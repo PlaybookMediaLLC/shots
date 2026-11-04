@@ -205,3 +205,45 @@ func TestSocialCapacityDoesNotReuseAnotherProvidersSlot(t *testing.T) {
 		t.Fatalf("another provider's identifier bypassed capacity: %v", err)
 	}
 }
+
+func TestChannelCapacityCountsActiveAccountsAgainstThePlan(t *testing.T) {
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo, w.owner
+
+	// Without a subscription a workspace connects nothing.
+	capacity, err := repo.GetChannelCapacity(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capacity.Held != 0 || capacity.Limit == nil || *capacity.Limit != 0 {
+		t.Fatalf("free capacity: %+v", capacity)
+	}
+
+	subscribe(t, ctx, repo, w.org, "pro")
+	connect := func(id, status string) {
+		t.Helper()
+		w.exec(t, `INSERT INTO channel_connection(id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId","updatedAt",platform,status)
+			VALUES($1,$2,'social',$1,'test-only',$3,now(),'x',$4)`, id+w.id, w.org, owner.UserID, status)
+	}
+	connect("active", "ACTIVE")
+	connect("second", "ACTIVE")
+	connect("removed", "DISABLED")
+	capacity, err = repo.GetChannelCapacity(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capacity.Held != 2 || capacity.Limit == nil || *capacity.Limit != 15 {
+		t.Fatalf("pro capacity counts active accounts only: %+v", capacity)
+	}
+
+	if err := w.db.Client.WorkspaceEntitlement.UpdateOneID(w.org).SetPlan("enterprise").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	capacity, err = repo.GetChannelCapacity(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if capacity.Held != 2 || capacity.Limit != nil {
+		t.Fatalf("enterprise capacity: %+v", capacity)
+	}
+}

@@ -532,6 +532,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/social-connection-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read social account capacity
+         * @description Counts active accounts across the workspace. A workspace whose plan does not stand may hold none. Capacity is rechecked when an account connects.
+         */
+        get: operations["getSocialConnectionCapacity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bluesky-connection-attempts": {
         parameters: {
             query?: never;
@@ -2076,6 +2096,10 @@ export interface components {
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
+        };
+        SocialConnectionCapacity: {
+            held: number;
+            limit: number | null;
         };
         BlueskyConnectionBeginRequest: {
             /** @enum {string} */
@@ -6780,6 +6804,53 @@ export interface operations {
                 };
             };
             /** @description The workspace binding or adapter availability could not be verified. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSocialConnectionCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current count and limit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialConnectionCapacity"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
