@@ -11,11 +11,7 @@ const storageState = {
   origins: [
     {
       origin: new URL(baseURL).origin,
-      // Post options start open so composer flows reach thread and automation controls.
-      localStorage: [
-        { name: 'shots-consent', value: '{"analytics":false,"ads":false}' },
-        { name: 'shots-post-options', value: 'open' },
-      ],
+      localStorage: [{ name: 'shots-consent', value: '{"analytics":false,"ads":false}' }],
     },
   ],
 }

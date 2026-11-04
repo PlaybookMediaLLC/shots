@@ -91,6 +91,7 @@ test(
     )
     const id = new URL(page.url()).pathname.split('/').pop()!
     await expect(draftEditor(page)).toContainText('My perspective on this release')
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Add LinkedIn comment', exact: true }).click()
     await page
       .getByLabel('First comment', { exact: true })

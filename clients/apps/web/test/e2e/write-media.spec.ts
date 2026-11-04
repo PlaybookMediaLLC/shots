@@ -631,6 +631,7 @@ test(
     const pdf = await readFile(
       '../../../server/internal/social/integrations/social/linkedin/testdata/two-pages.pdf'
     )
+    await page.getByTestId('options-chip').click()
     await page
       .locator('input[type=file][aria-label="PDF document"]')
       .setInputFiles({ name: 'two-pages.pdf', mimeType: 'application/pdf', buffer: pdf })
@@ -645,6 +646,7 @@ test(
     await expectSaved(page)
     await app.reload()
     await page.getByTestId('platform-tab-linkedin').click()
+    await page.getByTestId('options-chip').click()
     await expect(page.getByRole('button', { name: 'PDF: two-pages', exact: true })).toBeVisible()
     await page.getByTestId('schedule-button').click()
     await page
