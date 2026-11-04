@@ -940,8 +940,10 @@ export type BackendContentDraft = {
   attentionPosts: number
   /** The attention posts whose outcome is unknown (lists only). */
   checkPosts: number
+  /** The queued posts that are publishing now (lists only). */
+  publishingPosts: number
   kind: BackendDraftKind
-  /** When the next queued post goes out (lists only). */
+  /** When the next scheduled post goes out (lists only). */
   nextPostAt: string | null
   pinnedAt: string | null
   planTimeZone: string | null

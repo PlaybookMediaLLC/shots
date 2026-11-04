@@ -21,8 +21,10 @@ export const draftWriteFieldsSchema = z.object({
   attentionPosts: z.number().int(),
   /** The attention posts whose outcome is unknown (lists only). */
   checkPosts: z.number().int().default(0),
+  /** The queued posts that are publishing now (lists only). */
+  publishingPosts: z.number().int().default(0),
   kind: draftKindSchema,
-  /** When the next queued post goes out (lists only). */
+  /** When the next scheduled post goes out (lists only). */
   nextPostAt: timestampSchema.nullable(),
   pinnedAt: timestampSchema.nullable(),
   /** The zone a planned time was picked in. */

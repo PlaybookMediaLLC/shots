@@ -16470,6 +16470,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "publishingPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "kind": {
                   "type": "string",
                   "enum": [
@@ -17010,6 +17016,7 @@
                 "article",
                 "attentionPosts",
                 "checkPosts",
+                "publishingPosts",
                 "kind",
                 "nextPostAt",
                 "pinnedAt",
@@ -20568,6 +20575,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "publishingPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "kind": {
                   "type": "string",
                   "enum": [
@@ -21108,6 +21121,7 @@
                 "article",
                 "attentionPosts",
                 "checkPosts",
+                "publishingPosts",
                 "kind",
                 "nextPostAt",
                 "pinnedAt",
@@ -21419,6 +21433,12 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "publishingPosts": {
+                  "default": 0,
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
                 "kind": {
                   "type": "string",
                   "enum": [
@@ -21959,6 +21979,7 @@
                 "article",
                 "attentionPosts",
                 "checkPosts",
+                "publishingPosts",
                 "kind",
                 "nextPostAt",
                 "pinnedAt",
@@ -22853,6 +22874,12 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "publishingPosts": {
+            "default": 0,
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
           "kind": {
             "type": "string",
             "enum": [
@@ -23393,6 +23420,7 @@
           "article",
           "attentionPosts",
           "checkPosts",
+          "publishingPosts",
           "kind",
           "nextPostAt",
           "pinnedAt",
@@ -24591,6 +24619,12 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "publishingPosts": {
+                "default": 0,
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
               "kind": {
                 "type": "string",
                 "enum": [
@@ -25131,6 +25165,7 @@
               "article",
               "attentionPosts",
               "checkPosts",
+              "publishingPosts",
               "kind",
               "nextPostAt",
               "pinnedAt",

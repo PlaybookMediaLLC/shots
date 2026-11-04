@@ -41,6 +41,7 @@ export function libraryDraft(draft: DraftWire) {
     searchText: `${text} ${draft.scratchpad}`,
     kind: draft.kind,
     nextPostAt: draft.nextPostAt,
+    publishingPosts: draft.publishingPosts,
     pinned: draft.pinnedAt !== null,
     plannedFor: draft.plannedFor,
     publishedPosts: draft.publishedPosts,

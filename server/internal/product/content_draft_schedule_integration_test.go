@@ -304,6 +304,8 @@ func TestContentDraftScheduling(t *testing.T) {
 		post(linkedinChannel, "SCHEDULED", "1 hour")
 		post(instagramChannel, "FAILED", "2 hours")
 		post(instagramChannel, "CANCELLED", "1 hour")
+		// X again: a post that is publishing now is queued, not the next one scheduled.
+		post(xChannel, "PROCESSING", "30 minutes")
 		page, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{Limit: 100})
 		if err != nil {
 			t.Fatal(err)
@@ -312,8 +314,10 @@ func TestContentDraftScheduling(t *testing.T) {
 			if item.ID != counted.ID {
 				continue
 			}
-			if item.AttentionPosts != 2 || item.CheckPosts != 1 || item.PublishedPosts != 1 || item.QueuedPosts != 1 {
-				t.Fatalf("attention=%d check=%d published=%d queued=%d", item.AttentionPosts, item.CheckPosts, item.PublishedPosts, item.QueuedPosts)
+			if item.AttentionPosts != 2 || item.CheckPosts != 1 || item.PublishedPosts != 1 || item.QueuedPosts != 2 ||
+				item.PublishingPosts != 1 || item.NextPostAt == nil {
+				t.Fatalf("attention=%d check=%d published=%d queued=%d publishing=%d next=%v", item.AttentionPosts,
+					item.CheckPosts, item.PublishedPosts, item.QueuedPosts, item.PublishingPosts, item.NextPostAt)
 			}
 			return
 		}

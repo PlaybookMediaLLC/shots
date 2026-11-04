@@ -731,9 +731,10 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
       </span>
     )
   }
-  // The editor's word for a post whose time passed before it started.
+  // The editor's words, in its order: a post whose time passed before it
+  // started, then one publishing now, then the next one scheduled.
   const overdue = draft.nextPostAt && postState('SCHEDULED', draft.nextPostAt) === 'Overdue'
-  if (draft.nextPostAt) {
+  if (draft.nextPostAt && (overdue || draft.publishingPosts === 0)) {
     parts.push(
       <span
         className={overdue ? 'text-amber-700 dark:text-amber-300' : 'text-sky-700 dark:text-sky-300'}
@@ -751,6 +752,12 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
           }}
           value={draft.nextPostAt}
         />
+      </span>
+    )
+  } else if (draft.publishingPosts > 0) {
+    parts.push(
+      <span className="text-sky-700 dark:text-sky-300" key="next">
+        Publishing
       </span>
     )
   } else if (draft.plannedFor) {

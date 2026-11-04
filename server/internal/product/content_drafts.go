@@ -108,13 +108,15 @@ type ContentDraftRecord struct {
 	SourceDraftID    *string                   `json:"sourceDraftId"`
 	TagIDs           []string                  `json:"tagIds"`
 	Target           *draftdoc.Target          `json:"target"`
-	// Lists only: posts waiting to go out, the next one's time, and posts
-	// that failed or whose outcome is unknown, which need attention.
+	// Lists only: posts waiting to go out, the next scheduled one's time, and
+	// posts that failed or whose outcome is unknown, which need attention.
 	AttentionPosts int `json:"attentionPosts"`
 	// CheckPosts are the attention posts whose outcome is unknown.
-	CheckPosts  int        `json:"checkPosts"`
-	NextPostAt  *time.Time `json:"nextPostAt"`
-	QueuedPosts int        `json:"queuedPosts"`
+	CheckPosts int        `json:"checkPosts"`
+	NextPostAt *time.Time `json:"nextPostAt"`
+	// PublishingPosts are the queued posts that are publishing now.
+	PublishingPosts int `json:"publishingPosts"`
+	QueuedPosts     int `json:"queuedPosts"`
 }
 
 // ContentDraftPage is one page of a workspace's drafts in the asked order.
@@ -894,8 +896,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		return nil, err
 	}
 	type summary struct {
-		attention, check, published, queued int
-		next                                *time.Time
+		attention, check, published, publishing, queued int
+		next                                            *time.Time
 	}
 	byDraft := map[string]*summary{}
 	// A failure needs attention only while it is its destination's newest
@@ -911,7 +913,10 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		switch post.Status {
 		case scheduledpost.StatusPUBLISHED:
 			item.published++
-		case scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING:
+		case scheduledpost.StatusPROCESSING:
+			item.queued++
+			item.publishing++
+		case scheduledpost.StatusSCHEDULED:
 			item.queued++
 			if item.next == nil || post.ScheduledFor.Before(*item.next) {
 				at := post.ScheduledFor
@@ -930,6 +935,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		record := contentDraftRecord(row)
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
+			record.PublishingPosts = item.publishing
 		}
 		return record
 	}, nil
