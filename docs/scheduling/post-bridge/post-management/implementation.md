@@ -6,12 +6,14 @@ Implementation status is tracked per slice below. A row marked Slice N is accept
 
 ## First slices
 
-| Slice | Scope                                                        | Owner                                                                                                   |
-| ----- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| 1     | Calendar time zone menu, month day cap, Show all             | `components/plan/PlanWorkspace.tsx`, `lib/plan/calendar.ts`                                             |
-| 2     | Date-only calendar notes                                     | `server/internal/product/calendar_notes.go`, `calendar_note` table, `lib/api/contracts/plan-analyze.ts` |
-| 3     | Library All tab; account and date filters          | `server/internal/product/content_drafts.go`, `components/write/library.tsx`                             |
-| 4     | Connections overview by provider, allowance, removal preview | `components/workspace/ChannelConnections.tsx`                                                           |
+| Slice | Scope                                     | Owner                                                                                                     |
+| ----- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1     | Month day cap, +N more, Show all          | `components/plan/PlanWorkspace.tsx`, `lib/plan/calendar.ts`                                               |
+| 2     | Date-only calendar notes                  | `server/internal/product/calendar_notes.go`, `calendar_note` table, `lib/api/contracts/calendar-notes.ts` |
+| 3     | Library All tab; account and date filters | `server/internal/product/content_drafts.go`, `components/write/library.tsx`                               |
+| 4     | Account allowance on Settings › Channels  | `server/internal/workspaceplan`, `components/workspace/ChannelConnections.tsx`                            |
+
+Settings › Channels, the calendar's `TimeZonePicker` and the removal impact shipped separately in #433, so this work does not rebuild them.
 
 Client connect links are excluded. They add an unauthenticated path to publishing authority and need their own design and security review.
 
@@ -30,7 +32,6 @@ Each slice is accepted by its tests and the [verification](#verification) below.
 
 | Behavior                                                                                                                                       | Slice |
 | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| Choosing a zone over the month grid moves cards to the right day, including across a daylight-saving change                                    | 1     |
 | A day with a Failed post and more than two others shows the Failed card without expanding                                                      | 1     |
 | Show all survives a reload, and saved preferences without the field still load                                                                 | 1     |
 | A note created in one zone reads as the same day in another                                                                                    | 2     |
@@ -39,8 +40,7 @@ Each slice is accepted by its tests and the [verification](#verification) below.
 | A draft matches filters only when one live post meets all of them; a draft with no live post matches on its intended accounts and planned date | 3     |
 | Filters are in the URL and restore on reload; a private set's posts stay hidden                                                                | 3     |
 | Queue says it shows the next 60 days and links to the calendar                                                                                 | 3     |
-| Removing an account names the queued posts it cancels before it does so                                                                        | 4     |
-| The allowance counts the whole workspace, says so, and uses the backend's limits                                                               | 4     |
+| The allowance counts active accounts against the backend's limit, and is absent when the plan has none                                         | 4     |
 
 ### Known limit
 
@@ -52,7 +52,7 @@ Weekly workspaces that use library filters or calendar notes, read beside releas
 
 ## Rollback
 
-- Slices 1, 3 and 4: redeploy the previous web and API. New query parameters and response fields are additive.
+- Slices 1, 3 and 4: redeploy the previous web and API. New query parameters and endpoints are additive.
 - Slice 2: deploy the migration, then the API, then the web. To roll back, redeploy the previous code. The table is ignored and can stay.
 
 ## Verification
@@ -71,40 +71,40 @@ Then, in the running app with posts seeded in every state, at 1440, 1024 and 390
 
 Every check from the [verification matrix](post-management-verification-matrix.csv), against Shots. "Exists" was established by reading the code on 4 November 2026 unless a test is named.
 
-| Check                 | Disposition                                                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| PM-001, 002, 003      | Skip: Shots has no path-based workspace. The session names it.                                                                             |
-| PM-004 to 009         | Exists: library empty states. All arrives in Slice 3.                                                                                      |
-| PM-010, 011           | Exists: Posted tab. All arrives in Slice 3.                                                                                                |
-| PM-012                | Exists: created and updated sorts. A sort by post time is skipped until asked for.                                                         |
-| PM-013 to 015         | Slice 3: date presets and custom range, with a no-matches state.                                                                           |
-| PM-016                | Skip: Shots has no trial reels.                                                                                                            |
-| PM-017                | Slice 3: account filter, offered from the brand's accounts rather than loaded posts. A brand holds one active account per platform, so it is the platform filter too. A removed account's old posts match no option and show when the filter is off.                                                       |
-| PM-018                | Slice 3: filters are in the URL, unlike the observed product.                                                                              |
-| PM-019                | Skip: navigation re-reads the list.                                                                                                        |
-| PM-020                | Exists: cursor pagination in the API. Slice 3 adds a notice when the 100-row load has more.                                                |
-| PM-021 to 023         | Exists: `/publish/[draftId]` with `components/drafts/DraftPosts.tsx`, including View post, retry and reconcile.                            |
-| PM-024                | Skip: no path-based workspace to lose. Slice 3 tests that links keep `?set=`.                                                              |
-| PM-025 to 030         | Exists: `components/plan/PlanWorkspace.tsx`. Week start and view are preferences.                                                          |
-| PM-031                | Exists for create on today and later. Add note is Slice 2.                                                                                 |
-| PM-032                | Skip: overflow days keep their actions.                                                                                                    |
-| PM-033, 034           | Exists: a day's ＋ opens `PlanComposer`, with Choose existing content. Text, image, video and story share one composer.                    |
-| PM-035                | Exists: creating from a day plans the draft on it.                                                                                         |
-| PM-036 to 039, 074    | Slice 2: notes, with persistence, edit and delete defined.                                                                                 |
-| PM-040                | Exists: the calendar lists published posts.                                                                                                |
-| PM-041 to 044         | Slice 1: day cap, per-day expansion, Show all. Posts that need attention are never collapsed, which the observed product has no rule for.  |
-| PM-045                | Exists: platform filter, over Shots' own providers.                                                                                        |
-| PM-046, 047, 075      | Slice 1: time zone menu in a portaled popover.                                                                                             |
-| PM-048                | Existing responsive calendar header; checked at the widths in Verification.                                                                |
-| PM-049, 050, 052      | Slice 4: accounts by provider. Only providers Shots has adapters for.                                                                      |
-| PM-051                | Slice 4: allowance.                                                                                                                        |
-| PM-053, 070           | Exists: Reconnect and account health. A provider-wide Refresh is skipped.                                                                  |
-| PM-054                | Exists: `components/settings/DeveloperId.tsx` in developer mode.                                                                           |
-| PM-055 to 059, 076    | Exists as social sets. Slice 4 adds a brand filter.                                                                                        |
-| PM-060, 061, 068, 069 | Excluded: client connect links.                                                                                                            |
-| PM-062 to 067         | Skip: vendor API behavior. Shots uses explicit schedule and publish-now commands, and per-destination `scheduled_post` rows.               |
-| PM-071                | Exists with a different rule: removal cancels queued posts. Slice 4 previews the count.                                                    |
-| PM-072                | Differs by decision: reconnecting reactivates the same connection.                                                                         |
-| PM-073                | Exists: `test/e2e/write.spec.ts` and related specs.                                                                                        |
-| PM-077                | Exists: `TestSchedulingThroughTemporal` in [scheduling reliability](../../reliability.md#verification). Not a live-provider certification. |
-| PM-078                | Exists: `make tenant-isolation` and social set scope tests.                                                                                |
+| Check                 | Disposition                                                                                                                                                                                                                                          |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PM-001, 002, 003      | Skip: Shots has no path-based workspace. The session names it.                                                                                                                                                                                       |
+| PM-004 to 009         | Exists: library empty states. All arrives in Slice 3.                                                                                                                                                                                                |
+| PM-010, 011           | Exists: Posted tab. All arrives in Slice 3.                                                                                                                                                                                                          |
+| PM-012                | Exists: created and updated sorts. A sort by post time is skipped until asked for.                                                                                                                                                                   |
+| PM-013 to 015         | Slice 3: date presets and custom range, with a no-matches state.                                                                                                                                                                                     |
+| PM-016                | Skip: Shots has no trial reels.                                                                                                                                                                                                                      |
+| PM-017                | Slice 3: account filter, offered from the brand's accounts rather than loaded posts. A brand holds one active account per platform, so it is the platform filter too. A removed account's old posts match no option and show when the filter is off. |
+| PM-018                | Slice 3: filters are in the URL, unlike the observed product.                                                                                                                                                                                        |
+| PM-019                | Skip: navigation re-reads the list.                                                                                                                                                                                                                  |
+| PM-020                | Exists: cursor pagination in the API. Slice 3 adds a notice when the 100-row load has more.                                                                                                                                                          |
+| PM-021 to 023         | Exists: `/publish/[draftId]` with `components/drafts/DraftPosts.tsx`, including View post, retry and reconcile.                                                                                                                                      |
+| PM-024                | Skip: no path-based workspace to lose. Slice 3 tests that links keep `?set=`.                                                                                                                                                                        |
+| PM-025 to 030         | Exists: `components/plan/PlanWorkspace.tsx`. Week start and view are preferences.                                                                                                                                                                    |
+| PM-031                | Exists for create on today and later. Add note is Slice 2.                                                                                                                                                                                           |
+| PM-032                | Skip: overflow days keep their actions.                                                                                                                                                                                                              |
+| PM-033, 034           | Exists: a day's ＋ opens `PlanComposer`, with Choose existing content. Text, image, video and story share one composer.                                                                                                                              |
+| PM-035                | Exists: creating from a day plans the draft on it.                                                                                                                                                                                                   |
+| PM-036 to 039, 074    | Slice 2: notes, with persistence, edit and delete defined.                                                                                                                                                                                           |
+| PM-040                | Exists: the calendar lists published posts.                                                                                                                                                                                                          |
+| PM-041 to 044         | Slice 1: day cap, per-day expansion, Show all. Posts that need attention are never collapsed, which the observed product has no rule for.                                                                                                            |
+| PM-045                | Exists: platform filter, over Shots' own providers.                                                                                                                                                                                                  |
+| PM-046, 047, 075      | Exists: `TimeZonePicker` (#433), a searchable portaled menu of every IANA zone. Named presets are skipped: search finds them.                                                                                                                        |
+| PM-048                | Existing responsive calendar header; checked at the widths in Verification.                                                                                                                                                                          |
+| PM-049, 050, 052      | Exists: Settings › Channels, one row per platform (#433). Only providers Shots has adapters for.                                                                                                                                                     |
+| PM-051                | Slice 4: allowance.                                                                                                                                                                                                                                  |
+| PM-053, 070           | Exists: Reconnect, Refresh and account health (#433).                                                                                                                                                                                                |
+| PM-054                | Exists: Show IDs on Settings › Channels (#433).                                                                                                                                                                                                      |
+| PM-055 to 059, 076    | Exists as social sets, with a brand filter on Settings › Channels (#433).                                                                                                                                                                            |
+| PM-060, 061, 068, 069 | Excluded: client connect links.                                                                                                                                                                                                                      |
+| PM-062 to 067         | Skip: vendor API behavior. Shots uses explicit schedule and publish-now commands, and per-destination `scheduled_post` rows.                                                                                                                         |
+| PM-071                | Exists with a different rule: removal cancels queued posts, and says how many first (#433).                                                                                                                                                          |
+| PM-072                | Differs by decision: reconnecting reactivates the same connection.                                                                                                                                                                                   |
+| PM-073                | Exists: `test/e2e/write.spec.ts` and related specs.                                                                                                                                                                                                  |
+| PM-077                | Exists: `TestSchedulingThroughTemporal` in [scheduling reliability](../../reliability.md#verification). Not a live-provider certification.                                                                                                           |
+| PM-078                | Exists: `make tenant-isolation` and social set scope tests.                                                                                                                                                                                          |
