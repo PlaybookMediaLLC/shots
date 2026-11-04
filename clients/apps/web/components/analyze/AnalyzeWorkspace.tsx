@@ -6,12 +6,19 @@ import Link from 'next/link'
 import { domToPng } from 'modern-screenshot'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Combobox } from '@/components/ui/combobox'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -251,24 +258,24 @@ export function AnalyzeWorkspace({
           {!publicToken ? (
             <Label className="grid gap-1.5">
               Account{' '}
-              <NativeSelect
+              <Combobox
                 aria-label="Analytics account"
-                value={accountId}
-                onChange={(e) => {
-                  setAccountId(e.target.value)
+                className="w-72"
+                onValueChange={(value) => {
+                  setAccountId(value)
                   update({})
                   setGoalOpen(false)
                   setSharing(false)
                   setImage(null)
                   setInspection(null)
                 }}
-              >
-                {accounts.map((a) => (
-                  <NativeSelectOption key={a.id} value={a.id}>
-                    {a.setName} · {a.platform} · {a.handle ?? a.displayName ?? a.id}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                options={accounts.map((a) => ({
+                  label: `${a.setName} · ${a.platform} · ${a.handle ?? a.displayName ?? a.id}`,
+                  value: a.id,
+                }))}
+                searchPlaceholder="Search accounts"
+                value={accountId}
+              />
             </Label>
           ) : null}
           {report?.profileUrl ? (
@@ -327,15 +334,19 @@ export function AnalyzeWorkspace({
           />
           <Label className="grid gap-1.5">
             Grouping
-            <NativeSelect
-              aria-label="Grouping"
+            <Select
               value={query.grouping}
-              onChange={(e) => update({ grouping: e.target.value as AnalyticsQuery['grouping'] })}
+              onValueChange={(value) => update({ grouping: value as AnalyticsQuery['grouping'] })}
             >
-              <NativeSelectOption value="daily">Daily</NativeSelectOption>
-              <NativeSelectOption value="weekly">Weekly</NativeSelectOption>
-              <NativeSelectOption value="monthly">Monthly</NativeSelectOption>
-            </NativeSelect>
+              <SelectTrigger aria-label="Grouping">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
           </Label>
         </div>
         {formError ? <p role="alert">{formError}</p> : null}
@@ -573,39 +584,51 @@ export function AnalyzeWorkspace({
                 <h2 className="mr-auto font-semibold">Post performance · {report.totalPosts}</h2>
                 <Label className="grid gap-1.5">
                   Scope
-                  <NativeSelect
-                    aria-label="Post scope"
+                  <Select
                     value={query.scope}
-                    onChange={(e) => update({ scope: e.target.value as AnalyticsQuery['scope'] })}
+                    onValueChange={(value) => update({ scope: value as AnalyticsQuery['scope'] })}
                   >
-                    <NativeSelectOption value="all">All</NativeSelectOption>
-                    <NativeSelectOption value="replies">Replies</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Post scope">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="replies">Replies</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="grid gap-1.5">
                   Sort
-                  <NativeSelect
-                    aria-label="Sort posts"
+                  <Select
                     value={query.sort}
-                    onChange={(e) => update({ sort: e.target.value as AnalyticsQuery['sort'] })}
+                    onValueChange={(value) => update({ sort: value as AnalyticsQuery['sort'] })}
                   >
-                    {Object.entries(SORTS).map(([id, label]) => (
-                      <NativeSelectOption key={id} value={id}>
-                        {label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Sort posts">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SORTS).map(([id, label]) => (
+                        <SelectItem key={id} value={id}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="grid gap-1.5">
                   Order
-                  <NativeSelect
-                    aria-label="Sort direction"
+                  <Select
                     value={query.direction}
-                    onChange={(e) => update({ direction: e.target.value as 'asc' | 'desc' })}
+                    onValueChange={(value) => update({ direction: value as 'asc' | 'desc' })}
                   >
-                    <NativeSelectOption value="desc">Descending</NativeSelectOption>
-                    <NativeSelectOption value="asc">Ascending</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Sort direction">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Descending</SelectItem>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Button
                   variant="outline"
@@ -1002,14 +1025,18 @@ function GoalDialog({
         </DialogHeader>
         <Label className="grid gap-1.5">
           Cadence
-          <NativeSelect
-            aria-label="Goal cadence"
+          <Select
             value={cadence}
-            onChange={(e) => setCadence(e.target.value as 'daily' | 'weekly')}
+            onValueChange={(value) => setCadence(value as 'daily' | 'weekly')}
           >
-            <NativeSelectOption value="daily">Daily</NativeSelectOption>
-            <NativeSelectOption value="weekly">Weekly</NativeSelectOption>
-          </NativeSelect>
+            <SelectTrigger aria-label="Goal cadence">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Daily</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+            </SelectContent>
+          </Select>
         </Label>
         <Label>
           <Checkbox

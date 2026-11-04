@@ -17,11 +17,20 @@ import { deploymentExample } from '@/lib/workflows/deployment-examples'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { getErrorMessage } from '@/components/workspace/settings-client'
+
+/** The menu's stand-in for an empty value, which a Select item cannot hold. */
+const NONE = '__none'
 
 const providers = {
   github: 'GitHub',
@@ -263,52 +272,59 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="frontend-provider">Authoritative production provider</Label>
-              <NativeSelect
-                id="frontend-provider"
-                className={selectClass}
+              <Select
                 value={form.provider}
                 disabled={form.revision > 0}
-                onChange={(e) => {
-                  update('provider', frontendProviderSchema.parse(e.target.value))
+                onValueChange={(value) => {
+                  update('provider', frontendProviderSchema.parse(value))
                   update('id', '')
                   update('githubSourceId', '')
                   update('accountId', '')
                   update('projectId', '')
                 }}
               >
-                {Object.entries(providers).map(([id, label]) => (
-                  <NativeSelectOption key={id} value={id}>
-                    {label}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="frontend-provider" className={selectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(providers).map(([id, label]) => (
+                    <SelectItem key={id} value={id}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="frontend-repository">
                 Connected GitHub source (optional for hosting providers)
               </Label>
-              <NativeSelect
-                id="frontend-repository"
-                className={selectClass}
-                value={form.githubSourceId}
+              <Select
+                value={form.githubSourceId || NONE}
                 disabled={form.revision > 0}
-                onChange={(e) => {
-                  const s = overview.data?.sources.find((s) => s.id === e.target.value)
-                  update('githubSourceId', e.target.value)
-                  if (form.provider === 'github') update('id', e.target.value)
+                onValueChange={(choice) => {
+                  const value = choice === NONE ? '' : choice
+                  const s = overview.data?.sources.find((s) => s.id === value)
+                  update('githubSourceId', value)
+                  if (form.provider === 'github') update('id', value)
                   if (s && form.provider === 'github') {
                     update('projectId', s.repositoryId)
                     update('name', s.name)
                   }
                 }}
               >
-                <NativeSelectOption value="">New frontend source</NativeSelectOption>
-                {overview.data?.sources.map((s) => (
-                  <NativeSelectOption key={s.id} value={s.id}>
-                    {s.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="frontend-repository" className={selectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>New frontend source</SelectItem>
+                  {overview.data?.sources.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <Label htmlFor="frontend-account">Account / team ID (GitHub: installation ID)</Label>
@@ -398,27 +414,30 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             ))}
             <div className="space-y-1">
               <Label htmlFor="frontend-workflow">Shots workflow after a match</Label>
-              <NativeSelect
-                id="frontend-workflow"
-                className={selectClass}
-                value={form.policy.workflowVersionId}
-                onChange={(e) => policy('workflowVersionId', e.target.value)}
+              <Select
+                value={form.policy.workflowVersionId || NONE}
+                onValueChange={(value) => policy('workflowVersionId', value === NONE ? '' : value)}
               >
-                <NativeSelectOption value="">Alerts only</NativeSelectOption>
-                {overview.data?.definitions
-                  .filter(
-                    (d) =>
-                      d.sourceAppId === (form.githubSourceId || form.id) &&
-                      d.draft.family === 'deployment.succeeded' &&
-                      d.enabled &&
-                      d.activeVersionId
-                  )
-                  .map((d) => (
-                    <NativeSelectOption key={d.id} value={d.activeVersionId ?? ''}>
-                      {d.name}
-                    </NativeSelectOption>
-                  ))}
-              </NativeSelect>
+                <SelectTrigger id="frontend-workflow" className={selectClass}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Alerts only</SelectItem>
+                  {overview.data?.definitions
+                    .filter(
+                      (d) =>
+                        d.sourceAppId === (form.githubSourceId || form.id) &&
+                        d.draft.family === 'deployment.succeeded' &&
+                        d.enabled &&
+                        d.activeVersionId
+                    )
+                    .map((d) => (
+                      <SelectItem key={d.id} value={d.activeVersionId ?? ''}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -440,10 +459,9 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
               <div key={index} className="grid gap-3 rounded-md border p-3 md:grid-cols-3">
                 <Label className="text-sm">
                   Check source
-                  <NativeSelect
-                    className={selectClass}
+                  <Select
                     value={check.source}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       policy(
                         'checks',
                         form.policy.checks.map((c, i) =>
@@ -452,21 +470,25 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                                 ...c,
                                 source: z
                                   .enum(['github_check', 'github_status', 'vercel_check'])
-                                  .parse(e.target.value),
+                                  .parse(value),
                               }
                             : c
                         )
-                      )
-                    }
+                      )}
                   >
-                    <NativeSelectOption value="github_check">GitHub check run</NativeSelectOption>
-                    <NativeSelectOption value="github_status">
-                      GitHub commit status
-                    </NativeSelectOption>
-                    <NativeSelectOption value="vercel_check">
-                      Vercel deployment check
-                    </NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger className={selectClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="github_check">GitHub check run</SelectItem>
+                      <SelectItem value="github_status">
+                        GitHub commit status
+                      </SelectItem>
+                      <SelectItem value="vercel_check">
+                        Vercel deployment check
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="text-sm">
                   Check name
@@ -498,26 +520,29 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                 </Label>
                 <Label className="text-sm">
                   Must match
-                  <NativeSelect
-                    className={selectClass}
+                  <Select
                     value={check.scope}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       policy(
                         'checks',
                         form.policy.checks.map((c, i) =>
                           i === index
                             ? {
                                 ...c,
-                                scope: z.enum(['commit', 'deployment']).parse(e.target.value),
+                                scope: z.enum(['commit', 'deployment']).parse(value),
                               }
                             : c
                         )
-                      )
-                    }
+                      )}
                   >
-                    <NativeSelectOption value="commit">Repository and commit</NativeSelectOption>
-                    <NativeSelectOption value="deployment">Deployment ID</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger className={selectClass}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="commit">Repository and commit</SelectItem>
+                      <SelectItem value="deployment">Deployment ID</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="text-sm">
                   Maximum check age (seconds)
@@ -641,32 +666,36 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
         </p>
         <Label className="block text-sm">
           Representative event
-          <NativeSelect
-            className={selectClass}
+          <Select
             value={scenario}
-            onChange={(e) => {
-              setScenario(e.target.value)
+            onValueChange={(value) => {
+              setScenario(value)
               setPreview(null)
             }}
           >
-            <NativeSelectOption value="active">Production active, checks pass</NativeSelectOption>
-            <NativeSelectOption value="preview">Preview environment</NativeSelectOption>
-            <NativeSelectOption value="build">Build ready, publication pending</NativeSelectOption>
-            <NativeSelectOption value="workflow">
-              Workflow success without deployment proof
-            </NativeSelectOption>
-            <NativeSelectOption value="rollback">Rollback request accepted</NativeSelectOption>
-            <NativeSelectOption value="missing-check">Required checks missing</NativeSelectOption>
-            <NativeSelectOption value="failed-check">Required check failed</NativeSelectOption>
-            <NativeSelectOption value="wrong-revision">
-              Checks belong to another revision
-            </NativeSelectOption>
-            {history.data?.items.map((item) => (
-              <NativeSelectOption key={item.id} value={`record:${item.id}`}>
-                Recorded: {item.observation.kind} · {item.observation.deploymentId}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+            <SelectTrigger className={selectClass}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Production active, checks pass</SelectItem>
+              <SelectItem value="preview">Preview environment</SelectItem>
+              <SelectItem value="build">Build ready, publication pending</SelectItem>
+              <SelectItem value="workflow">
+                Workflow success without deployment proof
+              </SelectItem>
+              <SelectItem value="rollback">Rollback request accepted</SelectItem>
+              <SelectItem value="missing-check">Required checks missing</SelectItem>
+              <SelectItem value="failed-check">Required check failed</SelectItem>
+              <SelectItem value="wrong-revision">
+                Checks belong to another revision
+              </SelectItem>
+              {history.data?.items.map((item) => (
+                <SelectItem key={item.id} value={`record:${item.id}`}>
+                  Recorded: {item.observation.kind} · {item.observation.deploymentId}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         <Button
           type="button"

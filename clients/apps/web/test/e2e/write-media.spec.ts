@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   apiRequest,
+  chooseOption,
   db,
   draftEditor,
   expect,
@@ -473,7 +474,7 @@ test(
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('Second post with copied media.')
     await page.getByRole('button', { name: 'Manage media', exact: true }).click()
-    await manager.getByLabel('Destination post').first().selectOption('1')
+    await chooseOption(manager.getByLabel('Destination post').first(), 'Post 2')
     await manager.getByRole('button', { name: 'Move', exact: true }).first().click()
     await expect(
       manager.getByRole('region', { name: 'Post 2 media' }).locator('[data-attachment-id]')

@@ -15,7 +15,13 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
 import type { contentDraftScheduleSchema } from '@/lib/api/contracts/content-drafts'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
@@ -190,15 +196,19 @@ export function BulkScheduleDialog({
           <>
             <Label>
               Mode{' '}
-              <NativeSelect
-                aria-label="Batch mode"
+              <Select
                 value={mode}
                 disabled={busy}
-                onChange={(event) => setMode(event.target.value as 'queue' | 'spread')}
+                onValueChange={(value) => setMode(value as 'queue' | 'spread')}
               >
-                <NativeSelectOption value="queue">Fill the queue</NativeSelectOption>
-                <NativeSelectOption value="spread">Spread</NativeSelectOption>
-              </NativeSelect>
+                <SelectTrigger aria-label="Batch mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="queue">Fill the queue</SelectItem>
+                  <SelectItem value="spread">Spread</SelectItem>
+                </SelectContent>
+              </Select>
             </Label>
             {mode === 'spread' && (
               <div className="grid gap-3 sm:grid-cols-2">

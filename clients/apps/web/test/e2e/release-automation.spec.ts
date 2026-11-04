@@ -829,7 +829,7 @@ test(
     await page.getByLabel('Attempt', { exact: true }).fill('1')
     await page.getByRole('button', { name: 'Load jobs for this attempt' }).click()
     await page.getByRole('button', { name: 'Watch this job name' }).click()
-    await page.getByLabel('Shots workflow to run').selectOption(definition.id)
+    await chooseOption(page.getByLabel('Shots workflow to run'), /^Qualified deployment release · /)
     await page.getByLabel('Enable for new live events').check()
     await page.getByRole('button', { name: 'Save policy revision' }).click()
     await expect(
@@ -924,7 +924,9 @@ test(
       .toBe(2)
     expect(await count('release')).toBe(1)
     await page.getByRole('button', { name: 'Refresh events' }).click()
-    await page.getByLabel('Recorded observation').selectOption(matched.id)
+    // The newest observation, the one just matched, leads the list.
+    await page.getByLabel('Recorded observation').click()
+    await page.getByRole('option').first().click()
     await page.getByRole('button', { name: 'Preview current policy' }).click()
     await expect(
       page.getByText('Configured production evidence matched.', { exact: false }).first()

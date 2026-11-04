@@ -13,7 +13,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -112,39 +118,42 @@ export function SocialAnalytics({
       <div className="flex flex-wrap items-end gap-3">
         <Label className="grid gap-1.5">
           Channel{' '}
-          <NativeSelect
-            aria-label="Channel"
-            value={channel}
-            onChange={(event) => setChannel(event.target.value)}
-          >
-            <NativeSelectOption value="all">All channels</NativeSelectOption>
-            {[...new Set(observations.map((row) => row.platform))].map((platform) => (
-              <NativeSelectOption key={platform}>{platform}</NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <Select value={channel} onValueChange={(value) => setChannel(value)}>
+            <SelectTrigger aria-label="Channel">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All channels</SelectItem>
+              {[...new Set(observations.map((row) => row.platform))].map((platform) => (
+                <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         <Label className="grid gap-1.5">
           Period{' '}
-          <NativeSelect
-            aria-label="Period"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value as 'week' | 'month')}
-          >
-            <NativeSelectOption value="week">Weekly</NativeSelectOption>
-            <NativeSelectOption value="month">Monthly</NativeSelectOption>
-          </NativeSelect>
+          <Select value={period} onValueChange={(value) => setPeriod(value as 'week' | 'month')}>
+            <SelectTrigger aria-label="Period">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Weekly</SelectItem>
+              <SelectItem value="month">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
         </Label>
         <Label className="grid gap-1.5">
           Metric{' '}
-          <NativeSelect
-            aria-label="Metric"
-            value={metric}
-            onChange={(event) => setMetric(event.target.value)}
-          >
-            {metrics.map((name) => (
-              <NativeSelectOption key={name}>{name}</NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <Select value={metric} onValueChange={(value) => setMetric(value)}>
+            <SelectTrigger aria-label="Metric">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {metrics.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         <Button variant="outline" disabled={!rows.length} onClick={exportCSV}>
           Export CSV

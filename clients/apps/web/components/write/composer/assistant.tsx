@@ -5,7 +5,13 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { socialSetHref } from '@/components/workspace/settings-sections'
@@ -112,18 +118,18 @@ export function AssistantPanel({
       </p>
       <Label className="grid gap-1 text-xs">
         Prompt library
-        <NativeSelect
-          aria-label="Prompt library"
-          value=""
-          onChange={(event) => setMessage(event.target.value)}
-        >
-          <NativeSelectOption value="">Choose an instruction…</NativeSelectOption>
-          {STARTERS.map((starter) => (
-            <NativeSelectOption key={starter} value={starter}>
-              {starter}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Select value="" onValueChange={(value) => setMessage(value)}>
+          <SelectTrigger aria-label="Prompt library">
+            <SelectValue placeholder="Choose an instruction…" />
+          </SelectTrigger>
+          <SelectContent>
+            {STARTERS.map((starter) => (
+              <SelectItem key={starter} value={starter}>
+                {starter}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Label>
       <Disclosure className="rounded-lg border border-border p-3">
         <DisclosureTrigger>Writing prompts and examples</DisclosureTrigger>

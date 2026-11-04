@@ -15,7 +15,13 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -240,28 +246,33 @@ export function GitHubProduction({
         <fieldset disabled={!canManage || busy} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="production-signal">Evidence required</Label>
-            <NativeSelect
-              id="production-signal"
-              className="w-full rounded-md border bg-background p-2"
+            <Select
               value={policy.signal}
-              onChange={(event) =>
+              onValueChange={(value) =>
                 change({
-                  signal: event.target.value,
+                  signal: value,
                   trustActionsOutcome: false,
-                  requireChangeReceipt: event.target.value === 'deployment_status',
-                })
-              }
+                  requireChangeReceipt: value === 'deployment_status',
+                })}
             >
-              <NativeSelectOption value="deployment_status">
-                Successful reported deployment
-              </NativeSelectOption>
-              <NativeSelectOption value="workflow_run">
-                Explicitly trusted workflow outcome
-              </NativeSelectOption>
-              <NativeSelectOption value="workflow_job">
-                Explicitly trusted job outcome
-              </NativeSelectOption>
-            </NativeSelect>
+              <SelectTrigger
+                id="production-signal"
+                className="w-full rounded-md border bg-background p-2"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deployment_status">
+                  Successful reported deployment
+                </SelectItem>
+                <SelectItem value="workflow_run">
+                  Explicitly trusted workflow outcome
+                </SelectItem>
+                <SelectItem value="workflow_job">
+                  Explicitly trusted job outcome
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -442,20 +453,25 @@ export function GitHubProduction({
           ))}
           <div className="space-y-2">
             <Label htmlFor="shots-workflow">Shots workflow to run</Label>
-            <NativeSelect
-              id="shots-workflow"
-              className="w-full rounded-md border bg-background p-2"
+            <Select
               value={policy.definitionId}
-              onChange={(event) => change({ definitionId: event.target.value })}
+              onValueChange={(value) => change({ definitionId: value })}
             >
-              <NativeSelectOption value="">Select a deployment workflow</NativeSelectOption>
-              {definitions.map((definition) => (
-                <NativeSelectOption key={definition.id} value={definition.id}>
-                  {definition.name} · {definition.enabled ? 'active' : 'inactive'} · version{' '}
-                  {definition.activeVersionId ?? 'none'}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              <SelectTrigger
+                id="shots-workflow"
+                className="w-full rounded-md border bg-background p-2"
+              >
+                <SelectValue placeholder="Select a deployment workflow" />
+              </SelectTrigger>
+              <SelectContent>
+                {definitions.map((definition) => (
+                  <SelectItem key={definition.id} value={definition.id}>
+                    {definition.name} · {definition.enabled ? 'active' : 'inactive'} · version{' '}
+                    {definition.activeVersionId ?? 'none'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-sm text-muted-foreground">
               This is the Shots release-automation graph. Its active version is pinned when an event
               arrives. Activate it in the workflow editor before enabling this policy.
@@ -499,23 +515,28 @@ export function GitHubProduction({
           paid generation. A missing value remains unknown.
         </p>
         <Label htmlFor="production-observation">Recorded observation</Label>
-        <NativeSelect
-          id="production-observation"
-          className="w-full rounded-md border bg-background p-2"
+        <Select
           value={observationId}
-          onChange={(event) => {
-            setObservationId(event.target.value)
+          onValueChange={(value) => {
+            setObservationId(value)
             setPreview(null)
           }}
         >
-          <NativeSelectOption value="">Select an event</NativeSelectOption>
-          {state.data?.observations.map((observation) => (
-            <NativeSelectOption key={observation.id} value={observation.id}>
-              {observation.evidence.eventName} · {observation.evidence.objectId} ·{' '}
-              {observation.evidence.state} · {observation.status}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+          <SelectTrigger
+            id="production-observation"
+            className="w-full rounded-md border bg-background p-2"
+          >
+            <SelectValue placeholder="Select an event" />
+          </SelectTrigger>
+          <SelectContent>
+            {state.data?.observations.map((observation) => (
+              <SelectItem key={observation.id} value={observation.id}>
+                {observation.evidence.eventName} · {observation.evidence.objectId} ·{' '}
+                {observation.evidence.state} · {observation.status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           disabled={busy || !observationId || !policy.definitionId}

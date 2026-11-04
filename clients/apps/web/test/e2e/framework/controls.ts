@@ -21,37 +21,47 @@ export async function chooseOption(
 }
 
 /**
- * WCAG contrast of an element's text against the first opaque background
- * behind it, from computed styles: what a reader actually sees.
+ * The colors an element's text and border show against the first opaque
+ * background behind it, as hex. Colors go through a canvas, so oklab and
+ * color-mix values read the same as rgb ones.
  */
-export async function contrastOf(element: Locator): Promise<number> {
-  const [text, background] = await element.evaluate((node) => {
-    const hex = (color: string) => {
-      const [r, g, b, a = 1] = (color.match(/[\d.]+/g) ?? []).map(Number)
-      return {
-        a,
-        hex: `#${[r, g, b]
-          .map((part) =>
-            Math.round(part ?? 0)
-              .toString(16)
-              .padStart(2, '0')
-          )
-          .join('')}`,
-      }
+async function paintedColors(
+  element: Locator
+): Promise<{ background: string; border: string; text: string }> {
+  return element.evaluate((node) => {
+    const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!
+    const read = (color: string) => {
+      context.clearRect(0, 0, 1, 1)
+      context.fillStyle = color
+      context.fillRect(0, 0, 1, 1)
+      const [r = 0, g = 0, b = 0, a = 0] = context.getImageData(0, 0, 1, 1).data
+      return { a, hex: `#${[r, g, b].map((part) => part.toString(16).padStart(2, '0')).join('')}` }
     }
-    let surface: Element | null = node
-    let fill = hex('rgb(255, 255, 255)')
+    let surface: Element | null = node.parentElement
+    let background = '#ffffff'
     while (surface) {
-      const color = hex(getComputedStyle(surface).backgroundColor)
-      if (color.a === 1) {
-        fill = color
+      const color = read(getComputedStyle(surface).backgroundColor)
+      if (color.a === 255) {
+        background = color.hex
         break
       }
       surface = surface.parentElement
     }
-    return [hex(getComputedStyle(node).color).hex, fill.hex]
+    const style = getComputedStyle(node)
+    return { background, border: read(style.borderTopColor).hex, text: read(style.color).hex }
   })
+}
+
+/** WCAG contrast of an element's text against what is behind it: what a reader sees. */
+export async function contrastOf(element: Locator): Promise<number> {
+  const { background, text } = await paintedColors(element)
   return contrastRatio(text, background)
+}
+
+/** WCAG contrast of an element's border against what is behind it, as for a checkbox's edge. */
+export async function borderContrastOf(element: Locator): Promise<number> {
+  const { background, border } = await paintedColors(element)
+  return contrastRatio(border, background)
 }
 
 /** Open the Disclosure section a control sits in, as a person clicks its title row. */

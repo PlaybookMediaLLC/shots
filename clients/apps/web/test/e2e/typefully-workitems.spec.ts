@@ -5,6 +5,7 @@ import { importedBody } from '@/lib/write/import-text'
 import {
   addBatchRows,
   apiRequest,
+  chooseOption,
   db,
   draftEditor,
   enableDraftTags,
@@ -55,7 +56,7 @@ test(
     await expectSaved(page)
     await page.getByRole('button', { name: 'More draft actions' }).click()
     await page.getByRole('menuitem', { name: 'Copy poll to channel…' }).click()
-    await page.getByLabel('Poll destination').selectOption('linkedin')
+    await chooseOption(page.getByLabel('Poll destination'), 'linkedin')
     await page.getByLabel('Poll question').fill('Which option?')
     await page.getByRole('button', { name: 'Review destination version' }).click()
     await page.getByRole('button', { name: 'Copy poll', exact: true }).click()
@@ -160,7 +161,7 @@ test(
     const id = (created.body as { id: string }).id
     const calendarURL = `/write/plan?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
     await page.goto(calendarURL)
-    await page.getByLabel('Calendar view').selectOption('week')
+    await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
     const slot = page.getByRole('button', { name: /Available ·/ }).first()
     await slot.click()
@@ -238,7 +239,7 @@ test(
       .getByRole('toolbar', { name: 'Selected drafts' })
       .getByRole('button', { name: 'Schedule', exact: true })
       .click()
-    await page.getByLabel('Batch mode').selectOption('spread')
+    await chooseOption(page.getByLabel('Batch mode'), 'Spread')
     await page.getByRole('button', { name: 'Preview and validate' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Ready')
@@ -248,7 +249,7 @@ test(
     await page.keyboard.press('Escape')
     await app.open('/write/plan?view=month')
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
-    await page.getByLabel('Calendar view').selectOption('month')
+    await chooseOption(page.getByLabel('Calendar view'), 'Month')
     await page.getByTestId('calendar-post').filter({ visible: true }).first().click()
     await page.getByLabel('Time', { exact: true }).fill('16:35')
     await page.getByRole('button', { name: 'Move', exact: true }).click()
@@ -264,9 +265,10 @@ test(
       .getByTestId('calendar-post')
       .filter({ hasText: result.rows[0].caption, visible: true })
       .click()
-    await page
-      .getByLabel(`Swap queue position for ${result.rows[0].caption}`)
-      .selectOption(result.rows[1].id)
+    await chooseOption(
+      page.getByLabel(`Swap queue position for ${result.rows[0].caption}`),
+      new RegExp(`^${result.rows[1].caption} · `)
+    )
     await expect
       .poll(
         async () =>
@@ -426,7 +428,7 @@ test(
     await expect(page.getByRole('img', { name: /x · Followers/ }).locator('circle')).toHaveCount(2)
     await expect(page.getByTestId('social-analytics')).toContainText('12')
     await expect(page.getByTestId('social-analytics')).toContainText('Unavailable')
-    await page.getByLabel('Period', { exact: true }).selectOption('month')
+    await chooseOption(page.getByLabel('Period', { exact: true }), 'Monthly')
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export CSV' }).click()
     expect((await download).suggestedFilename()).toBe('social-observations.csv')
@@ -521,7 +523,7 @@ test(
       .getByRole('button', { name: 'Drag media 1', exact: true })
       .dragTo(media.getByText('Post 1, media 2', { exact: true }))
     await expect(media.getByAltText('Media 1')).toHaveAttribute('src', new RegExp(assets[1]))
-    await media.getByLabel('Media destination post').selectOption('1')
+    await chooseOption(media.getByLabel('Media destination post'), 'Post 2')
     await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
     await expect(media).toContainText('Post 2, media 2')
     await page.keyboard.press('Escape')

@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -83,16 +89,19 @@ export function AutoDmDraft({
             </p>
             <Label>
               Match
-              <NativeSelect
-                aria-label="Auto-DM action matching"
+              <Select
                 value={form.match}
-                onChange={(event) =>
-                  setForm({ ...form, match: event.target.value as AutoDm['match'] })
-                }
+                onValueChange={(value) =>
+                  setForm({ ...form, match: value as AutoDm['match'] })}
               >
-                <NativeSelectOption value="any">Any selected action</NativeSelectOption>
-                <NativeSelectOption value="all">All selected actions</NativeSelectOption>
-              </NativeSelect>
+                <SelectTrigger aria-label="Auto-DM action matching">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any selected action</SelectItem>
+                  <SelectItem value="all">All selected actions</SelectItem>
+                </SelectContent>
+              </Select>
             </Label>
             {(['replies', 'reposts', 'requireFollow'] as const).map((key) => (
               <Label key={key} className="flex gap-2">
