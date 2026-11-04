@@ -80,7 +80,7 @@ test('a member saves a code project, reopens it from the Library and posts it wi
 
   const draft = (await browserJson(page, `/api/v1/content-drafts/${draftId}`)) as {
     assetIds?: string[]
-    body?: { type?: string; children?: { children?: { text: string }[] }[] }[]
+    body?: { type?: string; children?: { text?: string }[] }[]
   }
   expect(draft.assetIds).toHaveLength(1)
   // The reply post: one paragraph per code line, after the last post break.
