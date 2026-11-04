@@ -1381,7 +1381,11 @@ export type BackendBatchValidation = {
 }
 
 export type BackendContentDraftListQuery = {
+  /** A draft with a live post to this account, or, with none, meant for it. */
+  connectionId?: string
   cursor?: string
+  /** From this instant, with `to` exclusive, on a live post's or a plan's time. */
+  from?: string
   kind?: BackendDraftKind
   limit?: number
   search?: string
@@ -1389,6 +1393,7 @@ export type BackendContentDraftListQuery = {
   sort?: 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc'
   status?: BackendContentDraftStatus
   tagId?: string
+  to?: string
   view?: 'drafts' | 'posted' | 'archived'
 }
 

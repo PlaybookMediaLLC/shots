@@ -10,7 +10,7 @@ Implementation status is tracked per slice below. A row marked Slice N is accept
 | ----- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | 1     | Calendar time zone menu, month day cap, Show all             | `components/plan/PlanWorkspace.tsx`, `lib/plan/calendar.ts`                                             |
 | 2     | Date-only calendar notes                                     | `server/internal/product/calendar_notes.go`, `calendar_note` table, `lib/api/contracts/plan-analyze.ts` |
-| 3     | Library All tab; platform, account and date filters          | `server/internal/product/content_drafts.go`, `components/write/library.tsx`                             |
+| 3     | Library All tab; account and date filters          | `server/internal/product/content_drafts.go`, `components/write/library.tsx`                             |
 | 4     | Connections overview by provider, allowance, removal preview | `components/workspace/ChannelConnections.tsx`                                                           |
 
 Client connect links are excluded. They add an unauthenticated path to publishing authority and need their own design and security review.
@@ -79,7 +79,7 @@ Every check from the [verification matrix](post-management-verification-matrix.c
 | PM-012                | Exists: created and updated sorts. A sort by post time is skipped until asked for.                                                         |
 | PM-013 to 015         | Slice 3: date presets and custom range, with a no-matches state.                                                                           |
 | PM-016                | Skip: Shots has no trial reels.                                                                                                            |
-| PM-017                | Slice 3: account filter, offered from the brand's accounts rather than loaded posts.                                                       |
+| PM-017                | Slice 3: account filter, offered from the brand's accounts rather than loaded posts. A brand holds one active account per platform, so it is the platform filter too. A removed account's old posts match no option and show when the filter is off.                                                       |
 | PM-018                | Slice 3: filters are in the URL, unlike the observed product.                                                                              |
 | PM-019                | Skip: navigation re-reads the list.                                                                                                        |
 | PM-020                | Exists: cursor pagination in the API. Slice 3 adds a notice when the 100-row load has more.                                                |

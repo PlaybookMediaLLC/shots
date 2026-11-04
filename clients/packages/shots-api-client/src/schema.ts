@@ -9085,7 +9085,9 @@ export interface operations {
     listContentDrafts: {
         parameters: {
             query?: {
+                connectionId?: string;
                 cursor?: string;
+                from?: string;
                 kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
                 limit?: number;
                 search?: string;
@@ -9093,6 +9095,7 @@ export interface operations {
                 sort?: "updated_desc" | "updated_asc" | "created_desc" | "created_asc";
                 status?: "draft" | "scheduled" | "archived";
                 tagId?: string;
+                to?: string;
                 view?: "drafts" | "posted" | "archived";
             };
             header?: never;

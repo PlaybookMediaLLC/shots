@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
@@ -157,4 +160,109 @@ func TestContentDrafts(t *testing.T) {
 			t.Fatalf("deleted draft err=%v", err)
 		}
 	})
+}
+
+// A draft matches only when one live post meets every criterion together. With
+// no live post, it matches on what it intends.
+func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo, w.owner
+	subscribe(t, ctx, repo, w.org, "pro")
+	w.addMember(t, "other", "creator")
+	set, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Brand"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	connect := func(id, platform, setID string) string {
+		t.Helper()
+		w.exec(t, `INSERT INTO channel_connection(id,"organizationId",provider,"externalAccountId","secretReference","createdByUserId","updatedAt",platform,"socialSetId")
+			VALUES($1,$2,'social',$1,'test-only',$3,now(),$4,$5)`, id+w.id, w.org, owner.UserID, platform, setID)
+		return id + w.id
+	}
+	x, linkedin := connect("x", "x", set.ID), connect("li", "linkedin", set.ID)
+	day := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	draft := func(title string, intended ...string) string {
+		t.Helper()
+		row, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: title, SocialSetID: set.ID, ChannelConnectionIDs: intended})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return row.ID
+	}
+	post := func(draftID, connection string, at time.Time, status scheduledpost.Status) {
+		t.Helper()
+		id := cuid.New()
+		if _, err := w.db.Client.ScheduledPost.Create().SetID(id).SetOrganizationID(w.org).SetContentDraftID(draftID).
+			SetChannelConnectionID(connection).SetSocialSetID(set.ID).SetScheduledFor(at).SetStatus(status).
+			SetCaption("post").SetIdempotencyKey(id).Save(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	split := draft("X last week, LinkedIn today", x, linkedin)
+	post(split, x, day.AddDate(0, 0, -7), scheduledpost.StatusPUBLISHED)
+	post(split, linkedin, day, scheduledpost.StatusSCHEDULED)
+	today := draft("X today", x)
+	post(today, x, day, scheduledpost.StatusFAILED)
+	cancelled := draft("Cancelled on X, meant for LinkedIn", linkedin)
+	post(cancelled, x, day, scheduledpost.StatusCANCELLED)
+	intended := draft("Never scheduled, meant for X", x)
+	planned := draft("Planned for today, meant for LinkedIn", linkedin)
+	if _, err := w.db.Client.ContentDraft.UpdateOneID(planned).SetPlannedFor(day).Save(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	from, to := day.Add(-12*time.Hour), day.Add(12*time.Hour)
+	for name, c := range map[string]struct {
+		query ContentDraftListQuery
+		want  []string
+	}{
+		"account alone uses the post, else the intent":  {ContentDraftListQuery{ConnectionID: x}, []string{split, today, intended}},
+		"a draft's only live post can be elsewhere":     {ContentDraftListQuery{ConnectionID: linkedin}, []string{split, cancelled, planned}},
+		"both criteria on one post, never across posts": {ContentDraftListQuery{ConnectionID: x, From: &from, To: &to}, []string{today}},
+		"time alone uses the post, else the plan":       {ContentDraftListQuery{From: &from, To: &to}, []string{split, today, planned}},
+		"the end is exclusive":                          {ContentDraftListQuery{From: &from, To: &day}, []string{}},
+		"the start is inclusive":                        {ContentDraftListQuery{From: &day, To: &to}, []string{split, today, planned}},
+		"a posted view still applies":                   {ContentDraftListQuery{View: "posted", ConnectionID: x}, []string{split}},
+		"an account from elsewhere matches nothing":     {ContentDraftListQuery{ConnectionID: cuid.New()}, []string{}},
+	} {
+		c.query.SocialSetID = set.ID
+		page, err := repo.ListContentDrafts(ctx, owner, c.query)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		got := []string{}
+		for _, row := range page.Items {
+			got = append(got, row.ID)
+		}
+		slices.Sort(got)
+		slices.Sort(c.want)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("%s: got %v, want %v", name, got, c.want)
+		}
+	}
+
+	if _, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{ConnectionID: "not an id"}); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("a malformed account: %v", err)
+	}
+	if _, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{From: &to, To: &from}); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("a reversed range: %v", err)
+	}
+
+	private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Private", Visibility: "PRIVATE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	hidden := connect("private", "x", private.ID)
+	secret, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "Private", SocialSetID: private.ID, ChannelConnectionIDs: []string{hidden}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	post(secret.ID, hidden, day, scheduledpost.StatusSCHEDULED)
+	page, err := repo.ListContentDrafts(ctx, w.actor("other"), ContentDraftListQuery{ConnectionID: hidden})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Items) != 0 {
+		t.Errorf("another member found a private set's draft through its account: %+v", page.Items)
+	}
 }

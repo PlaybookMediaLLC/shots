@@ -85,10 +85,30 @@ func (s *Server) listContentDrafts(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid social set ID")
 		return
 	}
+	instant := func(name string) (*time.Time, bool) {
+		if query.Get(name) == "" {
+			return nil, true
+		}
+		at, err := time.Parse(time.RFC3339, query.Get(name))
+		if err != nil {
+			writeError(w, http.StatusBadRequest, name+" is an RFC 3339 time")
+			return nil, false
+		}
+		at = at.UTC()
+		return &at, true
+	}
+	from, ok := instant("from")
+	if !ok {
+		return
+	}
+	to, ok := instant("to")
+	if !ok {
+		return
+	}
 	page, err := s.configuration.ListContentDrafts(r.Context(), workspaceActor(r), product.ContentDraftListQuery{
-		Cursor: query.Get("cursor"), Kind: query.Get("kind"), Limit: limit, Search: query.Get("search"),
+		ConnectionID: query.Get("connectionId"), Cursor: query.Get("cursor"), From: from, Kind: query.Get("kind"), Limit: limit, Search: query.Get("search"),
 		SocialSetID: query.Get("socialSetId"), Sort: query.Get("sort"), Status: query.Get("status"),
-		TagID: query.Get("tagId"), View: query.Get("view"),
+		TagID: query.Get("tagId"), To: to, View: query.Get("view"),
 	})
 	if err != nil {
 		writeStoreError(w, err)
