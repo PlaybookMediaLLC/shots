@@ -16,7 +16,7 @@ import {
   CommandShortcut,
 } from '@shots/platejs-editor/ui'
 import { useKeys } from './shortcuts'
-import { draftHref, rememberSet, useWrite } from './write-context'
+import { draftHref, type EditorCommandEntry, rememberSet, useWrite } from './write-context'
 
 /**
  * Search and commands (⌘K): the set's drafts by text, its tags, switching
@@ -35,7 +35,11 @@ export default function CommandPalette({
   const t = useTranslations('platformNavigation')
   const keys = useKeys()
   const router = useWriteRouter()
-  const { beforeLeaveRef, openPreviewRef, activeId, canEdit, data, setQuery } = useWrite()
+  const { beforeLeaveRef, openPreviewRef, editorCommandsRef, activeId, canEdit, data, setQuery } =
+    useWrite()
+  // Read once as the palette opens: the editor's commands for the version being edited.
+  const [editorCommands, setEditorCommands] = React.useState<EditorCommandEntry[]>([])
+  React.useEffect(() => setEditorCommands(editorCommandsRef.current?.() ?? []), [editorCommandsRef])
   const [results, setResults] = React.useState<{ id: string; title: string; plainText: string }[]>(
     []
   )
@@ -127,6 +131,23 @@ export default function CommandPalette({
                 <span className="ml-2 truncate text-xs text-muted-foreground">
                   {draft.plainText.slice(0, 60)}
                 </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+        {editorCommands.length ? (
+          <CommandGroup heading="In the editor">
+            {editorCommands.map((command) => (
+              <CommandItem
+                key={command.id}
+                value={`Editor ${command.label}`}
+                // After the palette closes and focus is back in the editor.
+                onSelect={() => go(() => requestAnimationFrame(command.run))}
+              >
+                {command.label}
+                {command.shortcut ? (
+                  <CommandShortcut>{keys.label(command.shortcut)}</CommandShortcut>
+                ) : null}
               </CommandItem>
             ))}
           </CommandGroup>

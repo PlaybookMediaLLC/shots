@@ -68,7 +68,10 @@ export const createYjsPlugin = (
           color: cursor.color,
           name: cursor.name,
           style: { backgroundColor: cursor.color },
-          selectionStyle: { backgroundColor: `${cursor.color}33` },
+          // Any CSS color (hosts pass hsl()), at a fifth of its strength.
+          selectionStyle: {
+            backgroundColor: `color-mix(in srgb, ${cursor.color} 20%, transparent)`,
+          },
           userId: cursor.userId,
         },
       },

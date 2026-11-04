@@ -41,7 +41,7 @@ export function TooltipContent({
   return (
     <TooltipContentPrimitive
       className={cn(
-        "z-9999 overflow-hidden rounded-none bg-primary px-2 py-1.5 font-semibold text-primary-foreground text-xs shadow-md",
+        "z-9999 overflow-hidden rounded-md bg-foreground px-3 py-1.5 text-background text-xs",
         className
       )}
       sideOffset={sideOffset}
@@ -132,7 +132,7 @@ export function withTooltip<T extends React.ElementType>(Component: T) {
               <TooltipContent {...tooltipContentProps}>
                 {tooltip}
                 {shortcut && (
-                  <div className="mt-px text-foreground">{shortcut}</div>
+                  <div className="mt-px text-background/70">{shortcut}</div>
                 )}
               </TooltipContent>
             </TooltipPortal>

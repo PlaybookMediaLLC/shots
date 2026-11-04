@@ -217,6 +217,9 @@ export function ShellSearch({
         event.key.toLowerCase() !== 'k'
       )
         return
+      // Selected text in a post editor: ⌘K edits its link there (Plate's shortcut).
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[data-slate-editor]') && !window.getSelection()?.isCollapsed) return
       event.preventDefault()
       event.stopImmediatePropagation()
       show()

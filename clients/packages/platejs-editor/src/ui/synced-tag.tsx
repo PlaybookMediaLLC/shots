@@ -29,7 +29,7 @@ export function SyncedTag() {
   // Applications should override this component for full functionality
   return (
     <div className="pointer-events-none absolute -top-2 left-0 z-10 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-      <span className="pointer-events-auto h-5 truncate rounded-none bg-muted px-1.5 text-[10px] text-muted-foreground">
+      <span className="pointer-events-auto h-5 truncate rounded-md bg-muted px-1.5 text-label text-muted-foreground">
         Synced • {id.slice(0, 6)}
       </span>
     </div>

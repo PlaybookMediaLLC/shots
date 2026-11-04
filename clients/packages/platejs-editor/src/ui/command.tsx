@@ -16,7 +16,7 @@ import {
 import { inputVariants } from "./input";
 
 const commandVariants = cva(
-  "flex size-full flex-col rounded-none bg-popover text-popover-foreground focus-visible:outline-hidden",
+  "flex size-full flex-col rounded-md bg-popover text-popover-foreground focus-visible:outline-hidden",
   {
     defaultVariants: {
       variant: "default",
@@ -154,7 +154,7 @@ function CommandSeparator({
 }
 
 export const commandItemVariants = cva(
-  "relative mx-1 flex h-[28px] cursor-default select-none items-center rounded-none px-2 text-sm outline-hidden data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50",
+  "relative mx-1 flex h-[28px] cursor-default select-none items-center rounded-md px-2 text-sm outline-hidden data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50",
   {
     defaultVariants: {
       variant: "default",
@@ -164,7 +164,7 @@ export const commandItemVariants = cva(
         default: "",
         menuItem: cn(
           "w-[calc(100%-8px)] min-w-56 px-2.5",
-          "no-focus-ring cursor-pointer text-accent-foreground hover:bg-accent focus:bg-accent focus:text-accent-foreground"
+          "outline-none cursor-pointer text-accent-foreground hover:bg-accent focus:bg-accent focus:text-accent-foreground"
         ),
       },
     },

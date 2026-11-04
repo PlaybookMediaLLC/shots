@@ -15,6 +15,7 @@ import {
   saveBatchDrafts,
   test,
   trpcMutation,
+  editorMore,
 } from './framework'
 
 test.use({ actionTimeout: 30_000 })
@@ -45,8 +46,9 @@ test(
     await expect(page.getByTestId('post-header')).toHaveCount(3)
     await expect(draftEditor(page)).toContainText('Third post')
 
+    // A post's poll sits in the bar under that post.
     await page
-      .locator('[data-post-number="1"]')
+      .getByRole('toolbar', { name: 'Post 1 tools', exact: true })
       .getByRole('button', { name: 'Add a poll', exact: true })
       .click()
     await page.getByRole('button', { name: 'Add poll', exact: true }).click()
@@ -160,6 +162,15 @@ test(
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
     const calendarURL = `/publish/calendar?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
+    // Plan commits nothing itself: both paths open the draft's one scheduling review.
+    const reviewAndSchedule = async () => {
+      await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
+      const review = page.getByTestId('schedule-dialog')
+      await expect(review.getByTestId('destinations')).toBeVisible()
+      await review.getByRole('checkbox', { name: 'Open a new draft after scheduling' }).uncheck()
+      await review.getByRole('button', { name: /^Confirm schedule/ }).click()
+      await expect(review).toHaveCount(0)
+    }
     await page.goto(calendarURL)
     await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
@@ -168,8 +179,7 @@ test(
     await page.getByRole('button', { name: 'Choose existing content' }).click()
     await page.getByRole('button', { name: /Pick this saved draft/ }).click()
     await page.getByRole('checkbox', { name: 'Open in editor' }).uncheck()
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     const committed = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
     expect(committed.status).toBe(200)
     expect((committed.body as { posts: unknown[] }).posts).toHaveLength(1)
@@ -203,8 +213,7 @@ test(
     )
     expect(beforeConfirm.status).toBe(200)
     expect((beforeConfirm.body as { posts: unknown[] }).posts).toHaveLength(0)
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     await page.goto(calendarURL)
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
     await app.reload()
@@ -527,7 +536,7 @@ test(
     await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
     await expect(media).toContainText('Post 2, media 2')
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Describe images', exact: true }).click()
+    await editorMore(page, 'Alt text')
     await page.getByRole('button', { name: 'Suggest with AI', exact: true }).first().click()
     await expect(page.getByLabel('Description of image 1')).not.toHaveValue('', {
       timeout: 60_000,
@@ -546,7 +555,7 @@ test(
         },
       })
     )
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })
@@ -560,12 +569,12 @@ test(
     await page.keyboard.press('Escape')
     await expectSaved(page)
     await app.reload()
-    await page.getByRole('button', { name: 'Describe images', exact: true }).click()
+    await editorMore(page, 'Alt text')
     await expect(page.getByLabel('Description of image 1')).toHaveValue(
       'A small light square, reviewed by the author.'
     )
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })

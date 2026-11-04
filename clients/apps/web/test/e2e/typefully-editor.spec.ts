@@ -88,6 +88,11 @@ test(
       navigator.clipboard.writeText('Automatic splitting keeps the rest of the draft. '.repeat(10))
     )
     await page.keyboard.press('ControlOrMeta+V')
+    // The split is previewed first; applying it adds the posts.
+    await page
+      .getByTestId('split-preview')
+      .getByRole('button', { name: /^Split into \d+ posts$/ })
+      .click()
     await expect.poll(() => page.getByTestId('post-header').count()).toBeGreaterThan(count)
     await expect(editor).toContainText('Automatic splitting keeps the rest of the draft.')
     await expectSaved(page)

@@ -68,7 +68,7 @@ export const MediaEmbedElement = withHOC(
                   <iframe
                     allowFullScreen
                     className={cn(
-                      "absolute top-0 left-0 aspect-video size-full rounded-none",
+                      "absolute top-0 left-0 aspect-video size-full rounded-md",
                       isVideo && "border-0",
                       focused && selected && "ring-2 ring-ring ring-offset-2"
                     )}

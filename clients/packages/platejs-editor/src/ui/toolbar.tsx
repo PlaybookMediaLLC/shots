@@ -26,7 +26,7 @@ const toolbarVariants = cva("relative flex select-none items-center", {
     variant: {
       default: "gap-1 bg-background",
       media:
-        "absolute z-2 h-[26px] max-w-[calc(100%-16px)] overflow-hidden rounded-none bg-black/60 transition-opacity",
+        "absolute z-2 h-[26px] max-w-[calc(100%-16px)] overflow-hidden rounded-md bg-black/60 transition-opacity",
     },
   },
 });
@@ -82,7 +82,7 @@ export function ToolbarSeparator({
 }
 
 export const toolbarButtonVariants = cva(
-  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-none font-medium text-foreground/80 text-sm ring-offset-background transition-bg-ease focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg:not([data-icon])]:size-4",
+  "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-md font-medium text-muted-foreground text-ui hover:text-foreground aria-checked:text-foreground ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg:not([data-icon])]:size-4",
   {
     defaultVariants: {
       size: "sm",
@@ -90,16 +90,17 @@ export const toolbarButtonVariants = cva(
     },
     variants: {
       size: {
-        default: "h-10 px-3",
-        lg: "h-11 px-5",
+        // One control height with the app's Button (32px, as platform-shell.css sets it).
+        default: "h-8 min-w-8 px-2",
+        lg: "h-8 min-w-8 px-3",
         none: "",
-        sm: "h-[28px] px-1.5",
+        sm: "h-8 min-w-8 px-2",
       },
       variant: {
         default:
-          "bg-transparent hover:bg-black/5 aria-checked:bg-accent aria-checked:text-accent-foreground",
+          "bg-transparent hover:bg-accent aria-checked:bg-accent aria-checked:text-accent-foreground",
         media:
-          "no-focus-ring m-0 h-auto rounded-none not-last:border-r not-last:border-r-white/20 bg-black/20 px-1.5 py-1 text-white hover:bg-background/5 focus:bg-background/5 [&_svg]:size-[14px] [&_svg]:text-white",
+          "outline-none m-0 h-auto rounded-md not-last:border-r not-last:border-r-white/20 bg-black/20 px-1.5 py-1 text-white hover:bg-background/5 focus:bg-background/5 [&_svg]:size-[14px] [&_svg]:text-white",
         outline:
           "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
       },

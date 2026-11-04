@@ -468,7 +468,7 @@ export function FinisherDialog({
             <Label className="flex items-center justify-between text-sm">
               <span>
                 Quote the first post
-                <span className="block text-[11px] text-muted-foreground">
+                <span className="block text-label text-muted-foreground">
                   Added once the first post is live.
                 </span>
               </span>
@@ -523,7 +523,7 @@ export function FinisherDialog({
                     <p className="flex items-center justify-between text-sm text-foreground">
                       {item.name}
                       {item.quoteFirstPost ? (
-                        <span className="text-[11px] text-sky-700 dark:text-sky-300">
+                        <span className="text-label text-sky-700 dark:text-sky-300">
                           quotes the first post
                         </span>
                       ) : null}
@@ -791,7 +791,7 @@ function FirstComment({
             value={value}
           />
         </Label>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-label text-muted-foreground">
           Posted after the post is live. If it fails, the post stays published and the comment shows
           as failed.
         </p>

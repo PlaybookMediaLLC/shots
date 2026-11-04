@@ -76,7 +76,7 @@ export const MediaVideoElement = withHOC(
                     id={embed.id}
                     title="youtube"
                     wrapperClass={cn(
-                      "aspect-video rounded-none",
+                      "aspect-video rounded-md",
                       // focused && selected && 'ring-2 ring-ring ring-offset-2',
                       "relative block cursor-pointer bg-black bg-center bg-cover [contain:content]",
                       "[&.lyt-activated]:before:absolute [&.lyt-activated]:before:top-0 [&.lyt-activated]:before:h-[60px] [&.lyt-activated]:before:w-full [&.lyt-activated]:before:bg-top [&.lyt-activated]:before:bg-repeat-x [&.lyt-activated]:before:pb-[50px] [&.lyt-activated]:before:[transition:all_0.2s_cubic-bezier(0,_0,_0.2,_1)]",
