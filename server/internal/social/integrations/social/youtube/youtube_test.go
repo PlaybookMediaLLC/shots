@@ -102,7 +102,11 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	p, srv := setup(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/video.mp4" && r.Method == http.MethodHead:
-			w.Header().Set("Content-Length", "10")
+			w.WriteHeader(http.StatusForbidden) // a GET-signed delivery URL refuses HEAD
+		case r.URL.Path == "/video.mp4" && r.Header.Get("Range") == "bytes=0-0":
+			w.Header().Set("Content-Range", "bytes 0-0/10")
+			w.WriteHeader(http.StatusPartialContent)
+			w.Write(video[:1])
 		case r.URL.Path == "/video.mp4":
 			if r.Header.Get("Range") != "bytes=0-9" {
 				t.Errorf("range %q", r.Header.Get("Range"))
@@ -145,7 +149,7 @@ func TestPostUploadsInChunksAndSetsThumbnail(t *testing.T) {
 	})
 	res, err := p.Post(context.Background(), "i", "tok", []integrations.PostDetails{{
 		ID: "p1", Message: "hello", Settings: settings,
-		Media: []integrations.MediaContent{{Type: "video", Path: srv.URL + "/video.mp4"}},
+		Media: []integrations.MediaContent{{Type: "video", Path: srv.URL + "/video.mp4?X-Amz-Signature=signed"}},
 	}}, nil)
 	if err != nil {
 		t.Fatal(err)

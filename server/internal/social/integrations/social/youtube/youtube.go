@@ -385,37 +385,6 @@ func (d pendingData) raw() json.RawMessage {
 	return data
 }
 
-// youtubeMediaSize resolves the total byte size of the media without loading
-// it into memory: a HEAD request for remote URLs, stat for local files.
-func youtubeMediaSize(ctx context.Context, path string) (int64, error) {
-	if !strings.HasPrefix(path, "http") {
-		info, err := os.Stat(path)
-		if err != nil {
-			return 0, err
-		}
-		return info.Size(), nil
-	}
-	// the media path is user-influenced, keep the SSRF-safe client. identity
-	// encoding so content-length matches the bytes a later GET actually streams.
-	temporalx.SetHeartbeatDetails(ctx, "youtube: media size "+temporalx.StripQuery(path))
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, path, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("Accept-Encoding", "identity")
-	res, err := ssrf.Client().Do(req)
-	if err != nil {
-		return 0, err
-	}
-	res.Body.Close()
-	length := res.Header.Get("Content-Length")
-	if length == "" {
-		return 0, temporalx.BadBody(identifier, "{}", "{}", "Could not determine the video size for the YouTube upload")
-	}
-	n, _ := strconv.ParseInt(length, 10, 64)
-	return n, nil
-}
-
 // youtubeChunkStream returns a streaming body for the [start, end] byte range
 // of the media so we never hold the whole file in memory.
 func youtubeChunkStream(ctx context.Context, path string, start, end int64) (io.ReadCloser, error) {
@@ -543,7 +512,7 @@ func (p *Provider) PostPending(ctx context.Context, _ string, accessToken string
 	if len(firstPost.Media) > 0 {
 		path = firstPost.Media[0].Path
 	}
-	videoSize, err := youtubeMediaSize(ctx, path)
+	videoSize, err := p.MediaSize(ctx, path, identifier)
 	if err != nil {
 		return nil, err
 	}
