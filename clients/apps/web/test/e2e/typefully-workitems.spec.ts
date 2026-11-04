@@ -161,6 +161,15 @@ test(
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
     const calendarURL = `/write/plan?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
+    // Plan commits nothing itself: both paths open the draft's one scheduling review.
+    const reviewAndSchedule = async () => {
+      await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
+      const review = page.getByTestId('schedule-dialog')
+      await expect(review.getByTestId('destinations')).toBeVisible()
+      await review.getByRole('checkbox', { name: 'Open a new draft after scheduling' }).uncheck()
+      await review.getByRole('button', { name: /^Confirm schedule/ }).click()
+      await expect(review).toHaveCount(0)
+    }
     await page.goto(calendarURL)
     await page.getByLabel('Calendar view').selectOption('week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
@@ -169,8 +178,7 @@ test(
     await page.getByRole('button', { name: 'Choose existing content' }).click()
     await page.getByRole('button', { name: /Pick this saved draft/ }).click()
     await page.getByRole('checkbox', { name: 'Open in editor' }).uncheck()
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     const committed = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
     expect(committed.status).toBe(200)
     expect((committed.body as { posts: unknown[] }).posts).toHaveLength(1)
@@ -204,8 +212,7 @@ test(
     )
     expect(beforeConfirm.status).toBe(200)
     expect((beforeConfirm.body as { posts: unknown[] }).posts).toHaveLength(0)
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     await page.goto(calendarURL)
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
     await app.reload()
