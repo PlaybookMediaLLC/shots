@@ -1423,7 +1423,8 @@ export function WriteComposer({
                 .filter(
                   (item) =>
                     item.account.channel !== active ||
-                    (active !== primary && versionOfTab.mode !== 'manual')
+                    (active !== primary && versionOfTab.mode !== 'manual') ||
+                    item.publication.serialized.posts.length === 0
                 )
                 .map((item) => {
                   const over = item.publication.serialized.posts.some(

@@ -331,7 +331,8 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :is([data-slot='button'], [data-slot$='-trigger'][data-variant]):is(
     [data-variant='outline'],
     [data-variant='secondary']
-  ) {
+  ):not([data-variant='custom']) {
+  /* The :not matches the base rule's specificity, so this border wins. */
   border-color: var(--border);
   background: transparent;
   color: var(--foreground);

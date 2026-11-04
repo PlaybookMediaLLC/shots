@@ -187,7 +187,7 @@ test(
       for (let index = 0; index < extra; index += 1) await page.keyboard.press('Backspace')
       expect(await settledCount()).toBe(51)
     }).toPass({ timeout: 30_000 })
-    await expect(page.getByTestId('counter-x')).toHaveText('51 / 280')
+    await expect(page.getByTestId('post-length-1')).toHaveText('51 / 280')
     await expectSaved(page)
 
     // Dropped formatting is shown in the preview, not a block: nothing stops scheduling.

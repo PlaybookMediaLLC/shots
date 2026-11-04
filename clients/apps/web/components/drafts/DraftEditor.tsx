@@ -317,17 +317,18 @@ function DiscussionsWatcher({ onChange }: { onChange: (discussions: DraftDiscuss
 function Presence() {
   const editor = useEditorRef()
   const awareness = editor.getOptions(YjsPlugin).awareness
-  const [people, setPeople] = React.useState<{ color: string; name: string }[]>([])
+  const [people, setPeople] = React.useState<{ color: string; key: string; name: string }[]>([])
   React.useEffect(() => {
     // One chip per person: each tab or reconnect is its own awareness client.
     const update = () => {
-      const byName = new Map<string, { color: string; name: string }>()
+      const byPerson = new Map<string, { color: string; key: string; name: string }>()
       for (const state of awareness.getStates().values()) {
-        const data = (state as { data?: { color?: string; name?: string } }).data
-        if (data?.name && !byName.has(data.name))
-          byName.set(data.name, { color: data.color ?? 'gray', name: data.name })
+        const data = (state as { data?: { color?: string; name?: string; userId?: string } }).data
+        const key = data?.userId ?? data?.name
+        if (data?.name && key && !byPerson.has(key))
+          byPerson.set(key, { color: data.color ?? 'gray', key, name: data.name })
       }
-      setPeople([...byName.values()])
+      setPeople([...byPerson.values()])
     }
     update()
     awareness.on('change', update)
@@ -339,7 +340,7 @@ function Presence() {
       {people.map((person) => (
         <span
           className="flex max-w-48 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-1 text-label text-foreground"
-          key={person.name}
+          key={person.key}
           style={{ background: `color-mix(in srgb, ${person.color} 14%, transparent)` }}
         >
           <span
