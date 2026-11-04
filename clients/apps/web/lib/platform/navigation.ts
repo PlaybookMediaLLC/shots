@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { withoutLocale } from '@/lib/settings/appearance'
 
 /** Stable jobs; document URLs remain owned by their existing editors. */
@@ -13,6 +14,37 @@ export const PLATFORM_DESTINATIONS = [
 ] as const
 
 export type PlatformArea = (typeof PLATFORM_DESTINATIONS)[number]['key']
+
+/** What the workspace's plan and rollout flags open, as the sidebar shows it. */
+export const platformAccessSchema = z.object({
+  campaignsEnabled: z.boolean(),
+  /** Content drafts are rolled out (PLATFORM_CONTENT_DRAFTS); otherwise Publish opens link checks. */
+  draftsEnabled: z.boolean(),
+  /** The plan includes content drafts. */
+  draftsPlan: z.boolean(),
+  paidPlan: z.boolean(),
+})
+export type PlatformAccess = z.infer<typeof platformAccessSchema>
+
+/** Areas that need a paid plan; a workspace without one sees them marked Pro. */
+const PAID_AREAS: ReadonlySet<PlatformArea> = new Set([
+  'create',
+  'campaigns',
+  'library',
+  'automate',
+  'activity',
+])
+
+/** Whether the plan leaves an area out: the sidebar marks it Pro and opens the plan page. */
+export function areaLocked(
+  key: PlatformArea,
+  access: Pick<PlatformAccess, 'draftsEnabled' | 'draftsPlan' | 'paidPlan'>
+): boolean {
+  // Home, and Publish where it opens drafts, need content drafts.
+  return key === 'home' || (key === 'publish' && access.draftsEnabled)
+    ? !access.draftsPlan
+    : !access.paidPlan && PAID_AREAS.has(key)
+}
 
 /** The task words people search with, so "draft" finds Publish and "screenshot" finds Create. */
 const DESTINATION_ALIASES: Record<PlatformArea, string[]> = {

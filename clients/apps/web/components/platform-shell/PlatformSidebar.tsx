@@ -17,6 +17,7 @@ import {
   SidebarIcon,
 } from './icons'
 import {
+  areaLocked,
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
@@ -42,6 +43,7 @@ import type { z } from 'zod'
 import { surface } from './shell-config'
 import { Button } from '@/components/ui/button'
 import { NavRow, type NavIcon } from './NavRow'
+import { ProductTourMenu } from './ProductTour'
 import { SidebarLink } from './SidebarLink'
 import { SettingsNav } from '@/components/settings/SettingsNav'
 import { ThemeToggle } from './ThemeToggle'
@@ -70,9 +72,6 @@ const NAV_GROUPS = [
   ...group,
   items: group.items.map((item) => ({ ...item, icon: ICONS[item.key] })),
 }))
-
-/** Areas that need a paid plan; a workspace without one sees them marked Pro. */
-const PAID_AREAS = new Set(['create', 'campaigns', 'library', 'automate', 'activity'])
 
 function NavLink({
   collapsed,
@@ -110,6 +109,7 @@ function NavLink({
         label={t(key)}
         name={locked ? `${t(key)} (Pro)` : undefined}
         onNavigate={onNavigate}
+        tourId={`nav-${key}`}
       />
       {active && subs && !collapsed && !locked ? (
         <AreaSubNav items={subs} label={t(key)} onNavigate={onNavigate} />
@@ -164,12 +164,7 @@ function Navigation({
                 collapsed={collapsed}
                 item={item}
                 key={item.href}
-                // Home, and Publish where it opens drafts, need content drafts.
-                locked={
-                  item.key === 'home' || (item.key === 'publish' && draftsEnabled)
-                    ? !draftsPlan
-                    : !paidPlan && PAID_AREAS.has(item.key)
-                }
+                locked={areaLocked(item.key, { draftsEnabled, draftsPlan, paidPlan })}
                 onNavigate={onNavigate}
                 subs={
                   item.key === 'publish'
@@ -293,6 +288,8 @@ function SidebarFooter({
             Documentation <OutwardIcon aria-hidden="true" size={14} />
           </SidebarLink>
         )}
+        {/* The settings sidebar lists its own sections, not the places the tours show. */}
+        {settings ? null : <ProductTourMenu />}
         <ThemeToggle />
         {navigation ? (
           <Tooltip>

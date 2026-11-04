@@ -690,3 +690,9 @@ body:has([data-platform-shell])
   font-size: revert-layer;
   line-height: revert-layer;
 }
+
+/* The element a product tour step explains (ProductTour.tsx). */
+[data-product-tour-active] {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
