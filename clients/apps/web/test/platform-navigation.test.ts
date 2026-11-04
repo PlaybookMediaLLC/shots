@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  areaLocked,
   matchesDestination,
   paidCapability,
   platformArea,
@@ -212,4 +213,26 @@ test('Publish lists Campaign deliveries only where campaigns can be used', () =>
     'Link checks',
   ])
   assert.deepEqual(labels(false), ['Drafts', 'Calendar', 'Analyze', 'Link checks'])
+})
+
+test('the plan locks an area as the sidebar shows it, for the sidebar and the product tours', () => {
+  const plan = (draftsEnabled: boolean, draftsPlan: boolean, paidPlan: boolean) => ({
+    draftsEnabled,
+    draftsPlan,
+    paidPlan,
+  })
+  // Home needs content drafts in the plan, whatever the rollout.
+  assert.equal(areaLocked('home', plan(true, false, true)), true)
+  assert.equal(areaLocked('home', plan(false, true, false)), false)
+  // Publish opens drafts when they are rolled out, so it needs them in the plan.
+  assert.equal(areaLocked('publish', plan(true, true, false)), false)
+  assert.equal(areaLocked('publish', plan(true, false, true)), true)
+  // Without the rollout, Publish opens link checks, which every plan has.
+  assert.equal(areaLocked('publish', plan(false, false, false)), false)
+  // The paid areas need a paid plan; Settings never locks.
+  for (const area of ['create', 'campaigns', 'library', 'automate', 'activity'] as const) {
+    assert.equal(areaLocked(area, plan(true, true, false)), true, area)
+    assert.equal(areaLocked(area, plan(true, true, true)), false, area)
+  }
+  assert.equal(areaLocked('settings', plan(false, false, false)), false)
 })

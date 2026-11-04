@@ -7,6 +7,7 @@ import { useWriteRouter } from '@/components/write/write-context'
 import * as React from 'react'
 // Hover-intent prefetch: the rail lists up to 100 drafts.
 import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
+import { ProductTourButton } from '@/components/platform-shell/ProductTour'
 import { toast } from 'sonner'
 import { PlusIcon as Add01Icon } from '@phosphor-icons/react/dist/ssr/Plus'
 import { PushPinIcon as PinIcon } from '@phosphor-icons/react/dist/ssr/PushPin'
@@ -121,19 +122,23 @@ export function WriteRail() {
     >
       <div className="flex items-center justify-between gap-2 px-3 pt-4">
         <h2 className="text-heading">Publish</h2>
-        {canEdit && (
-          <Button asChild variant="outline" size="sm">
-            {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
-            <Link
-              href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
-            >
-              Bulk schedule
-            </Link>
-          </Button>
-        )}
+        <div className="flex items-center gap-1">
+          <ProductTourButton label="Take the Publish tour" tourId="publish" />
+          {canEdit && (
+            <Button asChild variant="outline" size="sm">
+              {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
+              <Link
+                data-tour-id="write-bulk"
+                href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
+              >
+                Bulk schedule
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
       <p className="platform-eyebrow px-3 pt-3">Publishing brand</p>
-      <div className="flex items-center gap-1 px-3 pt-1 pb-2">
+      <div className="flex items-center gap-1 px-3 pt-1 pb-2" data-tour-id="write-brand">
         <div className="min-w-0 flex-1">
           <SocialSetSwitcher />
         </div>
@@ -145,7 +150,12 @@ export function WriteRail() {
         </Link>
       </div>
       {/* Underlined tabs: the current one is medium weight over a 2px line. */}
-      <div className="border-b border-border px-1" role="tablist" aria-label="Library">
+      <div
+        className="border-b border-border px-1"
+        data-tour-id="write-tabs"
+        role="tablist"
+        aria-label="Library"
+      >
         <div className="flex">
           {TABS.map((item) => (
             <Button
@@ -428,7 +438,10 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
   }
   return (
     // A secondary split button: Schedule is the page's one primary action.
-    <div className={cn('flex items-center', compact ? '' : 'mx-3 mt-2')}>
+    <div
+      className={cn('flex items-center', compact ? '' : 'mx-3 mt-2')}
+      data-tour-id="write-new-draft"
+    >
       <Button
         className="flex h-8 flex-1 items-center gap-2 rounded-l-md border border-border px-3 text-ui font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
         data-testid="new-draft"

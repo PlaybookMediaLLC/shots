@@ -55,6 +55,7 @@ export function SearchButton() {
   return (
     <Button
       data-platform-action
+      data-tour-id="search"
       variant="ghost"
       size={null}
       className="touch-hitbox grid size-8 place-items-center rounded-full p-0 text-muted-foreground hover:text-foreground"
@@ -104,6 +105,7 @@ export function ShellActions({
         <DropdownMenuTrigger asChild>
           <Button
             data-platform-action
+            data-tour-id="new"
             variant="custom"
             size={null}
             className={cn(

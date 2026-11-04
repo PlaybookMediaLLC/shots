@@ -6,6 +6,11 @@ import { createIdentity, type E2EIdentity, waitForHydration } from './flow'
 import { getActiveOrganizationId } from './auth'
 import { createPublishingWorkspace, unbindTestGoOrganization } from './publishing'
 import { closeSharedDatabase } from './services'
+import {
+  PRODUCT_TOUR_RESOLVED_KEY,
+  PRODUCT_TOURS,
+  tourTipId,
+} from '../../../lib/platform/product-tour'
 
 /**
  * The end-to-end test framework. Every spec imports `test` and `expect` from
@@ -97,6 +102,9 @@ export const test = base.extend<
     budget: void
     failureContext: void
     identity: E2EIdentity
+    /** Let the first-visit product tour start by itself; off, so it covers no other spec's page. */
+    productTour: boolean
+    quietProductTours: void
     thirdPartyAssets: boolean
     thirdPartyAssetsRoute: void
     startInWorkspace: void
@@ -113,6 +121,31 @@ export const test = base.extend<
   identity: async ({}, provide) => {
     await provide(createIdentity())
   },
+
+  // Every test account is new, so the first-visit tour would open its card,
+  // a second dialog, on each page. A spec about the tour sets `productTour`.
+  productTour: [false, { option: true }],
+  quietProductTours: [
+    async ({ context, productTour }, provide) => {
+      if (!productTour) {
+        const tips = PRODUCT_TOURS.filter((tour) => 'autoStart' in tour && tour.autoStart).map(
+          tourTipId
+        )
+        await context.addInitScript(
+          ([key, seen]) => {
+            try {
+              window.sessionStorage.setItem(key, JSON.stringify(seen))
+            } catch {
+              // A page without storage still runs the spec; the tour can then open.
+            }
+          },
+          [PRODUCT_TOUR_RESOLVED_KEY, tips] as const
+        )
+      }
+      await provide()
+    },
+    { auto: true },
+  ],
 
   // Each test is its own client, so rate limits keyed by client IP count only
   // the test's own requests and parallel workers never share a budget.

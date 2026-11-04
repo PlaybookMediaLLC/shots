@@ -21,6 +21,7 @@ export function NavRow({
   label,
   name = label,
   onNavigate,
+  tourId,
 }: {
   active: boolean
   /** Shown after the label in the expanded row, such as a plan badge. */
@@ -32,10 +33,13 @@ export function NavRow({
   /** The accessible name when it says more than the label; it starts with the label. */
   name?: string
   onNavigate?: () => void
+  /** Where a product tour step points (`data-tour-id`). */
+  tourId?: string
 }) {
   const link = (
     <SidebarLink
       data-platform-nav
+      data-tour-id={tourId}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed || name !== label ? name : undefined}
       className={cn(
