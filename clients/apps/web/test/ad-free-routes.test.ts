@@ -15,7 +15,7 @@ test("content pages that share a prefix with an editor route still carry ads", (
 });
 
 test("signed-in app pages are ad free, so links between them stay client-side", () => {
-  for (const path of ["/home", "/write", "/workspace/billing", "/upgrade", "/de/upgrade"]) {
+  for (const path of ["/home", "/publish", "/settings/billing", "/upgrade", "/de/upgrade"]) {
     assert.equal(isAdFreePath(path), true, path);
   }
 });

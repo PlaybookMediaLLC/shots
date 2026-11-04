@@ -4,21 +4,21 @@ test.use({ workspaceOptions: { plan: 'pro' } })
 
 /** The pages the controls audit scanned, as their routes. */
 const AUDITED = [
-  '/write/analyze',
-  '/write/analyze/observations',
-  '/write/settings',
-  '/write/plan',
-  '/write/batches',
-  '/workspace',
-  '/workspace/account',
-  '/workspace/appearance',
-  '/workspace/brand-kit',
-  '/workspace/notifications',
-  '/workspace/integrations',
-  '/workspace/roles',
-  '/workspace/channels',
-  '/workspace/developers',
-  '/workspace/audit-log',
+  '/publish/analyze',
+  '/publish/analyze/observations',
+  '/publish/calendar',
+  '/publish/batches',
+  '/settings',
+  '/settings/account',
+  '/settings/appearance',
+  '/settings/brand-kit',
+  '/settings/notifications',
+  '/settings/integrations',
+  '/settings/roles',
+  '/settings/channels',
+  '/settings/publishing-brands',
+  '/settings/developers',
+  '/settings/audit-log',
 ]
 
 /** Browser-drawn controls that ignore the app's fonts, colors and dark mode. */
@@ -63,7 +63,7 @@ test('one time-zone picker finds a city, and times read the way they are typed',
   app,
   page,
 }) => {
-  await app.open('/workspace')
+  await app.open('/settings')
   const zone = page.getByRole('combobox', { exact: true, name: 'Timezone' })
   await zone.click()
   await page.keyboard.type('Paris')

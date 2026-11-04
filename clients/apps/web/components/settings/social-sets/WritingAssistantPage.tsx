@@ -148,7 +148,7 @@ function Lifecycle({ canWrite, set }: { canWrite: boolean; set: SocialSetRecord 
             </Button>
           ) : null}
           <Button asChild variant="outline">
-            <Link href={`/write?set=${encodeURIComponent(set.id)}`}>
+            <Link href={`/publish?set=${encodeURIComponent(set.id)}`}>
               Create a draft to use Writing Assistant
             </Link>
           </Button>

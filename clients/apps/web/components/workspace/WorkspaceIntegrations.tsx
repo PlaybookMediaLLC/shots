@@ -72,7 +72,7 @@ export function WorkspaceIntegrations({ canManage }: { canManage: boolean }) {
 
   if (loadFailure === 'plan') {
     return (
-      <PlanRequired from="/workspace/integrations">
+      <PlanRequired from="/settings/integrations">
         Delivering designs to Slack, Notion and Figma needs Pro.
       </PlanRequired>
     )

@@ -17,7 +17,7 @@ import (
 
 var ErrOAuthExchangeUncertain = errors.New("authorization is already being processed or its result is unknown; check the connection before starting a new authorization")
 var ErrOAuthIdentityMismatch = errors.New("the authorized account is not the account being reconnected; choose the original account and try again")
-var oauthReturnPath = regexp.MustCompile(`^/(?:workspace/social-sets|write)/[a-z0-9]{10,32}$`)
+var oauthReturnPath = regexp.MustCompile(`^/(?:settings/publishing-brands|publish)/[a-z0-9]{10,32}$`)
 
 // OAuthStartOptions binds the intended account and navigation to one attempt.
 type OAuthStartOptions struct {
@@ -54,7 +54,7 @@ func (r *Repository) ResolveOAuthContext(ctx context.Context, userID, sessionID,
 	}
 	path := start.ReturnPath
 	if start.CreatedSocialSetID != nil {
-		path = "/workspace/social-sets/" + *start.CreatedSocialSetID
+		path = "/settings/publishing-brands/" + *start.CreatedSocialSetID
 	}
 	return &OAuthContext{OrganizationID: start.OrganizationID, SocialSetID: oauthTargetSet(start), ReturnPath: path,
 		Operation: string(start.Operation), Completed: start.ExchangeStatus == socialoauthstart.ExchangeStatusCOMPLETED}, nil

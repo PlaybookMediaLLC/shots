@@ -15,7 +15,7 @@ in [social publishing verification](social-publishing-verification.md).
 | One photo or video with a caption | Write composer | Upload or pick an asset, write a Unicode caption, set per-platform text and options in platform versions, preview, and schedule to one or more accounts at a local time in an IANA zone or in the next queue slot. Reschedule, cancel, or add accounts to a scheduled draft. |
 | One post with several attachments | Write composer, Manage media | Attach up to each destination's limit, reorder, move between thread posts. The order in the body is the order the provider receives. |
 | A PDF to LinkedIn | Composer document option, bulk batch | Sent as the post's LinkedIn document; refused on every other destination. |
-| Many separate posts | Write → Bulk schedule (`/write/batches`) | A durable batch of up to 50 items, each one post with its own media, caption, accounts and time. Files and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
+| Many separate posts | Publish → Bulk schedule (`/publish/batches`) | A durable batch of up to 50 items, each one post with its own media, caption, accounts and time. Files and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
 
 Every check that refuses media at scheduling time is shown in the composer
 and the batch before the person submits: the rules live in one JSON file

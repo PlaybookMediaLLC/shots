@@ -52,7 +52,7 @@ test(
       }),
     })
     expect(legacy.status).toBe(200)
-    await app.open('/workspace/notifications')
+    await app.open('/settings/notifications')
     const firstRow = (event: string, channel: string) =>
       page.getByLabel(`Same brand (${first.id}): ${event}: your ${channel} preference`, {
         exact: true,
@@ -116,7 +116,7 @@ test(
     await expect(secondRow('Post published', 'in-app')).toBeChecked()
 
     const sibling = await context.newPage()
-    await sibling.goto('/workspace/notifications')
+    await sibling.goto('/settings/notifications')
     await expect(
       sibling.getByLabel(`Same brand (${first.id}): Post published: your email preference`, {
         exact: true,

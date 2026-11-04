@@ -128,7 +128,7 @@ export function ProjectMenu({ compact = false }: { compact?: boolean }) {
         onSubmit={async (name) => {
           await createProjectFromEditor(trpcClient, name)
           toast.success(`Saved “${name}”`, {
-            action: { label: 'All projects', onClick: () => router.push('/projects') },
+            action: { label: 'All projects', onClick: () => router.push('/library') },
           })
         }}
         open={nameDialog === 'create'}
@@ -254,7 +254,7 @@ export function ProjectMenu({ compact = false }: { compact?: boolean }) {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild>
-            <Link href="/projects">
+            <Link href="/library">
               <Folder01Icon size={15} />
               All projects
             </Link>

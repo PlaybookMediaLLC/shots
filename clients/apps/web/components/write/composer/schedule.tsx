@@ -1,5 +1,6 @@
 'use client'
 
+import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -336,9 +337,7 @@ export function ScheduleDialog({
               variant="custom"
               onClick={() => {
                 onClose()
-                const url = new URL(window.location.href)
-                url.searchParams.set('settings', 'scheduling')
-                window.history.pushState(null, '', url)
+                openBrandSettings('scheduling', setId)
               }}
             >
               Change

@@ -221,7 +221,7 @@ export function ScheduleDialog({
                   No {channelLabel} account is connected.{' '}
                   <Link
                     className="font-medium text-foreground underline-offset-4 hover:underline"
-                    href="/workspace/channels"
+                    href="/settings/channels"
                   >
                     Connect one in Channels
                   </Link>

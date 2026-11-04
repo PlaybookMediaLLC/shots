@@ -229,9 +229,10 @@ test('mobile editor navigation works with the keyboard and browser back', async 
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
     .toBeLessThanOrEqual(390)
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
+  // The editor is in Create but is none of its listed pages, so the row marks the section.
   await expect(navigation.getByRole('link', { name: 'Create', exact: true })).toHaveAttribute(
     'aria-current',
-    'page'
+    'true'
   )
   await page.keyboard.press('Escape')
   await page.goBack()
@@ -415,11 +416,11 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   // Settings is one link; as in Polar, its sections replace the destinations there.
   const workspace = page.getByRole('navigation', { name: 'Workspace', exact: true })
   const settings = workspace.getByRole('link', { name: 'Settings', exact: true })
-  await expect(settings).toHaveAttribute('href', '/workspace')
+  await expect(settings).toHaveAttribute('href', '/settings')
   await expect(page.getByRole('navigation', { name: 'Workspace settings' })).toHaveCount(0)
   await page.setViewportSize({ width: 1280, height: 1000 })
   await settings.click()
-  await expect(page).toHaveURL(/\/workspace$/)
+  await expect(page).toHaveURL(/\/settings$/)
   await expect(workspace).toHaveCount(0)
   const settingsLinks = page.getByRole('navigation', { name: 'Settings sections', exact: true })
   // Every settings section, including RFC 024's Appearance, Install, Experimental,
@@ -427,7 +428,7 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   await expect(settingsLinks.getByRole('link')).toHaveCount(21)
   await expect(
     settingsLinks.getByRole('link', { name: 'Notifications', exact: true })
-  ).toHaveAttribute('href', '/workspace/notifications')
+  ).toHaveAttribute('href', '/settings/notifications')
   await expect(settingsLinks.getByRole('link', { name: 'General', exact: true })).toHaveAttribute(
     'aria-current',
     'page'
@@ -441,13 +442,13 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true })
   await expect(drawer.getByRole('navigation', { name: 'Settings sections' })).toBeVisible()
-  await drawer.getByRole('link', { name: 'Settings, back to Home', exact: true }).press('Enter')
+  await drawer.getByRole('link', { name: 'Back, leave settings', exact: true }).press('Enter')
   await expect(drawer).toBeHidden()
-  await expect(page).toHaveURL(/\/home$/)
+  await expect(page).not.toHaveURL(/\/settings/)
   await page.getByRole('button', { name: 'Open navigation', exact: true }).click()
   await expect(drawer.getByRole('link', { name: 'Settings', exact: true })).toHaveAttribute(
     'href',
-    '/workspace'
+    '/settings'
   )
   await expect(drawer.getByRole('navigation', { name: 'Workspace settings' })).toHaveCount(0)
   await drawer.getByRole('link', { name: 'Create', exact: true }).press('Enter')

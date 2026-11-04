@@ -625,7 +625,7 @@ function BrandVoiceSection({
             ))}
             <Row
               label="Never use"
-              description="These rules apply to all writing, including social-set overrides."
+              description="These rules apply to all writing, including publishing brand overrides."
               layout="stacked"
             >
               <ProhibitedTermsEditor value={draft.terms} onChange={(terms) => change({ terms })} />

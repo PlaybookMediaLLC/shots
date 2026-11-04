@@ -59,7 +59,7 @@ test('X composer reads verified limits and keeps Basic Articles unavailable', as
   })
   expect(created.status).toBe(201)
   const article = draftReceiptSchema.parse(created.body)
-  await app.open(`/write/${article.id}`)
+  await app.open(`/publish/${article.id}`)
   await expect(draftEditor(page)).toBeVisible()
   await page.getByRole('button', { name: 'Preview', exact: true }).click()
   await expect(page.getByTestId('preview-panel')).toContainText('Connect an eligible account.')

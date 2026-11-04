@@ -34,7 +34,7 @@ test('retrying team creation after a lost committed response keeps one workspace
   await expect(page.getByRole('heading', { name: 'Choose a plan' })).toBeVisible()
   const originalId = await getActiveOrganizationId(page)
   await grantWorkspacePlan(originalId, 'pro')
-  await app.open('/workspace/new-team')
+  await app.open('/settings/new-team')
   await page.getByRole('button', { name: 'Create workspace', exact: true }).click()
   const dialog = page.getByRole('dialog')
   const name = `${identity.workspaceName} retry`
@@ -107,7 +107,7 @@ test('retrying team creation after a lost committed response keeps one workspace
 
   // Reusing a committed key with a changed name is a real backend conflict.
   // The user must be able to discard that rejected intent without an endless retry loop.
-  await app.open('/workspace/new-team')
+  await app.open('/settings/new-team')
   await page.evaluate(({ key, raw }) => sessionStorage.setItem(key, raw), {
     key: saved.key,
     raw: JSON.stringify({

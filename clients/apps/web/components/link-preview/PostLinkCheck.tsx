@@ -88,7 +88,7 @@ export function PostLinkCheck({ text }: { text: string }) {
             return (
               <li key={url} className="flex flex-wrap items-center gap-2">
                 <a
-                  href={`/link-preview?${new URLSearchParams({ url })}`}
+                  href={`/publish/link-checks?${new URLSearchParams({ url })}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex min-w-0 items-center gap-1 text-neutral-200 hover:underline"

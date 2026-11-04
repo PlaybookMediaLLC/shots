@@ -11,6 +11,6 @@ export default async function DraftsCalendarPage({ params, searchParams }: Calen
   const { locale } = await params
   const { week } = await searchParams
   redirect(
-    getLocalizedPath(locale, week ? `/write/plan?week=${encodeURIComponent(week)}` : '/write/plan')
+    getLocalizedPath(locale, week ? `/publish/calendar?week=${encodeURIComponent(week)}` : '/publish/calendar')
   )
 }

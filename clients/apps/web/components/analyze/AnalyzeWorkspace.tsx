@@ -68,14 +68,11 @@ type Row = AnalyticsReport['posts'][number]
 /** All views derive from one account/query key; stale responses never cross that boundary. */
 export function AnalyzeWorkspace({
   sets = [],
-  campaignsEnabled = false,
   canManage = false,
   initial = {},
   publicToken,
 }: {
   sets?: SocialSetWire[]
-  /** Campaigns are usable here, so Publish lists Campaign deliveries. */
-  campaignsEnabled?: boolean
   canManage?: boolean
   initial?: Record<string, string | undefined>
   publicToken?: string
@@ -229,7 +226,7 @@ export function AnalyzeWorkspace({
   if (!publicToken && !accounts.length)
     return (
       <div>
-        <WorkspaceNav active="analyze" campaigns={campaignsEnabled} />
+        <WorkspaceNav active="analyze" />
         <AnalyzeNav active="Overview" />
         <main className="mx-auto max-w-7xl space-y-2 p-4 sm:p-6">
           <h1 className="text-2xl font-semibold">Analyze</h1>
@@ -237,7 +234,7 @@ export function AnalyzeWorkspace({
             Connect a social account to collect analytics.
           </p>
           <Button asChild variant="outline">
-            <Link href="/workspace/social-sets">Connect a social account</Link>
+            <Link href="/settings/publishing-brands">Connect a social account</Link>
           </Button>
         </main>
       </div>
@@ -246,7 +243,7 @@ export function AnalyzeWorkspace({
     <div className="h-full min-h-0 overflow-y-auto">
       {!publicToken ? (
         <>
-          <WorkspaceNav active="analyze" campaigns={campaignsEnabled} />
+          <WorkspaceNav active="analyze" />
           <AnalyzeNav active="Overview" />
         </>
       ) : (

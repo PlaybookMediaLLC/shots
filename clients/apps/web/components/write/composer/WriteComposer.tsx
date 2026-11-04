@@ -38,7 +38,7 @@ import {
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { DraftPosts } from '@/components/drafts/DraftPosts'
 import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/DraftEditor'
-import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
+import { BrandSettingsButton, openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
 import { appendPost, movePost, postRanges } from '@/components/drafts/thread'
@@ -201,7 +201,6 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
-    data,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -455,7 +454,7 @@ export function WriteComposer({
       if (newDraft)
         void draftsApi
           .create({ socialSetId: draft.socialSetId ?? undefined })
-          .then((next) => router.push(`/write/${next.id}`))
+          .then((next) => router.push(`/publish/${next.id}`))
           .catch(() =>
             toast.error(
               'Scheduled successfully, but the next draft could not be opened. Create one from the sidebar.'
@@ -973,12 +972,7 @@ export function WriteComposer({
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
                   {set ? (
                     <span className="hidden md:contents">
-                      <DraftSettingsDrawer
-                        advancedScheduling={data.advancedScheduling}
-                        canManage={canPublish}
-                        canWrite={canEdit}
-                        socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}
-                      />
+                      <BrandSettingsButton id={set.id} name={set.name} />
                     </span>
                   ) : null}
                 </>
@@ -1067,11 +1061,7 @@ export function WriteComposer({
                       {set ? (
                         <DropdownMenuItem
                           className="md:hidden"
-                          onSelect={() => {
-                            const url = new URL(window.location.href)
-                            url.searchParams.set('settings', 'scheduling')
-                            window.history.pushState(null, '', url)
-                          }}
+                          onSelect={() => openBrandSettings('scheduling', set.id)}
                         >
                           Brand settings…
                         </DropdownMenuItem>
@@ -1248,7 +1238,7 @@ export function WriteComposer({
                     target: { url },
                     body: bodyFor(document.value as PlateBody, document.versions, active),
                   })
-                  router.push(`/write/${next.id}`)
+                  router.push(`/publish/${next.id}`)
                 })().catch((error) =>
                   toast.error(
                     error instanceof Error ? error.message : 'The quote draft could not be created.'
@@ -1577,7 +1567,7 @@ export function WriteComposer({
                     try {
                       await flush()
                       window.location.assign(
-                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/write/${initial.id}` })}`
+                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
                       )
                     } catch (error) {
                       toast.error(

@@ -195,7 +195,7 @@ function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord
             </Button>
           </ConnectionLauncher>
           <p className="text-xs text-muted-foreground">
-            <Link className="underline" href={`/workspace/channels?brand=${encodeURIComponent(set.id)}`}>
+            <Link className="underline" href={`/settings/channels?brand=${encodeURIComponent(set.id)}`}>
               Manage in Channels
             </Link>{' '}
             to refresh or remove accounts.{' '}

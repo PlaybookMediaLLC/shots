@@ -127,7 +127,7 @@ test(
     await scheduleDialog.getByRole('button', { name: 'Confirm schedule' }).click()
     await expect(page.getByTestId('draft-post')).toHaveCount(1, { timeout: 30_000 })
 
-    await app.open(`/write/plan?week=${local.slice(0, 10)}`)
+    await app.open(`/publish/calendar?week=${local.slice(0, 10)}`)
     const card = page
       .getByTestId('calendar-post')
       .filter({ hasText: 'Moved on the calendar', visible: true })
@@ -153,7 +153,7 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
 
-    await app.open('/write')
+    await app.open('/publish')
     await page
       .getByTestId('write-rail')
       .getByRole('link', { name: 'Settings', exact: true })
@@ -293,10 +293,10 @@ test(
     await expect(backups.getByTestId('backup-time')).toBeVisible({ timeout: 60_000 })
     await backups.getByRole('button', { name: 'Create new draft from this version' }).click()
     await page.waitForURL(
-      (url) => !url.pathname.endsWith(draftId) && /\/write\/[a-z0-9]+/.test(url.pathname)
+      (url) => !url.pathname.endsWith(draftId) && /\/publish\/[a-z0-9]+/.test(url.pathname)
     )
     await expect(draftEditor(page)).toContainText('#shipit', { timeout: 60_000 })
-    await app.open(`/write/${draftId}`)
+    await app.open(`/publish/${draftId}`)
     await expect(draftEditor(page)).toContainText('Second post', { timeout: 60_000 })
 
     // Channel text: LinkedIn says something longer, in its own version.

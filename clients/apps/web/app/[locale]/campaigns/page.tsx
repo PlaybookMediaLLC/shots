@@ -1,4 +1,6 @@
-import { AreaNavigation, CAMPAIGN_LINKS } from '@/components/platform-hub/AreaNavigation'
+import { campaignLinks } from '@/lib/platform/navigation'
+import { AreaNavigation } from '@/components/platform-hub/AreaNavigation'
+import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 import { CampaignsIcon as MegaphoneIcon } from '@/components/platform-shell/icons'
 import { CalendarIcon as Calendar03Icon } from '@/components/platform-shell/icons'
 import { CampaignsIcon as Megaphone01Icon } from '@/components/platform-shell/icons'
@@ -14,10 +16,15 @@ import { backendSDK } from '@/lib/backend/sdk'
 import { listCampaigns } from '@/lib/tenant/campaigns'
 import { requireCampaignPageAccess } from './page-access'
 
-export const metadata: Metadata = { title: 'Campaigns' }
-
 type CampaignsPageProps = {
   params: Promise<{ locale: string }>
+  searchParams: Promise<{ status?: string }>
+}
+
+/** The tab title names the Campaigns page shown, as the sidebar does. */
+export async function generateMetadata({ searchParams }: CampaignsPageProps): Promise<Metadata> {
+  const { status } = await searchParams
+  return { title: `${status === 'ARCHIVED' ? 'Archived' : 'All campaigns'} · Campaigns` }
 }
 
 /** The three RFC 048 workflows; a workflow without an href is planned, not offered yet. */
@@ -106,7 +113,7 @@ export default async function CampaignsPage({ params }: CampaignsPageProps) {
         description="From release brief to launch."
         title="Campaigns"
       >
-        <AreaNavigation label="Campaigns" items={CAMPAIGN_LINKS} />
+        <AreaNavigation label="Campaigns" items={campaignLinks(contentDraftsEnabled())} />
         <ShipInput
           aiEnabled={bootstrap.capabilities.aiAgent}
           hasProfile={Boolean(profile)}

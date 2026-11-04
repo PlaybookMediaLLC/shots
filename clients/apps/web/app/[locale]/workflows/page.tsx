@@ -1,5 +1,6 @@
+import { AUTOMATE_LINKS } from '@/lib/platform/navigation'
 import { ReturnToWork } from '@/components/platform-hub/ReturnToWork'
-import { AreaNavigation, AUTOMATE_LINKS } from '@/components/platform-hub/AreaNavigation'
+import { AreaNavigation } from '@/components/platform-hub/AreaNavigation'
 import type { Metadata } from 'next'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -7,7 +8,7 @@ import { Page, PlanRequired } from '@/components/platform-ui'
 import { WorkflowsDashboard } from '@/components/workflows/WorkflowsDashboard'
 import { requireWorkflowPageAccess } from './page-access'
 
-export const metadata: Metadata = { title: 'Workflows' }
+export const metadata: Metadata = { title: 'Workflows · Automate' }
 
 type WorkflowsPageProps = { params: Promise<{ locale: string }> }
 
@@ -20,15 +21,10 @@ export default async function WorkflowsPage({ params }: WorkflowsPageProps) {
     >
       <Page
         actions={
-          <>
-            <ButtonLink href="/workflows/runs" variant="outline">
-              Run history
-            </ButtonLink>
-            {access.canManage ? <ButtonLink href="/workflows/new">New workflow</ButtonLink> : null}
-          </>
+          access.canManage ? <ButtonLink href="/workflows/new">New workflow</ButtonLink> : null
         }
         description="Shipped changes become reviewable campaigns."
-        title="Automate"
+        title="Workflows"
       >
         <ReturnToWork />
         {access.hasPaidPlan ? null : (

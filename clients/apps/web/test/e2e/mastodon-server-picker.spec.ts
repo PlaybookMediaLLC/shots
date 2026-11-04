@@ -40,7 +40,7 @@ test('a public Mastodon server returns a real preview through the authenticated 
       return { body: connectionAvailabilityFixture({ 'mastodon-custom': 'disabled' }) }
     return { status: 404 }
   }, socialMockPort)
-  await app.open('/workspace/social-sets')
+  await app.open('/settings/publishing-brands')
   await page
     .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
     .click()
@@ -101,7 +101,7 @@ test('Mastodon preview follows the chosen server and refuses credentials in the 
     })
   })
   try {
-    await app.open('/workspace/social-sets')
+    await app.open('/settings/publishing-brands')
     await page
       .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
       .click()

@@ -377,7 +377,7 @@ export function WebhookSettings({ canManage }: { canManage: boolean }) {
         <div className="grid gap-4">
           {secret ? <SecretNotice onDone={() => setSecret(null)} secret={secret} /> : null}
           {planRequired ? (
-            <PlanRequired from="/workspace/developers">Outbound webhooks need Pro.</PlanRequired>
+            <PlanRequired from="/settings/developers">Outbound webhooks need Pro.</PlanRequired>
           ) : webhooks.isError ? (
             <p className="text-sm text-red-700 dark:text-red-300" role="alert">
               {unavailable

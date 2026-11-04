@@ -171,13 +171,13 @@ export function WorkspaceCreationDialog({
         </DialogHeader>
         {created ? (
           <div className="grid gap-3">
-            <Button disabled={busy} onClick={() => void openWorkspace('/workspace/channels')}>
+            <Button disabled={busy} onClick={() => void openWorkspace('/settings/channels')}>
               Connect social accounts
             </Button>
             <Button
               disabled={busy}
               variant="outline"
-              onClick={() => void openWorkspace('/workspace/members')}
+              onClick={() => void openWorkspace('/settings/members')}
             >
               Invite members
             </Button>
@@ -193,7 +193,7 @@ export function WorkspaceCreationDialog({
             <Button
               disabled={busy}
               variant="ghost"
-              onClick={() => void openWorkspace('/workspace/billing')}
+              onClick={() => void openWorkspace('/settings/billing')}
             >
               Choose a plan
             </Button>
@@ -208,7 +208,7 @@ export function WorkspaceCreationDialog({
           >
             <a
               className="w-fit text-sm underline underline-offset-4"
-              href="/workspace/roles"
+              href="/settings/roles"
               target="_blank"
               rel="noreferrer"
             >

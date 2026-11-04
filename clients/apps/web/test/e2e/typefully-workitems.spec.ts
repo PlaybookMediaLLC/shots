@@ -27,7 +27,7 @@ test(
     await app.open(`/?new=${encodeURIComponent('What comes next? 100% + 🚀')}`)
     await expect(page.getByLabel('Imported draft text')).toHaveValue('What comes next? 100% + 🚀')
     await page.getByRole('button', { name: 'Create draft', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+$/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+$/)
     await expect(draftEditor(page)).toContainText('100% + 🚀')
     const paste = async () => {
       await page.getByRole('button', { name: 'More draft actions' }).click()
@@ -97,9 +97,9 @@ test(
       { length: 25 },
       (_, index) => `Post ${index + 1}: a distinct thought with enough room to edit.`
     ).join('\n---\n')
-    await app.open(`/write?new=${encodeURIComponent(text)}`)
+    await app.open(`/publish?new=${encodeURIComponent(text)}`)
     await page.getByRole('button', { name: 'Create draft', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+$/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+$/)
     await expect(page.getByTestId('post-header')).toHaveCount(25)
     const editor = draftEditor(page)
     await editor.click()
@@ -159,7 +159,7 @@ test(
     })
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
-    const calendarURL = `/write/plan?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
+    const calendarURL = `/publish/calendar?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
     await page.goto(calendarURL)
     await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
@@ -230,7 +230,7 @@ test(
       })
       expect(created.status, JSON.stringify(created.body)).toBe(201)
     }
-    await app.open('/write')
+    await app.open('/publish')
     const first = page.getByTestId('draft-row').filter({ hasText: 'Batch first' })
     const second = page.getByTestId('draft-row').filter({ hasText: 'Batch second' })
     await first.getByRole('link').click({ modifiers: ['Shift'] })
@@ -247,7 +247,7 @@ test(
     await page.getByRole('button', { name: 'Schedule valid drafts' }).click()
     await expect(dialog.getByRole('listitem').filter({ hasText: 'Scheduled' })).toHaveCount(2)
     await page.keyboard.press('Escape')
-    await app.open('/write/plan?view=month')
+    await app.open('/publish/calendar?view=month')
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
     await chooseOption(page.getByLabel('Calendar view'), 'Month')
     await page.getByTestId('calendar-post').filter({ visible: true }).first().click()
@@ -408,7 +408,7 @@ test(
         }),
       ]
     )
-    await app.open('/write/analyze/observations')
+    await app.open('/publish/analyze/observations')
     await expect(
       page.getByRole('img', { name: 'Average engagement score 8.0 from 5 posts' }).first()
     ).toBeVisible()
@@ -471,7 +471,7 @@ test(
     await expect(saved).toHaveCount(2)
     expect(
       await saved.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))
-    ).toEqual(ids.map((id) => `/write/${id}`))
+    ).toEqual(ids.map((id) => `/publish/${id}`))
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
     ).toBeDisabled()
@@ -505,9 +505,9 @@ test(
     })
     expect(combined.status, JSON.stringify(combined.body)).toBe(201)
     const id = (combined.body as { id: string }).id
-    await app.open(`/write/${id}`)
+    await app.open(`/publish/${id}`)
     await expect(page.getByTestId('post-header')).toHaveCount(2)
-    await app.open(`/write/${id}?panel=properties`)
+    await app.open(`/publish/${id}?panel=properties`)
     await page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true }).click()
     await expect(
       page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true })
@@ -630,7 +630,7 @@ test(
       },
     })
     expect(scheduled.status, JSON.stringify(scheduled.body)).toBe(201)
-    await app.open(`/write/${draft.id}`)
+    await app.open(`/publish/${draft.id}`)
     // The composer can append only once the live session has loaded the draft;
     // until then the reading link has no editor to go into.
     await expect(draftEditor(page)).toContainText('Unsent reply', { timeout: 60_000 })
@@ -654,7 +654,7 @@ test(
     await app.reload()
     await expect(page.getByText('Delivered root', { exact: false }).first()).toBeVisible()
     await page.screenshot({ path: '.context/shots/typefully-published-reading.png' })
-    await app.open(`/write/${draft.id}`)
+    await app.open(`/publish/${draft.id}`)
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.getByLabel('Public link', { exact: true }).click()
     await expect(page.getByLabel('Public link to share')).toHaveCount(0)
@@ -674,7 +674,7 @@ test(
     })
     expect(issued.status, JSON.stringify(issued.body)).toBe(200)
     const key = (issued.body as { apiKey: { id: string; key: string } }).apiKey
-    await app.open('/write')
+    await app.open('/publish')
     const origin = new URL(page.url()).origin
     const api = new ShotsClient(origin, key.key)
     const sets = await api.sets()
@@ -731,7 +731,7 @@ test(
     }
     const zapDraft = await zapier.createDraft(z, zapInput)
     expect((await zapier.createDraft(z, zapInput)).id).toBe(zapDraft.id)
-    await app.open(`/write/${zapDraft.id}`)
+    await app.open(`/publish/${zapDraft.id}`)
     await expect(draftEditor(page)).toContainText('From a source document.')
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await app.reload()
@@ -755,7 +755,7 @@ test(
     await expect(
       api.request(`/api/v1/social-sets/${sets[0].id}/queue`, 'PATCH', queueBody)
     ).rejects.toThrow()
-    await app.open(`/workspace/social-sets/${sets[0].id}/scheduling`)
+    await app.open(`/settings/publishing-brands/${sets[0].id}/scheduling`)
     await expect(
       page.getByRole('switch', { name: 'Natural posting times for new drafts', exact: true })
     ).toBeChecked()
@@ -802,7 +802,7 @@ test(
       body: JSON.stringify(action),
     })
     expect(replay.status).toBe(409)
-    await app.open(`/write/${created.id}?panel=comments`)
+    await app.open(`/publish/${created.id}?panel=comments`)
     await expect(page.getByTestId('comment-thread')).toContainText('Review assistant (API key)')
     await expect(page.getByTestId('comment-thread')).toContainText('Check the source.')
     await expect(page.getByTestId('orphaned-thread')).toHaveCount(0)

@@ -16,7 +16,7 @@ test(
 
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('link', { name: 'Account', exact: true }).click()
-    await expect(page).toHaveURL(/\/workspace\/account/)
+    await expect(page).toHaveURL(/\/settings\/account/)
     await openWorkspaceSetting(page, 'General')
     await expect(description).toHaveValue('Keep this draft')
     page.once('dialog', (dialog) => dialog.accept())
@@ -84,7 +84,7 @@ test('an expired freshness window offers sign-in recovery back to Account', asyn
   ).toBeVisible()
   await page.getByRole('link', { name: 'Verify identity', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible()
-  await expect(page).toHaveURL(/callbackURL=%2Fworkspace%2Faccount/)
+  await expect(page).toHaveURL(/callbackURL=%2Fsettings%2Faccount/)
 })
 
 test('SSO prerequisites explain the next steps before credentials are requested', async ({

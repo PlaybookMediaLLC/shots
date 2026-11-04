@@ -21,7 +21,7 @@ import {
  *   test.use({ workspaceOptions: { channels: ['x'], plan: 'pro' } })
  *
  *   test('…', async ({ app, workspace }) => {
- *     await app.open('/write')
+ *     await app.open('/publish')
  *     expect(await db.row('SELECT …', [workspace.id])).toMatchObject({ … })
  *   })
  *

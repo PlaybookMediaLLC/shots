@@ -147,7 +147,7 @@ test(
     const memberPage = await memberContext.newPage()
     try {
       await signUp(member, memberPage)
-      // Accepting navigates to /workspace; a request sent before that lands is aborted.
+      // Accepting navigates to /settings; a request sent before that lands is aborted.
       await acceptInvitation(memberPage, invitation.id)
       await expect
         .poll(async () => (await browserRequest(memberPage, '/api/v1/bootstrap')).status)

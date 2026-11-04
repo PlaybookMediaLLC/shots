@@ -37,7 +37,7 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
   ).toBe(200)
   const originalId = await getActiveOrganizationId(page)
   await grantWorkspacePlan(originalId, 'pro')
-  await app.open('/workspace')
+  await app.open('/settings')
   const originalField = page.getByRole('textbox', { name: 'Workspace name', exact: true })
   await originalField.fill('Unsaved current workspace name')
   const originalURL = page.url()
@@ -57,7 +57,7 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
   ).toBeVisible()
   await expect(dialog.getByRole('link', { name: 'Learn about team roles' })).toHaveAttribute(
     'href',
-    '/workspace/roles'
+    '/settings/roles'
   )
   await name.fill('Discard this draft name')
   await page.screenshot({
@@ -81,7 +81,7 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
 
   // The settings launcher exposes the same dialog on a small screen.
   await page.setViewportSize({ width: 390, height: 844 })
-  await app.open('/workspace/new-team')
+  await app.open('/settings/new-team')
   const launcher = page
     .getByRole('main')
     .getByRole('button', { name: 'Create workspace', exact: true })
@@ -119,7 +119,7 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
   })
   await dialog.getByRole('button', { name: 'Stay on this page' }).click()
   await expect(launcher).toBeFocused()
-  expect(new URL(page.url()).pathname).toBe('/workspace/new-team')
+  expect(new URL(page.url()).pathname).toBe('/settings/new-team')
   expect(creationRequests).toBe(1)
   await page.setViewportSize({ width: 1280, height: 900 })
   await account.click()

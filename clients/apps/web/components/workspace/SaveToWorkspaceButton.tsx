@@ -68,7 +68,7 @@ export function SaveToWorkspaceButton({
       toast.success('Saved to workspace', {
         action: {
           label: 'View assets',
-          onClick: () => window.open('/assets', '_blank', 'noopener,noreferrer'),
+          onClick: () => window.open('/library?view=assets', '_blank', 'noopener,noreferrer'),
         },
         description: 'This export is now available to your team.',
       })
@@ -103,7 +103,7 @@ export function SaveToWorkspaceButton({
       {draftExport && (
         <a
           className="text-sm underline"
-          href={`/write/${encodeURIComponent(draftExport.draft)}?attach=${encodeURIComponent(draftExport.assetId)}`}
+          href={`/publish/${encodeURIComponent(draftExport.draft)}?attach=${encodeURIComponent(draftExport.assetId)}`}
         >
           Review export in draft
         </a>

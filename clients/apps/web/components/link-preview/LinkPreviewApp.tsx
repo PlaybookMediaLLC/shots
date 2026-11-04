@@ -422,7 +422,7 @@ export function LinkPreviewApp() {
     }
   }, [url, preview, loading, post, campaign, content, tab])
 
-  // Open a shared check: /link-preview?url=…&agent=…
+  // Open a shared check: /publish/link-checks?url=…&agent=…
   useEffect(() => {
     setRecent(readRecent())
     const params = new URLSearchParams(window.location.search)

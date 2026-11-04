@@ -64,7 +64,7 @@ export function AcceptInvitation({ invitationId }: { invitationId: string }) {
       if (action === 'accept') {
         // Accepting makes the new workspace active for every tab.
         announceSessionChange()
-        window.location.assign('/workspace')
+        window.location.assign('/settings')
       } else await refresh()
     } catch (failure) {
       setError(getAuthErrorMessage(failure, 'The invitation result was not confirmed.'))
@@ -84,7 +84,7 @@ export function AcceptInvitation({ invitationId }: { invitationId: string }) {
       if (result.error)
         throw new Error(result.error.message || 'You no longer have access to this workspace.')
       announceSessionChange()
-      window.location.assign('/workspace')
+      window.location.assign('/settings')
     } catch (failure) {
       setError(getAuthErrorMessage(failure, 'Could not open this workspace.'))
       setBusy(false)
