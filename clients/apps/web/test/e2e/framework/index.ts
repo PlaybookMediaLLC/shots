@@ -303,6 +303,7 @@ export {
   saveBatchDrafts,
   settleSelection,
   socialMockPort,
+  toolbarTool,
   xVerification,
 } from './content-drafts'
 export { chooseOption } from './controls'

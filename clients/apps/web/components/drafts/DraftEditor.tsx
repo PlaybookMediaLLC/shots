@@ -61,6 +61,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
@@ -69,7 +70,6 @@ import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
 import {
-  insertPostBreak,
   insertPostAfter,
   leaveHeader,
   postRanges,
@@ -161,6 +161,10 @@ export type DraftEditorProps = {
   postSettings?: PostTools['settings']
   /** Extra buttons for the bottom toolbar: numbering, finishers, platform tools. */
   toolbarExtras?: React.ReactNode
+  /** Menu items the host adds to the toolbar's Media menu. */
+  toolbarMediaItems?: React.ReactNode
+  /** Menu items the host adds to the toolbar's More menu. */
+  toolbarMoreItems?: React.ReactNode
   /** Plugins the host adds, such as social mentions. */
   extraPlugins?: unknown[]
   /** Collaboration is off for a platform's own version: it saves with the draft. */
@@ -365,93 +369,31 @@ function fileSlug(title: string): string {
   )
 }
 
-/** Pick a file, hand it over, and reset the input so the same file can be picked again. */
-function FileButton({
-  accept,
-  children,
-  inputRef,
-  label,
-  onFile,
-}: {
-  accept: string
-  children: React.ReactNode
-  /** The hidden picker, for opening it from elsewhere. */
-  inputRef?: React.RefObject<HTMLInputElement | null>
-  label: string
-  onFile: (file: File) => void
-}) {
-  const own = React.useRef<HTMLInputElement>(null)
-  const input = inputRef ?? own
-  return (
-    <>
-      <ToolbarButton aria-label={label} onClick={() => input.current?.click()} tooltip={label}>
-        {children}
-      </ToolbarButton>
-      <Input
-        accept={accept}
-        aria-label={label}
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0]
-          event.target.value = ''
-          if (file) onFile(file)
-        }}
-        ref={input}
-        type="file"
-      />
-    </>
-  )
-}
-
 /**
- * A toolbar button that inserts at the caret. Pressing it must not move focus
- * out of the editor, and the editor takes focus back after the insert, so
- * typing continues where the insert put the caret.
+ * The rarer tools behind one button, out of the writing toolbar's way:
+ * inserts, the host's tools, then import and export.
  */
-function InsertButton({
+function MoreMenu({
   children,
-  editor,
-  insert,
-  label,
-}: {
-  children: React.ReactNode
-  editor: PlateEditor
-  insert: () => void
-  label: string
-}) {
-  return (
-    <ToolbarButton
-      aria-label={label}
-      onClick={() => {
-        insert()
-        editor.tf.focus()
-      }}
-      onMouseDown={(event) => event.preventDefault()}
-      tooltip={label}
-    >
-      {children}
-    </ToolbarButton>
-  )
-}
-
-/** Import and export, out of the writing toolbar's way behind one button. */
-function DocumentMenu({
   exports,
   files,
 }: {
+  children: React.ReactNode
   exports: { label: string; run: () => void | Promise<void> }[]
   files: { accept: string; label: string; onFile: (file: File) => void }[]
 }) {
   const inputs = React.useRef<Record<string, HTMLInputElement | null>>({})
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <ToolbarButton aria-label="Import and export" tooltip="Import and export">
+          <ToolbarButton aria-label="More tools" tooltip="More tools">
             <MoreHorizontalIcon aria-hidden className="size-4" />
           </ToolbarButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" side="top">
+          {children}
+          <DropdownMenuSeparator />
           {files.map((file) => (
             <DropdownMenuItem key={file.label} onSelect={() => inputs.current[file.label]?.click()}>
               {file.label}
@@ -488,12 +430,16 @@ function DocumentMenu({
 function DraftToolbar({
   editor,
   imageInput,
+  mediaItems,
+  moreItems,
   services,
   title,
   extras,
 }: {
   editor: PlateEditor
   imageInput: React.RefObject<HTMLInputElement | null>
+  mediaItems?: React.ReactNode
+  moreItems?: React.ReactNode
   services: EditorServices
   title: string
   extras?: React.ReactNode
@@ -534,9 +480,10 @@ function DraftToolbar({
   }
 
   return (
+    // One row: formatting, media, the host's writing tools, and the rest behind More.
     <Toolbar
       aria-label="Draft formatting"
-      className="flex max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md border border-border bg-card/95 p-px backdrop-blur [&_button]:!h-7 [&_button]:!px-2 [&_button]:!text-[13px] [&_button]:!font-medium"
+      className="flex max-w-full items-center justify-start gap-0.5 rounded-md border border-border bg-card/95 p-px backdrop-blur [&_button]:!h-7 [&_button]:!px-2 [&_button]:!text-[13px] [&_button]:!font-medium"
     >
       <ToolbarGroup>
         <MarkToolbarButton aria-label="Bold" nodeType={KEYS.bold} tooltip="Bold">
@@ -547,35 +494,42 @@ function DraftToolbar({
         </MarkToolbarButton>
       </ToolbarGroup>
       <ToolbarGroup>
-        <InsertButton editor={editor} insert={() => insertPostBreak(editor)} label="Add post">
-          + Post
-        </InsertButton>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <FileButton
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <ToolbarButton aria-label="Media" tooltip="Add media">
+              Media ▾
+            </ToolbarButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            onCloseAutoFocus={(event) => event.preventDefault()}
+          >
+            <DropdownMenuItem onSelect={() => imageInput.current?.click()}>
+              Upload a file
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setLibraryOpen(true)}>
+              Attach from Library
+            </DropdownMenuItem>
+            {mediaItems}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <Input
           accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
-          inputRef={imageInput}
-          label="Insert media"
-          onFile={(file) => {
+          aria-label="Insert media"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (!file) return
             // The media plugin takes a FileList, as from a drop or a picker.
             if (!editor.selection) editor.tf.select(editor.api.end([]))
             const files = new DataTransfer()
             files.items.add(file)
             editor.getTransforms(PlaceholderPlugin).insert.media(files.files)
           }}
-        >
-          Media
-        </FileButton>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <ToolbarButton
-          aria-label="Attach from Library"
-          tooltip="Attach from Library"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setLibraryOpen(true)}
-        >
-          Library
-        </ToolbarButton>
+          ref={imageInput}
+          type="file"
+        />
       </ToolbarGroup>
       {libraryOpen ? (
         <LibraryAssetPicker
@@ -590,51 +544,9 @@ function DraftToolbar({
           }}
         />
       ) : null}
-      {/* The longest group wraps inside itself, so no tool is cut off at the edge. */}
-      {extras ? (
-        <ToolbarGroup className="min-w-0 shrink [&>div]:flex-wrap">{extras}</ToolbarGroup>
-      ) : null}
+      {extras ? <ToolbarGroup className="min-w-0 shrink">{extras}</ToolbarGroup> : null}
       <ToolbarGroup>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <ToolbarButton aria-label="Insert" tooltip="Insert">
-              Insert ▾
-            </ToolbarButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault()
-              editor.tf.focus()
-            }}
-          >
-            {[
-              { label: 'Table', insert: () => insertBlock(editor, KEYS.table) },
-              { label: 'Math', insert: () => insertBlock(editor, KEYS.equation) },
-              {
-                label: 'Footnote',
-                insert: () => insertInlineElement(editor, KEYS.footnoteReference),
-              },
-              { label: 'Split post at caret', insert: () => splitPostAtCaret(editor) },
-            ].map((item) => (
-              <DropdownMenuItem
-                key={item.label}
-                onSelect={() => {
-                  item.insert()
-                  editor.tf.focus()
-                }}
-              >
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-            <p className="max-w-64 px-2 py-1 text-xs text-muted-foreground">
-              Tables and math publish as images. Footnotes publish as text.
-            </p>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <DocumentMenu
+        <MoreMenu
           files={[
             {
               accept:
@@ -648,7 +560,36 @@ function DraftToolbar({
             { label: 'Export DOCX', run: exportDocument },
             { label: 'Export Markdown', run: exportMarkdown },
           ]}
-        />
+        >
+          {[
+            { label: 'Table', insert: () => insertBlock(editor, KEYS.table) },
+            { label: 'Math', insert: () => insertBlock(editor, KEYS.equation) },
+            {
+              label: 'Footnote',
+              insert: () => insertInlineElement(editor, KEYS.footnoteReference),
+            },
+            { label: 'Split post at caret', insert: () => splitPostAtCaret(editor) },
+          ].map((item) => (
+            <DropdownMenuItem
+              key={item.label}
+              onSelect={() => {
+                item.insert()
+                editor.tf.focus()
+              }}
+            >
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+          <p className="max-w-64 px-2 py-1 text-xs text-muted-foreground">
+            Tables and math publish as images. Footnotes publish as text.
+          </p>
+          {moreItems ? (
+            <>
+              <DropdownMenuSeparator />
+              {moreItems}
+            </>
+          ) : null}
+        </MoreMenu>
       </ToolbarGroup>
     </Toolbar>
   )
@@ -706,6 +647,8 @@ function DraftEditorSession({
   postHeader,
   postSettings,
   toolbarExtras,
+  toolbarMediaItems,
+  toolbarMoreItems,
   extraPlugins,
   documentName,
   initialDiscussions: storedDiscussions,
@@ -1103,6 +1046,8 @@ function DraftEditorSession({
                     editor={editor}
                     extras={toolbarExtras}
                     imageInput={imageInput}
+                    mediaItems={toolbarMediaItems}
+                    moreItems={toolbarMoreItems}
                     services={services}
                     title={title}
                   />

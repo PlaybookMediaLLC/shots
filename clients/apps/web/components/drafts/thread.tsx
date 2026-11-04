@@ -1,14 +1,7 @@
 'use client'
 
 import { normalizeMentions } from '@/lib/write/normalize-mentions'
-import {
-  AddIcon,
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CloseIcon,
-  DragIcon,
-  ImageIcon,
-} from '@/components/platform-shell/icons'
+import { AddIcon, DragIcon, ImageIcon, MoreIcon } from '@/components/platform-shell/icons'
 
 import * as React from 'react'
 import {
@@ -28,6 +21,14 @@ import { newPostId, postBreak } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 /**
  * Threads (RFC 013, RFC 025): a draft is one or more posts. Every post starts
@@ -305,6 +306,13 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
   const editor = useEditorRef()
   const readOnly = useReadOnly()
   const count = useEditorSelector((current) => postRanges(current.children).length, [])
+  // The post holding the caret keeps its tools in view; others show them on hover or focus.
+  const holdsCaret = useEditorSelector((current) => {
+    const index = current.selection?.anchor.path[0]
+    if (index === undefined) return false
+    const [start, end] = postRanges(current.children)[number - 1] ?? [-1, -1]
+    return index >= start && index < end
+  }, [number])
   const [over, setOver] = React.useState(false)
   const button =
     'flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-30'
@@ -336,7 +344,13 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
     >
       <div className="min-w-0 flex-1">{header(number)}</div>
       {readOnly ? null : (
-        <div className="flex shrink-0 items-center flex-wrap gap-0.5">
+        <div
+          className={cn(
+            'flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 group-hover/post:opacity-100 motion-reduce:transition-none',
+            holdsCaret ? 'opacity-100' : 'opacity-0'
+          )}
+          data-testid={`post-tools-${number}`}
+        >
           {tools.settings?.({ number, settings })}
           <Button
             variant="custom"
@@ -383,41 +397,40 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
               >
                 <DragIcon aria-hidden size={15} />
               </span>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Move post ${number} up`}
-                className={button}
-                disabled={number === 1}
-                onClick={() => movePost(editor, number, number - 1)}
-                title="Move up (⌥↑)"
-                type="button"
-              >
-                <ArrowUpIcon aria-hidden size={14} />
-              </Button>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Move post ${number} down`}
-                className={button}
-                disabled={number === count}
-                onClick={() => movePost(editor, number, number + 1)}
-                title="Move down (⌥↓)"
-                type="button"
-              >
-                <ArrowDownIcon aria-hidden size={14} />
-              </Button>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Delete post ${number}`}
-                className={cn(button, 'hover:text-red-700 dark:hover:text-red-400')}
-                onClick={() => deletePost(editor, number)}
-                title="Delete post"
-                type="button"
-              >
-                <CloseIcon aria-hidden size={14} />
-              </Button>
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="custom"
+                    size={null}
+                    aria-label={`More actions for post ${number}`}
+                    className={button}
+                    title="Move or delete"
+                    type="button"
+                  >
+                    <MoreIcon aria-hidden size={15} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    disabled={number === 1}
+                    onSelect={() => movePost(editor, number, number - 1)}
+                  >
+                    Move post {number} up
+                    <DropdownMenuShortcut>⌥↑</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    disabled={number === count}
+                    onSelect={() => movePost(editor, number, number + 1)}
+                  >
+                    Move post {number} down
+                    <DropdownMenuShortcut>⌥↓</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => deletePost(editor, number)} variant="destructive">
+                    Delete post {number}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>

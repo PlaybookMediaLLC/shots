@@ -34,18 +34,22 @@ function attachmentsIn(node: TElement): TElement[] {
 /** Media controls operate on the editor's nodes, with native undo and autosave. */
 export function MediaTools({
   channel,
+  dialog,
+  onDialog,
   setId,
   onDescriptionSaved,
 }: {
   channel: string
+  /** The media tool the toolbar's menus opened, if any. */
+  dialog: 'gif' | 'link' | 'manage' | null
+  onDialog: (dialog: 'gif' | 'link' | 'manage' | null) => void
   setId: string | null
   onDescriptionSaved: (assetId: string, alt: string) => void
 }) {
   const editor = useEditorRef()
   const body = useEditorSelector((current) => current.children, [])
-  const [open, setOpen] = React.useState(false)
-  const [link, setLink] = React.useState(false)
-  const [gif, setGif] = React.useState(false)
+  const open = dialog === 'manage'
+  const setOpen = (next: boolean) => onDialog(next ? 'manage' : null)
   const [alt, setAlt] = React.useState<string | null>(null)
   const [frame, setFrame] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string | null>(null)
@@ -57,27 +61,8 @@ export function MediaTools({
   )
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setOpen(true)}
-      >
-        Manage media
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setLink(true)}
-      >
-        Image from link
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setGif(true)}>
-        GIF
-      </Button>
-      {gif ? <GiphyPicker editor={editor} onClose={() => setGif(false)} /> : null}
-      {link ? <LinkImage editor={editor} onClose={() => setLink(false)} /> : null}
+      {dialog === 'gif' ? <GiphyPicker editor={editor} onClose={() => onDialog(null)} /> : null}
+      {dialog === 'link' ? <LinkImage editor={editor} onClose={() => onDialog(null)} /> : null}
       {alt ? (
         <DescribeImages
           editor={editor}

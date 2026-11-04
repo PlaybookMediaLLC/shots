@@ -120,6 +120,7 @@ import type { PostPoll } from '@/lib/write/document'
 import { RefineButton } from './refine'
 import {
   MentionPicker,
+  mentionLookups,
   SocialMentionPlugin,
   SocialMentionInputPlugins,
   SocialMentionContext,
@@ -380,6 +381,12 @@ export function WriteComposer({
   )
   const bodyArea = React.useRef<HTMLDivElement>(null)
   const [pasteNotice, setPasteNotice] = React.useState(false)
+  const [toolDialog, setToolDialog] = React.useState<ToolDialog | null>(null)
+  const tools = (writing: DraftChannel[]) =>
+    toolMenuItems(
+      setToolDialog,
+      Boolean(server.socialSetId ?? set?.id) && mentionLookups(writing).length > 0
+    )
   const renderBlocks = async (): Promise<BlockImages> => {
     if (pendingBlocks.length === 0 || !services.uploadFile) return []
     if (active !== primary || !bodyArea.current) {
@@ -1404,11 +1411,15 @@ export function WriteComposer({
                     channel={active}
                     limit={activePublication.serialized.limit}
                     channels={items.map((item) => item.account.channel)}
+                    dialog={toolDialog}
                     editor={editor}
                     draftId={initial.id}
+                    onDialog={setToolDialog}
                     setId={server.socialSetId ?? set?.id ?? null}
                   />
                 }
+                toolbarMediaItems={tools(items.map((item) => item.account.channel)).media}
+                toolbarMoreItems={tools(items.map((item) => item.account.channel)).more}
               />
             ) : versionOfTab.mode === 'manual' ? (
               <>
@@ -1447,11 +1458,15 @@ export function WriteComposer({
                       channel={active}
                       limit={activePublication.serialized.limit}
                       channels={[active]}
+                      dialog={toolDialog}
                       editor={editor}
                       draftId={initial.id}
+                      onDialog={setToolDialog}
                       setId={server.socialSetId ?? set?.id ?? null}
                     />
                   }
+                  toolbarMediaItems={tools([active]).media}
+                  toolbarMoreItems={tools([active]).more}
                 />
               </>
             ) : (
@@ -1910,17 +1925,49 @@ function TargetBanner({ draft }: { draft: DraftWire }) {
 }
 
 /** The bottom toolbar's Write tools: mentions looked up on the platform, and emoji. */
+/** A tool the toolbar's Media or More menu opened. */
+type ToolDialog = 'alt' | 'gif' | 'link' | 'manage' | 'mention'
+
+/** The toolbar's Media and More menu items the composer adds; each opens a tool. */
+function toolMenuItems(
+  open: (dialog: ToolDialog) => void,
+  mention: boolean
+): { media: React.ReactNode; more: React.ReactNode } {
+  return {
+    media: (
+      <>
+        <DropdownMenuItem onSelect={() => open('link')}>Image from link</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => open('gif')}>GIF</DropdownMenuItem>
+      </>
+    ),
+    more: (
+      <>
+        {mention ? (
+          <DropdownMenuItem onSelect={() => open('mention')}>Add mention</DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem onSelect={() => open('alt')}>Describe images</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => open('manage')}>Manage media</DropdownMenuItem>
+      </>
+    ),
+  }
+}
+
 function ToolbarExtras({
   onDescriptionSaved,
   aiEnabled,
   channel,
   channels,
+  dialog,
   editor,
   limit,
   draftId,
+  onDialog,
   setId,
 }: {
   aiEnabled: boolean
+  /** The tool the toolbar's menus opened, if any. */
+  dialog: ToolDialog | null
+  onDialog: (dialog: ToolDialog | null) => void
   onDescriptionSaved: (assetId: string, alt: string) => void
   /** The version being edited, which Refine writes for. */
   channel: DraftChannel
@@ -1932,7 +1979,6 @@ function ToolbarExtras({
 }) {
   const { mod } = useKeys()
   const [open, setOpen] = React.useState(false)
-  const [describing, setDescribing] = React.useState(false)
   useShortcuts([
     { key: '>', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
     { key: '.', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
@@ -1942,24 +1988,25 @@ function ToolbarExtras({
       {aiEnabled ? (
         <RefineButton channel={channel} draftId={draftId} editor={editor} limit={limit} />
       ) : null}
-      <MentionPicker channels={channels} editor={editor} setId={setId} />
-      <MediaTools channel={channel} setId={setId} onDescriptionSaved={onDescriptionSaved} />
-      <Button
-        aria-label="Describe images"
-        className="h-7 rounded-md px-2 text-xs"
-        onClick={() => setDescribing(true)}
-        size={null}
-        title="Describe images (alt text)"
-        type="button"
-        variant="ghost"
-      >
-        ALT
-      </Button>
-      {describing && editor.current ? (
+      <MentionPicker
+        channels={channels}
+        editor={editor}
+        onOpenChange={(next) => onDialog(next ? 'mention' : null)}
+        open={dialog === 'mention'}
+        setId={setId}
+      />
+      <MediaTools
+        channel={channel}
+        dialog={dialog === 'gif' || dialog === 'link' || dialog === 'manage' ? dialog : null}
+        onDialog={onDialog}
+        setId={setId}
+        onDescriptionSaved={onDescriptionSaved}
+      />
+      {dialog === 'alt' && editor.current ? (
         <DescribeImages
           aiEnabled={aiEnabled}
           editor={editor.current}
-          onClose={() => setDescribing(false)}
+          onClose={() => onDialog(null)}
           onSaved={onDescriptionSaved}
         />
       ) : null}

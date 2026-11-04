@@ -628,7 +628,7 @@ test(
       .boundingBox()
     const publish = await page.getByTestId('publish-button').boundingBox()
     expect(panel && publish && publish.x + publish.width <= panel.x).toBeTruthy()
-    await page.getByRole('button', { name: 'Add post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add another post', exact: true }).click()
     await page.keyboard.type('Second post')
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expect(page.getByTestId('post-length-2')).toHaveText('11 / 280')
