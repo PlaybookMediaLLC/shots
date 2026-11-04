@@ -337,6 +337,14 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.e2e-plan.outputs.matrix) }}
     steps:
+      # The host install, the dev image and its node_modules volume each hold a
+      # copy of the dependencies, which can fill the runner's disk. The job
+      # never uses these preinstalled toolchains.
+      - name: Free runner disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
