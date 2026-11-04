@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { ProjectPreview } from '@/components/projects/ProjectPreview'
@@ -155,13 +156,13 @@ export function SourceUpdate({
           Replace the shared evidence and select its focus again. Review each affected format after
           applying. Local copy, styling and placement are preserved.
         </DialogDescription>
-        <Input
-          aria-label="Replacement screenshot"
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
+        <FileDropZone
+          accept={{ 'image/png': [], 'image/jpeg': [], 'image/webp': [] }}
           disabled={busy}
-          onChange={async (event) => {
-            const file = event.target.files?.[0]
+          hint="PNG, JPEG or WebP."
+          label="Replacement screenshot"
+          onFiles={async (files) => {
+            const file = files[0]
             if (!file) return
             setBusy(true)
             setError(null)

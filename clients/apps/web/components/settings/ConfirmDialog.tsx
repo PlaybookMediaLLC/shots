@@ -28,6 +28,8 @@ export function ConfirmDialog({
   destructive,
   disabled,
   onConfirm,
+  onOpenChange,
+  open: controlledOpen,
   title,
   triggerLabel,
 }: {
@@ -40,11 +42,19 @@ export function ConfirmDialog({
   disabled?: boolean
   /** Resolves to an error message, or null when it succeeded. */
   onConfirm: (typed: string) => Promise<string | null>
+  /** With `open`, the caller opens the dialog, such as from a menu, and no trigger renders. */
+  onOpenChange?: (open: boolean) => void
+  open?: boolean
   title: string
-  triggerLabel: string
+  triggerLabel?: string
 }) {
   const id = useId()
-  const [open, setOpen] = useState(false)
+  const [ownOpen, setOwnOpen] = useState(false)
+  const open = controlledOpen ?? ownOpen
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next)
+    onOpenChange?.(next)
+  }
   const [typed, setTyped] = useState('')
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -75,11 +85,13 @@ export function ConfirmDialog({
       }}
       open={open}
     >
-      <AlertDialogTrigger asChild>
-        <Button disabled={disabled} type="button" variant={destructive ? 'destructive' : 'outline'}>
-          {triggerLabel}
-        </Button>
-      </AlertDialogTrigger>
+      {triggerLabel ? (
+        <AlertDialogTrigger asChild>
+          <Button disabled={disabled} type="button" variant={destructive ? 'destructive' : 'outline'}>
+            {triggerLabel}
+          </Button>
+        </AlertDialogTrigger>
+      ) : null}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

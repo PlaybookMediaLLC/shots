@@ -3482,6 +3482,7 @@ var (
 		{Name: "theme", Type: field.TypeEnum, Enums: []string{"light", "dark", "system"}, Default: "dark"},
 		{Name: "navigation", Type: field.TypeEnum, Enums: []string{"compact", "dynamic", "expanded"}, Default: "compact"},
 		{Name: "weekStart", Type: field.TypeEnum, Enums: []string{"monday", "sunday"}, Default: "monday"},
+		{Name: "timeFormat", Type: field.TypeEnum, Enums: []string{"auto", "12h", "24h"}, Default: "auto"},
 		{Name: "textDirection", Type: field.TypeEnum, Enums: []string{"ltr", "rtl"}, Default: "ltr"},
 		{Name: "showScrollbars", Type: field.TypeBool, Default: true},
 		{Name: "developerMode", Type: field.TypeBool, Default: false},

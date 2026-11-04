@@ -29,6 +29,16 @@ export async function listBackendConnections(access: OrganizationAccess) {
   return result.items
 }
 
+/** Removes an account from the workspace; the Go domain cancels its queue and checks its brand's visibility. */
+export async function removeBackendConnection(access: OrganizationAccess, connectionId: string) {
+  return backendSDK(access).removeConnection(connectionId)
+}
+
+/** Reads an account's profile from its platform again and returns it with its health. */
+export async function refreshBackendConnection(access: OrganizationAccess, connectionId: string) {
+  return backendSDK(access).refreshConnection(connectionId)
+}
+
 export async function createBackendConnection(
   access: OrganizationAccess,
   input: {

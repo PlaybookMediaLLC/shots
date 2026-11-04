@@ -107,6 +107,7 @@ import type {
   Engagement,
   ExperimentState,
   PublicProfile,
+  SocialAccountHealth,
   SocialSet,
   SocialSetInput,
   SocialSetList,
@@ -254,6 +255,14 @@ export type ChannelConnection = {
   avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
+  /** The publishing brand it belongs to; null when it is in none. */
+  socialSetId?: string | null
+  /** Its verified state, when the product configuration could read it. */
+  health?: SocialAccountHealth
+  /** Drafts and scheduled posts that removing it would cancel. */
+  queuedPosts?: number
+  /** When the row last changed, such as a refresh of its profile. */
+  updatedAt?: string
 }
 
 export type BrandKit = {
@@ -2254,6 +2263,21 @@ export class ScreenshotStudioBackendSDK {
 
   async listConnections() {
     return this.request<{ items: ChannelConnection[] }>('v1/channel-connections')
+  }
+
+  /** Removes an account from the workspace, in a publishing brand or in none; its queued posts are cancelled. */
+  async removeConnection(id: string) {
+    return this.request<SocialSetRemoval>(`v1/channel-connections/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /** Reads an account's name, handle and picture from its platform again, with its current health. */
+  async refreshConnection(id: string) {
+    return this.request<ChannelConnection>(
+      `v1/channel-connections/${encodeURIComponent(id)}/refresh`,
+      { method: 'POST' }
+    )
   }
 
   async createConnection(input: {

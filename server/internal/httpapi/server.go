@@ -531,9 +531,16 @@ func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	connections = s.fillProfiles(r.Context(), organizationID, connections)
+	var states map[string]product.ChannelAccountState
+	if s.configuration != nil {
+		if states, err = s.configuration.ChannelAccountStates(r.Context(), organizationID, connections); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+	}
 	items := make([]any, 0, len(connections))
 	for _, connection := range connections {
-		items = append(items, connectionResponse(connection))
+		items = append(items, connectionWithState(connection, states))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -718,7 +725,19 @@ func connectionResponse(connection *ent.ChannelConnection) map[string]any {
 		"providerSettings": connection.ProviderSettings, "status": connection.Status,
 		"createdAt": connection.CreatedAt, "updatedAt": connection.UpdatedAt,
 		"displayName": connection.DisplayName, "handle": connection.Handle, "avatarUrl": connection.AvatarURL,
+		"socialSetId": connection.SocialSetID,
 	}
+}
+
+// connectionWithState adds an account's health and queued-post count, when
+// the product configuration could read them.
+func connectionWithState(connection *ent.ChannelConnection, states map[string]product.ChannelAccountState) map[string]any {
+	response := connectionResponse(connection)
+	if state, ok := states[connection.ID]; ok {
+		response["health"] = state.Health
+		response["queuedPosts"] = state.QueuedPosts
+	}
+	return response
 }
 
 func decodeJSON(r *http.Request, target any) error {

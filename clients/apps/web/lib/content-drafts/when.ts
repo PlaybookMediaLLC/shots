@@ -4,6 +4,8 @@
  * day without a time means 9:00; a time alone means its next occurrence.
  */
 
+import { parseTimeOfDay } from '@/lib/time-of-day'
+
 const UNITS: Record<string, number> = {
   d: 86_400_000,
   day: 86_400_000,
@@ -22,17 +24,8 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 /** "9", "9am", "9:30pm", "21:00", "noon", "midnight" as [hours, minutes]. */
 function parseTime(text: string): [number, number] | null {
-  if (text === 'noon') return [12, 0]
-  if (text === 'midnight') return [0, 0]
-  const match = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm|a|p)?$/.exec(text)
-  if (!match) return null
-  let hours = Number(match[1])
-  const minutes = Number(match[2] ?? 0)
-  const half = match[3]?.[0]
-  if (minutes > 59 || hours > 23 || (half && (hours < 1 || hours > 12))) return null
-  if (half === 'p' && hours < 12) hours += 12
-  if (half === 'a' && hours === 12) hours = 0
-  return [hours, minutes]
+  const time = parseTimeOfDay(text)
+  return time ? [Number(time.slice(0, 2)), Number(time.slice(3))] : null
 }
 
 function at(day: Date, [hours, minutes]: [number, number]): Date {

@@ -19,7 +19,8 @@ import {
 import { useTRPCClient } from '@/lib/trpc/react'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { workspaceNameSchema } from '@/lib/workspace/input-schemas'
-import { TimeZonePicker, browserTimeZone } from '@/components/settings/TimeZonePicker'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { browserTimeZone } from '@/lib/time-zones'
 import {
   isTerminalCreationError,
   newWorkspaceCreationAttempt,

@@ -108,6 +108,7 @@ function DisplayTimeZone() {
       <TimeZonePicker
         allowBrowser
         disabled={status !== 'ready' || state === 'saving'}
+        hideLabel
         label="Display time zone"
         onChange={(timeZone) => setDraft({ timeZone })}
         value={value}
