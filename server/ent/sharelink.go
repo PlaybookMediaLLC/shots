@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -33,6 +34,8 @@ type ShareLink struct {
 	Description *string `json:"description,omitempty"`
 	// AltText holds the value of the "alt_text" field.
 	AltText *string `json:"alt_text,omitempty"`
+	// Code holds the value of the "code" field.
+	Code map[string]interface{} `json:"code,omitempty"`
 	// Access holds the value of the "access" field.
 	Access sharelink.Access `json:"access,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
@@ -53,6 +56,8 @@ func (*ShareLink) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case sharelink.FieldCode:
+			values[i] = new([]byte)
 		case sharelink.FieldID, sharelink.FieldOrganizationID, sharelink.FieldToken, sharelink.FieldAssetID, sharelink.FieldPosterAssetID, sharelink.FieldProjectID, sharelink.FieldTitle, sharelink.FieldDescription, sharelink.FieldAltText, sharelink.FieldAccess, sharelink.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
 		case sharelink.FieldExpiresAt, sharelink.FieldRevokedAt, sharelink.FieldCreatedAt, sharelink.FieldUpdatedAt:
@@ -129,6 +134,14 @@ func (_m *ShareLink) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.AltText = new(string)
 				*_m.AltText = value.String
+			}
+		case sharelink.FieldCode:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field code", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Code); err != nil {
+					return fmt.Errorf("unmarshal field code: %w", err)
+				}
 			}
 		case sharelink.FieldAccess:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -236,6 +249,9 @@ func (_m *ShareLink) String() string {
 		builder.WriteString("alt_text=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("code=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Code))
 	builder.WriteString(", ")
 	builder.WriteString("access=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Access))

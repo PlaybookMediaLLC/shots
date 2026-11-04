@@ -100,6 +100,12 @@ func (_c *ShareLinkCreate) SetNillableAltText(v *string) *ShareLinkCreate {
 	return _c
 }
 
+// SetCode sets the "code" field.
+func (_c *ShareLinkCreate) SetCode(v map[string]interface{}) *ShareLinkCreate {
+	_c.mutation.SetCode(v)
+	return _c
+}
+
 // SetAccess sets the "access" field.
 func (_c *ShareLinkCreate) SetAccess(v sharelink.Access) *ShareLinkCreate {
 	_c.mutation.SetAccess(v)
@@ -333,6 +339,10 @@ func (_c *ShareLinkCreate) createSpec() (*ShareLink, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AltText(); ok {
 		_spec.SetField(sharelink.FieldAltText, field.TypeString, value)
 		_node.AltText = &value
+	}
+	if value, ok := _c.mutation.Code(); ok {
+		_spec.SetField(sharelink.FieldCode, field.TypeJSON, value)
+		_node.Code = value
 	}
 	if value, ok := _c.mutation.Access(); ok {
 		_spec.SetField(sharelink.FieldAccess, field.TypeEnum, value)

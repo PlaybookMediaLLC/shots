@@ -6,6 +6,7 @@ import {
   type BoardVisual,
 } from '@/components/launch/assets/AssetBoard'
 import { ProduceControl } from '@/components/launch/assets/ProduceControl'
+import { CodeHighlights } from '@/components/code-studio/CodeHighlights'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
 import { critiqueSchema } from '@/lib/ai/launch/critique'
 import { hasPermission } from '@/lib/auth/permissions'
@@ -76,7 +77,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
       ...campaign.assets
         .filter(
           (link) =>
-            link.kind === 'product-shot' &&
+            (link.kind === 'product-shot' || link.kind === 'code-visual') &&
             !designs.some((design) => design.renderedAsset?.id === link.assetId)
         )
         .map(async (link): Promise<BoardVisual> => ({
@@ -85,7 +86,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
           createdAt: link.createdAt.getTime(),
           critique: null,
           designId: null,
-          editHref: `/?asset=${link.asset.id}`,
+          editHref: link.kind === 'code-visual' ? '/library?type=code' : `/?asset=${link.asset.id}`,
           fromEarlierPlan:
             plan && link.planVersion !== null ? link.planVersion !== plan.version : undefined,
           id: link.id,
@@ -94,7 +95,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
             url: await sign(link.asset.id),
             width: link.asset.width,
           },
-          name: 'Product shot',
+          name: link.kind === 'code-visual' ? 'Code visual' : 'Product shot',
           planAssetKey: link.planAssetKey,
           renderedAssetId: link.asset.id,
           variantLabel: link.variantLabel,
@@ -131,6 +132,9 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
           campaignId={campaign.id}
           lastError={produce?.status === 'FAILED' ? produce.error : null}
         />
+      ) : null}
+      {canEdit ? (
+        <CodeHighlights campaignId={campaign.id} sourceUrls={campaign.release?.sourceUrls ?? []} />
       ) : null}
       <AssetBoard
         captures={captures}

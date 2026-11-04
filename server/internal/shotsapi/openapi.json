@@ -7837,6 +7837,416 @@
         ]
       }
     },
+    "/api/v1/code-projects": {
+      "post": {
+        "x-shots-entitlement": {
+          "feature": "workspace:paid",
+          "minimumPlan": "pro",
+          "quota": "api:write:minute"
+        },
+        "description": "Creates a Code Studio project from code, as a CLI or editor extension does with a selection. The project opens in Code Studio for styling, exporting and posting; render it with the render operation.",
+        "operationId": "createCodeProject",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "aspect": {
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "16:9",
+                      "1.91:1",
+                      "1:1",
+                      "4:5",
+                      "9:16"
+                    ]
+                  },
+                  "dark": {
+                    "type": "boolean"
+                  },
+                  "files": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 100000
+                        },
+                        "lang": {
+                          "type": "string",
+                          "enum": [
+                            "typescript",
+                            "tsx",
+                            "javascript",
+                            "jsx",
+                            "python",
+                            "go",
+                            "rust",
+                            "java",
+                            "kotlin",
+                            "swift",
+                            "c",
+                            "cpp",
+                            "csharp",
+                            "php",
+                            "ruby",
+                            "dart",
+                            "elixir",
+                            "scala",
+                            "lua",
+                            "r",
+                            "zig",
+                            "sql",
+                            "graphql",
+                            "prisma",
+                            "json",
+                            "yaml",
+                            "toml",
+                            "hcl",
+                            "html",
+                            "xml",
+                            "css",
+                            "scss",
+                            "vue",
+                            "svelte",
+                            "markdown",
+                            "bash",
+                            "shellsession",
+                            "dockerfile",
+                            "diff",
+                            "text"
+                          ]
+                        },
+                        "name": {
+                          "type": "string",
+                          "maxLength": 120
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "theme": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "files"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new code project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeProject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The code or settings are not valid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks the required workspace scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceApiKey": [
+              "asset:write"
+            ]
+          },
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Create a code project",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/api/v1/code-projects/{projectId}": {
+      "get": {
+        "x-shots-entitlement": {
+          "feature": "workspace:paid",
+          "minimumPlan": "pro"
+        },
+        "description": "Reads a Code Studio project's document: its slides, files and style.",
+        "operationId": "getCodeProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "cuid",
+              "pattern": "^[cC][0-9a-z]{6,}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The code project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeProject"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks the required workspace scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No code project with that id exists in this workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceApiKey": [
+              "artifact:read"
+            ]
+          },
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Get a code project",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
+    "/api/v1/code-projects/{projectId}/render": {
+      "post": {
+        "x-shots-entitlement": {
+          "feature": "workspace:paid",
+          "minimumPlan": "pro",
+          "quota": "api:write:minute"
+        },
+        "description": "Renders one slide as a PNG on the server, exactly as Code Studio exports it, and stores it as a workspace asset. Download it with the asset download URL operation. Renders count against the workspace render limit.",
+        "operationId": "renderCodeProject",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "cuid",
+              "pattern": "^[cC][0-9a-z]{6,}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "scale": {
+                    "default": 2,
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 2
+                      },
+                      {
+                        "type": "number",
+                        "const": 3
+                      }
+                    ]
+                  },
+                  "slide": {
+                    "default": 0,
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 49
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderedCode"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The API key lacks the required workspace scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No code project with that id exists in this workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The workspace is rendering too fast.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceQuotaError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A required dependency is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "workspaceApiKey": [
+              "artifact:read"
+            ]
+          },
+          {
+            "workspaceSession": []
+          }
+        ],
+        "summary": "Render a code project slide",
+        "tags": [
+          "Assets"
+        ]
+      }
+    },
     "/api/v1/campaigns": {
       "get": {
         "x-shots-entitlement": {
@@ -18994,6 +19404,716 @@
         "required": [
           "altText",
           "id"
+        ],
+        "additionalProperties": false
+      },
+      "CodeProject": {
+        "type": "object",
+        "properties": {
+          "createdAt": {},
+          "document": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "number",
+                "const": 1
+              },
+              "kind": {
+                "type": "string",
+                "const": "code"
+              },
+              "style": {
+                "type": "object",
+                "properties": {
+                  "theme": {
+                    "default": "midnight",
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "brandTheme": {
+                    "default": null,
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kitId": {
+                            "type": "string",
+                            "maxLength": 200
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 200
+                          },
+                          "from": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "to": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "accent": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-fA-F]{6}$"
+                          },
+                          "light": {
+                            "type": "object",
+                            "properties": {
+                              "foreground": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "constant": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "string": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "comment": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "keyword": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "parameter": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "function": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "stringExpression": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "punctuation": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "link": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "number": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "property": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              }
+                            },
+                            "required": [
+                              "foreground"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "dark": {
+                            "type": "object",
+                            "properties": {
+                              "foreground": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "constant": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "string": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "comment": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "keyword": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "parameter": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "function": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "stringExpression": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "punctuation": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "link": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "number": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              },
+                              "property": {
+                                "type": "string",
+                                "pattern": "^#[0-9a-fA-F]{6}$"
+                              }
+                            },
+                            "required": [
+                              "foreground"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "kitId",
+                          "name",
+                          "from",
+                          "to",
+                          "accent",
+                          "light",
+                          "dark"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "dark": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "showBackground": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "background": {
+                    "default": {
+                      "kind": "theme",
+                      "id": ""
+                    },
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "theme",
+                          "gradient",
+                          "image",
+                          "pattern"
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "maxLength": 400
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "id"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "padding": {
+                    "default": 64,
+                    "type": "number"
+                  },
+                  "font": {
+                    "default": "jetbrainsMono",
+                    "type": "string"
+                  },
+                  "lineNumbers": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "frame": {
+                    "default": "mac",
+                    "type": "string",
+                    "enum": [
+                      "mac",
+                      "terminal",
+                      "card",
+                      "none"
+                    ]
+                  },
+                  "title": {
+                    "default": "",
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "width": {
+                    "default": 700,
+                    "type": "integer",
+                    "minimum": 520,
+                    "maximum": 1200
+                  },
+                  "aspect": {
+                    "default": "auto",
+                    "type": "string",
+                    "enum": [
+                      "auto",
+                      "16:9",
+                      "1.91:1",
+                      "1:1",
+                      "4:5",
+                      "9:16"
+                    ]
+                  },
+                  "footer": {
+                    "default": {
+                      "show": false,
+                      "name": "",
+                      "handle": ""
+                    },
+                    "type": "object",
+                    "properties": {
+                      "show": {
+                        "default": false,
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "handle": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "logo": {
+                        "type": "string",
+                        "pattern": "^asset:[0-9a-fA-F-]{36}$"
+                      }
+                    },
+                    "required": [
+                      "show",
+                      "name",
+                      "handle"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "theme",
+                  "brandTheme",
+                  "dark",
+                  "showBackground",
+                  "background",
+                  "padding",
+                  "font",
+                  "lineNumbers",
+                  "frame",
+                  "title",
+                  "width",
+                  "aspect",
+                  "footer"
+                ],
+                "additionalProperties": false
+              },
+              "slides": {
+                "minItems": 1,
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "layout": {
+                      "default": "single",
+                      "type": "string",
+                      "enum": [
+                        "single",
+                        "split"
+                      ]
+                    },
+                    "panes": {
+                      "minItems": 1,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "activeFile": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 80
+                          },
+                          "files": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 80
+                                },
+                                "name": {
+                                  "default": "",
+                                  "type": "string",
+                                  "maxLength": 120
+                                },
+                                "lang": {
+                                  "default": "text",
+                                  "type": "string",
+                                  "enum": [
+                                    "typescript",
+                                    "tsx",
+                                    "javascript",
+                                    "jsx",
+                                    "python",
+                                    "go",
+                                    "rust",
+                                    "java",
+                                    "kotlin",
+                                    "swift",
+                                    "c",
+                                    "cpp",
+                                    "csharp",
+                                    "php",
+                                    "ruby",
+                                    "dart",
+                                    "elixir",
+                                    "scala",
+                                    "lua",
+                                    "r",
+                                    "zig",
+                                    "sql",
+                                    "graphql",
+                                    "prisma",
+                                    "json",
+                                    "yaml",
+                                    "toml",
+                                    "hcl",
+                                    "html",
+                                    "xml",
+                                    "css",
+                                    "scss",
+                                    "vue",
+                                    "svelte",
+                                    "markdown",
+                                    "bash",
+                                    "shellsession",
+                                    "dockerfile",
+                                    "diff",
+                                    "text"
+                                  ]
+                                },
+                                "code": {
+                                  "type": "string",
+                                  "maxLength": 100000
+                                },
+                                "base": {
+                                  "type": "string",
+                                  "maxLength": 100000
+                                },
+                                "diff": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unified",
+                                    "split"
+                                  ]
+                                },
+                                "marks": {
+                                  "type": "object",
+                                  "properties": {
+                                    "highlight": {
+                                      "default": [],
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "prefixItems": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          },
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          }
+                                        ],
+                                        "items": false,
+                                        "minItems": 2,
+                                        "maxItems": 2
+                                      }
+                                    },
+                                    "focus": {
+                                      "default": [],
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "prefixItems": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          },
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          }
+                                        ],
+                                        "items": false,
+                                        "minItems": 2,
+                                        "maxItems": 2
+                                      }
+                                    },
+                                    "blur": {
+                                      "default": [],
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "array",
+                                        "prefixItems": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          },
+                                          {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "maximum": 20000
+                                          }
+                                        ],
+                                        "items": false,
+                                        "minItems": 2,
+                                        "maxItems": 2
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "highlight",
+                                    "focus",
+                                    "blur"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "annotations": {
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": 80
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "marker",
+                                          "callout"
+                                        ]
+                                      },
+                                      "line": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "maximum": 20000
+                                      },
+                                      "text": {
+                                        "default": "",
+                                        "type": "string",
+                                        "maxLength": 280
+                                      }
+                                    },
+                                    "required": [
+                                      "id",
+                                      "kind",
+                                      "line",
+                                      "text"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "tape": {
+                                  "type": "string",
+                                  "maxLength": 20000
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "lang",
+                                "code"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "activeFile",
+                          "files"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "caption": {
+                      "default": "",
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "duration": {
+                      "default": 2500,
+                      "type": "integer",
+                      "minimum": 300,
+                      "maximum": 20000
+                    },
+                    "transition": {
+                      "default": "morph",
+                      "type": "string",
+                      "enum": [
+                        "morph",
+                        "type",
+                        "highlight",
+                        "cut"
+                      ]
+                    },
+                    "transitionDuration": {
+                      "default": 800,
+                      "type": "integer",
+                      "minimum": 100,
+                      "maximum": 5000
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "layout",
+                    "panes",
+                    "caption",
+                    "duration",
+                    "transition",
+                    "transitionDuration"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "source": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "github-file",
+                      "github-pull",
+                      "github-commit",
+                      "gist",
+                      "file"
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "repo": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "path": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "version",
+              "kind",
+              "style",
+              "slides"
+            ],
+            "additionalProperties": false
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "updatedAt": {},
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        },
+        "required": [
+          "createdAt",
+          "document",
+          "id",
+          "name",
+          "revision",
+          "updatedAt",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "RenderedCode": {
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "height": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "mediaType": {
+            "type": "string",
+            "const": "image/png"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "assetId",
+          "height",
+          "mediaType",
+          "width"
         ],
         "additionalProperties": false
       },

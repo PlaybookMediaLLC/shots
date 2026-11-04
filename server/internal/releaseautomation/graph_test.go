@@ -511,3 +511,46 @@ func TestCreateCanvas(t *testing.T) {
 		t.Fatal(issues)
 	}
 }
+
+// A code visual reads code only with the owner's consent, from a merged pull request.
+func TestRenderCodeVisualNeedsConsentAndAPullRequest(t *testing.T) {
+	build := func() Graph {
+		g := testGraph()
+		g.SchemaVersion = 2
+		g.Family = Merged
+		g.Qualification = Condition{Field: "pr.base", Operator: "eq", Values: []string{"main"}}
+		g.Nodes[1] = Node{ID: "stable", Type: "condition", Condition: &Condition{Field: "pr.base", Operator: "eq", Values: []string{"main"}}}
+		g.Nodes = append(g.Nodes, Node{ID: "code", Type: "action", Action: &Action{Type: "render_code_visual", Input: &Reference{NodeID: "campaign", Output: "campaignId"}, ReadSourceCode: true}})
+		g.Edges[4].To = "code"
+		g.Edges = append(g.Edges, Edge{"code", "review", "next"})
+		g.Nodes[4].Action.Input.NodeID = "code"
+		return g
+	}
+	if issues := Validate(build()); len(issues) > 0 {
+		t.Fatal(issues)
+	}
+	if outcome := DryRun(build(), Event{Family: Merged, Fields: map[string]Value{"pr.base": StringValue("main")}}).Steps; !slices.ContainsFunc(outcome, func(step Step) bool {
+		return step.Action == "render_code_visual" && strings.Contains(step.Outcome, "reads no code")
+	}) {
+		t.Fatalf("dry run=%+v", outcome)
+	}
+	for name, change := range map[string]func(*Graph){
+		"no consent":        func(g *Graph) { g.Nodes[7].Action.ReadSourceCode = false },
+		"release trigger":   func(g *Graph) { g.Family = Published },
+		"version one":       func(g *Graph) { g.SchemaVersion = 1 },
+		"consent elsewhere": func(g *Graph) { g.Nodes[3].Action.ReadSourceCode = true },
+		"twice": func(g *Graph) {
+			g.Nodes = append(g.Nodes, Node{ID: "code2", Type: "action", Action: &Action{Type: "render_code_visual", Input: &Reference{NodeID: "campaign", Output: "campaignId"}, ReadSourceCode: true}})
+			g.Edges[len(g.Edges)-1].To = "code2"
+			g.Edges = append(g.Edges, Edge{"code2", "review", "next"})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := build()
+			change(&g)
+			if len(Validate(g)) == 0 {
+				t.Fatal("invalid code visual accepted")
+			}
+		})
+	}
+}

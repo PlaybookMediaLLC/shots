@@ -37,6 +37,12 @@ export type AutomationAction =
       recipeIds?: string[]
       surfaceId?: string
     }
+  | {
+      type: 'render_code_visual'
+      input?: { nodeId: string; output: string }
+      /** The owner's consent to read the merged pull request's diff. */
+      readSourceCode?: boolean
+    }
   | { type: 'submit_review'; input?: { nodeId: string; output: string } }
 export type AutomationClassify = { criteria: string; threshold: number; creditLimit: number }
 export type AutomationNode = {
@@ -151,6 +157,7 @@ export type AutomationOutputs = {
   designIds?: string[]
   renderedAssetIds?: string[]
   canvasId?: string
+  codeProjectId?: string
 }
 export type AutomationHistoryItem = {
   event: {

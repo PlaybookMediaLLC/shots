@@ -84,6 +84,18 @@ const nextConfig: NextConfig = {
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
         ],
       },
+      // Share embeds exist to be framed by other sites (blogs, docs). The
+      // catch-all above forbids framing, so these routes override it.
+      ...['/s/:token/embed', '/:locale/s/:token/embed'].map((source) => ({
+        source,
+        headers: [
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-ancestors *; object-src 'none'; base-uri 'self'",
+          },
+        ],
+      })),
       // COOP/COEP for editor routes (FFmpeg WASM)
       {
         source: '/editor/:path*',

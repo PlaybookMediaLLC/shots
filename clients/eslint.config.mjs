@@ -87,8 +87,8 @@ export default defineConfig([
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    // Zapier's native runtime loads CommonJS modules.
-    files: ['integrations/zapier/**/*.js'],
+    // Zapier's native runtime and the VS Code extension host load CommonJS modules.
+    files: ['integrations/zapier/**/*.js', 'integrations/vscode/**/*.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { Buffer: 'readonly', URL: 'readonly' },
@@ -169,6 +169,20 @@ export default defineConfig([
       ].map((directory) => `apps/web/components/${directory}/**`),
     ],
     rules: { 'no-restricted-syntax': ['error', ...rawControls, ...nativePickers] },
+  },
+  {
+    // The Code Studio CLI and VS Code extension run on Node.
+    files: ['integrations/cli/**/*.js', 'integrations/vscode/**/*.js'],
+    languageOptions: {
+      globals: {
+        AbortSignal: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
   },
   {
     files: ['apps/web/test/e2e/fixtures/*.mjs'],

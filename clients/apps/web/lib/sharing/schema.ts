@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { codeDocumentSchema } from '@/lib/code-studio/document'
 
 /**
  * Share links: a published export (an image, or a video with a poster)
@@ -52,6 +53,8 @@ export const shareLinkCreateSchema = z.object({
   posterAssetId: z.uuid().optional(),
   projectId: z.string().cuid().optional(),
   title,
+  /** A Code Studio document to embed as copyable text beside the image. */
+  code: codeDocumentSchema.optional(),
 })
 /** Input to publish an asset. */
 export type ShareLinkCreateInput = z.infer<typeof shareLinkCreateSchema>

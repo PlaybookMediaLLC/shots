@@ -226,6 +226,9 @@ func (_u *ShareLinkUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.AltTextCleared() {
 		_spec.ClearField(sharelink.FieldAltText, field.TypeString)
 	}
+	if _u.mutation.CodeCleared() {
+		_spec.ClearField(sharelink.FieldCode, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.Access(); ok {
 		_spec.SetField(sharelink.FieldAccess, field.TypeEnum, value)
 	}
@@ -494,6 +497,9 @@ func (_u *ShareLinkUpdateOne) sqlSave(ctx context.Context) (_node *ShareLink, er
 	}
 	if _u.mutation.AltTextCleared() {
 		_spec.ClearField(sharelink.FieldAltText, field.TypeString)
+	}
+	if _u.mutation.CodeCleared() {
+		_spec.ClearField(sharelink.FieldCode, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.Access(); ok {
 		_spec.SetField(sharelink.FieldAccess, field.TypeEnum, value)

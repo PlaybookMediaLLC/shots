@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { CodeEmbed } from '@/components/code-studio/CodeEmbed'
 import { shareView } from '@/lib/sharing/page'
 
 type EmbedPageProps = { params: Promise<{ token: string }> }
@@ -19,6 +20,12 @@ export default async function ShareEmbedPage({ params }: EmbedPageProps) {
     )
   }
   const { link } = view
+  if (link.code)
+    return (
+      <main className="grid min-h-dvh place-items-center overflow-auto bg-transparent">
+        <CodeEmbed code={link.code} title={link.title} />
+      </main>
+    )
   return (
     <main className="grid h-dvh place-items-center overflow-hidden bg-transparent">
       {link.mediaType.startsWith('video/') ? (

@@ -91837,6 +91837,7 @@ type ShareLinkMutation struct {
 	title              *string
 	description        *string
 	alt_text           *string
+	code               *map[string]interface{}
 	access             *sharelink.Access
 	expires_at         *time.Time
 	revoked_at         *time.Time
@@ -92293,6 +92294,55 @@ func (m *ShareLinkMutation) ResetAltText() {
 	delete(m.clearedFields, sharelink.FieldAltText)
 }
 
+// SetCode sets the "code" field.
+func (m *ShareLinkMutation) SetCode(value map[string]interface{}) {
+	m.code = &value
+}
+
+// Code returns the value of the "code" field in the mutation.
+func (m *ShareLinkMutation) Code() (r map[string]interface{}, exists bool) {
+	v := m.code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCode returns the old "code" field's value of the ShareLink entity.
+// If the ShareLink object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShareLinkMutation) OldCode(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCode: %w", err)
+	}
+	return oldValue.Code, nil
+}
+
+// ClearCode clears the value of the "code" field.
+func (m *ShareLinkMutation) ClearCode() {
+	m.code = nil
+	m.clearedFields[sharelink.FieldCode] = struct{}{}
+}
+
+// CodeCleared returns if the "code" field was cleared in this mutation.
+func (m *ShareLinkMutation) CodeCleared() bool {
+	_, ok := m.clearedFields[sharelink.FieldCode]
+	return ok
+}
+
+// ResetCode resets all changes to the "code" field.
+func (m *ShareLinkMutation) ResetCode() {
+	m.code = nil
+	delete(m.clearedFields, sharelink.FieldCode)
+}
+
 // SetAccess sets the "access" field.
 func (m *ShareLinkMutation) SetAccess(s sharelink.Access) {
 	m.access = &s
@@ -92582,7 +92632,7 @@ func (m *ShareLinkMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShareLinkMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 15)
 	if m.organization_id != nil {
 		fields = append(fields, sharelink.FieldOrganizationID)
 	}
@@ -92606,6 +92656,9 @@ func (m *ShareLinkMutation) Fields() []string {
 	}
 	if m.alt_text != nil {
 		fields = append(fields, sharelink.FieldAltText)
+	}
+	if m.code != nil {
+		fields = append(fields, sharelink.FieldCode)
 	}
 	if m.access != nil {
 		fields = append(fields, sharelink.FieldAccess)
@@ -92649,6 +92702,8 @@ func (m *ShareLinkMutation) Field(name string) (ent.Value, bool) {
 		return m.Description()
 	case sharelink.FieldAltText:
 		return m.AltText()
+	case sharelink.FieldCode:
+		return m.Code()
 	case sharelink.FieldAccess:
 		return m.Access()
 	case sharelink.FieldExpiresAt:
@@ -92686,6 +92741,8 @@ func (m *ShareLinkMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldDescription(ctx)
 	case sharelink.FieldAltText:
 		return m.OldAltText(ctx)
+	case sharelink.FieldCode:
+		return m.OldCode(ctx)
 	case sharelink.FieldAccess:
 		return m.OldAccess(ctx)
 	case sharelink.FieldExpiresAt:
@@ -92762,6 +92819,13 @@ func (m *ShareLinkMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAltText(v)
+		return nil
+	case sharelink.FieldCode:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCode(v)
 		return nil
 	case sharelink.FieldAccess:
 		v, ok := value.(sharelink.Access)
@@ -92847,6 +92911,9 @@ func (m *ShareLinkMutation) ClearedFields() []string {
 	if m.FieldCleared(sharelink.FieldAltText) {
 		fields = append(fields, sharelink.FieldAltText)
 	}
+	if m.FieldCleared(sharelink.FieldCode) {
+		fields = append(fields, sharelink.FieldCode)
+	}
 	if m.FieldCleared(sharelink.FieldExpiresAt) {
 		fields = append(fields, sharelink.FieldExpiresAt)
 	}
@@ -92881,6 +92948,9 @@ func (m *ShareLinkMutation) ClearField(name string) error {
 		return nil
 	case sharelink.FieldAltText:
 		m.ClearAltText()
+		return nil
+	case sharelink.FieldCode:
+		m.ClearCode()
 		return nil
 	case sharelink.FieldExpiresAt:
 		m.ClearExpiresAt()
@@ -92922,6 +92992,9 @@ func (m *ShareLinkMutation) ResetField(name string) error {
 		return nil
 	case sharelink.FieldAltText:
 		m.ResetAltText()
+		return nil
+	case sharelink.FieldCode:
+		m.ResetCode()
 		return nil
 	case sharelink.FieldAccess:
 		m.ResetAccess()

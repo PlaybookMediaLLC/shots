@@ -80,7 +80,7 @@ type CreativeSetPage struct {
 
 // CreativeSetListQuery filters and orders a creativeSet list. Sort is "updated"
 // (newest first, the default) or "name" (A to Z). Kind is "story-set" (the
-// default) or "canvas".
+// default), "canvas" or "code".
 type CreativeSetListQuery struct {
 	Archived bool
 	Cursor   string
@@ -141,6 +141,8 @@ func creativeSetAction(kind platformcreativeset.Kind, action string) string {
 		return "product.canvas_" + action
 	case platformcreativeset.KindStore:
 		return "product.store_project_" + action
+	case platformcreativeset.KindCode:
+		return "product.code_project_" + action
 	}
 	return "product.creative_set_" + action
 }
@@ -211,6 +213,8 @@ func (c *Configuration) CreateCreativeSet(ctx context.Context, actor Actor, id, 
 		created = "Canvas created"
 	case platformcreativeset.KindStore:
 		created = "Store screenshots created"
+	case platformcreativeset.KindCode:
+		created = "Code project created"
 	}
 	if _, err := recordCreativeSetVersion(ctx, tx, actor, row, platformcreativesetversion.KindAutosave, &created); err != nil {
 		return nil, err
@@ -271,7 +275,7 @@ func (c *Configuration) ListCreativeSets(ctx context.Context, actor Actor, query
 	if query.Kind != "" {
 		kind = platformcreativeset.Kind(query.Kind)
 		if platformcreativeset.KindValidator(kind) != nil {
-			return nil, invalid("List story-set, canvas or store documents.")
+			return nil, invalid("List story-set, canvas, store or code documents.")
 		}
 	}
 	rows := c.client.PlatformCreativeSet.Query().Where(platformcreativeset.OrganizationID(actor.OrganizationID), platformcreativeset.Archived(query.Archived), platformcreativeset.KindEQ(kind))
@@ -371,7 +375,7 @@ func advanceCreativeSet(ctx context.Context, tx *ent.Tx, actor Actor, id string,
 			return nil, err
 		}
 		if current.Kind != kind {
-			return nil, invalid("A document cannot change between a Story Set and a canvas.")
+			return nil, invalid("A document cannot change kind.")
 		}
 		return nil, &CreativeSetRevisionConflictError{Current: current.Revision}
 	}
