@@ -372,7 +372,7 @@ function score(term: string, query: string): number {
 /**
  * The commands to show for a query. Empty: up to five recent ones first, then
  * the rest in registry order. Typed: matches on the label or an alias, best
- * first; nothing is pinned above them.
+ * first, the label before an alias; nothing is pinned above them.
  */
 export function rankCommands(
   commands: readonly Command[],
@@ -391,10 +391,12 @@ export function rankCommands(
     .map((command, index) => ({
       command,
       index,
+      label: score(command.label, typed),
       score: Math.max(score(command.label, typed), ...command.aliases.map((alias) => score(alias, typed))),
     }))
     .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
+    // On a tie, a match on the label beats one on an alias ("split": Split at caret).
+    .sort((a, b) => b.score - a.score || b.label - a.label || a.index - b.index)
     .map((entry) => entry.command)
 }
 

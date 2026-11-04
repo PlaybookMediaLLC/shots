@@ -29,7 +29,6 @@ import type {
 } from "react";
 import {
   createContext,
-  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -143,8 +142,9 @@ function InlineCombobox({
       }
       // The query is kept on the node too, so a save while it is open keeps the
       // typed text (the host turns the input into "#query" text); not an undo step.
+      // Picking an item removes the input first; a stale path names another node or none.
       const path = editor.api.findPath(element);
-      if (path)
+      if (path && editor.api.node(path)?.[0] === element)
         editor.tf.withoutSaving(() =>
           editor.tf.setNodes({ value: newValue }, { at: path })
         );
@@ -219,9 +219,9 @@ function InlineCombobox({
     ]
   );
 
-  const store = useComboboxStore({
-    setValue: (newValue) => startTransition(() => setValue(newValue)),
-  });
+  // The query applies in the same render, not in a transition: Enter right
+  // after typing runs the best match for what was typed, not a stale row.
+  const store = useComboboxStore({ setValue });
 
   const items = store.useState("items");
 

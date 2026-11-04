@@ -86,7 +86,7 @@ test('ranking respects the query, pins nothing, and matches aliases', () => {
   assert.notEqual(he[0].id, 'ai-ask', 'Ask AI is not pinned above matches')
   assert.deepEqual(rankCommands(commands, 'zzz'), [])
   assert.equal(rankCommands(commands, 'img')[0].id, 'insert-media')
-  assert.equal(rankCommands(commands, 'split')[0].group, 'Post')
+  assert.equal(rankCommands(commands, 'split')[0].id, 'post-split', 'a label match beats an alias')
 })
 
 test('recent commands come first when nothing is typed', () => {

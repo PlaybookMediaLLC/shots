@@ -370,7 +370,16 @@ function FrameLayout({
         </Button>
       ) : null}
       <Sheet onOpenChange={setDrawer} open={drawer}>
-        <SheetContent className="w-full pt-10 sm:max-w-sm" side="left">
+        <SheetContent
+          className="w-full pt-10 sm:max-w-sm"
+          // Focus the sheet itself: its first button (the Publish tour) would open a
+          // tooltip that takes the first Escape instead of the sheet.
+          onOpenAutoFocus={(event) => {
+            event.preventDefault()
+            if (event.currentTarget instanceof HTMLElement) event.currentTarget.focus()
+          }}
+          side="left"
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>Drafts</SheetTitle>
             <SheetDescription>The drafts of this brand.</SheetDescription>
