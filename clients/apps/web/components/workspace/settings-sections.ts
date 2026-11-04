@@ -154,7 +154,7 @@ const SECTIONS = [
     title: 'Publishing brands',
   },
   {
-    description: 'Every connected account in the workspace and the set it belongs to.',
+    description: 'Manage the social accounts this workspace posts from, and the publishing brand each belongs to.',
     group: 'publishing',
     id: 'channels',
     slug: 'channels',

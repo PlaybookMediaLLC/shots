@@ -299,6 +299,26 @@ func WeekStartNotIn(vs ...WeekStart) predicate.UserPreference {
 	return predicate.UserPreference(sql.FieldNotIn(FieldWeekStart, vs...))
 }
 
+// TimeFormatEQ applies the EQ predicate on the "time_format" field.
+func TimeFormatEQ(v TimeFormat) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldEQ(FieldTimeFormat, v))
+}
+
+// TimeFormatNEQ applies the NEQ predicate on the "time_format" field.
+func TimeFormatNEQ(v TimeFormat) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNEQ(FieldTimeFormat, v))
+}
+
+// TimeFormatIn applies the In predicate on the "time_format" field.
+func TimeFormatIn(vs ...TimeFormat) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldIn(FieldTimeFormat, vs...))
+}
+
+// TimeFormatNotIn applies the NotIn predicate on the "time_format" field.
+func TimeFormatNotIn(vs ...TimeFormat) predicate.UserPreference {
+	return predicate.UserPreference(sql.FieldNotIn(FieldTimeFormat, vs...))
+}
+
 // TextDirectionEQ applies the EQ predicate on the "text_direction" field.
 func TextDirectionEQ(v TextDirection) predicate.UserPreference {
 	return predicate.UserPreference(sql.FieldEQ(FieldTextDirection, v))

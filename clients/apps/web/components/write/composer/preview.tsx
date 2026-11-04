@@ -4,6 +4,7 @@ import * as React from 'react'
 import { PreviewLinkCard } from './preview-link-card'
 import { LinkPreviewCard } from './link-cards'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Select,
   SelectContent,
@@ -355,10 +356,12 @@ function Media({ media }: { media: SerializedMedia[] }) {
             <p className="text-xs">Tagged: {item.photoTags.map((tag) => tag.label).join(', ')}</p>
           ) : null}
           {item.alt ? (
-            <details className="bg-black/80 px-2 text-xs text-neutral-100">
-              <summary className="cursor-pointer">ALT</summary>
-              <p>{item.alt}</p>
-            </details>
+            <Disclosure className="bg-black/80 px-2 text-xs text-neutral-100">
+              <DisclosureTrigger>ALT</DisclosureTrigger>
+              <DisclosureContent>
+                <p>{item.alt}</p>
+              </DisclosureContent>
+            </Disclosure>
           ) : null}
           {item.processingStatus !== 'ready' ? (
             <figcaption role="status">

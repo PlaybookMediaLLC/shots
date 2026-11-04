@@ -1,23 +1,64 @@
 'use client'
 
-import type { ChannelConnection } from 'screenshot-studio-backend-sdk'
+import { UsersIcon } from '@phosphor-icons/react/dist/ssr/Users'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
+import type { ChannelConnection, SocialAccountHealth } from 'screenshot-studio-backend-sdk'
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
-import { Group, Pill, Row, Section } from '@/components/platform-ui'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ctaClassName } from '@/components/platform-landing/CtaLink'
-import { ctaToneSchema } from '@/components/platform-landing/primitives'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { Group, Pill, Section } from '@/components/platform-ui'
+import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
+import { usePreferences } from '@/components/settings/PreferencesProvider'
+import {
+  CONNECT_PROVIDERS,
+  HEALTH_GUIDANCE,
+  connectHref,
+  useSocialSets,
+} from '@/components/settings/social-sets/api'
+import { useSocialSetScope } from '@/components/settings/social-sets/scope'
+import { providerReady, useConnectionAvailability } from '@/components/social-connections/availability'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { socialSetHref } from '@/components/workspace/settings-sections'
+import { socialSetSchema } from '@/lib/api/contracts/social-sets'
+import { channelForPlatform } from '@/lib/content-drafts/serialize'
+import { settingsErrorMessage } from '@/lib/settings/client'
 import { useTRPCClient } from '@/lib/trpc/react'
+import { cn } from '@/lib/utils'
 import { getErrorMessage } from './settings-client'
 
-/** The accounts a workspace can connect, by OAuth provider. */
-const PROVIDERS = [
-  { label: 'X', provider: 'x' },
-  { label: 'LinkedIn', provider: 'linkedin' },
-  { label: 'Instagram', provider: 'instagram-standalone' },
-  { label: 'Threads', provider: 'threads' },
-  { label: 'Mastodon', provider: 'mastodon' },
-] as const
+/** The order platforms are listed in: most used first. */
+const ORDER = ['x', 'tiktok', 'linkedin', 'linkedin-page', 'instagram-standalone', 'threads', 'youtube', 'mastodon']
+
+/** One row per platform the connect routes support, from the same registry the brand pages use. */
+const ROWS = [...CONNECT_PROVIDERS].sort((a, b) => ORDER.indexOf(a.provider) - ORDER.indexOf(b.provider))
+
+/** Platform names that are another row's platform. */
+const ALIASES: Record<string, string> = {
+  instagram: 'instagram-standalone',
+  'mastodon-custom': 'mastodon',
+  mastodoncustom: 'mastodon',
+  twitter: 'x',
+}
 
 /** What a return trip from a provider tells the admin, keyed by the `connected` search parameter. */
 const CONNECTED: Record<string, string> = {
@@ -25,29 +66,348 @@ const CONNECTED: Record<string, string> = {
   'instagram-standalone':
     'Instagram is connected. Approved Instagram posts can be scheduled to it.',
   linkedin: 'LinkedIn is connected. Approved LinkedIn posts can be scheduled to it.',
+  'linkedin-page': 'LinkedIn Page is connected. Approved LinkedIn posts can be scheduled to it.',
   mastodon: 'Mastodon is connected. Drafts can be scheduled to it.',
   threads: 'Threads is connected. Drafts can be scheduled to it.',
+  tiktok: 'TikTok is connected. Approved TikTok posts can be scheduled to it.',
   x: 'X is connected. Approved X posts can be scheduled to it.',
+  youtube: 'YouTube is connected. Approved YouTube posts can be scheduled to it.',
 }
 
-/** Connect the social accounts that approved campaign posts publish to. */
+/** The help tip ID that remembers the banner was dismissed. */
+const BANNER_TIP = 'channels-shared-accounts'
+
+type Filter = 'all' | 'attention' | 'unassigned' | `brand:${string}`
+
+/** An account's state on the page, from the backend's verified health. */
+function healthOf(connection: ChannelConnection): SocialAccountHealth {
+  return connection.health ?? (connection.status === 'ACTIVE' ? 'connected' : 'removed')
+}
+
+function needsReconnect(health: SocialAccountHealth): boolean {
+  return ['reconnect_required', 'expired', 'unverified', 'permission_required'].includes(health)
+}
+
+/** The status dot: green ready, amber needs a reconnect, red disconnected. */
+function StatusDot({ health }: { health: SocialAccountHealth }) {
+  const [tone, label] =
+    health === 'connected'
+      ? ['bg-[var(--success,#047857)]', 'Active']
+      : needsReconnect(health)
+        ? ['bg-amber-500', 'Needs reconnect']
+        : ['bg-[var(--danger,#b91c1c)]', 'Disconnected']
+  return (
+    <span className="flex items-center" title={label}>
+      <span aria-hidden className={cn('size-2 rounded-full', tone)} />
+      <span className="sr-only">{label}</span>
+    </span>
+  )
+}
+
+/** Where an account lives on its platform, when its handle says. */
+function profileUrl(platform: string, handle: string | null | undefined): string | null {
+  const name = handle?.replace(/^@/, '')
+  if (!name) return null
+  const row = ALIASES[platform] ?? platform
+  if (row === 'mastodon') {
+    const [user, server] = name.split('@')
+    return user && server ? `https://${server}/@${user}` : null
+  }
+  const pages: Record<string, string> = {
+    bluesky: `https://bsky.app/profile/${name}`,
+    'instagram-standalone': `https://www.instagram.com/${name}`,
+    threads: `https://www.threads.net/@${name}`,
+    tiktok: `https://www.tiktok.com/@${name}`,
+    x: `https://x.com/${name}`,
+    youtube: `https://www.youtube.com/@${name}`,
+  }
+  return pages[row] ?? null
+}
+
+/** Initials for an avatar that has no picture. */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+}
+
+/**
+ * The workspace's social accounts, one row per platform: a Connect button,
+ * then each connected account as a chip with its health, its publishing
+ * brand and the actions an admin takes on it.
+ */
 export function ChannelConnections({ canManage }: { canManage: boolean }) {
   const trpcClient = useTRPCClient()
-  const connected = useSearchParams().get('connected')
+  const search = useSearchParams()
+  const connected = search.get('connected')
+  const scope = useSocialSetScope()
+  const sets = useSocialSets()
+  const availability = useConnectionAvailability()
+  const { preferences, save } = usePreferences()
   const [connections, setConnections] = useState<ChannelConnection[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [filter, setFilter] = useState<Filter>(() => {
+    const brand = search.get('brand')
+    return brand ? `brand:${brand}` : 'all'
+  })
+  const [showIds, setShowIds] = useState(false)
+  const [fresh, setFresh] = useState<string | null>(null)
+  const [menu, setMenu] = useState<string | null>(null)
+  const [removing, setRemoving] = useState<ChannelConnection | null>(null)
+  const [refreshing, setRefreshing] = useState<string | null>(null)
 
+  const load = useCallback(
+    () =>
+      trpcClient.channelConnection.list
+        .query()
+        .then((result) => {
+          setConnections(result.connections.filter((connection) => connection.status === 'ACTIVE'))
+          setError(null)
+        })
+        .catch((requestError: unknown) => setError(getErrorMessage(requestError))),
+    [trpcClient]
+  )
   useEffect(() => {
-    if (!canManage) return
-    trpcClient.channelConnection.list
-      .query()
-      .then((result) => setConnections(result.connections))
-      .catch((requestError: unknown) => setError(getErrorMessage(requestError)))
-  }, [canManage, trpcClient])
+    if (canManage) void load()
+  }, [canManage, load])
+
+  // Brands are only there when the workspace has publishing brands; without them the page still works.
+  const brands = useMemo(() => sets.data?.items ?? [], [sets.data])
+  const brandOf = (connection: ChannelConnection) =>
+    connection.socialSetId ? brands.find((set) => set.id === connection.socialSetId) : undefined
+  const rowOf = (platform: string) => ALIASES[platform] ?? platform
+  const shown = ROWS.filter(
+    (row) => !availability.isSuccess || providerReady(availability.data, row.provider, true)
+  )
+  const attention = (connections ?? []).filter((connection) => needsReconnect(healthOf(connection)))
+  const visible = (connection: ChannelConnection) =>
+    filter === 'all' ||
+    (filter === 'attention' && needsReconnect(healthOf(connection))) ||
+    (filter === 'unassigned' && !connection.socialSetId) ||
+    filter === `brand:${connection.socialSetId}`
+  const accountsFor = (platform: string) =>
+    (connections ?? []).filter((connection) => rowOf(connection.platform) === platform && visible(connection))
+  // Accounts on a platform with no Connect row here, such as Bluesky, which connects from a brand.
+  const others = (connections ?? []).filter(
+    (connection) => !ROWS.some((row) => row.platform === rowOf(connection.platform)) && visible(connection)
+  )
+
+  // Back from a provider: show the new account, and offer a brand when it has none.
+  useEffect(() => {
+    if (!connected || !connections) return
+    const row = ALIASES[connected] ?? connected
+    const newest = connections
+      .filter((connection) => rowOf(connection.platform) === row)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+    document.getElementById(`channels-${row}`)?.scrollIntoView({ block: 'center' })
+    if (!newest) return
+    setFresh(newest.id)
+    if (!newest.socialSetId && brands.length) setMenu(newest.id)
+    const timer = setTimeout(() => setFresh(null), 2000)
+    return () => clearTimeout(timer)
+    // Once per return trip, when the accounts first arrive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, connections === null])
+
+  const assign = async (connection: ChannelConnection, setId: string) => {
+    try {
+      await scope.request(
+        `/api/v1/social-sets/${encodeURIComponent(setId)}/accounts/${encodeURIComponent(connection.id)}`,
+        socialSetSchema,
+        { method: 'POST' }
+      )
+      await Promise.all([load(), sets.refetch()])
+      toast.success('Account added to the publishing brand.')
+    } catch (assignError) {
+      toast.error(settingsErrorMessage(assignError))
+    }
+  }
+
+  const refresh = async (targets: ChannelConnection[]) => {
+    setRefreshing(targets.length === 1 ? targets[0]!.id : rowOf(targets[0]?.platform ?? ''))
+    try {
+      for (const target of targets)
+        await trpcClient.channelConnection.refresh.mutate({ connectionId: target.id })
+      await load()
+      toast.success(targets.length === 1 ? 'Account refreshed.' : 'Accounts refreshed.')
+    } catch (refreshError) {
+      toast.error(getErrorMessage(refreshError))
+    } finally {
+      setRefreshing(null)
+    }
+  }
+
+  const reconnectHref = (connection: ChannelConnection) => {
+    const provider = ROWS.find((row) => row.platform === rowOf(connection.platform))?.provider
+    if (!provider) return null
+    return connection.socialSetId
+      ? connectHref(provider, connection.socialSetId, connection.id)
+      : `/integrations/social/${encodeURIComponent(provider)}/start`
+  }
+
+  const chip = (connection: ChannelConnection) => {
+    const health = healthOf(connection)
+    const name = connection.displayName || connection.handle || connection.externalAccountId
+    const brand = brandOf(connection)
+    const profile = profileUrl(connection.platform, connection.handle)
+    const reconnect = reconnectHref(connection)
+    const platform = rowOf(connection.platform)
+    const open = (connection.socialSetId ? [] : brands).map((set) => ({
+      set,
+      taken: set.accounts.some((account) => rowOf(account.platform) === platform),
+    }))
+    return (
+      <div
+        className={cn(
+          'flex min-w-0 max-w-full items-center gap-1 rounded-full border border-border bg-card py-0.5 pr-1 pl-0.5 transition-shadow',
+          fresh === connection.id && 'ring-2 ring-ring'
+        )}
+        data-testid="channel-account"
+        key={connection.id}
+      >
+        <DropdownMenu
+          onOpenChange={(next) => setMenu(next ? connection.id : null)}
+          open={menu === connection.id}
+        >
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={`${name}: account actions`}
+              className="flex min-w-0 items-center gap-1.5 rounded-full px-1 py-0.5 text-left text-sm hover:bg-accent"
+              size={null}
+              type="button"
+              variant="custom"
+            >
+              <Avatar className="size-6">
+                {connection.avatarUrl ? <AvatarImage alt="" src={connection.avatarUrl} /> : null}
+                <AvatarFallback className="text-[10px]">{initials(name)}</AvatarFallback>
+              </Avatar>
+              <span className="grid min-w-0">
+                <span className="truncate">{name}</span>
+                {showIds ? (
+                  <span className="truncate text-xs text-muted-foreground">
+                    {connection.handle ? `@${connection.handle} · ` : ''}
+                    {connection.id}
+                  </span>
+                ) : null}
+              </span>
+              <StatusDot health={health} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-64">
+            <DropdownMenuLabel className="grid gap-0.5">
+              <span>{name}</span>
+              <span className="text-xs font-normal text-muted-foreground">{HEALTH_GUIDANCE[health]}</span>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {profile ? (
+              <DropdownMenuItem asChild>
+                <a href={profile} rel="noreferrer" target="_blank">
+                  Open profile
+                </a>
+              </DropdownMenuItem>
+            ) : null}
+            {canManage && reconnect ? (
+              <DropdownMenuItem asChild>
+                {/* A plain link: prefetching the start route would begin an OAuth flow. */}
+                <a href={reconnect}>Reconnect</a>
+              </DropdownMenuItem>
+            ) : null}
+            {canManage ? (
+              <DropdownMenuItem disabled={refreshing !== null} onSelect={() => void refresh([connection])}>
+                Refresh
+              </DropdownMenuItem>
+            ) : null}
+            {canManage && open.length ? (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>Assign to brand</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup onValueChange={(setId) => void assign(connection, setId)} value="">
+                    {open.map(({ set, taken }) => (
+                      <DropdownMenuRadioItem disabled={taken} key={set.id} value={set.id}>
+                        <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: set.color }} />
+                        {set.name}
+                        {taken ? <span className="ml-auto text-xs text-muted-foreground">Has one</span> : null}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ) : null}
+            {brand ? (
+              <DropdownMenuItem asChild>
+                <a href={socialSetHref(brand.id)}>Open {brand.name}</a>
+              </DropdownMenuItem>
+            ) : null}
+            <DropdownMenuItem
+              onSelect={() =>
+                void navigator.clipboard
+                  .writeText(connection.id)
+                  .then(() => toast.success('Account ID copied.'))
+              }
+            >
+              Copy ID
+            </DropdownMenuItem>
+            {canManage ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setRemoving(connection)} variant="destructive">
+                  Remove…
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {brand ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span
+                aria-label={`In ${brand.name}`}
+                className="size-2.5 shrink-0 rounded-full ring-1 ring-foreground/15"
+                role="img"
+                style={{ backgroundColor: brand.color }}
+              />
+            </TooltipTrigger>
+            <TooltipContent>{brand.name}</TooltipContent>
+          </Tooltip>
+        ) : connection.socialSetId ? (
+          <span aria-label="In a private brand" className="size-2.5 shrink-0 rounded-full ring-1 ring-muted-foreground" role="img" />
+        ) : null}
+        {canManage && needsReconnect(health) && reconnect ? (
+          <Button asChild className="h-6 rounded-full px-2 text-xs" size={null} variant="outline">
+            <a href={reconnect}>Reconnect</a>
+          </Button>
+        ) : null}
+        {canManage ? (
+          <Button
+            aria-label={`Remove ${name}`}
+            className="size-6 rounded-full text-muted-foreground"
+            onClick={() => setRemoving(connection)}
+            size="icon-sm"
+            type="button"
+            variant="ghost"
+          >
+            <XIcon />
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
+
+  const removingBrand = removing ? brandOf(removing) : undefined
+  const removingName = removing ? removing.displayName || removing.handle || removing.externalAccountId : ''
+  const refreshable = shown.filter((row) => accountsFor(row.platform).length > 0)
+  const lastChanged = (platform: string) =>
+    accountsFor(platform)
+      .map((connection) => connection.updatedAt ?? connection.createdAt)
+      .sort()
+      .at(-1)
 
   return (
     <Section
-      description="Each approved post publishes to an account on its own channel."
+      description="Connect an account here once; each publishing brand posts from the accounts assigned to it."
       title="Connected accounts"
     >
       {connected && CONNECTED[connected] ? (
@@ -55,61 +415,127 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <AlertDescription>{CONNECTED[connected]}</AlertDescription>
         </Alert>
       ) : null}
-      <Group>
-        {!canManage ? (
-          <Row>
-            <p className="text-sm text-muted-foreground">
-              Only admins and publishers can connect channels.
+      {preferences && !preferences.dismissedTips.includes(BANNER_TIP) ? (
+        <Alert className="mb-4">
+          <UsersIcon aria-hidden />
+          <AlertTitle>Connecting for the workspace</AlertTitle>
+          <AlertDescription>
+            <p>
+              Accounts you connect here are shared with everyone in this workspace. Assign each one to a
+              publishing brand to post from it.
             </p>
-          </Row>
+            <Button
+              className="mt-2 h-auto p-0"
+              onClick={() => void save({ dismissTip: BANNER_TIP })}
+              size={null}
+              type="button"
+              variant="link"
+            >
+              Got it
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <Group>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+          <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
+            Accounts
+            {attention.length ? <Pill tone="yellow">{attention.length} need attention</Pill> : null}
+          </h3>
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <Label className="flex items-center gap-2 text-sm font-normal">
+              Show IDs
+              <Switch checked={showIds} onCheckedChange={setShowIds} />
+            </Label>
+            <Select onValueChange={(value) => setFilter(value as Filter)} value={filter}>
+              <SelectTrigger aria-label="Show accounts" size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="all">All accounts</SelectItem>
+                <SelectItem value="attention">Needs attention</SelectItem>
+                <SelectItem value="unassigned">Not in any brand</SelectItem>
+                {brands.map((set) => (
+                  <SelectItem key={set.id} value={`brand:${set.id}`}>
+                    {set.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        {!canManage ? (
+          <p className="px-4 py-3 text-sm text-muted-foreground">
+            Only owners and admins can connect and manage accounts.
+          </p>
+        ) : connections === null ? (
+          error ? null : <p className="px-4 py-3 text-sm text-muted-foreground">Loading channels…</p>
         ) : (
           <>
-            {connections === null ? (
-              error ? null : (
-                <Row>
-                  <p className="text-sm text-muted-foreground">Loading channels…</p>
-                </Row>
-              )
-            ) : connections.length === 0 ? (
-              <Row>
-                <p className="text-sm text-muted-foreground">No channels connected yet.</p>
-              </Row>
-            ) : (
-              connections.map((connection) => (
-                <Row key={connection.id}>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-ui-lg font-medium text-foreground">
-                      {connection.displayName || connection.externalAccountId}
-                    </span>
-                    {connection.handle ? (
-                      <span className="text-sm text-muted-foreground">@{connection.handle}</span>
-                    ) : null}
-                    <Pill>{connection.platform}</Pill>
-                    <Pill tone={connection.status === 'ACTIVE' ? 'green' : 'yellow'}>
-                      {connection.status.toLowerCase()}
-                    </Pill>
+            {shown.map((row) => {
+              const accounts = accountsFor(row.platform)
+              const channel = channelForPlatform(row.platform)
+              return (
+                <div
+                  className="grid gap-3 px-4 py-3 sm:grid-cols-[40px_200px_minmax(0,1fr)] sm:items-center"
+                  data-testid="channel-platform"
+                  id={`channels-${row.platform}`}
+                  key={row.provider}
+                >
+                  <div className="flex items-center gap-2">
+                    {channel ? <ChannelIcon channel={channel} className="size-7 shrink-0 text-foreground" /> : null}
+                    <span className="text-sm font-medium sm:sr-only">{row.label}</span>
                   </div>
-                </Row>
-              ))
-            )}
-            <Row
-              description="You sign in with the provider, then return here."
-              label="Connect an account"
-              layout="inline"
-            >
-              <div className="flex flex-wrap gap-2">
-                {PROVIDERS.map(({ label, provider }) => (
-                  // A plain link, not next/link: prefetching the start route would begin an OAuth flow.
-                  <a
-                    className={ctaClassName(ctaToneSchema.enum.secondary)}
-                    href={`/integrations/social/${provider}/start`}
-                    key={provider}
-                  >
-                    Connect {label}
-                  </a>
+                  <Button asChild className="w-full" size="sm">
+                    {/* A plain link, not next/link: prefetching the start route would begin an OAuth flow. */}
+                    <a href={`/integrations/social/${row.provider}/start`}>Connect {row.label}</a>
+                  </Button>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {accounts.length ? (
+                      accounts.map(chip)
+                    ) : (
+                      <span className="text-sm text-muted-foreground">
+                        {filter === 'all' ? 'No accounts yet' : 'None match'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+            {others.length ? (
+              <div className="grid gap-3 px-4 py-3 sm:grid-cols-[40px_200px_minmax(0,1fr)] sm:items-center">
+                <span className="text-sm font-medium sm:col-span-2">
+                  Other accounts
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    Connect these from a publishing brand.
+                  </span>
+                </span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">{others.map(chip)}</div>
+              </div>
+            ) : null}
+            {refreshable.length ? (
+              <div className="flex flex-wrap gap-2 px-4 py-3">
+                {refreshable.map((row) => (
+                  <Tooltip key={row.provider}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        disabled={refreshing !== null}
+                        onClick={() => void refresh(accountsFor(row.platform))}
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                      >
+                        {refreshing === row.platform ? 'Refreshing…' : `Refresh ${row.label}`}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Reads names and pictures again. Last changed{' '}
+                      {new Date(lastChanged(row.platform) ?? Date.now()).toLocaleString()}.
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
               </div>
-            </Row>
+            ) : null}
           </>
         )}
       </Group>
@@ -118,6 +544,42 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
+      <ConfirmDialog
+        confirmLabel="Remove account"
+        description={
+          removing ? (
+            <>
+              <p>
+                {removingName} stops publishing from Shots
+                {removingBrand ? ` and leaves ${removingBrand.name}` : removing.socialSetId ? ' and leaves its private brand' : ''}.
+              </p>
+              <p>
+                {removing.queuedPosts
+                  ? `${removing.queuedPosts} scheduled ${removing.queuedPosts === 1 ? 'post is' : 'posts are'} cancelled.`
+                  : 'No scheduled posts are affected.'}{' '}
+                Published posts and their receipts stay.
+              </p>
+            </>
+          ) : null
+        }
+        destructive
+        onConfirm={async () => {
+          if (!removing) return null
+          try {
+            await trpcClient.channelConnection.remove.mutate({ connectionId: removing.id })
+            await Promise.all([load(), sets.refetch()])
+            toast.success(`${removingName} was removed.`)
+            return null
+          } catch (removeError) {
+            return getErrorMessage(removeError)
+          }
+        }}
+        onOpenChange={(next) => {
+          if (!next) setRemoving(null)
+        }}
+        open={removing !== null}
+        title={`Remove ${removingName}?`}
+      />
     </Section>
   )
 }

@@ -4,7 +4,7 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { SwatchColorPicker } from '@/components/ui/color-picker'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -169,12 +169,11 @@ export function MediaFrame({
         </DialogHeader>
         <Label>
           Frame color{' '}
-          <Input
+          <SwatchColorPicker
             aria-label="Frame color"
-            type="color"
             value={settings.color}
-            onChange={(event) => setSettings({ ...settings, color: event.target.value })}
-            className="w-12 p-1"
+            onChange={(color) => setSettings({ ...settings, color })}
+            swatches={palette}
           />
         </Label>
         {palette.length ? (

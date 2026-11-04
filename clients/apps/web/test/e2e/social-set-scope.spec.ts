@@ -227,7 +227,7 @@ test(
         'Private Alpha'
       )
       await page.getByLabel('Publishing brand name', { exact: true }).fill('Private Alpha saved')
-      await page.getByRole('button', { name: 'Save name', exact: true }).click()
+      await page.getByLabel('Publishing brand name', { exact: true }).press('Enter')
       await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
       await app.reload()
       await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(
@@ -235,7 +235,9 @@ test(
       )
       await app.open(`/settings/publishing-brands/${alpha.set.id}/writing-assistant`)
       await expect(
-        page.locator('summary').filter({ hasText: 'Private writing sample for Private Alpha.' })
+        page
+          .locator('[data-slot="disclosure-trigger"]')
+          .filter({ hasText: 'Private writing sample for Private Alpha.' })
       ).toBeVisible()
       await page.screenshot({
         path: '.context/social-set-scoped-settings.png',

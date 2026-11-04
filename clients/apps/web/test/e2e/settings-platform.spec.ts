@@ -59,7 +59,9 @@ test('personal settings are addressable, saved on the server and survive a reloa
   const email = page.getByRole('switch', { name: 'Email notifications' })
   await expect(email).toBeChecked()
   await email.click()
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
+  // The switch saves with the page's other preferences, not on its own.
+  await page.getByRole('button', { name: 'Save my preferences', exact: true }).click()
+  await expect(page.getByText('Your preferences are saved.', { exact: true })).toBeVisible()
   await app.reload()
   await expect(page.getByRole('switch', { name: 'Email notifications' })).not.toBeChecked()
   await expect(
@@ -68,16 +70,16 @@ test('personal settings are addressable, saved on the server and survive a reloa
   await expect(page.getByText('Slack is unavailable.', { exact: false }).first()).toBeVisible()
 
   await openWorkspaceSetting(page, 'Account')
-  await page.getByLabel('Search display time zone').fill('Tokyo')
   await chooseOption(
     page.getByRole('combobox', { exact: true, name: 'Display time zone' }),
-    /^Tokyo · Asia\/Tokyo · /
+    /^Tokyo · UTC\+09:00/,
+    'Tokyo'
   )
   await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
   await app.reload()
   await expect(
     page.getByRole('combobox', { exact: true, name: 'Display time zone' })
-  ).toContainText('Asia/Tokyo')
+  ).toContainText('Tokyo · UTC+09:00')
 
   // The registry says what each experiment is, and promoted or unavailable
   // ones cannot be switched.
@@ -148,13 +150,13 @@ test(
     // of five: ten weekly slots, as the server saved them.
     await app.open(`/settings/publishing-brands/${setId}/scheduling`)
     await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 of 50 weekly posting slots')
-    await page.getByLabel('Search scheduling time zone').fill('Paris')
     await chooseOption(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' }),
-      /^Paris · Europe\/Paris · /
+      /^Paris · UTC/,
+      'Paris'
     )
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
-    await chooseOption(page.getByLabel('Time to add'), /^1:00\sPM$/)
+    await page.getByLabel('Time to add', { exact: true }).fill('1p')
     await page.getByRole('button', { name: 'Add time' }).click()
     await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect.poll(() => slotCount(setId)).toBe(10)
@@ -162,7 +164,7 @@ test(
     await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' })
-    ).toContainText('Europe/Paris')
+    ).toContainText('Paris · UTC')
 
     await app.open('/settings/brand-kit')
     await page

@@ -336,6 +336,37 @@ func TestSocialSetsPlatform(t *testing.T) {
 		}
 	})
 
+	t.Run("the Channels page counts queued posts and removes an account in no brand", func(t *testing.T) {
+		connections, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org)).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		states, err := repo.ChannelAccountStates(ctx, org, connections)
+		if err != nil || states[ids["x"]].QueuedPosts < 5 || states[ids["x"]].Health == "" || states[ids["linkedin"]].QueuedPosts != 0 {
+			t.Fatalf("states=%+v err=%v", states, err)
+		}
+		// The brand already has an X account, so a second one joins no brand.
+		connect("x", nil)
+		spare, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org),
+			channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).Only(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.RemoveChannelAccount(ctx, publisher, spare.ID); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("a publisher removed an account: %v", err)
+		}
+		removal, err := repo.RemoveChannelAccount(ctx, admin, spare.ID)
+		if err != nil || len(removal.CancelledPostIDs) != 0 {
+			t.Fatalf("removal=%+v err=%v", removal, err)
+		}
+		if removed, _ := db.Client.ChannelConnection.Get(ctx, spare.ID); removed.Status != channelconnection.StatusDISABLED {
+			t.Fatalf("the removed account is %s", removed.Status)
+		}
+		if _, err := repo.RemoveChannelAccount(ctx, admin, spare.ID); !errors.Is(err, publishing.ErrNotFound) {
+			t.Fatalf("a removed account was removed again: %v", err)
+		}
+	})
+
 	t.Run("a removed account cancels its queue and cannot publish", func(t *testing.T) {
 		removal, err := repo.RemoveSocialSetAccount(ctx, owner, defaultSet.ID, ids["x"])
 		if err != nil || len(removal.CancelledPostIDs) < 5 {

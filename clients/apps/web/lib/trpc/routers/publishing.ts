@@ -7,6 +7,8 @@ import {
   createBackendScheduledPost,
   listBackendConnections,
   listBackendScheduledPosts,
+  refreshBackendConnection,
+  removeBackendConnection,
 } from '@/lib/tenant/publishing-backend'
 import { getScheduledPostIdempotencyKey } from '@/lib/tenant/scheduled-posts'
 import {
@@ -26,6 +28,14 @@ export const channelConnectionRouter = router({
     .input(channelConnectionCreateSchema)
     .mutation(async ({ ctx, input }) => ({
       connection: await createBackendConnection(ctx.access, input),
+    })),
+  remove: organizationProcedure('connection:manage')
+    .input(z.object({ connectionId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => removeBackendConnection(ctx.access, input.connectionId)),
+  refresh: organizationProcedure('connection:manage')
+    .input(z.object({ connectionId: z.string().cuid() }))
+    .mutation(async ({ ctx, input }) => ({
+      connection: await refreshBackendConnection(ctx.access, input.connectionId),
     })),
 })
 

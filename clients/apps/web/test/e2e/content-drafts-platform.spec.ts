@@ -158,9 +158,9 @@ test(
       .getByTestId('write-rail')
       .getByRole('link', { name: 'Settings', exact: true })
       .click()
+    // Settings save as they change.
     await page.getByLabel('Require approval').check()
-    await page.getByRole('button', { name: 'Save settings' }).click()
-    await expect(page.getByText('Saved.')).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
 
     const draftId = await openNewDraft(page)
     await write(page, 'Needs a second pair of eyes')
