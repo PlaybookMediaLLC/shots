@@ -20,16 +20,13 @@ export function codeAltText(code: string, lang: string): string {
   return `${characters.slice(0, ALT_TEXT_LIMIT - 1).join('')}…`
 }
 
-/** The code as a reply post: a code block, one line per code line. */
-function codeReply(code: string, lang: string): PlateBody {
-  return [
-    postBreak(),
-    {
-      type: 'code_block',
-      lang,
-      children: code.split('\n').map((text) => ({ type: 'code_line', children: [{ text }] })),
-    },
-  ]
+/**
+ * The code as a reply post: one paragraph per code line, indentation kept.
+ * Posts publish plain text, and the post editor treats a code block as
+ * formatting to convert (`lib/write/legacy-blocks.ts`).
+ */
+function codeReply(code: string): PlateBody {
+  return [postBreak(), ...code.split('\n').map((text) => ({ type: 'p', children: [{ text }] }))]
 }
 
 /** One post per media item, a carousel of images, or a document, plus an optional code reply. */
@@ -42,13 +39,13 @@ export type CodePostMedia = { id: string; mediaType: string; alt: string }
 export function codePostBody(input: {
   media: CodePostMedia[]
   caption?: string
-  reply?: { code: string; lang: string }
+  reply?: { code: string }
 }): PlateBody {
   return [
     postBreak(),
     { type: 'p', children: [{ text: input.caption ?? '' }] },
     ...input.media.map((media) => ({ ...draftAssetNode(media), alt: media.alt })),
-    ...(input.reply ? codeReply(input.reply.code, input.reply.lang) : []),
+    ...(input.reply ? codeReply(input.reply.code) : []),
   ]
 }
 

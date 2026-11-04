@@ -123,7 +123,7 @@ export function PostThisDialog({
           body: codePostBody({
             media: uploads,
             caption,
-            reply: reply ? { code, lang: file.lang } : undefined,
+            reply: reply ? { code } : undefined,
           }),
         },
         (draftId) => router.push(`/publish/${encodeURIComponent(draftId)}`)

@@ -83,8 +83,12 @@ test('a member saves a code project, reopens it from the Library and posts it wi
     body?: { type?: string; children?: { children?: { text: string }[] }[] }[]
   }
   expect(draft.assetIds).toHaveLength(1)
-  const reply = draft.body?.find((node) => node.type === 'code_block')
-  expect(reply?.children?.map((line) => line.children?.[0]?.text)).toEqual(SNIPPET.split('\n'))
+  // The reply post: one paragraph per code line, after the last post break.
+  const body = draft.body ?? []
+  const reply = body.slice(body.findLastIndex((node) => node.type === 'post_break') + 1)
+  expect(reply.map((line) => [line.type, line.children?.[0]?.text])).toEqual(
+    SNIPPET.split('\n').map((text) => ['p', text])
+  )
   const asset = await db.row<{ altText: string; mediaType: string }>(
     'SELECT "altText", "mediaType" FROM asset WHERE id = $1',
     [draft.assetIds![0]]

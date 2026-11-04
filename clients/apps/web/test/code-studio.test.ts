@@ -13,6 +13,7 @@ import {
 } from '@/lib/code-studio/document'
 import { languageForFileName, languageFromLegacy } from '@/lib/code-studio/languages'
 import { ALT_TEXT_LIMIT, codeAltText, codePostBody, replyFitsX } from '@/lib/code-studio/post'
+import { legacyCount } from '@/lib/write/legacy-blocks'
 
 const kit = (overrides: Partial<BrandKit> = {}): BrandKit => ({
   accent: '#7c3aed',
@@ -144,14 +145,21 @@ test('the post body attaches the image with alt text and can add the code as a r
   assert.equal(image?.alt, 'Go code')
   assert.equal(image?.assetId, media.id)
 
-  const thread = codePostBody({ media: [media], reply: { code: 'a\n  b', lang: 'go' } })
+  const thread = codePostBody({ media: [media], reply: { code: 'a\n  b' } })
   assert.equal(thread.filter((node) => node.type === 'post_break').length, 2)
-  const block = thread.at(-1) as { type: string; children: { children: { text: string }[] }[] }
-  assert.equal(block.type, 'code_block')
+  // The reply is plain paragraphs, so the post editor shows no "Convert to text".
+  const reply = thread.slice(thread.findLastIndex((node) => node.type === 'post_break') + 1) as {
+    type: string
+    children: { text: string }[]
+  }[]
   assert.deepEqual(
-    block.children.map((line) => line.children[0]!.text),
-    ['a', '  b']
+    reply.map((line) => [line.type, line.children[0]!.text]),
+    [
+      ['p', 'a'],
+      ['p', '  b'],
+    ]
   )
+  assert.equal(legacyCount(thread), 0)
   assert.equal(replyFitsX('x'.repeat(280)), true)
   assert.equal(replyFitsX('x'.repeat(281)), false)
 })
