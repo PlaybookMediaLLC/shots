@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { KeyExpiry } from '@/components/settings/KeyExpiry'
 import { Label } from '@/components/ui/label'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Select,
   SelectContent,
@@ -259,10 +260,12 @@ function NewSourceNotice({ onDismiss, source }: { onDismiss: () => void; source:
         </p>
       )}
       {!secret && source.provider !== 'gitlab' ? (
-        <details className="text-xs text-muted-foreground">
-          <summary>Administrator setup details</summary>
-          <p>Configure SOURCE_WEBHOOK_SIGNING_KEY on the server.</p>
-        </details>
+        <Disclosure className="text-xs text-muted-foreground">
+          <DisclosureTrigger>Administrator setup details</DisclosureTrigger>
+          <DisclosureContent>
+            <p>Configure SOURCE_WEBHOOK_SIGNING_KEY on the server.</p>
+          </DisclosureContent>
+        </Disclosure>
       ) : null}
       {source.provider === 'github' && secret ? (
         <p className="text-sm text-foreground/65">

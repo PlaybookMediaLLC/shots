@@ -3,7 +3,13 @@
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -56,30 +62,32 @@ export function Hourly({
       <div className="my-3 flex gap-2">
         <Label>
           View{' '}
-          <NativeSelect
-            aria-label="Hourly mode"
-            value={mode}
-            onChange={(e) => setMode(e.target.value)}
-          >
-            <NativeSelectOption value="average">Average</NativeSelectOption>
-            <NativeSelectOption value="days">Days</NativeSelectOption>
-            <NativeSelectOption value="heatmap">Heatmap</NativeSelectOption>
-          </NativeSelect>
+          <Select value={mode} onValueChange={(value) => setMode(value)}>
+            <SelectTrigger aria-label="Hourly mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="average">Average</SelectItem>
+              <SelectItem value="days">Days</SelectItem>
+              <SelectItem value="heatmap">Heatmap</SelectItem>
+            </SelectContent>
+          </Select>
         </Label>
         {mode === 'days' ? (
           <Label>
             Day{' '}
-            <NativeSelect
-              aria-label="Weekday"
-              value={day}
-              onChange={(e) => setDay(Number(e.target.value))}
-            >
-              {DAYS.map((label, i) => (
-                <NativeSelectOption key={label} value={i}>
-                  {label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+            <Select value={String(day)} onValueChange={(value) => setDay(Number(value))}>
+              <SelectTrigger aria-label="Weekday">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DAYS.map((label, i) => (
+                  <SelectItem key={label} value={String(i)}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </Label>
         ) : null}
       </div>

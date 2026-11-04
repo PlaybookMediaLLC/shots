@@ -30,6 +30,8 @@ type UserPreferences struct {
 	ShowScrollbars     bool            `json:"showScrollbars"`
 	TextDirection      string          `json:"textDirection"`
 	Theme              string          `json:"theme"`
+	// TimeFormat is the clock times read on: auto (the browser locale's), 12h or 24h.
+	TimeFormat string `json:"timeFormat"`
 	// TimeZone is the display time zone; nil follows the browser.
 	TimeZone  *string    `json:"timeZone"`
 	UpdatedAt *time.Time `json:"updatedAt"`
@@ -48,6 +50,7 @@ type UserPreferencesUpdate struct {
 	ShowScrollbars     *bool   `json:"showScrollbars"`
 	TextDirection      *string `json:"textDirection"`
 	Theme              *string `json:"theme"`
+	TimeFormat         *string `json:"timeFormat"`
 	// TimeZone sets the display time zone; an empty string follows the browser.
 	TimeZone  *string `json:"timeZone"`
 	WeekStart *string `json:"weekStart"`
@@ -69,7 +72,7 @@ func (e *UserPreferencesConflictError) Unwrap() error { return publishing.ErrCon
 
 func defaultUserPreferences() UserPreferences {
 	return UserPreferences{DismissedTips: []string{}, EmailNotifications: true, Experiments: map[string]bool{},
-		Navigation: "expanded", ShowScrollbars: true, TextDirection: "ltr", Theme: "dark", WeekStart: "monday"}
+		Navigation: "expanded", ShowScrollbars: true, TextDirection: "ltr", Theme: "dark", TimeFormat: "auto", WeekStart: "monday"}
 }
 
 func userPreferencesRecord(row *ent.UserPreference) UserPreferences {
@@ -80,7 +83,7 @@ func userPreferencesRecord(row *ent.UserPreference) UserPreferences {
 	return UserPreferences{AccentColor: row.AccentColor, DeveloperMode: row.DeveloperMode, DismissedTips: nonNilStrings(row.DismissedTips),
 		EmailNotifications: row.EmailNotifications, Experiments: nonNilFlags(row.Experiments),
 		Navigation: string(row.Navigation), ShowScrollbars: row.ShowScrollbars, TextDirection: string(row.TextDirection),
-		Theme: string(row.Theme), TimeZone: row.TimeZone, UpdatedAt: &updated, Version: row.Version,
+		Theme: string(row.Theme), TimeFormat: string(row.TimeFormat), TimeZone: row.TimeZone, UpdatedAt: &updated, Version: row.Version,
 		WeekStart: string(row.WeekStart)}
 }
 
@@ -163,6 +166,12 @@ func (c *Configuration) applyPreferenceUpdate(ctx context.Context, actor Actor, 
 		}
 		current.WeekStart = *input.WeekStart
 	}
+	if input.TimeFormat != nil {
+		if !oneOf(*input.TimeFormat, "auto", "12h", "24h") {
+			return invalid("Time format is auto, 12h or 24h.")
+		}
+		current.TimeFormat = *input.TimeFormat
+	}
 	if input.TextDirection != nil {
 		if !oneOf(*input.TextDirection, "ltr", "rtl") {
 			return invalid("Text direction is ltr or rtl.")
@@ -242,7 +251,7 @@ func (c *Configuration) UpdateUserPreferences(ctx context.Context, actor Actor, 
 		if row == nil {
 			created, err := c.client.UserPreference.Create().SetID(actor.UserID).SetNillableTimeZone(current.TimeZone).
 				SetAccentColor(current.AccentColor).SetTheme(userpreference.Theme(current.Theme)).SetNavigation(userpreference.Navigation(current.Navigation)).
-				SetWeekStart(userpreference.WeekStart(current.WeekStart)).
+				SetWeekStart(userpreference.WeekStart(current.WeekStart)).SetTimeFormat(userpreference.TimeFormat(current.TimeFormat)).
 				SetTextDirection(userpreference.TextDirection(current.TextDirection)).
 				SetShowScrollbars(current.ShowScrollbars).SetDeveloperMode(current.DeveloperMode).
 				SetEmailNotifications(current.EmailNotifications).SetDismissedTips(current.DismissedTips).
@@ -259,7 +268,7 @@ func (c *Configuration) UpdateUserPreferences(ctx context.Context, actor Actor, 
 		}
 		update := c.client.UserPreference.Update().Where(userpreference.ID(actor.UserID), userpreference.Version(current.Version)).
 			SetAccentColor(current.AccentColor).SetTheme(userpreference.Theme(current.Theme)).SetNavigation(userpreference.Navigation(current.Navigation)).
-			SetWeekStart(userpreference.WeekStart(current.WeekStart)).
+			SetWeekStart(userpreference.WeekStart(current.WeekStart)).SetTimeFormat(userpreference.TimeFormat(current.TimeFormat)).
 			SetTextDirection(userpreference.TextDirection(current.TextDirection)).
 			SetShowScrollbars(current.ShowScrollbars).SetDeveloperMode(current.DeveloperMode).
 			SetEmailNotifications(current.EmailNotifications).SetDismissedTips(current.DismissedTips).

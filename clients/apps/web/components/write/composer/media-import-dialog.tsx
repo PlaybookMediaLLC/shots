@@ -7,7 +7,13 @@ import type { EditorUploadFile } from '@shots/platejs-editor/lib'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
@@ -103,17 +109,18 @@ export function MediaImportDialog({
         </DialogHeader>
         <Label className="grid gap-1 text-sm">
           Destination post
-          <NativeSelect
-            aria-label="Media destination post"
-            value={post}
-            onChange={(event) => setPost(Number(event.target.value))}
-          >
-            {ranges.map((_, index) => (
-              <NativeSelectOption key={index} value={index}>
-                Post {index + 1}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+          <Select value={String(post)} onValueChange={(value) => setPost(Number(value))}>
+            <SelectTrigger aria-label="Media destination post">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ranges.map((_, index) => (
+                <SelectItem key={index} value={String(index)}>
+                  Post {index + 1}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Label>
         {returnedAsset && !attached && (
           <div className="grid gap-2">

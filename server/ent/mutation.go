@@ -104546,6 +104546,7 @@ type UserPreferenceMutation struct {
 	theme                *userpreference.Theme
 	navigation           *userpreference.Navigation
 	week_start           *userpreference.WeekStart
+	time_format          *userpreference.TimeFormat
 	text_direction       *userpreference.TextDirection
 	show_scrollbars      *bool
 	developer_mode       *bool
@@ -104857,6 +104858,42 @@ func (m *UserPreferenceMutation) OldWeekStart(ctx context.Context) (v userprefer
 // ResetWeekStart resets all changes to the "week_start" field.
 func (m *UserPreferenceMutation) ResetWeekStart() {
 	m.week_start = nil
+}
+
+// SetTimeFormat sets the "time_format" field.
+func (m *UserPreferenceMutation) SetTimeFormat(uf userpreference.TimeFormat) {
+	m.time_format = &uf
+}
+
+// TimeFormat returns the value of the "time_format" field in the mutation.
+func (m *UserPreferenceMutation) TimeFormat() (r userpreference.TimeFormat, exists bool) {
+	v := m.time_format
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTimeFormat returns the old "time_format" field's value of the UserPreference entity.
+// If the UserPreference object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserPreferenceMutation) OldTimeFormat(ctx context.Context) (v userpreference.TimeFormat, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTimeFormat is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTimeFormat requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTimeFormat: %w", err)
+	}
+	return oldValue.TimeFormat, nil
+}
+
+// ResetTimeFormat resets all changes to the "time_format" field.
+func (m *UserPreferenceMutation) ResetTimeFormat() {
+	m.time_format = nil
 }
 
 // SetTextDirection sets the "text_direction" field.
@@ -105216,7 +105253,7 @@ func (m *UserPreferenceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserPreferenceMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.time_zone != nil {
 		fields = append(fields, userpreference.FieldTimeZone)
 	}
@@ -105231,6 +105268,9 @@ func (m *UserPreferenceMutation) Fields() []string {
 	}
 	if m.week_start != nil {
 		fields = append(fields, userpreference.FieldWeekStart)
+	}
+	if m.time_format != nil {
+		fields = append(fields, userpreference.FieldTimeFormat)
 	}
 	if m.text_direction != nil {
 		fields = append(fields, userpreference.FieldTextDirection)
@@ -105274,6 +105314,8 @@ func (m *UserPreferenceMutation) Field(name string) (ent.Value, bool) {
 		return m.Navigation()
 	case userpreference.FieldWeekStart:
 		return m.WeekStart()
+	case userpreference.FieldTimeFormat:
+		return m.TimeFormat()
 	case userpreference.FieldTextDirection:
 		return m.TextDirection()
 	case userpreference.FieldShowScrollbars:
@@ -105309,6 +105351,8 @@ func (m *UserPreferenceMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldNavigation(ctx)
 	case userpreference.FieldWeekStart:
 		return m.OldWeekStart(ctx)
+	case userpreference.FieldTimeFormat:
+		return m.OldTimeFormat(ctx)
 	case userpreference.FieldTextDirection:
 		return m.OldTextDirection(ctx)
 	case userpreference.FieldShowScrollbars:
@@ -105368,6 +105412,13 @@ func (m *UserPreferenceMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetWeekStart(v)
+		return nil
+	case userpreference.FieldTimeFormat:
+		v, ok := value.(userpreference.TimeFormat)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTimeFormat(v)
 		return nil
 	case userpreference.FieldTextDirection:
 		v, ok := value.(userpreference.TextDirection)
@@ -105512,6 +105563,9 @@ func (m *UserPreferenceMutation) ResetField(name string) error {
 		return nil
 	case userpreference.FieldWeekStart:
 		m.ResetWeekStart()
+		return nil
+	case userpreference.FieldTimeFormat:
+		m.ResetTimeFormat()
 		return nil
 	case userpreference.FieldTextDirection:
 		m.ResetTextDirection()

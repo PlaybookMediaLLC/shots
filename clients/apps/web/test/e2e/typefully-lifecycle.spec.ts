@@ -52,16 +52,17 @@ test(
     await page.getByRole('link', { name: 'Allow selected workspace' }).click()
     await chooseOption(page.getByLabel('Slack workspace'), 'Fixture team')
     await chooseOption(page.getByLabel('Slack channel', { exact: true }), '#workspace-activity')
-    await page
-      .getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true })
-      .selectOption('C067890')
+    await chooseOption(
+      page.getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true }),
+      '#brand-publishing'
+    )
     await page.getByRole('button', { name: 'Save workspace policy', exact: true }).click()
     await expect(page.getByText('Workspace policy saved.', { exact: true })).toBeVisible()
     await app.reload()
     await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
     await expect(
       page.getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true })
-    ).toHaveValue('C067890')
+    ).toContainText('#brand-publishing')
 
     const id = await openNewDraft(page)
     await page.getByLabel('Draft title', { exact: true }).fill('Lifecycle release')

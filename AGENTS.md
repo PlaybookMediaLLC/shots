@@ -147,12 +147,16 @@ add one.
   `<input>`, `<textarea>`, `<select>`, `<option>`, `<label>`, `<button>` or
   `<table>` in app code is an antipattern: it skips the design system's
   focus, invalid, disabled and dark-mode states and the platform-shell styles
-  keyed to `data-slot`. Use `Input`, `Textarea`, `NativeSelect` (or `Select`),
-  `Label`, `Button` (`variant="custom" size={null}` for a bespoke control) and
-  `Table`; `Checkbox` for a checkbox, `Slider` for a range, and `DatePicker`
-  (a `Calendar` in a popover) for a day, never `<input type="date">`. Only
-  `components/ui/` itself and `<input type="hidden">` use the raw elements;
-  ESLint enforces it in `clients/eslint.config.mjs`.
+  keyed to `data-slot`. Use `Input`, `Textarea`, `Select` (`Combobox` for a
+  long or searchable list), `Label`, `Button` (`variant="custom" size={null}`
+  for a bespoke control) and `Table`; `Checkbox` for a checkbox, `Slider` for
+  a range, `DatePicker` or `DateRangePicker` for days, `TimePicker` for a time,
+  `TimeZonePicker` for a zone, `SwatchColorPicker` for a color, `FileDropZone`
+  for a visible file input and `Disclosure` for a collapsible section, never
+  the browser's `type="date|time|color"` inputs, `<datalist>` or `<details>`.
+  Only `components/ui/` itself, `<input type="hidden">` and a hidden file input
+  behind a button use the raw elements; ESLint enforces it in
+  `clients/eslint.config.mjs`.
 - **Compatibility.** Before you change shared code, list its callers and
   keep their behavior or update them in the same change. A public API break
   must be listed in `server/internal/shotsapi/breaking-changes-allowed.txt`.

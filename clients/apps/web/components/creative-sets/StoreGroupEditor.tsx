@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Select,
   SelectContent,
@@ -296,36 +297,38 @@ export function StoreGroupEditor({
                 </Button>
               </div>
               {group.brandAssignment ? (
-                <details className="border-b p-3 text-xs">
-                  <summary>Brand · linked to the set’s accepted version</summary>
-                  {storeBrandOverrides(group).map((field) => (
-                    <div className="mt-2 flex items-center gap-2" key={field.label}>
-                      <span>{field.label} · Override in this store group</span>
-                      {canEdit ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            flush()
-                            const next = structuredClone(session.snapshot().document)
-                            const index = next.storeGroups.findIndex((item) => item.id === group.id)
-                            next.storeGroups[index] = resetStoreBrandField(
-                              next.storeGroups[index]!,
-                              field
-                            )
-                            session.commit(next)
-                          }}
-                        >
-                          Reset to brand
-                        </Button>
-                      ) : null}
-                    </div>
-                  ))}
-                  <p className="mt-2 text-muted-foreground">
-                    Individual slide typography and placement remain local. Select a layer to edit
-                    or reset those fields.
-                  </p>
-                </details>
+                <Disclosure className="border-b p-3 text-xs">
+                  <DisclosureTrigger>Brand · linked to the set’s accepted version</DisclosureTrigger>
+                  <DisclosureContent>
+                    {storeBrandOverrides(group).map((field) => (
+                      <div className="mt-2 flex items-center gap-2" key={field.label}>
+                        <span>{field.label} · Override in this store group</span>
+                        {canEdit ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              flush()
+                              const next = structuredClone(session.snapshot().document)
+                              const index = next.storeGroups.findIndex((item) => item.id === group.id)
+                              next.storeGroups[index] = resetStoreBrandField(
+                                next.storeGroups[index]!,
+                                field
+                              )
+                              session.commit(next)
+                            }}
+                          >
+                            Reset to brand
+                          </Button>
+                        ) : null}
+                      </div>
+                    ))}
+                    <p className="mt-2 text-muted-foreground">
+                      Individual slide typography and placement remain local. Select a layer to edit
+                      or reset those fields.
+                    </p>
+                  </DisclosureContent>
+                </Disclosure>
               ) : null}
               {group.review.source || group.review.wording ? (
                 <div role="status" className="flex items-center gap-2 bg-amber-500/10 p-3 text-xs">

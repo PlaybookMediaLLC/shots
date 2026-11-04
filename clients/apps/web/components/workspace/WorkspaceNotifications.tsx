@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { PersonalNotificationDeliveries } from '@/components/settings/PersonalNotificationDeliveries'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   Table,
   TableBody,
@@ -43,6 +44,18 @@ import {
   notificationSlackChannelsSchema,
   type NotificationSettings,
 } from '@/lib/notifications/schema'
+import { preferenceChannels, preferenceSelected } from '@/lib/notifications/preferences'
+
+/** How many of a group's events reach you on any channel, such as "3 of 8 on". */
+function groupSummary(
+  preferences: NotificationSettings['preferences'],
+  events: NotificationSettings['catalogue']
+): string {
+  const on = events.filter((event) =>
+    preferenceChannels.some((channel) => preferenceSelected(preferences, event.id, channel.id))
+  ).length
+  return `${on} of ${events.length} on`
+}
 
 function SettingsForm({
   initial,
@@ -65,8 +78,13 @@ function SettingsForm({
       ? 'delivery'
       : 'personal'
   )
-  const { preferences: personal } = usePreferences()
-  const preferencesDirty = JSON.stringify(preferences) !== JSON.stringify(settings.preferences)
+  const { preferences: personal, save: savePersonal } = usePreferences()
+  // The email switch is a personal preference; it saves with the rest of these preferences.
+  const [email, setEmail] = useState<boolean | null>(null)
+  const savedEmail = personal?.emailNotifications !== false
+  const emailDirty = email !== null && email !== savedEmail
+  const preferencesDirty =
+    emailDirty || JSON.stringify(preferences) !== JSON.stringify(settings.preferences)
   const policyDirty = JSON.stringify(policy) !== JSON.stringify(settings.policy)
   useUnsavedSettings(preferencesDirty || policyDirty)
   const [preferencesConflict, setPreferencesConflict] = useState(false)
@@ -160,6 +178,11 @@ function SettingsForm({
   }
   async function save(section: 'policy' | 'preferences') {
     await perform(section, async () => {
+      if (section === 'preferences' && emailDirty && email !== null) {
+        const result = await savePersonal({ emailNotifications: email })
+        if (!result.ok) throw new Error(result.error)
+        setEmail(null)
+      }
       const next = await notificationRequest(identity, `/${section}`, notificationSettingsSchema, {
         method: 'PUT',
         body: section === 'policy' ? policy : preferences,
@@ -311,9 +334,9 @@ function SettingsForm({
       <div hidden={panel !== 'personal'} className="space-y-8">
         <Section
           title="Email"
-          description="Saves automatically. Your switch for activity email in every workspace."
+          description="Your switch for activity email in every workspace. It saves with your preferences below."
         >
-          <EmailSwitch />
+          <EmailSwitch checked={email ?? savedEmail} disabled={!personal || !!busy} onCheckedChange={setEmail} />
         </Section>
 
         <Section
@@ -386,32 +409,40 @@ function SettingsForm({
         >
           <Group>
             {personalGroups.map((group) => (
-              <details
+              <Disclosure
                 className="border-b border-border last:border-0"
                 key={group}
-                open={group === 'reviews'}
+                defaultOpen={group === 'reviews'}
               >
-                <summary className="cursor-pointer px-5 py-4 text-ui-lg font-medium capitalize">
+                <DisclosureTrigger
+                  className="px-5 py-4 text-ui-lg font-medium capitalize"
+                  summary={groupSummary(
+                    preferences,
+                    settings.catalogue.filter((event) => personalGroup(event.group) === group)
+                  )}
+                >
                   {group === 'publishing' ? 'Publishing defaults' : group}
-                </summary>
-                <div className="px-5 pb-4">
-                  {group === 'publishing' ? (
-                    <p className="mb-3 text-xs text-muted-foreground">
-                      Used unless you choose a channel for a specific publishing brand below.
-                    </p>
-                  ) : null}
-                  <NotificationPreferenceTable
-                    events={settings.catalogue.filter(
-                      (event) => personalGroup(event.group) === group
-                    )}
-                    group={group === 'publishing' ? 'publishing defaults' : group}
-                    value={preferences}
-                    onChange={setPreferences}
-                    settings={settings}
-                    emailEnabled={personal?.emailNotifications !== false}
-                  />
-                </div>
-              </details>
+                </DisclosureTrigger>
+                <DisclosureContent>
+                  <div className="px-5 pb-4">
+                    {group === 'publishing' ? (
+                      <p className="mb-3 text-xs text-muted-foreground">
+                        Used unless you choose a channel for a specific publishing brand below.
+                      </p>
+                    ) : null}
+                    <NotificationPreferenceTable
+                      events={settings.catalogue.filter(
+                        (event) => personalGroup(event.group) === group
+                      )}
+                      group={group === 'publishing' ? 'publishing defaults' : group}
+                      value={preferences}
+                      onChange={setPreferences}
+                      settings={settings}
+                      emailEnabled={email ?? savedEmail}
+                    />
+                  </div>
+                </DisclosureContent>
+              </Disclosure>
             ))}
           </Group>
           <div className="mt-6">
@@ -420,7 +451,7 @@ function SettingsForm({
               onChange={setPreferences}
               value={preferences}
               settings={settings}
-              emailEnabled={personal?.emailNotifications !== false}
+              emailEnabled={email ?? savedEmail}
             />
           </div>
           <div className="mt-4 flex flex-wrap gap-3">
@@ -444,7 +475,10 @@ function SettingsForm({
           busy={busy === 'preferences'}
           label="Save my preferences"
           onSave={() => void save('preferences')}
-          onDiscard={() => setPreferences(settings.preferences)}
+          onDiscard={() => {
+            setPreferences(settings.preferences)
+            setEmail(null)
+          }}
         />
       </div>
       <div hidden={panel !== 'personal'}>
@@ -622,79 +656,81 @@ function SettingsForm({
               </fieldset>
               <Group>
                 {groups.map((group) => (
-                  <details
+                  <Disclosure
                     className="border-b border-border last:border-0"
                     key={group}
-                    open={group === 'reviews'}
+                    defaultOpen={group === 'reviews'}
                   >
-                    <summary className="cursor-pointer px-5 py-4 text-ui-lg font-medium capitalize">
+                    <DisclosureTrigger className="px-5 py-4 text-ui-lg font-medium capitalize">
                       {group}
-                    </summary>
-                    <div className="overflow-x-auto px-5 pb-4">
-                      <Table className="w-full text-left text-sm">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead scope="col" className="pb-3 font-medium">
-                              Activity
-                            </TableHead>
-                            {['In-app', 'Email', 'Slack'].map((channel) => (
-                              <TableHead
-                                scope="col"
-                                className="px-3 pb-3 font-medium"
-                                key={channel}
-                              >
-                                {channel}
+                    </DisclosureTrigger>
+                    <DisclosureContent>
+                      <div className="overflow-x-auto px-5 pb-4">
+                        <Table className="w-full text-left text-sm">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead scope="col" className="pb-3 font-medium">
+                                Activity
                               </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {settings.catalogue
-                            .filter((event) => event.group === group)
-                            .map((event) => (
-                              <TableRow className="border-t border-border" key={event.id}>
+                              {['In-app', 'Email', 'Slack'].map((channel) => (
                                 <TableHead
-                                  scope="row"
-                                  className="py-3 pr-4 font-normal whitespace-normal"
+                                  scope="col"
+                                  className="px-3 pb-3 font-medium"
+                                  key={channel}
                                 >
-                                  {event.label}
-                                  {event.restricted ? (
-                                    <span className="mt-1 block text-xs text-muted-foreground">
-                                      Private to recipients
-                                    </span>
-                                  ) : null}
+                                  {channel}
                                 </TableHead>
-                                {(['inApp', 'email', 'slack'] as const).map((channel) => (
-                                  <TableCell className="px-3 py-3" key={channel}>
-                                    <Checkbox
-                                      aria-label={`${event.label}: workspace ${channel === 'inApp' ? 'in-app' : channel}`}
-                                      disabled={
-                                        !!busy ||
-                                        !policy.availability[channel] ||
-                                        (channel === 'slack' && event.restricted)
-                                      }
-                                      checked={policy.events[event.id]?.[channel] ?? false}
-                                      onCheckedChange={(checked) =>
-                                        setPolicy((current) => ({
-                                          ...current,
-                                          events: {
-                                            ...current.events,
-                                            [event.id]: {
-                                              ...current.events[event.id],
-                                              [channel]: checked === true,
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {settings.catalogue
+                              .filter((event) => event.group === group)
+                              .map((event) => (
+                                <TableRow className="border-t border-border" key={event.id}>
+                                  <TableHead
+                                    scope="row"
+                                    className="py-3 pr-4 font-normal whitespace-normal"
+                                  >
+                                    {event.label}
+                                    {event.restricted ? (
+                                      <span className="mt-1 block text-xs text-muted-foreground">
+                                        Private to recipients
+                                      </span>
+                                    ) : null}
+                                  </TableHead>
+                                  {(['inApp', 'email', 'slack'] as const).map((channel) => (
+                                    <TableCell className="px-3 py-3" key={channel}>
+                                      <Checkbox
+                                        aria-label={`${event.label}: workspace ${channel === 'inApp' ? 'in-app' : channel}`}
+                                        disabled={
+                                          !!busy ||
+                                          !policy.availability[channel] ||
+                                          (channel === 'slack' && event.restricted)
+                                        }
+                                        checked={policy.events[event.id]?.[channel] ?? false}
+                                        onCheckedChange={(checked) =>
+                                          setPolicy((current) => ({
+                                            ...current,
+                                            events: {
+                                              ...current.events,
+                                              [event.id]: {
+                                                ...current.events[event.id],
+                                                [channel]: checked === true,
+                                              },
                                             },
-                                          },
-                                        }))
-                                      }
-                                    />
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </details>
+                                          }))
+                                        }
+                                      />
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </DisclosureContent>
+                  </Disclosure>
                 ))}
               </Group>
               <SettingsSaveBar

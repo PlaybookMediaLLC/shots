@@ -14,6 +14,7 @@ export function AppearanceSettings() {
   const [themeState, runTheme] = useSaveState()
   const [navigationState, runNavigation] = useSaveState()
   const [weekState, runWeek] = useSaveState()
+  const [timeFormatState, runTimeFormat] = useSaveState()
   const [directionState, runDirection] = useSaveState()
   const disabled = status !== 'ready'
 
@@ -86,6 +87,19 @@ export function AppearanceSettings() {
         onChange={(weekStart) => void runWeek(() => save({ weekStart }))}
         status={weekState}
         value={preferences?.weekStart}
+      />
+      <ChoiceGroup<Preferences['timeFormat']>
+        choices={[
+          { description: "Follows this device's language settings.", label: 'Automatic', value: 'auto' },
+          { description: 'Such as 9:30 PM.', label: '12-hour', value: '12h' },
+          { description: 'Such as 21:30.', label: '24-hour', value: '24h' },
+        ]}
+        disabled={disabled}
+        legend="Time format"
+        name="time-format"
+        onChange={(timeFormat) => void runTimeFormat(() => save({ timeFormat }))}
+        status={timeFormatState}
+        value={preferences?.timeFormat}
       />
       <ChoiceGroup<Preferences['textDirection']>
         choices={[

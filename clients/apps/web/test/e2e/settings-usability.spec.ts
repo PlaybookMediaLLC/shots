@@ -44,7 +44,11 @@ test('brand colors retain the last valid preview and block publication until cor
   await page.getByLabel('Visual brand kit name').fill('Validation test')
   await page.getByLabel('Accent', { exact: true }).fill('#123456')
   await page.getByLabel('Accent', { exact: true }).fill('not-a-color')
-  await expect(page.getByLabel('Accent color picker')).toHaveValue('#123456')
+  // The swatch keeps showing the last valid color.
+  await expect(page.getByLabel('Accent color picker').locator('span').first()).toHaveCSS(
+    'background-color',
+    'rgb(18, 52, 86)'
+  )
   await expect(page.getByText('Enter a six-digit hex color, like #6d5dfc.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Publish visual brand kit' })).toBeDisabled()
   await page.getByLabel('Accent', { exact: true }).fill('#654321')
