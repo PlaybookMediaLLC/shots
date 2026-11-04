@@ -32,7 +32,7 @@ export function NewBatchButton({
           method: 'POST',
           body: { title, socialSetId: setId },
         })
-          .then((batch) => window.location.assign(`/write/batches/${batch.id}`))
+          .then((batch) => window.location.assign(`/publish/batches/${batch.id}`))
           .catch((error: unknown) => {
             toast.error(error instanceof Error ? error.message : 'The batch could not be started.')
             setBusy(false)

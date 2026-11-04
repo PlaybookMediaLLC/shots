@@ -70,7 +70,7 @@ export function WorkspaceSharedLinks({ canEdit }: { canEdit: boolean }) {
 
   if (planRequired) {
     return (
-      <PlanRequired from="/workspace/shared-links">
+      <PlanRequired from="/settings/shared-links">
         Publishing designs at a link needs Pro.
       </PlanRequired>
     )

@@ -108,7 +108,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
           `INSERT INTO "Organization" (id,name,"updatedAt") VALUES ($1,'Bluesky fixture',now())`,
           [`go-${organizationId}`]
         )
-        await app.open('/workspace/social-sets?bluesky=preserve')
+        await app.open('/settings/publishing-brands?bluesky=preserve')
         const originalURL = page.url()
         await page
           .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
@@ -189,7 +189,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
             await anonymous.close()
           }
           await dialog.getByRole('link', { name: 'Open publishing brand' }).click()
-          await expect(page).toHaveURL(new RegExp(`/workspace/social-sets/${created.id}$`))
+          await expect(page).toHaveURL(new RegExp(`/settings/publishing-brands/${created.id}$`))
           await app.reload()
           await expect(page.getByText(account.name, { exact: false }).first()).toBeVisible()
           await page.screenshot({

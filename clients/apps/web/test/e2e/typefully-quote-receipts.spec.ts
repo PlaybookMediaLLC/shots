@@ -36,7 +36,7 @@ test('pending and rejected native quote receipts remain published and never offe
     `UPDATE scheduled_post SET status='PUBLISHED',"remotePostId"='root',"publishedAt"=now(),"threadProgress"=$2 WHERE "contentDraftId"=$1`,
     [draft.id, JSON.stringify({ posted: 0, total: 0, quotes })]
   )
-  await app.open(`/write/${draft.id}`)
+  await app.open(`/publish/${draft.id}`)
   const post = page.getByTestId('draft-post')
   for (const quote of quotes)
     await expect(post).toContainText(

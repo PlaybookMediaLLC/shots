@@ -22,7 +22,7 @@ func emailConfigured() bool {
 	return resendConfigured() || strings.TrimSpace(os.Getenv("AUTH_EMAIL_WEBHOOK_URL")) != "" || os.Getenv("EMAIL_PROVIDER") == "nodemailer" && os.Getenv("EMAIL_HOST") != ""
 }
 func renderEmail(e *Envelope) {
-	prefs := appURL("/workspace/notifications")
+	prefs := appURL("/settings/notifications")
 	summary := e.Text
 	if summary == "" {
 		summary = e.Subject

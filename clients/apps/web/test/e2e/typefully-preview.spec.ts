@@ -104,7 +104,7 @@ test(
       'caption,asset,channels\nMoving picture,preview.mp4,x\nTwo-page document,preview.pdf,linkedin',
       [fixture('preview.mp4'), fixture('preview.pdf')]
     )
-    const [videoURL, pdfURL] = (await saveBatchDrafts(page)).map((id) => `/write/${id}`)
+    const [videoURL, pdfURL] = (await saveBatchDrafts(page)).map((id) => `/publish/${id}`)
     await page.goto(videoURL)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const video = page.getByTestId('preview-x').getByLabel('Attached video')
@@ -268,7 +268,7 @@ test(
       },
     })
     expect(created.status, JSON.stringify(created.body)).toBe(201)
-    await app.open(`/write/${(created.body as { id: string }).id}`)
+    await app.open(`/publish/${(created.body as { id: string }).id}`)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const preview = page.getByTestId('preview-x')
     await expect(

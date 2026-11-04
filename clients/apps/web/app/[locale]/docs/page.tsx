@@ -245,7 +245,7 @@ export default function DocsPage() {
             </h2>
             <p className="mb-4 leading-relaxed text-muted-foreground">
               Create a workspace API key in Settings → Developer API
-              (<code>/workspace/developers</code>), then capture a page and
+              (<code>/settings/developers</code>), then capture a page and
               write the PNG to disk in one command.
             </p>
             <pre className={codeBlockClassName}>

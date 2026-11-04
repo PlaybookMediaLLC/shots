@@ -14,9 +14,9 @@ test(
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await startWorkspace({ channels: ['x'] })
-    await app.open('/write')
+    await app.open('/publish')
     await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const editor = draftEditor(page)
     await expect(editor).toBeVisible()
     await editor.click()

@@ -15,7 +15,7 @@ import { isAiEnabled } from '@/lib/trpc/routers/launch'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 import { loadWrite } from '../write-data'
 
-export const metadata: Metadata = { title: 'Publish' }
+export const metadata: Metadata = { title: 'Draft · Publish' }
 
 type WriteDraftPageProps = {
   params: Promise<{ draftId: string; locale: string }>
@@ -25,7 +25,7 @@ type WriteDraftPageProps = {
 /** Write with a draft open: the library of the draft's set beside the composer. */
 export default async function WriteDraftPage({ params, searchParams }: WriteDraftPageProps) {
   const { draftId, locale } = await params
-  const access = await requireDraftsPageAccess(locale, `/write/${draftId}`)
+  const access = await requireDraftsPageAccess(locale, `/publish/${draftId}`)
   const canManageSets = hasPermission(access.role, 'workspace:update')
   // Real-time co-editing runs when the collaboration server is configured.
   const collabUrl = process.env.PLATFORM_COLLAB_URL || null

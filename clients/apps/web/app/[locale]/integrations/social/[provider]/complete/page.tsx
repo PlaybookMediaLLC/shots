@@ -80,7 +80,7 @@ export default async function Page(
               This confirmation has expired or your access has changed. Open your workspace to check
               the account.
             </p>
-            <Link href="/workspace/channels" className="text-sm underline underline-offset-4">
+            <Link href="/settings/channels" className="text-sm underline underline-offset-4">
               Open workspace
             </Link>
           </div>

@@ -192,7 +192,7 @@ export const AGENT_PAGES: AgentPage[] = [
       'Editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in X-API-Key, and per-IP limits apply on top. Workspace-scoped /api/v1 operations require an X-API-Key organization key or an authorized signed-in session.',
     points: [
       'Editor utility endpoints return 401 unauthorized without a session or X-API-Key workspace key',
-      'Create a workspace API key in Settings → Developer API (/workspace/developers).',
+      'Create a workspace API key in Settings → Developer API (/settings/developers).',
       'Tenant /api/v1 operations enforce workspace permission, API-key scope, plan feature, and quota checks',
       'POST /api/screenshot is limited to 20 requests per minute per IP',
       'Rate-limited responses return HTTP 429 with Retry-After and X-RateLimit-* headers',

@@ -37,5 +37,5 @@ export function socialOAuthCompletionRedirect(
 export function socialOAuthCompletedPath(
   input: Pick<z.output<typeof socialOAuthCompletionViewSchema>, 'returnPath' | 'provider'>
 ): string {
-  return `${input.returnPath || '/workspace/channels'}?${new URLSearchParams({ connected: input.provider })}`
+  return `${input.returnPath || '/settings/channels'}?${new URLSearchParams({ connected: input.provider })}`
 }

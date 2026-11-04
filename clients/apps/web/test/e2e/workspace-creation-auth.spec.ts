@@ -111,7 +111,7 @@ test('Better Auth creation uses the atomic service without bypassing session or 
   expect(
     (await trpcMutation(page, 'workspace.setActive', { organizationId: first.id })).status
   ).toBe(200)
-  await app.open('/workspace/members')
+  await app.open('/settings/members')
   await expect(page.getByRole('heading', { name: 'Members', exact: true })).toBeVisible()
   await expect(page.getByText('1 member', { exact: true })).toBeVisible()
   await expect(

@@ -5,6 +5,31 @@ import createNextIntlPlugin from 'next-intl/plugin'
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts')
 
+type Redirect = Awaited<ReturnType<NonNullable<NextConfig['redirects']>>>[number]
+
+/** Pages that moved to their section's address; bookmarks and sent links keep working. */
+const NAVIGATION_MOVES: Pick<Redirect, 'source' | 'destination' | 'has'>[] = [
+  {
+    source: '/write/settings',
+    has: [{ type: 'query', key: 'set', value: '(?<set>[\\w-]+)' }],
+    destination: '/settings/publishing-brands/:set/scheduling',
+  },
+  { source: '/write/settings', destination: '/settings/publishing-brands' },
+  { source: '/write/plan', destination: '/publish/calendar' },
+  { source: '/write/deliveries', destination: '/campaigns/deliveries' },
+  { source: '/write/:path*', destination: '/publish/:path*' },
+  { source: '/link-preview', destination: '/publish/link-checks' },
+  { source: '/workspace/social-sets/:path*', destination: '/settings/publishing-brands/:path*' },
+  { source: '/workspace/:path*', destination: '/settings/:path*' },
+  {
+    source: '/library',
+    has: [{ type: 'query', key: 'view', value: 'templates' }],
+    destination: '/create',
+  },
+  { source: '/projects', destination: '/library' },
+  { source: '/assets', destination: '/library?view=assets' },
+]
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   // The repository root, so the web can import the media limits the Go
@@ -112,6 +137,15 @@ const nextConfig: NextConfig = {
             permanent: false,
           }))
         : []),
+      ...NAVIGATION_MOVES.flatMap((move) => [
+        { ...move, permanent: true },
+        {
+          ...move,
+          source: `/:locale(es|fr|de|ja|pt|ko|zh)${move.source}`,
+          destination: `/:locale${move.destination}`,
+          permanent: true,
+        },
+      ]),
       {
         source: '/features/background-remover',
         destination: '/remove-background',

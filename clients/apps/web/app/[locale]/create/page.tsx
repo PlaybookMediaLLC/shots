@@ -1,19 +1,28 @@
+import { CREATE_LINKS } from '@/lib/platform/navigation'
+import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
-import { AreaNavigation, CREATE_LINKS } from '@/components/platform-hub/AreaNavigation'
+import { AreaNavigation } from '@/components/platform-hub/AreaNavigation'
+import { RecentWork } from '@/components/platform-hub/RecentWork'
 import { ResourceCards } from '@/components/platform-hub/ResourceCards'
 import { TemplateBrowser } from '@/components/platform-hub/TemplateBrowser'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
 
-export const metadata = { title: 'Create' }
-export default async function CreatePage({
-  params,
-  searchParams,
-}: {
+type CreatePageProps = {
   params: Promise<{ locale: string }>
   searchParams: Promise<{ view?: string }>
-}) {
+}
+
+/** The tab title names the Create page shown, as the sidebar does. */
+export async function generateMetadata({ searchParams }: CreatePageProps): Promise<Metadata> {
+  const { view } = await searchParams
+  const href = view ? `/create?view=${view}` : '/create'
+  const page = CREATE_LINKS.find((link) => link.href === href)?.label ?? 'New'
+  return { title: `${page} · Create` }
+}
+
+export default async function CreatePage({ params, searchParams }: CreatePageProps) {
   const [{ locale }, { view }] = await Promise.all([params, searchParams])
   const access = await requirePaidPageAccess(await headers(), locale, '/create')
   return (
@@ -25,6 +34,9 @@ export default async function CreatePage({
         <AreaNavigation label="Create" items={CREATE_LINKS} />
         {view === 'templates' ? (
           <TemplateBrowser />
+        ) : view === 'recent' ? (
+          // Recent screenshots and canvases, from the same list as Home's.
+          <RecentWork draftsEnabled={false} organizationId={access.organization!.id} />
         ) : (
           <ResourceCards
             items={

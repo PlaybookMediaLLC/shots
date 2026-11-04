@@ -44,7 +44,7 @@ function SignInEmail({ email }: { email: string }) {
     if (!parsed.success) return
     setSending(true)
     const { error } = await authClient.changeEmail({
-      callbackURL: '/workspace/account',
+      callbackURL: '/settings/account',
       newEmail: parsed.data,
     })
     setSending(false)

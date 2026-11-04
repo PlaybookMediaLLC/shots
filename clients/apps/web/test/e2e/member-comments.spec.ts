@@ -70,7 +70,7 @@ test(
         await signUpViaApi({ ...identity, email, name }, target)
         await acceptInvitation(target, invitation.id)
       }
-      await viewer.goto(`/write/${draft.id}?panel=comments`)
+      await viewer.goto(`/publish/${draft.id}?panel=comments`)
       await expect(viewer.getByRole('textbox', { name: 'Draft title' })).toBeDisabled()
       await viewer.getByLabel('Comment on draft').fill('Please review the last sentence.')
       await viewer.getByRole('button', { name: 'Mention teammates' }).click()
@@ -112,7 +112,7 @@ test(
       expect(saved.plainText).toBe('Approved body')
       expect(saved.title).toBe('Comment permissions')
       const thread = saved.discussions.threads[0]
-      await reviewer.goto(`/write/${draft.id}?panel=comments`)
+      await reviewer.goto(`/publish/${draft.id}?panel=comments`)
       await expect(reviewer.getByRole('button', { name: 'Edit comment', exact: true })).toHaveCount(
         0
       )

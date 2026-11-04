@@ -73,7 +73,7 @@ export const PRODUCT_TOURS = [
         id: 'create',
         anchor: 'nav-create',
         title: 'Create',
-        description: 'Make branded screenshots, designs and store images from templates and tools.',
+        description: 'Start a screenshot, canvas or store image, pick up recent work, or begin from a template.',
       },
       {
         id: 'publish',
@@ -86,13 +86,13 @@ export const PRODUCT_TOURS = [
         id: 'library',
         anchor: 'nav-library',
         title: 'Library',
-        description: 'Find your screenshots, canvases, assets, templates and brand resources.',
+        description: 'Find your screenshots, canvases, Story Sets, assets and brand assets.',
       },
       {
         id: 'automate',
         anchor: 'nav-automate',
         title: 'Automate',
-        description: 'Turn deployments and other sources into workflows that run for you.',
+        description: 'Workflows that turn deployments and other sources into campaigns, with their runs.',
       },
       {
         id: 'search',
@@ -120,7 +120,7 @@ export const PRODUCT_TOURS = [
       {
         id: 'brand',
         anchor: 'write-brand',
-        route: '/write',
+        route: '/publish',
         title: 'Choose a publishing brand',
         description:
           'A brand is a set of social accounts. Drafts in it publish to those accounts. Settings opens its accounts and posting schedule.',
@@ -128,7 +128,7 @@ export const PRODUCT_TOURS = [
       {
         id: 'new-draft',
         anchor: 'write-new-draft',
-        route: '/write',
+        route: '/publish',
         title: 'Start a draft',
         description:
           'Write the post once. You can adapt it for each network before you schedule it.',
@@ -136,7 +136,7 @@ export const PRODUCT_TOURS = [
       {
         id: 'tabs',
         anchor: 'write-tabs',
-        route: '/write',
+        route: '/publish',
         title: 'Follow every post',
         description:
           'Drafts holds work in progress. Queue shows what is scheduled. Posted and Archived keep the history.',
@@ -144,7 +144,7 @@ export const PRODUCT_TOURS = [
       {
         id: 'bulk',
         anchor: 'write-bulk',
-        route: '/write',
+        route: '/publish',
         title: 'Schedule many posts at once',
         description: 'Bulk schedule plans a batch of separate posts in one pass.',
       },
@@ -250,7 +250,7 @@ export function unsavedTips(
 
 /**
  * Whether a page path, with or without its locale prefix, is the step's route
- * or a page under it: `/write` covers an open draft at `/write/<id>`.
+ * or a page under it: `/publish` covers an open draft at `/publish/<id>`.
  */
 export function isOnTourRoute(pathname: string, route: string | undefined): boolean {
   if (!route) return true

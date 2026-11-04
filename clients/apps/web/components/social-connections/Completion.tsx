@@ -71,7 +71,7 @@ export function ConnectionCompletion(props: z.output<typeof socialOAuthCompletio
       </Button>
       <Link
         className="text-center text-sm text-muted-foreground underline underline-offset-4"
-        href="/workspace/social-sets"
+        href="/settings/publishing-brands"
       >
         Stay in the current workspace
       </Link>

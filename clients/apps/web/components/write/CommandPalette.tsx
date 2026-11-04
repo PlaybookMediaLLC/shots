@@ -98,7 +98,7 @@ export default function CommandPalette({
                   go(() =>
                     router.push(
                       item.key === 'publish' && data.activeSet
-                        ? `/write?set=${data.activeSet.id}`
+                        ? `/publish?set=${data.activeSet.id}`
                         : item.href
                     )
                   )
@@ -154,16 +154,16 @@ export default function CommandPalette({
           ) : null}
           <CommandItem
             onSelect={() =>
-              go(() => router.push(`/write${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
+              go(() => router.push(`/publish${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
             }
           >
-            Go to Write
+            Go to Drafts
             <CommandShortcut>{keys.label({ key: '1', mod: true, shift: true })}</CommandShortcut>
           </CommandItem>
           <CommandItem
             onSelect={() =>
               go(() =>
-                router.push(`/write/plan${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
+                router.push(`/publish/calendar${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
               )
             }
           >

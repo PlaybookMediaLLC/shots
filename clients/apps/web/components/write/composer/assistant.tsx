@@ -106,7 +106,7 @@ export function AssistantPanel({
         </Button>
       </p>
       <p className="text-xs text-muted-foreground">
-        Workspace defaults → Social-set overrides → Your instructions for this draft. Prohibited
+        Workspace defaults → Publishing brand overrides → Your instructions for this draft. Prohibited
         terms always apply.
       </p>
       <Label className="grid gap-1 text-xs">

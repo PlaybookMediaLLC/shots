@@ -134,7 +134,7 @@ test('an MFA-protected owner can schedule and restore workspace deletion', async
   await page.getByRole('button', { name: 'Schedule deletion' }).click()
   await expect(page.getByRole('heading', { name: 'Workspace deletion is scheduled' })).toBeVisible()
   await app.open('/')
-  await expect.poll(() => new URL(page.url()).pathname).toBe('/workspace')
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/settings')
   await page.getByRole('button', { name: 'Open account menu' }).click()
   await page.getByRole('button', { name: `Switch to ${recoveryWorkspaceName}` }).click()
   await expect.poll(() => new URL(page.url()).pathname).toBe('/home')
@@ -142,7 +142,7 @@ test('an MFA-protected owner can schedule and restore workspace deletion', async
   await page
     .getByRole('button', { exact: true, name: `Switch to ${identity.workspaceName}` })
     .click()
-  await expect.poll(() => new URL(page.url()).pathname).toBe('/workspace')
+  await expect.poll(() => new URL(page.url()).pathname).toBe('/settings')
   await expect(page.getByRole('heading', { name: 'Workspace deletion is scheduled' })).toBeVisible()
   expect((await browserRequest(page, '/api/tenant/releases')).status).toBe(403)
   expect((await browserRequest(page, '/api/auth/organization/get-active-member')).status).toBe(403)
@@ -187,7 +187,7 @@ test('an MFA-protected owner can schedule and restore workspace deletion', async
   }).toPass({ intervals: [2_000], timeout: 45_000 })
   expect(restoreStatus).toBe(200)
 
-  // The page is already on /workspace, so polling the path proves nothing
+  // The page is already on /settings, so polling the path proves nothing
   // here: it matches immediately whether or not the restore navigation ever
   // happened. Wait for the restored content instead.
   await expect(page.getByRole('heading', { exact: true, level: 1, name: 'General' })).toBeVisible({
