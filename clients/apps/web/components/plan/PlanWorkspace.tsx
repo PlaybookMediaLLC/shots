@@ -74,6 +74,7 @@ import {
   selectionState,
   shiftAnchor,
   validDay,
+  visibleDayItems,
   visibleItems,
   weekCardLayout,
   type PlanItem,
@@ -160,6 +161,7 @@ export function PlanWorkspace({
   } | null>(null)
   const [detail, setDetail] = React.useState<PlanItem | null>(null)
   const [over, setOver] = React.useState<string | null>(null)
+  const [openDays, setOpenDays] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState(false)
   const activeIds = prefs.visible ?? sets.map((s) => s.id)
   const focused = activeIds.length === 1 ? sets.find((s) => s.id === activeIds[0]) : undefined
@@ -491,6 +493,30 @@ export function PlanWorkspace({
       ) : null}
     </Button>
   )
+  const dayCards = (day: string) => {
+    const onDay = shown.filter((i) => itemDay(i, prefs.zone) === day)
+    const capped = prefs.view === 'month' && !prefs.showAll
+    const open = openDays.includes(day)
+    const { visible, hidden } = capped ? visibleDayItems(onDay) : { visible: onDay, hidden: 0 }
+    return (
+      <div className="grid gap-2">
+        {(open ? onDay : visible).map((item) => card(item))}
+        {hidden > 0 ? (
+          <Button
+            aria-expanded={open}
+            className="h-auto justify-start px-1 py-0.5 text-xs font-normal text-muted-foreground"
+            onClick={() =>
+              setOpenDays((days) => (open ? days.filter((d) => d !== day) : [...days, day]))
+            }
+            size={null}
+            variant="ghost"
+          >
+            {open ? 'Show less' : `+${hidden} more`}
+          </Button>
+        ) : null}
+      </div>
+    )
+  }
   const slotsFor = (day: string, absolute = false) =>
     focused && prefs.slots
       ? displayDaySlots(
@@ -832,7 +858,8 @@ export function PlanWorkspace({
                   <Select
                     value={prefs.density}
                     onValueChange={(value) =>
-                      setPref({ density: value as PlanPreferences['density'] })}
+                      setPref({ density: value as PlanPreferences['density'] })
+                    }
                   >
                     <SelectTrigger aria-label="Card density">
                       <SelectValue />
@@ -897,6 +924,18 @@ export function PlanWorkspace({
                 <SelectItem value="week">Week</SelectItem>
               </SelectContent>
             </Select>
+            {prefs.view === 'month' ? (
+              <Button
+                aria-pressed={prefs.showAll}
+                // The month grid is hidden on a phone, where the queue lists every post.
+                className="hidden md:inline-flex"
+                onClick={() => setPref({ showAll: !prefs.showAll })}
+                size="sm"
+                variant={prefs.showAll ? 'default' : 'outline'}
+              >
+                {prefs.showAll ? 'Showing all posts' : 'Show all posts'}
+              </Button>
+            ) : null}
             <Button
               variant="outline"
               size="sm"
@@ -1039,11 +1078,7 @@ export function PlanWorkspace({
                       ))}
                     </div>
                   ) : (
-                    <div className="grid gap-2">
-                      {shown
-                        .filter((i) => itemDay(i, prefs.zone) === day)
-                        .map((item) => card(item))}
-                    </div>
+                    dayCards(day)
                   )}
                   {prefs.view !== 'week' ? slotsFor(day) : null}
                 </section>
@@ -1721,9 +1756,7 @@ function PlanDetail({
                 disabled={busy || !canPublish}
                 value=""
                 onValueChange={(value) => {
-                  const other = swapCandidates.find(
-                    (candidate) => candidate.id === value
-                  )
+                  const other = swapCandidates.find((candidate) => candidate.id === value)
                   if (other)
                     void run(() =>
                       mutate('swap', [placement(item, other.at), placement(other, item.at)])
@@ -1736,7 +1769,8 @@ function PlanDetail({
                 <SelectContent>
                   {swapCandidates.map((candidate) => (
                     <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.text || candidate.title} · {new Date(candidate.at).toLocaleString()}
+                      {candidate.text || candidate.title} ·{' '}
+                      {new Date(candidate.at).toLocaleString()}
                     </SelectItem>
                   ))}
                 </SelectContent>

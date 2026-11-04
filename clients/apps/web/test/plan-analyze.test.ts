@@ -18,6 +18,7 @@ import {
   planPreferencesSchema,
   selectionState,
   selectedInstant,
+  visibleDayItems,
   visibleItems,
   itemDay,
   movedToDay,
@@ -548,4 +549,31 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Publishing',
     'Scheduled',
   ])
+})
+
+test('a month day caps its posts but never hides one that needs attention', () => {
+  const day = (...statuses: string[]) =>
+    statuses.map((status, i) => ({ ...items[0], id: `item-${i}`, status }))
+  const ids = (found: PlanItem[]) => found.map((item) => item.id)
+
+  const quiet = visibleDayItems(day('Scheduled', 'Planned'))
+  assert.deepEqual([quiet.visible.length, quiet.hidden], [2, 0])
+
+  const over = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Published'))
+  assert.deepEqual(ids(over.visible), ['item-0', 'item-1'])
+  assert.equal(over.hidden, 2)
+
+  // A failure late in the day is shown in its own place, and takes a slot from a quiet post.
+  const late = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Failed'))
+  assert.deepEqual(ids(late.visible), ['item-0', 'item-3'])
+  assert.equal(late.hidden, 2)
+
+  // More attention than the cap still shows every one.
+  const failing = visibleDayItems(day('Failed', 'Needs check', 'Scheduled', 'Overdue'))
+  assert.deepEqual(ids(failing.visible), ['item-0', 'item-1', 'item-3'])
+  assert.equal(failing.hidden, 1)
+})
+
+test('saved calendar preferences from before Show all still load', () => {
+  assert.equal(planPreferencesSchema.parse({ view: 'month' }).showAll, false)
 })
