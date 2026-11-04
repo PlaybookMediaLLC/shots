@@ -372,6 +372,18 @@ function fileSlug(title: string): string {
 }
 
 /**
+ * Where focus goes when a toolbar menu closes. A dialog or picker that the
+ * chosen tool opens takes focus a moment later and keeps it; otherwise focus
+ * goes back to the editor, never to the page.
+ */
+function backToEditor(event: Event, editor: { tf: { focus: () => void } }) {
+  event.preventDefault()
+  requestAnimationFrame(() => {
+    if (document.activeElement === document.body) editor.tf.focus()
+  })
+}
+
+/**
  * The rarer tools behind one button, out of the writing toolbar's way:
  * inserts, the host's tools, then import and export.
  */
@@ -385,6 +397,7 @@ function MoreMenu({
   files: { accept: string; label: string; onFile: (file: File) => void }[]
 }) {
   const inputs = React.useRef<Record<string, HTMLInputElement | null>>({})
+  const editor = useEditorRef()
   return (
     <>
       <DropdownMenu modal={false}>
@@ -397,7 +410,7 @@ function MoreMenu({
         <DropdownMenuContent
           align="end"
           side="top"
-          onCloseAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => backToEditor(event, editor)}
         >
           {children}
           <DropdownMenuSeparator />
@@ -509,7 +522,7 @@ function DraftToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             side="top"
-            onCloseAutoFocus={(event) => event.preventDefault()}
+            onCloseAutoFocus={(event) => backToEditor(event, editor)}
           >
             <DropdownMenuItem onSelect={() => imageInput.current?.click()}>
               Upload a file

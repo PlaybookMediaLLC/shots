@@ -101,10 +101,13 @@ export function RefineButton({
   const [scope, setScope] = React.useState<RefineScope>('post')
   const [prompt, setPrompt] = React.useState('')
   const [busy, setBusy] = React.useState(false)
+  // A review keeps what was asked, so Try again asks the same thing.
   const [review, setReview] = React.useState<{
     action: RefineAction
+    instruction: string
     request: Request
     texts: string[]
+    title: string
   } | null>(null)
   const [hasSelection, setHasSelection] = React.useState(false)
   // Rewrite opens where it was asked for: at a post's sparkle, else at this button.
@@ -148,7 +151,13 @@ export function RefineButton({
       opener.current = null
     }
   })
-  const run = async (action: RefineAction, instruction = prompt) => {
+  const run = async (
+    action: RefineAction,
+    instruction = prompt,
+    title = action === 'custom'
+      ? 'Your instruction'
+      : REFINE_LABELS[action as keyof typeof REFINE_LABELS]
+  ) => {
     const current = editor.current
     if (!current) return
     let request: Request
@@ -195,7 +204,7 @@ export function RefineButton({
         method: 'POST',
       })
       setOpen(false)
-      setReview({ action, request, texts: answer.texts })
+      setReview({ action, instruction, request, texts: answer.texts, title })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The AI could not answer.')
     } finally {
@@ -263,7 +272,17 @@ export function RefineButton({
             {busy ? 'Rewriting…' : 'Rewrite'}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="grid w-80 gap-2 p-3" data-testid="refine-menu" side="top">
+        <PopoverContent
+          className="grid w-80 gap-2 p-3"
+          data-testid="refine-menu"
+          // Focus goes back to what opened it: a post's sparkle, else this button.
+          onCloseAutoFocus={(event) => {
+            if (!anchor.current?.isConnected) return
+            event.preventDefault()
+            anchor.current.focus()
+          }}
+          side="top"
+        >
           <fieldset className="flex flex-wrap gap-1 text-xs" aria-label="What to refine">
             {(
               [
@@ -313,7 +332,8 @@ export function RefineButton({
             onClick={() =>
               void run(
                 'custom',
-                `Adapt this for ${CAPABILITIES[channel].label}: keep the facts and the point, and write it the way people post there.`
+                `Adapt this for ${CAPABILITIES[channel].label}: keep the facts and the point, and write it the way people post there.`,
+                `Adapt for ${CAPABILITIES[channel].label}`
               )
             }
             size={null}
@@ -352,9 +372,7 @@ export function RefineButton({
           >
             <DialogHeader>
               <DialogTitle>
-                {review.action === 'custom'
-                  ? 'Your instruction'
-                  : REFINE_LABELS[review.action as keyof typeof REFINE_LABELS]}
+                {review.title}
               </DialogTitle>
               <DialogDescription>
                 Check the AI’s version. Accept replaces the text; Reject leaves it as it is.
@@ -416,9 +434,9 @@ export function RefineButton({
               <Button
                 disabled={busy}
                 onClick={() => {
-                  const action = review.action
+                  const { action, instruction, title } = review
                   setReview(null)
-                  void run(action)
+                  void run(action, instruction, title)
                 }}
                 type="button"
                 variant="ghost"

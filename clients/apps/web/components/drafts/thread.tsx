@@ -353,8 +353,9 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
       {readOnly ? null : (
         <div
           className={cn(
-            'flex shrink-0 items-center gap-0.5 transition-opacity focus-within:opacity-100 group-hover/post:opacity-100 motion-reduce:transition-none',
-            holdsCaret ? 'opacity-100' : 'opacity-0'
+            'flex shrink-0 items-center gap-0.5 transition-opacity focus-within:pointer-events-auto focus-within:opacity-100 group-hover/post:pointer-events-auto group-hover/post:opacity-100 motion-reduce:transition-none',
+            // Hidden tools take no taps: a touch screen has no hover to show them first.
+            holdsCaret ? 'opacity-100' : 'pointer-events-none opacity-0'
           )}
           data-testid={`post-tools-${number}`}
         >

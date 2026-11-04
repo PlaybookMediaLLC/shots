@@ -172,20 +172,30 @@ function InlineCombobox({
     };
   }, [editor, element]);
 
-  // In a shared draft, a collaborator's open menu reaches every editor. The
-  // editor that typed it has its caret, collapsed, in the menu when it appears,
-  // and only that editor owns it: it takes focus, shows the menu and can close
-  // it. Another person's keys, clicks or selection cannot close it.
+  // In a shared draft, a collaborator's open menu reaches every editor. Only
+  // the editor that typed it owns it: it takes focus, shows the menu and can
+  // close it. Another person's keys, clicks or selection cannot close it. The
+  // owner names its collaboration client on the menu, so it keeps the menu when
+  // a collaborator's edit mounts it again (an Enter before it, or a move).
+  // Before that, the owner is the editor whose caret, collapsed, is in it.
   const readOnly = useReadOnly();
   const selected = useSelected();
-  const [owner] = useState(
-    () => selected && !readOnly && editor.api.isCollapsed()
-  );
+  const [owner] = useState(() => {
+    if (readOnly) return false;
+    // One editor, not shared: every menu in it is its own.
+    if (!editor.plugins[KEYS.yjs]) return true;
+    const client = element.ownerClient;
+    if (typeof client === "number")
+      return (
+        client ===
+        editor.getOptions<YjsConfig>({ key: KEYS.yjs }).awareness.clientID
+      );
+    return selected && editor.api.isCollapsed();
+  });
 
-  // The owner writes its collaboration client on the menu. When that client
-  // leaves the draft with the menu open (a closed tab), each other editor
-  // removes the menu, so no "/" is left behind. Editors that are not shared
-  // skip this.
+  // When the owner's client leaves the draft with the menu open (a closed
+  // tab), each other editor removes the menu, so no "/" is left behind. A menu
+  // with no named owner (from an older version of the app) is left as it was.
   useEffect(() => {
     if (!editor.plugins[KEYS.yjs]) return;
     const { awareness } = editor.getOptions<YjsConfig>({ key: KEYS.yjs });
@@ -197,7 +207,7 @@ function InlineCombobox({
         editor.tf.setNodes({ ownerClient: awareness.clientID }, { at: path });
       return;
     }
-    if (readOnly) return;
+    if (readOnly || typeof client !== "number") return;
     let cancelled = false;
     let absentSince: number | null = null;
     const remove = () =>
@@ -206,17 +216,17 @@ function InlineCombobox({
         const path = at();
         if (cancelled || !path || editor.api.node(path)?.[0] !== element)
           return;
-        const drop = () => editor.tf.removeNodes({ at: path });
+        // A shared editor always has Yjs history.
         if (YHistoryEditor.isYHistoryEditor(editor))
-          YHistoryEditor.withoutSaving(editor, drop);
-        else editor.tf.withoutSaving(drop);
+          YHistoryEditor.withoutSaving(editor, () =>
+            editor.tf.removeNodes({ at: path })
+          );
       });
     // Count the owner's absence only while this editor is connected: offline,
     // it cannot see who is connected.
     const check = () => {
       const { _isConnected } = editor.getOptions<YjsConfig>({ key: KEYS.yjs });
-      const present =
-        typeof client === "number" && awareness.getStates().has(client);
+      const present = awareness.getStates().has(client);
       if (!_isConnected || present) absentSince = null;
       else if (absentSince === null) absentSince = Date.now();
       else if (Date.now() - absentSince >= ORPHAN_GRACE_MS) remove();
