@@ -18,6 +18,7 @@
     "./platejs/static": "./src/exports/platejs-static.ts",
     "./@platejs/ai/react": "./src/exports/platejs-ai-react.ts",
     "./@platejs/caption/react": "./src/exports/platejs-caption-react.ts",
+    "./@platejs/combobox": "./src/exports/platejs-combobox.ts",
     "./@platejs/comment": "./src/exports/platejs-comment.ts",
     "./@platejs/comment/react": "./src/exports/platejs-comment-react.ts",
     "./@platejs/date/react": "./src/exports/platejs-date-react.ts",

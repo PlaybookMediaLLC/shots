@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { trackEvent } from '@/lib/analytics'
 import { Button } from '@/components/ui/button'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -161,12 +162,13 @@ export function StorySetIntake({
           </Label>
           <Label className="grid gap-2 text-sm">
             Product screenshot
-            <Input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
+            <FileDropZone
+              accept={{ 'image/png': [], 'image/jpeg': [], 'image/webp': [] }}
               disabled={busy}
-              onChange={async (event) => {
-                const file = event.target.files?.[0]
+              hint="PNG, JPEG or WebP."
+              label="Product screenshot"
+              onFiles={async (files) => {
+                const file = files[0]
                 if (!file) return
                 setBusy(true)
                 setError(null)

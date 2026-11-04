@@ -13,6 +13,8 @@ export type UserPreferences = {
   showScrollbars: boolean
   textDirection: 'ltr' | 'rtl'
   theme: 'light' | 'dark' | 'system'
+  /** The clock times read on; `auto` follows the browser locale. */
+  timeFormat: 'auto' | '12h' | '24h'
   /** The display time zone; null follows the browser. */
   timeZone: string | null
   updatedAt: string | null
@@ -33,6 +35,7 @@ export type UserPreferencesUpdate = {
   showScrollbars?: boolean
   textDirection?: UserPreferences['textDirection']
   theme?: UserPreferences['theme']
+  timeFormat?: UserPreferences['timeFormat']
   /** An empty string follows the browser. */
   timeZone?: string
   weekStart?: UserPreferences['weekStart']

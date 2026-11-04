@@ -24,6 +24,8 @@ const (
 	FieldNavigation = "navigation"
 	// FieldWeekStart holds the string denoting the week_start field in the database.
 	FieldWeekStart = "weekStart"
+	// FieldTimeFormat holds the string denoting the time_format field in the database.
+	FieldTimeFormat = "timeFormat"
 	// FieldTextDirection holds the string denoting the text_direction field in the database.
 	FieldTextDirection = "textDirection"
 	// FieldShowScrollbars holds the string denoting the show_scrollbars field in the database.
@@ -52,6 +54,7 @@ var Columns = []string{
 	FieldTheme,
 	FieldNavigation,
 	FieldWeekStart,
+	FieldTimeFormat,
 	FieldTextDirection,
 	FieldShowScrollbars,
 	FieldDeveloperMode,
@@ -173,6 +176,33 @@ func WeekStartValidator(ws WeekStart) error {
 	}
 }
 
+// TimeFormat defines the type for the "time_format" enum field.
+type TimeFormat string
+
+// TimeFormatAuto is the default value of the TimeFormat enum.
+const DefaultTimeFormat = TimeFormatAuto
+
+// TimeFormat values.
+const (
+	TimeFormatAuto TimeFormat = "auto"
+	TimeFormat12h  TimeFormat = "12h"
+	TimeFormat24h  TimeFormat = "24h"
+)
+
+func (tf TimeFormat) String() string {
+	return string(tf)
+}
+
+// TimeFormatValidator is a validator for the "time_format" field enum values. It is called by the builders before save.
+func TimeFormatValidator(tf TimeFormat) error {
+	switch tf {
+	case TimeFormatAuto, TimeFormat12h, TimeFormat24h:
+		return nil
+	default:
+		return fmt.Errorf("userpreference: invalid enum value for time_format field: %q", tf)
+	}
+}
+
 // TextDirection defines the type for the "text_direction" enum field.
 type TextDirection string
 
@@ -230,6 +260,11 @@ func ByNavigation(opts ...sql.OrderTermOption) OrderOption {
 // ByWeekStart orders the results by the week_start field.
 func ByWeekStart(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldWeekStart, opts...).ToFunc()
+}
+
+// ByTimeFormat orders the results by the time_format field.
+func ByTimeFormat(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTimeFormat, opts...).ToFunc()
 }
 
 // ByTextDirection orders the results by the text_direction field.

@@ -293,19 +293,21 @@ export {
   caretAtDocumentEnd,
   chooseChannels,
   draftEditor,
+  editorMore,
   enableDraftTags,
   expectSaved,
   inPreview,
   openNewBatch,
   openNewDraft,
   openSchedule,
+  postMenu,
   previewOf,
   saveBatchDrafts,
   settleSelection,
   socialMockPort,
   xVerification,
 } from './content-drafts'
-export { chooseOption } from './controls'
+export { borderContrastOf, chooseOption, contrastOf, openDisclosureFor } from './controls'
 export { mockBrowserJson } from './downstream'
 export { startHttpMockServer, type HttpMockRequest, type HttpMockServer } from './http-server'
 export { getMaintenanceHeaders } from './maintenance'

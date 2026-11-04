@@ -31,7 +31,7 @@ export function EquationElementStatic(
     <SlateElement className="my-1" {...props}>
       <div
         className={cn(
-          "flex select-none items-center justify-center rounded-none",
+          "flex select-none items-center justify-center rounded-md",
           element.texExpression.length === 0 ? "bg-muted p-3" : "px-2 py-1"
         )}
       >
@@ -69,12 +69,12 @@ export function InlineEquationElementStatic(
 
   return (
     <SlateElement
-      className="inline-block select-none rounded-none [&_.katex-display]:my-0"
+      className="inline-block select-none rounded-md [&_.katex-display]:my-0"
       {...props}
     >
       <div
         className={cn(
-          'after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:z-1 after:h-[calc(100%)+4px] after:w-[calc(100%+8px)] after:rounded-none after:content-[""]',
+          'after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:z-1 after:h-[calc(100%)+4px] after:w-[calc(100%+8px)] after:rounded-md after:content-[""]',
           "h-6",
           element.texExpression.length === 0 &&
             "text-muted-foreground after:bg-neutral-500/10"

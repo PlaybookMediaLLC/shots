@@ -14,7 +14,7 @@ import {
 } from '@shots/platejs-editor/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { call } from '@/lib/content-drafts/client'
 import { SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
@@ -91,7 +91,7 @@ function SocialMentionInput(props: PlateElementProps) {
           ? 'Looking up account…'
           : (current.error ?? 'No matching account. Escape keeps your text.')
   return (
-    <PlateElement {...props} as="span">
+    <PlateElement {...props} as="span" className="rounded-sm bg-accent px-0.5 text-accent-foreground">
       <InlineCombobox
         element={props.element}
         trigger="@"
@@ -193,16 +193,20 @@ function insertMention(editor: PlateEditor, channel: DraftChannel, mention: Foun
 export function MentionPicker({
   channels,
   editor,
+  onOpenChange: setOpen,
+  open,
   setId,
 }: {
-  channels: DraftChannel[]
-  editor: React.MutableRefObject<PlateEditor | null>
+  channels: readonly DraftChannel[]
+  editor: React.MutableRefObject<PlateEditor | null> | { current: PlateEditor }
+  /** Opened from the toolbar's More menu or the slash menu's Mention. */
+  onOpenChange: (open: boolean) => void
+  open: boolean
   setId: string | null
 }) {
   const lookups = channels.filter(
     (channel): channel is 'x' | 'linkedin' => channel === 'x' || channel === 'linkedin'
   )
-  const [open, setOpen] = React.useState(false)
   const [channel, setChannel] = React.useState<'x' | 'linkedin'>(lookups[0] ?? 'x')
   const [query, setQuery] = React.useState('')
   const [kind, setKind] = React.useState<'organization' | 'person'>('organization')
@@ -244,18 +248,8 @@ export function MentionPicker({
       }}
       open={open}
     >
-      <PopoverTrigger asChild>
-        <Button
-          aria-label="Add mention"
-          className="h-7 rounded-md px-2 text-sm"
-          size={null}
-          title="Add mention"
-          type="button"
-          variant="ghost"
-        >
-          @
-        </Button>
-      </PopoverTrigger>
+      {/* Opens above the toolbar's end, where the More menu that asked for it was. */}
+      <PopoverAnchor className="h-8 w-0" />
       <PopoverContent className="grid w-80 gap-2 p-3" data-testid="mention-picker" side="top">
         <div className="flex gap-1">
           {lookups.map((item) => (
@@ -326,7 +320,7 @@ export function MentionPicker({
             Find
           </Button>
         </form>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-label text-muted-foreground">
           {channel === 'x'
             ? 'Looked up on X with this set’s account, by exact username.'
             : kind === 'person'

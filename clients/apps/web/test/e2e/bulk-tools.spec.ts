@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import sharp from 'sharp'
 import {
   apiRequest,
+  chooseOption,
   expect,
   openNewBatch,
   type Page,
@@ -211,7 +212,7 @@ test(
     await expect(
       page.getByRole('alert').filter({ hasText: 'at least one content item' })
     ).toBeVisible()
-    await page.getByLabel('Quick start').selectOption('Productivity')
+    await chooseOption(page.getByLabel('Quick start'), 'Productivity')
     await expect(page.getByLabel('Item 12', { exact: true })).toBeVisible()
     await page.getByRole('slider', { name: 'Number of videos' }).focus()
     await page.keyboard.press('Home')

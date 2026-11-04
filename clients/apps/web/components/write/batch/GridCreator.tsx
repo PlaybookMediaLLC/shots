@@ -7,7 +7,13 @@ import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Slider } from '@/components/ui/slider'
 import { normalizeAudioType } from '@/lib/animation/audio-type'
 import { MAX_AUDIO_BYTES } from '@/lib/animation/motion-schema'
@@ -503,23 +509,27 @@ export function GridCreator({
         <>
           <Group>
             <Row label="Quick start">
-              <NativeSelect
-                aria-label="Quick start"
-                defaultValue=""
-                onChange={(event) => {
-                  const preset = GRID_PRESETS.find((entry) => entry.name === event.target.value)
+              <Select
+                defaultValue="none"
+                onValueChange={(name) => {
+                  const preset = GRID_PRESETS.find((entry) => entry.name === name)
                   setCaptions(preset ? [...preset.captions] : [''])
                   setLines(preset ? [...preset.items] : [''])
                   setProblem('')
                 }}
               >
-                <NativeSelectOption value="">None</NativeSelectOption>
-                {GRID_PRESETS.map((preset) => (
-                  <NativeSelectOption key={preset.name} value={preset.name}>
-                    {preset.name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                <SelectTrigger aria-label="Quick start">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {GRID_PRESETS.map((preset) => (
+                    <SelectItem key={preset.name} value={preset.name}>
+                      {preset.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Row>
             <Row
               label="Video captions"

@@ -208,7 +208,7 @@ export function MentionInputElement(props: PlateElementProps) {
         trigger="@"
         value={search}
       >
-        <span className="rounded-none bg-muted px-1.5 py-0.5 align-baseline text-sm ring-ring">
+        <span className="rounded-md bg-muted px-1.5 py-0.5 align-baseline text-sm ring-ring">
           <span className="font-bold">@</span>
           <InlineComboboxInput
             className="min-w-[100px]"
@@ -431,7 +431,7 @@ function DocumentMentionElement(
                 }}
                 className={cn(
                   "inline-block cursor-pointer rounded px-0.5 hover:bg-muted",
-                  selected && focused && "bg-brand/25"
+                  selected && focused && "bg-primary/25"
                 )}
               >
                 {props.prefix}
@@ -520,7 +520,7 @@ function MentionHoverCardContent(props: { element: MyMentionElement }) {
           />
         )}
       </div>
-      <div className="absolute top-5 left-4 text-[30px]">{element.icon}</div>
+      <div className="absolute top-5 left-4 text-3xl">{element.icon}</div>
       <h1 className="mt-5 px-4 font-bold text-lg">{element.value}</h1>
       <EditorStatic
         className="px-4 text-xs"

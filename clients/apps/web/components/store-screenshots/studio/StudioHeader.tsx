@@ -56,12 +56,15 @@ export function StudioHeader({
   onLoadTheirs,
   onSaveVersion,
   onStartOver,
+  workspaceStatus,
 }: {
   issueCount: { requirements: number; recommendations: number }
   onKeepMine: () => void
   onLoadTheirs: () => void
   onSaveVersion: () => void
   onStartOver: () => void
+  /** Where the project stands in the workspace, after this browser's save status. */
+  workspaceStatus?: React.ReactNode
 }): React.JSX.Element {
   const api = useEditorApi()
   const actions = useStudioActions()
@@ -123,6 +126,7 @@ export function StudioHeader({
             </Button>
           </span>
         ) : null}
+        {workspaceStatus}
       </div>
 
       <div className="mx-auto flex max-w-full flex-wrap items-center gap-1">

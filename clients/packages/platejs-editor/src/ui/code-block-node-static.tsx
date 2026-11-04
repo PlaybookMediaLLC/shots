@@ -31,7 +31,7 @@ export function CodeBlockElementStatic(
       )}
       {...props}
     >
-      <pre className="overflow-x-auto rounded-none bg-muted pt-[34px] pr-4 pb-8 pl-8 text-sm leading-[normal] [tab-size:2] print:break-inside-avoid">
+      <pre className="overflow-x-auto rounded-md bg-muted pt-[34px] pr-4 pb-8 pl-8 text-sm leading-[normal] [tab-size:2] print:break-inside-avoid">
         <code>{props.children}</code>
       </pre>
     </SlateElement>

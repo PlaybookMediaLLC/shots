@@ -3,7 +3,13 @@ import * as React from 'react'
 import { useEditorRef, useEditorSelector } from '@shots/platejs-editor/platejs/react'
 import type { TElement } from '@shots/platejs-editor/platejs'
 import { Button } from '@/components/ui/button'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -31,21 +37,25 @@ function attachmentsIn(node: TElement): TElement[] {
   return node.children.flatMap((child) => ('type' in child ? attachmentsIn(child as TElement) : []))
 }
 
-/** Media controls operate on the editor's nodes, with native undo and autosave. */
+/**
+ * Media controls operate on the editor's nodes, with native undo and autosave.
+ * The toolbar's More menu and the slash menu open them through `tool`.
+ */
 export function MediaTools({
   channel,
+  onClose,
   setId,
   onDescriptionSaved,
+  tool,
 }: {
   channel: string
+  onClose: () => void
   setId: string | null
   onDescriptionSaved: (assetId: string, alt: string) => void
+  tool: 'gif' | 'link-image' | 'media' | null
 }) {
   const editor = useEditorRef()
   const body = useEditorSelector((current) => current.children, [])
-  const [open, setOpen] = React.useState(false)
-  const [link, setLink] = React.useState(false)
-  const [gif, setGif] = React.useState(false)
   const [alt, setAlt] = React.useState<string | null>(null)
   const [frame, setFrame] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string | null>(null)
@@ -57,27 +67,8 @@ export function MediaTools({
   )
   return (
     <>
-      <Button
-        variant="ghost"
-        size="sm"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setOpen(true)}
-      >
-        Manage media
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => setLink(true)}
-      >
-        Image from link
-      </Button>
-      <Button variant="ghost" size="sm" onClick={() => setGif(true)}>
-        GIF
-      </Button>
-      {gif ? <GiphyPicker editor={editor} onClose={() => setGif(false)} /> : null}
-      {link ? <LinkImage editor={editor} onClose={() => setLink(false)} /> : null}
+      {tool === 'gif' ? <GiphyPicker editor={editor} onClose={onClose} /> : null}
+      {tool === 'link-image' ? <LinkImage editor={editor} onClose={onClose} /> : null}
       {alt ? (
         <DescribeImages
           editor={editor}
@@ -90,7 +81,7 @@ export function MediaTools({
       {tags ? (
         <PhotoTags editor={editor} id={tags} setId={setId} onClose={() => setTags(null)} />
       ) : null}
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={tool === 'media'} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="max-h-[85vh] overflow-y-auto" data-testid="media-manager">
           <DialogHeader>
             <DialogTitle>Manage media</DialogTitle>
@@ -293,18 +284,18 @@ function AttachmentRow({
       >
         ↓
       </Button>
-      <NativeSelect
-        aria-label="Destination post"
-        size="sm"
-        value={destination}
-        onChange={(event) => setDestination(Number(event.target.value))}
-      >
-        {Array.from({ length: postCount }, (_, index) => (
-          <NativeSelectOption value={index} key={index}>
-            Post {index + 1}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
+      <Select value={String(destination)} onValueChange={(value) => setDestination(Number(value))}>
+        <SelectTrigger aria-label="Destination post" size="sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {Array.from({ length: postCount }, (_, index) => (
+            <SelectItem value={String(index)} key={index}>
+              Post {index + 1}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       <Button
         size="sm"
         variant="outline"

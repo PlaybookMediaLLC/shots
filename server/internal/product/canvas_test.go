@@ -24,6 +24,131 @@ func canvasFixture(assetIDs ...string) map[string]any {
 	return map[string]any{"version": float64(1), "kind": "canvas", "artboards": artboards, "deliveries": []any{}}
 }
 
+func storeProjectFixture(assetID string) map[string]any {
+	return map[string]any{
+		"id": "project-1", "kind": "store", "name": "Launch", "bindings": []any{}, "review": map[string]any{"source": false, "wording": false},
+		"assetMap": map[string]any{"img_1": "asset:" + assetID},
+		"document": map[string]any{
+			"version": float64(2),
+			"assets":  map[string]any{"img_1": map[string]any{"id": "img_1", "src": nil}},
+			"slides":  []any{map[string]any{"id": "slide-1", "layers": []any{map[string]any{"id": "layer-1"}}}},
+		},
+	}
+}
+
+func TestStoreProjectValidation(t *testing.T) {
+	id := uuid.NewString()
+	if creativeSetKind(storeProjectFixture(id)) != "store" {
+		t.Fatal("a store project names its kind")
+	}
+	if ids, err := creativeDocumentAssetIDs(storeProjectFixture(id)); err != nil || len(ids) != 1 || ids[0] != id {
+		t.Fatalf("ids=%v err=%v", ids, err)
+	}
+	native := func(doc map[string]any) map[string]any { return doc["document"].(map[string]any) }
+	for name, mutate := range map[string]func(map[string]any){
+		"local image": func(doc map[string]any) {
+			native(doc)["assets"].(map[string]any)["img_1"].(map[string]any)["src"] = "blob:local"
+		},
+		"unmapped image": func(doc map[string]any) { doc["assetMap"] = map[string]any{} },
+		"story binding": func(doc map[string]any) {
+			doc["bindings"] = []any{map[string]any{"storyId": "s", "slideId": "slide-1", "layerId": "layer-1"}}
+		},
+		"future version":    func(doc map[string]any) { native(doc)["version"] = float64(3) },
+		"no slides":         func(doc map[string]any) { native(doc)["slides"] = []any{} },
+		"missing native id": func(doc map[string]any) { delete(doc, "id") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			doc := storeProjectFixture(id)
+			mutate(doc)
+			if _, err := creativeDocumentAssetIDs(doc); err == nil {
+				t.Fatal("invalid input accepted")
+			}
+		})
+	}
+}
+
+// A store screenshot project saved to the workspace keeps its kind, its images and its tenant.
+func TestStoreProjectLifecycle(t *testing.T) {
+	w, foreign := newTestWorkspace(t), newTestWorkspace(t)
+	// Like a canvas, a store project is part of the paid workspace, not the Story Set rollout.
+	t.Setenv("PLATFORM_CREATIVE_SETS", "disabled")
+	subscribe(t, w.ctx, w.repo, w.org, "pro")
+	subscribe(t, foreign.ctx, foreign.repo, foreign.org, "pro")
+	w.addMember(t, "viewer", "viewer")
+	media, other := uuid.NewString(), uuid.NewString()
+	for id, org := range map[string]string{media: w.org, other: foreign.org} {
+		if err := w.db.Client.Asset.Create().SetID(id).SetOrganizationID(org).SetObjectKey("org/" + org + "/input/" + id + "/1/screen.png").SetMediaType("image/png").SetWidth(1320).SetHeight(2868).SetBytes(100).SetStatus(asset.StatusUPLOADED).Exec(w.ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	id := cuid.New()
+	if _, err := w.repo.CreateCreativeSet(w.ctx, w.actor("viewer"), id, "Launch", storeProjectFixture(media)); err == nil {
+		t.Fatal("a viewer saved a store project")
+	}
+	if _, err := w.repo.CreateCreativeSet(w.ctx, w.owner, cuid.New(), "Foreign", storeProjectFixture(other)); err == nil {
+		t.Fatal("a store project accepted another workspace's image")
+	}
+	created, err := w.repo.CreateCreativeSet(w.ctx, w.owner, id, "Launch", storeProjectFixture(media))
+	if err != nil || created.Kind != "store" || created.Revision != 1 {
+		t.Fatalf("create=%+v err=%v", created, err)
+	}
+	if page, err := w.repo.ListCreativeSets(w.ctx, w.owner, CreativeSetListQuery{Kind: "store"}); err != nil || len(page.Items) != 1 || page.Items[0].ID != id {
+		t.Fatalf("store list=%+v %v", page, err)
+	}
+	for _, kind := range []string{"", "canvas"} {
+		if page, err := w.repo.ListCreativeSets(w.ctx, w.owner, CreativeSetListQuery{Kind: kind}); err != nil || len(page.Items) != 0 {
+			t.Fatalf("%q list shows store projects=%+v %v", kind, page, err)
+		}
+	}
+	if page, err := w.repo.ListCreativeSets(w.ctx, foreign.owner, CreativeSetListQuery{Kind: "store"}); err != nil || len(page.Items) != 0 {
+		t.Fatalf("foreign store list=%+v %v", page, err)
+	}
+	if _, err := w.repo.UpdateCreativeSetDocument(w.ctx, w.owner, id, CreativeSetDocumentWrite{BaseRevision: 1, Document: canvasFixture(media)}); err == nil || errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("a store project became a canvas: %v", err)
+	}
+	updated, err := w.repo.UpdateCreativeSetDocument(w.ctx, w.owner, id, CreativeSetDocumentWrite{BaseRevision: 1, Document: storeProjectFixture(media)})
+	if err != nil || updated.Revision != 2 {
+		t.Fatalf("update=%+v err=%v", updated, err)
+	}
+	if _, err := w.repo.UpdateCreativeSetDocument(w.ctx, w.owner, id, CreativeSetDocumentWrite{BaseRevision: 1, Document: storeProjectFixture(media)}); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("stale update=%v", err)
+	}
+	if result, err := w.repo.DeleteAsset(w.ctx, w.owner, media); err != nil || result != AssetInUse {
+		t.Fatalf("store image deletion=%s %v", result, err)
+	}
+
+	// Deleting the workspace copy takes its versions with it, and only for its own kind and workspace.
+	canvasID := cuid.New()
+	if _, err := w.repo.CreateCreativeSet(w.ctx, w.owner, canvasID, "Board", canvasFixture(media)); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.owner, canvasID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("a canvas was deleted as a store project: %v", err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, foreign.owner, id); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("cross-tenant delete: %v", err)
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.actor("viewer"), id); err == nil {
+		t.Fatal("a viewer deleted a store project")
+	}
+	if err := w.repo.DeleteStoreProject(w.ctx, w.owner, id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.GetCreativeSet(w.ctx, w.owner, id); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("deleted store project still reads: %v", err)
+	}
+	if count, err := w.db.Client.PlatformCreativeSetVersion.Query().Where(platformcreativesetversion.CreativeSetID(id)).Count(w.ctx); err != nil || count != 0 {
+		t.Fatalf("versions left=%d err=%v", count, err)
+	}
+	if count, err := w.db.Client.AuditLog.Query().Where(auditlog.Action("product.store_project_deleted"), auditlog.EntityID(id)).Count(w.ctx); err != nil || count != 1 {
+		t.Fatalf("delete audit entries=%d err=%v", count, err)
+	}
+	// Saving the same project again after a delete starts a new copy.
+	if again, err := w.repo.CreateCreativeSet(w.ctx, w.owner, id, "Launch", storeProjectFixture(media)); err != nil || again.Revision != 1 {
+		t.Fatalf("re-save=%+v err=%v", again, err)
+	}
+}
+
 func TestCanvasValidation(t *testing.T) {
 	id := uuid.NewString()
 	if ids, err := creativeDocumentAssetIDs(canvasFixture(id)); err != nil || len(ids) != 1 || ids[0] != id {

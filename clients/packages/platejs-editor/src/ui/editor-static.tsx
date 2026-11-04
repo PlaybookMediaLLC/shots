@@ -8,7 +8,7 @@ export const editorVariants = cva(
   cn(
     "group/editor",
     "relative w-full overflow-x-hidden whitespace-pre-wrap break-words",
-    "rounded-none ring-offset-background placeholder:text-muted-foreground/80 focus-visible:outline-hidden",
+    "rounded-md ring-offset-background placeholder:text-muted-foreground/80 focus-visible:outline-hidden",
     "**:data-slate-placeholder:text-muted-foreground/80 **:data-slate-placeholder:opacity-100!",
     "**:data-slate-placeholder:top-[auto_!important]",
     "[&_strong]:font-bold"
@@ -28,12 +28,12 @@ export const editorVariants = cva(
         ai: "px-0 text-base md:text-sm",
         aiChat:
           "max-h-[min(70vh,320px)] max-w-[700px] overflow-y-auto px-3 py-2 text-base md:text-sm",
-        comment: cn("rounded-none border-none bg-transparent text-sm"),
+        comment: cn("rounded-md border-none bg-transparent text-sm"),
         default:
           "min-h-full px-16 pb-72 text-base sm:px-[max(64px,calc(50%-350px))]",
         demo: "h-full px-16 pt-4 pb-72 text-base sm:px-[max(64px,calc(50%-350px))]",
         fullWidth: "min-h-full px-16 pb-72 text-base sm:px-24",
-        mention: "rounded-none border-none bg-transparent text-sm",
+        mention: "rounded-md border-none bg-transparent text-sm",
         select: "px-3 py-2 text-base data-readonly:w-fit",
         update: "px-0 text-sm",
         versionHistory: "px-0 pb-[30vh] text-base",

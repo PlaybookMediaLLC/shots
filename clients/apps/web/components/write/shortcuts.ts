@@ -97,3 +97,12 @@ export function useShortcuts(shortcuts: Shortcut[]): void {
     return () => window.removeEventListener('keydown', listener)
   }, [])
 }
+
+/** The editor commands' keys (composer/commands.tsx); the shortcut reference lists these too. */
+export const COMMAND_SHORTCUTS = [
+  { id: 'ai-ask', key: 'j', label: 'Ask AI at the post', mod: true },
+  { id: 'post-new', key: 'enter', label: 'New post below', mod: true },
+  { id: 'insert-media', key: 'i', label: 'Image or video', mod: true, shift: true },
+  { id: 'insert-emoji', key: '.', label: 'Emoji', mod: true, shift: true },
+  { id: 'insert-link', key: 'k', label: 'Link on the selected text', mod: true },
+] as const satisfies readonly (Pick<Shortcut, 'key' | 'mod' | 'shift'> & { id: string; label: string })[]

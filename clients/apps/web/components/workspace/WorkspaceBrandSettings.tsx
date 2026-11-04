@@ -1,12 +1,14 @@
 'use client'
 
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import { WritingInheritance } from '@/components/settings/WritingInheritance'
 import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
 import { HandleRows, StyleChips, type HandleRow } from '@/components/settings/BrandVoiceFields'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
+import { SwatchColorPicker } from '@/components/ui/color-picker'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { fontFamilies } from '@/lib/constants/fonts'
@@ -111,19 +113,14 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
       .catch((requestError) => setError(getErrorMessage(requestError)))
   }, [trpcClient])
 
-  async function handleLogoChange(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const input = event.currentTarget
-    const file = input.files?.[0]
-    if (!file) return
+  async function handleLogoFile(file: File): Promise<void> {
     setError(null)
     if (!brandLogoContentTypeSchema.safeParse(file.type).success) {
       setError('Upload the logo as a PNG, WebP, or JPEG.')
-      input.value = ''
       return
     }
     if (file.size > BRAND_LOGO_MAX_BYTES) {
       setError('The logo must be 5 MB or smaller.')
-      input.value = ''
       return
     }
     setIsUploadingLogo(true)
@@ -136,7 +133,6 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
       setLogo({ assetId, previewUrl: URL.createObjectURL(file) })
     } catch (uploadError) {
       setError(getErrorMessage(uploadError))
-      input.value = ''
     } finally {
       setIsUploadingLogo(false)
     }
@@ -363,6 +359,7 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
                             id={`brand-${key}`}
                             key={key}
                             label={key[0]!.toUpperCase() + key.slice(1)}
+                            swatches={Object.values(colors).filter((color) => HEX_COLOR.test(color))}
                             onChange={(value) => {
                               setColors((current) => ({ ...current, [key]: value }))
                               if (HEX_COLOR.test(value))
@@ -400,28 +397,33 @@ export function WorkspaceBrandSettings({ canManage }: WorkspaceBrandSettingsProp
                       description="PNG, WebP, or JPEG, up to 5 MB."
                       label={<Label htmlFor="brand-logo">Logo</Label>}
                     >
-                      <div className="flex items-center gap-3">
-                        {logo?.previewUrl ? (
-                          // A local object URL; next/image cannot optimize it.
-                          <img
-                            alt="Uploaded logo preview"
-                            className="h-10 w-10 rounded-lg bg-foreground/[0.03] object-contain ring-1 ring-foreground/[0.08]"
-                            src={logo.previewUrl}
-                          />
-                        ) : null}
-                        {logo && !logo.previewUrl ? (
-                          <span className="text-xs text-muted-foreground">Saved logo retained</span>
-                        ) : null}
-                        <Input
-                          accept={brandLogoContentTypeSchema.options.join(',')}
-                          className="h-10 rounded-lg md:w-60"
-                          disabled={isUploadingLogo}
-                          id="brand-logo"
-                          key={logo?.assetId ?? 'no-logo'}
-                          onChange={handleLogoChange}
-                          type="file"
-                        />
-                      </div>
+                      <FileDropZone
+                        accept={Object.fromEntries(
+                          brandLogoContentTypeSchema.options.map((type) => [type, []])
+                        )}
+                        busy={isUploadingLogo}
+                        className="w-full md:w-96"
+                        hint="PNG, WebP or JPEG, up to 5 MB."
+                        id="brand-logo"
+                        label="Logo"
+                        maxSize={BRAND_LOGO_MAX_BYTES}
+                        onFiles={([file]) => {
+                          if (file) void handleLogoFile(file)
+                        }}
+                        onRemove={() => setLogo(null)}
+                        preview={
+                          logo?.previewUrl ? (
+                            // A local object URL; next/image cannot optimize it.
+                            <img
+                              alt="Uploaded logo preview"
+                              className="h-10 w-10 rounded-lg bg-foreground/[0.03] object-contain ring-1 ring-foreground/[0.08]"
+                              src={logo.previewUrl}
+                            />
+                          ) : logo ? (
+                            <span className="text-xs text-muted-foreground">Saved logo retained</span>
+                          ) : null
+                        }
+                      />
                     </Row>
                   </Group>
                 </fieldset>
@@ -772,11 +774,14 @@ function ColorField({
   id,
   label,
   onChange,
+  swatches,
   value,
 }: {
   id: string
   label: string
   onChange: (value: string) => void
+  /** The kit's other colors, one click away. */
+  swatches: string[]
   value: string
 }) {
   const isValid = HEX_COLOR.test(value)
@@ -788,11 +793,12 @@ function ColorField({
         {label}
       </Label>
       <div className="flex items-center gap-2">
-        <Input
+        <SwatchColorPicker
           aria-label={`${label} color picker`}
-          className="h-10 w-10 shrink-0 cursor-pointer rounded-lg bg-transparent"
-          onChange={(event) => onChange(event.target.value)}
-          type="color"
+          className="h-10 w-10 shrink-0"
+          onChange={onChange}
+          swatchOnly
+          swatches={swatches}
           value={(isValid ? value : lastValid).toLowerCase()}
         />
         <Input

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import {
   apiRequest,
+  chooseOption,
   connectionSchema,
   createApprovedVariant,
   createScheduledPost,
@@ -464,7 +465,7 @@ test('a grid video rendered in the browser and scheduled in the background publi
 
     // The real wizard and browser render: nothing in the video is a fixture file.
     await page.goto(`/publish/batches/${batch.id}?start=grid`)
-    await page.getByLabel('Quick start').selectOption('Tech')
+    await chooseOption(page.getByLabel('Quick start'), 'Tech')
     await page.getByLabel('Caption 1', { exact: true }).fill('Grid gate video')
     await page.getByRole('slider', { name: 'Number of videos' }).focus()
     await page.keyboard.press('Home')

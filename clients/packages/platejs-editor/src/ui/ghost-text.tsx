@@ -19,7 +19,7 @@ const MarkdownComponents: Components = {
   ),
   blockquote: ({ children }) => <span>{children}</span>,
   code: ({ children }) => (
-    <code className="whitespace-pre-wrap rounded-none bg-muted px-[0.3em] py-[0.2em] text-sm">
+    <code className="whitespace-pre-wrap rounded-md bg-muted px-[0.3em] py-[0.2em] text-sm">
       {children}
     </code>
   ),

@@ -25,7 +25,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 
 /** An approved visual a post can publish with; `id` is its creative variant. */
 export type ScheduleVisual = { id: string; label: string }
@@ -256,11 +256,10 @@ export function ScheduleDialog({
                   onChange={setDay}
                   value={day}
                 />
-                <Input
+                <TimePicker
                   aria-label="Publish time"
-                  className={fieldClass}
-                  onChange={(event) => setClock(event.target.value)}
-                  type="time"
+                  className="w-full"
+                  onChange={setClock}
                   value={clock}
                 />
               </div>

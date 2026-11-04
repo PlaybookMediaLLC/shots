@@ -33,6 +33,7 @@ import {
   matchesDestination,
   PLATFORM_DESTINATIONS,
   platformArea,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
 import { recentPages } from './PageVisits'
@@ -44,7 +45,7 @@ import { SidebarLink } from './SidebarLink'
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
   { href: '/?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
   { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
-  { href: '/?editor=app-store', label: 'Store screenshots', paid: true },
+  { ...STORE_SCREENSHOTS, paid: true },
   { href: '/publish', label: 'Post', paid: false, permission: 'artifact:edit' },
   { href: '/campaigns/new', label: 'Campaign', paid: true, permission: 'release:create' },
   { href: '/workflows/new', label: 'Workflow', paid: true, permission: 'workspace:update' },
@@ -216,6 +217,9 @@ export function ShellSearch({
         event.key.toLowerCase() !== 'k'
       )
         return
+      // Selected text in a post editor: ⌘K edits its link there (Plate's shortcut).
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[data-slate-editor]') && !window.getSelection()?.isCollapsed) return
       event.preventDefault()
       event.stopImmediatePropagation()
       show()

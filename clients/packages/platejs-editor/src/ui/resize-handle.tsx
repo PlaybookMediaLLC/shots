@@ -14,7 +14,7 @@ import { cn } from "../lib/utils";
 export const mediaResizeHandleVariants = cva(
   cn(
     "absolute inset-y-0 flex w-4 select-none flex-col justify-center",
-    "after:flex after:h-12 after:max-h-[50%] after:w-1.5 after:rounded-[20px] after:opacity-0 after:transition-opacity after:duration-200 after:ease-in-out after:content-['_'] group-hover/media:after:opacity-100",
+    "after:flex after:h-12 after:max-h-[50%] after:w-1.5 after:rounded-full after:opacity-0 after:transition-opacity after:duration-200 after:ease-in-out after:content-['_'] group-hover/media:after:opacity-100",
     "after:border after:border-white/90 after:bg-black/60 after:bg-opacity-[60]"
   ),
   {

@@ -1,4 +1,5 @@
 import { getRolePermissions, hasPermission, organizationRoles } from '@/lib/auth/permissions'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { roleCapabilities, roleLabels, roleSummaries } from '@/lib/auth/role-descriptions'
 import {
   Table,
@@ -58,15 +59,17 @@ export function WorkspaceRolesSettings() {
           </TableBody>
         </Table>
       </div>
-      <details className="text-sm text-muted-foreground">
-        <summary className="cursor-pointer">Technical permission details</summary>
-        {organizationRoles.map((role) => (
-          <p className="mt-3" key={role}>
-            <strong className="capitalize">{roleLabels[role]}: </strong>
-            {getRolePermissions(role).join(', ')}
-          </p>
-        ))}
-      </details>
+      <Disclosure className="text-sm text-muted-foreground">
+        <DisclosureTrigger>Technical permission details</DisclosureTrigger>
+        <DisclosureContent>
+          {organizationRoles.map((role) => (
+            <p className="mt-3" key={role}>
+              <strong className="capitalize">{roleLabels[role]}: </strong>
+              {getRolePermissions(role).join(', ')}
+            </p>
+          ))}
+        </DisclosureContent>
+      </Disclosure>
     </div>
   )
 }

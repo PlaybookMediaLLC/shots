@@ -11,6 +11,7 @@ import {
   trpcMutation,
   trpcQuery,
   uploadSignedAsset,
+  editorMore,
 } from './framework'
 import { mkdir } from 'node:fs/promises'
 
@@ -112,7 +113,10 @@ test(
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: '.context/ux-redesign/settings-mobile.png', fullPage: true })
     await app.open('/library?type=store')
-    await expect(page.getByText('On this browser only.', { exact: false })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'On this browser', exact: true })).toBeVisible()
+    await expect(
+      page.getByText('These projects belong to this browser profile.', { exact: false })
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Open navigation' }).click()
     await expect(page.getByRole('dialog', { name: 'Navigation', exact: true })).toBeVisible()
     await page
@@ -187,8 +191,7 @@ test(
     const kept = await upload('kept-library.png')
     const removed = await upload('removed-library.png')
     const draftId = await openNewDraft(page)
-    const attach = page.getByRole('button', { name: 'Attach from Library', exact: true })
-    await attach.click()
+    await editorMore(page, 'From Library')
     const picker = page.getByRole('dialog', { name: 'Attach from Library' })
     await picker.getByRole('button', { name: 'removed-library.png', exact: true }).click()
     expect((await trpcMutation(page, 'asset.delete', { assetId: removed })).status).toBe(200)

@@ -21,7 +21,7 @@ const SOCIAL: GuideLink = {
 };
 const MOCKUPS: GuideLink = { href: "/mockup-generator", label: "Device mockup generator" };
 const STORE: GuideLink = {
-  href: "/store-screenshots",
+  href: "/create/store",
   label: "App Store screenshot generator",
 };
 const TWEET: GuideLink = { href: "/tweet", label: "Tweet to image" };

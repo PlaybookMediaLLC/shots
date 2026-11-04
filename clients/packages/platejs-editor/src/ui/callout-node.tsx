@@ -20,7 +20,7 @@ export function CalloutElement(props: PlateElementProps) {
 
   return (
     <PlateElement
-      className="my-1 flex rounded-none bg-muted p-4 pl-3"
+      className="my-1 flex rounded-md bg-muted p-4 pl-3"
       style={{
         backgroundColor: props.element.backgroundColor as string | undefined,
       }}
@@ -30,12 +30,12 @@ export function CalloutElement(props: PlateElementProps) {
         "data-plate-open-context-menu": "true",
       }}
     >
-      <div className="flex w-full gap-2 rounded-none">
+      <div className="flex w-full gap-2 rounded-md">
         <EmojiPopover
           {...emojiToolbarDropdownProps}
           control={
             <Button
-              className="size-6 select-none p-1 text-[18px] hover:bg-muted-foreground/15"
+              className="size-6 select-none p-1 text-lg hover:bg-muted-foreground/15"
               contentEditable={false}
               style={{
                 fontFamily:

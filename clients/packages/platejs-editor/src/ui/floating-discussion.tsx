@@ -631,7 +631,7 @@ function FloatingDiscussionContent() {
       {/* Unsubmit comment */}
       {commentingNode && (
         <div
-          className="absolute right-[80px] w-[288px] cursor-pointer rounded-none border bg-popover p-3 transition-transform duration-200"
+          className="absolute right-[80px] w-[288px] cursor-pointer rounded-md border bg-popover p-3 transition-transform duration-200"
           ref={(el) => {
             domRef.current[getDraftCommentKey()] = el;
           }}
@@ -725,7 +725,7 @@ function FloatingCommentsContent({
   return (
     <div
       className={cn(
-        "absolute right-20 z-10 w-72 animate-fade-in rounded-none border bg-popover p-3 transition-transform duration-200",
+        "absolute right-20 z-10 w-72 animate-fade-in rounded-md border bg-popover p-3 transition-transform duration-200",
         "[&[data-active=true]]:-translate-x-2"
       )}
       data-active={activeId === discussion.id}
@@ -749,7 +749,7 @@ function FloatingCommentsContent({
             onEditorClick={() => highlightDiscussion(editor, discussion.id)}
             setEditingId={setEditingId}
           />
-          <div className="relative mb-1 ml-[26px] flex h-7 items-center rounded-none pl-1.5 text-muted-foreground text-sm hover:bg-muted">
+          <div className="relative mb-1 ml-[26px] flex h-7 items-center rounded-md pl-1.5 text-muted-foreground text-sm hover:bg-muted">
             <div className="absolute top-[-5px] left-[-14px] h-full w-0.5 shrink-0 bg-muted" />
             <div className="ml-2">
               Show {discussion.comments.length - 2} replies
@@ -986,7 +986,7 @@ function FloatingSuggestionContent({
   return (
     <div
       className={cn(
-        "group absolute right-20 z-10 w-72 animate-fade-in rounded-none border bg-popover p-3 transition-transform duration-200 hover:-translate-x-2 hover:bg-muted",
+        "group absolute right-20 z-10 w-72 animate-fade-in rounded-md border bg-popover p-3 transition-transform duration-200 hover:-translate-x-2 hover:bg-muted",
         "[&[data-active=true]]:-translate-x-2"
       )}
       data-active={activeId === id}
@@ -1010,7 +1010,7 @@ function FloatingSuggestionContent({
                 <AvatarImage alt={userData.name} src={userData.avatarUrl} />
                 <AvatarFallback>{userData.name?.[0]}</AvatarFallback>
               </Avatar>
-              <PencilLineIcon className="absolute -bottom-2 left-4 size-4 rounded-[50%] bg-brand-foreground p-0.5 text-brand/80" />
+              <PencilLineIcon className="absolute -bottom-2 left-4 size-4 rounded-full bg-brand-foreground p-0.5 text-primary/80" />
             </>
           )}
           <h4 className="font-semibold text-sm leading-none">
@@ -1045,7 +1045,7 @@ function FloatingSuggestionContent({
               <div className="flex flex-col gap-2">
                 {insertItems.map((item) => (
                   <React.Fragment key={item.id}>
-                    <div className="flex items-center text-brand/80">
+                    <div className="flex items-center text-primary/80">
                       <span className="text-sm">With:</span>
                       <span className="text-sm">"{item.text}"</span>
                     </div>
@@ -1096,7 +1096,7 @@ function FloatingSuggestionContent({
               key={suggestion.comments[0].id}
               setEditingId={setEditingId}
             />
-            <div className="relative mb-1 ml-[26px] flex h-7 items-center rounded-none pl-1.5 text-muted-foreground text-sm hover:bg-muted">
+            <div className="relative mb-1 ml-[26px] flex h-7 items-center rounded-md pl-1.5 text-muted-foreground text-sm hover:bg-muted">
               <div className="absolute top-[-5px] left-[-14px] h-full w-0.5 shrink-0 bg-muted" />
               <div className="ml-2">
                 Show {suggestion.comments.length - 2} replies

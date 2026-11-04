@@ -8,7 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { draftPlainText } from '@/lib/content-drafts/serialize'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { postRanges } from '@/components/drafts/thread'
+import { draftPlainText, serializeDraft } from '@/lib/content-drafts/serialize'
+import { bodyPosts } from '@/lib/write/versions'
 import { splitThread } from '@/lib/write/split-thread'
 import type { DraftChannel, PlateBody, VersionOptions } from '@/lib/write/document'
 
@@ -31,11 +41,12 @@ export function ThreadTools({
   onSplit?: () => void
 }) {
   const maxLength = Math.min(options.splitLimit ?? limit, limit)
-  const performSplit = React.useCallback(() => {
+  // A split on paste is shown first: where each post breaks, before anything changes.
+  const [preview, setPreview] = React.useState<PlateBody | null>(null)
+  const apply = React.useCallback((body: PlateBody) => {
     const current = editor.current
     if (!current) return
     try {
-      const body = splitThread(current.children as PlateBody, channel, maxLength, options.numbering)
       current.tf.withNewBatch(() =>
         current.tf.withoutNormalizing(() => {
           for (let index = current.children.length - 1; index >= 0; index--)
@@ -50,7 +61,21 @@ export function ThreadTools({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The text could not be split.')
     }
-  }, [editor, channel, maxLength, options.numbering, onSplit])
+  }, [editor, onSplit])
+  const split = React.useCallback((): PlateBody | null => {
+    const current = editor.current
+    if (!current) return null
+    try {
+      return splitThread(current.children as PlateBody, channel, maxLength, options.numbering)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The text could not be split.')
+      return null
+    }
+  }, [editor, channel, maxLength, options.numbering])
+  const performSplit = () => {
+    const body = split()
+    if (body) apply(body)
+  }
   const lastPaste = React.useRef(false)
   React.useEffect(() => {
     if (!pasted) {
@@ -59,9 +84,14 @@ export function ThreadTools({
     }
     if (!options.splitOnPaste || lastPaste.current) return
     lastPaste.current = true
-    // Run after Plate's synchronous paste transaction has finished.
-    window.setTimeout(performSplit, 0)
-  }, [pasted, options.splitOnPaste, performSplit])
+    // After Plate's synchronous paste transaction has finished.
+    window.setTimeout(() => {
+      const body = split()
+      const before = postRanges((editor.current?.children ?? []) as Value).length
+      if (body && bodyPosts(body).length > before) setPreview(body)
+    }, 0)
+  }, [editor, pasted, options.splitOnPaste, split])
+  const posts = preview ? serializeDraft(preview, channel).posts : []
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-ui">
       {pasted ? (
@@ -103,6 +133,55 @@ export function ThreadTools({
       >
         Make thread
       </Button>
+      <Dialog
+        onOpenChange={(open) => {
+          if (open) return
+          setPreview(null)
+          onSplit?.()
+        }}
+        open={preview !== null}
+      >
+        <DialogContent className="max-w-lg" data-testid="split-preview">
+          <DialogHeader>
+            <DialogTitle>Split into {posts.length} posts?</DialogTitle>
+            <DialogDescription>
+              Where your paste breaks at {maxLength} characters a post. Nothing changes until you
+              split.
+            </DialogDescription>
+          </DialogHeader>
+          <ol className="grid max-h-[50dvh] gap-2 overflow-y-auto">
+            {posts.map((post, index) => (
+              <li className="grid gap-1 rounded-lg border border-border p-3" key={index}>
+                <p className="text-caption text-muted-foreground">
+                  Post {index + 1} · {post.length} / {limit}
+                </p>
+                <p className="whitespace-pre-wrap text-ui text-foreground">{post.caption}</p>
+              </li>
+            ))}
+          </ol>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                setPreview(null)
+                onSplit?.()
+              }}
+              type="button"
+              variant="outline"
+            >
+              Keep as one post
+            </Button>
+            <Button
+              onClick={() => {
+                if (preview) apply(preview)
+                setPreview(null)
+              }}
+              type="button"
+            >
+              Split into {posts.length} posts
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Button
         className="h-8 rounded-md px-3 text-ui"
         size={null}

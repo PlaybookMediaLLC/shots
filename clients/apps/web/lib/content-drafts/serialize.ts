@@ -540,7 +540,7 @@ export function captionLength(caption: string): number {
 
 const blueskySegments = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
-/** A caption's length as `channel` counts it. */
+/** A caption's length as the platform counts it: weighted on X, graphemes on Bluesky. */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
   if (channel === 'x') return xLength(caption)
   if (channel === 'bluesky') return Array.from(blueskySegments.segment(caption)).length

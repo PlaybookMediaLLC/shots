@@ -17,3 +17,24 @@ func TestNavigationPreferenceDefaultsAndExistingValues(t *testing.T) {
 		}
 	}
 }
+
+func TestTimeFormatPreferenceDefaultsRoundTripsAndRejectsUnknown(t *testing.T) {
+	if got := userPreferencesRecord(nil).TimeFormat; got != "auto" {
+		t.Fatalf("new user time format = %q", got)
+	}
+	if got := userPreferencesRecord(&ent.UserPreference{TimeFormat: userpreference.TimeFormat24h}).TimeFormat; got != "24h" {
+		t.Fatalf("stored time format = %q", got)
+	}
+	configuration := &Configuration{}
+	for _, value := range []string{"auto", "12h", "24h"} {
+		current := defaultUserPreferences()
+		if err := configuration.applyPreferenceUpdate(t.Context(), Actor{}, &current, UserPreferencesUpdate{TimeFormat: &value}); err != nil || current.TimeFormat != value {
+			t.Fatalf("time format %q: %v, %+v", value, err, current)
+		}
+	}
+	bad := "h12"
+	current := defaultUserPreferences()
+	if err := configuration.applyPreferenceUpdate(t.Context(), Actor{}, &current, UserPreferencesUpdate{TimeFormat: &bad}); err == nil || current.TimeFormat != "auto" {
+		t.Fatalf("unknown time format accepted: %v, %+v", err, current)
+	}
+}

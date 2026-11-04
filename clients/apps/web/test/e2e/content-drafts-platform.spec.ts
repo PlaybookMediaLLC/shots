@@ -12,6 +12,7 @@ import {
   previewOf,
   settleSelection,
   test,
+  postMenu,
 } from './framework'
 import { format } from 'date-fns'
 
@@ -158,9 +159,9 @@ test(
       .getByTestId('write-rail')
       .getByRole('link', { name: 'Settings', exact: true })
       .click()
+    // Settings save as they change.
     await page.getByLabel('Require approval').check()
-    await page.getByRole('button', { name: 'Save settings' }).click()
-    await expect(page.getByText('Saved.')).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
 
     const draftId = await openNewDraft(page)
     await write(page, 'Needs a second pair of eyes')
@@ -274,13 +275,13 @@ test(
 
     // Per-post tools: the second post moves up, then is deleted.
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Move post 2 up' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Move post up' }).click()
     // Still two posts, now in the other order.
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     // Each post's header (account, length) sits inside the editor, before its text.
     await expect(draftEditor(page)).toHaveText(/Second post[\s\S]*#shipit First post$/)
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Delete post 2' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Delete post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)
     await expect(draftEditor(page)).not.toContainText('First post')
     await expectSaved(page)
@@ -318,7 +319,7 @@ test(
 
     // AI: the scripted model answers, Accept puts the answer in, and Undo takes it back.
     await page.getByTestId('platform-tab-x').click()
-    await page.getByRole('button', { name: 'Rewrite', exact: true }).click()
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     await page
       .getByTestId('refine-menu')
       .getByRole('button', { name: 'Rewrite as a thread start' })
