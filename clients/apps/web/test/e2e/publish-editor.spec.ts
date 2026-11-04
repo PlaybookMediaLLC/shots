@@ -19,7 +19,11 @@ import {
 
 test.use({ viewport: { height: 900, width: 1440 } })
 
-/** Every day at 09:00 and 18:00 in New York, so the next seven days have free slots. */
+/**
+ * Every day at 10:30 and 18:30 in New York, so the next seven days have free
+ * slots. Neither is the schedule dialog's own default time (09:00), so a check
+ * that the dialog opens at a slot can fail.
+ */
 async function weeklySlots(page: Page): Promise<string> {
   const sets = await apiRequest(page, '/api/v1/social-sets')
   const [set] = (sets.body as { items: { id: string; name: string; version: number }[] }).items
@@ -29,8 +33,8 @@ async function weeklySlots(page: Page): Promise<string> {
       baseVersion: set.version,
       name: set.name,
       postingSlots: [0, 1, 2, 3, 4, 5, 6].flatMap((weekday) => [
-        { time: '09:00', weekday },
-        { time: '18:00', weekday },
+        { time: '10:30', weekday },
+        { time: '18:30', weekday },
       ]),
       timeZone: 'America/New_York',
     },
@@ -54,6 +58,8 @@ test(
   async ({ identity, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'bluesky'] })
     await weeklySlots(page)
+    // The old editor showed post options above the text when this was set.
+    await page.evaluate(() => localStorage.setItem('shots-post-options', 'open'))
     const id = await openNewDraft(page)
     // Nothing that asks for input sits between the header and the first post.
     const between = await page.evaluate(() => {
@@ -158,6 +164,15 @@ test(
     await openNewDraft(page)
     await page.keyboard.type('x'.repeat(290))
     await expectSaved(page)
+    // The palette lists this draft's actions, with their shortcuts.
+    await page.keyboard.press('ControlOrMeta+k')
+    const palette = page.getByRole('dialog')
+    await expect(palette.getByRole('option', { name: /^Add to the next free slot/ })).toBeVisible()
+    await expect(
+      palette.getByRole('option', { name: 'Duplicate draft', exact: true })
+    ).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(palette).toBeHidden()
     // From another tab, a blocker opens the platform it belongs to.
     await page.getByTestId('platform-tab-bluesky').click()
     await page.getByTestId('blockers-button').click()
@@ -170,6 +185,10 @@ test(
     await expect(page.getByTestId('empty-post-2')).toContainText('Empty, not sent')
     await page.getByRole('button', { name: 'Remove empty post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)
+
+    // Fewer than three posts are queued this week: Home asks for one.
+    await page.goto('/home')
+    await expect(page.getByTestId('queue-nudge')).toContainText('Write one now')
 
     await page.goto('/write?tab=queue')
     const queue = page.getByTestId('queue')

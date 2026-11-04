@@ -262,6 +262,18 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
+    // Each post has its own Rewrite. Adapt asks for this platform, and Try again
+    // asks the same thing again, not the empty instruction box.
+    await page.getByRole('button', { name: 'Rewrite post 1' }).click()
+    await page.getByTestId('refine-menu').getByRole('button', { name: 'Adapt for X' }).click()
+    await expect(review).toContainText('Adapt for X')
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Try again' }).click()
+    await expect(review).toContainText('Adapt for X', { timeout: 60_000 })
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Reject' }).click()
+    await expect(editor).not.toContainText('(refined)')
+
     // The writing assistant helps at once; its voice setup is offered later, never as a gate.
     await page.getByRole('button', { name: 'Assistant', exact: true }).click()
     await expect(page.getByTestId('assistant-setup')).toHaveCount(0)
