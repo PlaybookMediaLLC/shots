@@ -5,7 +5,7 @@ import { OnboardingProduct } from '@/components/auth/OnboardingProduct'
 import { ONBOARDING_STEPS, OnboardingShell } from '@/components/auth/OnboardingShell'
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { ONBOARDING_PRODUCT_PATH, pageTenant } from '@/lib/onboarding/next-step'
 import { getIdealCustomerProfile } from '@/lib/tenant/ideal-customer-profile'
 import { getLatestOnboardingRun } from '@/lib/tenant/onboarding-runs'
@@ -38,7 +38,7 @@ export default async function OnboardingProductPage({ params }: OnboardingProduc
   if (!access.hasPaidPlan) redirect(getLocalizedPath(locale, '/onboarding/plan'))
   const tenant = pageTenant(access, requestHeaders)
   // Only owners and admins edit the product profile; everyone else goes to the app.
-  if (!tenant || !hasPermission(access.role, 'brand:manage')) {
+  if (!tenant || !accessAllows(access, 'brand:manage')) {
     redirect(getLocalizedPath(locale, '/'))
   }
   const [profile, icp, run] = await Promise.all([

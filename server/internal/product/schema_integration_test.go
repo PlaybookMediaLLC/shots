@@ -54,6 +54,8 @@ func TestEntProjectionsMatchMigratedTables(t *testing.T) {
 		"apikey":                           func() error { _, err := c.Apikey.Query().Limit(1).All(ctx); return err },
 		"audience_subscriber":              func() error { _, err := c.AudienceSubscriber.Query().Limit(1).All(ctx); return err },
 		"audit_retention_policy":           func() error { _, err := c.AuditRetentionPolicy.Query().Limit(1).All(ctx); return err },
+		"permission_group":                 func() error { _, err := c.PermissionGroup.Query().Limit(1).All(ctx); return err },
+		"permission_group_member":          func() error { _, err := c.PermissionGroupMember.Query().Limit(1).All(ctx); return err },
 		"billing_entitlement_event":        func() error { _, err := c.BillingEntitlementEvent.Query().Limit(1).All(ctx); return err },
 		"campaign_plan":                    func() error { _, err := c.CampaignPlan.Query().Limit(1).All(ctx); return err },
 		"campaign_revision":                func() error { _, err := c.CampaignRevision.Query().Limit(1).All(ctx); return err },

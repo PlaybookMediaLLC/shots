@@ -98,7 +98,7 @@ func (c *Configuration) UpdateMemberRole(ctx context.Context, actor Actor, membe
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := workspaceAdministrator(ctx, tx, actor); err != nil {
+	if err := workspaceAdministrator(ctx, tx, actor, "member:update_role"); err != nil {
 		return nil, err
 	}
 	if _, err = tx.PlatformExec(ctx, `SELECT set_config('platform.membership_explicit','true',true)`); err != nil {
@@ -153,7 +153,7 @@ func (c *Configuration) RemoveMember(ctx context.Context, actor Actor, memberID 
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := workspaceAdministrator(ctx, tx, actor); err != nil {
+	if err := workspaceAdministrator(ctx, tx, actor, "member:remove"); err != nil {
 		return nil, err
 	}
 	if _, err = tx.PlatformExec(ctx, `SELECT set_config('platform.membership_explicit','true',true)`); err != nil {

@@ -65,6 +65,7 @@ function setup(role: OrganizationRole = 'creator', campaignId: string | null = C
   const events: BackendAuditEvent[] = []
   const run = createToolRun({
     access: {
+      deniedPermissions: [],
       organizationId: 'org_1',
       principal: { display: 'ada@example.com', kind: 'session', sessionId: 's_1', userId: 'u_1' },
       requestId: 'req_1',

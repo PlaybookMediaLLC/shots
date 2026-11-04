@@ -7,6 +7,7 @@ import { getPageAccess } from '@/lib/auth/page-access'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 import { NAVIGATION_COOKIE, parseNavigation } from '@/lib/settings/appearance'
 import type { PlatformAccess } from '@/lib/platform/navigation'
+import { brandIdentity, brandThemeCss } from '@/lib/whitelabeling'
 import { cn } from '@/lib/utils'
 import { PlatformSidebar } from './PlatformSidebar'
 import { ProductTourProvider } from './ProductTour'
@@ -51,8 +52,14 @@ export async function PlatformShell({
     draftsPlan: access?.hasBasicScheduling ?? true,
     paidPlan: access?.hasPaidPlan ?? true,
   }
+  const brandCss = brandThemeCss(access?.whitelabel)
   return (
     <PreferencesProvider>
+      {/* Rendered with the shell, so branding stays out of public pages. */}
+      {brandCss ? <style>{brandCss}</style> : null}
+      {access?.whitelabel?.faviconUrl ? (
+        <link href={access.whitelabel.faviconUrl} rel="icon" />
+      ) : null}
       <ProductTourProvider access={platformAccess} autoStart={variant === 'page'}>
         <div
           data-platform-shell
@@ -69,7 +76,9 @@ export async function PlatformShell({
             Skip to content
           </a>
           <PlatformSidebar
+            brand={brandIdentity(access?.whitelabel)}
             campaignsEnabled={platformAccess.campaignsEnabled}
+            deniedPermissions={access?.deniedPermissions}
             draftsEnabled={platformAccess.draftsEnabled}
             draftsPlan={platformAccess.draftsPlan}
             initialNavigation={navigation}

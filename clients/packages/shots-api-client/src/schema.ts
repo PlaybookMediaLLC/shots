@@ -3984,7 +3984,7 @@ export interface components {
             /** @enum {string} */
             currentPlan: "free" | "pro" | "business" | "enterprise";
             /** @enum {string} */
-            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
+            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "enterprise:white-label" | "enterprise:permission-groups" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
             /** @enum {string} */
             requiredPlan: "free" | "pro" | "business" | "enterprise";
         };

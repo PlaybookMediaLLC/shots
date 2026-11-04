@@ -136,6 +136,10 @@ type Tx struct {
 	OutboxEvent *OutboxEventClient
 	// PageKnowledge is the client for interacting with the PageKnowledge builders.
 	PageKnowledge *PageKnowledgeClient
+	// PermissionGroup is the client for interacting with the PermissionGroup builders.
+	PermissionGroup *PermissionGroupClient
+	// PermissionGroupMember is the client for interacting with the PermissionGroupMember builders.
+	PermissionGroupMember *PermissionGroupMemberClient
 	// PlatformAutoDMCampaign is the client for interacting with the PlatformAutoDMCampaign builders.
 	PlatformAutoDMCampaign *PlatformAutoDMCampaignClient
 	// PlatformAutoDMDelivery is the client for interacting with the PlatformAutoDMDelivery builders.
@@ -447,6 +451,8 @@ func (tx *Tx) init() {
 	tx.OrganizationEnterpriseSettings = NewOrganizationEnterpriseSettingsClient(tx.config)
 	tx.OutboxEvent = NewOutboxEventClient(tx.config)
 	tx.PageKnowledge = NewPageKnowledgeClient(tx.config)
+	tx.PermissionGroup = NewPermissionGroupClient(tx.config)
+	tx.PermissionGroupMember = NewPermissionGroupMemberClient(tx.config)
 	tx.PlatformAutoDMCampaign = NewPlatformAutoDMCampaignClient(tx.config)
 	tx.PlatformAutoDMDelivery = NewPlatformAutoDMDeliveryClient(tx.config)
 	tx.PlatformAutoDMOptOut = NewPlatformAutoDMOptOutClient(tx.config)

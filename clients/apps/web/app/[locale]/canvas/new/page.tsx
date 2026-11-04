@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { NewCanvas } from '@/components/canvas-workspace/NewCanvas'
 
@@ -22,7 +22,7 @@ export default async function NewCanvasPage({
       organizationName={access.organization?.name}
     >
       <NewCanvas
-        canEdit={hasPermission(access.role, 'artifact:edit')}
+        canEdit={accessAllows(access, 'artifact:edit')}
         campaignsEnabled={access.campaignWorkflowEnabled}
         source={{
           start: one(query.start),

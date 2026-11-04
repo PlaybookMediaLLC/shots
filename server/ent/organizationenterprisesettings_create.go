@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // OrganizationEnterpriseSettingsCreate is the builder for creating a OrganizationEnterpriseSettings entity.
@@ -44,6 +45,20 @@ func (_c *OrganizationEnterpriseSettingsCreate) SetScimEnabled(v bool) *Organiza
 func (_c *OrganizationEnterpriseSettingsCreate) SetNillableScimEnabled(v *bool) *OrganizationEnterpriseSettingsCreate {
 	if v != nil {
 		_c.SetScimEnabled(*v)
+	}
+	return _c
+}
+
+// SetWhitelabelSettings sets the "whitelabel_settings" field.
+func (_c *OrganizationEnterpriseSettingsCreate) SetWhitelabelSettings(v whitelabel.Settings) *OrganizationEnterpriseSettingsCreate {
+	_c.mutation.SetWhitelabelSettings(v)
+	return _c
+}
+
+// SetNillableWhitelabelSettings sets the "whitelabel_settings" field if the given value is not nil.
+func (_c *OrganizationEnterpriseSettingsCreate) SetNillableWhitelabelSettings(v *whitelabel.Settings) *OrganizationEnterpriseSettingsCreate {
+	if v != nil {
+		_c.SetWhitelabelSettings(*v)
 	}
 	return _c
 }
@@ -170,6 +185,10 @@ func (_c *OrganizationEnterpriseSettingsCreate) createSpec() (*OrganizationEnter
 	if value, ok := _c.mutation.ScimEnabled(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldScimEnabled, field.TypeBool, value)
 		_node.ScimEnabled = value
+	}
+	if value, ok := _c.mutation.WhitelabelSettings(); ok {
+		_spec.SetField(organizationenterprisesettings.FieldWhitelabelSettings, field.TypeJSON, value)
+		_node.WhitelabelSettings = value
 	}
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(organizationenterprisesettings.FieldUpdatedAt, field.TypeTime, value)

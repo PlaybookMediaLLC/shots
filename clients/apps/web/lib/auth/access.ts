@@ -6,7 +6,7 @@ import { backendSDK } from '@/lib/backend/sdk'
 import { BackendSDKError } from 'screenshot-studio-backend-sdk'
 import { assertAuthEnvironment } from './environment'
 import {
-  hasPermission,
+  accessAllows,
   needsShotsTwoFactor,
   normalizeOrganizationRole,
   type OrganizationRole,
@@ -36,6 +36,8 @@ export class AuthorizationError extends Error {
 }
 
 export type OrganizationAccess = {
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions: readonly string[]
   organizationId: string
   principal: SessionPrincipal
   requestId: string
@@ -136,6 +138,8 @@ async function getBackendActiveOrganization(
     requestId,
   }).getActiveAccess()
   return {
+    // An older backend mid-deploy sends none, and has no groups to apply.
+    deniedPermissions: access.deniedPermissions ?? [],
     organizationId: access.organizationId,
     principal,
     requestId,
@@ -216,7 +220,7 @@ async function requireActiveSessionOrganization(
 }
 
 function assertPermission(access: OrganizationAccess, permission: Permission): void {
-  if (!hasPermission(access.role, permission)) {
+  if (!accessAllows(access, permission)) {
     throw new AuthorizationError('You do not have permission for this organization.', 403)
   }
 }

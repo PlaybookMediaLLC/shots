@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { roleLabels } from '@/lib/auth/role-descriptions'
-import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
+import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { Input } from '@/components/ui/input'
 import {
   matchesDestination,
@@ -80,6 +80,7 @@ export function ShellActions({
   onNavigate,
   paidPlan = true,
   role,
+  deniedPermissions,
 }: {
   collapsed: boolean
   campaignsEnabled: boolean
@@ -91,6 +92,8 @@ export function ShellActions({
   paidPlan?: boolean
   /** Items the role may not create are shown unavailable, with who can grant access. */
   role: string
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions: readonly string[]
 }) {
   const t = useTranslations('platformNavigation')
   const newPost = useNewPost(onNavigate)
@@ -99,7 +102,7 @@ export function ShellActions({
       (campaignsEnabled || item.label !== 'Campaign') && (draftsEnabled || item.label !== 'Post')
   )
   const allowed = (item: (typeof NEW_ITEMS)[number]) =>
-    !item.permission || hasPermission(role, item.permission)
+    !item.permission || accessAllows({ deniedPermissions, role }, item.permission)
   const locked = (item: (typeof NEW_ITEMS)[number]) =>
     item.label === 'Post' ? !draftsPlan : item.paid && !paidPlan
   const unavailable = items.filter((item) => !allowed(item))

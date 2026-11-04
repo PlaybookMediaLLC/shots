@@ -192,6 +192,12 @@ type OutboxEvent func(*sql.Selector)
 // PageKnowledge is the predicate function for pageknowledge builders.
 type PageKnowledge func(*sql.Selector)
 
+// PermissionGroup is the predicate function for permissiongroup builders.
+type PermissionGroup func(*sql.Selector)
+
+// PermissionGroupMember is the predicate function for permissiongroupmember builders.
+type PermissionGroupMember func(*sql.Selector)
+
 // PlatformAutoDMCampaign is the predicate function for platformautodmcampaign builders.
 type PlatformAutoDMCampaign func(*sql.Selector)
 
