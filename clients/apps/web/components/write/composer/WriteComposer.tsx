@@ -468,22 +468,49 @@ export function WriteComposer({
           )
     },
     onToggle: toggle,
-    cancelPosts: async (postIds) => {
-      // Every post is tried; a refusal (such as a sign-in that is too old) is named.
-      const results = await Promise.allSettled(
-        postIds.map((scheduledPostId) => trpcClient.scheduledPost.cancel.mutate({ scheduledPostId }))
-      )
-      const failed = results.filter((result) => result.status === 'rejected')
-      if (failed.length === 0) toast.success('Undone. Nothing from that schedule will publish.')
-      else {
-        const reason = (failed[0] as PromiseRejectedResult).reason
-        toast.error(
-          `${failed.length} of ${postIds.length} posts are still queued. ${reason instanceof Error ? reason.message : 'Cancel them from the draft.'}`
-        )
-      }
-      await refreshPosts().catch(() => undefined)
-      router.refresh()
-    },
+    // The Calendar's unschedule cancels every queued post in one step and, unlike
+    // a cancel, needs no fresh sign-in. It refuses a draft with published
+    // results, so such a draft offers no Undo. It keeps the posts' time as a
+    // plan, so Undo puts back the plan the draft had before.
+    undoSchedule: posts.some((post) => post.status === 'PUBLISHED' || post.url)
+      ? undefined
+      : async (before, postId) => {
+          try {
+            const current = await draftsApi.get(before.id)
+            const [unscheduled] = (
+              await writeApi.unschedule({
+                at: null,
+                calendarVersion: current.calendarVersion,
+                draftId: current.id,
+                postId,
+                timeZone: 'UTC',
+                version: current.version,
+              })
+            ).drafts
+            setServer(unscheduled)
+            let message = 'Undone. Nothing from that schedule will publish.'
+            const plan =
+              before.plannedFor && new Date(before.plannedFor) > new Date()
+                ? before.plannedFor
+                : null
+            if (unscheduled.plannedFor !== plan)
+              await writeApi
+                .plan(unscheduled.id, {
+                  baseCalendarVersion: unscheduled.calendarVersion,
+                  plannedFor: plan,
+                  timeZone: before.planTimeZone ?? undefined,
+                })
+                .then(setServer, (error: unknown) => {
+                  message += ` The draft keeps that time as its plan: ${error instanceof Error ? error.message : 'it could not be changed.'}`
+                })
+            toast.success(message)
+          } catch (error) {
+            toast.error(
+              `Not undone. ${error instanceof Error ? error.message : 'Check the draft for posts that are still queued.'}`
+            )
+          }
+          await refreshPosts().catch(() => router.refresh())
+        },
     requireApproval,
     scheduled: posts.filter((post) => post.status === 'SCHEDULED'),
     setTimeZone: set?.timeZone ?? null,

@@ -88,8 +88,8 @@ export type ScheduleContext = {
   onCommunity?: (community: Community) => void
   autoDm?: AutoDm
   onAutoDm?: (config: AutoDm | undefined) => void
-  /** Cancel posts this schedule just queued: the Undo of its confirmation. */
-  cancelPosts?: (postIds: string[]) => Promise<void>
+  /** Undo a schedule just confirmed: cancel its posts and put back the draft's plan as it was. */
+  undoSchedule?: (before: DraftWire, postId: string) => Promise<void>
 }
 
 /**
@@ -289,18 +289,15 @@ export function ScheduleDialog({
       context.onDone({ ...result, newDraft: continueWriting })
       // Undo cancels what this schedule queued. A reschedule replaced earlier posts,
       // which Undo cannot bring back, so it offers none.
-      const cancel = rescheduling ? undefined : context.cancelPosts
+      const undo = rescheduling ? undefined : context.undoSchedule
+      const [first] = result.posts
+      const before = context.draft
       toast.success(
         result.created
           ? committedMessage(result.posts, zone, queue)
           : 'Already scheduled: nothing new was queued.',
-        result.created && cancel
-          ? {
-              action: {
-                label: 'Undo',
-                onClick: () => void cancel(result.posts.map((post) => post.id)),
-              },
-            }
+        result.created && undo && first
+          ? { action: { label: 'Undo', onClick: () => void undo(before, first.id) } }
           : undefined
       )
       onClose()

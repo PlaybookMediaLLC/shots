@@ -51,7 +51,7 @@ async function draftPosts(draftId: string) {
 test(
   'a new draft opens to its text and joins the queue by keyboard, with Undo',
   { tag: '@journey' },
-  async ({ page, startWorkspace }) => {
+  async ({ identity, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'bluesky'] })
     await weeklySlots(page)
     const id = await openNewDraft(page)
@@ -91,10 +91,22 @@ test(
     await expect
       .poll(async () => (await draftPosts(id)).map((post) => post.status))
       .toEqual(['SCHEDULED', 'SCHEDULED'])
+    // Undo works for a sign-in older than the 15 minutes a cancel asks for.
+    await db.query(
+      `UPDATE session SET "createdAt" = now() - interval '20 minutes' WHERE "userId" IN (SELECT id FROM "user" WHERE email = $1)`,
+      [identity.email]
+    )
     await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(page.getByText('Undone. Nothing from that schedule will publish.')).toBeVisible()
     await expect
       .poll(async () => (await draftPosts(id)).map((post) => post.status))
       .toEqual(['CANCELLED', 'CANCELLED'])
+    // The draft is back as it was: a draft with no plan date.
+    const draft = await db.row<{ plannedFor: Date | null; status: string }>(
+      `SELECT status::text AS status, "plannedFor" FROM content_draft WHERE id = $1`,
+      [id]
+    )
+    expect(draft).toEqual({ plannedFor: null, status: 'draft' })
   }
 )
 
