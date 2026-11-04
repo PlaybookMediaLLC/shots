@@ -148,7 +148,7 @@ test(
     // A new set posts weekdays at 9:00. A second weekday time makes two rows
     // of five: ten weekly slots, as the server saved them.
     await app.open(`/settings/publishing-brands/${setId}/scheduling`)
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 weekly posting slots')
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 of 50 weekly posting slots')
     await page.getByLabel('Search scheduling time zone').fill('Paris')
     await chooseOption(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' }),
@@ -157,10 +157,10 @@ test(
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await chooseOption(page.getByLabel('Time to add'), /^1:00\sPM$/)
     await page.getByRole('button', { name: 'Add time' }).click()
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 weekly posting slots')
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect.poll(() => slotCount(setId)).toBe(10)
     await app.reload()
-    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 weekly posting slots')
+    await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
     await expect(
       page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' })
     ).toContainText('Europe/Paris')
