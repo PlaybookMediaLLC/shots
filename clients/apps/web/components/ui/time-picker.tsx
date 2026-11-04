@@ -100,7 +100,7 @@ export function TimePicker({
                 setOpen(true)
               }
             }}
-            placeholder={placeholder ?? (twelveHour ? '9:00 AM' : '09:00')}
+            placeholder={placeholder ?? 'Type a time'}
             required={required}
             value={shown}
           />
