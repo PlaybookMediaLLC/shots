@@ -7,7 +7,6 @@ import { getPageAccess } from '@/lib/auth/page-access'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 import { NAVIGATION_COOKIE, parseNavigation } from '@/lib/settings/appearance'
 import { cn } from '@/lib/utils'
-import { platformFont } from './platform-font'
 import { PlatformSidebar } from './PlatformSidebar'
 import { WorkspaceTabGuard } from './WorkspaceTabGuard'
 import { surface } from './shell-config'
@@ -45,10 +44,6 @@ export async function PlatformShell({
   const navigation = parseNavigation(cookieStore.get(NAVIGATION_COOKIE)?.value)
   return (
     <PreferencesProvider>
-      {/* On body, so dialogs and menus portaled outside the shell share the face. */}
-      <style href="platform-font" precedence="default">
-        {`body:has([data-platform-shell]){--font-platform:${platformFont.style.fontFamily}}`}
-      </style>
       <div
         data-platform-shell
         data-platform-variant={variant}

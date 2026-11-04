@@ -55,12 +55,12 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
-// Modern Sans-serif fonts
+// The UI face: one variable Inter (100–900) with the optical size axis.
 const inter = Inter({
   variable: '--font-inter',
-  preload: false,
   subsets: ['latin'],
-  weight: ['100', '200', '300', '400', '500', '600', '700', '800', '900'],
+  axes: ['opsz'],
+  display: 'swap',
 })
 
 const poppins = Poppins({
@@ -447,7 +447,7 @@ export default async function RootLayout({
         href="/llms-full.txt"
         title="LLMs Full Documentation"
       />
-      <body className="antialiased">
+      <body>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(rootJsonLd) }}

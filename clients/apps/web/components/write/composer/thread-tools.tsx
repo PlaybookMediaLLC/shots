@@ -63,7 +63,7 @@ export function ThreadTools({
     window.setTimeout(performSplit, 0)
   }, [pasted, options.splitOnPaste, performSplit])
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 text-xs">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border px-4 py-3 text-ui">
       {pasted ? (
         <p className="w-full text-muted-foreground" role="status">
           Pasted content is ready. Make thread splits it at your chosen length while keeping its
@@ -94,7 +94,7 @@ export function ThreadTools({
         Split automatically on paste
       </Label>
       <Button
-        className="h-7 rounded-full px-3 text-xs"
+        className="h-8 rounded-md px-3 text-ui"
         size={null}
         variant="outline"
         onClick={() => {
@@ -104,7 +104,7 @@ export function ThreadTools({
         Make thread
       </Button>
       <Button
-        className="h-7 rounded-full px-3 text-xs"
+        className="h-8 rounded-md px-3 text-ui"
         size={null}
         variant="ghost"
         onClick={async () => {

@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.43.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.42.1...v2.43.0) (2026-11-04)
+
+
+### Features
+
+* publish LinkedIn Pages, TikTok and YouTube videos from Write ([#399](https://github.com/PlaybookMediaLLC/shots/issues/399)) ([4be92cd](https://github.com/PlaybookMediaLLC/shots/commit/4be92cdcc54a6602608587ae12a7108a15e69aaa))
+* **web:** use Inter, Geist Mono and a console type scale; move shell icons to Phosphor ([#406](https://github.com/PlaybookMediaLLC/shots/issues/406)) ([f0c1398](https://github.com/PlaybookMediaLLC/shots/commit/f0c1398cdc5ae5a2099f7c6d9de4e854471aa656))
+
+
+### Bug Fixes
+
+* **backend:** give the publishing worker the social credentials ([#411](https://github.com/PlaybookMediaLLC/shots/issues/411)) ([4e27a2b](https://github.com/PlaybookMediaLLC/shots/commit/4e27a2be7b6f2234c0c4b125a2e3b73422e10c87))
+* **publishing:** log a publication error that has no provider status ([#409](https://github.com/PlaybookMediaLLC/shots/issues/409)) ([918fd50](https://github.com/PlaybookMediaLLC/shots/commit/918fd503508c4e93356b45e0fcfb9c810837647a))
+* **social:** upload TikTok videos from the signed URL ([#402](https://github.com/PlaybookMediaLLC/shots/issues/402)) ([be91ef1](https://github.com/PlaybookMediaLLC/shots/commit/be91ef14a3733336e165ac238e6f44d30af0cab4))
+* **web:** let provider sign-in satisfy two-factor for sensitive actions ([#407](https://github.com/PlaybookMediaLLC/shots/issues/407)) ([dd29646](https://github.com/PlaybookMediaLLC/shots/commit/dd29646a4c45eefcc31cd3af14214fb3913e8d4d))
+* **web:** offer a fresh sign-in when connecting an account needs one ([#404](https://github.com/PlaybookMediaLLC/shots/issues/404)) ([7fc203b](https://github.com/PlaybookMediaLLC/shots/commit/7fc203b9c2fdfaa762e44e489a47439a9f252a38))
+
 ## [2.42.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.42.0...v2.42.1) (2026-10-31)
 
 

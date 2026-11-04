@@ -120,9 +120,9 @@ export function WriteRail() {
       data-testid="write-rail"
     >
       <div className="flex items-center justify-between gap-2 px-3 pt-4">
-        <h2 className="text-base font-medium">Publish</h2>
+        <h2 className="text-heading">Publish</h2>
         {canEdit && (
-          <Button asChild className="h-7 px-2.5 text-xs" variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm">
             {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
             <Link
               href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
@@ -138,21 +138,22 @@ export function WriteRail() {
           <SocialSetSwitcher />
         </div>
         <Link
-          className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
           href={data.activeSet ? `/write/settings?set=${data.activeSet.id}` : '/write/settings'}
         >
           Settings
         </Link>
       </div>
-      <div className="px-3" role="tablist" aria-label="Library">
-        <div className="grid grid-cols-4 rounded-lg bg-foreground/[0.04] p-0.5">
+      {/* Underlined tabs: the current one is medium weight over a 2px line. */}
+      <div className="border-b border-border px-1" role="tablist" aria-label="Library">
+        <div className="flex">
           {TABS.map((item) => (
             <Button
               aria-selected={tab === item.tab}
               className={cn(
-                'rounded-md px-1 py-1 text-[11px] transition-colors',
+                'flex h-10 items-center px-3 py-2.5 text-ui transition-colors',
                 tab === item.tab
-                  ? 'bg-foreground/[0.08] text-foreground'
+                  ? 'font-medium text-foreground shadow-[inset_0_-2px_0_var(--foreground)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
               key={item.tab}
@@ -167,7 +168,9 @@ export function WriteRail() {
             >
               {item.label}
               {item.tab === 'queue' && data.queue.length > 0 ? (
-                <span className="ml-1 text-muted-foreground">{data.queue.length}</span>
+                <span className="ml-1 text-[11px] leading-[11px] font-semibold text-muted-foreground">
+                  {data.queue.length}
+                </span>
               ) : null}
             </Button>
           ))}
@@ -283,7 +286,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
     <div className="flex items-center gap-1.5 px-3 pt-2">
       <Input
         aria-label="Search drafts"
-        className="h-8 min-w-0 flex-1 text-xs"
+        className="h-8 min-w-0 flex-1"
         onChange={(event) => {
           const value = event.target.value
           setSearch(value)
@@ -299,7 +302,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
           <Button
             aria-label="Draft filters"
             className={cn(
-              'h-8 rounded-md border border-border px-2 text-xs text-muted-foreground hover:text-foreground',
+              'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:text-foreground',
               (activeTag || data.query.kind || data.query.sort) &&
                 'border-sky-400/50 text-sky-700 dark:text-sky-200'
             )}
@@ -424,9 +427,10 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
     }
   }
   return (
-    <div className={cn('flex items-center gap-px', compact ? '' : 'mx-3 mt-2')}>
+    // A secondary split button: Schedule is the page's one primary action.
+    <div className={cn('flex items-center', compact ? '' : 'mx-3 mt-2')}>
       <Button
-        className="flex h-9 flex-1 items-center gap-2 rounded-l-full bg-primary px-3.5 text-ui-lg font-medium text-primary-foreground shadow-xs hover:bg-primary/90 disabled:opacity-50"
+        className="flex h-8 flex-1 items-center gap-2 rounded-l-md border border-border px-3 text-ui font-medium text-foreground hover:bg-foreground/[0.04] disabled:opacity-50"
         data-testid="new-draft"
         disabled={creating}
         onClick={() => void create('standard')}
@@ -442,7 +446,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
         <DropdownMenuTrigger asChild>
           <Button
             aria-label="New draft of another kind"
-            className="grid h-9 place-items-center rounded-r-full bg-primary pe-3 ps-2 text-primary-foreground shadow-xs hover:bg-primary/90"
+            className="grid h-8 place-items-center rounded-r-md border border-l-0 border-border pe-2.5 ps-2 text-foreground hover:bg-foreground/[0.04]"
             size={null}
             type="button"
             variant="custom"
@@ -612,7 +616,7 @@ function DraftRow({
       className={cn(
         'group/row relative border-b border-l-2 border-b-white/[0.04] transition-colors',
         active
-          ? 'border-l-sky-400 bg-foreground/[0.04]'
+          ? 'border-l-foreground bg-foreground/[0.04]'
           : 'border-l-transparent hover:bg-foreground/[0.02]',
         selected && 'bg-sky-400/[0.06]'
       )}
@@ -621,7 +625,7 @@ function DraftRow({
     >
       <Link
         aria-current={active ? 'page' : undefined}
-        className="block px-4 py-3 pr-10"
+        className="block px-4 py-2.5 pr-10"
         href={draftHref(draft.id, data.activeSet?.id)}
         draggable={canEdit && draft.status === 'draft' && draft.queuedPosts === 0}
         onDragStart={(event) => {
@@ -654,7 +658,7 @@ function DraftRow({
             {shown.excerpt || <span className="text-muted-foreground">Empty draft</span>}
           </span>
         </p>
-        <p className="mt-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+        <p className="mt-1 flex items-center gap-2 text-caption text-[var(--fg-tertiary)]">
           <span className="min-w-0 flex-1 truncate">
             {draft.kind !== 'standard' ? (
               <span className="mr-1 text-muted-foreground">{KIND_LABELS[draft.kind]} ·</span>
