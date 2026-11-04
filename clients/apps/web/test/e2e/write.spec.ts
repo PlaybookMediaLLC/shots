@@ -587,10 +587,13 @@ test(
     const draftId = await newDraft(page)
     const editor = draftEditor(page)
     await expect(editor).toBeFocused()
-    await expect(editor.locator('[placeholder="What would you like to share?"]')).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Add post', exact: true })
-    ).toBeInViewport()
+    // An X draft asks as X does, with the slash menu's hint (a CSS variable drawn as the placeholder).
+    await expect(editor).toHaveCSS(
+      '--post-placeholder',
+      '"What’s happening?   Type / for commands"'
+    )
+    await expect(editor.locator('[placeholder]')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add post', exact: true })).toBeInViewport()
     await editor.fill('QA persistence check two')
     await expect(page.getByTestId('post-length-1')).toHaveText('24 / 280')
     await expectSaved(page)

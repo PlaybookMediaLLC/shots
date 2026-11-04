@@ -12,6 +12,7 @@ import {
   previewOf,
   settleSelection,
   test,
+  postMenu,
 } from './framework'
 import { format } from 'date-fns'
 
@@ -274,13 +275,13 @@ test(
 
     // Per-post tools: the second post moves up, then is deleted.
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Move post 2 up' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Move post up' }).click()
     // Still two posts, now in the other order.
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     // Each post's header (account, length) sits inside the editor, before its text.
     await expect(draftEditor(page)).toHaveText(/Second post[\s\S]*#shipit First post$/)
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Delete post 2' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Delete post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)
     await expect(draftEditor(page)).not.toContainText('First post')
     await expectSaved(page)

@@ -16,6 +16,7 @@ import {
   type PlateEditor,
   useEditorRef,
   useEditorMounted,
+  useEditorSelector,
   usePlateEditor,
   usePluginOption,
 } from '@shots/platejs-editor/platejs/react'
@@ -46,7 +47,10 @@ import { POST_COLUMN } from './layout'
 import {
   insertPostBreak,
   leaveHeader,
+  PostBar,
   PostBreakPlugin,
+  PostHover,
+  postRanges,
   PostHeaderContext,
   type PostTools,
   PostToolsContext,
@@ -129,8 +133,10 @@ export type DraftEditorProps = {
   hashtags: string[]
   /** Each post's header, by its 1-based number in the thread: who it is from. */
   postHeader: (number: number) => React.ReactNode
-  /** Per-post settings tools for the platform being edited. */
-  postSettings?: PostTools['settings']
+  /** What each post's bar shows for the platform being edited (count, Ask AI, settings). */
+  postTools?: Omit<PostTools, 'addImage'>
+  /** The empty post's prompt for the platform being edited, such as "What's happening?". */
+  placeholder?: string
   /** The host's buttons after Add post and Image, given the editor's import and export. */
   toolbarExtras?: (document: DocumentActions) => React.ReactNode
   /** Plugins the host adds, such as social mentions. */
@@ -565,7 +571,8 @@ function DraftEditorSession({
   handles,
   hashtags,
   postHeader,
-  postSettings,
+  postTools: hostPostTools,
+  placeholder = 'Write your post…',
   toolbarExtras,
   extraPlugins,
   documentName,
@@ -609,7 +616,9 @@ function DraftEditorSession({
     return createEditorKit({
       recipe: 'collaborative',
       // Only an explicitly supplied host lookup may replace literal social handles.
-      excludePluginKeys: ['mention', 'mention_input', 'autoformatShortcuts'].filter(
+      // `dnd` is Plate's document gutter (drag handle and "+" beside every block):
+      // posts move from their bar and header, and file drops keep working without it.
+      excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts'].filter(
         (key) => !hosted.some((plugin) => plugin.key === key)
       ),
       additionalPlugins: live ? [PostBreakPlugin, ...hosted, live] : [PostBreakPlugin, ...hosted],
@@ -659,7 +668,8 @@ function DraftEditorSession({
         })),
         BlockSelectionKit[0].configure({ options: { disableSelectAll: true } }),
         BlockPlaceholderKit[0].configure({
-          options: { placeholders: { [KEYS.p]: 'What would you like to share?' } },
+          // The text shown comes from --post-placeholder, so it follows the platform.
+          options: { placeholders: { [KEYS.p]: 'Write your post' } },
         }),
         // Comments sit in a column beside the post once the text reaches its
         // full measure (POST_COLUMN's 42rem); a narrower editor opens them as a
@@ -861,8 +871,8 @@ function DraftEditorSession({
     () =>
       readOnly || waitingForConnection
         ? {}
-        : { addImage: () => imageInput.current?.click(), settings: postSettings },
-    [postSettings, readOnly, waitingForConnection]
+        : { ...hostPostTools, addImage: () => imageInput.current?.click() },
+    [hostPostTools, readOnly, waitingForConnection]
   )
   return (
     <EditorServicesProvider services={services}>
@@ -879,6 +889,7 @@ function DraftEditorSession({
             <DiscussionsWatcher onChange={onDiscussionsChange} />
             {!collaboration || live ? (
               <CommentColumn>
+                <PostHover>
                 <ThreadLine />
                 <Editor
                   autoFocus={false}
@@ -901,12 +912,19 @@ function DraftEditorSession({
                   aria-label="Draft body"
                   className={cn(
                     POST_COLUMN,
-                    'draft-prose min-h-0 pt-1 pb-4 text-body [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[attr(placeholder)]'
+                    'draft-prose min-h-0 pt-1 pb-0 text-body [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[var(--post-placeholder)]'
                   )}
                   dir={textDirection}
-                  placeholder="What would you like to share?"
+                  placeholder={placeholder}
+                  style={
+                    {
+                      '--post-placeholder': JSON.stringify(`${placeholder}   Type / for commands`),
+                    } as React.CSSProperties
+                  }
                   variant="default"
                 />
+                <LastPostBar />
+                </PostHover>
                 <ReadyEditor draftId={draftId} focus={!readOnly && initiallyEmpty} />
               </CommentColumn>
             ) : (
@@ -963,6 +981,12 @@ function DraftEditorSession({
       </PostHeaderContext.Provider>
     </EditorServicesProvider>
   )
+}
+
+/** The last post's bar, under the editable text (earlier posts' bars sit above the next header). */
+function LastPostBar() {
+  const count = useEditorSelector((editor) => postRanges(editor.children).length, [])
+  return <PostBar className={cn(POST_COLUMN, 'mb-6')} number={count} />
 }
 
 /** Focus once after Plate has mounted, never while a keystroke is being applied. */

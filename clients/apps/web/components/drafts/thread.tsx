@@ -5,10 +5,22 @@ import {
   AddIcon,
   ArrowDownIcon,
   ArrowUpIcon,
-  CloseIcon,
+  CopyIcon,
+  DeleteIcon,
   DragIcon,
   ImageIcon,
+  MoreIcon as DotsThreeIcon,
 } from '@/components/platform-shell/icons'
+import { SparkleIcon } from '@phosphor-icons/react/dist/ssr/Sparkle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useKeys } from '@/components/write/shortcuts'
 
 import * as React from 'react'
 import {
@@ -62,6 +74,15 @@ export function postRanges(children: Value): [number, number][] {
     ranges[ranges.length - 1][1] = index + 1
   })
   return ranges
+}
+
+/** The post the caret is in, 1-based. */
+export function caretPost(editor: PlateEditor): number {
+  const index = editor.selection?.anchor.path[0] ?? 0
+  return Math.max(
+    1,
+    postRanges(editor.children).findIndex(([start, end]) => index >= start && index < end) + 1
+  )
 }
 
 /** The index of the break that starts post `number` (1-based), or -1. */
@@ -311,29 +332,197 @@ export const PostBreakPlugin = createPlatePlugin({
   },
 }))
 
-/** What a post's tools can do beyond the editor itself. */
+/** What a post's tools can do beyond the editor itself; the host fills them in. */
 export type PostTools = {
   addImage?: () => void
-  /** Settings tools for this platform's posts, drawn beside the header. */
+  /** The post's count for the platform being edited; `active` while the post is in use. */
+  counter?: (number: number, active: boolean) => React.ReactNode
+  /** Extra items for the post's More menu, such as splitting at the limit. */
+  menu?: (number: number) => React.ReactNode
+  /** Wraps the post's Ask AI button so it opens Refine at the post. */
+  refine?: (number: number, button: React.ReactElement) => React.ReactNode
+  /** Settings tools for this platform's posts (audience, poll), drawn in the post's bar. */
   settings?: (props: { number: number; settings: PostSettings }) => React.ReactNode
 }
 
 /** The post tools the host provides. */
 export const PostToolsContext = React.createContext<PostTools>({})
 
-/** A post's header with its tools: add below, settings, media, reorder, delete. */
-function PostHead({ number, settings }: { number: number; settings: PostSettings }) {
-  const header = React.useContext(PostHeaderContext)
+/** The post under the pointer, 0 for none; the caret's post is read from the editor. */
+const HoveredPostContext = React.createContext(0)
+
+/**
+ * Tracks which post the pointer is over, so that post's bar shows. Posts are
+ * runs of top-level blocks, not elements, so the block under the pointer
+ * names the post.
+ */
+export function PostHover({ children }: { children: React.ReactNode }) {
+  const editor = useEditorRef()
+  const [hovered, setHovered] = React.useState(0)
+  const track = (target: EventTarget | null) => {
+    const element = target instanceof Element ? target : null
+    const bar = element?.closest<HTMLElement>('[data-post-bar]')
+    let number = bar ? Number(bar.dataset.postBar) : 0
+    if (!bar) {
+      let block = element?.closest('[data-slate-node="element"]') ?? null
+      while (block?.parentElement && !block.parentElement.hasAttribute('data-slate-editor'))
+        block = block.parentElement.closest('[data-slate-node="element"]')
+      try {
+        const index = block ? editor.api.findPath(editor.api.toSlateNode(block)!)?.[0] : undefined
+        if (index !== undefined)
+          number = postRanges(editor.children).findIndex(([start, end]) => index >= start && index < end) + 1
+      } catch {
+        // A node Slate no longer knows (mid-render): keep the last post.
+        return
+      }
+    }
+    if (number !== hovered) setHovered(number)
+  }
+  return (
+    <HoveredPostContext.Provider value={hovered}>
+      <div
+        className="relative"
+        onMouseLeave={() => setHovered(0)}
+        onMouseMove={(event) => track(event.target)}
+      >
+        {children}
+      </div>
+    </HoveredPostContext.Provider>
+  )
+}
+
+/**
+ * The bar under a post: its count, then Image, Ask AI, the platform's post
+ * settings and More (duplicate, move, delete). It shows for the post with the
+ * caret, the post under the pointer, and while it has keyboard focus; it
+ * keeps its height either way, so the text never shifts.
+ */
+export function PostBar({ className, number }: { className?: string; number: number }) {
   const tools = React.useContext(PostToolsContext)
+  const hovered = React.useContext(HoveredPostContext)
+  const editor = useEditorRef()
+  const readOnly = useReadOnly()
+  const count = useEditorSelector((current) => postRanges(current.children).length, [])
+  const settings = useEditorSelector(
+    (current) => {
+      const index = breakIndex(current.children, number)
+      return (index < 0 ? {} : current.children[index]) as PostSettings
+    },
+    [number]
+  )
+  const caret = useEditorSelector((current) => (current.selection ? caretPost(current) : 0), [])
+  const active = hovered === number || caret === number
+  const keys = useKeys()
+  const icon =
+    'size-8 justify-center rounded-md p-0 text-muted-foreground hover:bg-accent hover:text-foreground'
+  if (readOnly) return null
+  const ask = (
+    <Button aria-label={`Ask AI about post ${number}`} className={icon} size={null} title={`Ask AI (${keys.label({ key: 'j', mod: true })})`} type="button" variant="custom">
+      <SparkleIcon aria-hidden className="size-4 text-primary" />
+    </Button>
+  )
+  return (
+    <div
+      aria-label={`Post ${number} tools`}
+      className={cn('flex h-8 items-center gap-1', className)}
+      contentEditable={false}
+      data-post-bar={number}
+      role="toolbar"
+    >
+      {tools.counter?.(number, active)}
+      <div
+        className={cn(
+          'ms-auto flex items-center gap-0.5 transition-opacity duration-150 focus-within:opacity-100 hover:opacity-100 motion-reduce:transition-none',
+          active ? 'opacity-100' : 'opacity-0'
+        )}
+      >
+        {tools.addImage ? (
+          <Button
+            aria-label={`Add media to post ${number}`}
+            className={icon}
+            onClick={() => {
+              selectPostEnd(editor, number)
+              tools.addImage?.()
+            }}
+            size={null}
+            title={`Image or video (${keys.label({ key: 'i', mod: true, shift: true })})`}
+            type="button"
+            variant="custom"
+          >
+            <ImageIcon aria-hidden className="size-4" />
+          </Button>
+        ) : null}
+        {tools.refine ? tools.refine(number, ask) : null}
+        {tools.settings?.({ number, settings })}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={`More for post ${number}`}
+              className={icon}
+              size={null}
+              title="More"
+              type="button"
+              variant="custom"
+            >
+              <DotsThreeIcon aria-hidden className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            className="w-56"
+            onCloseAutoFocus={(event) => event.preventDefault()}
+          >
+            {tools.menu?.(number)}
+            <DropdownMenuItem onSelect={() => duplicatePost(editor, number)}>
+              <CopyIcon aria-hidden />
+              Duplicate post
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => insertPostAfter(editor, number)}>
+              <AddIcon aria-hidden />
+              Add a post below
+            </DropdownMenuItem>
+            {count > 1 ? (
+              <>
+                <DropdownMenuItem
+                  disabled={number === 1}
+                  onSelect={() => movePost(editor, number, number - 1)}
+                >
+                  <ArrowUpIcon aria-hidden />
+                  Move post up
+                  <DropdownMenuShortcut aria-hidden>{keys.label({ alt: true, key: 'arrowup' })}</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={number === count}
+                  onSelect={() => movePost(editor, number, number + 1)}
+                >
+                  <ArrowDownIcon aria-hidden />
+                  Move post down
+                  <DropdownMenuShortcut aria-hidden>{keys.label({ alt: true, key: 'arrowdown' })}</DropdownMenuShortcut>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => deletePost(editor, number)} variant="destructive">
+                  <DeleteIcon aria-hidden />
+                  Delete post
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  )
+}
+
+/** A post's header: the host's avatar, name and handle, and a drag grip on hover. */
+function PostHead({ number }: { number: number }) {
+  const header = React.useContext(PostHeaderContext)
   const editor = useEditorRef()
   const readOnly = useReadOnly()
   const count = useEditorSelector((current) => postRanges(current.children).length, [])
   const [over, setOver] = React.useState(false)
-  const button =
-    'flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground disabled:opacity-30'
   return (
     <div
-      className={cn('group/post flex items-start gap-2 rounded-lg', over && 'bg-sky-400/[0.06]')}
+      className={cn('group/post flex items-center gap-2 rounded-lg', over && 'bg-accent')}
       data-post-number={number}
       data-local-dropzone="true"
       onDragLeave={() => setOver(false)}
@@ -358,92 +547,22 @@ function PostHead({ number, settings }: { number: number; settings: PostSettings
       }}
     >
       <div className="min-w-0 flex-1">{header(number)}</div>
-      {readOnly ? null : (
-        <div className="flex shrink-0 items-center flex-wrap gap-0.5">
-          {tools.settings?.({ number, settings })}
-          <Button
-            variant="custom"
-            size={null}
-            aria-label={`Add a post below post ${number}`}
-            className={button}
-            onClick={() => insertPostAfter(editor, number)}
-            title="Add post below"
-            type="button"
-          >
-            <AddIcon aria-hidden size={15} />
-          </Button>
-          {tools.addImage ? (
-            <Button
-              variant="custom"
-              size={null}
-              aria-label={`Add media to post ${number}`}
-              className={button}
-              onClick={() => {
-                selectPostEnd(editor, number)
-                tools.addImage?.()
-              }}
-              title="Add media (⌘⇧I)"
-              type="button"
-            >
-              <ImageIcon aria-hidden size={15} />
-            </Button>
-          ) : null}
-          {count < 2 ? null : (
-            <>
-              <span
-                aria-label={`Drag post ${number}`}
-                className={cn(button, 'cursor-grab')}
-                draggable
-                onDragStart={(event) => {
-                  // Plate's window drag backend otherwise cancels this local gesture.
-                  event.stopPropagation()
-                  const index = breakIndex(editor.children, number)
-                  event.dataTransfer.setData(POST_DRAG, JSON.stringify({editorId:editor.id,postId:editor.children[index]?.id}))
-                  event.dataTransfer.effectAllowed = 'move'
-                }}
-                onDragEnd={(event) => event.stopPropagation()}
-                role="img"
-              >
-                <DragIcon aria-hidden size={15} />
-              </span>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Move post ${number} up`}
-                className={button}
-                disabled={number === 1}
-                onClick={() => movePost(editor, number, number - 1)}
-                title="Move up (⌥↑)"
-                type="button"
-              >
-                <ArrowUpIcon aria-hidden size={14} />
-              </Button>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Move post ${number} down`}
-                className={button}
-                disabled={number === count}
-                onClick={() => movePost(editor, number, number + 1)}
-                title="Move down (⌥↓)"
-                type="button"
-              >
-                <ArrowDownIcon aria-hidden size={14} />
-              </Button>
-              <Button
-                variant="custom"
-                size={null}
-                aria-label={`Delete post ${number}`}
-                className={cn(button, 'hover:text-red-700 dark:hover:text-red-400')}
-                onClick={() => deletePost(editor, number)}
-                title="Delete post"
-                type="button"
-              >
-                <CloseIcon aria-hidden size={14} />
-              </Button>
-            </>
-          )}
-        </div>
+      {readOnly || count < 2 ? null : (
+        // Inside the post's own row, at its end: never over the avatar.
+        <span
+          aria-label={`Drag post ${number}`}
+          className="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity group-hover/post:opacity-100 hover:bg-accent hover:text-foreground motion-reduce:transition-none"
+          draggable
+          onDragStart={(event) => {
+            const index = breakIndex(editor.children, number)
+            event.dataTransfer.setData(POST_DRAG, JSON.stringify({editorId:editor.id,postId:editor.children[index]?.id}))
+            event.dataTransfer.effectAllowed = 'move'
+          }}
+          role="img"
+          title="Drag to reorder"
+        >
+          <DragIcon aria-hidden className="size-4" />
+        </span>
       )}
     </div>
   )
@@ -462,11 +581,12 @@ function PostBreakElement(props: PlateElementProps) {
     },
     [element.id]
   )
-  const settings = element as unknown as PostSettings
   return (
-    <PlateElement {...props} className={number === 1 ? 'pt-2' : 'pt-8'}>
+    <PlateElement {...props} className={cn('relative', number === 1 ? 'pt-2' : 'pt-10')}>
+      {/* The previous post's bar sits in the gap above this header, under that post. */}
+      {number > 1 ? <PostBar className="absolute inset-x-0 top-0" number={number - 1} /> : null}
       <div className="select-none" contentEditable={false} data-post-id={String(element.id ?? '')}>
-        <PostHead number={number} settings={settings} />
+        <PostHead number={number} />
       </div>
       {props.children}
     </PlateElement>

@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
-import { postRanges } from '@/components/drafts/thread'
+import { caretPost, postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from '@/lib/write/document'
@@ -50,15 +50,6 @@ function postText(children: Value, number: number, channel: DraftChannel): strin
   const [start, end] = postRanges(children)[number - 1] ?? [0, 0]
   const blocks = children.slice(start, end).filter((node) => TEXT_BLOCKS.has(String(node.type)))
   return serializeDraft(blocks as Value, channel).caption
-}
-
-/** The post the caret is in, 1-based. */
-export function caretPost(editor: PlateEditor): number {
-  const index = editor.selection?.anchor.path[0] ?? 0
-  return Math.max(
-    1,
-    postRanges(editor.children).findIndex(([start, end]) => index >= start && index < end) + 1
-  )
 }
 
 /** Replace a post's words with text, keeping its break (and id) and its media. */

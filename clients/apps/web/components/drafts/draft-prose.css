@@ -72,6 +72,8 @@
  * The query being typed after "/", ":" or "@" is an input inside the post:
  * the trigger and query carry a quiet highlight, not the shell's focus box.
  */
-.draft-prose input[role='combobox']:focus-visible {
+.draft-prose input[role='combobox']:focus-visible,
+/* The writing surface itself shows the caret, not a focus box around the post. */
+.draft-prose[contenteditable='true']:focus-visible {
   outline: none;
 }

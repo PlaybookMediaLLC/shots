@@ -158,7 +158,7 @@ function AudienceTools({
         <Button
           aria-label={`Audience and disclosures for post ${number}`}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-label hover:bg-foreground/[0.06]',
+            'flex size-8 items-center justify-center rounded-md hover:bg-accent',
             replies !== 'everyone' || labelled
               ? 'text-sky-700 dark:text-sky-300'
               : 'text-muted-foreground hover:text-foreground'
@@ -169,9 +169,9 @@ function AudienceTools({
           variant="custom"
         >
           {replies !== 'everyone' ? (
-            <GroupIcon aria-hidden size={15} />
+            <GroupIcon aria-hidden size={16} />
           ) : (
-            <PublicIcon aria-hidden size={15} />
+            <PublicIcon aria-hidden size={16} />
           )}
           {labelled ? <InfoIcon aria-hidden className="ms-0.5" size={13} /> : null}
         </Button>
@@ -299,7 +299,7 @@ function PollTool({
         <Button
           aria-label={poll ? 'Edit the poll' : 'Add a poll'}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-label hover:bg-foreground/[0.06]',
+            'flex size-8 items-center justify-center rounded-md hover:bg-accent',
             poll ? 'text-sky-700 dark:text-sky-300' : 'text-muted-foreground hover:text-foreground'
           )}
           size={null}
@@ -307,7 +307,7 @@ function PollTool({
           type="button"
           variant="custom"
         >
-          <PollIcon aria-hidden size={15} />
+          <PollIcon aria-hidden size={16} />
         </Button>
       </PopoverTrigger>
       <PopoverContent

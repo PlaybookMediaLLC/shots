@@ -1,4 +1,4 @@
-import { apiRequest, db, draftEditor, expect, expectSaved, test } from './framework'
+import { apiRequest, db, draftEditor, expect, expectSaved, test, postMenu } from './framework'
 
 // @dev-server until fixed: on the production build one early-typed title character is lost.
 test(
@@ -40,9 +40,20 @@ test(
       .click()
     await page.keyboard.type('Second post with padding')
     await expect(editor).toContainText('Second post with padding')
-    await page.getByRole('button', { name: 'Move post 2 up', exact: true }).click()
-    await expect(page.getByRole('button', { name: 'Move post 1 up', exact: true })).toBeDisabled()
-    await page.getByRole('button', { name: 'Delete post 2', exact: true }).click()
+    await (
+      await postMenu(page, 2)
+    )
+      .getByRole('menuitem', { name: 'Move post up', exact: true })
+      .click()
+    await expect(
+      (await postMenu(page, 1)).getByRole('menuitem', { name: 'Move post up', exact: true })
+    ).toBeDisabled()
+    await page.keyboard.press('Escape')
+    await (
+      await postMenu(page, 2)
+    )
+      .getByRole('menuitem', { name: 'Delete post', exact: true })
+      .click()
     await expect(editor).not.toContainText('Hello world from QA')
     await expect(editor).toContainText('Second post with padding')
 

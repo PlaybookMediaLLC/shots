@@ -19,6 +19,7 @@ import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { connectHref } from '@/components/settings/social-sets/api'
 import { Pill, type PillTone } from '@/components/platform-ui'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -108,7 +109,7 @@ import { MediaImportDialog } from './media-import-dialog'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
-import { RefineProvider } from './refine'
+import { RefineMenu, RefineProvider } from './refine'
 import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
 import { ComposerToolbar } from './composer-toolbar'
 import { SelectionToolbarPlugin } from './selection-toolbar'
@@ -698,44 +699,43 @@ export function WriteComposer({
       archiveRef.current = null
     }
   })
-  const postHeader = (number: number) => {
-    const account = accounts.find((item) => item.channel === active)
+  // The publishing account for the tab: the enabled one, else any on that platform.
+  const account =
+    accounts.find((item) => item.channel === active && enabled.includes(item.id)) ??
+    accounts.find((item) => item.channel === active)
+  const author = account?.displayName ?? set?.name ?? user.name
+  const postHeader = () => (
+    <div className="flex items-center gap-2 sm:gap-3" data-testid="post-header">
+      <Avatar
+        // Covers the thread line where it meets the avatar.
+        className="relative z-[1] -ms-10 size-8 ring-4 ring-card sm:-ms-12 sm:size-9"
+        data-post-avatar
+      >
+        {account?.avatarUrl ? <AvatarImage alt="" src={account.avatarUrl} /> : null}
+        {/* Also shown when a provider's avatar link has expired. */}
+        <AvatarFallback className="bg-accent text-ui font-medium text-accent-foreground">
+          {initials(author)}
+        </AvatarFallback>
+      </Avatar>
+      <p className="min-w-0 flex-1 truncate text-ui">
+        <span className="font-medium text-foreground">{author}</span>
+        <span className="ml-1.5 text-muted-foreground">
+          {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
+        </span>
+      </p>
+    </div>
+  )
+  const postCounter = (number: number, inUse: boolean) => {
     const post = activePublication.serialized.posts.find((item) => item.group === number)
-    const limit = activePublication.serialized.limit
+    if (!post) return null
     return (
-      <div className="mb-1 flex items-center gap-3" data-testid="post-header">
-        <span
-          aria-hidden
-          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-ui-lg font-medium text-foreground ring-4 ring-card sm:flex"
-          data-post-avatar
-        >
-          {account?.avatarUrl ? (
-            // biome-ignore lint/performance/noImgElement: a provider avatar URL
-            <img alt="" className="size-full object-cover" src={account.avatarUrl} />
-          ) : (
-            (account?.displayName ?? set?.name ?? 'W').slice(0, 1).toUpperCase()
-          )}
-        </span>
-        <p className="min-w-0 flex-1 truncate text-sm">
-          <span className="font-medium text-foreground">
-            {account?.displayName ?? set?.name ?? 'Draft'}
-          </span>
-          <span className="ml-1.5 text-muted-foreground">
-            {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
-          </span>
-        </p>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          {post ? (
-            <span
-              className={cn(post.length > limit && 'text-red-700 dark:text-red-400')}
-              data-testid={`post-length-${number}`}
-            >
-              {post.length} / {limit}
-            </span>
-          ) : null}
-          {CAPABILITIES[active].thread ? <span>#{number}</span> : null}
-        </span>
-      </div>
+      <PostCount
+        active={inUse}
+        length={post.length}
+        limit={activePublication.serialized.limit}
+        number={number}
+        thread={Boolean(CAPABILITIES[active].thread)}
+      />
     )
   }
   const onDescriptionSaved = (assetId: string, alt: string) => {
@@ -757,7 +757,17 @@ export function WriteComposer({
     handles: vocabulary.handles,
     hashtags: vocabulary.hashtags,
     postHeader,
-    postSettings: canEdit
+    placeholder: PLACEHOLDERS[active] ?? `Write your ${CHANNEL_META[active].label} post…`,
+    postTools: {
+      counter: postCounter,
+      refine: aiEnabled
+        ? (number: number, button: React.ReactElement) => (
+            <RefineMenu align="end" at={`post-${number}`} side="bottom">
+              {button}
+            </RefineMenu>
+          )
+        : undefined,
+      settings: canEdit
       ? ({
           number,
           settings,
@@ -791,6 +801,7 @@ export function WriteComposer({
           />
         )
       : undefined,
+    },
     readOnly: !canEdit,
     services,
     // Text runs in the direction the person chose in Appearance (RFC 024).
@@ -1792,6 +1803,73 @@ export function WriteComposer({
         </PostSettingRequestContext.Provider>
       </ComposerCommandsContext.Provider>
     </SocialMentionContext.Provider>
+  )
+}
+
+/** The empty post's prompt per platform, as each platform asks it. */
+const PLACEHOLDERS: Partial<Record<DraftChannel, string>> = {
+  tiktok: 'Write your TikTok caption…',
+  x: 'What’s happening?',
+}
+
+/** Up to two initials for an avatar without an image. */
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase())
+      .join('') || 'S'
+  )
+}
+
+/**
+ * A post's length for the platform being edited: a ring that fills toward
+ * the limit, amber from 90%, red past it. Quiet posts hide it until it nears
+ * the limit; the post in use always shows it.
+ */
+function PostCount({
+  active,
+  length,
+  limit,
+  number,
+  thread,
+}: {
+  active: boolean
+  length: number
+  limit: number
+  number: number
+  thread: boolean
+}) {
+  const ratio = length / limit
+  const tone =
+    ratio > 1
+      ? 'text-destructive'
+      : ratio >= 0.9
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-muted-foreground'
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
+        tone,
+        !active && ratio < 0.9 && 'opacity-0'
+      )}
+    >
+      <span
+        aria-hidden
+        className="size-4 rounded-full"
+        style={{
+          background: `conic-gradient(currentColor ${Math.min(ratio, 1) * 360}deg, color-mix(in srgb, currentColor 20%, transparent) 0)`,
+          mask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2px))',
+        }}
+      />
+      <span data-testid={`post-length-${number}`}>
+        {length} / {limit}
+      </span>
+      {thread ? <span className="text-muted-foreground">#{number}</span> : null}
+    </span>
   )
 }
 

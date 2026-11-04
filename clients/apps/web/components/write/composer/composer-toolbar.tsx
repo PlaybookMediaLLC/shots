@@ -116,7 +116,7 @@ export function ComposerToolbar({
         {command.badge ? (
           <span className="text-label text-muted-foreground">{command.badge}</span>
         ) : command.shortcut ? (
-          <DropdownMenuShortcut>{keys.label(command.shortcut)}</DropdownMenuShortcut>
+          <DropdownMenuShortcut aria-hidden>{keys.label(command.shortcut)}</DropdownMenuShortcut>
         ) : null}
       </DropdownMenuItem>
     )

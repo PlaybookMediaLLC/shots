@@ -30,6 +30,7 @@ import { KEYS } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
 import {
+  caretPost,
   deletePost,
   duplicatePost,
   insertPostBreak,
@@ -39,7 +40,7 @@ import {
 import { CAPABILITIES, pollRules } from '@/lib/write/capabilities'
 import type { DraftChannel } from '@/lib/write/document'
 import { COMMAND_SHORTCUTS, type Shortcut } from '../shortcuts'
-import { caretPost, type RefineApi } from './refine'
+import type { RefineApi } from './refine'
 
 /**
  * Write's editor commands (the post editor brief): one typed registry that the

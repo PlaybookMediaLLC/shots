@@ -300,6 +300,7 @@ export {
   openNewBatch,
   openNewDraft,
   openSchedule,
+  postMenu,
   previewOf,
   saveBatchDrafts,
   settleSelection,
