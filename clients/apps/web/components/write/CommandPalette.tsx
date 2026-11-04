@@ -152,8 +152,9 @@ export default function CommandPalette({
                 onSelect={() =>
                   go(
                     () =>
-                      void writeApi
-                        .duplicate(activeId)
+                      // Save the latest edits first, so the copy has them.
+                      void Promise.resolve(beforeLeaveRef.current?.())
+                        .then(() => writeApi.duplicate(activeId))
                         .then((copy) => router.push(draftHref(copy.draft.id, data.activeSet?.id)))
                         .catch((error: unknown) =>
                           toast.error(

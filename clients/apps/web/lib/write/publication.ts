@@ -117,6 +117,8 @@ export type Publication = {
   problems: string[]
   /** The problems fixed in the platform's post options, a part of `problems`. */
   optionProblems: string[]
+  /** The problems fixed by refreshing or reconnecting the account, a part of `problems`. */
+  accountProblems: string[]
   /** Each post's settings, by its index in `serialized.posts`. */
   settings: PostSettings[]
   serialized: SerializedCaption
@@ -224,8 +226,10 @@ export function buildPublication(
   const settings = serialized.posts.map((post) => groups[post.group] ?? {})
   const [first, ...rest] = serialized.posts
   const problems = [...serialized.errors]
-  // Problems fixed in the platform's post options, named so a blocker can open them.
+  // Problems fixed in the platform's post options or its account, named so a
+  // blocker can open the place that fixes them.
   const optionProblems: string[] = []
+  const accountProblems: string[] = []
   if (
     channel === 'youtube' &&
     (!options.youtube?.title.trim() ||
@@ -237,7 +241,7 @@ export function buildPublication(
   if (channel === 'tiktok') {
     const creator = account.standing?.tiktokCreator
     if (!creator)
-      optionProblems.push(
+      accountProblems.push(
         'TikTok account permissions are unavailable. Refresh the account before scheduling.'
       )
     else if (options.tiktok) {
@@ -269,7 +273,7 @@ export function buildPublication(
     if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
-  problems.push(...optionProblems)
+  problems.push(...accountProblems, ...optionProblems)
   if (channel === 'x')
     settings.forEach((setting, index) => {
       if (setting.photoTagIds?.length && (article || !serialized.posts[index]?.images))
@@ -430,6 +434,7 @@ export function buildPublication(
   return {
     mediaTypes: previewMediaTypes(body),
     optionProblems,
+    accountProblems,
     problems: [...new Set(problems)],
     serialized,
     settings,

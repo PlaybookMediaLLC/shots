@@ -94,9 +94,15 @@ export type ScheduleContext = {
 
 /**
  * One thing that blocks scheduling, the platform it belongs to, if any, and
- * whether it is fixed in that platform's post options.
+ * where it is fixed: the platform's post options, its account, the save, the
+ * edit conflict, the review, or restoring the draft. Without one, the text.
  */
-export type ScheduleBlocker = { channel?: DraftChannel; options?: boolean; text: string }
+export type ScheduleBlocker = {
+  channel?: DraftChannel
+  fix?: 'account' | 'conflict' | 'restore' | 'review' | 'save'
+  options?: boolean
+  text: string
+}
 
 /**
  * What blocks scheduling every destination, checked live as the draft
@@ -111,30 +117,41 @@ export function scheduleBlockers(
   const problems: ScheduleBlocker[] = []
   if (context.conflict)
     problems.push({
+      fix: 'conflict',
       text: 'Your unsaved edit conflicts with a newer version. Choose what to do with it above the editor first.',
     })
   if (context.saveState === 'error' || context.saveState === 'offline')
     problems.push({
+      fix: 'save',
       text: 'Your latest edits are not saved. Retry saving before you schedule or publish.',
     })
   if (context.draft.status === 'archived')
-    problems.push({ text: 'Restore this draft before scheduling or publishing.' })
+    problems.push({ fix: 'restore', text: 'Restore this draft before scheduling or publishing.' })
   if (context.items.length === 0)
-    problems.push({ text: 'Connect or turn on at least one account in this publishing brand.' })
+    problems.push({
+      fix: 'account',
+      text: 'Connect or turn on at least one account in this publishing brand.',
+    })
   for (const item of context.items) {
     const channel = item.account.channel
     if (item.account.health !== 'connected') {
-      problems.push({ channel, text: `${CHANNEL_META[channel].label}: reconnect the account first.` })
+      problems.push({
+        channel,
+        fix: 'account',
+        text: `${CHANNEL_META[channel].label}: reconnect the account first.`,
+      })
     }
     for (const problem of item.publication.problems)
       problems.push({
         channel,
+        fix: item.publication.accountProblems.includes(problem) ? 'account' : undefined,
         options: item.publication.optionProblems.includes(problem),
         text: `${CHANNEL_META[channel].label}: ${problem}`,
       })
   }
   if (context.requireApproval && !context.approved) {
     problems.push({
+      fix: 'review',
       text: 'This workspace approves drafts before they publish. Ask for review first.',
     })
   }
@@ -371,7 +388,10 @@ export function ScheduleDialog({
         onKeyDown={(event) => {
           // ⌘↵ alone confirms, so the next free slot is a keyboard-only path. ⌘⇧↵ and
           // ⌘⌥↵ are the composer's publish-review and queue shortcuts: never a schedule.
+          // React passes keys from a dialog opened over this one (Auto-DM settings)
+          // up to here: only a key pressed in this dialog confirms it.
           if (
+            event.currentTarget.contains(event.target as Node) &&
             event.key === 'Enter' &&
             (event.metaKey || event.ctrlKey) &&
             !event.shiftKey &&
@@ -417,31 +437,14 @@ export function ScheduleDialog({
           ) : null}
           {queue ? null : (
             <div className="grid gap-4">
-              {freeSlots.length > 0 ? (
-                <div className="grid gap-2" data-testid="free-slot-picks">
-                  <p className="text-xs text-muted-foreground">Next free slots</p>
-                  <div className="flex flex-wrap gap-2">
-                    {freeSlots.map((slot) => (
-                      <Button
-                        aria-pressed={instant?.getTime() === slot.at.getTime()}
-                        className="h-8 rounded-md px-3 text-ui aria-pressed:border-foreground/40 aria-pressed:bg-foreground/[0.06]"
-                        key={slot.at.toISOString()}
-                        onClick={() => setInstant(slot.at)}
-                        size={null}
-                        type="button"
-                        variant="outline"
-                      >
-                        {slot.at.toLocaleString(undefined, {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          timeZone: zone,
-                          weekday: 'short',
-                        })}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <TimeChips
+                chosen={instant}
+                heading="Next free slots"
+                onPick={setInstant}
+                testId="free-slot-picks"
+                times={freeSlots.map((slot) => ({ at: slot.at }))}
+                zone={zone}
+              />
               <div className="grid grid-cols-2 gap-3">
                 <Label className="grid content-start gap-1.5 text-xs text-muted-foreground">
                   Day
@@ -599,31 +602,13 @@ export function ScheduleDialog({
                   </p>
                 ) : null}
               </div>
-              {bestTimes.length > 0 ? (
-                <div className="grid gap-2">
-                  <p className="text-xs text-muted-foreground">Suggested times</p>
-                  <div className="flex flex-wrap gap-2">
-                    {bestTimes.map((best) => (
-                      <Button
-                        className="h-8 rounded-md px-3 text-ui"
-                        key={best.at}
-                        onClick={() => setInstant(new Date(best.at))}
-                        size={null}
-                        title={best.reason}
-                        type="button"
-                        variant="outline"
-                      >
-                        {new Date(best.at).toLocaleString(undefined, {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          timeZone: zone,
-                          weekday: 'short',
-                        })}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <TimeChips
+                chosen={instant}
+                heading="Suggested times"
+                onPick={setInstant}
+                times={bestTimes.map((best) => ({ at: new Date(best.at), title: best.reason }))}
+                zone={zone}
+              />
               <div className="grid gap-2">
                 <Button
                   className="h-7 w-fit px-0 text-xs text-muted-foreground hover:text-foreground"
@@ -1206,5 +1191,50 @@ export function PublishReview({
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** A row of times to pick from, each read in the brand's zone. */
+function TimeChips({
+  chosen,
+  heading,
+  onPick,
+  testId,
+  times,
+  zone,
+}: {
+  chosen: Date | null
+  heading: string
+  onPick: (at: Date) => void
+  testId?: string
+  times: { at: Date; title?: string }[]
+  zone: string
+}) {
+  if (times.length === 0) return null
+  return (
+    <div className="grid gap-2" data-testid={testId}>
+      <p className="text-xs text-muted-foreground">{heading}</p>
+      <div className="flex flex-wrap gap-2">
+        {times.map(({ at, title }) => (
+          <Button
+            aria-pressed={chosen?.getTime() === at.getTime()}
+            className="h-8 rounded-md px-3 text-ui aria-pressed:border-foreground/40 aria-pressed:bg-foreground/[0.06]"
+            key={at.toISOString()}
+            onClick={() => onPick(at)}
+            size={null}
+            title={title}
+            type="button"
+            variant="outline"
+          >
+            {at.toLocaleString(undefined, {
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: zone,
+              weekday: 'short',
+            })}
+          </Button>
+        ))}
+      </div>
+    </div>
   )
 }

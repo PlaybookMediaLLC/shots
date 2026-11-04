@@ -52,7 +52,7 @@ import { Input } from '@/components/ui/input'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
-import { listedAttention, stateLabel } from '@/lib/content-drafts/post-status'
+import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
 import { writeApi } from '@/lib/write/client'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
@@ -731,10 +731,15 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
       </span>
     )
   }
+  // The editor's word for a post whose time passed before it started.
+  const overdue = draft.nextPostAt && postState('SCHEDULED', draft.nextPostAt) === 'Overdue'
   if (draft.nextPostAt) {
     parts.push(
-      <span className="text-sky-700 dark:text-sky-300" key="next">
-        Scheduled{' '}
+      <span
+        className={overdue ? 'text-amber-700 dark:text-amber-300' : 'text-sky-700 dark:text-sky-300'}
+        key="next"
+      >
+        {overdue ? 'Overdue' : 'Scheduled'}{' '}
         <LocalTime
           options={{
             day: 'numeric',

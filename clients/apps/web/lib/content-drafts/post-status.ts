@@ -132,15 +132,17 @@ export function stateLabel(state: PostState, count: number, total: number): stri
 }
 
 /**
- * The one status a draft reads as in its header and its details: archived,
- * else its destinations' state that needs attention first, else a plan.
+ * The one status a draft reads as in its header and its details: a failed or
+ * unconfirmed post first, as the drafts list shows it, even when archived (it
+ * may be live); else archived; else its destinations' state; else a plan.
  * It is derived from the posts each time, never from a stored draft status.
  */
 export function draftStatus(
   draft: { status: string; plannedFor: string | Date | null },
   destinations: { state: PostState; count: number; total: number } | null
 ): { label: string; tone: PillTone } | null {
-  if (draft.status === 'archived') return { label: 'Archived', tone: 'gray' }
+  const attention = destinations?.state === 'Needs check' || destinations?.state === 'Failed'
+  if (draft.status === 'archived' && !attention) return { label: 'Archived', tone: 'gray' }
   if (destinations)
     return {
       label: stateLabel(destinations.state, destinations.count, destinations.total),

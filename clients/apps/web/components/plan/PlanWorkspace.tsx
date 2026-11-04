@@ -447,12 +447,16 @@ export function PlanWorkspace({
       }
       className={`block h-auto w-full min-w-0 rounded-lg border p-2 text-left text-xs font-normal whitespace-normal shadow-sm ${weekly ? 'h-full overflow-hidden' : ''} ${item.status === 'Planned' ? 'border-dashed border-violet-400' : item.status === 'Published' ? 'border-emerald-500' : item.status === 'Failed' ? 'border-red-500' : item.status === 'Needs check' || item.status === 'Overdue' ? 'border-amber-500' : 'border-sky-500'} bg-background`}
     >
-      <span className="line-clamp-2 break-words text-muted-foreground">
-        {new Date(item.at).toLocaleTimeString(undefined, {
-          hour: 'numeric',
-          minute: '2-digit',
-          timeZone: prefs.zone,
-        })}{' '}
+      {/* One line, so the post text keeps its room in a fixed-height week card: the
+          time stays whole and the status gives way first. */}
+      <span className="block truncate text-muted-foreground">
+        <span className="whitespace-nowrap">
+          {new Date(item.at).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: prefs.zone,
+          })}
+        </span>{' '}
         · {item.status}
       </span>
       {item.publishAt && new Date(item.publishAt).getTime() !== new Date(item.at).getTime() ? (
@@ -466,7 +470,7 @@ export function PlanWorkspace({
           })}
         </span>
       ) : null}
-      <strong className="line-clamp-2 break-words">
+      <strong className={weekly ? 'block truncate' : 'line-clamp-2 break-words'}>
         {sets.find((s) => s.id === item.setId)?.name ?? 'Account'}{' '}
         {prefs.platforms ? `· ${item.platform}` : ''}
       </strong>

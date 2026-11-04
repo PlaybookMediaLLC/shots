@@ -29,6 +29,14 @@ const PAGES: { page: DrawerPage; title: string }[] = [
   { page: 'writing-assistant', title: 'Writing Assistant' },
 ]
 
+/**
+ * Whether the address opens the drawer: a page it has. An old page in a saved
+ * link (such as `appearance`, now in workspace settings) does not.
+ */
+export function settingsOpen(params: { get: (name: string) => string | null }): boolean {
+  return drawerPageSchema.safeParse(params.get('settings')).success
+}
+
 /** Opens or moves the drawer through the address, so back and forward work. */
 function go(page: DrawerPage | null) {
   const url = new URL(window.location.href)

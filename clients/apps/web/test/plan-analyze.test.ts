@@ -619,6 +619,21 @@ test('every surface reads a draft with the same status words, from its current p
     label: 'Archived',
     tone: 'gray',
   })
+  // An archived draft whose post may be live says so, as the drafts list does.
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Needs check', total: 2 }
+    )?.label,
+    'Needs check · 1 of 2'
+  )
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Published', total: 1 }
+    )?.label,
+    'Archived'
+  )
   assert.equal(draftStatus({ plannedFor: null, status: 'scheduled' }, null), null)
 })
 

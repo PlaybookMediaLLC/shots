@@ -39,7 +39,7 @@ import {
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { DraftPosts } from '@/components/drafts/DraftPosts'
 import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/DraftEditor'
-import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
+import { DraftSettingsDrawer, settingsOpen } from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
 import { appendPost, deletePost, movePost, postRanges } from '@/components/drafts/thread'
@@ -167,6 +167,21 @@ const SAVE_LABELS: Record<SaveState, string> = {
 }
 
 /**
+ * Keeps a sticky side panel within the part of its scrolling area that shows.
+ * The Publish tabs above that area come and go with the sidebar, so the panel
+ * reads the area's height instead of the frame's.
+ */
+function fitToScroller(panel: HTMLElement | null) {
+  const scroller = panel?.closest('main')
+  if (!panel || !scroller) return
+  const fit = () => panel.style.setProperty('max-height', `${scroller.clientHeight}px`)
+  fit()
+  const observer = new ResizeObserver(fit)
+  observer.observe(scroller)
+  return () => observer.disconnect()
+}
+
+/**
  * The Write composer (RFC 025). The draft is its primary body plus a version
  * per platform; the tab being edited is UI state only. Destinations,
  * versions, options and the body save together against the draft's version.
@@ -198,7 +213,7 @@ export function WriteComposer({
 }) {
   const router = useWriteRouter()
   const params = useSearchParams()
-  const { mod } = useKeys()
+  const { alt, mod } = useKeys()
   const narrow = useIsMobile()
   const trpcClient = useTRPCClient()
   const {
@@ -313,6 +328,9 @@ export function WriteComposer({
             : null
   )
   const [focus, setFocus] = React.useState(false)
+  // Where two blockers are fixed: the edit conflict and the review.
+  const conflictBanner = React.useRef<HTMLDivElement>(null)
+  const reviewControls = React.useRef<HTMLSpanElement>(null)
   // The preview starts on a phone, where most posts are read.
   const [previewSelection, setPreviewSelection] = React.useState<PreviewSelection>({
     channel: null,
@@ -493,7 +511,10 @@ export function WriteComposer({
               before.plannedFor && new Date(before.plannedFor) > new Date()
                 ? before.plannedFor
                 : null
-            if (unscheduled.plannedFor !== plan)
+            // Planning is an edit: a publisher who cannot edit keeps the time as a plan.
+            if (!canEdit && unscheduled.plannedFor !== plan)
+              message += ' The draft keeps that time as its plan.'
+            else if (unscheduled.plannedFor !== plan)
               await writeApi
                 .plan(unscheduled.id, {
                   baseCalendarVersion: unscheduled.calendarVersion,
@@ -550,6 +571,12 @@ export function WriteComposer({
       : undefined,
   }
   const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next))
+  // The platforms with a post over their limit: their tabs and counters say so.
+  const over = items
+    .filter((item) =>
+      item.publication.serialized.posts.some((post) => post.length > item.publication.serialized.limit)
+    )
+    .map((item) => item.account.channel)
   // Blockers show beside Schedule once there is something to post, not on an empty draft.
   const blockers = items.some((item) => item.publication.serialized.posts.length > 0)
     ? scheduleBlockers({
@@ -562,12 +589,6 @@ export function WriteComposer({
         saveState,
       })
     : []
-  const jumpTo = (blocker: ScheduleBlocker) => {
-    if (!blocker.channel) return
-    if (channels.includes(blocker.channel)) setTab(blocker.channel)
-    if (blocker.options) setPanel('options')
-    else editor.current?.tf.focus()
-  }
   React.useEffect(() => {
     openPreviewRef.current = () => setPanel('preview')
     return () => {
@@ -654,7 +675,7 @@ export function WriteComposer({
       shift: true,
       run: () =>
         bodyArea.current
-          ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert image"]')
+          ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert media"]')
           ?.click(),
       inEditor: true,
     },
@@ -705,6 +726,20 @@ export function WriteComposer({
       toast.error(error instanceof Error ? error.message : 'The draft did not change.')
     }
   }
+  // Each blocker opens the place where it is fixed.
+  const jumpTo = (blocker: ScheduleBlocker) => {
+    if (blocker.channel && channels.includes(blocker.channel)) setTab(blocker.channel)
+    if (blocker.fix === 'save') context.retrySave()
+    else if (blocker.fix === 'account') setDialog('manage')
+    else if (blocker.fix === 'restore') {
+      if (canEdit) void archive('draft')
+    } else if (blocker.fix === 'conflict') conflictBanner.current?.querySelector('button')?.focus()
+    else if (blocker.fix === 'review') reviewControls.current?.querySelector('button')?.focus()
+    else if (blocker.options) {
+      setFocus(false)
+      setPanel('options')
+    } else if (blocker.channel) editor.current?.tf.focus()
+  }
   // The palette lists this draft's actions with their shortcuts, as its menus do.
   React.useEffect(() => {
     const live = canPublish && server.status !== 'archived'
@@ -715,7 +750,7 @@ export function WriteComposer({
             {
               label: 'Add to the next free slot',
               run: () => setDialog('queue'),
-              shortcut: `${mod}⌥↵`,
+              shortcut: `${mod}${alt}↵`,
             },
             { label: 'Publish now…', run: () => setDialog('publish'), shortcut: `${mod}⇧↵` },
           ]
@@ -723,7 +758,7 @@ export function WriteComposer({
       { label: 'Post options', run: () => setPanel('options') },
       { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
       ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
-      { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}⌥S` },
+      { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}${alt}S` },
       { label: 'View automatic backups', run: () => setDialog('backups') },
       ...(canEdit
         ? [
@@ -734,9 +769,13 @@ export function WriteComposer({
             },
           ]
         : []),
-      { label: 'Focus mode', run: () => setFocus((current) => !current), shortcut: `${mod}⇧F` },
       {
-        label: 'Compact display',
+        label: focus ? 'Leave focus mode' : 'Focus mode',
+        run: () => setFocus((current) => !current),
+        shortcut: `${mod}⇧F`,
+      },
+      {
+        label: compact ? 'Comfortable display' : 'Compact display',
         run: () => setCompact((current) => !current),
         shortcut: `${mod}⇧H`,
       },
@@ -767,7 +806,7 @@ export function WriteComposer({
       <div className="mb-1 flex items-center gap-3" data-testid="post-header">
         <span
           aria-hidden
-          className="relative z-[1] -ml-12 hidden size-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-ui-lg font-medium text-foreground ring-4 ring-card sm:flex"
+          className="relative z-[1] -ml-12 hidden size-9 shrink-0 overflow-hidden rounded-full ring-4 ring-card sm:flex"
           data-post-avatar
         >
           {/* With no avatar, or one that fails to load, the account gets a face of its own. */}
@@ -911,7 +950,7 @@ export function WriteComposer({
         )
       : null
   // Shown options take a paste's split; otherwise its tools show above the text.
-  const optionsShown = panel === 'options' && !focus && !params.has('settings')
+  const optionsShown = panel === 'options' && !focus && !settingsOpen(params)
   const panelContent =
     panel === 'options' ? (
       <div data-testid="post-options">
@@ -1100,16 +1139,18 @@ export function WriteComposer({
               </span>
             ) : null}
             {requireApproval || server.reviewStatus !== 'none' ? (
-              <ReviewControls
-                canEdit={canEdit}
-                canReview={canReview}
-                draftId={initial.id}
-                onDraft={(next) => {
-                  setServer(next)
-                  router.refresh()
-                }}
-                review={{ ...server, version: version.current }}
-              />
+              <span className="contents" ref={reviewControls}>
+                <ReviewControls
+                  canEdit={canEdit}
+                  canReview={canReview}
+                  draftId={initial.id}
+                  onDraft={(next) => {
+                    setServer(next)
+                    router.refresh()
+                  }}
+                  review={{ ...server, version: version.current }}
+                />
+              </span>
             ) : null}
             {/* One row of actions that wraps as a whole; narrow screens keep the rest in ⋯. */}
             <div
@@ -1171,7 +1212,7 @@ export function WriteComposer({
                 className={cn('hidden lg:inline-flex', panel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
-                title={`Share (${mod}⌥S)`}
+                title={`Share (${mod}${alt}S)`}
                 variant="ghost"
               >
                 {panel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
@@ -1206,7 +1247,7 @@ export function WriteComposer({
                       data-testid="queue-button"
                       onClick={() => setDialog('queue')}
                       size="sm"
-                      title={`Add to the next free slot (${mod}⌥↵)`}
+                      title={`Add to the next free slot (${mod}${alt}↵)`}
                     >
                       <ListPlus aria-hidden className="size-4" />
                     </Button>
@@ -1229,7 +1270,10 @@ export function WriteComposer({
                     <>
                       <DropdownMenuItem onSelect={() => setDialog('queue')}>
                         Add to queue
-                        <DropdownMenuShortcut>{mod}⌥↵</DropdownMenuShortcut>
+                        <DropdownMenuShortcut>
+                          {mod}
+                          {alt}↵
+                        </DropdownMenuShortcut>
                       </DropdownMenuItem>
                       <DropdownMenuItem className="sm:hidden" onSelect={() => setDialog('publish')}>
                         Publish now…
@@ -1348,6 +1392,7 @@ export function WriteComposer({
             <div
               className="flex flex-wrap items-center gap-2 border-b border-amber-400/40 bg-amber-400/[0.08] px-4 py-3 text-sm text-foreground"
               data-testid="save-conflict"
+              ref={conflictBanner}
               role="alert"
             >
               <span className="min-w-0 flex-1 basis-64">
@@ -1405,17 +1450,14 @@ export function WriteComposer({
             enabled={enabled}
             onManage={canEdit ? () => setDialog('manage') : undefined}
             onSelect={setTab}
-            over={items
-              .filter((item) =>
-                item.publication.serialized.posts.some(
-                  (post) => post.length > item.publication.serialized.limit
-                )
-              )
-              .map((item) => item.account.channel)}
+            over={over}
             options={
               accounts.length > 0 ? (
                 <OptionsChip
-                  blocked={activePublication.optionProblems.length > 0}
+                  blocked={
+                    items.some((item) => item.account.channel === active) &&
+                    activePublication.optionProblems.length > 0
+                  }
                   channel={active}
                   onClick={() => togglePanel('options')}
                   open={panel === 'options'}
@@ -1610,14 +1652,13 @@ export function WriteComposer({
                       item.publication.serialized.posts.length === 0)
                 )
                 .map((item) => {
-                  const over = item.publication.serialized.posts.some(
-                    (post) => post.length > item.publication.serialized.limit
-                  )
                   return (
                     <span
                       className={cn(
                         'flex items-center gap-1 text-xs',
-                        over ? 'text-red-700 dark:text-red-400' : 'text-muted-foreground'
+                        over.includes(item.account.channel)
+                          ? 'text-red-700 dark:text-red-400'
+                          : 'text-muted-foreground'
                       )}
                       data-testid={`counter-${item.account.channel}`}
                       key={item.account.id}
@@ -1660,11 +1701,12 @@ export function WriteComposer({
             <div className="h-32" />
           </div>
         </div>
-        {panel && !focus && !narrow && !params.has('settings') ? (
+        {panel && !focus && !narrow && !settingsOpen(params) ? (
           <aside
             aria-label={PANEL_TITLES[panel]}
             // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
             className="sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 max-w-[48vw] self-start overflow-y-auto border-l border-border animate-in fade-in duration-150"
+            ref={fitToScroller}
             data-composer-panel
             style={{ width: panelWidth }}
           >
@@ -1709,7 +1751,7 @@ export function WriteComposer({
             {panelContent}
           </aside>
         ) : null}
-        {panel && !focus && narrow && !params.has('settings') ? (
+        {panel && !focus && narrow && !settingsOpen(params) ? (
           <>
             <Sheet onOpenChange={(open) => !open && setPanel(null)} open>
               <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md" side="right">

@@ -1,4 +1,5 @@
-import { resolveLocalTime, wallTime } from './zoned-time'
+import { addDays, dayOfWeek, zonedDayKey } from '@/lib/settings/zoned-time'
+import { resolveLocalTime } from './zoned-time'
 
 /** Dragging an authored draft opens scheduling review; it never creates a job. */
 export const CALENDAR_DRAFT_DRAG = 'application/x-shots-calendar-draft'
@@ -46,9 +47,12 @@ export function upcomingSlots(
   now = new Date()
 ): { at: Date; busy: boolean }[] {
   const out: { at: Date; busy: boolean }[] = []
+  // Calendar days, not 24-hour steps: a daylight-saving change neither skips
+  // nor repeats a day.
+  const today = zonedDayKey(now, zone)
   for (let days = 0; days < 21 && out.length < 12; days += 1) {
-    const day = wallTime(new Date(now.getTime() + days * 86_400_000), zone).slice(0, 10)
-    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay()
+    const day = addDays(today, days)
+    const weekday = dayOfWeek(day)
     for (const slot of postingSlots.filter((item) => item.weekday === weekday)) {
       const resolved = resolveLocalTime(`${day}T${slot.time}`, zone)
       if (resolved.kind !== 'exact' || resolved.at <= now) continue
@@ -74,10 +78,10 @@ export function queueDays<T extends { at: string }>(
   items: T[],
   now = new Date()
 ): { day: string; free: string[]; items: T[]; slots: number }[] {
-  const [year, month, date] = wallTime(now, zone).slice(0, 10).split('-').map(Number)
+  const today = zonedDayKey(now, zone)
   return Array.from({ length: 7 }, (_, offset) => {
-    const day = new Date(Date.UTC(year, month - 1, date + offset)).toISOString().slice(0, 10)
-    const held = items.filter((item) => wallTime(new Date(item.at), zone).slice(0, 10) === day)
+    const day = addDays(today, offset)
+    const held = items.filter((item) => zonedDayKey(new Date(item.at), zone) === day)
     return {
       day,
       free: availableDaySlots(

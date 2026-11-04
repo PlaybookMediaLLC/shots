@@ -170,7 +170,7 @@ export default async function HomePage({
           </ul>
         </section>
 
-        {paid && contentDraftsEnabled() && access.organization ? (
+        {paid && contentDraftsEnabled() && can('artifact:edit') && access.organization ? (
           <Suspense fallback={null}>
             <UpcomingQueue tenant={sessionTenant(access, access.organization.id, requestHeaders)} />
           </Suspense>
