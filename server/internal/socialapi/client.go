@@ -190,7 +190,7 @@ func New(baseURL string, httpClient *http.Client, assetReader AssetReader) *Clie
 
 func (c *Client) BeginOAuth(ctx context.Context, input BeginOAuthInput) (string, error) {
 	switch input.Provider {
-	case "x", "instagram", "instagram-standalone", "linkedin", "threads", "mastodon", "mastodon-custom":
+	case "x", "instagram", "instagram-standalone", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom":
 	default:
 		return "", &Error{Status: http.StatusBadRequest, message: "unsupported social provider"}
 	}

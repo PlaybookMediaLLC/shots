@@ -34,6 +34,10 @@ func (m *Manager) ConnectionStatus(id string) (string, bool) {
 		}
 	case "linkedin", "linkedin-page":
 		keys = []string{"LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"}
+	case "tiktok":
+		keys = []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET"}
+	case "youtube":
+		keys = []string{"YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"}
 	case "threads":
 		keys = []string{"THREADS_APP_ID", "THREADS_APP_SECRET"}
 	case "instagram":

@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
@@ -133,7 +135,7 @@ type testProvider struct {
 	fail  error
 }
 
-func (p *testProvider) Post(ctx context.Context, _, token string, posts []integrations.PostDetails, _ *socialent.Integration) ([]integrations.PostResponse, error) {
+func (p *testProvider) Post(ctx context.Context, _, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
 	p.mu.Lock()
 	p.calls++
 	fail := p.fail
@@ -166,7 +168,22 @@ func (p *testProvider) Post(ctx context.Context, _, token string, posts []integr
 	p.posts = append(p.posts, received)
 	id := fmt.Sprintf("remote-%d", len(p.posts))
 	p.mu.Unlock()
-	return []integrations.PostResponse{{PostID: id, Status: "posted"}}, nil
+	receiptURL := ""
+	if account.ProviderIdentifier == "tiktok" {
+		id = "7234567890123456789"
+		receiptURL = "https://www.tiktok.com/@fixture/video/" + id
+	}
+	if account.ProviderIdentifier == "youtube" {
+		receiptURL = "https://www.youtube.com/watch?v=" + id
+	}
+	return []integrations.PostResponse{{PostID: id, ReleaseURL: receiptURL, Status: "posted"}}, nil
+}
+
+func (*testProvider) CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error) {
+	return &postoptions.TikTokCreator{Nickname: "Fixture", PrivacyLevels: []string{"SELF_ONLY"}, MaxDurationSeconds: 300}, nil
+}
+func (*testProvider) ConfirmVideo(context.Context, string, string, string) (string, error) {
+	return "private", nil
 }
 
 type unlimitedMeter struct{}
@@ -285,6 +302,7 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 	provider := &testProvider{}
 	publisher := New(repository, socialDB.Client, bucket)
 	publisher.resolve = func(string) poster { return provider }
+	store.WithAccountStanding(publisher)
 	activities := temporalpublishing.NewActivities(repository, publisher)
 	run := func(postID string) temporalpublishing.WorkflowResult {
 		t.Helper()
@@ -410,6 +428,41 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 			}
 		}
 	})
+
+	for _, platform := range []string{"tiktok", "youtube"} {
+		t.Run(platform+" video snapshot and final receipt", func(t *testing.T) {
+			connection := connect(platform)
+			asset, digest := upload(platform+".mp4", "video/mp4", read("portrait.mp4"))
+			options := &postoptions.PublishOptions{}
+			if platform == "tiktok" {
+				options.TikTok = &postoptions.TikTokOptions{Privacy: "SELF_ONLY", Consent: true}
+			} else {
+				audience := false
+				options.YouTube = &postoptions.YouTubeOptions{Title: "Worker video", Privacy: "private", MadeForKids: &audience}
+			}
+			posts := schedule(platform, []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: connection, Caption: "Video worker proof", AssetIDs: []string{asset}, Options: options})
+			stored := db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+			if !reflect.DeepEqual(stored.PublishOptions.TikTok, options.TikTok) || !reflect.DeepEqual(stored.PublishOptions.YouTube, options.YouTube) {
+				t.Fatal("video options not persisted")
+			}
+			if result := run(posts[0].ID); result.Outcome != temporalpublishing.OutcomePublished {
+				t.Fatalf("result %+v", result)
+			}
+			if got := last(); len(got.media) != 1 || got.media[0].sha256 != digest || got.media[0].contentType != "video/mp4" {
+				t.Fatalf("wrong video bytes: %+v", got)
+			}
+			stored = db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+			if stored.ThreadProgress.Publication == nil || stored.ThreadProgress.Publication.URL == "" {
+				t.Fatal("final URL not retained")
+			}
+			receipt(posts[0], *stored.RemotePostID)
+			before := provider.calls
+			run(posts[0].ID)
+			if provider.calls != before {
+				t.Fatal("duplicate video mutation")
+			}
+		})
+	}
 
 	t.Run("an unanswered submission is UNKNOWN_DELIVERY and is not retried", func(t *testing.T) {
 		asset, _ := upload("lost.png", "image/png", photo(200))

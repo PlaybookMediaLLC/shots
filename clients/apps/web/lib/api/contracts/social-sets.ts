@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { draftChannelSchema } from '@/lib/write/document'
 import { workspaceDocs } from '@/lib/api/contracts/workspace-docs'
 import { socialAccountSchema } from 'screenshot-studio-backend-sdk'
 import type { SocialSet, SocialSetList, WritingSample } from 'screenshot-studio-backend-sdk'
@@ -29,15 +30,7 @@ export const engagementSchema = z.object({
 })
 
 /** A draft platform a default or guidance can name. */
-export const draftPlatformSchema = z.enum([
-  'x',
-  'linkedin',
-  'instagram',
-  'instagram-standalone',
-  'threads',
-  'bluesky',
-  'mastodon',
-])
+export const draftPlatformSchema = draftChannelSchema
 
 /** How a set writes; it refines the workspace brand voice. */
 export const styleGuideSchema = z.object({

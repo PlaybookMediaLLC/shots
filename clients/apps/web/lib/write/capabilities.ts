@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { tiktokCreatorSchema } from 'screenshot-studio-backend-sdk'
 import { AUTO_DM_UNAVAILABLE } from '@/lib/write/automation'
 import type { DraftChannel, DraftKind, PostPoll } from '@/lib/write/document'
 
@@ -185,11 +186,14 @@ export const CAPABILITIES: Record<DraftChannel, PlatformCapabilities> = {
       withMedia: false,
     },
   },
+  tiktok: { ...simple('TikTok', 2000, false), kinds: ['standard'], mentions: 'none' },
+  youtube: { ...simple('YouTube', 5000, false), kinds: ['standard'], mentions: 'none' },
   x: X,
 }
 
 /** Publishing capabilities verified for the connected account. */
 export const accountStandingSchema = z.object({
+  tiktokCreator: tiktokCreatorSchema.nullish(),
   maxWeightedCharacters: z.union([z.literal(280), z.literal(25_000)]).nullish(),
   articles: z.boolean().nullish(),
   xQuotes: z.boolean().optional(),

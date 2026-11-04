@@ -838,6 +838,9 @@ func (c *Configuration) GetSharedContentDraft(ctx context.Context, token string)
 		}
 		result.Published = true
 		result.PublishedURL = postoptions.LivePostURL(post.Edges.ChannelConnection.Platform, post.RemotePostID)
+		if receipt := post.ThreadProgress.Publication; receipt != nil && receipt.URL != "" {
+			result.PublishedURL = &receipt.URL
+		}
 		result.PlainText = strings.Join(texts, "\n\n")
 		result.Body = []any{}
 	}

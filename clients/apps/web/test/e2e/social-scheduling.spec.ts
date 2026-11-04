@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import {
   bindTestGoOrganization,
   connectionSchema,
@@ -221,7 +222,7 @@ test('X OAuth start binds its one-use callback to the active workspace', async (
   page,
 }) => {
   let organizationId: string | null = null
-  const state = 'oauth-state-for-x'
+  const state = `oauth-state-for-x-${randomUUID()}`
   const integrationId = 'go-x-test-integration'
   const backend = await startHttpMockServer((request) => {
     if (request.url === '/api/public/v1/me') {
@@ -290,7 +291,7 @@ test('LinkedIn OAuth callback connects through the SDK and rejects replay', asyn
   page,
 }) => {
   let organizationId: string | null = null
-  const state = 'oauth-state-for-linkedin'
+  const state = `oauth-state-for-linkedin-${randomUUID()}`
   const integrationId = 'go-linkedin-test-integration'
   const backend = await startHttpMockServer((request) => {
     if (request.url === '/api/public/v1/me') {
@@ -342,98 +343,112 @@ test('LinkedIn OAuth callback connects through the SDK and rejects replay', asyn
   }
 })
 
-// @dev-server until fixed: on the production build the Instagram callback answers 403, not 303.
-test(
-  'Instagram with Facebook Login registers the selected Page once',
-  { tag: '@dev-server' },
-  async ({ identity, page }) => {
-    let organizationId: string | null = null
-    const state = 'oauth-state-for-instagram'
-    const integrationId = 'go-instagram-test-integration'
-    const backend = await startHttpMockServer((request) => {
-      if (request.url === '/api/public/v1/me') {
-        return { body: { organization: { id: `go-${organizationId}` } } }
-      }
-      if (request.url === '/api/public/v1/social/instagram') {
-        return {
-          body: { url: `https://www.facebook.com/v24.0/dialog/oauth?state=${state}` },
+// Instagram retains its existing lane; Page and channel selection also run in production.
+for (const [providerName, authorizationURL] of [
+  ['instagram', 'https://www.facebook.com/v24.0/dialog/oauth'],
+  ['linkedin-page', 'https://www.linkedin.com/oauth/v2/authorization'],
+  ['youtube', 'https://accounts.google.com/o/oauth2/v2/auth'],
+] as const) {
+  test(
+    `${providerName} registers only the selected provider account once`,
+    providerName === 'instagram' ? { tag: '@dev-server' } : {},
+    async ({ identity, page }) => {
+      let organizationId: string | null = null
+      const state = `oauth-state-for-${providerName}-${randomUUID()}`
+      const integrationId = `go-${providerName}-test-integration`
+      const backend = await startHttpMockServer((request) => {
+        if (request.url === '/api/public/v1/me') {
+          return { body: { organization: { id: `go-${organizationId}` } } }
         }
-      }
-      if (request.url === '/integrations/social-connect/instagram') {
-        return {
-          body: {
-            id: integrationId,
-            pages: [
-              { id: 'instagram-test-account', name: 'Test Page', pageId: 'facebook-test-page' },
-            ],
-          },
+        if (request.url === `/api/public/v1/social/${providerName}`) {
+          return {
+            body: { url: `${authorizationURL}?state=${state}` },
+          }
         }
-      }
-      if (request.url === `/integrations/public/provider/${integrationId}/connect`) {
-        return { body: { success: true } }
-      }
-      if (request.url === '/api/public/v1/integrations') {
-        return { body: [{ id: integrationId, identifier: 'instagram', disabled: false }] }
-      }
-      return { body: { error: 'Not found.' }, status: 404 }
-    }, socialMockPort)
-    try {
-      await createWorkspace(identity, page)
-      organizationId = await bindTestGoOrganization(page)
-      await enableTwoFactor(page, identity.password)
+        if (request.url === `/integrations/social-connect/${providerName}`) {
+          return {
+            body: {
+              id: integrationId,
+              pages: [
+                { id: 'instagram-test-account', name: 'Test Page', pageId: 'facebook-test-page' },
+              ],
+            },
+          }
+        }
+        if (request.url === `/integrations/public/provider/${integrationId}/connect`) {
+          return { body: { success: true } }
+        }
+        if (request.url === '/api/public/v1/integrations') {
+          return { body: [{ id: integrationId, identifier: providerName, disabled: false }] }
+        }
+        return { body: { error: 'Not found.' }, status: 404 }
+      }, socialMockPort)
+      try {
+        await createWorkspace(identity, page)
+        organizationId = await bindTestGoOrganization(page)
+        await enableTwoFactor(page, identity.password)
 
-      const start = await page
-        .context()
-        .request.get(getE2EUrl('/integrations/social/instagram/start'), {
+        const start = await page
+          .context()
+          .request.get(getE2EUrl(`/integrations/social/${providerName}/start`), {
+            maxRedirects: 0,
+          })
+        expect(
+          start.status(),
+          `${await start.text()} ${backend.calls.map((call) => call.url)}`
+        ).toBe(303)
+        expect(start.headers().location).toBe(`${authorizationURL}?state=${state}`)
+
+        const callbackURL = getE2EUrl(
+          `/integrations/social/${providerName}?code=test-code&state=${state}`
+        )
+        const picker = await page.context().request.get(callbackURL)
+        expect(picker.status()).toBe(200)
+        const choice = (await picker.text()).match(/name="choice" value="([^"]+)"/)?.[1]
+        expect(choice).toBeTruthy()
+        const tampered = await page.context().request.post(callbackURL, {
+          form: { choice: `${choice}tampered` },
+          headers: { origin: new URL(getE2EUrl('/')).origin },
           maxRedirects: 0,
         })
-      expect(start.status(), `${await start.text()} ${backend.calls.map((call) => call.url)}`).toBe(
-        303
-      )
-      expect(start.headers().location).toBe(
-        `https://www.facebook.com/v24.0/dialog/oauth?state=${state}`
-      )
+        expect(tampered.status()).toBe(400)
+        expect(backend.calls.filter((call) => call.url.endsWith('/connect'))).toHaveLength(0)
+        const selection = await page.context().request.post(callbackURL, {
+          form: { choice: choice as string },
+          headers: { origin: new URL(getE2EUrl('/')).origin },
+          maxRedirects: 0,
+        })
+        expect(selection.status()).toBe(303)
+        // The callback hands off to the receipt page, which redirects to Channels.
+        expect(selection.headers().location).toMatch(
+          new RegExp(`^/integrations/social/${providerName}/complete\\?state=`)
+        )
 
-      const callbackURL = getE2EUrl(`/integrations/social/instagram?code=test-code&state=${state}`)
-      const picker = await page.context().request.get(callbackURL)
-      expect(picker.status()).toBe(200)
-      const choice = (await picker.text()).match(/name="choice" value="([^"]+)"/)?.[1]
-      expect(choice).toBeTruthy()
-      const selection = await page.context().request.post(callbackURL, {
-        form: { choice: choice as string },
-        headers: { origin: new URL(getE2EUrl('/')).origin },
-        maxRedirects: 0,
-      })
-      expect(selection.status()).toBe(303)
-      // The callback hands off to the receipt page, which redirects to Channels.
-      expect(selection.headers().location).toMatch(
-        /^\/integrations\/social\/instagram\/complete\?state=/
-      )
+        await expectOAuthConnection(organizationId, integrationId, state, providerName)
 
-      await expectOAuthConnection(organizationId, integrationId, state, 'instagram')
-
-      const callsBeforeReplay = backend.calls.length
-      const replay = await page.context().request.post(callbackURL, {
-        form: { choice: choice as string },
-        headers: { origin: new URL(getE2EUrl('/')).origin },
-      })
-      // A replay is answered from the stored receipt; it never reaches the provider again.
-      expect(replay.status()).toBe(200)
-      expect(backend.calls).toHaveLength(callsBeforeReplay)
-    } finally {
-      await deleteOAuthStart(state)
-      await unbindTestGoOrganization(organizationId)
-      await backend.close()
+        const callsBeforeReplay = backend.calls.length
+        const replay = await page.context().request.post(callbackURL, {
+          form: { choice: choice as string },
+          headers: { origin: new URL(getE2EUrl('/')).origin },
+        })
+        // A replay is answered from the stored receipt; it never reaches the provider again.
+        expect(replay.status()).toBe(200)
+        expect(backend.calls).toHaveLength(callsBeforeReplay)
+      } finally {
+        await deleteOAuthStart(state)
+        await unbindTestGoOrganization(organizationId)
+        await backend.close()
+      }
     }
-  }
-)
+  )
+}
 
 test('Instagram Login registers its destination after a one-use callback', async ({
   identity,
   page,
 }) => {
   let organizationId: string | null = null
-  const state = 'oauth-state-for-instagram-login'
+  const state = `oauth-state-for-instagram-login-${randomUUID()}`
   const integrationId = 'go-instagram-login-test-integration'
   const backend = await startHttpMockServer((request) => {
     if (request.url === '/api/public/v1/me') {

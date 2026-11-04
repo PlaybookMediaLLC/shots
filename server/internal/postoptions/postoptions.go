@@ -87,12 +87,20 @@ type ThreadReceipt struct {
 	PublishedAt time.Time `json:"publishedAt"`
 }
 
+// PublicationReceipt retains a confirmed remote identity, including while processing is uncertain.
+type PublicationReceipt struct {
+	RemoteID   string `json:"remoteId"`
+	URL        string `json:"url"`
+	Visibility string `json:"visibility,omitempty"`
+}
+
 type ThreadProgress struct {
-	Quotes      []QuoteReceipt  `json:"quotes,omitempty"`
-	Receipts    []ThreadReceipt `json:"receipts,omitempty"`
-	LastReplyID string          `json:"lastReplyId,omitempty"`
-	Posted      int             `json:"posted"`
-	Total       int             `json:"total"`
+	Publication *PublicationReceipt `json:"publication,omitempty"`
+	Quotes      []QuoteReceipt      `json:"quotes,omitempty"`
+	Receipts    []ThreadReceipt     `json:"receipts,omitempty"`
+	LastReplyID string              `json:"lastReplyId,omitempty"`
+	Posted      int                 `json:"posted"`
+	Total       int                 `json:"total"`
 }
 
 // QuoteReceipt preserves the native quote approval state of a published status.
@@ -110,6 +118,8 @@ type Metrics map[string]float64
 // belongs to the platforms whose adapter sends it; scheduling refuses it
 // anywhere else. Zero values are off.
 type PublishOptions struct {
+	YouTube *YouTubeOptions `json:"youtube,omitempty"`
+	TikTok  *TikTokOptions  `json:"tiktok,omitempty"`
 	// X: up to ten numeric user IDs tagged in attached photos.
 	PhotoTagIDs   []string     `json:"photoTagIds,omitempty"`
 	LinkPreview   *LinkPreview `json:"linkPreview,omitempty"`
@@ -157,8 +167,10 @@ func LivePostURL(platform string, remoteID *string) *string {
 	switch platform {
 	case "x":
 		url = "https://x.com/i/status/" + *remoteID
-	case "linkedin":
+	case "linkedin", "linkedin-page":
 		url = "https://www.linkedin.com/feed/update/" + *remoteID
+	case "youtube":
+		url = "https://www.youtube.com/watch?v=" + *remoteID
 	case "bluesky":
 		if uri, err := socialidentity.BlueskyPostURI(*remoteID); err == nil {
 			parts := strings.Split(strings.TrimPrefix(uri, "at://"), "/")

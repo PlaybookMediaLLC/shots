@@ -59,6 +59,8 @@ func TestPostWorkflowV2CompletesDirectReceiptWithoutSecondPostPoll(t *testing.T)
 	env := suite.NewTestWorkflowEnvironment()
 	submissions := 0
 	completedID := ""
+	recordCalls := 0
+	progress := &postoptions.ThreadProgress{Publication: &postoptions.PublicationReceipt{RemoteID: "remote-post-1", URL: "https://www.youtube.com/watch?v=remote-post-1"}}
 	env.RegisterActivityWithOptions(func(context.Context, PrepareInput) (PreparedPublication, error) {
 		return PreparedPublication{PostID: "post-1", OrganizationID: "org-1", Ready: true}, nil
 	}, activity.RegisterOptions{Name: PrepareActivityName})
@@ -67,9 +69,16 @@ func TestPostWorkflowV2CompletesDirectReceiptWithoutSecondPostPoll(t *testing.T)
 	}, activity.RegisterOptions{Name: BeginActivityName})
 	env.RegisterActivityWithOptions(func(context.Context, SubmitInput) (PublishResult, error) {
 		submissions++
-		return PublishResult{Outcome: OutcomePublished, ProviderID: "remote-post-1"}, nil
+		return PublishResult{Outcome: OutcomePublished, ProviderID: "remote-post-1", Progress: progress}, nil
 	}, activity.RegisterOptions{Name: SubmitActivityName})
 	env.RegisterActivityWithOptions(func(_ context.Context, input CompleteInput) error {
+		recordCalls++
+		if input.Progress == nil || input.Progress.Publication.URL != progress.Publication.URL {
+			t.Fatal("receipt lost from durable outcome")
+		}
+		if recordCalls == 1 {
+			return context.DeadlineExceeded
+		}
 		completedID = input.ProviderID
 		return nil
 	}, activity.RegisterOptions{Name: CompleteActivityName})
@@ -82,7 +91,7 @@ func TestPostWorkflowV2CompletesDirectReceiptWithoutSecondPostPoll(t *testing.T)
 		t.Fatal(err)
 	}
 	var result WorkflowResult
-	if err := env.GetWorkflowResult(&result); err != nil || result.Outcome != OutcomePublished || result.ProviderID != "remote-post-1" || submissions != 1 || completedID != "remote-post-1" {
+	if err := env.GetWorkflowResult(&result); err != nil || result.Outcome != OutcomePublished || result.ProviderID != "remote-post-1" || submissions != 1 || recordCalls != 2 || completedID != "remote-post-1" {
 		t.Fatalf("result=%#v submit=%d completed=%q err=%v", result, submissions, completedID, err)
 	}
 }

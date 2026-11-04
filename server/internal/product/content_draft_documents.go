@@ -3,6 +3,7 @@ package product
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"net/url"
 	"regexp"
 	"slices"
@@ -35,7 +36,7 @@ var (
 	linkedInSharePath = regexp.MustCompile(`^/posts/[A-Za-z0-9_-]+-activity-([0-9]{1,30})(?:-[A-Za-z0-9_-]+)?/?$`)
 	// The kinds of draft and the channels each can be written for.
 	draftKindChannels = map[string][]string{
-		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon"},
+		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "tiktok", "youtube"},
 		"reply":    {"x"},
 		"quote":    {"x", "linkedin", "bluesky", "mastodon"},
 		// A repurposed draft is a new post made from a published one.
@@ -224,6 +225,9 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 		return nil, nil
 	}
 	clean := *options
+	if err := postoptions.ValidateVideoOptions(channel, clean.YouTube, clean.TikTok, false); err != nil {
+		return nil, invalid(err.Error())
+	}
 	if len(clean.LinkPreviews) > 25 {
 		return nil, invalid("A draft can store at most 25 link previews.")
 	}

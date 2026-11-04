@@ -19,6 +19,7 @@ services:
       R2_ACCESS_KEY_ID: ''
       R2_SECRET_ACCESS_KEY: ''
       SOCIAL_API_KEY: ''
+      SOCIAL_API_KEY_LOCAL: ''
       SOCIAL_API_KEY_E2E: ''
       SOCIAL_API_KEY_E2E_W0: ''
       SOCIAL_API_KEY_E2E_W1: ''
@@ -67,7 +68,7 @@ services:
       SCREENSHOT_API_URL: ${SCREENSHOT_API_URL:-https://api.microlink.io}
       SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS: ${SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS:-}
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:${STUDIO_WEB_PORT:-3000}:3000'
     volumes:
       - ..:/workspace
       - app_node_modules:/workspace/clients/node_modules
@@ -198,6 +199,10 @@ services:
       SOCIAL_API_URL: ${SOCIAL_API_URL:-}
       JWT_SECRET: ${SOCIAL_JWT_SECRET:-local-social-only}
       FRONTEND_URL: ${SOCIAL_FRONTEND_URL:-http://localhost:3000}
+      TIKTOK_CLIENT_ID: ${TIKTOK_CLIENT_ID:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
       LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
       LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
       X_API_KEY: ${SOCIAL_X_API_KEY:-}
@@ -227,7 +232,7 @@ services:
       PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED: ${PLATFORM_SOCIAL_CUSTOM_MASTODON_ENABLED:-false}
       PUBLISHING_RETRY_DELAY: ${PUBLISHING_RETRY_DELAY:-2m}
       PUBLISHING_SERVICE_TOKEN: ${PUBLISHING_SERVICE_TOKEN:-local-publishing-service}
-      R2_BROWSER_ENDPOINT: http://localhost:9003
+      R2_BROWSER_ENDPOINT: ${R2_BROWSER_ENDPOINT:-http://localhost:9003}
       TEMPORAL_ADDRESS: temporal:7233
       # The onboarding agent (docs/rfcs/032). dev/studio points the model and
       # the fetch allowlist at the e2e fakes; without a key, drafts come from
@@ -321,8 +326,30 @@ services:
       SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
       PLATFORM_SLACK_CALLBACK_URL: ${PLATFORM_SLACK_CALLBACK_URL:-}
       INTEGRATION_ENCRYPTION_KEY: ${INTEGRATION_ENCRYPTION_KEY:-}
+      SOCIAL_API_URL: ${SOCIAL_API_URL:-}
+      JWT_SECRET: ${SOCIAL_JWT_SECRET:-local-social-only}
+      FRONTEND_URL: ${SOCIAL_FRONTEND_URL:-http://localhost:3000}
+      TIKTOK_CLIENT_ID: ${TIKTOK_CLIENT_ID:-}
+      TIKTOK_CLIENT_SECRET: ${TIKTOK_CLIENT_SECRET:-}
+      YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID:-}
+      YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET:-}
+      LINKEDIN_CLIENT_ID: ${LINKEDIN_CLIENT_ID:-}
+      LINKEDIN_CLIENT_SECRET: ${LINKEDIN_CLIENT_SECRET:-}
+      X_API_KEY: ${SOCIAL_X_API_KEY:-}
+      X_API_SECRET: ${SOCIAL_X_API_SECRET:-}
+      THREADS_APP_ID: ${SOCIAL_THREADS_APP_ID:-}
+      THREADS_APP_SECRET: ${SOCIAL_THREADS_APP_SECRET:-}
+      MASTODON_CLIENT_ID: ${SOCIAL_MASTODON_CLIENT_ID:-}
+      MASTODON_CLIENT_SECRET: ${SOCIAL_MASTODON_CLIENT_SECRET:-}
+      FACEBOOK_APP_ID: ${SOCIAL_FACEBOOK_APP_ID:-}
+      FACEBOOK_APP_SECRET: ${SOCIAL_FACEBOOK_APP_SECRET:-}
+      INSTAGRAM_APP_ID: ${SOCIAL_INSTAGRAM_APP_ID:-}
+      INSTAGRAM_APP_SECRET: ${SOCIAL_INSTAGRAM_APP_SECRET:-}
+      R2_BROWSER_ENDPOINT: ${R2_BROWSER_ENDPOINT:-http://localhost:9003}
       PORT: '8081'
       DATABASE_URL: postgresql://screenshot_studio:${POSTGRES_APP_PASSWORD}@postgres:5432/screenshot_studio?sslmode=disable
+      # Match the Go connection format when local maintenance is enabled.
+      AUDIT_RETENTION_DATABASE_URL: postgresql://screenshot_studio:${POSTGRES_APP_PASSWORD}@postgres:5432/screenshot_studio?sslmode=disable
       PUBLISHING_RETRY_DELAY: ${PUBLISHING_RETRY_DELAY:-2m}
       RUN_CRON: ${RUN_CRON:-true}
       TEMPORAL_ADDRESS: temporal:7233

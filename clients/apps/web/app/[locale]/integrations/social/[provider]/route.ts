@@ -27,7 +27,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
       onConnected: (oauthState, integrationId) =>
         registerSocialOAuthDestination(request.headers, provider, oauthState, integrationId),
       onPageChoice: (oauthState, integrationId) =>
-        rememberInstagramIntegration(request.headers, oauthState, integrationId),
+        rememberInstagramIntegration(request.headers, oauthState, integrationId, provider),
     })
   } catch (error) {
     return socialOAuthErrorResponse(error)
@@ -36,15 +36,29 @@ export async function GET(request: Request, context: Context): Promise<Response>
 
 export async function POST(request: Request, context: Context): Promise<Response> {
   const { provider } = await context.params
-  if (provider !== 'instagram') return new Response('Provider not found.', { status: 404 })
+  if (
+    !isSocialOAuthProvider(provider) ||
+    !['instagram', 'linkedin-page', 'youtube'].includes(provider)
+  )
+    return new Response('Provider not found.', { status: 404 })
   try {
-    return await selectInstagramAccount(request, {
-      redirect: async (state) => socialOAuthCompletionRedirect('instagram', state),
-      selectPage: ({ state, integrationId, accountId, pageId }) =>
-        selectInstagramOAuthPage(request.headers, { state, integrationId, accountId, pageId }),
-      onSelected: (state, integrationId) =>
-        registerSocialOAuthDestination(request.headers, 'instagram', state, integrationId),
-    })
+    return await selectInstagramAccount(
+      request,
+      {
+        redirect: async (state) => socialOAuthCompletionRedirect(provider, state),
+        selectPage: ({ state, integrationId, accountId, pageId }) =>
+          selectInstagramOAuthPage(request.headers, {
+            provider,
+            state,
+            integrationId,
+            accountId,
+            pageId,
+          }),
+        onSelected: (state, integrationId) =>
+          registerSocialOAuthDestination(request.headers, provider, state, integrationId),
+      },
+      provider
+    )
   } catch (error) {
     return socialOAuthErrorResponse(error)
   }

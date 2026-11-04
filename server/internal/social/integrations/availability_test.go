@@ -24,7 +24,7 @@ func configuredManager(t *testing.T) *Manager {
 	t.Setenv("X_URL", "")
 	t.Setenv("MASTODON_URL", "")
 	t.Setenv("HIDDEN_PROVIDERS", "")
-	for _, key := range []string{"X_API_KEY", "X_API_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "THREADS_APP_ID", "THREADS_APP_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"} {
+	for _, key := range []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "X_API_KEY", "X_API_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "THREADS_APP_ID", "THREADS_APP_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"} {
 		t.Setenv(key, "private-configuration-canary")
 	}
 	var providers []Provider
@@ -33,7 +33,6 @@ func configuredManager(t *testing.T) *Manager {
 			providers = append(providers, availabilityProvider{id: id})
 		}
 	}
-	providers = append(providers, availabilityProvider{id: "linkedin-page"})
 	return NewManager(providers)
 }
 
@@ -57,6 +56,8 @@ func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 		t.Fatal("configuration leaked")
 	}
 	for _, tc := range []struct{ provider, key string }{
+		{"tiktok", "TIKTOK_CLIENT_ID"}, {"tiktok", "TIKTOK_CLIENT_SECRET"},
+		{"youtube", "YOUTUBE_CLIENT_ID"}, {"youtube", "YOUTUBE_CLIENT_SECRET"},
 		{"x", "X_API_KEY"}, {"x", "X_API_SECRET"},
 		{"linkedin", "LINKEDIN_CLIENT_ID"}, {"linkedin-page", "LINKEDIN_CLIENT_SECRET"},
 		{"threads", "THREADS_APP_ID"}, {"threads", "THREADS_APP_SECRET"},

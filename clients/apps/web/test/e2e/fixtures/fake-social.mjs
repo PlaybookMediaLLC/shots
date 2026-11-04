@@ -87,7 +87,10 @@ createServer(async (request, response) => {
       return reply(response, 500, { error: 'temporary failure' })
     }
     const media = await Promise.all((body.post?.media ?? []).map(mediaReceipt))
-    const remoteId = `fake-remote-${state.posts.length + 1}`
+    const remoteId =
+      body.platform === 'tiktok'
+        ? `7234567890123456${String(state.posts.length + 1).padStart(3, '0')}`
+        : `fake-remote-${state.posts.length + 1}`
     state.posts.push({
       caption: body.post?.message,
       id: remoteId,
@@ -96,7 +99,12 @@ createServer(async (request, response) => {
     })
     return reply(response, 201, {
       postId: remoteId,
-      releaseURL: `https://fake-social.invalid/posts/${remoteId}`,
+      releaseURL:
+        body.platform === 'tiktok'
+          ? `https://www.tiktok.com/@fixture/video/${remoteId}`
+          : body.platform === 'youtube'
+            ? `https://www.youtube.com/watch?v=${remoteId}`
+            : `https://fake-social.invalid/posts/${remoteId}`,
     })
   } catch {
     return reply(response, 422, { error: 'invalid social request or media' })

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"regexp"
 	"sort"
 	"strings"
@@ -60,6 +61,7 @@ const (
 
 // SocialAccount is one connected account as a set shows it.
 type SocialAccount struct {
+	TikTokCreator  *postoptions.TikTokCreator `json:"tiktokCreator,omitempty"`
 	MastodonQuotes *bool                      `json:"mastodonQuotes"`
 	PollLimits     *socialidentity.PollLimits `json:"pollLimits"`
 	AvatarURL      *string                    `json:"avatarUrl"`
@@ -437,11 +439,12 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	accounts := map[string][]SocialAccount{}
 	for _, connection := range connections {
 		account := socialAccount(connection, health[connection.ID])
-		if (connection.Platform == "x" || connection.Platform == "mastodon-custom") && account.Health == AccountConnected {
+		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && account.Health == AccountConnected {
 			standing := c.accountStanding(ctx, connection)
 			account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
 			account.MastodonQuotes = standing.MastodonQuotes
 			account.XQuotes = standing.XQuotes
+			account.TikTokCreator = standing.TikTokCreator
 		}
 		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], account)
 	}

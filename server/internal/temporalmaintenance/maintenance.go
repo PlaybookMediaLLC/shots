@@ -94,8 +94,8 @@ func ScheduleOptions(job string) client.ScheduleOptions {
 		spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: time.Hour}}}
 	}
 	if job == "social-token-refresh" {
-		// Tokens renew a week before expiry; hourly retries a failed renewal often enough.
-		spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: time.Hour}}}
+		// Short-lived video tokens renew 15 minutes before expiry, leaving time for retries.
+		spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: 5 * time.Minute}}}
 	}
 	if job == "audit-retention" {
 		spec = client.ScheduleSpec{CronExpressions: []string{"5 3 * * *"}, TimeZoneName: "UTC"}

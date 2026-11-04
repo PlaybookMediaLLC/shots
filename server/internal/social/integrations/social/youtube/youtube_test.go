@@ -275,3 +275,36 @@ func TestAnalyticsMarksAverages(t *testing.T) {
 		t.Fatalf("data %+v %+v", res[1].Data, res[5].Data)
 	}
 }
+
+func TestConfirmVideoRequiresProcessingAndSelectedChannel(t *testing.T) {
+	savedInterval := processingPollInterval
+	processingPollInterval = 0
+	t.Cleanup(func() { processingPollInterval = savedInterval })
+	for _, tc := range []struct {
+		name, body string
+		ok         bool
+	}{
+		{"processed", `{"items":[{"id":"video","snippet":{"channelId":"channel"},"status":{"uploadStatus":"processed","privacyStatus":"private"},"processingDetails":{"processingStatus":"succeeded"}}]}`, true},
+		{"pending", `{"items":[{"id":"video","snippet":{"channelId":"channel"},"status":{"uploadStatus":"uploaded","privacyStatus":"private"},"processingDetails":{"processingStatus":"processing"}}]}`, false},
+		{"wrong channel", `{"items":[{"id":"video","snippet":{"channelId":"other"},"status":{"uploadStatus":"processed","privacyStatus":"private"},"processingDetails":{"processingStatus":"succeeded"}}]}`, false},
+		{"malformed", `{"items":null}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			requests := 0
+			p, _ := setup(t, func(w http.ResponseWriter, r *http.Request) {
+				requests++
+				if r.Method != http.MethodGet || r.URL.Query().Get("id") != "video" {
+					t.Fatalf("unexpected mutation or identity")
+				}
+				io.WriteString(w, tc.body)
+			})
+			visibility, err := p.ConfirmVideo(context.Background(), "token", "video", "channel")
+			if (err == nil) != tc.ok || tc.ok && visibility != "private" {
+				t.Fatalf("visibility=%s err=%v", visibility, err)
+			}
+			if requests > 12 {
+				t.Fatalf("unbounded checks: %d", requests)
+			}
+		})
+	}
+}

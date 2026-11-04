@@ -11,10 +11,16 @@ export function isCrossOriginCookieMutation(request: Request): boolean {
     return false
   }
   const origin = request.headers.get('origin')
-  if (origin !== null) {
-    const trusted = [getAuthBaseUrl(), ...getTrustedOrigins()]
-    return !trusted.some((value) => URL.canParse(value) && new URL(value).origin === origin)
-  }
+  if (origin !== null) return !isTrustedRequestOrigin(origin)
   const site = request.headers.get('sec-fetch-site')
   return site !== null && site !== 'same-origin'
+}
+
+/** Uses configured public origins because reverse proxies can change the request URL. */
+export function isTrustedRequestOrigin(origin: string | null): boolean {
+  const trusted = [getAuthBaseUrl(), ...getTrustedOrigins()]
+  return (
+    origin !== null &&
+    trusted.some((value) => URL.canParse(value) && new URL(value).origin === origin)
+  )
 }

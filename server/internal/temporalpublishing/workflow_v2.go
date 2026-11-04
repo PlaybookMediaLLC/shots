@@ -2,6 +2,7 @@ package temporalpublishing
 
 import (
 	"errors"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"sort"
 	"time"
 
@@ -85,7 +86,7 @@ func PostWorkflowV2(ctx workflow.Context, input WorkflowInput) (WorkflowResult, 
 
 		var submitted PublishResult
 		if err := workflow.ExecuteActivity(mutationCtx, SubmitActivityName, SubmitInput{Job: job}).Get(ctx, &submitted); err != nil {
-			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber)
+			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, nil)
 		}
 		switch submitted.Outcome {
 		case OutcomeRetry:
@@ -109,9 +110,9 @@ func PostWorkflowV2(ctx workflow.Context, input WorkflowInput) (WorkflowResult, 
 			}
 			return WorkflowResult{FailureCode: submitted.FailureCode, Outcome: OutcomeFailed}, nil
 		case OutcomeUnknown:
-			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber)
+			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, submitted.Progress)
 		case OutcomePublished:
-			if err := completeAttempt(ctx, recordCtx, attempt, job, runID, submitted.ProviderID); err != nil {
+			if err := completeAttempt(ctx, recordCtx, attempt, job, runID, submitted.ProviderID, submitted.Progress); err != nil {
 				return WorkflowResult{}, err
 			}
 			runAutoActions(ctx, input, job, submitted.ProviderID)
@@ -145,7 +146,7 @@ func awaitSocialConfirmation(
 		if err != nil {
 			consecutiveFailures++
 			if consecutiveFailures >= maxStatusCheckFailures {
-				return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber)
+				return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil)
 			}
 		} else {
 			consecutiveFailures = 0
@@ -155,7 +156,7 @@ func awaitSocialConfirmation(
 				if providerID == "" {
 					providerID = socialPostID
 				}
-				if err := completeAttempt(ctx, recordCtx, attempt, job, runID, providerID); err != nil {
+				if err := completeAttempt(ctx, recordCtx, attempt, job, runID, providerID, nil); err != nil {
 					return WorkflowResult{}, err
 				}
 				return WorkflowResult{Outcome: OutcomePublished, ProviderID: providerID}, nil
@@ -172,12 +173,12 @@ func awaitSocialConfirmation(
 			}
 		}
 	}
-	return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber)
+	return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil)
 }
 
-func completeAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job PreparedPublication, runID, providerID string) error {
+func completeAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job PreparedPublication, runID, providerID string, progress *postoptions.ThreadProgress) error {
 	return workflow.ExecuteActivity(activityCtx, CompleteActivityName, CompleteInput{
-		AttemptID: attempt.AttemptID, Job: job, ProviderID: providerID, RunID: runID,
+		AttemptID: attempt.AttemptID, Job: job, ProviderID: providerID, RunID: runID, Progress: progress,
 	}).Get(ctx, nil)
 }
 
@@ -188,9 +189,9 @@ func failAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job Pre
 	}).Get(ctx, nil)
 }
 
-func markUnknown(ctx, activityCtx workflow.Context, postID, runID string, attemptNumber int) (WorkflowResult, error) {
+func markUnknown(ctx, activityCtx workflow.Context, postID, runID string, attemptNumber int, progress *postoptions.ThreadProgress) (WorkflowResult, error) {
 	err := workflow.ExecuteActivity(activityCtx, MarkUnknownActivityName, MarkUnknownInput{
-		AttemptNumber: attemptNumber, PostID: postID, RunID: runID,
+		AttemptNumber: attemptNumber, PostID: postID, RunID: runID, Progress: progress,
 	}).Get(ctx, nil)
 	if err != nil {
 		return WorkflowResult{}, err

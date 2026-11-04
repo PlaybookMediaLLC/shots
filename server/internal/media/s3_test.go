@@ -74,6 +74,51 @@ func TestTenantObjectAccessRejectsForeignAndUnsafeKeys(t *testing.T) {
 	}
 }
 
+func TestEnvironmentDeliveryEndpointPreservesInternalStorage(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodHead {
+			t.Errorf("unexpected request method: %s", r.Method)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	t.Setenv("R2_ENDPOINT", server.URL)
+	t.Setenv("R2_BROWSER_ENDPOINT", "https://browser.example")
+	t.Setenv("R2_REGION", "us-east-1")
+	t.Setenv("R2_BUCKET_NAME", "tenant-assets")
+	t.Setenv("R2_ACCESS_KEY_ID", "test-key")
+	t.Setenv("R2_SECRET_ACCESS_KEY", "test-secret")
+	for _, endpoint := range []string{"", "https://delivery.example", "https://delivery.example?invalid=true"} {
+		t.Run(endpoint, func(t *testing.T) {
+			t.Setenv("R2_DELIVERY_ENDPOINT", endpoint)
+			store, err := NewS3StoreFromEnvironment()
+			if strings.Contains(endpoint, "?") {
+				if err == nil {
+					t.Fatal("invalid delivery endpoint accepted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if found, err := store.Exists(context.Background(), "org/org-1/input/asset-1/1/video.mp4"); err != nil || !found {
+				t.Fatalf("internal storage check: found=%v err=%v", found, err)
+			}
+			delivery, err := store.SignDelivery(context.Background(), "org/org-1/input/asset-1/1/video.mp4")
+			if endpoint == "" {
+				endpoint = server.URL
+			}
+			if err != nil || !strings.HasPrefix(delivery, endpoint+"/tenant-assets/") || !strings.Contains(delivery, "X-Amz-Expires=86400") {
+				t.Fatal("delivery did not use the configured origin and expiry")
+			}
+			upload, err := store.SignUpload(context.Background(), "org/org-1/input/asset-1/1/video.mp4", "video/mp4")
+			if err != nil || !strings.HasPrefix(upload, "https://browser.example/") {
+				t.Fatal("delivery configuration changed the browser upload origin")
+			}
+		})
+	}
+}
+
 // A large file goes in parts through signed URLs; the server lists and
 // completes them, and an abort after completion is not an error.
 func TestMultipartUploadThroughSignedParts(t *testing.T) {

@@ -36,9 +36,16 @@ services:
       BETTER_AUTH_URL: http://localhost:3010
       # The fake destination takes content drafts under X's rules.
       PLATFORM_E2E_DRAFT_PLATFORM: enabled
-      R2_BROWSER_ENDPOINT: http://localhost:9013
       SOCIAL_API_URL: ''
       SOCIAL_E2E_URL: http://fake-social:8080
+      FRONTEND_URL: http://localhost:3010
+      TIKTOK_CLIENT_ID: fixture
+      TIKTOK_CLIENT_SECRET: fixture
+      YOUTUBE_CLIENT_ID: fixture
+      YOUTUBE_CLIENT_SECRET: fixture
+      R2_ENDPOINT: http://rustfs:9000
+      R2_DELIVERY_ENDPOINT: http://rustfs:9000
+      R2_BROWSER_ENDPOINT: http://localhost:9013
     ports: !override
       - '127.0.0.1:8180:8080'
     depends_on:
@@ -58,6 +65,14 @@ services:
         GO_BUILD_TAGS: e2e
     environment:
       SOCIAL_E2E_URL: http://fake-social:8080
+      FRONTEND_URL: http://localhost:3010
+      TIKTOK_CLIENT_ID: fixture
+      TIKTOK_CLIENT_SECRET: fixture
+      YOUTUBE_CLIENT_ID: fixture
+      YOUTUBE_CLIENT_SECRET: fixture
+      R2_ENDPOINT: http://rustfs:9000
+      R2_DELIVERY_ENDPOINT: http://rustfs:9000
+      R2_BROWSER_ENDPOINT: http://localhost:9013
     ports: !override
       - '127.0.0.1:8181:8081'
     depends_on:

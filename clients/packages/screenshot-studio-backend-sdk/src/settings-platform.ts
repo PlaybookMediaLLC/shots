@@ -1,3 +1,4 @@
+import { tiktokCreatorSchema } from './video-publishing.ts'
 import { z } from 'zod'
 
 /** A person's preferences (RFC 024); they follow the person across workspaces. */
@@ -99,6 +100,7 @@ export const socialAccountSchema = z.object({
   /** Legacy display field; never authorizes long posts or Articles. */
   premium: z.boolean(),
   /** Verified X weighted text limit; older API responses remain unknown. */
+  tiktokCreator: tiktokCreatorSchema.nullish(),
   xCaptionLimit: z.union([z.literal(280), z.literal(25_000)]).nullish(),
   /** Verified Articles access, separate from long-post access. */
   xArticles: z.boolean().nullish(),
