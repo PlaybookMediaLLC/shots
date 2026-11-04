@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"log/slog"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -390,9 +391,14 @@ func socialAccount(ctx context.Context, connection *ent.ChannelConnection, healt
 // copies avatars into the social bucket. When that bucket is private, only a
 // signed link can read it, so the link is signed for a day. Other links pass
 // through. An avatar that cannot be signed is dropped, and the initial shows.
+// Only a plain link is signed, as the copy writes it: one with a user, a query
+// or a fragment did not come from the copy and passes through unsigned.
 func BrowserAvatar(ctx context.Context, stored *string) *string {
 	if stored == nil {
 		return nil
+	}
+	if u, err := url.Parse(*stored); err != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return stored
 	}
 	signer, err := upload.NewPrivateMediaSigner()
 	if err != nil {

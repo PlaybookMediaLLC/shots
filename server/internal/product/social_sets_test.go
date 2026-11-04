@@ -36,6 +36,17 @@ func TestBrowserAvatarSignsOnlyPrivateBucketLinks(t *testing.T) {
 	if BrowserAvatar(ctx, nil) != nil {
 		t.Fatal("no avatar must stay no avatar")
 	}
+	// The copy never writes a user, a query or a fragment: such a link names a
+	// file the copy did not make, so it is never signed.
+	for _, planted := range []string{
+		stored + "?imagedelivery.net",
+		stored + "#imagedelivery.net",
+		"https://imagedelivery.net@account.r2.cloudflarestorage.com/social-media/avatar.jpg",
+	} {
+		if got := BrowserAvatar(ctx, &planted); got == nil || *got != planted {
+			t.Fatalf("a planted link must pass through unsigned, got %v", got)
+		}
+	}
 
 	t.Setenv("CLOUDFLARE_BUCKETNAME", "")
 	if got := BrowserAvatar(ctx, &external); got == nil || *got != external {
