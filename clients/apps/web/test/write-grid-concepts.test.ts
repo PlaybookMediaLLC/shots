@@ -6,6 +6,7 @@ import {
   gridInputProblem,
   gridReady,
   missingImages,
+  redrawConcept,
   withLastCell,
   withSlot,
 } from '@/lib/write/grid-concepts'
@@ -85,6 +86,29 @@ test('the last cell setting writes only the bottom right, and blank keeps it', (
   )
   assert.equal(set.slots[3]?.assetId, 'cta')
   assert.deepEqual(withLastCell(concept!, { topic: '  ' }), concept)
+})
+
+test('redrawing a concept draws other items, drops its images and keeps its music', () => {
+  const concept = withSlot(
+    {
+      headline: 'Keep me',
+      musicAssetId: 'music',
+      slots: ['a', 'b', 'c', 'd'].map((topic) => ({ topic })),
+    },
+    0,
+    { assetId: 'image' }
+  )
+  const redrawn = redrawConcept(concept, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'E '], seeded(3))
+  assert.equal(redrawn.headline, 'Keep me')
+  assert.equal(redrawn.musicAssetId, 'music')
+  assert.equal(redrawn.slots.length, 4)
+  assert.ok(redrawn.slots.every((slot) => !slot.assetId))
+  assert.notEqual(redrawn.slots.map((slot) => slot.topic).join(), 'a,b,c,d')
+  assert.equal(new Set(redrawn.slots.map((slot) => slot.topic.toLowerCase())).size, 4)
+  // With only its own four items, it still changes their order.
+  const same = redrawConcept(concept, [], seeded(5))
+  assert.equal(new Set(same.slots.map((slot) => slot.topic)).size, 4)
+  assert.notEqual(same.slots.map((slot) => slot.topic).join(), 'a,b,c,d')
 })
 
 test('every preset can make concepts as it stands', () => {

@@ -41,6 +41,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchitem"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
@@ -223,6 +224,7 @@ func checkColumn(t, c string) error {
 			contentangle.Table:                    contentangle.ValidColumn,
 			contentbatch.Table:                    contentbatch.ValidColumn,
 			contentbatchitem.Table:                contentbatchitem.ValidColumn,
+			contentbatchrun.Table:                 contentbatchrun.ValidColumn,
 			contentdraft.Table:                    contentdraft.ValidColumn,
 			contentdraftfinisher.Table:            contentdraftfinisher.ValidColumn,
 			contentdraftrevision.Table:            contentdraftrevision.ValidColumn,

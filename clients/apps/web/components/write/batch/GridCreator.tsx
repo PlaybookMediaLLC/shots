@@ -15,10 +15,12 @@ import {
   type BatchGrid,
   type BatchItem,
   type BatchItemInput,
+  type BatchRun,
   BATCH_ITEM_LIMIT,
   GRID_HEADLINE_LIMIT,
   GRID_TOPIC_LIMIT,
 } from '@/lib/api/contracts/content-batches'
+import { call } from '@/lib/content-drafts/client'
 import { assetContentUrl } from '@/lib/editor/services'
 import { runPool } from '@/lib/export/batch'
 import { zipFiles } from '@/lib/export/zip'
@@ -32,6 +34,7 @@ import {
   gridInputProblem,
   gridReady,
   missingImages,
+  redrawConcept,
   withLastCell,
   withSlot,
 } from '@/lib/write/grid-concepts'
@@ -115,15 +118,23 @@ function LineList({
  * video being rendered. From then on it is an ordinary post of the batch.
  */
 export function GridCreator({
+  base,
   disabled,
   items,
+  lastRender,
   onAdd,
   onApply,
+  onReload,
   onUpdate,
   sharedAccounts,
 }: {
+  /** The batch's API path. */
+  base: string
   disabled: boolean
   items: BatchItem[]
+  /** The batch's latest render, so its failures survive a reload. */
+  lastRender?: BatchRun
+  onReload: () => Promise<void>
   onAdd: (inputs: BatchItemInput[]) => Promise<void>
   onApply: (changes: ({ itemId: string } & Record<string, unknown>)[]) => Promise<void>
   onUpdate: (
@@ -135,8 +146,8 @@ export function GridCreator({
   const trpc = useTRPCClient()
   const concepts = items.filter((item): item is Saved => Boolean(item.grid && !item.draftId))
   // A saved draft's video can still be downloaded, though its concept no longer changes.
-  const finished = items.filter(
-    (item): item is Saved => Boolean(item.grid && item.media.some((entry) => entry.assetId))
+  const finished = items.filter((item): item is Saved =>
+    Boolean(item.grid && item.media.some((entry) => entry.assetId))
   )
   const [stage, setStage] = React.useState<Stage>(concepts.length ? 'customize' : 'inputs')
 
@@ -274,6 +285,55 @@ export function GridCreator({
     }
   }
 
+  // A new headline comes from AI, working from the batch's others so it stays on topic.
+  const [regenerating, setRegenerating] = React.useState<string | null>(null)
+  const newHeadline = async (item: Saved) => {
+    const { lines: [headline] = [] } = await trpc.editorAi.suggestGridLines.mutate({
+      count: 1,
+      existing: [...new Set(concepts.map((other) => other.grid.headline))].slice(0, 50),
+      kind: 'captions',
+    })
+    return headline ?? item.grid.headline
+  }
+  const withCaption = (item: Saved, latest: BatchItem, grid: BatchGrid) => ({
+    grid,
+    // A caption still equal to the headline follows it.
+    ...(latest.caption === item.grid.headline ? { caption: grid.headline } : {}),
+  })
+  const regenerateCaption = async (item: Saved) => {
+    setRegenerating(item.id)
+    try {
+      const headline = await newHeadline(item)
+      await onUpdate(item, (latest) =>
+        withCaption(item, latest, { ...(latest.grid ?? item.grid), headline })
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No new caption came back.')
+    } finally {
+      setRegenerating(null)
+    }
+  }
+  const regenerateVideo = async (item: Saved) => {
+    if (!window.confirm('Regenerate this video? Its caption and images are replaced.')) return
+    setRegenerating(item.id)
+    try {
+      // Without AI the items still change: the new headline is what needs it.
+      const headline = await newHeadline(item).catch(() => {
+        toast.info('No new caption came back, so this video keeps its headline.')
+        return item.grid.headline
+      })
+      const pool = [...lines, ...concepts.flatMap((other) => other.grid.slots.map((s) => s.topic))]
+      await onUpdate(item, (latest) =>
+        withCaption(item, latest, {
+          ...redrawConcept(latest.grid ?? item.grid, pool),
+          headline,
+        })
+      )
+    } finally {
+      setRegenerating(null)
+    }
+  }
+
   const [lastTopic, setLastTopic] = React.useState('')
   const [lastImage, setLastImage] = React.useState<{ assetId: string; name: string } | null>(null)
   const applyLastCell = () =>
@@ -314,7 +374,13 @@ export function GridCreator({
     )
 
   // Render: one video at a time, each saved on its item as soon as it is done.
-  const [progress, setProgress] = React.useState<Record<string, number | string>>({})
+  const [progress, setProgress] = React.useState<Record<string, number | string>>(() =>
+    Object.fromEntries(
+      (lastRender?.items ?? []).flatMap((entry) =>
+        entry.status === 'FAILED' && entry.error ? [[entry.itemId, entry.error]] : []
+      )
+    )
+  )
   const [running, setRunning] = React.useState(false)
   const abort = React.useRef<AbortController | null>(null)
   const supported = React.useSyncExternalStore(
@@ -339,29 +405,47 @@ export function GridCreator({
     abort.current = controller
     setRunning(true)
     setProgress({})
-    await runPool(
-      toRender,
-      1,
-      async (item) => {
-        try {
-          const blob = await renderGridVideo(item.grid, controller.signal, (fraction) =>
-            setProgress((current) => ({ ...current, [item.id]: fraction }))
-          )
-          const fileName = `grid-video-${item.position + 1}.mp4`
-          const { assetId } = await saveExportToWorkspace({ blob, fileName, trpcClient: trpc })
-          await onUpdate(item, () => ({ media: [{ assetId, fileName }] }))
-          setProgress((current) => ({ ...current, [item.id]: 1 }))
-        } catch (error) {
-          if (controller.signal.aborted) return
-          setProgress((current) => ({
-            ...current,
-            [item.id]: error instanceof Error ? error.message : 'This video could not be rendered.',
-          }))
-        }
-      },
-      controller.signal
-    )
-    setRunning(false)
+    try {
+      // The server freezes each concept, so a video cannot land on one that changed since.
+      const run = await call<BatchRun>(`${base}/renders`, {
+        body: {
+          itemIds: toRender.map((item) => item.id),
+          requestKey: `render-${crypto.randomUUID()}`,
+        },
+        method: 'POST',
+      })
+      const report = `${base}/renders/${encodeURIComponent(run.id)}/items`
+      await runPool(
+        run.items,
+        1,
+        async (entry) => {
+          const url = `${report}/${encodeURIComponent(entry.itemId)}`
+          try {
+            const blob = await renderGridVideo(entry.grid!, controller.signal, (fraction) =>
+              setProgress((current) => ({ ...current, [entry.itemId]: fraction }))
+            )
+            const item = concepts.find((candidate) => candidate.id === entry.itemId)
+            const fileName = `grid-video-${(item?.position ?? 0) + 1}.mp4`
+            const { assetId } = await saveExportToWorkspace({ blob, fileName, trpcClient: trpc })
+            await call(url, { body: { assetId, fileName }, method: 'POST' })
+            setProgress((current) => ({ ...current, [entry.itemId]: 1 }))
+            await onReload()
+          } catch (error) {
+            if (controller.signal.aborted) return
+            const message =
+              error instanceof Error ? error.message : 'This video could not be rendered.'
+            setProgress((current) => ({ ...current, [entry.itemId]: message }))
+            // Recorded so the failure is still here after a reload; losing the record is harmless.
+            await call(url, { body: { error: message }, method: 'POST' }).catch(() => undefined)
+          }
+        },
+        controller.signal
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The videos could not be rendered.')
+    } finally {
+      setRunning(false)
+    }
   }
 
   const fetchVideo = async (item: Saved) => {
@@ -644,6 +728,26 @@ export function GridCreator({
                   >
                     {item.grid.musicAssetId ? 'Change music' : 'Add music'}
                   </FilePicker>
+                  <Button
+                    aria-label={`New caption for video ${conceptIndex + 1}`}
+                    disabled={disabled || regenerating === item.id}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => void regenerateCaption(item)}
+                  >
+                    New caption
+                  </Button>
+                  <Button
+                    aria-label={`Regenerate video ${conceptIndex + 1}`}
+                    disabled={disabled || regenerating === item.id}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                    onClick={() => void regenerateVideo(item)}
+                  >
+                    Regenerate video
+                  </Button>
                 </div>
                 <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {item.grid.slots.map((slot, index) => {

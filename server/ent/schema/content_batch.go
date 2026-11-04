@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"encoding/json"
 	"time"
 
 	"entgo.io/ent"
@@ -11,7 +12,7 @@ import (
 )
 
 // ContentBatch is a set of separate posts prepared together (RFC 042 bulk
-// scheduling): up to 50 items in one social set, which survive a refresh or a
+// scheduling): up to 100 items in one social set, which survive a refresh or a
 // closed tab. Each item becomes its own content draft, so review, scheduling
 // and publication status stay on the draft and its scheduled posts.
 type ContentBatch struct{ ent.Schema }
@@ -108,5 +109,51 @@ func (ContentBatchItem) Indexes() []ent.Index {
 		index.Fields("batch_id", "import_key").Unique(),
 		index.Fields("batch_id", "position"),
 		index.Fields("draft_id").Unique(),
+	}
+}
+
+// BatchRunItem is one item of a run: what was frozen for it and what happened.
+// Status is PENDING, DONE, FAILED, or UNCONFIRMED when no answer came back.
+type BatchRunItem struct {
+	ItemID  string   `json:"itemId"`
+	Status  string   `json:"status"`
+	Error   string   `json:"error,omitempty"`
+	AssetID string   `json:"assetId,omitempty"`
+	DraftID string   `json:"draftId,omitempty"`
+	PostIDs []string `json:"postIds,omitempty"`
+	// Grid is the concept a render froze; Schedule the request a submit froze.
+	Grid     *BatchGrid      `json:"grid,omitempty"`
+	Schedule json.RawMessage `json:"schedule,omitempty"`
+}
+
+// ContentBatchRun is one pass over a batch: scheduling its items, or rendering
+// its grid concepts. Posts and assets remain the record of what exists.
+type ContentBatchRun struct{ ent.Schema }
+
+func (ContentBatchRun) Annotations() []schema.Annotation {
+	return []schema.Annotation{entsql.Annotation{Table: "content_batch_run"}}
+}
+
+func (ContentBatchRun) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("id").Immutable(),
+		field.String("batch_id").StorageKey("batchId").Immutable(),
+		field.String("organization_id").StorageKey("organizationId").Immutable(),
+		field.String("kind").Immutable(),
+		field.String("request_key").StorageKey("requestKey").Immutable(),
+		field.String("fingerprint").Immutable(),
+		field.String("status"),
+		field.JSON("items", []BatchRunItem{}).StorageKey("items"),
+		field.String("created_by_user_id").StorageKey("createdByUserId").Optional().Nillable().Immutable(),
+		field.String("session_id").StorageKey("sessionId").Optional().Nillable().Immutable(),
+		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
+		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
+	}
+}
+
+func (ContentBatchRun) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("batch_id", "request_key").Unique(),
+		index.Fields("batch_id", "kind", "created_at"),
 	}
 }

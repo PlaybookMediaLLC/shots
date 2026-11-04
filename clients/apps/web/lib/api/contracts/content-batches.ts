@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import { defineContract, timestampSchema } from '@/lib/api/contract'
 import {
+  BATCH_ITEM_LIMIT,
+  BATCH_MEDIA_LIMIT,
+  batchGridSchema,
+  batchParamsSchema,
+  batchRunSchema,
+  fileNameSchema,
+} from './content-batch-runs'
+import {
   contentDraftCreateSchema,
   contentDraftIdSchema,
   contentDraftPostSchema,
@@ -11,19 +19,18 @@ import {
  * becomes its own draft and is scheduled through the ordinary draft schedule.
  */
 
-/** The most posts one batch holds; Go's `contentBatchItemLimit`. */
-export const BATCH_ITEM_LIMIT = 100
-
-/** The most attachments one post holds; Go's `contentDraftAssetLimit`. */
-export const BATCH_MEDIA_LIMIT = 20
-
-/** A file name as stored in an object key: letters, digits, dots, dashes, underscores. */
-const fileNameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(/^[a-zA-Z0-9._-]+$/)
-  .refine((value) => value !== '.' && value !== '..')
+export {
+  BATCH_ITEM_LIMIT,
+  BATCH_MEDIA_LIMIT,
+  batchGridSchema,
+  batchParamsSchema,
+  batchRunSchema,
+  GRID_HEADLINE_LIMIT,
+  GRID_TOPIC_LIMIT,
+  type BatchGrid,
+  type BatchRun,
+  type BatchRunItem,
+} from './content-batch-runs'
 
 /** One attachment of an item: an uploaded asset, or a selected file still uploading. */
 export const batchMediaSchema = z
@@ -56,29 +63,6 @@ export const batchTimingSchema = z.object({
 
 /** One of {@link batchTimingSchema}. */
 export type BatchTiming = z.infer<typeof batchTimingSchema>
-
-/** The most characters of a grid video's headline; Go's `batchGridHeadlineLimit`. */
-export const GRID_HEADLINE_LIMIT = 60
-
-/** The most characters of a grid cell's label; Go's `batchGridTopicLimit`. */
-export const GRID_TOPIC_LIMIT = 100
-
-/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
-export const batchGridSchema = z.object({
-  headline: z.string().trim().min(1).max(GRID_HEADLINE_LIMIT),
-  musicAssetId: contentDraftIdSchema.optional(),
-  slots: z
-    .array(
-      z.object({
-        assetId: contentDraftIdSchema.optional(),
-        topic: z.string().max(GRID_TOPIC_LIMIT),
-      })
-    )
-    .length(4),
-})
-
-/** One of {@link batchGridSchema}. */
-export type BatchGrid = z.infer<typeof batchGridSchema>
 
 /** A staged item; `importKey` makes a retry idempotent. */
 export const batchItemInputSchema = z.object({
@@ -147,7 +131,11 @@ export const contentBatchSchema = z.object({
   id: z.string(),
   itemCount: z.number().int(),
   items: z.array(batchItemSchema).optional(),
+  /** The latest render of this batch, when one batch is read. */
+  render: batchRunSchema.optional(),
   socialSetId: z.string(),
+  /** The latest schedule of this batch, when one batch is read. */
+  submission: batchRunSchema.optional(),
   timeZone: z.string(),
   title: z.string(),
   updatedAt: timestampSchema,
@@ -155,9 +143,6 @@ export const contentBatchSchema = z.object({
 
 /** One of {@link contentBatchSchema}. */
 export type ContentBatch = z.infer<typeof contentBatchSchema>
-
-/** Path parameters of a batch. */
-export const batchParamsSchema = z.object({ id: contentDraftIdSchema })
 
 /** Path parameters of a batch item. */
 export const batchItemParamsSchema = z.object({

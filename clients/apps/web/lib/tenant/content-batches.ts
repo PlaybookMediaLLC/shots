@@ -9,7 +9,8 @@ import type {
 } from 'screenshot-studio-backend-sdk'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { backendSDK, orNull, withDates } from '@/lib/backend/sdk'
-import { draftTargets, readPost } from '@/lib/tenant/content-drafts'
+import { draftTargets, prepareContentDraftSchedule, readPost } from '@/lib/tenant/content-drafts'
+import { hasLivePosts } from '@/lib/write/batch'
 import { ScheduledPostError } from '@/lib/tenant/scheduled-posts'
 
 /**
@@ -84,6 +85,85 @@ export async function createContentBatchItemDraft(
   input: BackendContentDraftCreate
 ) {
   return readItem(await backendSDK(context).createContentBatchItemDraft(id, itemId, input))
+}
+
+/**
+ * Schedule items in the background. The composer's builder runs here, once, so
+ * the workflow applies exactly what was checked; an item that cannot go is
+ * recorded with its reason and the rest carry on. Null when the batch is not visible.
+ */
+export async function submitContentBatch(
+  context: OrganizationAccess,
+  id: string,
+  input: { items: { itemId: string; channelConnectionIds: string[] }[]; requestKey: string }
+) {
+  const sdk = backendSDK(context)
+  const batch = await orNull(sdk.getContentBatch(id))
+  if (!batch) return null
+  const byId = new Map((batch.items ?? []).map((item) => [item.id, item]))
+  // shortcut: prepares one item at a time, about a request per item; parallelize if a full batch is slow.
+  const items = []
+  for (const { channelConnectionIds, itemId } of input.items) {
+    const item = byId.get(itemId)
+    if (!item) throw new ScheduledPostError('A selected item is not in this batch.', 404)
+    if (!item.draftId || !item.draft) {
+      items.push({ itemId, refusal: 'Save this item as a draft first.' })
+      continue
+    }
+    const { timing } = item
+    try {
+      const schedule = await prepareContentDraftSchedule(context, item.draftId, {
+        add: hasLivePosts(item.posts),
+        channelConnectionIds,
+        naturalPostingTime: false,
+        version: item.draft.version,
+        ...(timing.mode === 'queue'
+          ? { expectedQueueSlot: timing.expectedQueueSlot, queue: true }
+          : {
+              disambiguation: timing.disambiguation,
+              localTime: timing.localTime,
+              timeZone: timing.timeZone,
+            }),
+      })
+      items.push(
+        schedule
+          ? { itemId, schedule }
+          : { itemId, refusal: 'This item’s draft is no longer available.' }
+      )
+    } catch (error) {
+      if (!(error instanceof ScheduledPostError)) throw error
+      items.push({ itemId, refusal: error.message })
+    }
+  }
+  return withDates(await sdk.submitContentBatch(id, { items, requestKey: input.requestKey }))
+}
+
+/** What a schedule or render of a batch did; null when it is not visible. */
+export async function getContentBatchRun(context: OrganizationAccess, id: string, runId: string) {
+  const run = await orNull(backendSDK(context).getContentBatchRun(id, runId))
+  return run ? withDates(run) : null
+}
+
+/** Freeze grid concepts for a browser to render; null when the batch is not visible. */
+export async function createContentBatchRender(
+  context: OrganizationAccess,
+  id: string,
+  input: { itemIds: string[]; requestKey: string }
+) {
+  const run = await orNull(backendSDK(context).createContentBatchRender(id, input))
+  return run ? withDates(run) : null
+}
+
+/** Record a rendered video on its item, or why it failed; null when it is not visible. */
+export async function reportContentBatchRender(
+  context: OrganizationAccess,
+  id: string,
+  runId: string,
+  itemId: string,
+  input: { assetId?: string; error?: string; fileName?: string }
+) {
+  const run = await orNull(backendSDK(context).reportContentBatchRender(id, runId, itemId, input))
+  return run ? withDates(run) : null
 }
 
 /** The result of one item and account. */

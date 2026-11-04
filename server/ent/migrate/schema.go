@@ -908,6 +908,39 @@ var (
 			},
 		},
 	}
+	// ContentBatchRunColumns holds the columns for the "content_batch_run" table.
+	ContentBatchRunColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "batchId", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "requestKey", Type: field.TypeString},
+		{Name: "fingerprint", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString},
+		{Name: "items", Type: field.TypeJSON},
+		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "sessionId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// ContentBatchRunTable holds the schema information for the "content_batch_run" table.
+	ContentBatchRunTable = &schema.Table{
+		Name:       "content_batch_run",
+		Columns:    ContentBatchRunColumns,
+		PrimaryKey: []*schema.Column{ContentBatchRunColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentbatchrun_batchId_requestKey",
+				Unique:  true,
+				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[4]},
+			},
+			{
+				Name:    "contentbatchrun_batchId_kind_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[3], ContentBatchRunColumns[10]},
+			},
+		},
+	}
 	// ContentDraftColumns holds the columns for the "content_draft" table.
 	ContentDraftColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -3742,6 +3775,7 @@ var (
 		ContentAngleTable,
 		ContentBatchTable,
 		ContentBatchItemTable,
+		ContentBatchRunTable,
 		ContentDraftTable,
 		ContentDraftFinisherTable,
 		ContentDraftRevisionTable,
@@ -3925,6 +3959,9 @@ func init() {
 	}
 	ContentBatchItemTable.Annotation = &entsql.Annotation{
 		Table: "content_batch_item",
+	}
+	ContentBatchRunTable.Annotation = &entsql.Annotation{
+		Table: "content_batch_run",
 	}
 	ContentDraftTable.Annotation = &entsql.Annotation{
 		Table: "content_draft",

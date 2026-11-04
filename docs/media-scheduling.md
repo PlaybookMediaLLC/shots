@@ -69,6 +69,7 @@ activity and never persisted, logged, or put in workflow history.
 | Video facts | `server/internal/mediavideo` (`Probe`) |
 | Draft media checks at scheduling | `server/internal/product/content_draft_media.go`, `content_draft_schedule.go` |
 | Bulk batches | `server/internal/product/content_batch.go`, `server/internal/httpapi/content_batches.go`; web `lib/tenant/content-batches.ts`, `lib/api/contracts/content-batches.ts`, `components/write/batch/` |
+| Background batch schedule | `server/internal/product/content_batch_run.go`, `server/internal/temporalbatches` |
 | Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts` |
 | Browser uploads | `clients/apps/web/lib/workspace/save-export.ts` |
 | Publish-time checks | `server/internal/publishing/repository.go` (`LoadPublishJob`) |
@@ -108,6 +109,7 @@ no queue table is added: Temporal stays the only scheduler.
 | `20261103093000_asset_multipart_upload.sql` | `asset."uploadId"`: the multipart upload a `PENDING` asset waits on, cleared at completion. |
 | `20261104100000_content_batch_source_key.sql` | `content_batch_item."sourceKey"`: the file or folder name an item came from, as the person knows it. |
 | `20261104101000_content_batch_grid.sql` | `content_batch_item.grid` for grid video concepts, and `platform_asset_in_use_v1` also counts a concept's images and music. |
+| `20261104102000_content_batch_run.sql` | `content_batch_run`: one schedule or render of a batch, what it froze and each item's outcome. |
 
 Why tables for batches: a batch must survive a reload, another device and a
 second editor, and an item must exist before its files finish uploading and
@@ -225,12 +227,44 @@ The analysis's remaining checks ([verification matrix](scheduling/post-bridge/bu
 | BULK-046 to 052: recovery, render, handoff | `test/e2e/bulk-tools.spec.ts`, `test/write-grid-layout.test.ts` |
 | BULK-056, 057: submission, retry, partial success | `TestContentBatches`, `TestContentDraftScheduleReliability` |
 
-Deliberately not built from the analysis: the proposed `/batches` and
-`/render-batches` API, a server-side submit job and server rendering (the client
-loop over per-draft idempotent scheduling resumes without duplicates); global
-format and length caps and a 120-day horizon (destination rules decide); an hourly
-AI image cap (AI credits decide); per-concept "regenerate" buttons (headlines and
-labels are edited directly, and a slot's Generate replaces its image).
+The analysis's suggested endpoints map onto the batch's own routes, under
+`/api/v1/content-batches`, so there is one batch model:
+
+| Suggested | Route | What it does |
+| --- | --- | --- |
+| `POST /batches`, `GET /batches/{id}` | `POST /`, `GET /{id}` | The durable batch, with its latest `submission` and `render` |
+| `POST /batches/validate` | `POST /{id}/validate` | Each item and account, without charging or reserving |
+| `POST /batches/{id}/submit` | `POST /{id}/submit` | Freezes each item's schedule and starts a workflow; the same `requestKey` replays |
+| `POST /render-batches` | `POST /{id}/renders` | Freezes concepts for this browser to render, and retires any earlier render |
+| `GET /render-batches/{id}` | `GET /{id}/runs/{runId}` | Per-item outcomes of a schedule or a render |
+| (recording a video) | `POST /{id}/renders/{runId}/items/{itemId}` | Attaches a video to its item, or records why it failed |
+
+**Background submit.** The web builds each post once with the composer's builder,
+and `content_batch_run` holds the frozen requests; workflow history carries only
+IDs. `temporalbatches.Workflow` applies them one at a time through
+`ScheduleContentDraft`, so approval, quota and idempotency are not repeated. A
+definite refusal is that item's outcome and the rest carry on. A failure to get an
+answer is retried, which replays rather than duplicates, and after its retries the
+item is `UNCONFIRMED` and the run moves on. The page can close at any point, and
+reopening it shows the progress. The run acts as the person who asked, using their
+session: scheduling stays a person's decision, so when their session ends or their
+role changes, the rest of the run is refused with a reason. A long run can outlive
+a session this way, and the person schedules the remainder again.
+
+**Render runs.** Rendering stays in the browser. The server's part is the record: a
+run freezes each concept, and a video attaches only if the concept is still what was
+frozen and the run has not been replaced by a newer one. A failure stays visible
+after a reload. A browser closed mid-render leaves its items `PENDING`; rendering
+again starts a new run.
+
+**Regenerating.** On a concept, "New caption" asks AI for a headline in the spirit of
+the batch's others. "Regenerate video" also redraws its four items from the batch's
+content items, in a new order, and clears its images, keeping its music; it asks
+first, and keeps the headline if AI gives nothing back. Either drops a rendered video.
+
+Deliberately not built from the analysis: global format and length caps and a
+120-day horizon (destination rules decide), and an hourly AI image cap (AI credits
+decide).
 
 ## Scheduling semantics
 
@@ -329,15 +363,16 @@ the two asset columns in a new reviewed migration.
 ## Evidence
 
 Bulk tools, 4 November 2026. `make -C server check` passed with the four CI
-databases, and `npm run format:check`, lint and the web unit suite (1,300 tests)
-passed; the web's production image built. `renderGridVideo` ran in Chrome against
+databases, and `npm run format:check`, lint and the web unit suite passed; the web's
+production image built before the run and regenerate work. `renderGridVideo` ran in Chrome against
 served images and a tone: `ffprobe` read H.264, 1080×1920, 30 fps, 180 frames and
 6 s, with AAC at 6.08 s when there is music, and every frame decoded.
-`test/e2e/bulk-tools.spec.ts` has **not run yet**: Docker's storage failed when the
-host disk filled, before the stack could start. Until it does, the batch page and
-wizard are unproven in a browser. `./dev/social-gate` and `make tenant-isolation`
-were not run, and the gate has no grid case; a rendered video is an ordinary MP4
-asset on that path.
+`test/e2e/bulk-tools.spec.ts` and the grid case in `social-gate.spec.ts`, which
+renders a video and schedules it through the worker with no page open, did not run
+locally: Docker's storage failed when the host disk filled. CI runs them. Until it
+does, the batch page, the wizard and the worker in the full stack are unproven.
+`make tenant-isolation` was not run either. The worker's steps are proven against
+PostgreSQL and its workflow in Temporal's test environment.
 
 Run on this branch, against local PostgreSQL (Docker was unavailable). The
 full Go suite and its race set pass except

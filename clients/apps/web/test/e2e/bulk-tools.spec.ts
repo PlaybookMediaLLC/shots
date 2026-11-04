@@ -233,6 +233,23 @@ test(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
     ).toBeDisabled()
 
+    // One video gets a new caption; another is redrawn, keeping its music and place.
+    await page.getByRole('button', { name: 'New caption for video 1', exact: true }).click()
+    await expect(page.getByLabel('Headline for video 1')).toHaveValue('Scripted suggestion one')
+    const topics = () =>
+      Promise.all(
+        [1, 2, 3, 4].map((slot) => page.getByLabel(`Label for video 2 image ${slot}`).inputValue())
+      )
+    const before = await topics()
+    await page.getByRole('button', { name: 'Generate video 2 image 1', exact: true }).click()
+    await expect(page.getByTestId('grid-readiness')).toContainText('7 images missing', {
+      timeout: 60_000,
+    })
+    page.once('dialog', (dialog) => void dialog.accept())
+    await page.getByRole('button', { name: 'Regenerate video 2', exact: true }).click()
+    await expect(page.getByTestId('grid-readiness')).toContainText('8 images missing')
+    await expect.poll(async () => (await topics()).join()).not.toBe(before.join())
+
     // The last cell setting writes the bottom right of every video.
     await page.getByLabel('Last cell label').fill('Follow for more')
     await page.getByRole('button', { name: 'Apply to all videos', exact: true }).click()
@@ -252,14 +269,27 @@ test(
     const list = page.getByTestId('grid-render-list')
     await expect(list.getByText('Done', { exact: true })).toHaveCount(2, { timeout: 300_000 })
 
+    // The server recorded the run: what was frozen, and each video it made.
+
     // The saved video is what the analysis measured: 9:16, 6 seconds, H.264 and AAC.
     const id = new URL(page.url()).pathname.split('/').pop()!
     const batch = (await apiRequest(page, `/api/v1/content-batches/${id}`)).body as {
       items: {
         media: { assetId: string; durationMs: number; height: number; width: number }[]
       }[]
+      render: { id: string; items: { assetId: string; status: string }[]; status: string }
     }
+    expect(batch.render.status).toBe('FINISHED')
+    expect(batch.render.items.map((item) => item.status)).toEqual(['DONE', 'DONE'])
     const media = batch.items[0]!.media[0]!
+    expect(batch.render.items[0]!.assetId).toBe(media.assetId)
+    // Only what the run froze can be recorded.
+    const stale = await apiRequest(
+      page,
+      `/api/v1/content-batches/${id}/renders/${batch.render.id}/items/cmissingitem00000000000000`,
+      { body: { error: 'Not in this run.' }, method: 'POST' }
+    )
+    expect(stale.status).toBe(404)
     expect([media.width, media.height]).toEqual([1080, 1920])
     expect(media.durationMs).toBeGreaterThanOrEqual(5900)
     expect(media.durationMs).toBeLessThanOrEqual(6100)

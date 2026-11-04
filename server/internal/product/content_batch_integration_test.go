@@ -2,6 +2,7 @@ package product
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -336,6 +337,213 @@ func TestContentBatches(t *testing.T) {
 		}
 	})
 
+	t.Run("a submit run schedules frozen items as the person who asked, and reports each", func(t *testing.T) {
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Submit"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		inputs := []ContentBatchItemInput{item("submit", 0, photos[0]), item("submit", 1, photos[1]), item("submit", 2, photos[2])}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, inputs); err != nil {
+			t.Fatal(err)
+		}
+		draftAll(batch)
+		reloaded, err := repo.GetContentBatch(ctx, owner, batch.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		frozen := func(index int) *ScheduleContentDraftInput {
+			entry := reloaded.Items[index]
+			targets := []ContentDraftScheduleTarget{}
+			for _, channel := range entry.ChannelConnectionIDs {
+				targets = append(targets, ContentDraftScheduleTarget{ChannelConnectionID: channel, Caption: entry.Draft.PlainText, AssetIDs: entry.Draft.AssetIDs})
+			}
+			return &ScheduleContentDraftInput{Version: entry.Draft.Version, LocalTime: entry.Timing.LocalTime, TimeZone: entry.Timing.TimeZone, Targets: targets}
+		}
+		input := BatchSubmitInput{RequestKey: "submit-request-key-0001", Items: []BatchSubmitItem{
+			{ItemID: reloaded.Items[0].ID, Schedule: frozen(0)},
+			{ItemID: reloaded.Items[1].ID, Refusal: "x: This video is too long."},
+			{ItemID: reloaded.Items[2].ID, Schedule: frozen(2)},
+		}}
+		// A person only: a key cannot schedule a batch.
+		if _, err := repo.SubmitContentBatch(ctx, Actor{OrganizationID: w.org, Kind: "service"}, batch.ID, input); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("service actor: %v", err)
+		}
+		// Without a worker to start it, the run is saved, and a retry finds the same one.
+		if _, err := repo.SubmitContentBatch(ctx, owner, batch.ID, input); !errors.Is(err, ErrBatchRunNotStarted) {
+			t.Fatalf("no starter: %v", err)
+		}
+		starter := &recordingBatchStarter{}
+		repo.WithBatchRuns(starter)
+		run, err := repo.SubmitContentBatch(ctx, owner, batch.ID, input)
+		if err != nil || run.Status != "RUNNING" || len(starter.runs) != 1 || starter.runs[0] != run.ID {
+			t.Fatalf("submit: %+v %v %v", run, err, starter.runs)
+		}
+		if run.Items[0].Status != "PENDING" || run.Items[1].Status != "FAILED" || run.Items[1].Error != "x: This video is too long." || run.Items[0].Schedule != nil {
+			t.Fatalf("items: %+v", run.Items)
+		}
+		again, err := repo.SubmitContentBatch(ctx, owner, batch.ID, input)
+		if err != nil || again.ID != run.ID {
+			t.Fatalf("replay: %+v %v", again, err)
+		}
+		other := input
+		other.Items = input.Items[:1]
+		if _, err := repo.SubmitContentBatch(ctx, owner, batch.ID, other); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("reused key: %v", err)
+		}
+
+		first, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
+		if err != nil || first.Done || len(first.Scheduled) != 2 {
+			t.Fatalf("first step: %+v %v", first, err)
+		}
+		// A step whose answer was lost replays the item: the same posts, not new ones.
+		var countBefore int
+		if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM scheduled_post WHERE "contentDraftId"=$1`, *reloaded.Items[0].DraftID).Scan(&countBefore); err != nil {
+			t.Fatal(err)
+		}
+		replayed, err := repo.ScheduleContentDraft(ctx, owner, *reloaded.Items[0].DraftID, *frozen(0))
+		if err != nil || replayed.Created {
+			t.Fatalf("replay of item: %+v %v", replayed, err)
+		}
+		var countAfter int
+		if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM scheduled_post WHERE "contentDraftId"=$1`, *reloaded.Items[0].DraftID).Scan(&countAfter); err != nil || countAfter != countBefore {
+			t.Fatalf("replay made posts: %d then %d %v", countBefore, countAfter, err)
+		}
+
+		// A session that ends stops the rest, with a reason: nothing runs as a service.
+		w.exec(t, `UPDATE session SET "expiresAt"=now()-interval '1 hour' WHERE id=$1`, owner.SessionID)
+		last, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
+		w.exec(t, `UPDATE session SET "expiresAt"=now()+interval '1 hour' WHERE id=$1`, owner.SessionID)
+		if err != nil || !last.Done || len(last.Scheduled) != 0 {
+			t.Fatalf("ended session: %+v %v", last, err)
+		}
+		finished, err := repo.GetContentBatchRun(ctx, owner, batch.ID, run.ID)
+		if err != nil || finished.Status != "FINISHED" {
+			t.Fatalf("finished: %+v %v", finished, err)
+		}
+		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 || finished.Items[2].Status != "FAILED" || !strings.Contains(finished.Items[2].Error, "session ended") {
+			t.Fatalf("outcomes: %+v", finished.Items)
+		}
+		// The batch shows its latest run on a reload, and a stranger sees neither.
+		shown, err := repo.GetContentBatch(ctx, owner, batch.ID)
+		if err != nil || shown.Submission == nil || shown.Submission.ID != run.ID {
+			t.Fatalf("latest: %+v %v", shown.Submission, err)
+		}
+		stranger := newTestWorkspace(t)
+		subscribe(t, ctx, repo, stranger.org, "pro")
+		if _, err := repo.GetContentBatchRun(ctx, stranger.owner, batch.ID, run.ID); !errors.Is(err, publishing.ErrNotFound) {
+			t.Fatalf("another workspace: %v", err)
+		}
+		if _, err := repo.ScheduleNextBatchRunItem(ctx, stranger.org, run.ID); err == nil {
+			t.Fatal("another workspace stepped this run")
+		}
+
+		// Retries that find no answer mark the item, and a replay of the step is done.
+		stuck, err := repo.SubmitContentBatch(ctx, owner, batch.ID, BatchSubmitInput{RequestKey: "submit-request-key-0002",
+			Items: []BatchSubmitItem{{ItemID: reloaded.Items[2].ID, Schedule: frozen(2)}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.MarkBatchRunItemUnconfirmed(ctx, w.org, stuck.ID); err != nil {
+			t.Fatal(err)
+		}
+		marked, err := repo.GetContentBatchRun(ctx, owner, batch.ID, stuck.ID)
+		if err != nil || marked.Status != "FINISHED" || marked.Items[0].Status != "UNCONFIRMED" {
+			t.Fatalf("unconfirmed: %+v %v", marked, err)
+		}
+		if done, err := repo.ScheduleNextBatchRunItem(ctx, w.org, stuck.ID); err != nil || !done.Done {
+			t.Fatalf("after unconfirmed: %+v %v", done, err)
+		}
+	})
+
+	t.Run("a render run freezes concepts, so a stale or superseded video cannot land", func(t *testing.T) {
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Renders"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		slots := []schema.BatchGridSlot{{Topic: "One", AssetID: photos[0]}, {Topic: "Two", AssetID: photos[1]}, {Topic: "Three", AssetID: photos[2]}, {Topic: "Four", AssetID: photos[0]}}
+		concept := func(i int) ContentBatchItemInput {
+			input := item("render", i, "")
+			input.Media = nil
+			input.Grid = &schema.BatchGrid{Headline: "Four tools", Slots: slots}
+			return input
+		}
+		empty := concept(2)
+		empty.Grid = &schema.BatchGrid{Headline: "Four tools", Slots: []schema.BatchGridSlot{{Topic: "One"}, {Topic: "Two"}, {Topic: "Three"}, {Topic: "Four"}}}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, []ContentBatchItemInput{concept(0), concept(1), empty, item("render", 3, photos[0])}); err != nil {
+			t.Fatal(err)
+		}
+		a, b := batch.Items[0].ID, batch.Items[1].ID
+		for name, ids := range map[string][]string{"an unfilled concept": {batch.Items[2].ID}, "a plain post": {batch.Items[3].ID}, "an item twice": {a, a}} {
+			if _, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, BatchRenderInput{RequestKey: "render-refused-key-0001", ItemIDs: ids}); !errors.Is(err, ErrInvalidInput) {
+				t.Fatalf("%s: %v", name, err)
+			}
+		}
+		key := BatchRenderInput{RequestKey: "render-request-key-0001", ItemIDs: []string{a, b}}
+		run, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, key)
+		if err != nil || run.Status != "RUNNING" || run.Items[0].Grid == nil || run.Items[0].Status != "PENDING" {
+			t.Fatalf("render: %+v %v", run, err)
+		}
+		if again, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, key); err != nil || again.ID != run.ID {
+			t.Fatalf("replay: %+v %v", again, err)
+		}
+		report := BatchRenderReport{AssetID: videos[0], FileName: "grid-1.mp4"}
+		// Only a video, and only one this workspace holds, can be the output.
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, a, BatchRenderReport{AssetID: photos[0], FileName: "grid-1.mp4"}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("an image as the output: %v", err)
+		}
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, a, BatchRenderReport{AssetID: "cmissingasset000000000000"}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("an unknown asset: %v", err)
+		}
+		done, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, a, report)
+		if err != nil || done.Items[0].Status != "DONE" || done.Items[0].AssetID != videos[0] || done.Status != "RUNNING" {
+			t.Fatalf("report: %+v %v", done, err)
+		}
+		if replay, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, a, report); err != nil || replay.Items[0].Status != "DONE" {
+			t.Fatalf("report replay: %+v %v", replay, err)
+		}
+		reread, err := repo.GetContentBatch(ctx, owner, batch.ID)
+		if err != nil || len(reread.Items[0].Media) != 1 || reread.Items[0].Media[0].AssetID != videos[0] || reread.Render == nil || reread.Render.ID != run.ID {
+			t.Fatalf("attached: %+v %v", reread, err)
+		}
+		// A concept changed while it rendered keeps no stale video.
+		changed := &schema.BatchGrid{Headline: "Five tools", Slots: slots}
+		if _, err := repo.UpdateContentBatchItem(ctx, owner, batch.ID, b, ContentBatchItemUpdate{Grid: changed}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, b, report); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("stale video: %v", err)
+		}
+		// A failure is recorded, and settling the last item closes the run.
+		failed, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, run.ID, b, BatchRenderReport{Error: "This browser ran out of memory."})
+		if err != nil || failed.Status != "FINISHED" || failed.Items[1].Status != "FAILED" {
+			t.Fatalf("failure: %+v %v", failed, err)
+		}
+		// A newer render retires an older tab's run.
+		first, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, BatchRenderInput{RequestKey: "render-request-key-0002", ItemIDs: []string{b}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, err := repo.CreateContentBatchRender(ctx, owner, batch.ID, BatchRenderInput{RequestKey: "render-request-key-0003", ItemIDs: []string{b}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, first.ID, b, report); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("superseded render: %v", err)
+		}
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, second.ID, b, report); err != nil {
+			t.Fatalf("current render: %v", err)
+		}
+		// One side of a report must be set, and a stranger cannot report.
+		if _, err := repo.ReportContentBatchRender(ctx, owner, batch.ID, second.ID, b, BatchRenderReport{}); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("empty report: %v", err)
+		}
+		stranger := newTestWorkspace(t)
+		subscribe(t, ctx, repo, stranger.org, "pro")
+		if _, err := repo.ReportContentBatchRender(ctx, stranger.owner, batch.ID, second.ID, b, report); !errors.Is(err, publishing.ErrNotFound) {
+			t.Fatalf("another workspace: %v", err)
+		}
+	})
+
 	t.Run("a bulk update applies to every item or to none", func(t *testing.T) {
 		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Captions"})
 		if err != nil {
@@ -612,4 +820,11 @@ func TestContentBatches(t *testing.T) {
 			t.Fatalf("closed batch: %v", err)
 		}
 	})
+}
+
+type recordingBatchStarter struct{ runs []string }
+
+func (r *recordingBatchStarter) StartBatchRun(_ context.Context, _, runID string) error {
+	r.runs = append(r.runs, runID)
+	return nil
 }

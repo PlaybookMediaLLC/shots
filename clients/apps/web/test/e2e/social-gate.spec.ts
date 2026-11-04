@@ -441,3 +441,153 @@ test('the backend worker publishes draft photos, video, and ordered images once 
     ])
   }
 })
+
+test('a grid video rendered in the browser and scheduled in the background publishes once', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const connectionId = await connect(page, bootstrap.destinationId)
+    const created = await apiRequest(page, '/api/v1/content-batches', {
+      body: { title: 'Grid gate' },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const batch = z.object({ id: z.string(), timeZone: z.string() }).parse(created.body)
+
+    // The real wizard and browser render: nothing in the video is a fixture file.
+    await page.goto(`/publish/batches/${batch.id}?start=grid`)
+    await page.getByLabel('Quick start').selectOption('Tech')
+    await page.getByLabel('Caption 1', { exact: true }).fill('Grid gate video')
+    await page.getByRole('slider', { name: 'Number of videos' }).focus()
+    await page.keyboard.press('Home')
+    await page.getByRole('button', { name: 'Make 1 video concept', exact: true }).click()
+    await expect(page.getByTestId('grid-concept')).toHaveCount(1)
+    await page.getByLabel('Upload images for all videos').setInputFiles(
+      (['red', 'green', 'blue', 'black'] as const).map((name, index) => ({
+        buffer: [red, png, blue, png][index]!,
+        mimeType: 'image/png',
+        name: `${name}.png`,
+      }))
+    )
+    await expect(page.getByTestId('grid-readiness')).toContainText('1 of 1 videos ready', {
+      timeout: 120_000,
+    })
+    await page.getByRole('button', { name: 'Continue to render', exact: true }).click()
+    await page.getByRole('button', { name: 'Render 1 video', exact: true }).click()
+    await expect(
+      page.getByTestId('grid-render-list').getByText('Done', { exact: true })
+    ).toBeVisible({ timeout: 300_000 })
+
+    const itemsSchema = z.object({
+      items: z.array(
+        z.object({
+          draft: z.object({ version: z.number() }).nullable(),
+          draftId: z.string().nullable(),
+          id: z.string(),
+          media: z.array(z.object({ assetId: z.string() })),
+        })
+      ),
+    })
+    const read = async () =>
+      itemsSchema.parse((await apiRequest(page, `/api/v1/content-batches/${batch.id}`)).body)
+    const [concept] = (await read()).items
+    const caption = 'Grid gate caption, delivered once'
+    // Due shortly: local minutes, at least 30 seconds out as a draft must be.
+    const due = new Date(Date.now() + 120_000)
+    const localTime = new Intl.DateTimeFormat('sv-SE', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+      timeZone: batch.timeZone,
+    })
+      .format(due)
+      .replace(' ', 'T')
+    const staged = await apiRequest(
+      page,
+      `/api/v1/content-batches/${batch.id}/items/${concept!.id}`,
+      {
+        body: {
+          caption,
+          channelConnectionIds: [connectionId],
+          timing: { localTime, mode: 'time', timeZone: batch.timeZone },
+        },
+        method: 'PATCH',
+      }
+    )
+    expect(staged.status, JSON.stringify(staged.body)).toBe(200)
+
+    await page.reload()
+    await page.getByRole('button', { name: 'Save ready items as drafts', exact: true }).click()
+    await expect(page.getByRole('link', { name: /^Open draft/ })).toBeVisible({ timeout: 60_000 })
+
+    const submit = {
+      items: [{ channelConnectionIds: [connectionId], itemId: concept!.id }],
+      requestKey: `grid-gate-${organizationId}`,
+    }
+    const started = await apiRequest(page, `/api/v1/content-batches/${batch.id}/submit`, {
+      body: submit,
+      method: 'POST',
+    })
+    expect(started.status, JSON.stringify(started.body)).toBe(200)
+    const runSchema = z.object({
+      id: z.string(),
+      items: z.array(
+        z.object({
+          error: z.string().optional(),
+          postIds: z.array(z.string()).optional(),
+          status: z.string(),
+        })
+      ),
+      status: z.string(),
+    })
+    const run = runSchema.parse(started.body)
+    // Nobody is watching from here: the worker finishes the schedule on its own.
+    await page.goto('/publish')
+    await expect
+      .poll(
+        async () =>
+          runSchema.parse(
+            (await apiRequest(page, `/api/v1/content-batches/${batch.id}/runs/${run.id}`)).body
+          ).status,
+        { timeout: 120_000 }
+      )
+      .toBe('FINISHED')
+    const finished = runSchema.parse(
+      (await apiRequest(page, `/api/v1/content-batches/${batch.id}/runs/${run.id}`)).body
+    )
+    expect(finished.items[0]?.status, finished.items[0]?.error).toBe('DONE')
+    const [postId, ...others] = finished.items[0]?.postIds ?? []
+    expect(others).toHaveLength(0)
+    // Submitting again replays the run: no second post, no second charge.
+    const replayed = await apiRequest(page, `/api/v1/content-batches/${batch.id}/submit`, {
+      body: submit,
+      method: 'POST',
+    })
+    expect(runSchema.parse(replayed.body).id).toBe(run.id)
+
+    await awaitStatus(postId!, 'PUBLISHED')
+    const remote = await fakeState()
+    const [received, ...duplicates] = remote.posts.filter((post) => post.caption === caption)
+    expect(duplicates).toHaveLength(0)
+    const assetId = (await read()).items[0]!.media[0]!.assetId
+    const video = await page.context().request.get(`/api/v1/assets/${assetId}/content`)
+    const bytes = await video.body()
+    expect(received).toMatchObject({
+      media: [{ bytes: bytes.length, contentType: 'video/mp4', sha256: sha256(bytes) }],
+    })
+    const [attempt, ...extraAttempts] = await attemptsOf(postId!)
+    expect(extraAttempts).toHaveLength(0)
+    expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})

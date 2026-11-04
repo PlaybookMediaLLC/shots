@@ -114,3 +114,17 @@ export function withLastCell(grid: BatchGrid, last: { assetId?: string; topic?: 
     ...(last.assetId ? { assetId: last.assetId } : {}),
   })
 }
+
+/** A different concept in the same place: four other items, no images, the same music. */
+export function redrawConcept(
+  grid: BatchGrid,
+  lines: readonly string[],
+  random: () => number = Math.random
+): BatchGrid {
+  const pool = cleaned([...lines, ...grid.slots.map((slot) => slot.topic)])
+  const shown = grid.slots.map((slot) => slot.topic).join('\n')
+  let topics = draw(pool, GRID_SLOT_COUNT, random)
+  for (let tries = 0; tries < 8 && topics.join('\n') === shown; tries++)
+    topics = draw(pool, GRID_SLOT_COUNT, random)
+  return { ...grid, slots: topics.map((topic) => ({ topic })) }
+}

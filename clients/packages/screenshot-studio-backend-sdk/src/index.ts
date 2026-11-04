@@ -1357,6 +1357,24 @@ export type BackendContentBatchItem = {
   timing: BackendBatchTiming
 }
 
+/** One pass over a batch: scheduling its items, or rendering its grid concepts. */
+export type BackendContentBatchRun = {
+  createdAt: string
+  id: string
+  items: {
+    assetId?: string
+    draftId?: string
+    error?: string
+    grid?: BackendBatchGrid
+    itemId: string
+    postIds?: string[]
+    status: 'PENDING' | 'DONE' | 'FAILED' | 'UNCONFIRMED'
+  }[]
+  kind: 'submit' | 'render'
+  status: 'RUNNING' | 'FINISHED' | 'SUPERSEDED'
+  updatedAt: string
+}
+
 /** A durable batch of separate posts in one social set. */
 export type BackendContentBatch = {
   archivedAt: string | null
@@ -1364,6 +1382,8 @@ export type BackendContentBatch = {
   id: string
   itemCount: number
   items?: BackendContentBatchItem[]
+  render?: BackendContentBatchRun
+  submission?: BackendContentBatchRun
   socialSetId: string
   timeZone: string
   title: string
@@ -3296,6 +3316,52 @@ export class ScreenshotStudioBackendSDK {
       body: { items },
       method: 'PATCH',
     })
+  }
+
+  /** Schedule frozen requests in the background; the same key replays its run. */
+  async submitContentBatch(
+    id: string,
+    input: {
+      items: {
+        itemId: string
+        refusal?: string
+        schedule?: Parameters<ScreenshotStudioBackendSDK['scheduleContentDraft']>[1]
+      }[]
+      requestKey: string
+    }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/submit`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** What a schedule or render of a batch did. */
+  async getContentBatchRun(id: string, runId: string) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}`
+    )
+  }
+
+  /** Freeze grid concepts for a browser to render; the same key replays its run. */
+  async createContentBatchRender(id: string, input: { itemIds: string[]; requestKey: string }) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** Record a rendered video on its item, or why it failed. */
+  async reportContentBatchRender(
+    id: string,
+    runId: string,
+    itemId: string,
+    input: { assetId?: string; error?: string; fileName?: string }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`,
+      { body: input, method: 'POST' }
+    )
   }
 
   /** Take an item out of its batch; a draft it made stays in Write. */

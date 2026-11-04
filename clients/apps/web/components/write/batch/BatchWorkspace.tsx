@@ -45,6 +45,7 @@ import {
   type BatchItem,
   type BatchItemInput,
   type BatchMedia,
+  type BatchRun,
   type BatchValidation,
   type ContentBatch,
 } from '@/lib/api/contracts/content-batches'
@@ -60,6 +61,7 @@ import {
   postOn,
   queueTimings,
   readTiming,
+  runOutcomes,
   spreadHourOptions,
   spreadTimings,
   stagedChecks,
@@ -96,6 +98,8 @@ const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
 const UPLOAD_CONCURRENCY = 3
 /** Items checked per request. */
 const VALIDATE_CHUNK = 25
+/** How often a running schedule's progress is read. */
+const SUBMIT_POLL_MS = 1500
 
 /** A row of the import preview; `files` holds each attachment's file, in order. */
 type Staged = {
@@ -116,6 +120,9 @@ function mediaInput({
     ? { assetId, ...(fileName ? { fileName } : {}) }
     : { fileName: fileName!, bytes: bytes!, ...(uploadAssetId ? { uploadAssetId } : {}) }
 }
+
+/** Whether an outcome is good news or still under way, rather than something to fix. */
+const settledWell = (outcome?: string) => outcome === 'Scheduled' || Boolean(outcome?.endsWith('…'))
 
 /** Which tool a batch was started for; it narrows what the page offers first. */
 export type BatchStart = 'videos' | 'images' | 'grid'
@@ -915,7 +922,9 @@ export function BatchWorkspace({
   // Checking and scheduling: every item and account apart, chosen explicitly.
   const [verdicts, setVerdicts] = React.useState<Record<string, BatchValidation>>({})
   const [selected, setSelected] = React.useState<Record<string, boolean>>({})
-  const [outcomes, setOutcomes] = React.useState<Record<string, string>>({})
+  const [outcomes, setOutcomes] = React.useState<Record<string, string>>(() =>
+    runOutcomes(initial.submission)
+  )
   /** Scheduled posts left this month, read when the batch is checked. Go's charge decides. */
   const [postsLeft, setPostsLeft] = React.useState<number | null>(null)
   const verdictKey = (itemId: string, accountId: string) => `${itemId}/${accountId}`
@@ -974,47 +983,70 @@ export function BatchWorkspace({
   ).length
   const attention = Object.values(verdicts).filter((verdict) => !verdict.valid).length
 
+  /** A submit with no answer yet: trying again sends the same key, which replays it. */
+  const unanswered = React.useRef<{
+    items: { channelConnectionIds: string[]; itemId: string }[]
+    requestKey: string
+  } | null>(null)
+  const [submitting, setSubmitting] = React.useState(false)
+
+  /** Show a schedule's progress until it is done; it carries on whether or not anyone watches. */
+  const follow = React.useCallback(
+    async (started: BatchRun) => {
+      setSubmitting(true)
+      try {
+        let run = started
+        setOutcomes(runOutcomes(run))
+        while (run.status === 'RUNNING') {
+          await new Promise((resolve) => setTimeout(resolve, SUBMIT_POLL_MS))
+          run = await call<BatchRun>(`${base}/runs/${encodeURIComponent(run.id)}`)
+          setOutcomes(runOutcomes(run))
+        }
+        await reload()
+        setVerdicts({})
+        setSelected({})
+      } catch {
+        toast.info('Scheduling continues in the background. Reload this page to see its progress.')
+      } finally {
+        setSubmitting(false)
+      }
+    },
+    [base, reload]
+  )
+
   const schedule = async () => {
     setBusy('schedule')
-    // Schedule each item at its saved time: a time changed since the check already dropped its verdicts.
-    await settled()
-    const results: Record<string, string> = {}
-    for (const item of itemsRef.current) {
-      if (!item.draftId || !item.draft) continue
-      const ids = Object.entries(selected)
-        .filter(([key, on]) => on && key.startsWith(`${item.id}/`) && verdicts[key]?.valid)
-        .map(([key]) => key.slice(item.id.length + 1))
-      if (!ids.length) continue
-      const timing = item.timing
-      try {
-        await draftsApi.schedule(item.draftId, {
-          channelConnectionIds: ids,
-          version: item.draft.version,
-          add: pendingAccounts(item, ids).add,
-          naturalPostingTime: false,
-          ...(timing.mode === 'queue'
-            ? { queue: true, expectedQueueSlot: timing.expectedQueueSlot }
-            : {
-                localTime: timing.localTime,
-                timeZone: timing.timeZone,
-                disambiguation: timing.disambiguation,
-              }),
-        })
-        results[item.id] = 'Scheduled'
-      } catch (error) {
-        // One item's failure keeps the others; it can be corrected and sent again.
-        results[item.id] =
-          error instanceof DraftRequestError
-            ? error.message
-            : 'No confirmation received. Check again before retrying.'
+    try {
+      // Each item schedules at its saved time: a time changed since the check dropped its verdicts.
+      await settled()
+      const request = unanswered.current ?? {
+        requestKey: `submit-${crypto.randomUUID()}`,
+        items: itemsRef.current.flatMap((item) => {
+          const channelConnectionIds = Object.entries(selected)
+            .filter(([key, on]) => on && key.startsWith(`${item.id}/`) && verdicts[key]?.valid)
+            .map(([key]) => key.slice(item.id.length + 1))
+          return item.draftId && channelConnectionIds.length
+            ? [{ channelConnectionIds, itemId: item.id }]
+            : []
+        }),
       }
-      setOutcomes({ ...results })
+      unanswered.current = request
+      const run = await call<BatchRun>(`${base}/submit`, { body: request, method: 'POST' })
+      unanswered.current = null
+      await follow(run)
+    } catch (error) {
+      // A refusal needs a correction; only an unanswered request is sent again as it was.
+      if (error instanceof DraftRequestError && error.status < 500) unanswered.current = null
+      toast.error(error instanceof Error ? error.message : 'The batch could not be scheduled.')
+    } finally {
+      setBusy(null)
     }
-    await reload()
-    setVerdicts({})
-    setSelected({})
-    setBusy(null)
   }
+
+  // A schedule that outlived the last visit to this page is picked up again.
+  React.useEffect(() => {
+    if (initial.submission?.status === 'RUNNING') void follow(initial.submission)
+  }, [follow, initial.submission])
 
   const archive = async () => {
     await call(`${base}/archive`, { method: 'POST' })
@@ -1396,10 +1428,13 @@ export function BatchWorkspace({
         {showGrid ? (
           <GridCreator
             disabled={busy !== null}
+            base={base}
             items={items}
+            lastRender={batch.render}
             sharedAccounts={sharedAccounts}
             onAdd={addConcepts}
             onApply={applyGrids}
+            onReload={reload}
             onUpdate={updateItem}
           />
         ) : null}
@@ -1810,11 +1845,13 @@ export function BatchWorkspace({
                     )}
                     {outcomes[item.id] ? (
                       <p
-                        role={outcomes[item.id] === 'Scheduled' ? 'status' : 'alert'}
+                        role={settledWell(outcomes[item.id]) ? 'status' : 'alert'}
                         className={
                           outcomes[item.id] === 'Scheduled'
                             ? 'text-emerald-700 dark:text-emerald-300'
-                            : 'text-destructive'
+                            : settledWell(outcomes[item.id])
+                              ? 'text-muted-foreground'
+                              : 'text-destructive'
                         }
                       >
                         {outcomes[item.id]}
@@ -1851,6 +1888,16 @@ export function BatchWorkspace({
                       : ''
                   }.`}
             </p>
+            {submitting ? (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="submit-running"
+              >
+                Scheduling in the background. You can close this page: it carries on, and each
+                post&rsquo;s result is here when you come back.
+              </p>
+            ) : null}
             {postsLeft !== null && chosenCount > postsLeft ? (
               <p role="status" className="text-sm text-destructive" data-testid="quota-warning">
                 This schedules {chosenCount} posts and your plan has {postsLeft} left this month.
@@ -1887,10 +1934,16 @@ export function BatchWorkspace({
                   <Button
                     size={compact}
                     variant={next === 'schedule' ? 'default' : 'outline'}
-                    disabled={busy !== null || chosenCount === 0}
+                    disabled={
+                      busy !== null || submitting || (chosenCount === 0 && !unanswered.current)
+                    }
                     onClick={() => void schedule()}
                   >
-                    {busy === 'schedule' ? 'Scheduling…' : `Schedule ${chosenCount} selected`}
+                    {busy === 'schedule'
+                      ? 'Scheduling…'
+                      : unanswered.current
+                        ? 'Try scheduling again'
+                        : `Schedule ${chosenCount} selected`}
                   </Button>
                 </>
               ) : (

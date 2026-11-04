@@ -35,6 +35,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchitem"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
@@ -485,6 +486,18 @@ func init() {
 	contentbatchitem.DefaultUpdatedAt = contentbatchitemDescUpdatedAt.Default.(func() time.Time)
 	// contentbatchitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	contentbatchitem.UpdateDefaultUpdatedAt = contentbatchitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	contentbatchrunFields := schema.ContentBatchRun{}.Fields()
+	_ = contentbatchrunFields
+	// contentbatchrunDescCreatedAt is the schema descriptor for created_at field.
+	contentbatchrunDescCreatedAt := contentbatchrunFields[10].Descriptor()
+	// contentbatchrun.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentbatchrun.DefaultCreatedAt = contentbatchrunDescCreatedAt.Default.(func() time.Time)
+	// contentbatchrunDescUpdatedAt is the schema descriptor for updated_at field.
+	contentbatchrunDescUpdatedAt := contentbatchrunFields[11].Descriptor()
+	// contentbatchrun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	contentbatchrun.DefaultUpdatedAt = contentbatchrunDescUpdatedAt.Default.(func() time.Time)
+	// contentbatchrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	contentbatchrun.UpdateDefaultUpdatedAt = contentbatchrunDescUpdatedAt.UpdateDefault.(func() time.Time)
 	contentdraftFields := schema.ContentDraft{}.Fields()
 	_ = contentdraftFields
 	// contentdraftDescDiscussions is the schema descriptor for discussions field.

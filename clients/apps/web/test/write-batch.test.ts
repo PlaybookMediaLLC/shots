@@ -8,6 +8,7 @@ import {
   pendingAccounts,
   postOn,
   queueTimings,
+  runOutcomes,
   readTiming,
   spreadHourOptions,
   spreadTimings,
@@ -208,5 +209,27 @@ test('YouTube and TikTok options reach only the channels an item goes to', () =>
   assert.equal(
     title(stagedVersions(video, ['youtube'], { youtube: { ...youtube, title: 'Chosen' } })),
     'Chosen'
+  )
+})
+
+test('a schedule run reads as an outcome per post, and never hides a failure', () => {
+  assert.deepEqual(runOutcomes(null), {})
+  assert.deepEqual(
+    runOutcomes({
+      items: [
+        { itemId: 'a', status: 'DONE' },
+        { itemId: 'b', status: 'PENDING' },
+        { error: 'x: Too long.', itemId: 'c', status: 'FAILED' },
+        { error: 'No confirmation came back.', itemId: 'd', status: 'UNCONFIRMED' },
+        { itemId: 'e', status: 'FAILED' },
+      ],
+    }),
+    {
+      a: 'Scheduled',
+      b: 'Waiting to be scheduled…',
+      c: 'x: Too long.',
+      d: 'No confirmation came back.',
+      e: 'This post was not scheduled.',
+    }
   )
 })

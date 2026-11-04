@@ -1,4 +1,4 @@
-import type { BatchItem, BatchTiming } from '@/lib/api/contracts/content-batches'
+import type { BatchItem, BatchRun, BatchTiming } from '@/lib/api/contracts/content-batches'
 import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import type { AccountStanding } from '@/lib/write/capabilities'
@@ -232,6 +232,25 @@ export function itemAccounts(item: BatchItem): string[] {
   return [...new Set([...item.channelConnectionIds, ...(item.draft?.channelConnectionIds ?? [])])]
 }
 
+/** Whether a draft already has queued or sent posts, so a new account goes beside them. */
+export function hasLivePosts(posts: readonly { status: string }[]) {
+  return posts.some((post) => post.status !== 'CANCELLED' && post.status !== 'FAILED')
+}
+
+/** What a schedule run did to each item, in words for the page. */
+export function runOutcomes(run: Pick<BatchRun, 'items'> | null | undefined) {
+  return Object.fromEntries(
+    (run?.items ?? []).map((item) => [
+      item.itemId,
+      item.status === 'DONE'
+        ? 'Scheduled'
+        : item.status === 'PENDING'
+          ? 'Waiting to be scheduled…'
+          : (item.error ?? 'This post was not scheduled.'),
+    ])
+  )
+}
+
 /** The accounts an item still needs scheduled to, and whether it already has live posts. */
 export function pendingAccounts(item: BatchItem, accountIds: string[]) {
   const live = accountIds.filter((id) => {
@@ -239,7 +258,7 @@ export function pendingAccounts(item: BatchItem, accountIds: string[]) {
     return post && post.status !== 'FAILED'
   })
   return {
-    add: item.posts.some((post) => post.status !== 'CANCELLED' && post.status !== 'FAILED'),
+    add: hasLivePosts(item.posts),
     remaining: accountIds.filter((id) => !live.includes(id)),
   }
 }

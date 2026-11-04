@@ -28,6 +28,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/tenantpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalbatches"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalmaintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalonboarding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
@@ -192,6 +193,19 @@ func main() {
 			os.Exit(1)
 		}
 		automationStore.WithMonthlyMeter(meter)
+	}
+	// A batch submit schedules with the same object store and quota meter as the API.
+	if !slices.Contains(cfg.ExcludedQueues, temporalbatches.TaskQueue) {
+		batchWorker := worker.New(temporalClient, temporalbatches.TaskQueue, worker.Options{
+			MaxConcurrentActivityExecutionSize: max(1, 5/cfg.WorkerConcurrencyDivider),
+			OnFatalError:                       func(err error) { slog.Error("Temporal batch worker failed", "error", err); stop() },
+		})
+		temporalbatches.Register(batchWorker, &temporalbatches.Activities{Publisher: scheduler, Store: automationStore})
+		if err := batchWorker.Start(); err != nil {
+			slog.Error("batch worker did not start", "error", err)
+			os.Exit(1)
+		}
+		defer batchWorker.Stop()
 	}
 	if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
 		automationWorker := worker.New(temporalClient, temporalreleaseautomation.TaskQueue, worker.Options{

@@ -45,15 +45,18 @@ type ContentBatchInput struct {
 
 // ContentBatchRecord is a batch; Items is set when one batch is read.
 type ContentBatchRecord struct {
-	ArchivedAt  *time.Time               `json:"archivedAt"`
-	CreatedAt   time.Time                `json:"createdAt"`
-	ID          string                   `json:"id"`
-	ItemCount   int                      `json:"itemCount"`
-	Items       []ContentBatchItemRecord `json:"items,omitempty"`
-	SocialSetID string                   `json:"socialSetId"`
-	TimeZone    string                   `json:"timeZone"`
-	Title       string                   `json:"title"`
-	UpdatedAt   time.Time                `json:"updatedAt"`
+	ArchivedAt *time.Time               `json:"archivedAt"`
+	CreatedAt  time.Time                `json:"createdAt"`
+	ID         string                   `json:"id"`
+	ItemCount  int                      `json:"itemCount"`
+	Items      []ContentBatchItemRecord `json:"items,omitempty"`
+	// Render and Submission are the latest of each run, when one batch is read.
+	Render      *BatchRunRecord `json:"render,omitempty"`
+	SocialSetID string          `json:"socialSetId"`
+	Submission  *BatchRunRecord `json:"submission,omitempty"`
+	TimeZone    string          `json:"timeZone"`
+	Title       string          `json:"title"`
+	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
 // BatchMediaRecord is an attachment and what its asset holds now. Status is
@@ -212,7 +215,17 @@ func (c *Configuration) GetContentBatch(ctx context.Context, actor Actor, id str
 	if err != nil {
 		return nil, err
 	}
-	return c.batchWithItems(ctx, actor, row, set)
+	record, err := c.batchWithItems(ctx, actor, row, set)
+	if err != nil {
+		return nil, err
+	}
+	if record.Submission, err = c.latestBatchRun(ctx, row.ID, batchRunSubmit); err != nil {
+		return nil, err
+	}
+	if record.Render, err = c.latestBatchRun(ctx, row.ID, batchRunRender); err != nil {
+		return nil, err
+	}
+	return record, nil
 }
 
 // batchWithItems reads a batch's items, or only those named by only, with their
