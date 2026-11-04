@@ -45,7 +45,7 @@ import {
   withSlot,
 } from '@/lib/write/grid-concepts'
 import { GRID_PRESETS } from '@/lib/write/grid-presets'
-import { gridRenderSupported, renderGridVideo } from '@/lib/write/grid-render'
+import { renderGridVideo } from '@/lib/write/grid-render'
 import { FilePicker } from './FilePicker'
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
@@ -389,11 +389,6 @@ export function GridCreator({
   )
   const [running, setRunning] = React.useState(false)
   const abort = React.useRef<AbortController | null>(null)
-  const supported = React.useSyncExternalStore(
-    () => () => undefined,
-    gridRenderSupported,
-    () => true
-  )
   const toRender = concepts.filter(
     (item) => gridReady(item.grid) && !item.media.some((entry) => entry.assetId)
   )
@@ -840,11 +835,6 @@ export function GridCreator({
 
       {stage === 'render' ? (
         <>
-          {!supported ? (
-            <p role="alert" className="text-sm text-destructive">
-              This browser cannot make videos. Use a recent version of Chrome, Edge or Safari.
-            </p>
-          ) : null}
           <Group>
             <Row layout="stacked" label="Videos">
               <p className="text-sm text-muted-foreground">
@@ -896,10 +886,7 @@ export function GridCreator({
             </Row>
           </Group>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              disabled={running || !supported || !toRender.length}
-              onClick={() => void render()}
-            >
+            <Button disabled={running || !toRender.length} onClick={() => void render()}>
               {running
                 ? 'Rendering…'
                 : `Render ${toRender.length} video${toRender.length === 1 ? '' : 's'}`}

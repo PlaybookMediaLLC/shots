@@ -57,24 +57,22 @@ test(
       'Trip/City/.DS_Store': 'hidden',
       'Trip/City/notes.txt': 'not an image',
     })
-    try {
-      await page.getByLabel('Batch image folder').setInputFiles(join(root, 'Trip'))
-      await page.getByRole('button', { name: 'Preview import', exact: true }).click()
-      const preview = page.getByTestId('import-preview')
-      await expect(preview.getByText('Ready', { exact: true })).toHaveCount(2)
-      await expect(page.getByTestId('import-skipped')).toContainText('.DS_Store')
-      await expect(page.getByTestId('import-skipped')).toContainText('notes.txt')
-      // Nothing is added until the preview is accepted.
-      expect(await page.getByTestId('batch-item').count()).toBe(0)
-      await preview.getByRole('button', { name: /^Add 2 ready rows/ }).click()
-    } finally {
-      await rm(root, { force: true, recursive: true })
-    }
+    await page.getByLabel('Batch image folder').setInputFiles(join(root, 'Trip'))
+    await page.getByRole('button', { name: 'Preview import', exact: true }).click()
+    const preview = page.getByTestId('import-preview')
+    await expect(preview.getByText('Ready', { exact: true })).toHaveCount(2)
+    await expect(page.getByTestId('import-skipped')).toContainText('.DS_Store')
+    await expect(page.getByTestId('import-skipped')).toContainText('notes.txt')
+    // Nothing is added until the preview is accepted.
+    expect(await page.getByTestId('batch-item').count()).toBe(0)
+    await preview.getByRole('button', { name: /^Add 2 ready rows/ }).click()
     const items = page.getByTestId('batch-item')
     await expect(items).toHaveCount(2)
     await expect(
       items.filter({ hasText: /Uploading|Waiting to upload|Upload failed/ })
     ).toHaveCount(0, { timeout: 60_000 })
+    // The browser reads the files while uploading, so they stay on disk until now.
+    await rm(root, { force: true, recursive: true })
     await expect(items.first().getByRole('listitem')).toHaveCount(2)
     await expect(items.last().getByRole('listitem')).toHaveCount(1)
 

@@ -210,7 +210,7 @@ kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
 | Images | Upload per slot, upload many (fills empty slots in order, naming leftovers), or AI (`editorAi.generateGridSlotImage`, two at a time). The page estimates credits before generating; a failed slot keeps its error and can be tried again |
 | Last grid cell | Sets the label or image of slot 4 on every video. It is a cell of the grid, not an extra slide |
 | Music | The person's own file, played from its start, or none. There is no built-in catalog: add one only with licensed tracks |
-| Render | In the browser, one at a time: the frame is composed once and encoded with `WebCodecsVideoEncoder` as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music |
+| Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, which holds one still with no fade |
 | Recovery | Each video uploads and is recorded on its item when done. Closing the tab loses only the one in progress; reopening renders what is left |
 | Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |
 | Handoff | A finished video is the item's media, so captions, times, drafts, review and scheduling apply. Download one, or several as a ZIP |
@@ -249,7 +249,9 @@ item is `UNCONFIRMED` and the run moves on. The page can close at any point, and
 reopening it shows the progress. The run acts as the person who asked, using their
 session: scheduling stays a person's decision, so when their session ends or their
 role changes, the rest of the run is refused with a reason. A long run can outlive
-a session this way, and the person schedules the remainder again.
+a session this way, and the person schedules the remainder again. Scheduling here
+must judge an account as the API does, so the worker's store has the API's media,
+account standing and quota meter.
 
 **Render runs.** Rendering stays in the browser. The server's part is the record: a
 run freezes each concept, and a video attaches only if the concept is still what was
@@ -368,11 +370,12 @@ production image built before the run and regenerate work. `renderGridVideo` ran
 served images and a tone: `ffprobe` read H.264, 1080×1920, 30 fps, 180 frames and
 6 s, with AAC at 6.08 s when there is music, and every frame decoded.
 `test/e2e/bulk-tools.spec.ts` and the grid case in `social-gate.spec.ts`, which
-renders a video and schedules it through the worker with no page open, did not run
-locally: Docker's storage failed when the host disk filled. CI runs them. Until it
-does, the batch page, the wizard and the worker in the full stack are unproven.
-`make tenant-isolation` was not run either. The worker's steps are proven against
-PostgreSQL and its workflow in Temporal's test environment.
+renders a video and schedules it through the worker with no page open, could not
+run locally because Docker's storage failed when the host disk filled, so they ran
+in CI. Pull requests into `develop` run only `@smoke` browser tests, so
+`bulk-tools.spec.ts` otherwise runs in the full suite after merge. `make
+tenant-isolation` was not run. The worker's steps are proven against PostgreSQL and
+its workflow in Temporal's test environment.
 
 Run on this branch, against local PostgreSQL (Docker was unavailable). The
 full Go suite and its race set pass except
