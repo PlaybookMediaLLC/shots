@@ -1,4 +1,13 @@
-import { apiRequest, db, draftEditor, expect, expectSaved, openNewDraft, test } from './framework'
+import {
+  apiRequest,
+  db,
+  draftEditor,
+  expect,
+  expectSaved,
+  openNewDraft,
+  test,
+  editorMore,
+} from './framework'
 
 test(
   'LinkedIn recent people and companies preserve native identities from picker through scheduled snapshot',
@@ -47,13 +56,13 @@ test(
     await draftEditor(page).click()
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.type('Thanks ')
-    await page.getByRole('button', { name: 'Add mention', exact: true }).click()
+    await editorMore(page, 'Mention')
     let picker = page.getByTestId('mention-picker')
     await picker.getByRole('button', { name: 'People', exact: true }).click()
     await picker.getByRole('button', { name: 'Recently mentioned people', exact: true }).click()
     await picker.getByTestId('mention-result').filter({ hasText: 'Anne (AJ) Doe' }).click()
     await expect(draftEditor(page).getByTestId('social-mention')).toContainText('Anne (AJ) Doe')
-    await page.getByRole('button', { name: 'Add mention', exact: true }).click()
+    await editorMore(page, 'Mention')
     picker = page.getByTestId('mention-picker')
     await picker.getByRole('button', { name: 'Companies', exact: true }).click()
     await picker.getByRole('button', { name: 'Recently mentioned companies', exact: true }).click()

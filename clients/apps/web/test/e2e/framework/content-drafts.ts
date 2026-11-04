@@ -239,6 +239,15 @@ export function draftEditor(page: Page) {
   return page.getByRole('textbox', { name: 'Draft body' })
 }
 
+/** Choose an item from the editor toolbar's More menu (insert, media tools, import and export). */
+export async function editorMore(page: Page, item: string): Promise<void> {
+  await page
+    .getByRole('toolbar', { name: 'Draft tools' })
+    .getByRole('button', { name: 'More', exact: true })
+    .click()
+  await page.getByRole('menuitem', { name: item, exact: true }).click()
+}
+
 /** Wait until autosave has written every change. */
 export async function expectSaved(page: Page): Promise<void> {
   await expect(page.getByTestId('save-state')).toHaveText('Saved', { timeout: 20_000 })

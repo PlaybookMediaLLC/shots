@@ -318,7 +318,7 @@ test(
 
     // AI: the scripted model answers, Accept puts the answer in, and Undo takes it back.
     await page.getByTestId('platform-tab-x').click()
-    await page.getByRole('button', { name: 'Rewrite', exact: true }).click()
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     await page
       .getByTestId('refine-menu')
       .getByRole('button', { name: 'Rewrite as a thread start' })

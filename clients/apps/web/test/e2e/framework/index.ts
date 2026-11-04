@@ -293,6 +293,7 @@ export {
   caretAtDocumentEnd,
   chooseChannels,
   draftEditor,
+  editorMore,
   enableDraftTags,
   expectSaved,
   inPreview,

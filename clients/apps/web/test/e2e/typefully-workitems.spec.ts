@@ -14,6 +14,7 @@ import {
   saveBatchDrafts,
   test,
   trpcMutation,
+  editorMore,
 } from './framework'
 
 test.use({ actionTimeout: 30_000 })
@@ -525,7 +526,7 @@ test(
     await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
     await expect(media).toContainText('Post 2, media 2')
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Describe images', exact: true }).click()
+    await editorMore(page, 'Alt text')
     await page.getByRole('button', { name: 'Suggest with AI', exact: true }).first().click()
     await expect(page.getByLabel('Description of image 1')).not.toHaveValue('', {
       timeout: 60_000,
@@ -544,7 +545,7 @@ test(
         },
       })
     )
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })
@@ -558,12 +559,12 @@ test(
     await page.keyboard.press('Escape')
     await expectSaved(page)
     await app.reload()
-    await page.getByRole('button', { name: 'Describe images', exact: true }).click()
+    await editorMore(page, 'Alt text')
     await expect(page.getByLabel('Description of image 1')).toHaveValue(
       'A small light square, reviewed by the author.'
     )
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })

@@ -11,6 +11,7 @@ import {
   trpcMutation,
   trpcQuery,
   uploadSignedAsset,
+  editorMore,
 } from './framework'
 import { mkdir } from 'node:fs/promises'
 
@@ -187,8 +188,7 @@ test(
     const kept = await upload('kept-library.png')
     const removed = await upload('removed-library.png')
     const draftId = await openNewDraft(page)
-    const attach = page.getByRole('button', { name: 'Attach from Library', exact: true })
-    await attach.click()
+    await editorMore(page, 'From Library')
     const picker = page.getByRole('dialog', { name: 'Attach from Library' })
     await picker.getByRole('button', { name: 'removed-library.png', exact: true }).click()
     expect((await trpcMutation(page, 'asset.delete', { assetId: removed })).status).toBe(200)

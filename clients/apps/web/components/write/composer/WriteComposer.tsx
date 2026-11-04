@@ -26,7 +26,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Sheet,
   SheetContent,
@@ -68,6 +67,7 @@ import {
 } from '@/lib/write/document'
 import { buildPublication } from '@/lib/write/publication'
 import {
+  adaptBody,
   bodyFor,
   bodyPosts,
   forkVersion,
@@ -82,7 +82,6 @@ import { useKeys, useShortcuts } from '../shortcuts'
 import { DraftsDrawerButton } from '../WriteFrame'
 import { useWrite, type WriteSet } from '../write-context'
 import { CommentsPanel } from './comments'
-import { ComposerEmojiPicker } from './emoji-picker'
 import { ThreadTools } from './thread-tools'
 import { ArticleTools } from './article-tools'
 import { MemberComments } from './member-comments'
@@ -94,22 +93,24 @@ import {
   SyncedVersion,
   tabChannels,
 } from './platforms'
-import { PostSettingsTools } from './post-tools'
+import { PostSettingRequestContext, PostSettingsTools, type PostSettingRequest } from './post-tools'
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
 import { PublishReview, ScheduleDialog, type ScheduleContext } from './schedule'
 import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
-import { DescribeImages, PreviewImageDescription } from './describe-images'
-import { MediaTools } from './media-tools'
+import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
-import { RefineButton } from './refine'
+import { RefineProvider } from './refine'
+import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
+import { ComposerToolbar } from './composer-toolbar'
+import { SelectionToolbarPlugin } from './selection-toolbar'
+import { SlashMenuPlugin } from './slash-menu'
 import {
-  MentionPicker,
   SocialMentionPlugin,
   SocialMentionInputPlugins,
   SocialMentionContext,
@@ -143,7 +144,12 @@ type Dialog =
   | null
 
 /** Plugins Write adds to the editor; stable, so the editor is built once. */
-const WRITE_PLUGINS = [SocialMentionPlugin, ...SocialMentionInputPlugins]
+const WRITE_PLUGINS = [
+  SocialMentionPlugin,
+  ...SocialMentionInputPlugins,
+  SlashMenuPlugin,
+  SelectionToolbarPlugin,
+]
 
 /** What the save state reads as. */
 const SAVE_LABELS: Record<SaveState, string> = {
@@ -170,6 +176,7 @@ export function WriteComposer({
   collabToken = null,
   collabUrl,
   draft: initial,
+  giphy = false,
   posts: initialPosts,
   requireApproval,
   set,
@@ -181,6 +188,8 @@ export function WriteComposer({
   collabToken?: DraftCollaboration['issued'] | null
   collabUrl: string | null
   draft: DraftWire
+  /** Whether GIF search is approved and configured. */
+  giphy?: boolean
   posts: DraftPostWire[]
   requireApproval: boolean
   set: WriteSet | null
@@ -416,6 +425,53 @@ export function WriteComposer({
     items.find((item) => item.account.channel === active)?.publication ??
     buildPublication(draftFields, { channel: active, connectionId: 'preview' }, pendingBlocks)
   const approved = server.reviewStatus === 'approved' && server.approvedVersion === server.version
+  const limitFor = (channel: DraftChannel) =>
+    items.find((item) => item.account.channel === channel)?.publication.serialized.limit ??
+    CAPABILITIES[channel].captionLimit
+  // Write's tools the toolbar, the More menu and the slash menu open.
+  const [tool, setTool] = React.useState<ComposerTool | null>(null)
+  const [postSetting, setPostSetting] = React.useState<PostSettingRequest | null>(null)
+  // The set's thread finishers are the slash menu's snippets.
+  const snippetSet = server.socialSetId ?? set?.id ?? null
+  const [snippets, setSnippets] = React.useState<Snippet[]>([])
+  const [snippetsRead, setSnippetsRead] = React.useState(0)
+  React.useEffect(() => {
+    if (!snippetSet || !canEdit) return
+    let cancelled = false
+    void writeApi
+      .finishers(snippetSet)
+      .then(({ items: found }) => {
+        if (!cancelled) setSnippets(found.map(({ id, name, text }) => ({ id, name, text })))
+      })
+      .catch(() => {
+        // Without them the menu offers to manage snippets; the dialog shows the error.
+        if (!cancelled) setSnippets([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canEdit, snippetSet, snippetsRead])
+  /** Another platform's own text, written from an accepted Refine review. */
+  const writeVersion = (target: DraftChannel, body: PlateBody) => {
+    const before = document.versions
+    update((current) => {
+      const versions =
+        versionFor(current.versions, target).mode === 'manual'
+          ? current.versions
+          : forkVersion(
+              current.versions,
+              target,
+              current.value as PlateBody,
+              version.current,
+              Boolean(CAPABILITIES[target].thread)
+            )
+      return { versions: withVersion(versions, { ...versionFor(versions, target), body }) }
+    })
+    setTab(target)
+    toast.success(`Written as ${CHANNEL_META[target].label}’s own text.`, {
+      action: { label: 'Undo', onClick: () => update({ versions: before }) },
+    })
+  }
   const refreshPosts = async () => {
     setPosts((await draftsApi.posts(initial.id)).posts)
     router.refresh()
@@ -573,22 +629,12 @@ export function WriteComposer({
       inEditor: true,
     },
     {
-      key: 'j',
-      label: 'Assistant',
-      mod: true,
-      run: () => togglePanel('assistant'),
-      inEditor: true,
-    },
-    {
       // The editor's own image picker, so the upload takes the usual path.
       key: 'i',
       label: 'Add media',
       mod: true,
       shift: true,
-      run: () =>
-        bodyArea.current
-          ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert image"]')
-          ?.click(),
+      run: () => addMedia(),
       inEditor: true,
     },
     {
@@ -606,6 +652,11 @@ export function WriteComposer({
       run: () => movePostAtCaret(1),
     },
   ])
+  function addMedia() {
+    bodyArea.current
+      ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert media"]')
+      ?.click()
+  }
   function movePostAtCaret(delta: number) {
     const current = editor.current
     const block = current?.api.block({ highest: true })
@@ -842,10 +893,7 @@ export function WriteComposer({
       })
       .map((post) => post.id)
   )
-  return (
-    <SocialMentionContext.Provider
-      value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
-    >
+  const composer = (
       <div
         // Opening a side panel changes text wrapping. Native scroll anchoring
         // would otherwise jump the editor to a different scroll position.
@@ -966,7 +1014,6 @@ export function WriteComposer({
                       icon={<Sparkles aria-hidden className="size-4" />}
                       label="Assistant"
                       onClick={() => togglePanel('assistant')}
-                      shortcut={`${mod}J`}
                     />
                   ) : null}
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
@@ -1336,18 +1383,18 @@ export function WriteComposer({
                   editorChannel.current = active
                   setEditorInstance(next)
                 }}
-                toolbarExtras={
-                  <ToolbarExtras
+                toolbarExtras={(documentActions) => (
+                  <ComposerToolbar
                     aiEnabled={aiEnabled}
-                    onDescriptionSaved={onDescriptionSaved}
                     channel={active}
-                    limit={activePublication.serialized.limit}
-                    channels={items.map((item) => item.account.channel)}
-                    editor={editor}
-                    draftId={initial.id}
-                    setId={server.socialSetId ?? set?.id ?? null}
+                    document={documentActions}
+                    onDescriptionSaved={onDescriptionSaved}
+                    onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
+                    onTool={setTool}
+                    setId={snippetSet}
+                    tool={tool}
                   />
-                }
+                )}
               />
             ) : versionOfTab.mode === 'manual' ? (
               <>
@@ -1379,18 +1426,18 @@ export function WriteComposer({
                     editorChannel.current = active
                     setEditorInstance(next)
                   }}
-                  toolbarExtras={
-                    <ToolbarExtras
+                  toolbarExtras={(documentActions) => (
+                    <ComposerToolbar
                       aiEnabled={aiEnabled}
-                      onDescriptionSaved={onDescriptionSaved}
                       channel={active}
-                      limit={activePublication.serialized.limit}
-                      channels={[active]}
-                      editor={editor}
-                      draftId={initial.id}
-                      setId={server.socialSetId ?? set?.id ?? null}
+                      document={documentActions}
+                      onDescriptionSaved={onDescriptionSaved}
+                      onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
+                      onTool={setTool}
+                      setId={snippetSet}
+                      tool={tool}
                     />
-                  }
+                  )}
                 />
               </>
             ) : (
@@ -1698,6 +1745,45 @@ export function WriteComposer({
           />
         ) : null}
       </div>
+  )
+  return (
+    <SocialMentionContext.Provider
+      value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
+    >
+      <ComposerCommandsContext.Provider
+        value={{
+          addMedia,
+          channel: active,
+          channels,
+          giphy,
+          openTool: setTool,
+          postSetting: (number, setting) => setPostSetting({ at: Date.now(), number, setting }),
+          snippets,
+        }}
+      >
+        <PostSettingRequestContext.Provider value={postSetting}>
+          {aiEnabled ? (
+            <RefineProvider
+              channel={active}
+              draftId={initial.id}
+              editor={editor}
+              limit={activePublication.serialized.limit}
+              limitFor={limitFor}
+              onVersion={writeVersion}
+              versionBase={(target) =>
+                adaptBody(
+                  (editor.current?.children ?? document.value) as PlateBody,
+                  Boolean(CAPABILITIES[target].thread)
+                )
+              }
+            >
+              {composer}
+            </RefineProvider>
+          ) : (
+            composer
+          )}
+        </PostSettingRequestContext.Provider>
+      </ComposerCommandsContext.Provider>
     </SocialMentionContext.Provider>
   )
 }
@@ -1735,7 +1821,7 @@ function PanelButton({
   icon: React.ReactNode
   label: string
   onClick: () => void
-  shortcut: string
+  shortcut?: string
 }) {
   return (
     <Button
@@ -1745,7 +1831,7 @@ function PanelButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       size="sm"
-      title={`${label} (${shortcut})`}
+      title={shortcut ? `${label} (${shortcut})` : label}
       variant="ghost"
     >
       {icon}
@@ -1793,96 +1879,5 @@ function TargetBanner({ draft }: { draft: DraftWire }) {
         <span>a published draft</span>
       )}
     </div>
-  )
-}
-
-/** The bottom toolbar's Write tools: mentions looked up on the platform, and emoji. */
-function ToolbarExtras({
-  onDescriptionSaved,
-  aiEnabled,
-  channel,
-  channels,
-  editor,
-  limit,
-  draftId,
-  setId,
-}: {
-  aiEnabled: boolean
-  onDescriptionSaved: (assetId: string, alt: string) => void
-  /** The version being edited, which Refine writes for. */
-  channel: DraftChannel
-  channels: DraftChannel[]
-  editor: React.MutableRefObject<PlateEditor | null>
-  limit: number
-  draftId: string
-  setId: string | null
-}) {
-  const { mod } = useKeys()
-  const [open, setOpen] = React.useState(false)
-  const [describing, setDescribing] = React.useState(false)
-  useShortcuts([
-    { key: '>', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
-    { key: '.', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
-  ])
-  return (
-    <>
-      {aiEnabled ? (
-        <RefineButton channel={channel} draftId={draftId} editor={editor} limit={limit} />
-      ) : null}
-      <MentionPicker channels={channels} editor={editor} setId={setId} />
-      <MediaTools channel={channel} setId={setId} onDescriptionSaved={onDescriptionSaved} />
-      <Button
-        aria-label="Describe images"
-        className="h-7 rounded-md px-2 text-xs"
-        onClick={() => setDescribing(true)}
-        size={null}
-        title="Describe images (alt text)"
-        type="button"
-        variant="ghost"
-      >
-        ALT
-      </Button>
-      {describing && editor.current ? (
-        <DescribeImages
-          aiEnabled={aiEnabled}
-          editor={editor.current}
-          onClose={() => setDescribing(false)}
-          onSaved={onDescriptionSaved}
-        />
-      ) : null}
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger asChild>
-          <Button
-            aria-label="Emoji"
-            className="h-7 rounded-md px-2 text-sm"
-            size={null}
-            title={`Emoji (${mod}⇧.)`}
-            type="button"
-            variant="ghost"
-          >
-            ☺
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-80 p-2"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            editor.current?.tf.focus()
-          }}
-          side="top"
-        >
-          <ComposerEmojiPicker
-            onSelect={(emoji) => {
-              const current = editor.current
-              if (!current) return
-              if (!current.selection) current.tf.select(current.api.end([]))
-              current.tf.insertText(emoji)
-              current.tf.focus()
-              setOpen(false)
-            }}
-          />
-        </PopoverContent>
-      </Popover>
-    </>
   )
 }

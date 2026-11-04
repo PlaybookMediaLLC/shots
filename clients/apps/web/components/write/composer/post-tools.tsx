@@ -42,6 +42,22 @@ const REPLY_LABELS: Record<PostSettings['replySettings'] & string, string> = {
   verified: 'Verified accounts',
 }
 
+/** A post's poll or audience settings, asked for from a command (the slash menu). */
+export type PostSettingRequest = { at: number; number: number; setting: 'audience' | 'poll' }
+
+/** The latest request; each tool opens when one names its post. */
+export const PostSettingRequestContext = React.createContext<PostSettingRequest | null>(null)
+
+/** A settings popover's open state, which a matching request also opens. */
+function useRequestedOpen(number: number, setting: PostSettingRequest['setting']) {
+  const request = React.useContext(PostSettingRequestContext)
+  const [open, setOpen] = React.useState(false)
+  React.useEffect(() => {
+    if (request?.number === number && request.setting === setting) setOpen(true)
+  }, [number, request, setting])
+  return [open, setOpen] as const
+}
+
 /** A duration in minutes as a person reads it. */
 function durationLabel(minutes: number): string {
   if (minutes === 0) return 'Set by the platform'
@@ -89,6 +105,7 @@ export function PostSettingsTools({
     tools.push(
       <PollTool
         channel={channel}
+        number={number}
         standing={standing}
         key="poll"
         set={set}
@@ -134,8 +151,9 @@ function AudienceTools({
       setPostSettings(editor, post, { replySettings: replies === 'everyone' ? undefined : replies })
     }
   }
+  const [open, setOpen] = useRequestedOpen(number, 'audience')
   return (
-    <Popover>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
           aria-label={`Audience and disclosures for post ${number}`}
@@ -260,20 +278,23 @@ function PollTool({
   pollSources,
   standing,
   channel,
+  number,
   set,
   settings,
 }: {
   channel: DraftChannel
+  number: number
   set: (change: Partial<PostSettings>) => void
   settings: PostSettings
   standing?: AccountStanding
   pollSources?: PollSource[]
 }) {
   const rules = pollRules(channel, standing)
+  const [open, setOpen] = useRequestedOpen(number, 'poll')
   if (!rules) return null
   const poll = settings.poll
   return (
-    <Popover>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
           aria-label={poll ? 'Edit the poll' : 'Add a poll'}

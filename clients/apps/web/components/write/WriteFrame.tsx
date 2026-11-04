@@ -23,7 +23,7 @@ import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import { createWritingDraft } from './pending-draft'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
-import { type Shortcut, useKeys, useShortcuts } from './shortcuts'
+import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
 import { draftHref, useWrite, type WriteLibrary, WriteProvider } from './write-context'
 
 // The palette loads on first use: it is not part of reading a draft.
@@ -65,17 +65,21 @@ export const SHORTCUT_REFERENCE: {
         label: 'Schedule at the next free slot (opens the review)',
         mod: true,
       },
-      { key: 'enter', label: 'Add a post', mod: true },
       { alt: true, key: 'arrowup', label: 'Move the post up' },
       { alt: true, key: 'arrowdown', label: 'Move the post down' },
-      { key: 'i', label: 'Add media', mod: true, shift: true },
-      { key: '.', label: 'Emoji', mod: true, shift: true },
       { key: 'f', label: 'Focus mode', mod: true, shift: true },
       { key: 'h', label: 'Display mode: compact or comfortable', mod: true, shift: true },
       { key: 'm', label: 'Comment on the selection', mod: true, shift: true },
-      { key: 'j', label: 'Writing assistant', mod: true },
-      { key: 'e', label: 'Rewrite with AI', mod: true, shift: true },
       { key: 'v', label: 'Preview', mod: true, shift: true },
+    ],
+  },
+  {
+    // The editor's commands, from the registry the slash menu reads.
+    group: 'In the editor',
+    items: [
+      { key: '/', label: 'Commands, at the start of a line or after a space' },
+      ...COMMAND_SHORTCUTS,
+      { key: 'e', label: 'Ask AI (also)', mod: true, shift: true },
     ],
   },
 ]

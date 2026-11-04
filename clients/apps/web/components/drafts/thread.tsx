@@ -106,6 +106,25 @@ export function deletePost(editor: PlateEditor, number: number): void {
   })
 }
 
+/** Copy post `number` below itself as a new post (new id, no settings or comments), in one step. */
+export function duplicatePost(editor: PlateEditor, number: number): void {
+  const range = postRanges(editor.children)[number - 1]
+  if (!range) return
+  const [start, end] = range
+  const first = editor.children[start]?.type === POST_BREAK ? start + 1 : start
+  const withoutComments = (node: unknown): unknown => {
+    if (!node || typeof node !== 'object') return node
+    const entries = Object.entries(node).filter(([key]) => !key.startsWith('comment'))
+    return Object.fromEntries(
+      entries.map(([key, value]) => [key, key === 'children' && Array.isArray(value) ? value.map(withoutComments) : value])
+    )
+  }
+  const copied = editor.children.slice(first, end).map(withoutComments) as Value
+  const blocks = copied.length ? structuredClone(copied) : [{ children: [{ text: '' }], type: 'p' }]
+  editor.tf.insertNodes([postBreak(), ...blocks], { at: [end] })
+  editor.tf.select(editor.api.end([end + blocks.length]))
+}
+
 /** Put the caret at the end of post `number`, to insert into it there. */
 export function selectPostEnd(editor: PlateEditor, number: number): void {
   const [start, end] = postRanges(editor.children)[number - 1]
@@ -194,6 +213,10 @@ export function leaveHeader(editor: PlateEditor): boolean {
 export const PostBreakPlugin = createPlatePlugin({
   handlers: {
     onKeyDown: ({ editor, event }) => {
+      // A character typed on a header goes into the post's text before any
+      // trigger ("/", "@", ":") reads where the caret is.
+      if (event.key.length === 1 && !event.metaKey && !event.ctrlKey && editor.api.isCollapsed())
+        leaveHeader(editor)
       if (event.key !== 'Enter' || event.shiftKey || event.altKey) return
       if (event.metaKey || event.ctrlKey) return
       const entry = editor.api.block({ highest: true })

@@ -1,0 +1,127 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import type { Value } from '@shots/platejs-editor/platejs'
+import { createPlateEditor } from '@shots/platejs-editor/platejs/react'
+import { duplicatePost, PostBreakPlugin, postRanges } from '@/components/drafts/thread'
+import {
+  type CommandContext,
+  commandsFor,
+  rankCommands,
+} from '@/components/write/composer/commands'
+import type { RefineApi } from '@/components/write/composer/refine'
+import { normalizeMentions } from '@/lib/write/normalize-mentions'
+import { postBreak } from '@/lib/write/versions'
+
+const p = (text = '') => ({ type: 'p', children: [{ text }] })
+
+function context(overrides: Partial<CommandContext> = {}): CommandContext {
+  const ai: RefineApi = { busy: false, open: () => undefined, run: () => undefined }
+  return {
+    addMedia: () => undefined,
+    ai,
+    channel: 'x',
+    channels: ['x', 'tiktok'],
+    editor: createPlateEditor({
+      plugins: [PostBreakPlugin],
+      value: [postBreak(), p('Hi')] as Value,
+    }),
+    giphy: false,
+    openTool: () => undefined,
+    postSetting: () => undefined,
+    snippets: [],
+    ...overrides,
+  }
+}
+
+const ids = (commands: { id: string }[]) => commands.map((command) => command.id)
+
+test('the slash menu offers about twenty publishable commands, no document blocks', () => {
+  const commands = commandsFor(context())
+  assert.ok(commands.length >= 18 && commands.length <= 24, `${commands.length} commands`)
+  const labels = commands.map((command) => command.label).join(' | ')
+  for (const gone of ['Heading', 'Toggle', 'Callout', 'Code', 'columns', 'Turn into', 'color'])
+    assert.ok(!labels.includes(gone), `${gone} is not offered`)
+})
+
+test('poll is offered on X and hidden on TikTok; GIF only when search is approved', () => {
+  assert.ok(ids(commandsFor(context())).includes('insert-poll'))
+  assert.equal(
+    commandsFor(context()).find((command) => command.id === 'insert-poll')?.badge,
+    'X only'
+  )
+  assert.ok(!ids(commandsFor(context({ channel: 'tiktok' }))).includes('insert-poll'))
+  assert.ok(!ids(commandsFor(context())).includes('insert-gif'))
+  assert.ok(ids(commandsFor(context({ giphy: true }))).includes('insert-gif'))
+})
+
+test('AI commands follow the platforms and disappear when AI is off', () => {
+  const commands = commandsFor(context())
+  assert.ok(ids(commands).includes('ai-rewrite-tiktok'))
+  assert.ok(!ids(commands).includes('ai-rewrite-x'))
+  assert.equal(commands.find((command) => command.id === 'ai-shorten')?.label, 'Shorten to fit X')
+  assert.ok(!ids(commandsFor(context({ ai: null }))).some((id) => id.startsWith('ai-')))
+})
+
+test('tables and math say they publish as images; snippets come from finishers', () => {
+  const commands = commandsFor(
+    context({ snippets: [{ id: 'f1', name: 'Signature', text: 'Thanks for reading' }] })
+  )
+  assert.equal(
+    commands.find((command) => command.id === 'insert-table')?.badge,
+    'Publishes as image'
+  )
+  assert.equal(
+    commands.find((command) => command.id === 'insert-math')?.badge,
+    'Publishes as image'
+  )
+  assert.equal(commands.find((command) => command.id === 'snippet-f1')?.label, 'Signature')
+})
+
+test('ranking respects the query, pins nothing, and matches aliases', () => {
+  const commands = commandsFor(context())
+  const he = rankCommands(commands, 'he')
+  assert.ok(he.length > 0)
+  assert.notEqual(he[0].id, 'ai-ask', 'Ask AI is not pinned above matches')
+  assert.deepEqual(rankCommands(commands, 'zzz'), [])
+  assert.equal(rankCommands(commands, 'img')[0].id, 'insert-media')
+  assert.equal(rankCommands(commands, 'split')[0].group, 'Post')
+})
+
+test('recent commands come first when nothing is typed', () => {
+  const commands = commandsFor(context())
+  const ranked = rankCommands(commands, '', ['insert-table', 'missing', 'post-split'])
+  assert.deepEqual(ids(ranked.slice(0, 2)), ['insert-table', 'post-split'])
+  assert.equal(ranked.length, commands.length)
+})
+
+test('duplicating a post copies its text below it as a new post, in one step', () => {
+  const first = postBreak()
+  const editor = createPlateEditor({
+    plugins: [PostBreakPlugin],
+    value: [first, p('One'), postBreak(), p('Two')] as Value,
+  })
+  duplicatePost(editor, 1)
+  assert.equal(postRanges(editor.children).length, 3)
+  assert.equal(editor.api.string([3]), 'One')
+  assert.notEqual(editor.children[2].id, first.id)
+  editor.undo()
+  assert.equal(postRanges(editor.children).length, 2)
+})
+
+test('half-typed inputs never persist: a slash command is dropped, emoji keep their text', () => {
+  const body = [
+    {
+      type: 'p',
+      children: [
+        { text: 'Hi ' },
+        { type: 'slash_input', trigger: '/', children: [{ text: '' }] },
+        { type: 'emoji_input', trigger: ':', value: 'fir', children: [{ text: '' }] },
+      ],
+    },
+  ]
+  assert.deepEqual(normalizeMentions(body)[0].children, [
+    { text: 'Hi ' },
+    { text: '' },
+    { text: ':fir' },
+  ])
+})

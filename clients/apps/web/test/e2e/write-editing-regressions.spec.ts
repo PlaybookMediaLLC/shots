@@ -32,7 +32,7 @@ test(
     await expectSaved(page)
     expect((await apiRequest(page, `/api/v1/content-drafts/${id}`)).body).toMatchObject({ title })
 
-    await page.getByRole('button', { name: 'Add another post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await editor
       .locator('[data-slate-node="element"]')
       .filter({ has: page.locator('[data-slate-zero-width]') })

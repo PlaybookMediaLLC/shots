@@ -1,3 +1,4 @@
+import { giphyEnabled } from '@/lib/content-drafts/giphy'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -66,6 +67,7 @@ export default async function WriteDraftPage({ params, searchParams }: WriteDraf
           collabToken={collabToken}
           collabUrl={collabUrl}
           draft={contentDraftSchema.parse(draft)}
+          giphy={giphyEnabled()}
           key={draft.id}
           posts={(posts ?? []).map((post) => contentDraftPostSchema.parse(post))}
           requireApproval={settings.requireApproval}

@@ -14,6 +14,7 @@ import {
   test,
   trpcMutation,
   uploadSignedAsset,
+  editorMore,
 } from './framework'
 
 test(
@@ -155,7 +156,7 @@ test(
     })
     await draftEditor(page).click()
     await page.keyboard.type('An animated release update.')
-    await page.getByRole('button', { name: 'GIF', exact: true }).click()
+    await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('empty')
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.getByRole('status').filter({ hasText: 'No GIFs found' })).toBeVisible()
@@ -206,7 +207,7 @@ test(
     const valid = await openNewDraft(page)
     await draftEditor(page).click()
     await page.keyboard.type('A supported single animation.')
-    await page.getByRole('button', { name: 'GIF', exact: true }).click()
+    await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('release')
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await page.getByRole('button', { name: 'Attach Local animation' }).click()
@@ -268,7 +269,7 @@ test(
       [...png]
     )
     await expect(editor.locator('img')).toHaveCount(1)
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: '+ALT', exact: true })
@@ -283,7 +284,7 @@ test(
     // through ClipboardItem would deliberately discard that media metadata.
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.keyboard.press('ControlOrMeta+c')
-    await page.getByRole('button', { name: 'Add another post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await page.keyboard.type('Second post receives the copied attachment.')
     await page.keyboard.press('ControlOrMeta+v')
     await expect(editor.locator('figure')).toHaveCount(2)
@@ -299,7 +300,7 @@ test(
     )
     await app.reload()
     await expect(editor.locator('figure')).toHaveCount(2)
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     const manager = page.getByTestId('media-manager')
     await expect(
       manager.getByRole('region', { name: 'Post 1 media' }).locator('[data-attachment-id]')
@@ -432,7 +433,7 @@ test(
       .locator('input[type=file][aria-label="Insert media"]')
       .setInputFiles({ name: 'media-test.png', mimeType: 'image/png', buffer: png })
     await expect(draftEditor(page).locator('img')).toHaveCount(1)
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     const manager = page.getByTestId('media-manager')
     await manager.getByRole('button', { name: '+ALT', exact: true }).click()
     await page
@@ -472,7 +473,7 @@ test(
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('Second post with copied media.')
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await manager.getByLabel('Destination post').first().selectOption('1')
     await manager.getByRole('button', { name: 'Move', exact: true }).first().click()
     await expect(
@@ -614,7 +615,7 @@ test(
     await openNewDraft(page)
     await draftEditor(page).click()
     await page.keyboard.type('Document and image preview.')
-    await page.getByRole('button', { name: 'GIF', exact: true }).click()
+    await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('release')
     await page.getByRole('button', { name: 'Search', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText('approval')
@@ -736,7 +737,7 @@ test(
       .locator('input[type=file][aria-label="Insert media"]')
       .setInputFiles({ name: 'alt-versions.png', mimeType: 'image/png', buffer: png })
     await expect(draftEditor(page).locator('figure')).toHaveCount(1)
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })
@@ -761,7 +762,7 @@ test(
     expect(JSON.stringify(denied.body)).toMatch(/photo.tag|permission|enabled/i)
     await page.getByTestId('platform-tab-linkedin').click()
     await page.getByRole('button', { name: 'Edit for LinkedIn independently' }).click()
-    await page.getByRole('button', { name: 'Manage media', exact: true }).click()
+    await editorMore(page, 'Manage media')
     // Remove inherited X metadata without changing the primary X version.
     await page
       .getByTestId('media-manager')
@@ -858,7 +859,7 @@ test(
       await page.keyboard.type('An image explicitly attached from a metadata page.')
       const url = new URL('/page', source.url)
       url.hostname = process.env.E2E_LINK_FIXTURE_HOST!
-      await page.getByRole('button', { name: 'Image from link', exact: true }).click()
+      await editorMore(page, 'Image from link')
       await page.getByLabel('Page URL').fill(url.toString())
       await page.getByRole('button', { name: 'Find image', exact: true }).click()
       await expect(page.getByAltText('Controlled image source')).toBeVisible()

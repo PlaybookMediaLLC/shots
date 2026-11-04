@@ -9,6 +9,15 @@ import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
 import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
+import type { Shortcut } from './shortcuts'
+
+/** An editor command as the palette lists it. */
+export type EditorCommandEntry = {
+  id: string
+  label: string
+  shortcut?: Pick<Shortcut, 'alt' | 'key' | 'mod' | 'shift'>
+  run: () => void
+}
 
 /**
  * Write's shared client state (RFC 025): the library the page loaded, and
@@ -46,6 +55,8 @@ type WriteContextValue = {
   openPreviewRef: React.MutableRefObject<(() => void) | null>
   /** Archives or restores the open draft through its composer, which keeps its version. */
   archiveRef: React.MutableRefObject<((status: 'draft' | 'archived') => Promise<void>) | null>
+  /** The open editor's commands (composer/commands.tsx), for the command palette. */
+  editorCommandsRef: React.MutableRefObject<(() => EditorCommandEntry[]) | null>
   saved: Record<string, DraftLine>
   /** The list for the chosen tab or search is still loading. */
   libraryPending: boolean
@@ -89,6 +100,7 @@ export function WriteProvider({
   const beforeLeaveRef = React.useRef<(() => Promise<void>) | null>(null)
   const openPreviewRef = React.useRef<(() => void) | null>(null)
   const archiveRef = React.useRef<((status: 'draft' | 'archived') => Promise<void>) | null>(null)
+  const editorCommandsRef = React.useRef<(() => EditorCommandEntry[]) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
@@ -225,6 +237,7 @@ export function WriteProvider({
       beforeLeaveRef,
       openPreviewRef,
       archiveRef,
+      editorCommandsRef,
       hideDraft,
       activeId,
       canEdit,

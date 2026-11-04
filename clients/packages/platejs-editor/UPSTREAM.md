@@ -92,6 +92,18 @@ Boundaries (RFC 013: the package reaches nothing the app owns, enforced by
   people's carets and selections; `createYjsPlugin` renders it after the
   editable. Adds the `@slate-yjs/react` dependency.
 
+Post editor (the Write brief: one look with the app, a social slash menu):
+
+- `src/ui/inline-combobox.tsx`: one highlight (hover moves the active row,
+  `focusOnHover`, and no separate hover style); Tab runs the active row as
+  Enter does; `closeOnSpace` (`empty`: a space right after the trigger types
+  it as text; `always`: a space ends the query); the host's `onKeyDown` is
+  composed with Plate's instead of replacing it; the popover sits 8px below
+  the caret's line (`gutter`) with no extra margin.
+- `src/ui/slash-node.tsx`, `src/ui/floating-toolbar-buttons.tsx`,
+  `src/ui/block-menu.tsx`: the multicolor 512-viewBox AI mark (three copies
+  sharing one gradient id) is Phosphor's `Sparkle` in `text-primary`.
+
 ## Pulling a later fix from oppulence-canvas
 
 1. In oppulence-canvas:
