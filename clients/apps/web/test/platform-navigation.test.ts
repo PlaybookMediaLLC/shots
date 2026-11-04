@@ -163,6 +163,8 @@ test('workspace and editor routes follow appearance in every locale', () => {
 
 test('the plan page names the paid capability a free workspace asked for', () => {
   assert.equal(paidCapability('/create'), 'Create')
+  assert.equal(paidCapability('/create/code'), 'Code Studio')
+  assert.equal(paidCapability('/create/code/cabc'), 'Code Studio')
   assert.equal(paidCapability('/library?view=assets'), 'Library')
   assert.equal(paidCapability('/assets'), 'Library')
   assert.equal(paidCapability('/activity'), 'Activity')

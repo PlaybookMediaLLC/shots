@@ -26,6 +26,8 @@ export interface WebCodecsEncoderOptions {
    * `isAudioEncodingSupported` first, as an unsupported codec fails the export.
    */
   audio?: AudioBuffer | null;
+  /** Keep the frames' transparency. WebM (VP9) only; check `isAlphaWebmSupported` first. */
+  alpha?: boolean;
   onProgress?: (progress: number) => void;
 }
 
@@ -50,6 +52,24 @@ const VPX_CODECS = [
 export interface FrameData {
   imageData: ImageData;
   timestamp: number; // in microseconds
+}
+
+/** Whether this browser encodes VP9 with transparency at a size, for transparent WebM. */
+export async function isAlphaWebmSupported(width: number, height: number, fps: number): Promise<boolean> {
+  if (!isWebCodecsSupported()) return false;
+  try {
+    const result = await VideoEncoder.isConfigSupported({
+      codec: 'vp09.00.50.08',
+      width: width + (width % 2),
+      height: height + (height % 2),
+      bitrate: 1_000_000,
+      framerate: fps,
+      alpha: 'keep',
+    });
+    return !!result.supported;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -167,6 +187,7 @@ export class WebCodecsVideoEncoder {
       bitrate: options.bitrate ?? 10_000_000, // 10 Mbps default
       container: options.container ?? 'mp4',
       audio: options.audio ?? null,
+      alpha: options.container === 'webm' && (options.alpha ?? false),
       onProgress: options.onProgress ?? (() => {}),
     };
   }
@@ -177,7 +198,7 @@ export class WebCodecsVideoEncoder {
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
-    const { width, height, fps, bitrate, container, audio } = this.options;
+    const { width, height, fps, bitrate, container, audio, alpha } = this.options;
 
     // Ensure dimensions are even (required for H.264/VP9)
     this.evenWidth = width % 2 === 0 ? width : width + 1;
@@ -187,7 +208,7 @@ export class WebCodecsVideoEncoder {
     const codecs = container === 'webm' ? VPX_CODECS : AVC_CODECS;
 
     // Check cache first for this resolution
-    const cacheKey = `${container}:${this.evenWidth}x${this.evenHeight}@${fps}`;
+    const cacheKey = `${container}:${this.evenWidth}x${this.evenHeight}@${fps}${alpha ? ':alpha' : ''}`;
     let supportedCodec: string | null = codecCache.get(cacheKey) || null;
 
     if (!supportedCodec) {
@@ -198,6 +219,7 @@ export class WebCodecsVideoEncoder {
           height: this.evenHeight,
           bitrate: 1_000_000,
           framerate: fps,
+          ...(alpha ? { alpha: 'keep' as const } : {}),
         });
         if (result.supported) {
           supportedCodec = codec;
@@ -218,6 +240,7 @@ export class WebCodecsVideoEncoder {
       height: this.evenHeight,
       bitrate,
       framerate: fps,
+      ...(alpha ? { alpha: 'keep' as const } : {}),
     };
 
     // Create the container muxer
@@ -229,6 +252,7 @@ export class WebCodecsVideoEncoder {
           width: this.evenWidth,
           height: this.evenHeight,
           frameRate: fps,
+          alpha,
         },
         ...(audio
           ? { audio: { codec: 'A_OPUS', numberOfChannels: audio.numberOfChannels, sampleRate: audio.sampleRate } }

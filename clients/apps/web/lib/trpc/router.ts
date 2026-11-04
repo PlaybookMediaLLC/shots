@@ -1,6 +1,7 @@
 import { frontendDeploymentsRouter } from './routers/frontend-deployments'
 import { creativeSetRouter } from './routers/creative-set'
 import { canvasRouter } from './routers/canvas'
+import { codeProjectRouter } from './routers/code-project'
 import 'server-only'
 
 import { router } from './init'
@@ -39,6 +40,7 @@ export const appRouter = router({
   campaign: campaignRouter,
   canvas: canvasRouter,
   channelConnection: channelConnectionRouter,
+  codeProject: codeProjectRouter,
   conversation: conversationRouter,
   creativeTemplate: creativeTemplateRouter,
   creativeVariant: creativeVariantRouter,

@@ -42,6 +42,7 @@ import { SidebarLink } from './SidebarLink'
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
   { href: '/?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
   { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
+  { href: '/create/code', label: 'Code image', paid: true },
   { href: '/?editor=app-store', label: 'Store screenshots', paid: true },
   { href: '/write', label: 'Post', paid: false, permission: 'artifact:edit' },
   { href: '/campaigns/new', label: 'Campaign', paid: true, permission: 'release:create' },

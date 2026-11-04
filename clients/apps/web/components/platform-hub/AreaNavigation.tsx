@@ -104,6 +104,7 @@ export const LIBRARY_LINKS = [
   { href: '/library?type=canvas', label: 'Canvas' },
   { href: '/library?type=story', label: 'Story Sets' },
   { href: '/library?type=store', label: 'Store screenshots' },
+  { href: '/library?type=code', label: 'Code' },
   { href: '/library?view=assets', label: 'Assets' },
   { href: '/library?view=templates', label: 'Templates' },
   { href: '/library?view=brand', label: 'Brand resources' },

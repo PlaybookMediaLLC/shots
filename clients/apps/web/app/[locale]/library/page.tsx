@@ -9,6 +9,7 @@ import { ProjectLibrary } from '@/components/projects/ProjectLibrary'
 import { CanvasLibrary } from '@/components/canvas-workspace/CanvasLibrary'
 import { StorySetLibrary } from '@/components/creative-sets/StorySetLibrary'
 import { WorkspaceAssets } from '@/components/workspace/WorkspaceAssets'
+import { CodeLibrary } from '@/components/code-studio/CodeLibrary'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
 import { hasPermission } from '@/lib/auth/permissions'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
@@ -51,6 +52,8 @@ export default async function LibraryPage({
               <StorySetLibrary embedded canEdit={canEdit} canCreate={access.creativeSetsEnabled} />
             ) : query.type === 'store' ? (
               <LocalStoreProjects />
+            ) : query.type === 'code' ? (
+              <CodeLibrary canEdit={canEdit} />
             ) : (
               <div className="grid gap-4">
                 <p className="text-sm text-muted-foreground">

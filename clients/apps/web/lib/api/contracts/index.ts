@@ -6,6 +6,11 @@ import {
   getGitHubRecoveryContract,
   inspectGitHubRecoveryContract,
 } from './github-production'
+import {
+  createCodeProjectContract,
+  getCodeProjectContract,
+  renderCodeProjectContract,
+} from '@/lib/api/contracts/code-projects'
 import { updateSocialSetQueueContract } from '@/lib/api/contracts/social-set-queue'
 import { listSocialSetsContract, getSocialSetContract } from '@/lib/api/contracts/social-sets'
 import { lookupMentionsContract } from '@/lib/api/contracts/social-mentions'
@@ -141,6 +146,9 @@ export const documentedContracts = [
   createAssetDownloadUrlContract,
   deleteAssetContract,
   setAssetAltTextContract,
+  createCodeProjectContract,
+  getCodeProjectContract,
+  renderCodeProjectContract,
   listCampaignsContract,
   createCampaignContract,
   getCampaignContract,
