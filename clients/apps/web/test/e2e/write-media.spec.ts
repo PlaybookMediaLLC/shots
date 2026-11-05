@@ -535,6 +535,8 @@ test(
   'TF-057 TF-074 TF-078 TF-085 TF-100: live preview, expansion and scaled mobile geometry preserve draft',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
+    // Wide enough that the drafts rail doesn't squeeze the panel below its full width.
+    await page.setViewportSize({ width: 1536, height: 720 })
     await startWorkspace({ channels: ['x', 'linkedin', 'threads'] })
     const id = await openNewDraft(page)
     const text =

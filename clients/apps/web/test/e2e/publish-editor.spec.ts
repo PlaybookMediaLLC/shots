@@ -152,12 +152,12 @@ test(
     await page.screenshot({ path: '.context/shots/publish-failure-1440.png', fullPage: true })
     // The drafts list reads the same words.
     await page.goto('/write')
-    await expect(page.getByTestId('write-rail')).toContainText('Failed · 1 of 2')
     // A failure has its own tab and count, and leaves the Drafts tab.
     await expect(page.getByTestId('failed-count')).toHaveText('1')
     await expect(page.getByTestId('draft-row')).toHaveCount(0)
     await page.getByTestId('library-tab-failed').click()
     await expect(page.getByTestId('draft-row')).toHaveCount(1)
+    await expect(page.getByTestId('write-rail')).toContainText('Failed · 1 of 2')
     // Opening a post keeps the list on the tab it was opened from.
     await page.getByTestId('draft-row').getByRole('link').first().click()
     await expect(page).toHaveURL(/tab=failed/)

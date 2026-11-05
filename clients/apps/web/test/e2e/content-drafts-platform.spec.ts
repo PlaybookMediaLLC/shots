@@ -260,7 +260,8 @@ test(
     await write(page, 'Launch week #shipit')
     const draftId = await openNewDraft(page)
     await draftEditor(page).click()
-    await page.getByRole('button', { name: '#shipit' }).click()
+    // Exact: a draft's row menu is named after its text, which holds the tag too.
+    await page.getByRole('button', { name: '#shipit', exact: true }).click()
     await expect(draftEditor(page)).toContainText('#shipit')
     await page.keyboard.type(' First post')
     await settleSelection(page)
@@ -432,7 +433,7 @@ test('a live post links to itself, shows engagement, and resumes a thread that s
 
   // The rail's Posted tab lists the draft.
   await page.getByRole('tab', { name: /Posted/ }).click()
-  await expect(page.getByRole('navigation').getByText('1 live', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('draft-row')).toContainText('Published')
   expect((await apiRequest(page, `/api/v1/content-drafts/${draftId}/revisions`)).status).toBe(200)
 })
 
