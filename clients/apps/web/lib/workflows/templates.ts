@@ -6,7 +6,7 @@ import {
   type AutomationLayout,
   type AutomationNode,
 } from '@/lib/api/contracts/release-automation'
-import { WORKFLOW_SCHEMA_VERSION } from './actions'
+import { graphSchemaVersion } from './actions'
 
 /** Templates that open as editable, executable definitions. */
 export const workflowTemplateIdSchema = z.enum([
@@ -36,6 +36,14 @@ export const workflowTemplateInputSchema = z.strictObject({
   renderTemplateIds: z.array(z.string().max(64)).max(3),
   /** Lays out a canvas from the release for the team to refine. */
   canvas: z.boolean(),
+  /** A deployment template captures this page before rendering, so creatives show this deployment. */
+  capture: z
+    .strictObject({
+      surfaceId: z.string().max(64),
+      /** The path that reports the deployed commit; without it the draft asks for a choice. */
+      versionPath: z.string().max(256).optional(),
+    })
+    .optional(),
 })
 
 /** Template parameters chosen in the template picker. */
@@ -203,6 +211,18 @@ export function buildWorkflowTemplate(
       },
     })
   }
+  if (input.capture && template.family === 'deployment.succeeded') {
+    steps.push({
+      id: 'capture',
+      type: 'action',
+      action: {
+        type: 'capture_product',
+        input: { nodeId: after(), output: 'campaignId' },
+        surfaceId: input.capture.surfaceId,
+        ...(input.capture.versionPath ? { versionPath: input.capture.versionPath } : {}),
+      },
+    })
+  }
   if (input.renderTemplateIds.length > 0) {
     steps.push({
       id: 'art',
@@ -251,7 +271,7 @@ export function buildWorkflowTemplate(
   })
   return {
     graph: {
-      schemaVersion: WORKFLOW_SCHEMA_VERSION,
+      schemaVersion: graphSchemaVersion({ nodes }),
       family: template.family,
       qualification,
       nodes,

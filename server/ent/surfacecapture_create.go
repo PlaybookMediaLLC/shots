@@ -86,6 +86,20 @@ func (_c *SurfaceCaptureCreate) SetNillableSupersededAt(v *time.Time) *SurfaceCa
 	return _c
 }
 
+// SetObservedRevision sets the "observed_revision" field.
+func (_c *SurfaceCaptureCreate) SetObservedRevision(v string) *SurfaceCaptureCreate {
+	_c.mutation.SetObservedRevision(v)
+	return _c
+}
+
+// SetNillableObservedRevision sets the "observed_revision" field if the given value is not nil.
+func (_c *SurfaceCaptureCreate) SetNillableObservedRevision(v *string) *SurfaceCaptureCreate {
+	if v != nil {
+		_c.SetObservedRevision(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *SurfaceCaptureCreate) SetID(v string) *SurfaceCaptureCreate {
 	_c.mutation.SetID(v)
@@ -217,6 +231,10 @@ func (_c *SurfaceCaptureCreate) createSpec() (*SurfaceCapture, *sqlgraph.CreateS
 	if value, ok := _c.mutation.SupersededAt(); ok {
 		_spec.SetField(surfacecapture.FieldSupersededAt, field.TypeTime, value)
 		_node.SupersededAt = &value
+	}
+	if value, ok := _c.mutation.ObservedRevision(); ok {
+		_spec.SetField(surfacecapture.FieldObservedRevision, field.TypeString, value)
+		_node.ObservedRevision = &value
 	}
 	return _node, _spec
 }

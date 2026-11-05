@@ -68,6 +68,7 @@ NODE
     ensure_env_value AUDIT_DRAIN_ENCRYPTION_KEY "$(random_base64 32)"
     ensure_env_value STORE_PUBLISHING_ENCRYPTION_KEY "$(random_base64 32)"
     ensure_env_value PLATFORM_WEBHOOK_ENCRYPTION_KEY "$(random_base64 32)"
+    ensure_env_value PLATFORM_CAPTURE_STATE_KEY "$(random_base64 32)"
     ensure_env_value BETTER_AUTH_URL "http://localhost:3000"
     ensure_env_value NEXT_PUBLIC_APP_URL "http://localhost:3000"
     ensure_env_value BETTER_AUTH_TRUSTED_ORIGINS "http://localhost:3000"
@@ -124,6 +125,7 @@ SOURCE_WEBHOOK_SIGNING_KEY=$source_webhook_signing_key
 AUDIT_DRAIN_ENCRYPTION_KEY=$audit_drain_encryption_key
 STORE_PUBLISHING_ENCRYPTION_KEY=$store_publishing_encryption_key
 PLATFORM_WEBHOOK_ENCRYPTION_KEY=$(random_base64 32)
+PLATFORM_CAPTURE_STATE_KEY=$(random_base64 32)
 DATABASE_URL=postgresql://screenshot_studio:$postgres_app_password@postgres:5432/screenshot_studio?schema=public
 AUDIT_RETENTION_DATABASE_URL=postgresql://screenshot_studio:$postgres_app_password@postgres:5432/screenshot_studio?schema=public
 HOST_DATABASE_URL=postgresql://screenshot_studio:$postgres_app_password@127.0.0.1:54329/screenshot_studio?schema=public

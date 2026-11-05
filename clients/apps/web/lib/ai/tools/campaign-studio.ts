@@ -11,6 +11,7 @@ import { captureScreenshot } from '@/lib/screenshot-service'
 import { readTenantObject } from '@/lib/storage/client'
 import { isRegisteredCaptureUrl } from '@/lib/launch/spec-schema'
 import { storeGeneratedAsset } from '@/lib/tenant/assets'
+import { queueSignedInCaptureAt } from '@/lib/tenant/product-surfaces'
 import {
   composeProductShot,
   isNearlyBlank,
@@ -107,6 +108,14 @@ export function createCampaignStudioTools(
         SCREENSHOT_RATE_LIMIT
       )
       if (!limit.allowed) return failure('Screenshot capacity is exhausted; try again later.')
+      const signedIn = await queueSignedInCaptureAt(scope.tenant, url, scope.run.runId)
+      if (signedIn) {
+        return failure(
+          signedIn === 'queued'
+            ? 'This page is behind a login, so a signed-in capture was queued; it finishes after this step. Use another registered URL for now.'
+            : 'This page is behind a login, and its signed-in capture could not start. Use another registered URL.'
+        )
+      }
       let bytes: Buffer
       try {
         const { screenshot } = await captureScreenshot({

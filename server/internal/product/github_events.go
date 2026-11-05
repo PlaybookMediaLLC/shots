@@ -5,16 +5,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/activity"
 	"image"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/activity"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
@@ -25,9 +27,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 )
 
 // Product events the worker hands back to the product, because doing them
@@ -49,6 +52,7 @@ type GitHubReader interface {
 	MilestonePullRequests(ctx context.Context, installationID int64, repositoryID string, milestone int) ([]int, error)
 	ReleaseHTML(ctx context.Context, installationID int64, repositoryID string, releaseID int64) (string, error)
 	InstallationToken(ctx context.Context, installationID int64) (string, error)
+	CommitForRef(ctx context.Context, installationID int64, repositoryID, ref string) (string, error)
 }
 
 // Capturer takes a screenshot of a public page.
@@ -84,6 +88,10 @@ func (c *Configuration) HandleOutboxEvent(ctx context.Context, eventID, organiza
 		return true, c.backfillSource(ctx, organizationID, aggregateID)
 	case EventDeploymentSucceeded:
 		return true, c.captureDeployment(ctx, organizationID, aggregateID)
+	case EventCaptureJobDispatch:
+		return true, c.dispatchCaptureJob(ctx, organizationID, aggregateID)
+	case EventCaptureConnectionFinish:
+		return true, c.dispatchCaptureConnection(ctx, organizationID, aggregateID)
 	case EventCampaignPostsSubmitted, EventCampaignPostsDecided:
 		// Personal deliveries are claimed independently by the notification dispatcher.
 		return true, nil
@@ -515,8 +523,10 @@ func ignoresPullRequestAuthor(source *ent.SourceApp, login, accountType string) 
 const maxCapturedSurfaces = 10
 
 // captureDeployment captures the workspace's registered production pages on
-// the deployed host once the deployment answers. Only registered product
-// surfaces are captured, never a URL taken from the payload.
+// the deployed origin once the deployment answers. Only registered product
+// surfaces are captured, never a URL taken from the payload. Each page's
+// capture is a receipt: a retried run captures only the pages still missing,
+// and the deployment is CAPTURED only when every page has one.
 func (c *Configuration) captureDeployment(ctx context.Context, organizationID, deploymentID string) error {
 	row, err := c.client.DeploymentEvent.Query().Where(deploymentevent.ID(deploymentID), deploymentevent.OrganizationID(organizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
@@ -528,12 +538,29 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 	skip := func(code string) error {
 		return row.Update().SetStatus(deploymentevent.StatusSKIPPED).SetFailureCode(code).Exec(ctx)
 	}
+	// The source may have been archived since the deployment arrived.
+	active, err := c.client.SourceApp.Query().Where(sourceapp.ID(row.SourceAppID), sourceapp.OrganizationID(organizationID),
+		sourceapp.StatusEQ(sourceapp.StatusACTIVE)).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !active {
+		return skip("source_inactive")
+	}
+	// A page behind a login is a durable job's, not a public screenshot's.
+	jobOwned, err := c.admitDeploymentCaptures(ctx, row)
+	if err != nil {
+		return err
+	}
 	if row.URL == nil {
 		return skip("deployment_url_missing")
 	}
 	deployed, err := url.Parse(*row.URL)
 	if err != nil {
 		return skip("deployment_url_invalid")
+	}
+	if !capture.PublicPageURL(*row.URL) {
+		return skip("deployment_url_refused")
 	}
 	candidates, err := c.client.ProductSurface.Query().Where(productsurface.OrganizationID(organizationID),
 		productsurface.Environment("production")).Order(ent.Asc(productsurface.FieldName)).All(ctx)
@@ -543,22 +570,35 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 	var surfaces []*ent.ProductSurface
 	for _, surface := range candidates {
 		parsed, err := url.Parse(surface.URL)
-		if err == nil && strings.EqualFold(parsed.Hostname(), deployed.Hostname()) && len(surfaces) < maxCapturedSurfaces {
+		if err == nil && !jobOwned[surface.ID] && sameOrigin(parsed, deployed) && capture.PublicPageURL(surface.URL) && len(surfaces) < maxCapturedSurfaces {
 			surfaces = append(surfaces, surface)
 		}
 	}
 	if len(surfaces) == 0 {
+		if len(jobOwned) > 0 {
+			return skip("capture_jobs_admitted")
+		}
 		return skip("deployment_host_rejected")
 	}
 	if c.capture == nil || c.objects == nil {
 		return skip("capture_unavailable")
 	}
-	// Not live yet: fail so the worker retries on its next run, the readiness window.
-	if err := c.ready(ctx, surfaces[0].URL); err != nil {
+	// Not live yet: fail so the worker retries on its next run, the readiness
+	// window. A private destination is refused for good.
+	if err := c.ready(ctx, surfaces[0].URL); errors.Is(err, errUnsafeDeploymentURL) || errors.Is(err, publicnet.ErrBlocked) {
+		return skip("deployment_url_refused")
+	} else if err != nil {
 		return err
 	}
-	actor := Actor{OrganizationID: organizationID, Kind: "service", Display: "deployment", RequestID: deploymentID}
-	assets := []string{}
+	receipts, err := c.client.SurfaceCapture.Query().Where(surfacecapture.OrganizationID(organizationID),
+		surfacecapture.SourceEQ(surfacecapture.SourceDeployment), surfacecapture.SourceID(row.ID)).All(ctx)
+	if err != nil {
+		return err
+	}
+	captured := map[string]string{}
+	for _, receipt := range receipts {
+		captured[receipt.SurfaceID] = receipt.AssetID
+	}
 	failed := func(surface *ent.ProductSurface, code string, err error) error {
 		slog.Info("deployment capture failed", "surface", surface.ID, "code", code, "reason", err.Error())
 		tx, txErr := c.client.Tx(ctx)
@@ -574,63 +614,155 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		}
 		return tx.Commit()
 	}
+	assets := []string{}
 	for i, surface := range surfaces {
-		actor.UserID = ""
-		if surface.PlatformOwnerUserID != nil {
-			actor.UserID = *surface.PlatformOwnerUserID
+		if asset, ok := captured[surface.ID]; ok {
+			assets = append(assets, asset)
+			continue
 		}
-		shot, err := c.capture.Capture(ctx, surface.URL)
-		if err != nil {
-			if err := failed(surface, "capture_failed", err); err != nil {
+		receipt, code, err := c.captureDeploymentSurface(ctx, row, surface, fmt.Sprintf("deployment-%d", i+1), nil)
+		if code != "" {
+			if err := failed(surface, code, err); err != nil {
 				return err
 			}
 			continue
 		}
-		stored, err := c.storeImage(ctx, actor, shot, http.DetectContentType(shot), fmt.Sprintf("deployment-%d", i+1))
-		if err != nil {
-			if err := failed(surface, "asset_unavailable", err); err != nil {
-				return err
-			}
-			continue
-		}
-		assets = append(assets, stored)
-		tx, err := c.client.Tx(ctx)
 		if err != nil {
 			return err
 		}
-		if _, err := recordCapture(ctx, tx, actor, surface, stored, surfacecapture.SourceDeployment, &row.ID); err != nil {
-			_ = tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
+		assets = append(assets, receipt.AssetID)
 	}
 	update := row.Update().SetAssetIds(assets).SetStatus(deploymentevent.StatusCAPTURED)
-	if len(assets) == 0 {
+	switch {
+	case len(assets) == 0:
 		update.SetStatus(deploymentevent.StatusFAILED).SetFailureCode("capture_failed")
+	case len(assets) < len(surfaces):
+		update.SetStatus(deploymentevent.StatusPARTIAL).SetFailureCode("capture_incomplete")
 	}
 	return update.Exec(ctx)
 }
 
-// ready reports whether the deployed page answers successfully.
-func (c *Configuration) ready(ctx context.Context, pageURL string) error {
+// captureDeploymentSurface takes a page's capture for a deployment and records
+// it as the deployment's receipt for that page, with the commit the app reported
+// when there is one. A failure the page itself caused returns a safe code.
+func (c *Configuration) captureDeploymentSurface(ctx context.Context, deployment *ent.DeploymentEvent, surface *ent.ProductSurface, name string, revision *string) (*ent.SurfaceCapture, string, error) {
+	page, err := c.probePage(ctx, surface.URL)
+	if errors.Is(err, errUnsafeDeploymentURL) || errors.Is(err, publicnet.ErrBlocked) {
+		return nil, "deployment_url_refused", err
+	}
+	if err == nil && page.signIn(surface.URL) {
+		return nil, "capture_login_page", errors.New("the page asks visitors to sign in")
+	}
+	actor := Actor{OrganizationID: deployment.OrganizationID, Kind: "service", Display: "deployment", RequestID: deployment.ID}
+	if surface.PlatformOwnerUserID != nil {
+		actor.UserID = *surface.PlatformOwnerUserID
+	}
+	shot, err := c.capture.Capture(ctx, surface.URL)
+	if err != nil {
+		return nil, "capture_failed", err
+	}
+	stored, err := c.storeImage(ctx, actor, shot, http.DetectContentType(shot), name)
+	if err != nil {
+		return nil, "asset_unavailable", err
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	defer tx.Rollback()
+	receipt, err := recordCapture(ctx, tx, actor, surface, stored, surfacecapture.SourceDeployment, &deployment.ID, revision)
+	if err != nil {
+		return nil, "", err
+	}
+	return receipt, "", tx.Commit()
+}
+
+// sameOrigin compares scheme, host, and effective port, so an HTTPS
+// deployment never selects an HTTP page or another port on its host.
+func sameOrigin(a, b *url.URL) bool {
+	port := func(u *url.URL) string {
+		if p := u.Port(); p != "" {
+			return p
+		}
+		return map[string]string{"http": "80", "https": "443"}[strings.ToLower(u.Scheme)]
+	}
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
+}
+
+// errUnsafeDeploymentURL refuses a request to a private or credentialed
+// address, or a redirect to one.
+var errUnsafeDeploymentURL = errors.New("deployment address refused")
+
+// probedPage is what the backend saw when it requested a customer page.
+type probedPage struct {
+	status int
+	final  *url.URL
+	body   []byte
+}
+
+// maxProbedBytes bounds how much of a customer page the backend reads.
+const maxProbedBytes = 256 << 10
+
+// customerPages carries every request the backend makes to a customer's page.
+var customerPages = publicnet.Transport()
+
+// probePage requests a customer page from the backend itself, so it dials
+// public addresses only, follows at most three redirects, and checks each
+// hop's scheme and credentials again.
+func (c *Configuration) probePage(ctx context.Context, pageURL string) (*probedPage, error) {
+	page, err := url.Parse(pageURL)
+	if err != nil || !capture.PublicPageURL(pageURL) || page.User != nil {
+		return nil, errUnsafeDeploymentURL
+	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// The customer's page is not a dependency: it gets no trace headers.
-	client := &http.Client{Timeout: 15 * time.Second, Transport: telemetry.UntracedTransport}
+	client := &http.Client{Timeout: 15 * time.Second, Transport: customerPages}
 	if c.web != nil {
 		client.Transport = c.web.Transport
 	}
+	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if len(via) >= 3 || next.URL.User != nil || !capture.PublicPageURL(next.URL.String()) {
+			return errUnsafeDeploymentURL
+		}
+		return nil
+	}
 	response, err := client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, maxProbedBytes))
+	if err != nil {
+		return nil, err
+	}
+	return &probedPage{status: response.StatusCode, final: response.Request.URL, body: body}, nil
+}
+
+var passwordField = regexp.MustCompile(`(?i)<input\b[^>]*\btype\s*=\s*["']?password`)
+
+// signIn reports whether a request for a page ended on a sign-in form or a
+// sign-in path instead. A surface registered at a sign-in path is that page,
+// not a redirect to it. A form an app renders in the browser cannot be seen
+// here; only version proof or an authenticated capture can rule it out.
+func (p *probedPage) signIn(requested string) bool {
+	page, err := url.Parse(requested)
+	if err == nil && capture.IsSignInPath(page.Path) {
+		return false
+	}
+	return passwordField.Match(p.body) || capture.IsSignInPath(p.final.Path)
+}
+
+// ready reports whether the deployed page answers successfully.
+func (c *Configuration) ready(ctx context.Context, pageURL string) error {
+	page, err := c.probePage(ctx, pageURL)
 	if err != nil {
 		return fmt.Errorf("deployment not ready: %w", err)
 	}
-	_ = response.Body.Close()
-	if response.StatusCode >= 400 {
-		return fmt.Errorf("deployment not ready: %d", response.StatusCode)
+	if page.status >= 400 {
+		return fmt.Errorf("deployment not ready: %d", page.status)
 	}
 	return nil
 }

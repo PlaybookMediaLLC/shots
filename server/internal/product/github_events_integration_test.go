@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -21,6 +22,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/lucsky/cuid"
@@ -41,6 +43,8 @@ type fakeReader struct {
 	fakeGitHub
 	base     string
 	released time.Time
+	// commits are the immutable commits of tags, for joining a release to its deployment.
+	commits map[string]string
 }
 
 func (f fakeReader) Repository(context.Context, int64, string) (githubapp.Repository, error) {
@@ -86,13 +90,37 @@ func (f fakeReader) MilestonePullRequests(context.Context, int64, string, int) (
 	return []int{90, 91}, nil
 }
 func (f fakeReader) InstallationToken(context.Context, int64) (string, error) { return "token", nil }
+func (f fakeReader) CommitForRef(_ context.Context, _ int64, _, ref string) (string, error) {
+	return f.commits[ref], nil
+}
 func (f fakeReader) ReleaseHTML(context.Context, int64, string, int64) (string, error) {
 	return `<img src="` + f.base + `/img/release.png"><img src="` + f.base + `/img/redirect"><img src="` + f.base + `/img/text">`, nil
 }
 
-type fakeCapturer struct{ shot []byte }
+// fakeCapturer returns its image for every page except one whose URL ends in fail.
+type fakeCapturer struct {
+	shot []byte
+	fail string
+}
 
-func (f fakeCapturer) Capture(context.Context, string) ([]byte, error) { return f.shot, nil }
+func (f fakeCapturer) Capture(_ context.Context, page string) ([]byte, error) {
+	if f.fail != "" && strings.HasSuffix(page, f.fail) {
+		return nil, errors.New("capture failed")
+	}
+	return f.shot, nil
+}
+
+// routedClient trusts the TLS test server and dials it for every host, so a
+// deployment can use a public name that the capture policy accepts.
+func routedClient(server *httptest.Server) *http.Client {
+	client := server.Client()
+	transport := client.Transport.(*http.Transport).Clone()
+	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, network, server.Listener.Addr().String())
+	}
+	client.Transport = transport
+	return client
+}
 
 func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 	dsn := os.Getenv("PUBLISHING_TEST_DATABASE_URL")
@@ -155,7 +183,9 @@ func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 	repo := NewConfiguration(db.Client).WithGitHubApp(reader).WithObjectStore(objects).WithCapturer(fakeCapturer{shot: shot})
 	subscribe(t, ctx, repo, org, "pro")
 	repo.imageHost = func(host string) bool { return host == local.Hostname() }
-	repo.web = server.Client()
+	repo.web = routedClient(server)
+	// The test certificate names example.com; the deployed app answers there.
+	app := "https://example.com:" + local.Port()
 	owner := Actor{OrganizationID: org, UserID: user, SessionID: session}
 
 	// The App-delivered source watches main and skips pre-releases.
@@ -266,23 +296,28 @@ func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 
 	// #6: a production deployment captures registered pages on its host only.
 	surface, err := repo.CreateProductSurface(ctx, owner, CreateProductSurfaceInput{Environment: "production", Name: "Product " + id,
-		FeatureTags: []string{}, ScreenshotAssetIDs: []string{}, URL: server.URL + "/product"})
+		FeatureTags: []string{}, ScreenshotAssetIDs: []string{}, URL: app + "/product"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	deploy := func(externalID string, deployURL *string) string {
+	ingest := func(externalID string, deployURL *string) string {
 		t.Helper()
 		result, err := repo.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: manual.ID},
 			IngestDeploymentInput{Environment: "production", EventID: "d", ExternalID: externalID, SourceAppID: manual.ID, URL: deployURL})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := repo.HandleOutboxEvent(ctx, "unused", org, EventDeploymentSucceeded, result.DeploymentID); err != nil {
-			t.Fatal(err)
-		}
 		return result.DeploymentID
 	}
-	live := server.URL
+	handle := func(deploymentID string) string {
+		t.Helper()
+		if _, err := repo.HandleOutboxEvent(ctx, "unused", org, EventDeploymentSucceeded, deploymentID); err != nil {
+			t.Fatal(err)
+		}
+		return deploymentID
+	}
+	deploy := func(externalID string, deployURL *string) string { return handle(ingest(externalID, deployURL)) }
+	live := app
 	captured, _ := db.Client.DeploymentEvent.Get(ctx, deploy("1", &live))
 	if captured.Status != deploymentevent.StatusCAPTURED || len(captured.AssetIds) != 1 {
 		t.Fatalf("deployment=%+v", captured)
@@ -312,6 +347,73 @@ func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 	}
 	if row, _ := db.Client.DeploymentEvent.Get(ctx, deploy("3", nil)); row.Status != deploymentevent.StatusSKIPPED || *row.FailureCode != "deployment_url_missing" {
 		t.Fatalf("a deployment without a URL: %+v", row)
+	}
+	// A private deployment address is recorded but never requested or captured.
+	for i, private := range []string{server.URL, "https://10.1.2.3/", "https://169.254.169.254/"} {
+		if row, _ := db.Client.DeploymentEvent.Get(ctx, deploy(fmt.Sprintf("private-%d", i), &private)); row.Status != deploymentevent.StatusSKIPPED || *row.FailureCode != "deployment_url_refused" {
+			t.Errorf("deployment URL %s: %+v", private, row)
+		}
+	}
+	// A credential in the address is not stored at all.
+	credentialed := "https://user:secret@example.com/"
+	if _, err := repo.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: manual.ID},
+		IngestDeploymentInput{Environment: "production", EventID: "d", ExternalID: "credentialed", SourceAppID: manual.ID, URL: &credentialed}); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("credentialed deployment URL err=%v", err)
+	}
+
+	// Deployments that finish out of order: the older one is history and the
+	// newer one's image stays current.
+	slower, faster := ingest("5", &live), ingest("6", &live)
+	handle(faster)
+	handle(slower)
+	current, err := repo.ListSurfaceCaptures(ctx, owner, surface.ID)
+	if err != nil || current[0].SupersededAt == nil || *current[0].SourceID != slower || current[1].SupersededAt != nil || *current[1].SourceID != faster {
+		t.Fatalf("out-of-order captures=%+v err=%v", current, err)
+	}
+
+	// An HTTP page or another port on the deployed host is not the deployed origin.
+	for i, other := range []string{"http://example.com:" + local.Port() + "/plain", "https://example.com:1/other"} {
+		if _, err := repo.CreateProductSurface(ctx, owner, CreateProductSurfaceInput{Environment: "production", Name: fmt.Sprintf("Other %d %s", i, id),
+			FeatureTags: []string{}, ScreenshotAssetIDs: []string{}, URL: other}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A page that fails leaves the deployment PARTIAL, and a rerun after a crash
+	// captures only the missing page: one receipt per page.
+	second, err := repo.CreateProductSurface(ctx, owner, CreateProductSurfaceInput{Environment: "production", Name: "Product second " + id,
+		FeatureTags: []string{}, ScreenshotAssetIDs: []string{}, URL: app + "/second"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.WithCapturer(fakeCapturer{shot: shot, fail: "/second"})
+	partial, _ := db.Client.DeploymentEvent.Get(ctx, deploy("7", &live))
+	if partial.Status != deploymentevent.StatusPARTIAL || *partial.FailureCode != "capture_incomplete" || len(partial.AssetIds) != 1 {
+		t.Fatalf("partial deployment=%+v", partial)
+	}
+	repo.WithCapturer(fakeCapturer{shot: shot})
+	if err := partial.Update().SetStatus(deploymentevent.StatusRECEIVED).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	resumed, _ := db.Client.DeploymentEvent.Get(ctx, handle(partial.ID))
+	receipts, _ := db.Client.SurfaceCapture.Query().Where(surfacecapture.SourceID(partial.ID)).All(ctx)
+	if resumed.Status != deploymentevent.StatusCAPTURED || len(resumed.AssetIds) != 2 || resumed.AssetIds[0] != partial.AssetIds[0] || len(receipts) != 2 {
+		t.Fatalf("resumed deployment=%+v receipts=%d", resumed, len(receipts))
+	}
+	if refreshed, _ := db.Client.ProductSurface.Get(ctx, second.ID); refreshed.LastCapturedAt == nil {
+		t.Fatal("the resumed page was not captured")
+	}
+	// The database refuses a second receipt for the same page and deployment.
+	if _, err := db.SQL.ExecContext(ctx, `INSERT INTO surface_capture (id,"organizationId","surfaceId","assetId",source,"sourceId","capturedAt","supersededAt")
+		VALUES ($1,$2,$3,$4,'deployment',$5,now(),now())`, cuid.New(), org, surface.ID, partial.AssetIds[0], partial.ID); err == nil {
+		t.Fatal("a duplicate deployment receipt was stored")
+	}
+	// An archived source captures nothing more.
+	pending := ingest("8", &live)
+	if err := db.Client.SourceApp.UpdateOneID(manual.ID).SetStatus("ARCHIVED").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if row, _ := db.Client.DeploymentEvent.Get(ctx, handle(pending)); row.Status != deploymentevent.StatusSKIPPED || *row.FailureCode != "source_inactive" {
+		t.Fatalf("an archived source's deployment: %+v", row)
 	}
 	if handled, _ := repo.HandleOutboxEvent(ctx, "unused", org, "asset.uploaded", "x"); handled {
 		t.Fatal("the product claimed an event it does not own")

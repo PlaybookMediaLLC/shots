@@ -252,6 +252,8 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 			outputs, err = c.automationCreateCampaign(ctx, actor, event, input, node.Action, key)
 		case "generate_copy":
 			outputs, err = c.automationGenerateCopy(ctx, actor, prior, event, input, node.Action)
+		case "capture_product":
+			outputs, err = c.automationCaptureProduct(ctx, org, event, input, node.Action)
 		case "render_creatives":
 			outputs, err = c.automationRenderCreatives(ctx, org, id, nodeID, event, input, node.Action)
 		case "create_canvas":
@@ -314,6 +316,9 @@ func (c *Configuration) AutomationNode(ctx context.Context, org, id, nodeID stri
 	}
 	if outputs.CodeProjectID != "" {
 		run.Outputs.CodeProjectID = outputs.CodeProjectID
+	}
+	if outputs.CaptureID != "" {
+		run.Outputs.CaptureID, run.Outputs.CaptureAssetID, run.Outputs.CaptureProof = outputs.CaptureID, outputs.CaptureAssetID, outputs.CaptureProof
 	}
 	if outputs.CreditsCharged > 0 {
 		// Sum receipts rather than increment: a late duplicate completion of
@@ -536,6 +541,18 @@ func automationFailureCode(err error) string {
 		return "renderer_unavailable"
 	case errors.Is(err, ErrCaptureMissing):
 		return "capture_missing"
+	case errors.Is(err, ErrCaptureUnavailable):
+		return "capture_unavailable"
+	case errors.Is(err, ErrDeploymentNotLive):
+		return "waiting_for_deployment"
+	case errors.Is(err, ErrDeploymentUnverified):
+		return "deployment_unverified"
+	case errors.Is(err, ErrCaptureRefused):
+		return "capture_refused"
+	case errors.Is(err, ErrCaptureNeedsAuth):
+		return "needs_auth"
+	case errors.Is(err, ErrCapturePending):
+		return "capture_pending"
 	case errors.Is(err, ErrInvalidInput), errors.Is(err, publishing.ErrNotFound), ent.IsNotFound(err):
 		return "configuration_invalid"
 	}
@@ -546,5 +563,5 @@ func automationFailureCode(err error) string {
 func PermanentAutomationError(err error) bool {
 	var entitlement *FeatureNotEntitledError
 	var prohibited *ProhibitedTermsError
-	return errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrCaptureMissing) || errors.Is(err, ErrAutomationStopped) || errors.Is(err, publishing.ErrForbidden) || errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrNotFound) || errors.Is(err, publishing.ErrInvalidState) || ent.IsNotFound(err) || errors.As(err, &entitlement) || errors.As(err, &prohibited)
+	return errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrCaptureMissing) || errors.Is(err, ErrCaptureRefused) || errors.Is(err, ErrCaptureNeedsAuth) || errors.Is(err, ErrAutomationStopped) || errors.Is(err, publishing.ErrForbidden) || errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrNotFound) || errors.Is(err, publishing.ErrInvalidState) || ent.IsNotFound(err) || errors.As(err, &entitlement) || errors.As(err, &prohibited)
 }

@@ -96,6 +96,7 @@ export const AUTOMATE_LINKS = [
   { href: '/workflows', label: 'Workflows' },
   { href: '/workflows/runs', label: 'Runs' },
   { href: '/workflows/deployments', label: 'Deployments' },
+  { href: '/workflows/connections', label: 'Signed-in capture' },
   { href: '/workflows?view=sources', label: 'Sources' },
 ]
 export const CREATE_LINKS = [

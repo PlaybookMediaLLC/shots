@@ -314,16 +314,35 @@ func (c *Configuration) UnlinkGitHubInstallation(ctx context.Context, actor Acto
 	return tx.Commit()
 }
 
-// RecordGitHubInstallation keeps an installation's details current from
-// GitHub's lifecycle events. It never links a workspace: only a verified
-// install does that.
+// currentGitHubInstallation reads an installation as GitHub reports it now. A
+// signed lifecycle event may be late or replayed (the signature does not cover
+// its delivery ID or date it), so GitHub, not the event, decides its status.
+func (c *Configuration) currentGitHubInstallation(ctx context.Context, installationID int64) (githubapp.Installation, error) {
+	if c.github == nil {
+		return githubapp.Installation{}, ErrGitHubUnavailable
+	}
+	current, err := c.github.Installation(ctx, installationID)
+	if err != nil {
+		return githubapp.Installation{}, ErrGitHubUnavailable
+	}
+	return current, nil
+}
+
+// RecordGitHubInstallation keeps an installation current after a lifecycle
+// event, recording what GitHub reports now rather than the event's snapshot;
+// it writes nothing when GitHub cannot be read. It never links a workspace:
+// only a verified install does that.
 func (c *Configuration) RecordGitHubInstallation(ctx context.Context, installation githubapp.Installation) error {
+	current, err := c.currentGitHubInstallation(ctx, installation.ID)
+	if err != nil {
+		return err
+	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := upsertGitHubInstallation(ctx, tx, installation); err != nil {
+	if _, err := upsertGitHubInstallation(ctx, tx, current); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -340,7 +359,21 @@ const (
 
 // SetGitHubInstallationStatus records a suspension, resumption, or removal.
 // A removed installation archives every workspace's sources it delivered.
+// A removal is final (GitHub never reuses an installation ID); otherwise the
+// status GitHub reports now is recorded, since the event may be old. Only a
+// suspension, which restores nothing, applies when GitHub cannot be read.
 func (c *Configuration) SetGitHubInstallationStatus(ctx context.Context, installationID int64, status GitHubInstallationStatus) (int, error) {
+	if status != GitHubInstallationDeleted {
+		current, err := c.currentGitHubInstallation(ctx, installationID)
+		switch {
+		case err == nil && current.Suspended:
+			status = GitHubInstallationSuspended
+		case err == nil:
+			status = GitHubInstallationActive
+		case status != GitHubInstallationSuspended:
+			return 0, err
+		}
+	}
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return 0, err
@@ -352,6 +385,10 @@ func (c *Configuration) SetGitHubInstallationStatus(ctx context.Context, install
 	}
 	if err != nil {
 		return 0, err
+	}
+	if row.Status == githubinstallation.StatusDELETED && status != GitHubInstallationDeleted {
+		// A removal is final: a late suspension cannot change it.
+		return 0, nil
 	}
 	if _, err := row.Update().SetStatus(githubinstallation.Status(status)).Save(ctx); err != nil {
 		return 0, err

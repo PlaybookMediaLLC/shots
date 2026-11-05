@@ -78,6 +78,15 @@ type CampaignPost func(*sql.Selector)
 // CampaignRevision is the predicate function for campaignrevision builders.
 type CampaignRevision func(*sql.Selector)
 
+// CaptureAttempt is the predicate function for captureattempt builders.
+type CaptureAttempt func(*sql.Selector)
+
+// CaptureJob is the predicate function for capturejob builders.
+type CaptureJob func(*sql.Selector)
+
+// CaptureRecipe is the predicate function for capturerecipe builders.
+type CaptureRecipe func(*sql.Selector)
+
 // ChannelConnection is the predicate function for channelconnection builders.
 type ChannelConnection func(*sql.Selector)
 
@@ -203,6 +212,9 @@ type PermissionGroup func(*sql.Selector)
 
 // PermissionGroupMember is the predicate function for permissiongroupmember builders.
 type PermissionGroupMember func(*sql.Selector)
+
+// PlatformAppConnection is the predicate function for platformappconnection builders.
+type PlatformAppConnection func(*sql.Selector)
 
 // PlatformAutoDMCampaign is the predicate function for platformautodmcampaign builders.
 type PlatformAutoDMCampaign func(*sql.Selector)

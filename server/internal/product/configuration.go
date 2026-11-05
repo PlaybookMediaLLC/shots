@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
@@ -14,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/authstore"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/brand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/collab"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/notifications"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -75,6 +77,12 @@ type Configuration struct {
 	// automationCanvases lays out canvases from releases.
 	automationCanvases AutomationCanvasBuilder
 	capture            Capturer
+	// captureRunner and captureKeys enable authenticated capture; captureDispatcher
+	// starts its durable work from the outbox.
+	captureRunner     CaptureRunner
+	captureKeys       *sessionstate.Keys
+	captureDispatcher CaptureDispatcher
+	captureStateAge   time.Duration
 	// collabKey signs content draft collaboration tokens (RFC 013).
 	collabKey []byte
 	// collabEpochs counts the changes that can alter live collaboration access.

@@ -94,6 +94,11 @@ func SupersededAt(v time.Time) predicate.SurfaceCapture {
 	return predicate.SurfaceCapture(sql.FieldEQ(FieldSupersededAt, v))
 }
 
+// ObservedRevision applies equality check predicate on the "observed_revision" field. It's identical to ObservedRevisionEQ.
+func ObservedRevision(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldEQ(FieldObservedRevision, v))
+}
+
 // OrganizationIDEQ applies the EQ predicate on the "organization_id" field.
 func OrganizationIDEQ(v string) predicate.SurfaceCapture {
 	return predicate.SurfaceCapture(sql.FieldEQ(FieldOrganizationID, v))
@@ -472,6 +477,81 @@ func SupersededAtIsNil() predicate.SurfaceCapture {
 // SupersededAtNotNil applies the NotNil predicate on the "superseded_at" field.
 func SupersededAtNotNil() predicate.SurfaceCapture {
 	return predicate.SurfaceCapture(sql.FieldNotNull(FieldSupersededAt))
+}
+
+// ObservedRevisionEQ applies the EQ predicate on the "observed_revision" field.
+func ObservedRevisionEQ(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldEQ(FieldObservedRevision, v))
+}
+
+// ObservedRevisionNEQ applies the NEQ predicate on the "observed_revision" field.
+func ObservedRevisionNEQ(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldNEQ(FieldObservedRevision, v))
+}
+
+// ObservedRevisionIn applies the In predicate on the "observed_revision" field.
+func ObservedRevisionIn(vs ...string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldIn(FieldObservedRevision, vs...))
+}
+
+// ObservedRevisionNotIn applies the NotIn predicate on the "observed_revision" field.
+func ObservedRevisionNotIn(vs ...string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldNotIn(FieldObservedRevision, vs...))
+}
+
+// ObservedRevisionGT applies the GT predicate on the "observed_revision" field.
+func ObservedRevisionGT(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldGT(FieldObservedRevision, v))
+}
+
+// ObservedRevisionGTE applies the GTE predicate on the "observed_revision" field.
+func ObservedRevisionGTE(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldGTE(FieldObservedRevision, v))
+}
+
+// ObservedRevisionLT applies the LT predicate on the "observed_revision" field.
+func ObservedRevisionLT(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldLT(FieldObservedRevision, v))
+}
+
+// ObservedRevisionLTE applies the LTE predicate on the "observed_revision" field.
+func ObservedRevisionLTE(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldLTE(FieldObservedRevision, v))
+}
+
+// ObservedRevisionContains applies the Contains predicate on the "observed_revision" field.
+func ObservedRevisionContains(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldContains(FieldObservedRevision, v))
+}
+
+// ObservedRevisionHasPrefix applies the HasPrefix predicate on the "observed_revision" field.
+func ObservedRevisionHasPrefix(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldHasPrefix(FieldObservedRevision, v))
+}
+
+// ObservedRevisionHasSuffix applies the HasSuffix predicate on the "observed_revision" field.
+func ObservedRevisionHasSuffix(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldHasSuffix(FieldObservedRevision, v))
+}
+
+// ObservedRevisionIsNil applies the IsNil predicate on the "observed_revision" field.
+func ObservedRevisionIsNil() predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldIsNull(FieldObservedRevision))
+}
+
+// ObservedRevisionNotNil applies the NotNil predicate on the "observed_revision" field.
+func ObservedRevisionNotNil() predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldNotNull(FieldObservedRevision))
+}
+
+// ObservedRevisionEqualFold applies the EqualFold predicate on the "observed_revision" field.
+func ObservedRevisionEqualFold(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldEqualFold(FieldObservedRevision, v))
+}
+
+// ObservedRevisionContainsFold applies the ContainsFold predicate on the "observed_revision" field.
+func ObservedRevisionContainsFold(v string) predicate.SurfaceCapture {
+	return predicate.SurfaceCapture(sql.FieldContainsFold(FieldObservedRevision, v))
 }
 
 // And groups predicates with the AND operator between them.

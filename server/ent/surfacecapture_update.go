@@ -98,6 +98,9 @@ func (_u *SurfaceCaptureUpdate) sqlSave(ctx context.Context) (_node int, err err
 	if _u.mutation.SupersededAtCleared() {
 		_spec.ClearField(surfacecapture.FieldSupersededAt, field.TypeTime)
 	}
+	if _u.mutation.ObservedRevisionCleared() {
+		_spec.ClearField(surfacecapture.FieldObservedRevision, field.TypeString)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{surfacecapture.Label}
@@ -217,6 +220,9 @@ func (_u *SurfaceCaptureUpdateOne) sqlSave(ctx context.Context) (_node *SurfaceC
 	}
 	if _u.mutation.SupersededAtCleared() {
 		_spec.ClearField(surfacecapture.FieldSupersededAt, field.TypeTime)
+	}
+	if _u.mutation.ObservedRevisionCleared() {
+		_spec.ClearField(surfacecapture.FieldObservedRevision, field.TypeString)
 	}
 	_node = &SurfaceCapture{config: _u.config}
 	_spec.Assign = _node.assignValues

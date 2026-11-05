@@ -742,6 +742,120 @@ var (
 			},
 		},
 	}
+	// CaptureColumns holds the columns for the "capture" table.
+	CaptureColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString, Nullable: true},
+		{Name: "captureJobId", Type: field.TypeString},
+		{Name: "recipeId", Type: field.TypeString},
+		{Name: "recipeVersion", Type: field.TypeInt},
+		{Name: "sourceUrl", Type: field.TypeString},
+		{Name: "provider", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}, Default: "QUEUED"},
+		{Name: "startedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "completedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "attemptNumber", Type: field.TypeInt},
+		{Name: "browserSessionId", Type: field.TypeString, Nullable: true},
+		{Name: "browserClosedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "observedRevision", Type: field.TypeString, Nullable: true},
+		{Name: "fencingToken", Type: field.TypeInt64, Default: 0},
+		{Name: "refusedRequests", Type: field.TypeInt, Default: 0},
+		{Name: "assetId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CaptureTable holds the schema information for the "capture" table.
+	CaptureTable = &schema.Table{
+		Name:       "capture",
+		Columns:    CaptureColumns,
+		PrimaryKey: []*schema.Column{CaptureColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "captureattempt_captureJobId_attemptNumber",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureColumns[3], CaptureColumns[12]},
+			},
+		},
+	}
+	// CaptureJobColumns holds the columns for the "capture_job" table.
+	CaptureJobColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "releaseId", Type: field.TypeString, Nullable: true},
+		{Name: "recipeId", Type: field.TypeString},
+		{Name: "recipeVersion", Type: field.TypeInt},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"}, Default: "QUEUED"},
+		{Name: "phase", Type: field.TypeEnum, Enums: []string{"QUEUED", "WAITING_DEPLOYMENT", "RUNNING", "NEEDS_AUTH", "SUCCEEDED", "FAILED", "CANCELLED"}, Default: "QUEUED"},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"test", "manual", "agent", "deployment"}, Default: "manual"},
+		{Name: "triggerRunId", Type: field.TypeString, Nullable: true},
+		{Name: "idempotencyKey", Type: field.TypeString},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "surfaceId", Type: field.TypeString, Nullable: true},
+		{Name: "appConnectionId", Type: field.TypeString, Nullable: true},
+		{Name: "connectionGeneration", Type: field.TypeInt, Default: 0},
+		{Name: "deploymentEventId", Type: field.TypeString, Nullable: true},
+		{Name: "expectedRevision", Type: field.TypeString, Nullable: true},
+		{Name: "recipeHash", Type: field.TypeString, Nullable: true},
+		{Name: "fencingToken", Type: field.TypeInt64, Default: 0},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "deadlineAt", Type: field.TypeTime, Nullable: true},
+		{Name: "requestedByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "surfaceCaptureId", Type: field.TypeString, Nullable: true},
+		{Name: "assetId", Type: field.TypeString, Nullable: true},
+		{Name: "resumeCount", Type: field.TypeInt, Default: 0},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CaptureJobTable holds the schema information for the "capture_job" table.
+	CaptureJobTable = &schema.Table{
+		Name:       "capture_job",
+		Columns:    CaptureJobColumns,
+		PrimaryKey: []*schema.Column{CaptureJobColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "capturejob_organizationId_idempotencyKey",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[9]},
+			},
+			{
+				Name:    "capturejob_organizationId_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{CaptureJobColumns[1], CaptureJobColumns[24]},
+			},
+		},
+	}
+	// CaptureRecipeColumns holds the columns for the "capture_recipe" table.
+	CaptureRecipeColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceAppId", Type: field.TypeString, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "version", Type: field.TypeInt},
+		{Name: "definition", Type: field.TypeJSON},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "ACTIVE", "ARCHIVED"}, Default: "DRAFT"},
+		{Name: "surfaceId", Type: field.TypeString, Nullable: true},
+		{Name: "appConnectionId", Type: field.TypeString, Nullable: true},
+		{Name: "definitionHash", Type: field.TypeString, Nullable: true},
+		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "testedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CaptureRecipeTable holds the schema information for the "capture_recipe" table.
+	CaptureRecipeTable = &schema.Table{
+		Name:       "capture_recipe",
+		Columns:    CaptureRecipeColumns,
+		PrimaryKey: []*schema.Column{CaptureRecipeColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "capturerecipe_organizationId_name_version",
+				Unique:  true,
+				Columns: []*schema.Column{CaptureRecipeColumns[1], CaptureRecipeColumns[3], CaptureRecipeColumns[4]},
+			},
+		},
+	}
 	// ChannelConnectionColumns holds the columns for the "channel_connection" table.
 	ChannelConnectionColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1287,7 +1401,7 @@ var (
 		{Name: "environment", Type: field.TypeString},
 		{Name: "url", Type: field.TypeString, Nullable: true},
 		{Name: "sha", Type: field.TypeString, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"RECEIVED", "CAPTURED", "SKIPPED", "FAILED"}, Default: "RECEIVED"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"RECEIVED", "CAPTURED", "PARTIAL", "SKIPPED", "FAILED"}, Default: "RECEIVED"},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
 		{Name: "assetIds", Type: field.TypeJSON},
 		{Name: "createdAt", Type: field.TypeTime},
@@ -2051,6 +2165,52 @@ var (
 				Name:    "permissiongroupmember_permissionGroupId",
 				Unique:  false,
 				Columns: []*schema.Column{PermissionGroupMemberColumns[1]},
+			},
+		},
+	}
+	// PlatformAppConnectionColumns holds the columns for the "platform_app_connection" table.
+	PlatformAppConnectionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "sourceAppId", Type: field.TypeString, Nullable: true},
+		{Name: "name", Type: field.TypeString},
+		{Name: "environment", Type: field.TypeString},
+		{Name: "origin", Type: field.TypeString},
+		{Name: "hosts", Type: field.TypeJSON},
+		{Name: "loginHosts", Type: field.TypeJSON},
+		{Name: "protectedPath", Type: field.TypeString},
+		{Name: "identitySelector", Type: field.TypeString},
+		{Name: "expectedAccount", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CONNECTING", "READY", "NEEDS_AUTH", "REVOKED"}, Default: "CONNECTING"},
+		{Name: "stateCiphertext", Type: field.TypeString, Nullable: true},
+		{Name: "generation", Type: field.TypeInt, Default: 1},
+		{Name: "stateRevision", Type: field.TypeInt, Default: 0},
+		{Name: "validatedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "stateExpiresAt", Type: field.TypeTime, Nullable: true},
+		{Name: "connectIntentId", Type: field.TypeString, Nullable: true},
+		{Name: "connectUserId", Type: field.TypeString, Nullable: true},
+		{Name: "connectSessionId", Type: field.TypeString, Nullable: true},
+		{Name: "connectExpiresAt", Type: field.TypeTime, Nullable: true},
+		{Name: "connectPhase", Type: field.TypeString, Nullable: true},
+		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "leaseJobId", Type: field.TypeString, Nullable: true},
+		{Name: "leaseToken", Type: field.TypeInt64, Default: 0},
+		{Name: "leaseExpiresAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PlatformAppConnectionTable holds the schema information for the "platform_app_connection" table.
+	PlatformAppConnectionTable = &schema.Table{
+		Name:       "platform_app_connection",
+		Columns:    PlatformAppConnectionColumns,
+		PrimaryKey: []*schema.Column{PlatformAppConnectionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformappconnection_organizationId_name",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformAppConnectionColumns[1], PlatformAppConnectionColumns[3]},
 			},
 		},
 	}
@@ -3530,6 +3690,7 @@ var (
 		{Name: "sourceId", Type: field.TypeString, Nullable: true},
 		{Name: "capturedAt", Type: field.TypeTime},
 		{Name: "supersededAt", Type: field.TypeTime, Nullable: true},
+		{Name: "observedRevision", Type: field.TypeString, Nullable: true},
 	}
 	// SurfaceCaptureTable holds the schema information for the "surface_capture" table.
 	SurfaceCaptureTable = &schema.Table{
@@ -3838,6 +3999,9 @@ var (
 		CampaignPlanTable,
 		CampaignPostTable,
 		CampaignRevisionTable,
+		CaptureTable,
+		CaptureJobTable,
+		CaptureRecipeTable,
 		ChannelConnectionTable,
 		CommunicationAttemptTable,
 		CommunicationRecipientTable,
@@ -3880,6 +4044,7 @@ var (
 		PageKnowledgeTable,
 		PermissionGroupTable,
 		PermissionGroupMemberTable,
+		PlatformAppConnectionTable,
 		PlatformAutoDmCampaignTable,
 		PlatformAutoDmDeliveryTable,
 		PlatformAutoDmOptOutTable,
@@ -4016,6 +4181,15 @@ func init() {
 	CampaignRevisionTable.Annotation = &entsql.Annotation{
 		Table: "campaign_revision",
 	}
+	CaptureTable.Annotation = &entsql.Annotation{
+		Table: "capture",
+	}
+	CaptureJobTable.Annotation = &entsql.Annotation{
+		Table: "capture_job",
+	}
+	CaptureRecipeTable.Annotation = &entsql.Annotation{
+		Table: "capture_recipe",
+	}
 	ChannelConnectionTable.Annotation = &entsql.Annotation{
 		Table: "channel_connection",
 	}
@@ -4142,6 +4316,9 @@ func init() {
 	}
 	PermissionGroupMemberTable.Annotation = &entsql.Annotation{
 		Table: "permission_group_member",
+	}
+	PlatformAppConnectionTable.Annotation = &entsql.Annotation{
+		Table: "platform_app_connection",
 	}
 	PlatformAutoDmCampaignTable.Annotation = &entsql.Annotation{
 		Table: "platform_auto_dm_campaign",

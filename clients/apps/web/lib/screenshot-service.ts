@@ -282,6 +282,8 @@ async function captureOnce(input: ScreenshotRequest, waitForTimeout?: number): P
  */
 export async function captureScreenshot(input: ScreenshotRequest): Promise<ScreenshotCapture> {
   try {
+    // Checked here, below every caller, not only in the routes that remember to.
+    assertPublicCaptureUrl(input.url)
     let image = await captureOnce(input)
     if (await isBlankImage(image)) {
       image = await captureOnce(input, SETTLE_WAIT_MS)

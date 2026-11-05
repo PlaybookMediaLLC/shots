@@ -49,6 +49,10 @@ OPTIONAL_TENANT_SECRETS = (
     "PLATFORM_SLACK_CALLBACK_URL", "INTEGRATION_ENCRYPTION_KEY",
     # Outbound webhooks (docs/rfcs/043); without it the API answers 503.
     "PLATFORM_WEBHOOK_ENCRYPTION_KEY",
+    # Authenticated capture; without all three it stays off. The token is separate
+    # from the design renderer's and never reaches the web.
+    "PLATFORM_CAPTURE_CDP_URL", "PLATFORM_CAPTURE_CDP_TOKEN", "PLATFORM_CAPTURE_STATE_KEY",
+    "PLATFORM_CAPTURE_STATE_KEY_PREVIOUS", "PLATFORM_CAPTURE_STATE_MAX_AGE",
 )
 # OpenTelemetry export to Axiom (docs/observability.md). The headers carry the
 # Axiom token. The backend and the web read the same keys.

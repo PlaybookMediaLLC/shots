@@ -452,6 +452,17 @@ func TestConfigurationRoutesPreserveProductShape(t *testing.T) {
 	if badSource.Code != http.StatusBadRequest {
 		t.Fatalf("unsafe source URL status=%d body=%s", badSource.Code, badSource.Body)
 	}
+	// The backend requests surface pages when a deployment lands: no private
+	// or credentialed address is saved.
+	for _, page := range []string{"https://127.0.0.1/dummy", "https://[::1]/dummy", "https://10.1.2.3/dummy",
+		"https://169.254.169.254/dummy", "http://localhost:8080/", "https://user:secret@app.example.com/"} {
+		if got := configurationRequest(handler, http.MethodPost, "/v1/product-surfaces", `{"name":"Main","url":"`+page+`","environment":"production","featureTags":[],"screenshotAssetIds":[]}`); got.Code != http.StatusBadRequest {
+			t.Errorf("surface %s status=%d body=%s", page, got.Code, got.Body)
+		}
+	}
+	if got := configurationRequest(handler, http.MethodPost, "/v1/product-surfaces", `{"name":"Main","url":"https://app.example.com/","environment":"production","featureTags":[],"screenshotAssetIds":[]}`); got.Code != http.StatusCreated {
+		t.Fatalf("public surface status=%d body=%s", got.Code, got.Body)
+	}
 	// Branch length counts characters, as the web schema does: 255 multi-byte runes fit.
 	for branch, want := range map[string]int{
 		`"main"`: http.StatusCreated, `"` + strings.Repeat("枝", 255) + `"`: http.StatusCreated,

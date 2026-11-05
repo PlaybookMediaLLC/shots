@@ -2,13 +2,15 @@ import 'server-only'
 
 import sharp from 'sharp'
 import { SCREENSHOT_RATE_LIMIT } from '@/lib/api/rate-limit-policy'
-import type { OrganizationAccess } from '@/lib/auth/access'
+import type { OrganizationAccess, TenantContext } from '@/lib/auth/access'
 import type { SessionPrincipal } from '@/lib/auth/principal'
 import { backendSDK, orNull } from '@/lib/backend/sdk'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { captureScreenshot, getScreenshotFailure } from '@/lib/screenshot-service'
+import { activeRecipeForSurface } from '@/lib/workflows/capture'
 import {
   BackendSDKError,
+  type CaptureJob,
   type ProductSurface,
   type SurfaceCapture,
   type SurfaceCaptureSource,
@@ -83,11 +85,44 @@ export async function findSurfacesForFeature(
 export type SurfaceCaptureFailure = { message: string; status: number }
 
 /**
+ * Queues a signed-in capture when a registered surface at this URL has an active
+ * recipe, because a public screenshot of it would only show the sign-in screen.
+ * Returns null when the URL is an ordinary public page.
+ */
+export async function queueSignedInCaptureAt(
+  context: TenantContext,
+  url: string,
+  sourceId: string
+): Promise<'queued' | 'unavailable' | null> {
+  const sdk = backendSDK(context)
+  const [{ available, recipes }, { productSurfaces }] = await Promise.all([
+    sdk.captureOverview(),
+    sdk.listProductSurfaces(),
+  ])
+  const recipe = productSurfaces
+    .filter((surface) => surface.url === url)
+    .map((surface) => activeRecipeForSurface(recipes, surface.id))
+    .find(Boolean)
+  if (!recipe) return null
+  if (!available) return 'unavailable'
+  try {
+    await sdk.requestCaptureJob(recipe.id, { test: false, source: 'agent', sourceId })
+    return 'queued'
+  } catch (error) {
+    if (error instanceof BackendSDKError && error.status === 409) return 'unavailable'
+    throw error
+  }
+}
+
+/**
  * Capture a surface's page now and make it the current capture. The page is
  * shot through the same SSRF-guarded screenshot service and rate limit the
  * campaign studio uses, stored as a capture asset, and recorded as a manual
  * capture, which supersedes the previous one without deleting it. An agent
  * capture records `source: 'agent'` and the run that asked for it.
+ *
+ * A surface with an active signed-in recipe never gets a public screenshot, which
+ * would show its login screen: a capture job is queued, and its result arrives later.
  */
 export async function captureProductSurface(
   context: OrganizationAccess,
@@ -95,9 +130,36 @@ export async function captureProductSurface(
   origin: { source: Extract<SurfaceCaptureSource, 'agent' | 'manual'>; sourceId?: string } = {
     source: 'manual',
   }
-): Promise<{ capture: SurfaceCapture } | { failure: SurfaceCaptureFailure } | null> {
+): Promise<
+  { capture: SurfaceCapture } | { failure: SurfaceCaptureFailure } | { job: CaptureJob } | null
+> {
   const surface = (await listProductSurfaces(context)).find((entry) => entry.id === surfaceId)
   if (!surface) return null
+  const { available, recipes } = await backendSDK(context).captureOverview()
+  const recipe = activeRecipeForSurface(recipes, surfaceId)
+  if (recipe) {
+    if (!available) {
+      return {
+        failure: {
+          message: 'Signed-in capture is not configured on this deployment.',
+          status: 503,
+        },
+      }
+    }
+    try {
+      return await backendSDK(context).requestCaptureJob(recipe.id, { test: false, ...origin })
+    } catch (error) {
+      if (error instanceof BackendSDKError && error.status === 409) {
+        return {
+          failure: {
+            message: 'The sign-in for this page was revoked. Connect it again in Automate.',
+            status: 409,
+          },
+        }
+      }
+      throw error
+    }
+  }
   const limit = await checkRateLimit(
     `surface-capture:${context.organizationId}`,
     SCREENSHOT_RATE_LIMIT

@@ -193,6 +193,19 @@ func TestAuditControlsAndSourceWebhooks(t *testing.T) {
 	if n := count(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action='product.release_ingested' AND "actorType"='WEBHOOK' AND "actorDisplay"=$2 AND "requestId"='delivery-1'`, org, source.ID); n != 1 {
 		t.Fatalf("ingest audits=%d", n)
 	}
+	// A source that names a repository takes releases only from it; a release
+	// without a repository (above) is not filtered.
+	wrongRepo := "999"
+	byRepo := func(repositoryID *string) (*SourceReleaseIngest, error) {
+		return repo.IngestSourceRelease(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: source.ID, RequestID: "delivery-repo"},
+			IngestSourceReleaseInput{BenefitStatement: "Faster exports.", EventID: "release:" + *repositoryID + ":77", RepositoryID: repositoryID, SourceAppID: source.ID, Title: "v3"})
+	}
+	if _, err := byRepo(&wrongRepo); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("another repository's release was ingested: %v", err)
+	}
+	if own, err := byRepo(&repoID); err != nil || !own.Created {
+		t.Fatalf("the source's repository release=%+v err=%v", own, err)
+	}
 	exec(`UPDATE source_app SET status='DRAFT' WHERE id=$1`, source.ID)
 	if _, err := repo.GetWebhookSource(ctx, source.ID); !errors.Is(err, publishing.ErrNotFound) {
 		t.Fatalf("inactive source resolved: %v", err)

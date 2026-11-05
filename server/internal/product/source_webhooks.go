@@ -162,6 +162,10 @@ func (c *Configuration) ingestSourceRelease(ctx context.Context, actor Actor, in
 	if source.ReleaseAutomation && input.automationAssociation == nil {
 		return nil, conflict("This source uses release automation; legacy release intake is disabled.")
 	}
+	// A source that names a repository takes releases only from it.
+	if source.ExternalID != nil && input.RepositoryID != nil && *input.RepositoryID != *source.ExternalID {
+		return nil, invalid("This release is from a different repository than the source's.")
+	}
 	existing, err := tx.OutboxEvent.Query().Where(outboxevent.OrganizationID(actor.OrganizationID),
 		outboxevent.IdempotencyKey(key)).Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
@@ -443,7 +447,10 @@ func (c *Configuration) IngestDeployment(ctx context.Context, actor Actor, input
 	return &DeploymentIngest{Created: true, DeploymentID: created.ID}, nil
 }
 
+// validDeploymentURL accepts an HTTPS address without credentials. A private
+// address is still recorded, because the deployment happened; capturing it is
+// refused, and the readiness request checks the address it actually dials.
 func validDeploymentURL(value string) bool {
 	parsed, err := url.Parse(value)
-	return err == nil && len(value) <= 2000 && parsed.Scheme == "https" && parsed.Host != ""
+	return err == nil && len(value) <= 2000 && parsed.Scheme == "https" && parsed.Host != "" && parsed.User == nil
 }

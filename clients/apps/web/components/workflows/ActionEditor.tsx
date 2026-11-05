@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
+import { useQuery } from '@tanstack/react-query'
 
 import type {
   AutomationAction,
@@ -27,6 +28,8 @@ import {
   workflowActionTypes,
   WORKFLOW_ACTIONS,
 } from '@/lib/workflows/actions'
+import { useTRPC } from '@/lib/trpc/react'
+import { workflowCaptureRecipes } from '@/lib/workflows/capture'
 import { automationSelectClass } from './ConditionEditor'
 import { CANVAS_RECIPES, canvasRecipeSchema } from '@/lib/canvas/recipes'
 
@@ -35,6 +38,7 @@ const EMPTY = '__empty_option__'
 /** A fresh configuration for a newly chosen action type. */
 function blankAction(type: AutomationActionType): AutomationAction {
   if (type === 'generate_copy') return { type, creditLimit: 25 }
+  if (type === 'capture_product') return { type, versionPath: '/api/version' }
   if (type === 'render_creatives') return { type, templateIds: ['layout-browser-launch'] }
   if (type === 'create_canvas') return { type, recipeIds: ['feature-announcement', 'social-pack'] }
   if (type === 'render_code_visual') return { type, readSourceCode: false }
@@ -46,13 +50,16 @@ export function ActionEditor({
   node,
   graph,
   overview,
+  sourceAppId,
   onChange,
 }: {
   node: AutomationNode
   graph: AutomationGraph
   overview: AutomationOverview
+  sourceAppId: string
   onChange: (action: AutomationAction) => void
 }) {
+  const trpc = useTRPC()
   const pathname = usePathname()
   const params = useSearchParams()
   const back = new URLSearchParams(params.toString())
@@ -62,6 +69,16 @@ export function ActionEditor({
   const spec = WORKFLOW_ACTIONS[action.type]
   const availability = actionAvailability(overview, action.type)
   const producers = producersOf(action.type)
+  const captureOverview = useQuery(
+    trpc.capture.overview.queryOptions(undefined, { enabled: action.type === 'capture_product' })
+  )
+  const recipes = captureOverview.data
+    ? workflowCaptureRecipes(captureOverview.data, sourceAppId)
+    : []
+  const chosenRecipe =
+    action.type === 'capture_product'
+      ? recipes.find((recipe) => recipe.id === action.recipeId)
+      : undefined
   return (
     <div className="space-y-3">
       <Label className="grid gap-1 text-sm">
@@ -236,6 +253,116 @@ export function ActionEditor({
               : 'Takes the merged PR itself, PRs the notes or commit message reference, or a milestone’s assigned PRs.'}
           </span>
         </Label>
+      ) : null}
+      {action.type === 'capture_product' ? (
+        <>
+          <Label className="grid gap-1 text-sm">
+            Page behind a sign-in
+            <Select
+              value={action.recipeId || EMPTY}
+              onValueChange={(nextValue) => {
+                const recipe = recipes.find((item) => item.id === nextValue)
+                onChange(
+                  recipe
+                    ? // A recipe with no version proof can only ever be the current state.
+                      {
+                        type: action.type,
+                        input: action.input,
+                        recipeId: recipe.id,
+                        currentState: recipe.definition.version ? undefined : true,
+                      }
+                    : { type: action.type, input: action.input, versionPath: '/api/version' }
+                )
+              }}
+            >
+              <SelectTrigger className={automationSelectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={EMPTY}>None: capture a public page</SelectItem>
+                {action.recipeId && !chosenRecipe ? (
+                  <SelectItem value={action.recipeId}>
+                    {captureOverview.isPending ? 'Loading…' : 'No longer enabled: choose another'}
+                  </SelectItem>
+                ) : null}
+                {recipes.map((recipe) => (
+                  <SelectItem key={recipe.id} value={recipe.id}>
+                    {recipe.name} · version {recipe.version}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <span className="text-xs leading-5 font-normal text-muted-foreground">
+              {captureOverview.error
+                ? 'Signed-in screens could not be loaded.'
+                : chosenRecipe
+                  ? chosenRecipe.definition.version
+                    ? 'The page and version proof come from this screen.'
+                    : 'This screen has no version proof, so the image is labeled as its current state.'
+                  : 'Lists screens enabled in Signed-in capture for this repository.'}
+            </span>
+          </Label>
+          {action.recipeId ? null : (
+            <>
+              <Label className="grid gap-1 text-sm">
+                Product page
+                <Select
+                  value={action.surfaceId || EMPTY}
+                  onValueChange={(nextValue) =>
+                    onChange({ ...action, surfaceId: nextValue === EMPTY ? undefined : nextValue })
+                  }
+                >
+                  <SelectTrigger className={automationSelectClass}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={EMPTY}>Choose a page</SelectItem>
+                    {(overview.surfaces ?? []).map((surface) => (
+                      <SelectItem key={surface.id} value={surface.id}>
+                        {surface.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Label>
+              <Label className="flex items-start gap-2 text-sm">
+                <Checkbox
+                  checked={action.currentState ?? false}
+                  onCheckedChange={(checked) =>
+                    onChange(
+                      checked === true
+                        ? { ...action, currentState: true, versionPath: undefined }
+                        : { ...action, currentState: undefined, versionPath: '/api/version' }
+                    )
+                  }
+                />
+                <span>
+                  Capture without version proof
+                  <span className="block text-xs leading-5 text-muted-foreground">
+                    The image is labeled as the page&apos;s current state. It may show the version
+                    from before this deployment.
+                  </span>
+                </span>
+              </Label>
+              {action.currentState ? null : (
+                <Label className="grid gap-1 text-sm">
+                  Path that reports the deployed commit
+                  <Input
+                    maxLength={256}
+                    value={action.versionPath ?? ''}
+                    onChange={(event) =>
+                      onChange({ ...action, versionPath: event.target.value || undefined })
+                    }
+                  />
+                  <span className="text-xs leading-5 text-muted-foreground">
+                    On the same site as the product page. It must answer with the commit SHA before
+                    the screenshot is taken; until then the step keeps waiting, then fails.
+                  </span>
+                </Label>
+              )}
+            </>
+          )}
+        </>
       ) : null}
       {action.type === 'render_creatives' ? (
         <>

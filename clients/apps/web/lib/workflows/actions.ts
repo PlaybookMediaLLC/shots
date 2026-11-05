@@ -86,11 +86,31 @@ export const WORKFLOW_ACTIONS = {
     paid: true,
     humanApproval: false,
   },
+  capture_product: {
+    type: 'capture_product',
+    label: 'Capture this deployment',
+    description:
+      'Takes a screenshot of one product page or signed-in screen for this deployment, for a later render to show instead of the latest image. Your app must first report the deployed commit at a path you set; without that proof the image is labeled as the current state only.',
+    input: 'campaignId',
+    output: 'campaignId',
+    minSchemaVersion: 3,
+    permission: ADMIN,
+    integrations: [
+      'Public page or signed-in capture',
+      'Deployment or release trigger',
+      'Screenshot service',
+    ],
+    entitlement: 'campaign:workflow',
+    retry:
+      'Up to 8 attempts over about 10 minutes while the deployment goes live. A retry reuses a capture it already took.',
+    paid: false,
+    humanApproval: false,
+  },
   render_creatives: {
     type: 'render_creatives',
     label: 'Render creatives',
     description:
-      'Fills 1–3 design templates with your latest product capture and the release headline, styles them with the campaign brand kit, renders them, and attaches them to the campaign for review.',
+      'Fills 1–3 design templates with the capture from an earlier step, or your latest product capture, and the release headline, styles them with the campaign brand kit, renders them, and attaches them to the campaign for review.',
     input: 'campaignId',
     output: 'campaignId',
     minSchemaVersion: 2,
@@ -172,9 +192,20 @@ export const WORKFLOW_CLASSIFY = {
 /**
  * The language version the editor saves. Version 2 holds everything version
  * 1 does with the same meaning, so a re-saved v1 draft behaves the same;
- * it only needs a worker that runs v2, which activation checks.
+ * it only needs a worker that runs v2, which activation checks. A graph with
+ * a newer action saves as that action's version: see graphSchemaVersion.
  */
 export const WORKFLOW_SCHEMA_VERSION = 2
+
+/** The language version a graph needs, so only graphs using a newer action need a newer worker. */
+export function graphSchemaVersion(graph: Pick<AutomationGraph, 'nodes'>): number {
+  return Math.max(
+    WORKFLOW_SCHEMA_VERSION,
+    ...graph.nodes.map((node) =>
+      node.action ? WORKFLOW_ACTIONS[node.action.type].minSchemaVersion : 0
+    )
+  )
+}
 
 /** The backend's verdict for an action or AI check, unavailable when unreported. */
 export function actionAvailability(
@@ -194,5 +225,5 @@ export function actionAvailability(
 
 /** The graph as the editor saves it. */
 export function savedGraph(graph: AutomationGraph): AutomationGraph {
-  return { ...graph, schemaVersion: WORKFLOW_SCHEMA_VERSION }
+  return { ...graph, schemaVersion: graphSchemaVersion(graph) }
 }
