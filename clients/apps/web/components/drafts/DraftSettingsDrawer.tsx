@@ -32,6 +32,14 @@ import { cn } from '@/lib/utils'
 const PAGES = SOCIAL_SET_PAGES.filter((page) => page.slug !== 'general')
 
 /**
+ * Whether the address opens the sheet: a page it has. An old page in a saved
+ * link (such as `appearance`, now in workspace settings) does not.
+ */
+export function settingsOpen(params: { get: (name: string) => string | null }): boolean {
+  return PAGES.some((item) => item.slug === params.get('settings'))
+}
+
+/**
  * Opens, moves or closes the sheet through the address, so back and forward
  * work. `brand` picks another brand than the page's own, as the Calendar does.
  */

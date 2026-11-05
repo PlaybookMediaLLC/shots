@@ -185,6 +185,13 @@ function insertMention(editor: PlateEditor, channel: DraftChannel, mention: Foun
   editor.tf.focus()
 }
 
+/** The platforms a mention can be looked up on, of those being written for. */
+export function mentionLookups(channels: DraftChannel[]): ('x' | 'linkedin')[] {
+  return channels.filter(
+    (channel): channel is 'x' | 'linkedin' => channel === 'x' || channel === 'linkedin'
+  )
+}
+
 /**
  * The mention picker: look an account up on X or LinkedIn with the set's
  * own account and put it in the post. People searches use the connected
@@ -250,7 +257,16 @@ export function MentionPicker({
     >
       {/* Opens above the toolbar's end, where the More menu that asked for it was. */}
       <PopoverAnchor className="h-8 w-0" />
-      <PopoverContent className="grid w-80 gap-2 p-3" data-testid="mention-picker" side="top">
+      <PopoverContent
+        className="grid w-80 gap-2 p-3"
+        data-testid="mention-picker"
+        // It has no trigger to return to: closing hands focus back to the post.
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          editor.current?.tf.focus()
+        }}
+        side="top"
+      >
         <div className="flex gap-1">
           {lookups.map((item) => (
             <Button

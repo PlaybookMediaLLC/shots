@@ -89,6 +89,7 @@ test(
     await expect(page.getByTestId('post-length-2')).toHaveText('38 / 280')
 
     // Numbering is applied when serialized and counted; the text never holds it.
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: /Auto-numbering/ }).click()
     await page.getByLabel('Enable auto-numbering').click()
     await expect(page.getByTestId('numbering-preview')).toContainText('1/2')
@@ -261,10 +262,23 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // The writing assistant, in the set's voice: set up or skipped, then asked.
+    // Each post has its own Ask AI, and Try again asks the same thing again,
+    // not the empty instruction box.
+    await page.getByRole('button', { name: 'Ask AI about post 1' }).click()
+    const menu = page.getByTestId('refine-menu')
+    await menu.getByLabel('Refine instruction').fill('Make it friendlier')
+    await menu.getByRole('button', { name: 'Go', exact: true }).click()
+    await expect(review).toContainText('Make it friendlier')
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Try again' }).click()
+    await expect(review).toContainText('Make it friendlier', { timeout: 60_000 })
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Reject' }).click()
+    await expect(editor).not.toContainText('(refined)')
+
+    // The writing assistant helps at once; its voice setup is offered later, never as a gate.
     await page.getByRole('button', { name: 'Assistant', exact: true }).click()
-    await expect(page.getByTestId('assistant-setup')).toBeVisible()
-    await page.getByTestId('assistant-setup').getByRole('button', { name: 'Skip for now' }).click()
+    await expect(page.getByTestId('assistant-setup')).toHaveCount(0)
     const assistant = page.getByTestId('assistant-panel')
     await assistant.getByRole('button', { name: /stronger hooks/ }).click()
     await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })
@@ -272,6 +286,19 @@ test(
     await assistant.getByRole('button', { name: 'Add as a new post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expectSaved(page)
+    // After three answers with no style guide, the assistant offers its voice setup.
+    await expect(assistant.getByRole('button', { name: 'Set up its voice' })).toHaveCount(0)
+    for (const [index, question] of ['Make it shorter.', 'Add a question at the end.'].entries()) {
+      await assistant.getByLabel('Ask the assistant').fill(question)
+      await assistant.getByRole('button', { name: 'Send', exact: true }).click()
+      await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(index + 2, {
+        timeout: 60_000,
+      })
+    }
+    await assistant.getByRole('button', { name: 'Set up its voice' }).click()
+    await expect(page.getByTestId('assistant-setup')).toBeVisible()
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click()
+    await expect(page.getByTestId('assistant-panel')).toBeVisible()
 
     // The review names every account and the follow-ups; Auto-DM is off, with why.
     await page.getByTestId('publish-button').click()

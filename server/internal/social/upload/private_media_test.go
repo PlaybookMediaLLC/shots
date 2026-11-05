@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func privateMediaEnv(t *testing.T) {
@@ -38,6 +39,19 @@ func TestPrivateMediaSignsAtPublishTime(t *testing.T) {
 	}
 	if strings.Contains(stored, "X-Amz-") {
 		t.Fatal("the stored URL must remain stable and unsigned")
+	}
+
+	// One file keeps one link for the hour, so a browser can cache it.
+	start := time.Now().UTC()
+	again, err := signer.SignURL(context.Background(), stored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if date := u.Query().Get("X-Amz-Date"); !strings.HasSuffix(date, "0000Z") {
+		t.Fatalf("the link must be signed as of the start of the hour, got X-Amz-Date=%q", date)
+	}
+	if again != signed && start.Truncate(time.Hour).Equal(time.Now().UTC().Truncate(time.Hour)) {
+		t.Fatal("two links for one file in the same hour must be the same")
 	}
 
 	refreshed, err := signer.SignURL(context.Background(), stored+"?X-Amz-Expires=1&X-Amz-Signature=expired")

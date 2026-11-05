@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import {
   Dialog,
   DialogContent,
@@ -26,10 +27,17 @@ import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import type { DraftChannel, DraftKind, PlateBody, PlatformVersions } from '@/lib/write/document'
+import type {
+  DraftChannel,
+  DraftKind,
+  PlateBody,
+  PlatformVersions,
+  VersionOptions,
+} from '@/lib/write/document'
 import { forkVersion, primaryChanged, resyncVersion, versionFor } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { healthLabel } from '../sets'
+import { optionsSummary } from './video-options'
 import type { WriteSet } from '../write-context'
 import { CONNECT_PROVIDERS } from '@/components/settings/social-sets/api'
 
@@ -48,6 +56,8 @@ export function PlatformTabs({
   enabled,
   onManage,
   onSelect,
+  options,
+  over = [],
   primary,
   versions,
 }: {
@@ -56,6 +66,10 @@ export function PlatformTabs({
   enabled: string[]
   onManage?: () => void
   onSelect: (channel: DraftChannel) => void
+  /** Platforms whose text runs over their limit; each tab shows only its own count. */
+  over?: DraftChannel[]
+  /** The edited platform's options chip, at the row's end. */
+  options?: React.ReactNode
   primary: DraftChannel
   versions: PlatformVersions
 }) {
@@ -94,6 +108,14 @@ export function PlatformTabs({
                   Own text
                 </span>
               ) : null}
+              {over.includes(channel) ? (
+                <span
+                  aria-label="Over its character limit"
+                  className="size-1.5 rounded-full bg-red-500"
+                  data-testid={`platform-over-${channel}`}
+                  role="img"
+                />
+              ) : null}
               {!publishing ? (
                 <span className="text-label text-muted-foreground">
                   {account ? '· off' : '· not connected'}
@@ -119,7 +141,48 @@ export function PlatformTabs({
           Manage platforms
         </Button>
       ) : null}
+      {options ? <div className="ml-auto shrink-0">{options}</div> : null}
     </div>
+  )
+}
+
+/**
+ * The edited platform's options in a few words, such as "TikTok: Only me ·
+ * comments on". It opens them beside the draft, so no form sits above the text.
+ */
+export function OptionsChip({
+  blocked,
+  channel,
+  onClick,
+  open,
+  options,
+}: {
+  /** Something in these options blocks scheduling. */
+  blocked: boolean
+  channel: DraftChannel
+  onClick: () => void
+  open: boolean
+  options: VersionOptions
+}) {
+  const summary = optionsSummary(channel, options)
+  const label = CHANNEL_META[channel].label
+  const text = summary ? `${label}: ${summary}` : `${label} options`
+  return (
+    <Button
+      aria-expanded={open}
+      className={cn(
+        'h-8 gap-1.5 text-ui',
+        blocked && 'text-amber-700 dark:text-amber-300'
+      )}
+      data-testid="options-chip"
+      onClick={onClick}
+      size="sm"
+      title="Post options for this platform"
+      variant="outline"
+    >
+      {blocked ? <span aria-hidden className="size-1.5 rounded-full bg-amber-500" /> : null}
+      {text}
+    </Button>
   )
 }
 
@@ -150,11 +213,15 @@ export function ManagePlatformsDialog({
   onChange,
   onClose,
   onConnect,
+  onPreview,
+  defaultsHref,
   primary,
   value,
   versions,
 }: {
   accounts: ComposerAccount[]
+  /** The brand's new-draft settings, where its default platforms are chosen. */
+  defaultsHref?: string
   draftVersion: number
   enabled: string[]
   kind: DraftKind
@@ -165,6 +232,8 @@ export function ManagePlatformsDialog({
   }) => void
   onClose: () => void
   onConnect?: (provider: string) => Promise<void>
+  /** Show a platform's post in the preview beside the draft. */
+  onPreview?: (channel: DraftChannel) => void
   primary: DraftChannel
   value: PlateBody
   versions: PlatformVersions
@@ -225,6 +294,20 @@ export function ManagePlatformsDialog({
                             : ''}
                         </span>
                       </span>
+                      {account.channel === primary ? (
+                        <span className="text-label text-muted-foreground">Main</span>
+                      ) : null}
+                      {on && onPreview ? (
+                        <Button
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          onClick={() => onPreview(account.channel)}
+                          size={null}
+                          type="button"
+                          variant="custom"
+                        >
+                          Preview
+                        </Button>
+                      ) : null}
                       <Switch
                         aria-label={`Publish to ${CHANNEL_META[account.channel].label}`}
                         checked={on}
@@ -317,7 +400,17 @@ export function ManagePlatformsDialog({
               ))}
             </div>
           ) : accounts.length === 0 ? <p className="text-sm text-muted-foreground">Ask an admin or publisher to connect an account.</p> : null}
-          <DialogFooter>
+          <DialogFooter className="items-center sm:justify-between">
+            {defaultsHref ? (
+              <SidebarLink
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                href={defaultsHref}
+              >
+                Change default platforms
+              </SidebarLink>
+            ) : (
+              <span />
+            )}
             <Button onClick={onClose} type="button">
               Done
             </Button>

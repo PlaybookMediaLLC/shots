@@ -404,9 +404,23 @@ func TestWritePublishing(t *testing.T) {
 		if err != nil || retried.Post.ChannelConnectionID != x || retried.Post.Status != "SCHEDULED" {
 			t.Fatalf("retried=%+v err=%v", retried, err)
 		}
+		// The retry keeps the brand, so its failure can link to the account.
+		if optionalText(retried.Post.SocialSetID) != optionalText(result.Posts[0].SocialSetID) || retried.Post.SocialSetID == nil {
+			t.Fatalf("the retry lost its social set: %v", retried.Post.SocialSetID)
+		}
 		if _, err := repo.RetryContentDraftPost(ctx, owner, failed); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("a second click retried again: %v", err)
 		}
+		// A failed retry is the one to retry: the replaced original is history.
+		w.exec(t, `UPDATE scheduled_post SET status='FAILED' WHERE id=$1`, retried.Post.ID)
+		if _, err := repo.RetryContentDraftPost(ctx, owner, failed); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("a replaced failure was retried, which could publish twice: %v", err)
+		}
+		second, err := repo.RetryContentDraftPost(ctx, owner, retried.Post.ID)
+		if err != nil {
+			t.Fatalf("the newest failure cannot be retried: %v", err)
+		}
+		w.exec(t, `UPDATE scheduled_post SET status='CANCELLED' WHERE id=$1`, second.Post.ID)
 		if _, err := repo.RetryContentDraftPost(ctx, owner, unknown); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("an unknown outcome was retried blindly: %v", err)
 		}
@@ -431,8 +445,8 @@ func TestWritePublishing(t *testing.T) {
 		if _, err := repo.RetryContentDraftPost(ctx, owner, again.Posts[0].ID); err != nil {
 			t.Fatalf("a post reconciled as not live cannot be retried: %v", err)
 		}
-		if n, err := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).Count(ctx); err != nil || n != 3 {
-			t.Fatalf("the draft has %d posts, want the two and one retry: %v", n, err)
+		if n, err := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID)).Count(ctx); err != nil || n != 4 {
+			t.Fatalf("the draft has %d posts, want the two and two retries: %v", n, err)
 		}
 	})
 

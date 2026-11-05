@@ -466,7 +466,7 @@ func (c *Configuration) GetPublicProfile(ctx context.Context, slug string) (*Pub
 	}
 	profile := &PublicProfile{Accounts: []PublicAccount{}, Color: set.Color, Name: set.Name}
 	for _, connection := range connections {
-		profile.Accounts = append(profile.Accounts, PublicAccount{AvatarURL: connection.AvatarURL,
+		profile.Accounts = append(profile.Accounts, PublicAccount{AvatarURL: BrowserAvatar(ctx, connection.AvatarURL),
 			DisplayName: connection.DisplayName, Handle: connection.Handle, Platform: connection.Platform})
 	}
 	return profile, nil

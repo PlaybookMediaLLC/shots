@@ -3,6 +3,11 @@
 import * as React from 'react'
 import { PreviewLinkCard } from './preview-link-card'
 import { LinkPreviewCard } from './link-cards'
+import {
+  Avatar as AccountAvatar,
+  AvatarFallback,
+  AvatarImage,
+} from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
@@ -156,25 +161,15 @@ export function PreviewPanel({
   )
 }
 
-/** An account's avatar, or its initial. */
+/** An account's avatar, or a face of its own when it has none or it fails to load. */
 function Avatar({ account, size = 'size-10' }: { account: ComposerAccount; size?: string }) {
-  return account.avatarUrl ? (
-    // biome-ignore lint/performance/noImgElement: a provider avatar URL
-    <img
-      alt=""
-      className={cn(size, 'shrink-0 rounded-full bg-foreground/5 object-cover')}
-      src={account.avatarUrl}
-    />
-  ) : (
-    <span
-      aria-hidden
-      className={cn(
-        size,
-        'flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-500/40 to-violet-500/40 text-sm text-foreground'
-      )}
-    >
-      {(account.displayName ?? account.handle ?? '?').slice(0, 1).toUpperCase()}
-    </span>
+  return (
+    <AccountAvatar aria-hidden className={cn(size, 'bg-foreground/5')}>
+      {account.avatarUrl ? (
+        <AvatarImage alt="" className="object-cover" src={account.avatarUrl} />
+      ) : null}
+      <AvatarFallback name={account.displayName ?? account.handle ?? '?'} />
+    </AccountAvatar>
   )
 }
 

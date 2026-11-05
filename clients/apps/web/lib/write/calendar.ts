@@ -1,4 +1,5 @@
-import { resolveLocalTime, wallTime } from './zoned-time'
+import { addDays, dayOfWeek, zonedDayKey } from '@/lib/settings/zoned-time'
+import { resolveLocalTime } from './zoned-time'
 
 /** Dragging an authored draft opens scheduling review; it never creates a job. */
 export const CALENDAR_DRAFT_DRAG = 'application/x-shots-calendar-draft'
@@ -46,9 +47,12 @@ export function upcomingSlots(
   now = new Date()
 ): { at: Date; busy: boolean }[] {
   const out: { at: Date; busy: boolean }[] = []
+  // Calendar days, not 24-hour steps: a daylight-saving change neither skips
+  // nor repeats a day.
+  const today = zonedDayKey(now, zone)
   for (let days = 0; days < 21 && out.length < 12; days += 1) {
-    const day = wallTime(new Date(now.getTime() + days * 86_400_000), zone).slice(0, 10)
-    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay()
+    const day = addDays(today, days)
+    const weekday = dayOfWeek(day)
     for (const slot of postingSlots.filter((item) => item.weekday === weekday)) {
       const resolved = resolveLocalTime(`${day}T${slot.time}`, zone)
       if (resolved.kind !== 'exact' || resolved.at <= now) continue
@@ -61,6 +65,36 @@ export function upcomingSlots(
     }
   }
   return out.sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, 12)
+}
+
+/**
+ * The queue's next days in a brand's zone: each day's queued items and its
+ * free weekly slots, so an empty slot reads as a prompt to write, and how many
+ * future slots it has. A slot an item holds (within five minutes) is not free.
+ */
+export function queueDays<T extends { at: string }>(
+  postingSlots: { time: string; weekday: number }[],
+  zone: string,
+  items: T[],
+  now = new Date()
+): { day: string; free: string[]; items: T[]; slots: number }[] {
+  const today = zonedDayKey(now, zone)
+  return Array.from({ length: 7 }, (_, offset) => {
+    const day = addDays(today, offset)
+    const held = items.filter((item) => zonedDayKey(new Date(item.at), zone) === day)
+    return {
+      day,
+      free: availableDaySlots(
+        day,
+        zone,
+        postingSlots,
+        held.map((item) => item.at),
+        now
+      ),
+      items: held,
+      slots: availableDaySlots(day, zone, postingSlots, [], now).length,
+    }
+  })
 }
 
 /** Visible calendar days, including adjacent weeks in month view. */

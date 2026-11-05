@@ -652,3 +652,10 @@ html *::-webkit-scrollbar {
 ) {
   border-radius: 6px;
 }
+
+/* Facehash avatars blink: stop the blink for people who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  [data-facehash] * {
+    animation: none !important;
+  }
+}

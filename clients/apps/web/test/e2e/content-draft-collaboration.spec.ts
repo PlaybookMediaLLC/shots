@@ -544,3 +544,63 @@ test(
     await expect(page.getByRole('region', { name: 'Saved draft' })).toHaveCount(0)
   }
 )
+
+test(
+  'a menu one editor opens stays its own: another editor neither shows it nor closes it',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace()
+    const draftId = await openNewDraft(page)
+    await page.keyboard.type('Shared draft.')
+    await expectSaved(page)
+    const other = await page.context().newPage()
+    try {
+      await other.goto(`/write/${draftId}`)
+      await expect(draftEditor(other)).toContainText('Shared draft.')
+      await page.bringToFront()
+      await page.keyboard.type(' /')
+      await expect(page.getByRole('listbox')).toBeVisible()
+      // The "/" reaches the other editor, but its menu and focus stay where they opened.
+      await expect(draftEditor(other)).toContainText('Shared draft. /')
+      await other.bringToFront()
+      await expect(other.getByRole('listbox')).toHaveCount(0)
+      expect(await other.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT')
+      await other.keyboard.press('Escape')
+      await page.bringToFront()
+      await expect(page.getByRole('listbox')).toBeVisible()
+      await page.keyboard.type('heading')
+      await expect(
+        page.getByRole('option').filter({ hasText: 'Large section heading.' })
+      ).toBeVisible()
+    } finally {
+      await other.close()
+    }
+  }
+)
+
+test(
+  'a menu left open in a closed editor is removed for everyone else',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace()
+    const draftId = await openNewDraft(page)
+    await page.keyboard.type('Shared draft.')
+    await expectSaved(page)
+    const other = await page.context().newPage()
+    await other.goto(`/write/${draftId}`)
+    await endOfText(other, 'Shared draft.')
+    await other.keyboard.type(' /')
+    await expect(other.getByRole('listbox')).toBeVisible()
+    // The menu is an inline node; the post's "14 / 280" counter is in the editor too.
+    const menu = draftEditor(page).locator('[data-slate-inline]')
+    await expect(menu).toHaveCount(1)
+    // eslint-disable-next-line no-restricted-syntax -- A menu whose owner is still here must outlast the 45 s orphan grace and its 5 s check.
+    await page.waitForTimeout(56_000)
+    await expect(menu).toHaveCount(1)
+    await expect(other.getByRole('listbox')).toBeVisible()
+    // The tab closes with its menu still open; no "/" is left in the draft.
+    await other.close()
+    await expect(menu).toHaveCount(0, { timeout: 90_000 })
+    await expect(draftEditor(page)).toContainText('Shared draft.')
+  }
+)

@@ -51,6 +51,7 @@ import { calendarNoteListSchema, type CalendarNoteWire } from '@/lib/api/contrac
 import { calendarResultSchema, type CalendarPlacement } from '@/lib/api/contracts/plan-analyze'
 import { call, draftsApi, type DraftWire, type DraftPostWire } from '@/lib/content-drafts/client'
 import {
+  currentPosts,
   POST_STATE_TONE,
   postFailureReason,
   postState,
@@ -484,12 +485,16 @@ export function PlanWorkspace({
       }
       className={`block h-auto w-full min-w-0 rounded-lg border p-2 text-left text-xs font-normal whitespace-normal shadow-sm ${weekly ? 'h-full overflow-hidden' : ''} ${item.status === 'Planned' ? 'border-dashed border-violet-400' : item.status === 'Published' ? 'border-emerald-500' : item.status === 'Failed' ? 'border-red-500' : item.status === 'Needs check' || item.status === 'Overdue' ? 'border-amber-500' : 'border-sky-500'} bg-background`}
     >
+      {/* One line, so the post text keeps its room in a fixed-height week card: the
+          time stays whole and the status gives way first. */}
       <span className="block truncate text-muted-foreground">
-        {new Date(item.at).toLocaleTimeString(undefined, {
-          hour: 'numeric',
-          minute: '2-digit',
-          timeZone: prefs.zone,
-        })}{' '}
+        <span className="whitespace-nowrap">
+          {new Date(item.at).toLocaleTimeString(undefined, {
+            hour: 'numeric',
+            minute: '2-digit',
+            timeZone: prefs.zone,
+          })}
+        </span>{' '}
         · {item.status}
       </span>
       {item.publishAt && new Date(item.publishAt).getTime() !== new Date(item.at).getTime() ? (
@@ -503,7 +508,7 @@ export function PlanWorkspace({
           })}
         </span>
       ) : null}
-      <strong className="block truncate">
+      <strong className={weekly ? 'block truncate' : 'line-clamp-2 break-words'}>
         {sets.find((s) => s.id === item.setId)?.name ?? 'Account'}{' '}
         {prefs.platforms ? `· ${item.platform}` : ''}
       </strong>
@@ -568,7 +573,7 @@ export function PlanWorkspace({
                 // The zone stays in the name and tooltip; in the cell it wrapped into the next day.
                 aria-label={`Available · ${slot.displayTime} (${prefs.zone})`}
                 title={`Available · ${slot.displayTime} (${prefs.zone})`}
-                className="block h-auto w-full truncate rounded border border-dashed p-2 text-xs font-normal text-muted-foreground"
+                className="block h-auto w-full rounded border border-dashed p-2 text-xs font-normal break-words whitespace-normal text-muted-foreground"
                 onClick={() =>
                   setCompose({
                     day: slot.localDay,
@@ -1792,6 +1797,8 @@ function PlanDetail({
   const set = sets.find((s) => s.id === item.setId)
   // A calendar unschedule returns the draft to a plan, so it cancels all of these.
   const queued = receipts.filter((post) => post.status === 'SCHEDULED')
+  // A failure a newer attempt replaced is history: retrying it could post twice.
+  const current = currentPosts(receipts)
   return (
     <Sheet
       open
@@ -2070,7 +2077,10 @@ function PlanDetail({
                       published.
                     </p>
                   ) : null}
-                  {post.status === 'FAILED' ? (
+                  {post.status === 'FAILED' && !current.includes(post) ? (
+                    <p>A newer attempt to this account replaced this one.</p>
+                  ) : null}
+                  {post.status === 'FAILED' && current.includes(post) ? (
                     <Button
                       size="sm"
                       variant="outline"

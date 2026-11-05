@@ -4,11 +4,20 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { POST_STATE_TONE, postFailureReason, postState } from '@/lib/content-drafts/post-status'
+import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
+import { socialSetHref } from '@/components/workspace/settings-sections'
+import {
+  currentPosts,
+  POST_STATE_TONE,
+  postFailureFix,
+  postFailureReason,
+  postState,
+} from '@/lib/content-drafts/post-status'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { cn } from '@/lib/utils'
 import { CHANNEL_META, ChannelIcon } from './channel-meta'
@@ -62,6 +71,7 @@ export function DraftPosts({
   edited,
   onCancel,
   onChange,
+  onEdit,
   onReschedule,
   posts,
 }: {
@@ -73,6 +83,8 @@ export function DraftPosts({
   onReschedule?: () => void
   /** Called with a post as the server now has it, or a new one. */
   onChange: (post: DraftPostWire) => void
+  /** Open the editor on a failed post's platform, to fix its text, media or options. */
+  onEdit?: (platform: string) => void
   posts: DraftPostWire[]
 }) {
   const [busy, setBusy] = React.useState<string | null>(null)
@@ -88,20 +100,12 @@ export function DraftPosts({
     }
   }
   if (posts.length === 0) return null
-  return (
-    <section className={cn('mb-10', POST_COLUMN)}>
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Posts from this draft
-        </h2>
-        {onReschedule ? (
-          <Button onClick={onReschedule} size="sm" variant="outline">
-            Replace queued posts with this version…
-          </Button>
-        ) : null}
-      </div>
-      <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
-        {posts.map((post) => {
+  // A failure a newer post of its destination replaced (a retry) folds away.
+  const latest = currentPosts(posts)
+  const earlier = posts.filter((post) => !latest.includes(post))
+  // An earlier attempt is history: it shows what happened, with no action, so
+  // it cannot be retried behind the post that replaced it.
+  const row = (post: DraftPostWire, history = false) => {
           const channel = channelForPlatform(post.platform)
           const stopped =
             post.status === 'PUBLISHED' &&
@@ -111,7 +115,9 @@ export function DraftPosts({
           const state = postState(post.status, post.scheduledFor)
           const overdue = state === 'Overdue'
           const reason = postFailureReason(post.failureCode)
+          const fix = postFailureFix(post.failureCode)
           const label = channel ? CHANNEL_META[channel].label : post.platform
+          const support = `code ${post.failureCode} · post ${post.id} · ${post.platform}`
           return (
             <li className="flex flex-col gap-2 px-4 py-3" data-testid="draft-post" key={post.id}>
               <div className="flex items-center justify-between gap-4">
@@ -238,7 +244,17 @@ export function DraftPosts({
                 <p className="flex flex-wrap items-center gap-2 text-xs text-red-700 dark:text-red-300" role="status">
                   {reason ? `${reason} ` : ''}This destination did not publish; the draft’s other
                   posts are unaffected.
-                  {canSchedule ? (
+                  {!history && fix === 'reconnect' && post.socialSetId ? (
+                    <Button asChild size="sm" variant="outline">
+                      <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
+                    </Button>
+                  ) : null}
+                  {!history && fix === 'edit' && onEdit ? (
+                    <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
+                      Edit the {label} post
+                    </Button>
+                  ) : null}
+                  {!history && canSchedule ? (
                     <Button
                       disabled={busy === post.id}
                       onClick={() =>
@@ -278,6 +294,28 @@ export function DraftPosts({
                     />
                   ) : null}
                 </div>
+              ) : null}
+              {post.failureCode ? (
+                <Disclosure className="text-xs text-muted-foreground" data-testid="failure-details">
+                  <DisclosureTrigger className="select-none hover:text-foreground">
+                    Details
+                  </DisclosureTrigger>
+                  <DisclosureContent className="mt-1 flex flex-wrap items-center gap-2 font-mono">
+                    {support}
+                    <Button
+                      onClick={() =>
+                        void navigator.clipboard
+                          .writeText(`${support} · ${post.scheduledFor}`)
+                          .then(() => toast.success('Details copied for support.'))
+                          .catch(() => toast.error('The details could not be copied.'))
+                      }
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Copy for support
+                    </Button>
+                  </DisclosureContent>
+                </Disclosure>
               ) : null}
               {post.replies > 0 && post.status !== 'PUBLISHED' ? (
                 <p className="text-xs text-muted-foreground">
@@ -373,8 +411,34 @@ export function DraftPosts({
               ) : null}
             </li>
           )
-        })}
+  }
+  return (
+    <section className={cn('mb-10', POST_COLUMN)}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Posts from this draft
+        </h2>
+        {onReschedule ? (
+          <Button onClick={onReschedule} size="sm" variant="outline">
+            Replace queued posts with this version…
+          </Button>
+        ) : null}
+      </div>
+      <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
+        {latest.map((post) => row(post))}
       </ul>
+      {earlier.length > 0 ? (
+        <Disclosure className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
+          <DisclosureTrigger className="select-none hover:text-foreground">
+            {earlier.length} earlier attempt{earlier.length === 1 ? '' : 's'}
+          </DisclosureTrigger>
+          <DisclosureContent>
+            <ul className="mt-2 divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
+              {earlier.map((post) => row(post, true))}
+            </ul>
+          </DisclosureContent>
+        </Disclosure>
+      ) : null}
     </section>
   )
 }

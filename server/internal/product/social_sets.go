@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
+	"log/slog"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -25,6 +27,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialsetwritingsample"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/upload"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/lucsky/cuid"
@@ -379,9 +382,36 @@ func connectionHealth(ctx context.Context, client *ent.Client, organizationID st
 	})
 }
 
-func socialAccount(connection *ent.ChannelConnection, health string) SocialAccount {
-	return SocialAccount{AvatarURL: connection.AvatarURL, CreatedAt: connection.CreatedAt, DisplayName: connection.DisplayName,
+func socialAccount(ctx context.Context, connection *ent.ChannelConnection, health string) SocialAccount {
+	return SocialAccount{AvatarURL: BrowserAvatar(ctx, connection.AvatarURL), CreatedAt: connection.CreatedAt, DisplayName: connection.DisplayName,
 		Handle: connection.Handle, Health: health, ID: connection.ID, Platform: connection.Platform, SocialSetID: connection.SocialSetID}
+}
+
+// BrowserAvatar returns a stored avatar as a link a browser can load. Connect
+// copies avatars into the social bucket. When that bucket is private, only a
+// signed link can read it, so the link is signed for a day. Other links pass
+// through. An avatar that cannot be signed is dropped, and the initial shows.
+// Only a plain link is signed, as the copy writes it: one with a user, a query
+// or a fragment did not come from the copy and passes through unsigned.
+func BrowserAvatar(ctx context.Context, stored *string) *string {
+	if stored == nil {
+		return nil
+	}
+	if u, err := url.Parse(*stored); err != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return stored
+	}
+	signer, err := upload.NewPrivateMediaSigner()
+	if err != nil {
+		// Without the bucket settings, no link can be signed: keep the stored one.
+		slog.WarnContext(ctx, "avatar links cannot be signed", "error", err)
+		return stored
+	}
+	signed, err := signer.SignURL(ctx, *stored)
+	if err != nil {
+		slog.WarnContext(ctx, "avatar link not signed", "avatar", *stored, "error", err)
+		return nil
+	}
+	return &signed
 }
 
 // workspaceAIEnabled reads the workspace AI switch.
@@ -438,7 +468,7 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	}
 	accounts := map[string][]SocialAccount{}
 	for _, connection := range connections {
-		account := socialAccount(connection, health[connection.ID])
+		account := socialAccount(ctx, connection, health[connection.ID])
 		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && account.Health == AccountConnected {
 			standing := c.accountStanding(ctx, connection)
 			account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
@@ -536,7 +566,7 @@ func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*Socia
 		return nil, err
 	}
 	for _, connection := range unassigned {
-		list.Unassigned = append(list.Unassigned, socialAccount(connection, health[connection.ID]))
+		list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
 	}
 	if actor.IsSession() && c.authorizeRoles(ctx, actor, "owner", "admin") == nil {
 		orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)

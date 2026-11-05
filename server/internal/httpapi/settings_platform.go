@@ -333,7 +333,7 @@ func (s *Server) refreshChannelConnection(w http.ResponseWriter, r *http.Request
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, connectionWithState(connection, states))
+	writeJSON(w, http.StatusOK, connectionWithState(r.Context(), connection, states))
 }
 
 // stopCancelledPosts signals the workflows of posts a removal cancelled. A

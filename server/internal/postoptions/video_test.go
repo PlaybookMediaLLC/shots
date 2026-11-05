@@ -2,6 +2,7 @@ package postoptions
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 )
 
@@ -74,8 +75,9 @@ func TestTikTokCreatorRechecksAccountRestrictions(t *testing.T) {
 	}
 	o.AllowDuet = false
 	o.Privacy = "PUBLIC_TO_EVERYONE"
-	if c.Check(o, 5000) == nil {
-		t.Fatal("unavailable privacy accepted")
+	// The post's options fix this, not a refresh of the account.
+	if err := c.Check(o, 5000); err == nil || errors.Is(err, ErrCreatorPermissions) {
+		t.Fatalf("unavailable privacy: %v", err)
 	}
 	var missing *TikTokCreator
 	if missing.Check(o, 5000) == nil {
