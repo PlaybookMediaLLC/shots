@@ -4,7 +4,7 @@ import * as React from 'react'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { WriteData } from '@/app/[locale]/publish/write-data'
-import { libraryDraft, libraryQuery } from '@/lib/write/library'
+import { libraryDraft, libraryQuery, libraryRange } from '@/lib/write/library'
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
@@ -77,7 +77,7 @@ type DraftLine = { excerpt?: string; pinned?: boolean; title?: string; updatedAt
 
 const WriteContext = React.createContext<WriteContextValue | null>(null)
 
-const TABS = ['drafts', 'queue', 'posted', 'archived'] as const
+const TABS = ['all', 'drafts', 'queue', 'posted', 'archived'] as const
 
 /** The Write context; every Write component sits inside a provider. */
 export function useWrite(): WriteContextValue {
@@ -170,7 +170,8 @@ export function WriteProvider({
     [pathname, query, router]
   )
   const showSaved = React.useCallback<WriteContextValue['showSaved']>(
-    ({ id, ...draft }) => setSaved((current) => ({ ...current, [id]: { ...current[id], ...draft } })),
+    ({ id, ...draft }) =>
+      setSaved((current) => ({ ...current, [id]: { ...current[id], ...draft } })),
     []
   )
   // A pin shows at once, until the server's list arrives; from then on, it is the server's.
@@ -194,8 +195,19 @@ export function WriteProvider({
   const tab = TABS.find((item) => item === params.get('tab')) ?? 'drafts'
   const view = tab === 'queue' ? 'drafts' : tab
   const loaded = view === (data.query.tab === 'queue' ? 'drafts' : data.query.tab)
-  const [results, setResults] = React.useState<{ key: string; items: LibraryDraft[] } | null>(null)
-  const searchQuery = new URLSearchParams({ limit: '100', search, view })
+  const [results, setResults] = React.useState<{
+    key: string
+    items: LibraryDraft[]
+    hasMore: boolean
+  } | null>(null)
+  const searchQuery = new URLSearchParams({ limit: '100', search })
+  // All leaves the view out, which leaves out only archived drafts.
+  if (view !== 'all') searchQuery.set('view', view)
+  if (data.query.account) searchQuery.set('connectionId', data.query.account)
+  for (const [key, at] of Object.entries(
+    libraryRange(data.query, data.activeSet?.timeZone ?? 'UTC')
+  ))
+    searchQuery.set(key, at)
   if (data.activeSet) searchQuery.set('socialSetId', data.activeSet.id)
   if (data.query.kind) searchQuery.set('kind', data.query.kind)
   if (data.query.sort) searchQuery.set('sort', data.query.sort)
@@ -210,9 +222,17 @@ export function WriteProvider({
     void fetch(`/api/v1/content-drafts?${searchKey}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('Search failed. Try again.')
-        const page = (await response.json()) as { pinned: DraftWire[]; items: DraftWire[] }
+        const page = (await response.json()) as {
+          pinned: DraftWire[]
+          items: DraftWire[]
+          nextCursor: string | null
+        }
         if (!controller.signal.aborted)
-          setResults({ key: searchKey, items: [...page.pinned, ...page.items].map(libraryDraft) })
+          setResults({
+            key: searchKey,
+            items: [...page.pinned, ...page.items].map(libraryDraft),
+            hasMore: page.nextCursor !== null,
+          })
       })
       .catch(() => {
         if (controller.signal.aborted) return
@@ -222,16 +242,18 @@ export function WriteProvider({
             : 'This list could not load. Try again.'
         )
         // A tab with nothing loaded stops showing its loading rows.
-        if (!loaded) setResults({ key: searchKey, items: [] })
+        if (!loaded) setResults({ key: searchKey, items: [], hasMore: false })
       })
     return () => controller.abort()
     // A refreshed page (after an archive, restore or pin) reloads the fetched list too.
   }, [data, fetched, loaded, searchKey])
   const remote = fetched && results?.key === searchKey ? results.items : null
+  const remoteHasMore = fetched && results?.key === searchKey ? results.hasMore : null
   const libraryPending = !loaded && !remote
   const visibleData = React.useMemo(
     () => ({
       ...data,
+      hasMore: remoteHasMore ?? data.hasMore,
       query: { ...data.query, q: search || undefined, tab },
       library: (remote ?? (loaded ? data.library : [])).filter((draft) => {
         if (removed.includes(draft.id)) return false
@@ -241,7 +263,7 @@ export function WriteProvider({
           .includes(search.toLocaleLowerCase())
       }),
     }),
-    [data, loaded, removed, remote, saved, search, tab]
+    [data, loaded, remoteHasMore, removed, remote, saved, search, tab]
   )
   const value = React.useMemo(
     () => ({

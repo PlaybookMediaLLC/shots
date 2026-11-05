@@ -3,7 +3,7 @@ import { AnalyzeNav } from '@/components/plan/WorkspaceNav'
 import { WriteFrame } from '@/components/write/WriteFrame'
 import { PostingTimes } from '@/components/write/PostingTimes'
 import { calendarPostSchema } from '@/lib/api/contracts/content-draft-platform'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
 import { requireDraftsPageAccess } from '../../../drafts/page-access'
 import { loadWrite } from '../../write-data'
@@ -31,7 +31,7 @@ export default async function PostingTimesPage({
         set.id
       )
     : []
-  const canManage = hasPermission(access.role, 'workspace:update')
+  const canManage = accessAllows(access, 'workspace:update')
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}
@@ -41,10 +41,10 @@ export default async function PostingTimesPage({
         activeId="analyze"
         section="analyze"
         campaignsEnabled={access.campaignWorkflowEnabled && access.hasPaidPlan}
-        canEdit={hasPermission(access.role, 'artifact:edit')}
+        canEdit={accessAllows(access, 'artifact:edit')}
         canManageSets={canManage}
-        canPublish={hasPermission(access.role, 'publish:manage')}
-        canReview={hasPermission(access.role, 'release:approve')}
+        canPublish={accessAllows(access, 'publish:manage')}
+        canReview={accessAllows(access, 'release:approve')}
         data={data}
       >
         <AnalyzeNav active="Best times and posting slots" scope={set ? `?set=${set.id}` : ''} />

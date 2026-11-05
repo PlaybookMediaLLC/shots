@@ -33,7 +33,7 @@ function backendPageDeletion(active: ListedWorkspace) {
 }
 
 async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSession) {
-  const { active, count, workspace, features } = await backendSDK({
+  const { active, count, deniedPermissions, workspace, features, whitelabel } = await backendSDK({
     organizationId: '',
     principal: {
       display: session.user.email,
@@ -51,6 +51,8 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
       (process.env.PLATFORM_CAMPAIGN_WORKFLOW === 'enabled' ||
         features['campaign:workflow'] === true),
     creativeSetsEnabled: Boolean(workspace) && features['creative-sets:create'] === true,
+    // An older backend mid-deploy sends none, and has no groups to apply.
+    deniedPermissions: deniedPermissions ?? [],
     hasOrganization: count > 0,
     // The onboarding agent (docs/rfcs/032). The backend decides it, including
     // the PLATFORM_ONBOARDING_AGENT rollback; without it onboarding is manual.
@@ -61,6 +63,8 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
     organization: backendPageOrganization(active, workspace),
     role: active?.role ?? 'viewer',
     session,
+    // Set only while the plan grants it, so a lapsed plan shows Shots again.
+    whitelabel,
   }
 }
 
@@ -149,6 +153,7 @@ export function sessionTenant(
   requestHeaders: Headers
 ): OrganizationAccess {
   return {
+    deniedPermissions: access.deniedPermissions,
     organizationId,
     principal: {
       display: access.session.user.email,

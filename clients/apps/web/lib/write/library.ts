@@ -1,5 +1,7 @@
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
+import { startOfWeek } from '@/lib/plan/calendar'
+import { addDays, zonedInstant } from '@/lib/settings/zoned-time'
 
 /**
  * The library's URL query as last asked for. Each change merges into the
@@ -53,4 +55,45 @@ export function libraryDraft(draft: DraftWire) {
     title: draft.title,
     updatedAt: draft.updatedAt,
   }
+}
+
+/** Inclusive days in a brand's zone as the instants the API filters by: `to` is exclusive. */
+export function libraryRange(
+  days: { from?: string; to?: string },
+  zone: string
+): { from?: string; to?: string } {
+  return {
+    ...(days.from ? { from: zonedInstant(days.from, 0, 0, zone).toISOString() } : {}),
+    ...(days.to ? { to: zonedInstant(addDays(days.to, 1), 0, 0, zone).toISOString() } : {}),
+  }
+}
+
+/** The days a date preset covers, from today in the brand's zone. */
+export function datePreset(
+  preset: 'today' | 'week' | 'month',
+  today: string,
+  weekStart: number
+): { from: string; to: string } {
+  if (preset === 'today') return { from: today, to: today }
+  if (preset === 'week') {
+    const from = startOfWeek(today, weekStart)
+    return { from, to: addDays(from, 6) }
+  }
+  const [year, month] = today.split('-').map(Number)
+  const last = new Date(Date.UTC(year!, month!, 0)).getUTCDate()
+  return { from: `${today.slice(0, 7)}-01`, to: `${today.slice(0, 7)}-${last}` }
+}
+
+/** The queue rows matching the account and instants, which are ISO strings in UTC. */
+export function filterQueue<T extends { accountIds: string[]; at: string }>(
+  rows: T[],
+  account: string | undefined,
+  range: { from?: string; to?: string }
+): T[] {
+  return rows.filter(
+    (row) =>
+      (!account || row.accountIds.includes(account)) &&
+      (!range.from || row.at >= range.from) &&
+      (!range.to || row.at < range.to)
+  )
 }

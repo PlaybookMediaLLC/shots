@@ -523,6 +523,30 @@ var (
 			},
 		},
 	}
+	// CalendarNoteColumns holds the columns for the "calendar_note" table.
+	CalendarNoteColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "day", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "date"}},
+		{Name: "title", Type: field.TypeString},
+		{Name: "color", Type: field.TypeEnum, Enums: []string{"blue", "green", "red", "yellow", "purple", "orange"}},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CalendarNoteTable holds the schema information for the "calendar_note" table.
+	CalendarNoteTable = &schema.Table{
+		Name:       "calendar_note",
+		Columns:    CalendarNoteColumns,
+		PrimaryKey: []*schema.Column{CalendarNoteColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "calendarnote_organizationId_day",
+				Unique:  false,
+				Columns: []*schema.Column{CalendarNoteColumns[1], CalendarNoteColumns[2]},
+			},
+		},
+	}
 	// CampaignColumns holds the columns for the "campaign" table.
 	CampaignColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -1873,6 +1897,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "ssoEnabled", Type: field.TypeBool, Default: false},
 		{Name: "scimEnabled", Type: field.TypeBool, Default: false},
+		{Name: "whitelabelSettings", Type: field.TypeJSON, Nullable: true},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
 	// OrganizationEnterpriseSettingsTable holds the schema information for the "organization_enterprise_settings" table.
@@ -1950,6 +1975,47 @@ var (
 				Name:    "pageknowledge_organizationId_runId",
 				Unique:  false,
 				Columns: []*schema.Column{PageKnowledgeColumns[1], PageKnowledgeColumns[2]},
+			},
+		},
+	}
+	// PermissionGroupColumns holds the columns for the "permission_group" table.
+	PermissionGroupColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "deniedPermissions", Type: field.TypeJSON},
+		{Name: "isDefault", Type: field.TypeBool, Default: false},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PermissionGroupTable holds the schema information for the "permission_group" table.
+	PermissionGroupTable = &schema.Table{
+		Name:       "permission_group",
+		Columns:    PermissionGroupColumns,
+		PrimaryKey: []*schema.Column{PermissionGroupColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "permissiongroup_organizationId_name",
+				Unique:  true,
+				Columns: []*schema.Column{PermissionGroupColumns[1], PermissionGroupColumns[2]},
+			},
+		},
+	}
+	// PermissionGroupMemberColumns holds the columns for the "permission_group_member" table.
+	PermissionGroupMemberColumns = []*schema.Column{
+		{Name: "memberId", Type: field.TypeString},
+		{Name: "permissionGroupId", Type: field.TypeString},
+	}
+	// PermissionGroupMemberTable holds the schema information for the "permission_group_member" table.
+	PermissionGroupMemberTable = &schema.Table{
+		Name:       "permission_group_member",
+		Columns:    PermissionGroupMemberColumns,
+		PrimaryKey: []*schema.Column{PermissionGroupMemberColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "permissiongroupmember_permissionGroupId",
+				Unique:  false,
+				Columns: []*schema.Column{PermissionGroupMemberColumns[1]},
 			},
 		},
 	}
@@ -3731,6 +3797,7 @@ var (
 		BrandKitTable,
 		BrandProfileTable,
 		CalendarMutationTable,
+		CalendarNoteTable,
 		CampaignTable,
 		CampaignAssetTable,
 		CampaignPlanTable,
@@ -3775,6 +3842,8 @@ var (
 		OrganizationEnterpriseSettingsTable,
 		OutboxEventTable,
 		PageKnowledgeTable,
+		PermissionGroupTable,
+		PermissionGroupMemberTable,
 		PlatformAutoDmCampaignTable,
 		PlatformAutoDmDeliveryTable,
 		PlatformAutoDmOptOutTable,
@@ -3892,6 +3961,9 @@ func init() {
 	}
 	CalendarMutationTable.Annotation = &entsql.Annotation{
 		Table: "calendar_mutation",
+	}
+	CalendarNoteTable.Annotation = &entsql.Annotation{
+		Table: "calendar_note",
 	}
 	CampaignTable.Annotation = &entsql.Annotation{
 		Table: "campaign",
@@ -4025,6 +4097,12 @@ func init() {
 	}
 	PageKnowledgeTable.Annotation = &entsql.Annotation{
 		Table: "page_knowledge",
+	}
+	PermissionGroupTable.Annotation = &entsql.Annotation{
+		Table: "permission_group",
+	}
+	PermissionGroupMemberTable.Annotation = &entsql.Annotation{
+		Table: "permission_group_member",
 	}
 	PlatformAutoDmCampaignTable.Annotation = &entsql.Annotation{
 		Table: "platform_auto_dm_campaign",

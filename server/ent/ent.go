@@ -30,6 +30,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarnote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
@@ -74,6 +75,8 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroupmember"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmoptout"
@@ -212,6 +215,7 @@ func checkColumn(t, c string) error {
 			brandkit.Table:                        brandkit.ValidColumn,
 			brandprofile.Table:                    brandprofile.ValidColumn,
 			calendarmutation.Table:                calendarmutation.ValidColumn,
+			calendarnote.Table:                    calendarnote.ValidColumn,
 			campaign.Table:                        campaign.ValidColumn,
 			campaignasset.Table:                   campaignasset.ValidColumn,
 			campaignplan.Table:                    campaignplan.ValidColumn,
@@ -256,6 +260,8 @@ func checkColumn(t, c string) error {
 			organizationenterprisesettings.Table:  organizationenterprisesettings.ValidColumn,
 			outboxevent.Table:                     outboxevent.ValidColumn,
 			pageknowledge.Table:                   pageknowledge.ValidColumn,
+			permissiongroup.Table:                 permissiongroup.ValidColumn,
+			permissiongroupmember.Table:           permissiongroupmember.ValidColumn,
 			platformautodmcampaign.Table:          platformautodmcampaign.ValidColumn,
 			platformautodmdelivery.Table:          platformautodmdelivery.ValidColumn,
 			platformautodmoptout.Table:            platformautodmoptout.ValidColumn,

@@ -6,6 +6,7 @@ import { rateLimitHeaders } from '@/lib/api/platform-errors'
 import { AuthorizationError, resolveActiveOrganizationId } from '@/lib/auth/access'
 import { assertAuthEnvironment } from '@/lib/auth/environment'
 import {
+  authorizeAuthEndpointPermission,
   authorizeEnterpriseAuthRequest,
   logEnterpriseAuthRequest,
 } from '@/lib/auth/enterprise-guard'
@@ -224,6 +225,7 @@ const handler = toNextJsHandler({
 
       await ensureActiveOrganizationForSessionRead(request)
 
+      await authorizeAuthEndpointPermission(request)
       const enterpriseRequest = await authorizeEnterpriseAuthRequest(request)
       const response = await auth.handler(request)
       if (enterpriseRequest && response.ok) {

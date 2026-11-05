@@ -15,7 +15,7 @@ import type {
 import { z } from 'zod'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { type AuditMetadata, sanitizeAuditMetadata } from '@/lib/audit/metadata'
-import { hasPermission, type Permission } from '@/lib/auth/permissions'
+import { accessAllows, type Permission } from '@/lib/auth/permissions'
 
 /**
  * The agent tool executor (RFC 027).
@@ -314,7 +314,7 @@ async function call<INPUT, OUTPUT>(
     run.stopReason = 'LOOP_DETECTED'
     return fail('LOOP_DETECTED', `${spec.name} was called with the same input ${repeats} times.`)
   }
-  if (!hasPermission(run.access.role, spec.permission)) {
+  if (!accessAllows(run.access, spec.permission)) {
     return fail('DENIED', `This run is not allowed to call ${spec.name}.`)
   }
   const budget = spec.budget ?? spec.name

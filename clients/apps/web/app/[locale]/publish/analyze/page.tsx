@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { AnalyzeWorkspace } from '@/components/analyze/AnalyzeWorkspace'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { socialSetSchema } from '@/lib/api/contracts/social-sets'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 
@@ -25,7 +25,7 @@ export default async function AnalyzePage({
     >
       <AnalyzeWorkspace
         sets={sets.map((s) => socialSetSchema.parse(s))}
-        canManage={hasPermission(access.role, 'publish:manage')}
+        canManage={accessAllows(access, 'publish:manage')}
         initial={await searchParams}
       />
     </PlatformShell>

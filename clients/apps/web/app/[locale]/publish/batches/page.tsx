@@ -5,7 +5,7 @@ import { LibraryIcon } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
 import { NewBatchButton } from '@/components/write/batch/NewBatchButton'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { listContentBatches } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
@@ -26,7 +26,7 @@ export default async function BatchesPage({
     listContentBatches(access.tenant),
     listSocialSets(access.tenant),
   ])
-  const canEdit = hasPermission(access.role, 'artifact:edit')
+  const canEdit = accessAllows(access, 'artifact:edit')
   return (
     <PlatformShell
       campaignsEnabled={access.campaignWorkflowEnabled}

@@ -22,6 +22,7 @@ type SettingsPlatformStore interface {
 	RequestAccountDeletion(context.Context, product.Actor, string) (*product.AccountDeletionStatus, error)
 	CancelAccountDeletion(context.Context, product.Actor) (*product.AccountDeletionStatus, error)
 	ListSocialSets(context.Context, product.Actor) (*product.SocialSetList, error)
+	GetChannelCapacity(context.Context, product.Actor) (*product.ChannelCapacity, error)
 	GetSocialSet(context.Context, product.Actor, string) (*product.SocialSetRecord, error)
 	CreateSocialSet(context.Context, product.Actor, product.SocialSetInput) (*product.SocialSetRecord, error)
 	UpdateSocialSet(context.Context, product.Actor, string, product.SocialSetUpdate) (*product.SocialSetRecord, error)

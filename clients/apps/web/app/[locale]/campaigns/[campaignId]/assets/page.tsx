@@ -9,7 +9,7 @@ import { ProduceControl } from '@/components/launch/assets/ProduceControl'
 import { CodeHighlights } from '@/components/code-studio/CodeHighlights'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
 import { critiqueSchema } from '@/lib/ai/launch/critique'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import type { TenantContext } from '@/lib/auth/access'
 import { latestLaunchRuns } from '@/lib/launch/runs'
 import { getCampaignPlans, getReleaseSpecs } from '@/lib/launch/store'
@@ -115,7 +115,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
     ),
   ])
 
-  const canEdit = campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:create')
+  const canEdit = campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:create')
   const aiConfigured = isCampaignStudioConfigured()
   const produce = runs.produce
 
@@ -142,7 +142,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
           aiConfigured,
           campaignId: campaign.id,
           canApprove:
-            campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:approve'),
+            campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:approve'),
           canEdit,
         }}
         plan={plan?.content ?? null}

@@ -2,7 +2,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { AnalyzeNav } from '@/components/plan/WorkspaceNav'
 import { WriteFrame } from '@/components/write/WriteFrame'
 import { SocialAnalytics } from '@/components/write/analytics'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK } from '@/lib/backend/sdk'
 import { requireDraftsPageAccess } from '../../../drafts/page-access'
 import { loadWrite } from '../../write-data'
@@ -52,10 +52,10 @@ export default async function AnalyzePage({
         section="analyze"
         data={data}
         campaignsEnabled={access.campaignWorkflowEnabled && access.hasPaidPlan}
-        canEdit={hasPermission(access.role, 'artifact:edit')}
-        canManageSets={hasPermission(access.role, 'workspace:update')}
-        canPublish={hasPermission(access.role, 'publish:manage')}
-        canReview={hasPermission(access.role, 'release:approve')}
+        canEdit={accessAllows(access, 'artifact:edit')}
+        canManageSets={accessAllows(access, 'workspace:update')}
+        canPublish={accessAllows(access, 'publish:manage')}
+        canReview={accessAllows(access, 'release:approve')}
       >
         <AnalyzeNav
           active="Recorded observations and CSV"
@@ -65,7 +65,7 @@ export default async function AnalyzePage({
           observations={observations.items}
           recommendations={recommendations.items}
           timeZone={data.activeSet?.timeZone}
-          canManage={hasPermission(access.role, 'connection:manage')}
+          canManage={accessAllows(access, 'connection:manage')}
           range={range}
           rangeError={rangeError}
           socialSetId={data.activeSet?.id}

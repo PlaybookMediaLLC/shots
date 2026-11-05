@@ -2,7 +2,7 @@ import 'server-only'
 
 import { randomUUID } from 'node:crypto'
 import type { OrganizationAccess } from '@/lib/auth/access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { backendSDK } from '@/lib/backend/sdk'
 import { LaunchError } from '@/lib/launch/store'
 import { createRelease } from '@/lib/tenant/releases'
@@ -91,5 +91,5 @@ export async function startFirstCampaign(
     productSurfaceId: surface.id,
     releaseId: release.id,
   })
-  return { campaignId: campaign.id, canApprove: hasPermission(access.role, 'release:approve') }
+  return { campaignId: campaign.id, canApprove: accessAllows(access, 'release:approve') }
 }

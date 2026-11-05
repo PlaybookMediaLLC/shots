@@ -17,6 +17,7 @@ function fakeRun(
   role: OrganizationRole,
   options: {
     audit?: () => Promise<unknown>
+    deniedPermissions?: readonly string[]
     launchRunId?: string
     recordStep?: () => Promise<unknown>
     signal?: AbortSignal
@@ -26,6 +27,7 @@ function fakeRun(
   const steps: BackendLaunchRunStepInput[] = []
   const run = createToolRun({
     access: {
+      deniedPermissions: options.deniedPermissions ?? [],
       organizationId: 'org_1',
       principal: { display: 'ada@example.com', kind: 'session', sessionId: 's_1', userId: 'u_1' },
       requestId: 'req_1',
@@ -94,6 +96,27 @@ test('a viewer is denied a tool that needs release:create, and the denial is aud
   assert.equal(events.length, 1)
   assert.equal(events[0]!.outcome, 'DENIED')
   assert.equal(events[0]!.metadata?.errorCode, 'DENIED')
+})
+
+test('a permission group stops a tool the role would allow', async () => {
+  const { run } = fakeRun('owner', { deniedPermissions: ['release:create'] })
+  let ran = false
+  const result = await call(
+    run,
+    spec({
+      execute: () => {
+        ran = true
+        return { ok: true, value: 1 }
+      },
+    }),
+    { value: 1 }
+  )
+  assert.equal(ran, false)
+  assert.deepEqual(result, {
+    code: 'DENIED',
+    error: 'This run is not allowed to call echo.',
+    ok: false,
+  })
 })
 
 test('a viewer may still call read tools', async () => {

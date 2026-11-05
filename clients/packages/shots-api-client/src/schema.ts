@@ -364,6 +364,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List calendar notes
+         * @description Date-only notes visible to everyone in the workspace, at most 100 days at a time.
+         */
+        get: operations["listCalendarNotes"];
+        put?: never;
+        /**
+         * Add a calendar note
+         * @description Adds a note to a date. A note is not a post and never publishes.
+         */
+        post: operations["createCalendarNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a calendar note
+         * @description Deletes a note from this workspace.
+         */
+        delete: operations["deleteCalendarNote"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a calendar note
+         * @description Changes a note's title and color. Its date stays.
+         */
+        patch: operations["updateCalendarNote"];
+        trace?: never;
+    };
     "/api/v1/analytics/{id}": {
         parameters: {
             query?: never;
@@ -476,6 +524,26 @@ export interface paths {
          * @description Reads the current adapter configuration and product rollout gates for the active workspace. Only signed-in owners/admins may inspect it; API keys cannot connect accounts. No app IDs, secrets or credentials are returned. Available means a connection can be attempted, not that provider approval, account grants or publishing capabilities have been verified. Subscription capacity, target ownership and occupied slots are rechecked when an attempt starts and commits. The response is not cached.
          */
         get: operations["getSocialConnectionAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social-connection-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read social account capacity
+         * @description Counts active accounts across the workspace. A workspace whose plan does not stand may hold none. Capacity is rechecked when an account connects.
+         */
+        get: operations["getSocialConnectionCapacity"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1847,6 +1915,32 @@ export interface components {
                 timeZone: string;
             }[];
         };
+        CalendarNoteList: {
+            items: {
+                id: string;
+                /** Format: date */
+                day: string;
+                title: string;
+                /** @enum {string} */
+                color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+        };
+        CalendarNote: {
+            id: string;
+            /** Format: date */
+            day: string;
+            title: string;
+            /** @enum {string} */
+            color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         AnalyticsReport: {
             accountId: string;
             name: string;
@@ -2006,6 +2100,10 @@ export interface components {
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
+        };
+        SocialConnectionCapacity: {
+            held: number;
+            limit: number | null;
         };
         BlueskyConnectionBeginRequest: {
             /** @enum {string} */
@@ -4004,7 +4102,7 @@ export interface components {
             /** @enum {string} */
             currentPlan: "free" | "pro" | "business" | "enterprise";
             /** @enum {string} */
-            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
+            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "enterprise:white-label" | "enterprise:permission-groups" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
             /** @enum {string} */
             requiredPlan: "free" | "pro" | "business" | "enterprise";
         };
@@ -6084,6 +6182,239 @@ export interface operations {
             };
         };
     };
+    listCalendarNotes: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notes in the range. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNoteList"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    /** @enum {string} */
+                    color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                    /** Format: date */
+                    day: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The note. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNote"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    /** @enum {string} */
+                    color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                };
+            };
+        };
+        responses: {
+            /** @description The note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNote"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getAccountAnalytics: {
         parameters: {
             query: {
@@ -6493,6 +6824,53 @@ export interface operations {
                 };
             };
             /** @description The workspace binding or adapter availability could not be verified. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSocialConnectionCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current count and limit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialConnectionCapacity"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8798,7 +9176,9 @@ export interface operations {
     listContentDrafts: {
         parameters: {
             query?: {
+                connectionId?: string;
                 cursor?: string;
+                from?: string;
                 kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
                 limit?: number;
                 search?: string;
@@ -8806,6 +9186,7 @@ export interface operations {
                 sort?: "updated_desc" | "updated_asc" | "created_desc" | "created_asc";
                 status?: "draft" | "scheduled" | "archived";
                 tagId?: string;
+                to?: string;
                 view?: "drafts" | "posted" | "archived";
             };
             header?: never;

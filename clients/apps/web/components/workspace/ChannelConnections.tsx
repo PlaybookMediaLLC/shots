@@ -2,6 +2,7 @@
 
 import { UsersIcon } from '@phosphor-icons/react/dist/ssr/Users'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
+import { useQuery } from '@tanstack/react-query'
 import type { ChannelConnection, SocialAccountHealth } from 'screenshot-studio-backend-sdk'
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -17,7 +18,10 @@ import {
   useSocialSets,
 } from '@/components/settings/social-sets/api'
 import { useSocialSetScope } from '@/components/settings/social-sets/scope'
-import { providerReady, useConnectionAvailability } from '@/components/social-connections/availability'
+import {
+  providerReady,
+  useConnectionAvailability,
+} from '@/components/social-connections/availability'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -35,10 +39,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { socialSetHref } from '@/components/workspace/settings-sections'
+import { channelCapacitySchema } from '@/lib/api/contracts/social-availability'
 import { socialSetSchema } from '@/lib/api/contracts/social-sets'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { settingsErrorMessage } from '@/lib/settings/client'
@@ -47,10 +58,21 @@ import { cn } from '@/lib/utils'
 import { getErrorMessage } from './settings-client'
 
 /** The order platforms are listed in: most used first. */
-const ORDER = ['x', 'tiktok', 'linkedin', 'linkedin-page', 'instagram-standalone', 'threads', 'youtube', 'mastodon']
+const ORDER = [
+  'x',
+  'tiktok',
+  'linkedin',
+  'linkedin-page',
+  'instagram-standalone',
+  'threads',
+  'youtube',
+  'mastodon',
+]
 
 /** One row per platform the connect routes support, from the same registry the brand pages use. */
-const ROWS = [...CONNECT_PROVIDERS].sort((a, b) => ORDER.indexOf(a.provider) - ORDER.indexOf(b.provider))
+const ROWS = [...CONNECT_PROVIDERS].sort(
+  (a, b) => ORDER.indexOf(a.provider) - ORDER.indexOf(b.provider)
+)
 
 /** Platform names that are another row's platform. */
 const ALIASES: Record<string, string> = {
@@ -158,6 +180,13 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
   const [menu, setMenu] = useState<string | null>(null)
   const [removing, setRemoving] = useState<ChannelConnection | null>(null)
   const [refreshing, setRefreshing] = useState<string | null>(null)
+  // A new or removed account changes the count too.
+  const capacity = useQuery({
+    enabled: canManage && scope.ready,
+    queryFn: ({ signal }) =>
+      scope.request('/api/v1/social-connection-capacity', channelCapacitySchema, { signal }),
+    queryKey: [...scope.key, 'capacity', connections?.length],
+  }).data
 
   const load = useCallback(
     () =>
@@ -189,10 +218,13 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
     (filter === 'unassigned' && !connection.socialSetId) ||
     filter === `brand:${connection.socialSetId}`
   const accountsFor = (platform: string) =>
-    (connections ?? []).filter((connection) => rowOf(connection.platform) === platform && visible(connection))
+    (connections ?? []).filter(
+      (connection) => rowOf(connection.platform) === platform && visible(connection)
+    )
   // Accounts on a platform with no Connect row here, such as Bluesky, which connects from a brand.
   const others = (connections ?? []).filter(
-    (connection) => !ROWS.some((row) => row.platform === rowOf(connection.platform)) && visible(connection)
+    (connection) =>
+      !ROWS.some((row) => row.platform === rowOf(connection.platform)) && visible(connection)
   )
 
   // Back from a provider: show the new account, and offer a brand when it has none.
@@ -299,7 +331,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <DropdownMenuContent align="start" className="w-64">
             <DropdownMenuLabel className="grid gap-0.5">
               <span>{name}</span>
-              <span className="text-xs font-normal text-muted-foreground">{HEALTH_GUIDANCE[health]}</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                {HEALTH_GUIDANCE[health]}
+              </span>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             {profile ? (
@@ -316,7 +350,10 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
               </DropdownMenuItem>
             ) : null}
             {canManage ? (
-              <DropdownMenuItem disabled={refreshing !== null} onSelect={() => void refresh([connection])}>
+              <DropdownMenuItem
+                disabled={refreshing !== null}
+                onSelect={() => void refresh([connection])}
+              >
                 Refresh
               </DropdownMenuItem>
             ) : null}
@@ -324,12 +361,21 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>Assign to brand</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
-                  <DropdownMenuRadioGroup onValueChange={(setId) => void assign(connection, setId)} value="">
+                  <DropdownMenuRadioGroup
+                    onValueChange={(setId) => void assign(connection, setId)}
+                    value=""
+                  >
                     {open.map(({ set, taken }) => (
                       <DropdownMenuRadioItem disabled={taken} key={set.id} value={set.id}>
-                        <span aria-hidden className="size-2 rounded-full" style={{ backgroundColor: set.color }} />
+                        <span
+                          aria-hidden
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: set.color }}
+                        />
                         {set.name}
-                        {taken ? <span className="ml-auto text-xs text-muted-foreground">Has one</span> : null}
+                        {taken ? (
+                          <span className="ml-auto text-xs text-muted-foreground">Has one</span>
+                        ) : null}
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>
@@ -373,7 +419,11 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
             <TooltipContent>{brand.name}</TooltipContent>
           </Tooltip>
         ) : connection.socialSetId ? (
-          <span aria-label="In a private brand" className="size-2.5 shrink-0 rounded-full ring-1 ring-muted-foreground" role="img" />
+          <span
+            aria-label="In a private brand"
+            className="size-2.5 shrink-0 rounded-full ring-1 ring-muted-foreground"
+            role="img"
+          />
         ) : null}
         {canManage && needsReconnect(health) && reconnect ? (
           <Button asChild className="h-6 rounded-full px-2 text-xs" size={null} variant="outline">
@@ -397,7 +447,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
   }
 
   const removingBrand = removing ? brandOf(removing) : undefined
-  const removingName = removing ? removing.displayName || removing.handle || removing.externalAccountId : ''
+  const removingName = removing
+    ? removing.displayName || removing.handle || removing.externalAccountId
+    : ''
   const refreshable = shown.filter((row) => accountsFor(row.platform).length > 0)
   const lastChanged = (platform: string) =>
     accountsFor(platform)
@@ -421,8 +473,8 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <AlertTitle>Connecting for the workspace</AlertTitle>
           <AlertDescription>
             <p>
-              Accounts you connect here are shared with everyone in this workspace. Assign each one to a
-              publishing brand to post from it.
+              Accounts you connect here are shared with everyone in this workspace. Assign each one
+              to a publishing brand to post from it.
             </p>
             <Button
               className="mt-2 h-auto p-0"
@@ -441,6 +493,11 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <h3 className="flex items-center gap-2 text-ui-lg font-medium text-foreground">
             Accounts
             {attention.length ? <Pill tone="yellow">{attention.length} need attention</Pill> : null}
+            {capacity && capacity.limit !== null ? (
+              <Pill tone={capacity.held >= capacity.limit ? 'yellow' : undefined}>
+                {capacity.held} of {capacity.limit} accounts
+              </Pill>
+            ) : null}
           </h3>
           <div className="ml-auto flex flex-wrap items-center gap-3">
             <Label className="flex items-center gap-2 text-sm font-normal">
@@ -469,7 +526,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
             Only owners and admins can connect and manage accounts.
           </p>
         ) : connections === null ? (
-          error ? null : <p className="px-4 py-3 text-sm text-muted-foreground">Loading channels…</p>
+          error ? null : (
+            <p className="px-4 py-3 text-sm text-muted-foreground">Loading channels…</p>
+          )
         ) : (
           <>
             {shown.map((row) => {
@@ -483,7 +542,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                   key={row.provider}
                 >
                   <div className="flex items-center gap-2">
-                    {channel ? <ChannelIcon channel={channel} className="size-7 shrink-0 text-foreground" /> : null}
+                    {channel ? (
+                      <ChannelIcon channel={channel} className="size-7 shrink-0 text-foreground" />
+                    ) : null}
                     <span className="text-sm font-medium sm:sr-only">{row.label}</span>
                   </div>
                   <Button asChild className="w-full" size="sm">
@@ -551,7 +612,12 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
             <>
               <p>
                 {removingName} stops publishing from Shots
-                {removingBrand ? ` and leaves ${removingBrand.name}` : removing.socialSetId ? ' and leaves its private brand' : ''}.
+                {removingBrand
+                  ? ` and leaves ${removingBrand.name}`
+                  : removing.socialSetId
+                    ? ' and leaves its private brand'
+                    : ''}
+                .
               </p>
               <p>
                 {removing.queuedPosts

@@ -99,6 +99,16 @@ func ScimEnabledNEQ(v bool) predicate.OrganizationEnterpriseSettings {
 	return predicate.OrganizationEnterpriseSettings(sql.FieldNEQ(FieldScimEnabled, v))
 }
 
+// WhitelabelSettingsIsNil applies the IsNil predicate on the "whitelabel_settings" field.
+func WhitelabelSettingsIsNil() predicate.OrganizationEnterpriseSettings {
+	return predicate.OrganizationEnterpriseSettings(sql.FieldIsNull(FieldWhitelabelSettings))
+}
+
+// WhitelabelSettingsNotNil applies the NotNil predicate on the "whitelabel_settings" field.
+func WhitelabelSettingsNotNil() predicate.OrganizationEnterpriseSettings {
+	return predicate.OrganizationEnterpriseSettings(sql.FieldNotNull(FieldWhitelabelSettings))
+}
+
 // UpdatedAtEQ applies the EQ predicate on the "updated_at" field.
 func UpdatedAtEQ(v time.Time) predicate.OrganizationEnterpriseSettings {
 	return predicate.OrganizationEnterpriseSettings(sql.FieldEQ(FieldUpdatedAt, v))

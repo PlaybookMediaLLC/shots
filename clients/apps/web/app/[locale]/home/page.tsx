@@ -18,7 +18,7 @@ import { TemplateHighlights } from '@/components/platform-hub/TemplateBrowser'
 import { requirePaidPageAccess, sessionTenant } from '@/lib/auth/page-access'
 import type { OrganizationAccess } from '@/lib/auth/access'
 import { Suspense } from 'react'
-import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
+import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { roleLabels } from '@/lib/auth/role-descriptions'
 import { StartPostAction } from '@/components/platform-hub/StartPostAction'
 import { QueueNudge } from '@/components/platform-hub/QueueNudge'
@@ -48,7 +48,7 @@ export default async function HomePage({
   const access = await requirePaidPageAccess(requestHeaders, locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
-  const can = (permission: Permission) => hasPermission(access.role, permission)
+  const can = (permission: Permission) => accessAllows(access, permission)
   const starters = [
     {
       title: 'Create a visual',

@@ -6,6 +6,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // PageAccessSnapshot contains only what the signed-in page gate needs.
@@ -15,6 +16,12 @@ type PageAccessSnapshot struct {
 	Count     int              `json:"count"`
 	Workspace *Workspace       `json:"workspace"`
 	Features  map[string]bool  `json:"features"`
+	// DeniedPermissions is what the member's permission group subtracts from
+	// their role in the active workspace.
+	DeniedPermissions []string `json:"deniedPermissions"`
+	// Whitelabel is the active organization's branding, set only while its
+	// plan grants the feature.
+	Whitelabel *whitelabel.Settings `json:"whitelabel"`
 }
 
 func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAccessSnapshot, error) {
@@ -26,7 +33,7 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 	if err != nil {
 		return nil, err
 	}
-	result := &PageAccessSnapshot{Count: len(workspaces), Features: map[string]bool{}}
+	result := &PageAccessSnapshot{Count: len(workspaces), DeniedPermissions: []string{}, Features: map[string]bool{}}
 	if len(workspaces) == 0 {
 		return result, nil
 	}
@@ -49,6 +56,9 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 	if err := c.AuthorizeRead(ctx, actor); err != nil {
 		return nil, err
 	}
+	if result.DeniedPermissions, err = deniedPermissions(ctx, c.client, actor.OrganizationID, actor.UserID, result.Active.Role); err != nil {
+		return nil, err
+	}
 	result.Workspace, err = c.GetWorkspace(ctx, actor.OrganizationID)
 	if err != nil {
 		return nil, err
@@ -61,5 +71,10 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 		return nil, err
 	}
 	_, _, result.Features = evaluateBootstrapEntitlement(entitlement, time.Now().UTC())
+	if result.Features[WhitelabelFeature] {
+		if result.Whitelabel, err = c.storedWhitelabel(ctx, actor.OrganizationID); err != nil {
+			return nil, err
+		}
+	}
 	return result, nil
 }

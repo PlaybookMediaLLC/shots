@@ -628,7 +628,11 @@ export type BackendCurrentUser = {
   name: string | null
 }
 
-export type BackendActiveAccess = { organizationId: string; role: string }
+export type BackendActiveAccess = {
+  deniedPermissions?: string[]
+  organizationId: string
+  role: string
+}
 
 export type BackendSupportGrant = { grantId: string; organizationId: string }
 
@@ -1381,7 +1385,11 @@ export type BackendBatchValidation = {
 }
 
 export type BackendContentDraftListQuery = {
+  /** A draft with a live post to this account, or, with none, meant for it. */
+  connectionId?: string
   cursor?: string
+  /** From this instant, with `to` exclusive, on a live post's or a plan's time. */
+  from?: string
   kind?: BackendDraftKind
   limit?: number
   search?: string
@@ -1389,6 +1397,7 @@ export type BackendContentDraftListQuery = {
   sort?: 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc'
   status?: BackendContentDraftStatus
   tagId?: string
+  to?: string
   view?: 'drafts' | 'posted' | 'archived'
 }
 
@@ -1666,6 +1675,31 @@ export type BackendAuditDrainInput = {
 }
 
 export type BackendAuditRetention = { legalHold: boolean; retentionDays: number }
+
+/** A permission group: permissions subtracted from its members' roles. */
+export type BackendPermissionGroup = {
+  createdAt: string
+  deniedPermissions: string[]
+  id: string
+  isDefault: boolean
+  memberIds: string[]
+  name: string
+  updatedAt: string
+}
+
+export type BackendPermissionGroupInput = Pick<
+  BackendPermissionGroup,
+  'deniedPermissions' | 'isDefault' | 'name'
+>
+
+/** An organization's app branding. An empty field keeps the Shots default. */
+export type BackendWhitelabelSettings = {
+  accentColor?: string
+  brandName?: string
+  faviconUrl?: string
+  logoUrl?: string
+  primaryColor?: string
+}
 
 /** Caller fingerprint recorded with an audit-control change. */
 export type BackendAuditRequest = { ipHash?: string | null; userAgentSummary?: string | null }
@@ -3113,6 +3147,29 @@ export class ScreenshotStudioBackendSDK {
   async mutateCalendar(input: unknown) {
     return this.request<unknown>('v1/calendar/mutations', { body: input, method: 'POST' })
   }
+  /** How many accounts the workspace holds and may hold; a null limit means none. */
+  async socialConnectionCapacity() {
+    return this.request<{ held: number; limit: number | null }>('v1/social-connection-capacity')
+  }
+  /** A workspace's date-only notes on the days from..to, inclusive. */
+  async listCalendarNotes(from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    return this.request<unknown>(`v1/calendar/notes?${params}`)
+  }
+  async createCalendarNote(input: unknown) {
+    return this.request<unknown>('v1/calendar/notes', { body: input, method: 'POST' })
+  }
+  async updateCalendarNote(id: string, input: unknown) {
+    return this.request<unknown>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PATCH',
+    })
+  }
+  async deleteCalendarNote(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
   async getAnalytics(id: string, query: Record<string, string | number | undefined>) {
     const params = new URLSearchParams(
       Object.entries(query)
@@ -4335,6 +4392,56 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  async listPermissionGroups() {
+    return this.request<{ groups: BackendPermissionGroup[] }>('v1/permission-groups')
+  }
+
+  async createPermissionGroup(input: BackendPermissionGroupInput, audit?: BackendAuditRequest) {
+    return this.request<BackendPermissionGroup>('v1/permission-groups', {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'POST',
+    })
+  }
+
+  async updatePermissionGroup(
+    id: string,
+    input: BackendPermissionGroupInput,
+    audit?: BackendAuditRequest
+  ) {
+    return this.request<BackendPermissionGroup>(`v1/permission-groups/${encodeURIComponent(id)}`, {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'PUT',
+    })
+  }
+
+  async deletePermissionGroup(id: string, audit?: BackendAuditRequest) {
+    return this.request<{ deleted: boolean }>(`v1/permission-groups/${encodeURIComponent(id)}`, {
+      headers: auditRequestHeaders(audit),
+      method: 'DELETE',
+    })
+  }
+
+  async setPermissionGroupMembers(id: string, memberIds: string[], audit?: BackendAuditRequest) {
+    return this.request<BackendPermissionGroup>(
+      `v1/permission-groups/${encodeURIComponent(id)}/members`,
+      { body: { memberIds }, headers: auditRequestHeaders(audit), method: 'PUT' }
+    )
+  }
+
+  async getWhitelabel() {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel')
+  }
+
+  async updateWhitelabel(input: BackendWhitelabelSettings, audit?: BackendAuditRequest) {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel', {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'PUT',
+    })
+  }
+
   /** Facade-only: resolves a source app before its webhook signature is verified. */
   async getWebhookSource(sourceAppId: string) {
     return this.request<BackendWebhookSource>(
@@ -4950,8 +5057,10 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{
       active: ListedWorkspace | null
       count: number
+      deniedPermissions?: string[]
       workspace: Workspace | null
       features: Record<string, boolean>
+      whitelabel: BackendWhitelabelSettings | null
     }>('v1/page-access')
   }
 

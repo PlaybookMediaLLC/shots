@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 // OrganizationEnterpriseSettings is the model entity for the OrganizationEnterpriseSettings schema.
@@ -21,6 +23,8 @@ type OrganizationEnterpriseSettings struct {
 	SSOEnabled bool `json:"sso_enabled,omitempty"`
 	// ScimEnabled holds the value of the "scim_enabled" field.
 	ScimEnabled bool `json:"scim_enabled,omitempty"`
+	// WhitelabelSettings holds the value of the "whitelabel_settings" field.
+	WhitelabelSettings whitelabel.Settings `json:"whitelabel_settings,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 	selectValues sql.SelectValues
@@ -31,6 +35,8 @@ func (*OrganizationEnterpriseSettings) scanValues(columns []string) ([]any, erro
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case organizationenterprisesettings.FieldWhitelabelSettings:
+			values[i] = new([]byte)
 		case organizationenterprisesettings.FieldSSOEnabled, organizationenterprisesettings.FieldScimEnabled:
 			values[i] = new(sql.NullBool)
 		case organizationenterprisesettings.FieldID:
@@ -69,6 +75,14 @@ func (_m *OrganizationEnterpriseSettings) assignValues(columns []string, values 
 				return fmt.Errorf("unexpected type %T for field scim_enabled", values[i])
 			} else if value.Valid {
 				_m.ScimEnabled = value.Bool
+			}
+		case organizationenterprisesettings.FieldWhitelabelSettings:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field whitelabel_settings", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.WhitelabelSettings); err != nil {
+					return fmt.Errorf("unmarshal field whitelabel_settings: %w", err)
+				}
 			}
 		case organizationenterprisesettings.FieldUpdatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -117,6 +131,9 @@ func (_m *OrganizationEnterpriseSettings) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("scim_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ScimEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("whitelabel_settings=")
+	builder.WriteString(fmt.Sprintf("%v", _m.WhitelabelSettings))
 	builder.WriteString(", ")
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
