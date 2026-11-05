@@ -201,6 +201,17 @@ backend's value), `FRONTEND_URL`, `SCREENSHOT_API_URL`, `SCREENSHOT_API_KEY`,
 `DCR_VERIFIED_DOMAINS`, `OPENAI_OAUTH_CLIENT_ID`, and `OPENAI_APP_CHALLANGE`.
 Per-key call limits use the product API's `REDIS_URL`.
 
+Authenticated capture stays off unless the API and the worker both have
+`PLATFORM_CAPTURE_CDP_URL` (Browser Run's account base,
+`https://api.cloudflare.com/client/v4/accounts/<id>/browser-run`),
+`PLATFORM_CAPTURE_CDP_TOKEN` (a Cloudflare API token with Browser Rendering - Edit,
+separate from the design renderer's), and `PLATFORM_CAPTURE_STATE_KEY` (32 bytes,
+base64). `PLATFORM_CAPTURE_STATE_KEY_PREVIOUS` reads state during a key rotation;
+state is re-encrypted on its next validated use. `PLATFORM_CAPTURE_STATE_MAX_AGE`
+(a Go duration, default `24h`) is how long saved sign-in state is kept before a
+person must sign in again. The worker registers the `platform-capture` queue only
+when capture is configured. See [authenticated capture](../docs/rfcs/authenticated-release-capture-review.md#10-implementation-status).
+
 ## Social code (`internal/social`)
 
 `internal/social` is a library, not a service: the provider adapters, the

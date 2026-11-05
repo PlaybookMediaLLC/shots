@@ -142,9 +142,14 @@ func (c *Configuration) automationRenderCreatives(ctx context.Context, org, runI
 	if err := c.requireWorkspaceFeature(ctx, org, "campaign:workflow"); err != nil {
 		return automation.Outputs{}, err
 	}
-	captureAssetID, err := c.currentCapture(ctx, org, action.SurfaceID)
-	if err != nil {
-		return automation.Outputs{}, err
+	// A capture taken earlier in this run wins, with no fallback to the latest
+	// image; a graph without one keeps the meaning it was activated with.
+	captureAssetID := input.CaptureAssetID
+	if captureAssetID == "" {
+		var err error
+		if captureAssetID, err = c.currentCapture(ctx, org, action.SurfaceID); err != nil {
+			return automation.Outputs{}, err
+		}
 	}
 	headline := strings.TrimSpace(event.Snapshot.Title)
 	if utf8.RuneCountInString(headline) > 60 {

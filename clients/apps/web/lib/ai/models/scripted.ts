@@ -815,6 +815,7 @@ const SUBMIT_TOOLS = [
   'submitCaptions',
   'submitTranslations',
   'submitCopySuggestions',
+  'submitGridLines',
 ] as const
 
 // ------------------------------------------------- store screenshots --
@@ -875,7 +876,9 @@ export function createScriptedModel(modelId: string): LanguageModelV4 {
           return respond([{ text: 'Submitted.', type: 'text' }])
         }
         const input =
-          submit === 'submitRefinement'
+          submit === 'submitGridLines'
+            ? { lines: ['Scripted suggestion one', 'Scripted suggestion two'] }
+            : submit === 'submitRefinement'
             ? scriptRefinement(text, systemText(options))
             : submit === 'submitSpec'
             ? scriptSpec(text)

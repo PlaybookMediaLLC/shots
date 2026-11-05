@@ -60,6 +60,8 @@ func (SurfaceCapture) Fields() []ent.Field {
 		field.String("source_id").StorageKey("sourceId").Optional().Nillable().Immutable(),
 		field.Time("captured_at").StorageKey("capturedAt").Default(time.Now).Immutable(),
 		field.Time("superseded_at").StorageKey("supersededAt").Optional().Nillable(),
+		// ObservedRevision is the commit the app reported just before this capture.
+		field.String("observed_revision").StorageKey("observedRevision").Optional().Nillable().Immutable(),
 	}
 }
 func (SurfaceCapture) Indexes() []ent.Index {

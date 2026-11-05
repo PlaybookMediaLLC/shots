@@ -84,6 +84,11 @@ func Fingerprint(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldFingerprint, v))
 }
 
+// SourceKey applies equality check predicate on the "source_key" field. It's identical to SourceKeyEQ.
+func SourceKey(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldEQ(FieldSourceKey, v))
+}
+
 // Position applies equality check predicate on the "position" field. It's identical to PositionEQ.
 func Position(v int) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldPosition, v))
@@ -369,6 +374,71 @@ func FingerprintContainsFold(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldContainsFold(FieldFingerprint, v))
 }
 
+// SourceKeyEQ applies the EQ predicate on the "source_key" field.
+func SourceKeyEQ(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldEQ(FieldSourceKey, v))
+}
+
+// SourceKeyNEQ applies the NEQ predicate on the "source_key" field.
+func SourceKeyNEQ(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNEQ(FieldSourceKey, v))
+}
+
+// SourceKeyIn applies the In predicate on the "source_key" field.
+func SourceKeyIn(vs ...string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldIn(FieldSourceKey, vs...))
+}
+
+// SourceKeyNotIn applies the NotIn predicate on the "source_key" field.
+func SourceKeyNotIn(vs ...string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNotIn(FieldSourceKey, vs...))
+}
+
+// SourceKeyGT applies the GT predicate on the "source_key" field.
+func SourceKeyGT(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldGT(FieldSourceKey, v))
+}
+
+// SourceKeyGTE applies the GTE predicate on the "source_key" field.
+func SourceKeyGTE(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldGTE(FieldSourceKey, v))
+}
+
+// SourceKeyLT applies the LT predicate on the "source_key" field.
+func SourceKeyLT(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldLT(FieldSourceKey, v))
+}
+
+// SourceKeyLTE applies the LTE predicate on the "source_key" field.
+func SourceKeyLTE(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldLTE(FieldSourceKey, v))
+}
+
+// SourceKeyContains applies the Contains predicate on the "source_key" field.
+func SourceKeyContains(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldContains(FieldSourceKey, v))
+}
+
+// SourceKeyHasPrefix applies the HasPrefix predicate on the "source_key" field.
+func SourceKeyHasPrefix(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldHasPrefix(FieldSourceKey, v))
+}
+
+// SourceKeyHasSuffix applies the HasSuffix predicate on the "source_key" field.
+func SourceKeyHasSuffix(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldHasSuffix(FieldSourceKey, v))
+}
+
+// SourceKeyEqualFold applies the EqualFold predicate on the "source_key" field.
+func SourceKeyEqualFold(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldEqualFold(FieldSourceKey, v))
+}
+
+// SourceKeyContainsFold applies the ContainsFold predicate on the "source_key" field.
+func SourceKeyContainsFold(v string) predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldContainsFold(FieldSourceKey, v))
+}
+
 // PositionEQ applies the EQ predicate on the "position" field.
 func PositionEQ(v int) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldEQ(FieldPosition, v))
@@ -472,6 +542,16 @@ func CaptionEqualFold(v string) predicate.ContentBatchItem {
 // CaptionContainsFold applies the ContainsFold predicate on the "caption" field.
 func CaptionContainsFold(v string) predicate.ContentBatchItem {
 	return predicate.ContentBatchItem(sql.FieldContainsFold(FieldCaption, v))
+}
+
+// GridIsNil applies the IsNil predicate on the "grid" field.
+func GridIsNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldIsNull(FieldGrid))
+}
+
+// GridNotNil applies the NotNil predicate on the "grid" field.
+func GridNotNil() predicate.ContentBatchItem {
+	return predicate.ContentBatchItem(sql.FieldNotNull(FieldGrid))
 }
 
 // DraftIDEQ applies the EQ predicate on the "draft_id" field.

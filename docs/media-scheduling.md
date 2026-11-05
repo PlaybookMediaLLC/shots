@@ -15,7 +15,8 @@ in [social publishing verification](social-publishing-verification.md).
 | One photo or video with a caption | Write composer | Upload or pick an asset, write a Unicode caption, set per-platform text and options in platform versions, preview, and schedule to one or more accounts at a local time in an IANA zone or in the next queue slot. Reschedule, cancel, or add accounts to a scheduled draft. |
 | One post with several attachments | Write composer, Manage media | Attach up to each destination's limit, reorder, move between thread posts. The order in the body is the order the provider receives. |
 | A PDF to LinkedIn | Composer document option, bulk batch | Sent as the post's LinkedIn document; refused on every other destination. |
-| Many separate posts | Publish → Bulk schedule (`/publish/batches`) | A durable batch of up to 50 items, each one post with its own media, caption, accounts and time. Files and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
+| Many separate posts | Publish → Bulk tools (`/publish/batches`) | A durable batch of up to 100 items, each one post with its own media, caption, accounts and time. Files, folders and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
+| Grid videos | Publish → Bulk tools → Grid videos | Captions and content items assemble into concepts of four labelled images, filled by upload or AI, rendered to MP4 in the browser. Each video is then an ordinary post of the batch. See [bulk tools](#bulk-tools). |
 
 Every check that refuses media at scheduling time is shown in the composer
 and the batch before the person submits: the rules live in one JSON file
@@ -68,6 +69,8 @@ activity and never persisted, logged, or put in workflow history.
 | Video facts | `server/internal/mediavideo` (`Probe`) |
 | Draft media checks at scheduling | `server/internal/product/content_draft_media.go`, `content_draft_schedule.go` |
 | Bulk batches | `server/internal/product/content_batch.go`, `server/internal/httpapi/content_batches.go`; web `lib/tenant/content-batches.ts`, `lib/api/contracts/content-batches.ts`, `components/write/batch/` |
+| Background batch schedule | `server/internal/product/content_batch_run.go`, `server/internal/temporalbatches` |
+| Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts` |
 | Browser uploads | `clients/apps/web/lib/workspace/save-export.ts` |
 | Publish-time checks | `server/internal/publishing/repository.go` (`LoadPublishJob`) |
 | Provider requests | `server/internal/social/integrations/social/<provider>` |
@@ -104,6 +107,9 @@ no queue table is added: Temporal stays the only scheduler.
 | `20261103091000_content_batch.sql` | `content_batch` and `content_batch_item`: per item an import key (unique per batch), a fingerprint of its input, position, caption, media list, accounts, timing (`mode`, `localTime`, `timeZone`, `disambiguation`, `expectedQueueSlot`) and the draft it became (unique, `ON DELETE SET NULL`). |
 | `20261103092000_asset_retention.sql` | `platform_asset_in_use_v1(org, asset, history)`: whether an unarchived draft, an unfinished post (or, with history, a published one) or an open batch item references the asset. Deletion and cleanup both use it. |
 | `20261103093000_asset_multipart_upload.sql` | `asset."uploadId"`: the multipart upload a `PENDING` asset waits on, cleared at completion. |
+| `20261104100000_content_batch_source_key.sql` | `content_batch_item."sourceKey"`: the file or folder name an item came from, as the person knows it. |
+| `20261104101000_content_batch_grid.sql` | `content_batch_item.grid` for grid video concepts, and `platform_asset_in_use_v1` also counts a concept's images and music. |
+| `20261104102000_content_batch_run.sql` | `content_batch_run`: one schedule or render of a batch, what it froze and each item's outcome. |
 
 Why tables for batches: a batch must survive a reload, another device and a
 second editor, and an item must exist before its files finish uploading and
@@ -148,6 +154,124 @@ single write-once PUT.
 | A draft request whose response was lost | The batch item's import key makes the retry return the same draft. |
 | One item of a batch fails to schedule | The others stay scheduled; the failed one shows its reason and can be corrected and sent again with `add`, which schedules only the accounts without a live post. |
 | Provider gives no answer | `UNKNOWN_DELIVERY`; never retried automatically. |
+
+## Bulk tools
+
+Built from the [Bulk Tools analysis](scheduling/post-bridge/bulk-tools/post-bridge-bulk-tools-technical-analysis.md)
+on top of batches, so review, validation, idempotency, retention and tenancy
+are the batch's. These are the rules that analysis left open.
+
+**Folders.** A folder that directly holds images is one post, so a parent folder
+makes one post per folder at any depth. Images sort by name with numbers in
+order. Hidden files, other types and empty files are listed in the preview and
+left out. A file is stored under its path (`Trip-Beach-1.png`), which keeps two
+folders' `1.png` apart and lets selecting the folder again resume an upload.
+"One post per image" ignores folders. A post takes 20 attachments, the most any
+destination takes.
+
+**Caption variations.** `{a|b}` is a group; each post gets one alternative of each
+group at random, so captions may repeat. Braces without a `|` are literal, a
+backslash escapes `{`, `}`, `|` or `\`, and nested groups are refused. The expansion
+is stored when applied and never re-rolled.
+
+**Caption CSV.** Two columns are `filename, caption`; one column assigns captions to
+posts in order; a header is optional and recognized by name. Names match without
+case, with the extension optional, against the original file or folder name
+(`sourceKey`) and the stored file name. A name matching two posts, or two rows
+naming one post, is a problem shown in the preview: nothing is guessed. Only posts
+not yet saved as drafts change.
+
+**Caption limits.** Variations and CSV rows go through one check: the longest
+expansion must fit every account the post goes to, counted the way each channel
+counts. A refused bulk change leaves every caption as it was
+(`PATCH /v1/content-batches/{id}/items` is one transaction).
+
+**Spread.** A day's posts may run past midnight, up to `postsPerDay × spacing ≤ 24h`,
+which is what keeps one day's last post before the next day's first. The random
+shift moves a post later by 0 to 55 minutes in 5-minute steps and is seeded, so a
+retry lands on the same time. A clock change on any post still refuses the plan and
+names it.
+
+**Quota.** Checking a batch reads the posts left this month and warns before
+scheduling past them. Go's charge decides: posts past the limit are refused with a
+reason, and the rest stay scheduled.
+
+**YouTube and TikTok.** Options chosen for the batch go into each draft's platform
+version when it is saved; one post's options are then edited in Write. An empty
+YouTube title uses the post's first caption line, then its file name.
+
+**Grid videos.** A concept is a batch item with a `grid` column: a headline of up
+to 60 characters, four labelled slots and optional music. It survives a reload or
+another device. Images and music are workspace assets, checked for tenancy, and
+kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
+
+| Step | Behavior |
+| --- | --- |
+| Images | Upload per slot, upload many (fills empty slots in order, naming leftovers), or AI (`editorAi.generateGridSlotImage`, two at a time). The page estimates credits before generating; a failed slot keeps its error and can be tried again |
+| Last grid cell | Sets the label or image of slot 4 on every video. It is a cell of the grid, not an extra slide |
+| Music | The person's own file, played from its start, or none. There is no built-in catalog: add one only with licensed tracks |
+| Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, which holds one still with no fade |
+| Recovery | Each video uploads and is recorded on its item when done. Closing the tab loses only the one in progress; reopening renders what is left |
+| Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |
+| Handoff | A finished video is the item's media, so captions, times, drafts, review and scheduling apply. Download one, or several as a ZIP |
+
+The analysis's remaining checks ([verification matrix](scheduling/post-bridge/bulk-tools/bulk-tools-verification-matrix.csv)) are covered here:
+
+| Matrix | Where Shots proves it |
+| --- | --- |
+| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts` |
+| BULK-018 to 022: variations and overflow | `test/write-spintax.test.ts`, `test/write-batch.test.ts` |
+| BULK-023, 055: CSV matching | `test/write-bulk-import.test.ts` |
+| BULK-025 to 030: schedule | `TestSpreadTimes`, `test/write-batch.test.ts` |
+| BULK-035 to 041: concepts | `test/write-grid-concepts.test.ts`, `TestContentBatches` |
+| BULK-046 to 052: recovery, render, handoff | `test/e2e/bulk-tools.spec.ts`, `test/write-grid-layout.test.ts` |
+| BULK-056, 057: submission, retry, partial success | `TestContentBatches`, `TestContentDraftScheduleReliability` |
+
+The analysis's suggested endpoints map onto the batch's own routes, under
+`/api/v1/content-batches`, so there is one batch model:
+
+| Suggested | Route | What it does |
+| --- | --- | --- |
+| `POST /batches`, `GET /batches/{id}` | `POST /`, `GET /{id}` | The durable batch, with its latest `submission` and `render` |
+| `POST /batches/validate` | `POST /{id}/validate` | Each item and account, without charging or reserving |
+| `POST /batches/{id}/submit` | `POST /{id}/submit` | Freezes each item's schedule and starts a workflow; the same `requestKey` replays |
+| `POST /render-batches` | `POST /{id}/renders` | Freezes concepts for this browser to render, and retires any earlier render |
+| `GET /render-batches/{id}` | `GET /{id}/runs/{runId}` | Per-item outcomes of a schedule or a render |
+| (recording a video) | `POST /{id}/renders/{runId}/items/{itemId}` | Attaches a video to its item, or records why it failed |
+
+**Background submit.** The web builds each post once with the composer's builder,
+and `content_batch_run` holds the frozen requests; workflow history carries only
+IDs. `temporalbatches.Workflow` applies them one at a time through
+`ScheduleContentDraft`, so approval, quota and idempotency are not repeated. A
+definite refusal is that item's outcome and the rest carry on. A failure to get an
+answer is retried, which replays rather than duplicates, and after its retries the
+item is `UNCONFIRMED` and the run moves on. The page can close at any point, and
+reopening it shows the progress. Only a person with a real session can start a run.
+It then acts as that person: each item reads their account, membership and role again,
+so a banned account, a lost role or a lost membership refuses the rest with a reason,
+and what was already scheduled stays. It does not read their session or active
+workspace, so signing out, an expired session or switching workspace does not stop
+it, as none of those stops a post already queued. The cost is that revoking a stolen
+session does not stop a run it started; removing the person from the workspace does.
+Only the worker's step has this exemption (`publishing.ForStartedRun`): ordinary
+requests still need the session and the active workspace. Scheduling here
+must judge an account as the API does, so the worker's store has the API's media,
+account standing and quota meter.
+
+**Render runs.** Rendering stays in the browser. The server's part is the record: a
+run freezes each concept, and a video attaches only if the concept is still what was
+frozen and the run has not been replaced by a newer one. A failure stays visible
+after a reload. A browser closed mid-render leaves its items `PENDING`; rendering
+again starts a new run.
+
+**Regenerating.** On a concept, "New caption" asks AI for a headline in the spirit of
+the batch's others. "Regenerate video" also redraws its four items from the batch's
+content items, in a new order, and clears its images, keeping its music; it asks
+first, and keeps the headline if AI gives nothing back. Either drops a rendered video.
+
+Deliberately not built from the analysis: global format and length caps and a
+120-day horizon (destination rules decide), and an hourly AI image cap (AI credits
+decide).
 
 ## Scheduling semantics
 
@@ -244,6 +368,22 @@ the two asset columns in a new reviewed migration.
   the scheduling transaction and again at publish time.
 
 ## Evidence
+
+Bulk tools, 4 November 2026. `make -C server check` passed with the four CI
+databases, and `npm run format:check`, lint, typecheck and the web unit suite passed.
+Docker's storage failed when the development machine's disk filled, so the browser
+checks ran in CI. `test/e2e/bulk-tools.spec.ts` passed there, covering a folder upload
+to drafts, caption CSVs and variations, reload, and a grid video with music, read back
+as H.264 and AAC. `social-gate.spec.ts` passed with its grid case: a video rendered in
+the browser and scheduled by the worker with no page open, then delivered once with
+matching bytes. Pull requests into `develop` run only `@smoke` browser tests, so these
+journeys were tagged for one pull request and otherwise run in the full suite.
+Screens at 1440, 1024 and 390 pixels in both themes are in
+`docs/product/qa-evidence/2026-11-04/bulk-tools/`; they come from `next dev`, so its
+badge shows. `make tenant-isolation` was not run, and neither was a real provider or
+R2. Tenancy of runs and grid assets is covered in `TestContentBatches`. A full batch of
+100 was not timed in a browser. At 390 pixels a post's account table clips its Result
+column.
 
 Run on this branch, against local PostgreSQL (Docker was unavailable). The
 full Go suite and its race set pass except

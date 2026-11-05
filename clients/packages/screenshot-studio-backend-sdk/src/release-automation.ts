@@ -26,6 +26,14 @@ export type AutomationAction =
     }
   | { type: 'generate_copy'; input?: { nodeId: string; output: string }; creditLimit?: number }
   | {
+      type: 'capture_product'
+      input?: { nodeId: string; output: string }
+      surfaceId?: string
+      versionPath?: string
+      currentState?: boolean
+      recipeId?: string
+    }
+  | {
       type: 'render_creatives'
       input?: { nodeId: string; output: string }
       templateIds?: string[]
@@ -158,6 +166,9 @@ export type AutomationOutputs = {
   renderedAssetIds?: string[]
   canvasId?: string
   codeProjectId?: string
+  captureId?: string
+  captureAssetId?: string
+  captureProof?: 'version' | 'current_state'
 }
 export type AutomationHistoryItem = {
   event: {

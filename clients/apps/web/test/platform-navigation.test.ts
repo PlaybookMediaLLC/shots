@@ -44,6 +44,7 @@ test('canonical editors, aliases and localized routes select the owning job', ()
     ['/campaigns/a/copy#post-a', 'campaigns'],
     ['/releases/a', 'campaigns'],
     ['/workflows/runs/a', 'automate'],
+    ['/fr/workflows/connections', 'automate'],
     ['/settings/brand-kit', 'settings'],
   ] as const)
     assert.equal(platformArea(path), area, path)
@@ -217,7 +218,7 @@ test('the in-app plan page follows the theme like the rest of the app', () => {
 test('Campaigns lists Deliveries only where content drafts are rolled out', () => {
   assert.deepEqual(
     publishLinks('?set=a').map((item) => item.label),
-    ['Drafts', 'Calendar', 'Analyze', 'Link checks']
+    ['Drafts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
   )
   assert.deepEqual(
     campaignLinks(true).map((item) => item.label),
@@ -264,6 +265,11 @@ test('the highlighted page matches the address, query views included', () => {
   assert.equal(on('/library', 'type=story&search=launch'), 'Story Sets')
   assert.equal(on('/library', 'search=launch'), 'Screenshots')
   assert.equal(on('/create'), undefined)
+  // Signed-in capture is its own page, not the Workflows list it nests under.
+  assert.equal(
+    activeLink(AREA_LINKS.automate ?? [], '/workflows/connections', new URLSearchParams())?.label,
+    'Signed-in capture'
+  )
 })
 
 test('the plan locks an area as the sidebar shows it, for the sidebar and the product tours', () => {

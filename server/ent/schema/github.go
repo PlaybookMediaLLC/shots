@@ -135,7 +135,7 @@ func (DeploymentEvent) Fields() []ent.Field {
 		field.String("environment").StorageKey("environment"),
 		field.String("url").StorageKey("url").Optional().Nillable(),
 		field.String("sha").StorageKey("sha").Optional().Nillable(),
-		field.Enum("status").StorageKey("status").Values("RECEIVED", "CAPTURED", "SKIPPED", "FAILED").Default("RECEIVED"),
+		field.Enum("status").StorageKey("status").Values("RECEIVED", "CAPTURED", "PARTIAL", "SKIPPED", "FAILED").Default("RECEIVED"),
 		field.String("failure_code").StorageKey("failureCode").Optional().Nillable(),
 		field.JSON("asset_ids", []string{}).StorageKey("assetIds").Default([]string{}),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),

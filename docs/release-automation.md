@@ -147,12 +147,59 @@ check never silently chooses the false branch for missing evidence. Previews
 never call the model: **AI checks in this preview** assumes one verdict and
 labels the step as assumed.
 
+### Deployment capture
+
+`capture_product` (v3) gives a deployment-triggered run the screenshot of its own
+deployment. It takes a campaign output and one workspace product surface, passes
+the campaign on, and adds `captureId`, `captureAssetId` and `captureProof` to the
+outputs. A later `render_creatives` or `create_canvas` on that chain shows exactly
+that image and never falls back to the latest capture. A graph without this action
+keeps the meaning it was activated with. The action runs once per run, on the
+`deployment.succeeded` trigger or on a published release with version proof. A release
+can arrive before its code is live, so its tag resolves to an immutable commit and the
+run waits for a deployment of that commit, failing as `waiting_for_deployment` until
+one arrives.
+
+A page behind a login uses `recipeId`, a pinned authenticated recipe version, instead
+of a surface. The recipe names the page and its proof, the run admits the same durable
+job the deployment trigger does, and it never holds a browser: the node retries as
+`capture_pending` until the job finishes, and stops as `needs_auth` when a person must
+sign in again. After they do, the job resumes, and retrying the run finds its result. A
+recipe without version proof also needs `currentState: true`. Its worker advertises the
+`browser` capability ([design and status](rfcs/authenticated-release-capture-review.md#10-implementation-status)).
+
+For a public page, the action has an explicit proof choice, and the validator requires
+exactly one:
+
+- `versionPath`, a path on the surface's own origin. The app must answer it with
+  the deployment's commit, full or at least seven characters, before the screenshot
+  is taken. Another commit fails as `waiting_for_deployment`; no answer fails as
+  `deployment_unverified`. Both retry for about ten minutes and capture nothing.
+  The capture records the commit as `surface_capture.observedRevision`
+  (`captureProof: "version"`).
+- `currentState: true`, the choice to capture without proof. The output is labeled
+  `captureProof: "current_state"`, which claims nothing about the deployment.
+
+A page that redirects to a sign-in path or shows a password field fails permanently
+as `capture_refused`, as does a deployment with no production record to bind to. A
+surface registered at its own sign-in path is that page. The backend cannot see a
+sign-in form an app draws in the browser, so only version proof rules that out.
+
+The legacy capture and this action share one receipt per deployment, page and proof,
+enforced by a unique index, so a retry reuses a capture instead of taking another.
+A proven capture may follow an unproven one, because the unproven one may show the
+old page. The time between the proof and the screenshot is not closed: a newer
+deployment landing in that gap appears under the earlier commit. An older deployment
+that finishes late stays in history and never replaces a newer deployment's current
+image. Workers advertise the `capture` capability when they have object storage.
+
 ### Rendered creatives
 
 `render_creatives` (v2) takes a campaign output and 1–3 design templates from
 the web's catalog (`layout-*` templates that place a headline). The worker
-picks the current capture of the chosen product page, or the most recently
-captured page, and asks the web over `POST /api/internal/workflow-renders`,
+shows the capture from an earlier `capture_product` step, or else picks the
+current capture of the chosen product page, or the most recently captured page,
+and asks the web over `POST /api/internal/workflow-renders`,
 signed with HMAC-SHA256 over `<timestamp>.<body>` and rejected after five
 minutes. The web fills each template with the capture, the event title as
 headline, and the first line of its notes as subheadline, applies the campaign's
@@ -262,8 +309,9 @@ nodes. It is sequential, acyclic, reachable, and bounded to 64 nodes, 128 edges,
 holds the three draft/review actions and the original fields and operators;
 version 2 adds the `classify` node, `generate_copy`, `render_creatives`, release
 contents, the tag and milestone triggers, the new fields, and numeric
-comparisons. Version 2 keeps every version 1 meaning, and the editor saves every
-graph as version 2. Branch merges require
+comparisons. Version 3 adds `capture_product`. Each version keeps every earlier
+meaning. The editor saves a graph as version 2, or as version 3 when it uses
+`capture_product`, so only those graphs need a version 3 worker. Branch merges require
 input-producing actions to dominate the consumer on every incoming path.
 Layout is stored separately from the semantic graph/hash. Incomplete drafts can
 be stored, but they cannot exceed hard size/depth limits.
@@ -436,7 +484,11 @@ contain none of them, so
 v1 histories replay unchanged. A worker older than this change advertises
 version 1, cannot be chosen to activate v2 graphs, and fails a v2 run it picks up
 as `needs_attention` without side effects. Rolling the worker back therefore
-needs active v2 definitions disabled first. Future interpreter changes need
+needs active v2 definitions disabled first. `capture_product` follows the same
+rule: the interpreter only sets its activity options, which v1 and v2 graphs never
+reach, an older worker cannot activate a v3 graph and fails a v3 run it picks up as
+`needs_attention`, and rolling back needs active v3 definitions disabled first.
+Future interpreter changes need
 Temporal versioning or a separate compatible workflow registration; graph schema
 versioning alone is insufficient. Rollback must preserve the new tables/receipts
 and sticky source mode. Do not roll the facade back to unconditional legacy intake

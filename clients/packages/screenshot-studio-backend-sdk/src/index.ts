@@ -102,6 +102,16 @@ import type {
 } from './release-automation.js'
 export type * from './release-automation.js'
 import type {
+  CaptureConnection,
+  CaptureConnectionInput,
+  CaptureConnectStart,
+  CaptureJob,
+  CaptureOverview,
+  CaptureRecipe,
+  CaptureRecipeInput,
+} from './capture.js'
+export type * from './capture.js'
+import type {
   AccountDeletionStatus,
   CopyableSocialSet,
   Engagement,
@@ -1314,6 +1324,13 @@ export type BackendBatchMedia = {
   uploadAssetId?: string
 }
 
+/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+export type BackendBatchGrid = {
+  headline: string
+  musicAssetId?: string
+  slots: { assetId?: string; topic: string }[]
+}
+
 /** When a batch item is meant to go out: a local time in a zone, or the queue at a previewed slot. */
 export type BackendBatchTiming = {
   mode?: 'time' | 'queue'
@@ -1329,6 +1346,10 @@ export type BackendContentBatchItemInput = {
   channelConnectionIds: string[]
   importKey: string
   media: BackendBatchMedia[]
+  /** A grid video concept; its rendered video becomes the item's media. */
+  grid?: BackendBatchGrid
+  /** The file or folder name the item came from, as the person knows it. */
+  sourceKey?: string
   timing: BackendBatchTiming
 }
 
@@ -1358,7 +1379,27 @@ export type BackendContentBatchItem = {
   })[]
   position: number
   posts: BackendContentDraftPost[]
+  grid?: BackendBatchGrid
+  sourceKey?: string
   timing: BackendBatchTiming
+}
+
+/** One pass over a batch: scheduling its items, or rendering its grid concepts. */
+export type BackendContentBatchRun = {
+  createdAt: string
+  id: string
+  items: {
+    assetId?: string
+    draftId?: string
+    error?: string
+    grid?: BackendBatchGrid
+    itemId: string
+    postIds?: string[]
+    status: 'PENDING' | 'DONE' | 'FAILED' | 'UNCONFIRMED'
+  }[]
+  kind: 'submit' | 'render'
+  status: 'RUNNING' | 'FINISHED' | 'SUPERSEDED'
+  updatedAt: string
 }
 
 /** A durable batch of separate posts in one social set. */
@@ -1368,6 +1409,8 @@ export type BackendContentBatch = {
   id: string
   itemCount: number
   items?: BackendContentBatchItem[]
+  render?: BackendContentBatchRun
+  submission?: BackendContentBatchRun
   socialSetId: string
   timeZone: string
   title: string
@@ -3357,7 +3400,10 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     itemId: string,
     input: Partial<
-      Pick<BackendContentBatchItemInput, 'caption' | 'channelConnectionIds' | 'media' | 'timing'>
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
     > & {
       position?: number
     }
@@ -3365,6 +3411,69 @@ export class ScreenshotStudioBackendSDK {
     return this.request<BackendContentBatchItem>(
       `v1/content-batches/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`,
       { body: input, method: 'PATCH' }
+    )
+  }
+
+  /** Change many items as one operation: a refused item refuses them all. */
+  async updateContentBatchItems(
+    id: string,
+    items: (Partial<
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
+    > & { itemId: string; position?: number })[]
+  ) {
+    return this.request<BackendContentBatch>(`v1/content-batches/${encodeURIComponent(id)}/items`, {
+      body: { items },
+      method: 'PATCH',
+    })
+  }
+
+  /** Schedule frozen requests in the background; the same key replays its run. */
+  async submitContentBatch(
+    id: string,
+    input: {
+      items: {
+        channelConnectionIds: string[]
+        itemId: string
+        refusal?: string
+        schedule?: Parameters<ScreenshotStudioBackendSDK['scheduleContentDraft']>[1]
+      }[]
+      requestKey: string
+    }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/submit`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** What a schedule or render of a batch did. */
+  async getContentBatchRun(id: string, runId: string) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}`
+    )
+  }
+
+  /** Freeze grid concepts for a browser to render; the same key replays its run. */
+  async createContentBatchRender(id: string, input: { itemIds: string[]; requestKey: string }) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** Record a rendered video on its item, or why it failed. */
+  async reportContentBatchRender(
+    id: string,
+    runId: string,
+    itemId: string,
+    input: { assetId?: string; error?: string; fileName?: string }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`,
+      { body: input, method: 'POST' }
     )
   }
 
@@ -4679,6 +4788,80 @@ export class ScreenshotStudioBackendSDK {
       `v1/release-automation/runs/${encodeURIComponent(id)}/retry`,
       { method: 'POST' }
     )
+  }
+
+  /** This workspace's connections, recipes and recent jobs; any member may read them. */
+  async captureOverview() {
+    return this.request<CaptureOverview>('v1/capture')
+  }
+
+  async createCaptureConnection(input: CaptureConnectionInput) {
+    return this.request<{ connection: CaptureConnection }>('v1/capture/connections', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Opens a sign-in browser for an owner or admin session; see {@link CaptureConnectStart}. */
+  async startCaptureConnect(id: string) {
+    return this.request<CaptureConnectStart>(
+      `v1/capture/connections/${encodeURIComponent(id)}/connect`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Records "I signed in"; the worker must still restore it in a fresh browser. */
+  async finishCaptureConnect(id: string, intentId: string) {
+    return this.request<{ accepted: true }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/connect/finish`,
+      { body: { intentId }, method: 'POST' }
+    )
+  }
+
+  async revokeCaptureConnection(id: string) {
+    return this.request<{ revoked: true }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/revoke`,
+      { method: 'POST' }
+    )
+  }
+
+  async createCaptureRecipe(input: CaptureRecipeInput) {
+    return this.request<{ recipe: CaptureRecipe }>('v1/capture/recipes', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Enables capture after deployment for a tested version, replacing any earlier one. */
+  async activateCaptureRecipe(id: string) {
+    return this.request<{ recipe: CaptureRecipe }>(
+      `v1/capture/recipes/${encodeURIComponent(id)}/activate`,
+      { method: 'POST' }
+    )
+  }
+
+  async archiveCaptureRecipe(id: string) {
+    return this.request<{ archived: true }>(
+      `v1/capture/recipes/${encodeURIComponent(id)}/archive`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Runs a recipe now: a test may use a draft; anything else needs an active recipe. */
+  async requestCaptureJob(
+    recipeId: string,
+    input: { test: boolean; source?: 'agent' | 'manual'; sourceId?: string }
+  ) {
+    return this.request<{ job: CaptureJob }>(
+      `v1/capture/recipes/${encodeURIComponent(recipeId)}/jobs`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  async cancelCaptureJob(id: string) {
+    return this.request<{ cancelled: true }>(`v1/capture/jobs/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    })
   }
 
   async completeGitHubConnection(input: { code: string; installationId: number; state: string }) {

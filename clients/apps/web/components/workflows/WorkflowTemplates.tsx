@@ -59,6 +59,8 @@ export function WorkflowTemplates() {
   const [aiRelevance, setAIRelevance] = useState(false)
   const [majorMinorOnly, setMajorMinorOnly] = useState(true)
   const [renderTemplateIds, setRenderTemplateIds] = useState<string[]>([])
+  const [captureSurfaceId, setCaptureSurfaceId] = useState('')
+  const [captureVersionPath, setCaptureVersionPath] = useState('/api/version')
   const [canvas, setCanvas] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +112,7 @@ export function WorkflowTemplates() {
   const generation = actionAvailability(overview, 'generate_copy')
   const relevance = actionAvailability(overview, 'classify')
   const rendering = actionAvailability(overview, 'render_creatives')
+  const capturing = actionAvailability(overview, 'capture_product')
   const canvases = actionAvailability(overview, 'create_canvas')
 
   async function create() {
@@ -126,6 +129,10 @@ export function WorkflowTemplates() {
         majorMinorOnly: template.versioned && majorMinorOnly,
         renderTemplateIds: rendering.available ? renderTemplateIds : [],
         canvas: canvases.available && canvas,
+        capture:
+          capturing.available && captureSurfaceId
+            ? { surfaceId: captureSurfaceId, versionPath: captureVersionPath.trim() || undefined }
+            : undefined,
       })
       const saved = await client.releaseAutomation.save.mutate({
         id: '',
@@ -543,6 +550,52 @@ export function WorkflowTemplates() {
                   ))}
                 </div>
               </Row>
+              {template.family === 'deployment.succeeded' ? (
+                <Row
+                  description={
+                    capturing.available
+                      ? 'Captures one product page for this deployment after your app reports the deployed commit, so creatives never show an older image.'
+                      : `Unavailable: ${capturing.reason}`
+                  }
+                  label="Deployment capture"
+                  layout="stacked"
+                >
+                  <div className="grid gap-3 sm:max-w-md">
+                    <Label className="grid gap-1 text-sm">
+                      Product page
+                      <Select
+                        disabled={!capturing.available}
+                        value={captureSurfaceId || EMPTY}
+                        onValueChange={(nextValue) =>
+                          setCaptureSurfaceId(nextValue === EMPTY ? '' : nextValue)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={EMPTY}>Don&apos;t capture</SelectItem>
+                          {(overview.surfaces ?? []).map((surface) => (
+                            <SelectItem key={surface.id} value={surface.id}>
+                              {surface.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Label>
+                    {captureSurfaceId ? (
+                      <Label className="grid gap-1 text-sm">
+                        Path that reports the deployed commit
+                        <Input
+                          maxLength={256}
+                          value={captureVersionPath}
+                          onChange={(event) => setCaptureVersionPath(event.target.value)}
+                        />
+                      </Label>
+                    ) : null}
+                  </div>
+                </Row>
+              ) : null}
               <Row
                 description={
                   canvases.available

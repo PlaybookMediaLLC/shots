@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/google/uuid"
 )
@@ -472,12 +473,15 @@ var resourceIDPattern = regexp.MustCompile(`^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9
 func validSurfaceName(value string) bool {
 	return value != "" && utf8.RuneCountInString(value) <= 160
 }
+
+// validSurfaceURL accepts a public http(s) page without credentials, the
+// address the capture service and the deployment readiness check will accept.
 func validSurfaceURL(value string) bool {
 	if len(value) > 2000 {
 		return false
 	}
 	u, err := url.Parse(value)
-	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != ""
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil && capture.PublicPageURL(value)
 }
 func validSurfaceEnvironment(value string) bool {
 	return value == "production" || value == "staging" || value == "demo" || value == "development"

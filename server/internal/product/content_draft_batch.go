@@ -11,7 +11,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 )
 
-// DraftBatchTimesInput previews up to 50 instants without reserving or publishing.
+// DraftBatchTimesInput previews up to contentBatchItemLimit instants without reserving or publishing.
 type DraftBatchTimesInput struct {
 	SocialSetID    string `json:"socialSetId"`
 	Count          int    `json:"count"`
@@ -31,16 +31,16 @@ func spreadTimes(input DraftBatchTimesInput, zone string, now time.Time) ([]time
 	if err != nil {
 		return nil, invalid("Start is a local date and time.")
 	}
-	if start.Hour()*60+start.Minute()-input.ShiftMinutes < 0 || start.Hour()*60+start.Minute()+(input.PostsPerDay-1)*input.SpacingMinutes+input.ShiftMinutes >= 1440 {
-		return nil, invalid("The daily times and their shifts must fit inside the selected day.")
+	// A day's posts may run past midnight, but must end before the next day's first post.
+	if input.PostsPerDay*input.SpacingMinutes > 1440 {
+		return nil, invalid("Space a day's posts so they fit in 24 hours.")
 	}
 	result := make([]time.Time, 0, input.Count)
 	for i := 0; i < input.Count; i++ {
 		shift := 0
 		if input.ShiftMinutes > 0 {
 			hash := sha256.Sum256([]byte(fmt.Sprintf("%s/%d", input.Seed, i)))
-			steps := input.ShiftMinutes / 5
-			shift = (int(binary.BigEndian.Uint32(hash[:4])%uint32(2*steps+1)) - steps) * 5
+			shift = int(binary.BigEndian.Uint32(hash[:4])%uint32(input.ShiftMinutes/5+1)) * 5
 		}
 		wall := start.AddDate(0, 0, i/input.PostsPerDay).Add(time.Duration((i%input.PostsPerDay)*input.SpacingMinutes+shift) * time.Minute)
 		at, err := resolveLocalTime(wall.Format("2006-01-02T15:04"), zone, "")
@@ -73,8 +73,8 @@ func (c *Configuration) PreviewDraftBatchTimes(ctx context.Context, actor Actor,
 	if err := c.authorizeContentDrafts(ctx, actor, false); err != nil {
 		return nil, err
 	}
-	if input.Count < 1 || input.Count > 50 {
-		return nil, invalid("Select between 1 and 50 drafts.")
+	if input.Count < 1 || input.Count > contentBatchItemLimit {
+		return nil, invalid(fmt.Sprintf("Select between 1 and %d drafts.", contentBatchItemLimit))
 	}
 	set, err := c.resolveSocialSet(ctx, actor, input.SocialSetID)
 	if err != nil {

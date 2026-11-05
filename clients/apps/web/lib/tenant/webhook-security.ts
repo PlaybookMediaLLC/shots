@@ -355,13 +355,17 @@ function getMergedPullRequest(source: WebhookSourceRule, payload: unknown): Webh
 }
 
 /**
- * A published release, keyed on its release ID rather than the delivery ID:
- * the signature covers the body but not the delivery header, so a replayed
- * delivery under a new ID must still be a no-op.
+ * A published release from the source's repository when it names one, keyed
+ * on its release ID rather than the delivery ID: the signature covers the body
+ * but not the delivery header, so a replayed delivery under a new ID must
+ * still be a no-op.
  */
 function getPublishedRelease(source: WebhookSourceRule, payload: unknown): WebhookIntent | null {
   const { release, repository } = githubReleaseSchema.parse(payload)
-  if (source.skipPrereleases && release.prerelease === true) {
+  if (
+    (source.skipPrereleases && release.prerelease === true) ||
+    (source.externalId !== null && source.externalId !== String(repository.id))
+  ) {
     return null
   }
   const notes = cleanText(release.body, NOTES_MAX)

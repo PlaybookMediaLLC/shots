@@ -13,6 +13,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/activity"
@@ -86,29 +87,50 @@ func surfaceCaptureRecord(row *ent.SurfaceCapture) SurfaceCaptureRecord {
 // recordCapture makes assetID the surface's current capture: the previous one
 // is superseded, never removed, and the surface's freshness is updated.
 func recordCapture(ctx context.Context, tx *ent.Tx, actor Actor, surface *ent.ProductSurface, assetID string,
-	source surfacecapture.Source, sourceID *string) (*ent.SurfaceCapture, error) {
+	source surfacecapture.Source, sourceID, observedRevision *string) (*ent.SurfaceCapture, error) {
 	now := time.Now().UTC()
-	if err := tx.SurfaceCapture.Update().Where(surfacecapture.SurfaceID(surface.ID), surfacecapture.SupersededAtIsNil()).
-		SetSupersededAt(now).Exec(ctx); err != nil {
+	// Locking the surface makes concurrent captures of it choose the current
+	// image one at a time, each adding to what the last one left.
+	surface, err := tx.ProductSurface.UpdateOneID(surface.ID).SetUpdatedAt(now).Save(ctx)
+	if err != nil {
 		return nil, err
 	}
-	created, err := tx.SurfaceCapture.Create().SetID(cuid.New()).SetOrganizationID(surface.OrganizationID).
+	current := true
+	if source == surfacecapture.SourceDeployment && sourceID != nil {
+		if current, err = newestDeploymentCapture(ctx, tx, surface.ID, *sourceID); err != nil {
+			return nil, err
+		}
+	}
+	if current {
+		if err := tx.SurfaceCapture.Update().Where(surfacecapture.SurfaceID(surface.ID), surfacecapture.SupersededAtIsNil()).
+			SetSupersededAt(now).Exec(ctx); err != nil {
+			return nil, err
+		}
+	}
+	create := tx.SurfaceCapture.Create().SetID(cuid.New()).SetOrganizationID(surface.OrganizationID).
 		SetSurfaceID(surface.ID).SetAssetID(assetID).SetSource(source).SetNillableSourceID(sourceID).
-		SetCapturedAt(now).Save(ctx)
+		SetNillableObservedRevision(observedRevision).SetCapturedAt(now)
+	if !current {
+		// History only: a newer deployment's image stays current.
+		create.SetSupersededAt(now)
+	}
+	created, err := create.Save(ctx)
 	if ent.IsConstraintError(err) {
-		// Another capture of this surface committed first.
+		// Another capture of this surface, or this deployment's receipt for it, committed first.
 		return nil, publishing.ErrConflict
 	}
 	if err != nil {
 		return nil, err
 	}
-	screenshots := append(slices.Clone(surface.ScreenshotAssetIds), assetID)
-	if len(screenshots) > surfaceScreenshotLimit {
-		screenshots = screenshots[len(screenshots)-surfaceScreenshotLimit:]
-	}
-	if err := tx.ProductSurface.UpdateOneID(surface.ID).SetLastCapturedAt(now).ClearLastCaptureFailureCode().
-		SetScreenshotAssetIds(screenshots).Exec(ctx); err != nil {
-		return nil, err
+	if current {
+		screenshots := append(slices.Clone(surface.ScreenshotAssetIds), assetID)
+		if len(screenshots) > surfaceScreenshotLimit {
+			screenshots = screenshots[len(screenshots)-surfaceScreenshotLimit:]
+		}
+		if err := tx.ProductSurface.UpdateOneID(surface.ID).SetLastCapturedAt(now).ClearLastCaptureFailureCode().
+			SetScreenshotAssetIds(screenshots).Exec(ctx); err != nil {
+			return nil, err
+		}
 	}
 	human := ""
 	background := source != surfacecapture.SourceManual
@@ -123,6 +145,36 @@ func recordCapture(ctx context.Context, tx *ent.Tx, actor Actor, surface *ent.Pr
 		return nil, err
 	}
 	return created, nil
+}
+
+// newestDeploymentCapture reports whether a deployment's capture may become
+// the surface's current image: an older deployment that finishes late never
+// replaces a newer deployment's. Deployments are ordered as Shots received them.
+func newestDeploymentCapture(ctx context.Context, tx *ent.Tx, surfaceID, deploymentID string) (bool, error) {
+	current, err := tx.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(surfaceID), surfacecapture.SupersededAtIsNil(),
+		surfacecapture.SourceEQ(surfacecapture.SourceDeployment), surfacecapture.SourceIDNotNil()).Only(ctx)
+	if ent.IsNotFound(err) {
+		return true, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	rows, err := tx.DeploymentEvent.Query().Where(deploymentevent.IDIn(deploymentID, *current.SourceID)).All(ctx)
+	if err != nil {
+		return false, err
+	}
+	var mine, theirs *ent.DeploymentEvent
+	for _, row := range rows {
+		if row.ID == deploymentID {
+			mine = row
+		} else {
+			theirs = row
+		}
+	}
+	if mine == nil || theirs == nil {
+		return true, nil
+	}
+	return !theirs.CreatedAt.After(mine.CreatedAt) && (theirs.CreatedAt.Before(mine.CreatedAt) || theirs.ID < mine.ID), nil
 }
 
 // RecordSurfaceCaptureInput attaches an uploaded image to a surface as its
@@ -166,7 +218,7 @@ func (c *Configuration) RecordSurfaceCapture(ctx context.Context, actor Actor, s
 	if image.Status != asset.StatusUPLOADED || !strings.HasPrefix(image.MediaType, "image/") {
 		return nil, invalid("A capture must be an uploaded image.")
 	}
-	created, err := recordCapture(ctx, tx, actor, surface, image.ID, source, input.SourceID)
+	created, err := recordCapture(ctx, tx, actor, surface, image.ID, source, input.SourceID, nil)
 	if err != nil {
 		return nil, err
 	}

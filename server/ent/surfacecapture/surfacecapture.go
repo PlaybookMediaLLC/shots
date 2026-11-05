@@ -28,6 +28,8 @@ const (
 	FieldCapturedAt = "capturedAt"
 	// FieldSupersededAt holds the string denoting the superseded_at field in the database.
 	FieldSupersededAt = "supersededAt"
+	// FieldObservedRevision holds the string denoting the observed_revision field in the database.
+	FieldObservedRevision = "observedRevision"
 	// Table holds the table name of the surfacecapture in the database.
 	Table = "surface_capture"
 )
@@ -42,6 +44,7 @@ var Columns = []string{
 	FieldSourceID,
 	FieldCapturedAt,
 	FieldSupersededAt,
+	FieldObservedRevision,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -125,4 +128,9 @@ func ByCapturedAt(opts ...sql.OrderTermOption) OrderOption {
 // BySupersededAt orders the results by the superseded_at field.
 func BySupersededAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupersededAt, opts...).ToFunc()
+}
+
+// ByObservedRevision orders the results by the observed_revision field.
+func ByObservedRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldObservedRevision, opts...).ToFunc()
 }

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
@@ -16,9 +17,14 @@ type ContentBatchStore interface {
 	ArchiveContentBatch(context.Context, product.Actor, string) error
 	AddContentBatchItems(context.Context, product.Actor, string, []product.ContentBatchItemInput) (*product.ContentBatchRecord, error)
 	UpdateContentBatchItem(context.Context, product.Actor, string, string, product.ContentBatchItemUpdate) (*product.ContentBatchItemRecord, error)
+	UpdateContentBatchItems(context.Context, product.Actor, string, []product.ContentBatchItemPatch) (*product.ContentBatchRecord, error)
 	RemoveContentBatchItem(context.Context, product.Actor, string, string) error
 	CreateContentBatchItemDraft(context.Context, product.Actor, string, string, product.ContentDraftInput) (*product.ContentBatchItemRecord, error)
 	ValidateContentBatch(context.Context, product.Actor, string, []product.BatchValidationRow) ([]product.BatchValidationResult, error)
+	SubmitContentBatch(context.Context, product.Actor, string, product.BatchSubmitInput) (*product.BatchRunRecord, error)
+	CreateContentBatchRender(context.Context, product.Actor, string, product.BatchRenderInput) (*product.BatchRunRecord, error)
+	ReportContentBatchRender(context.Context, product.Actor, string, string, string, product.BatchRenderReport) (*product.BatchRunRecord, error)
+	GetContentBatchRun(context.Context, product.Actor, string, string) (*product.BatchRunRecord, error)
 }
 
 func (s *Server) registerContentBatches(mux *http.ServeMux) {
@@ -27,10 +33,15 @@ func (s *Server) registerContentBatches(mux *http.ServeMux) {
 	mux.Handle("GET /v1/content-batches/{id}", s.authenticateProduct(http.HandlerFunc(s.getContentBatch)))
 	mux.Handle("POST /v1/content-batches/{id}/archive", s.authenticateProduct(http.HandlerFunc(s.archiveContentBatch)))
 	mux.Handle("POST /v1/content-batches/{id}/items", s.authenticateProduct(http.HandlerFunc(s.addContentBatchItems)))
+	mux.Handle("PATCH /v1/content-batches/{id}/items", s.authenticateProduct(http.HandlerFunc(s.updateContentBatchItems)))
 	mux.Handle("PATCH /v1/content-batches/{id}/items/{itemId}", s.authenticateProduct(http.HandlerFunc(s.updateContentBatchItem)))
 	mux.Handle("DELETE /v1/content-batches/{id}/items/{itemId}", s.authenticateProduct(http.HandlerFunc(s.removeContentBatchItem)))
 	mux.Handle("POST /v1/content-batches/{id}/items/{itemId}/draft", s.authenticateProduct(http.HandlerFunc(s.createContentBatchItemDraft)))
 	mux.Handle("POST /v1/content-batches/{id}/validate", s.authenticateProduct(http.HandlerFunc(s.validateContentBatch)))
+	mux.Handle("POST /v1/content-batches/{id}/submit", s.authenticateProduct(http.HandlerFunc(s.submitContentBatch)))
+	mux.Handle("POST /v1/content-batches/{id}/renders", s.authenticateProduct(http.HandlerFunc(s.createContentBatchRender)))
+	mux.Handle("POST /v1/content-batches/{id}/renders/{runId}/items/{itemId}", s.authenticateProduct(http.HandlerFunc(s.reportContentBatchRender)))
+	mux.Handle("GET /v1/content-batches/{id}/runs/{runId}", s.authenticateProduct(http.HandlerFunc(s.getContentBatchRun)))
 }
 
 func batchIDs(w http.ResponseWriter, r *http.Request, item bool) (string, string, bool) {
@@ -128,6 +139,26 @@ func (s *Server) updateContentBatchItem(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, item)
 }
 
+func (s *Server) updateContentBatchItems(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := batchIDs(w, r, false)
+	if !ok {
+		return
+	}
+	var input struct {
+		Items []product.ContentBatchItemPatch `json:"items"`
+	}
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid batch items")
+		return
+	}
+	batch, err := s.configuration.UpdateContentBatchItems(r.Context(), workspaceActor(r), id, input.Items)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, batch)
+}
+
 func (s *Server) removeContentBatchItem(w http.ResponseWriter, r *http.Request) {
 	id, itemID, ok := batchIDs(w, r, true)
 	if !ok {
@@ -176,4 +207,87 @@ func (s *Server) validateContentBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+}
+
+// submitContentBatch records a frozen schedule and starts its workflow. The run
+// is committed either way: a retry of the same key replays it and starts it again.
+func (s *Server) submitContentBatch(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := batchIDs(w, r, false)
+	if !ok {
+		return
+	}
+	var input product.BatchSubmitInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid batch submission")
+		return
+	}
+	run, err := s.configuration.SubmitContentBatch(r.Context(), workspaceActor(r), id, input)
+	if errors.Is(err, product.ErrBatchRunNotStarted) {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err != nil {
+		writeContentDraftError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) createContentBatchRender(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := batchIDs(w, r, false)
+	if !ok {
+		return
+	}
+	var input product.BatchRenderInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid batch render")
+		return
+	}
+	run, err := s.configuration.CreateContentBatchRender(r.Context(), workspaceActor(r), id, input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) reportContentBatchRender(w http.ResponseWriter, r *http.Request) {
+	id, itemID, ok := batchIDs(w, r, true)
+	if !ok {
+		return
+	}
+	runID := r.PathValue("runId")
+	if !resourceIDPattern.MatchString(runID) {
+		writeError(w, http.StatusBadRequest, "invalid batch run ID")
+		return
+	}
+	var input product.BatchRenderReport
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid render report")
+		return
+	}
+	run, err := s.configuration.ReportContentBatchRender(r.Context(), workspaceActor(r), id, runID, itemID, input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
+}
+
+func (s *Server) getContentBatchRun(w http.ResponseWriter, r *http.Request) {
+	id, _, ok := batchIDs(w, r, false)
+	if !ok {
+		return
+	}
+	runID := r.PathValue("runId")
+	if !resourceIDPattern.MatchString(runID) {
+		writeError(w, http.StatusBadRequest, "invalid batch run ID")
+		return
+	}
+	run, err := s.configuration.GetContentBatchRun(r.Context(), workspaceActor(r), id, runID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, run)
 }

@@ -4,7 +4,9 @@ import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
 import { type BrandVoice, writeCopy } from '@/lib/ai/agents/captions'
 import { critiqueDesign, proposeVariants, estimateVariantCredits } from '@/lib/ai/agents/editor-assist'
+import { gridLinesRequestSchema, suggestGridLines } from '@/lib/ai/agents/grid-lines'
 import { BackgroundGenerationError, generateBackground } from '@/lib/ai/images/background'
+import { generateGridSlotImage, gridSlotRequestSchema } from '@/lib/ai/images/grid-slot'
 import { backgroundRequestSchema } from '@/lib/ai/images/background-request'
 import { withAiCredits } from '@/lib/ai/metering'
 import { variantCountSchema } from '@/lib/ai/variants'
@@ -98,6 +100,36 @@ export const editorAiRouter = router({
         }
         throw error
       }
+    }),
+  /** Draw the image of one grid video slot from its label, stored as a workspace image. */
+  generateGridSlotImage: organizationProcedure('artifact:edit')
+    .input(gridSlotRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      await allowAiAction(ctx.access)
+      try {
+        const image = await withAiCredits(ctx.access, () => generateGridSlotImage(input))
+        const asset = await backendSDK(ctx.access).storeGeneratedAsset({
+          body: image.body,
+          classification: 'derived',
+          contentType: 'image/webp',
+          fileName: 'grid-image.webp',
+          height: image.height,
+          width: image.width,
+        })
+        return { assetId: asset.id }
+      } catch (error) {
+        if (error instanceof BackgroundGenerationError) {
+          throw new TRPCError({ cause: error, code: 'BAD_REQUEST', message: error.message })
+        }
+        throw error
+      }
+    }),
+  /** More captions or content items in the spirit of the ones a grid video batch has. */
+  suggestGridLines: organizationProcedure('artifact:edit')
+    .input(gridLinesRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      await allowAiAction(ctx.access)
+      return { lines: await withAiCredits(ctx.access, () => suggestGridLines(input)) }
     }),
   /** Alt text and platform-aware captions for the design, from a snapshot and its text. */
   captions: organizationProcedure('artifact:edit')

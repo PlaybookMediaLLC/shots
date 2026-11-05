@@ -81,6 +81,13 @@ export const FAILURE_CODES: Record<string, string> = {
   model_unavailable: 'No worker had an AI model provider configured.',
   renderer_unavailable: 'No worker could reach the design renderer.',
   capture_missing: 'No product page has a current capture to put in the creatives.',
+  capture_unavailable: 'No worker could capture and store product pages.',
+  waiting_for_deployment: 'The app kept reporting another commit, so nothing was captured.',
+  deployment_unverified: 'The app did not report its deployed commit, so nothing was captured.',
+  capture_refused:
+    'The page asks visitors to sign in, or is not public, so it cannot show this deployment.',
+  needs_auth: 'The signed-in session ended. Reconnect it in Signed-in capture to continue.',
+  capture_pending: 'The signed-in capture had not finished when this step stopped waiting.',
   action_failed: 'The action failed; see the node for details.',
   missing: 'Event evidence was missing, so no branch was chosen.',
   pending: 'Event enrichment was still pending, so no branch was chosen.',

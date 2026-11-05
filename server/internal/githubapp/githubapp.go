@@ -330,6 +330,15 @@ func (a *App) PullRequest(ctx context.Context, installationID int64, repositoryI
 }
 
 // ReleaseHTML reads a release's rendered body, for its signed image URLs.
+// CommitForRef resolves a tag or branch to its immutable commit.
+func (a *App) CommitForRef(ctx context.Context, installationID int64, repositoryID, ref string) (string, error) {
+	var out struct {
+		SHA string `json:"sha"`
+	}
+	err := a.get(ctx, installationID, fmt.Sprintf("/repositories/%s/commits/%s", url.PathEscape(repositoryID), url.PathEscape(ref)), "application/vnd.github+json", &out)
+	return out.SHA, err
+}
+
 func (a *App) ReleaseHTML(ctx context.Context, installationID int64, repositoryID string, releaseID int64) (string, error) {
 	var out struct {
 		BodyHTML string `json:"body_html"`

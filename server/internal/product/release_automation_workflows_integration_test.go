@@ -4,21 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationnode"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
+	"github.com/lucsky/cuid"
 )
 
 // scriptedCopyModel answers every requested post and records what it was sent.
@@ -698,5 +706,248 @@ func TestAutomationArchivingUnusedDraftDoesNotCancelOtherWorkflows(t *testing.T)
 	history, err := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{})
 	if err != nil || len(history) != 1 || history[0].Run.CancelRequested {
 		t.Fatalf("unrelated run cancelled: %+v %v", history, err)
+	}
+}
+
+// captureFixture runs deployment → release → campaign → capture → render.
+type captureFixture struct {
+	*automationFixture
+	active   *AutomationDefinition
+	renderer *recordingRenderer
+	capturer *countingCapturer
+	surface  string
+	// version is what the app's version endpoint answers; empty is a 404.
+	version atomic.Value
+}
+
+type countingCapturer struct {
+	fakeCapturer
+	calls atomic.Int32
+}
+
+func (c *countingCapturer) Capture(ctx context.Context, page string) ([]byte, error) {
+	c.calls.Add(1)
+	return c.fakeCapturer.Capture(ctx, page)
+}
+
+func newCaptureFixture(t *testing.T, page string, action automation.Action) *captureFixture {
+	t.Helper()
+	f := &captureFixture{automationFixture: newAutomationFixture(t), renderer: &recordingRenderer{}, surface: "surface" + cuid.New()[:12]}
+	f.version.Store("")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/version":
+			version := f.version.Load().(string)
+			if version == "" {
+				http.NotFound(w, r)
+				return
+			}
+			_, _ = w.Write([]byte(`{"commit":"` + version + `"}`))
+		case "/dashboard":
+			http.Redirect(w, r, "/login?next=/dashboard", http.StatusFound)
+		case "/login":
+			_, _ = w.Write([]byte(`<form><input name="email"><input type="password" name="p"></form>`))
+		default:
+			_, _ = w.Write([]byte("<html>the product</html>"))
+		}
+	}))
+	t.Cleanup(server.Close)
+	f.capturer = &countingCapturer{fakeCapturer: fakeCapturer{shot: testPNG(t, 40)}}
+	f.repo.WithObjectStore(&recordingAssetObjects{}).WithCapturer(f.capturer).WithAutomationRenderer(f.renderer)
+	f.repo.web = routedClient(server)
+	_, port, _ := net.SplitHostPort(server.Listener.Addr().String())
+	f.exec(t, `INSERT INTO product_surface (id,"organizationId",name,slug,url,"featureTags","screenshotAssetIds","createdAt","updatedAt") VALUES ($1,$2,'App','app',$3,'[]','[]',now(),now())`,
+		f.surface, f.org, "https://example.com:"+port+page)
+	if err := f.repo.AdvertiseReleaseAutomationExecutor(f.ctx, "capture-worker"+f.id, f.repo.AutomationCapabilities()...); err != nil {
+		t.Fatal(err)
+	}
+	f.graph.SchemaVersion, f.graph.Family = 3, automation.Deployed
+	f.graph.Qualification = automation.Condition{Field: "deployment.environment", Operator: "eq", Values: []string{"production"}}
+	f.graph.Nodes[1].Condition = &automation.Condition{Field: "deployment.state", Operator: "eq", Values: []string{"success"}}
+	action.Type, action.SurfaceID = "capture_product", f.surface
+	action.Input = &automation.Reference{NodeID: "campaign", Output: "campaignId"}
+	f.graph.Nodes = append(f.graph.Nodes, automation.Node{ID: "capture", Type: "action", Action: &action},
+		automation.Node{ID: "art", Type: "action", Action: &automation.Action{Type: "render_creatives", Input: &automation.Reference{NodeID: "capture", Output: "campaignId"}, TemplateIDs: []string{"layout-browser-launch"}}})
+	f.graph.Nodes[4].Action.Input.NodeID = "art"
+	f.graph.Edges[4].To = "capture"
+	f.graph.Edges = append(f.graph.Edges, automation.Edge{From: "capture", To: "art", Branch: "next"}, automation.Edge{From: "art", To: "review", Branch: "next"})
+	f.active = f.activate(t)
+	return f
+}
+
+const deployedSHA = "abcdef1234567890abcdef1234567890abcdef12"
+
+// deploy delivers a successful deployment and runs the workflow to its campaign.
+func (f *captureFixture) deploy(t *testing.T, id int, environment string) string {
+	t.Helper()
+	body, _ := json.Marshal(map[string]any{"installation": map[string]any{"id": f.installation}, "repository": map[string]any{"id": 1001, "full_name": "acme/app"},
+		"deployment":        map[string]any{"id": id, "sha": deployedSHA, "environment": environment},
+		"deployment_status": map[string]any{"id": id + 1000, "state": "success", "created_at": time.Now().Format(time.RFC3339Nano)}})
+	if _, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{DeliveryID: "deployment-" + strconv.Itoa(id), EventName: "deployment_status", Body: body}); err != nil {
+		t.Fatal(err)
+	}
+	history, err := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{})
+	if err != nil || len(history) == 0 {
+		t.Fatalf("history=%+v err=%v", history, err)
+	}
+	runID := history[0].Run.ID
+	if _, err := f.repo.LoadReleaseAutomation(f.ctx, f.org, runID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.SelectReleaseAutomation(f.ctx, f.org, runID, *f.active.ActiveVersionID, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range []string{"release", "campaign"} {
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, node, nil, 0); err != nil {
+			t.Fatalf("%s: %v", node, err)
+		}
+	}
+	return runID
+}
+
+func (f *captureFixture) failureCode(t *testing.T, runID, node string) string {
+	t.Helper()
+	return f.db.Client.ReleaseAutomationNode.Query().Where(releaseautomationnode.RunID(runID), releaseautomationnode.NodeID(node)).OnlyX(f.ctx).FailureCode
+}
+
+func TestAutomationCaptureProductProvesTheDeployment(t *testing.T) {
+	f := newCaptureFixture(t, "/app", automation.Action{VersionPath: "/api/version"})
+	runID := f.deploy(t, 700, "production")
+	deployment := f.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(f.org)).OnlyX(f.ctx)
+
+	// No answer proves nothing; another commit means the deployment is not live.
+	// Both retry, and neither captures.
+	if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0); !errors.Is(err, ErrDeploymentUnverified) || PermanentAutomationError(err) || f.failureCode(t, runID, "capture") != "deployment_unverified" {
+		t.Fatalf("no version endpoint: %v", err)
+	}
+	f.version.Store("1111111111111111111111111111111111111111")
+	if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0); !errors.Is(err, ErrDeploymentNotLive) || PermanentAutomationError(err) || f.failureCode(t, runID, "capture") != "waiting_for_deployment" {
+		t.Fatalf("older commit live: %v", err)
+	}
+	if f.capturer.calls.Load() != 0 {
+		t.Fatal("a page was captured without version proof")
+	}
+
+	// The legacy capture ran first and may show the old page: its receipt is
+	// not this workflow's proof, though it stays in history.
+	unproven, older := "unproven"+f.id, "older"+f.id
+	if err := f.db.Client.Asset.Create().SetID(older).SetOrganizationID(f.org).SetObjectKey("org/" + f.org + "/capture/" + older + "/1/screen.png").SetMediaType("image/png").SetBytes(100).SetStatus(asset.StatusUPLOADED).Exec(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, `INSERT INTO surface_capture (id,"organizationId","surfaceId","assetId",source,"sourceId","capturedAt") VALUES ($1,$2,$3,$4,'deployment',$5,now())`, unproven, f.org, f.surface, older, deployment.ID)
+
+	// The app reports the commit, short form included: the capture is bound to it.
+	f.version.Store(deployedSHA[:12])
+	outputs, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receipt := f.db.Client.SurfaceCapture.GetX(f.ctx, outputs.CaptureID)
+	if outputs.CaptureProof != automation.CaptureProofVersion || outputs.CaptureAssetID != receipt.AssetID || receipt.AssetID == older || outputs.CampaignID == "" ||
+		receipt.ObservedRevision == nil || *receipt.ObservedRevision != deployedSHA || *receipt.SourceID != deployment.ID || receipt.OrganizationID != f.org || f.capturer.calls.Load() != 1 {
+		t.Fatalf("outputs=%+v receipt=%+v calls=%d", outputs, receipt, f.capturer.calls.Load())
+	}
+	if run := f.db.Client.ReleaseAutomationRun.GetX(f.ctx, runID); run.Outputs.CaptureID != outputs.CaptureID || run.Outputs.CaptureProof != automation.CaptureProofVersion {
+		t.Fatalf("run outputs=%+v", run.Outputs)
+	}
+	// The proven image supersedes the unproven one.
+	if row := f.db.Client.SurfaceCapture.GetX(f.ctx, unproven); row.SupersededAt == nil || receipt.SupersededAt != nil {
+		t.Fatalf("unproven=%+v proven=%+v", row, receipt)
+	}
+
+	// A crash after the commit: a retry reuses the receipt even though a newer
+	// commit is live by then, and takes no second screenshot.
+	f.version.Store("2222222222222222222222222222222222222222")
+	event := f.db.Client.ReleaseSourceEvent.Query().Where(releasesourceevent.OrganizationID(f.org)).OnlyX(f.ctx)
+	action := automation.FindNode(f.graph, "capture").Action
+	retried, err := f.repo.automationCaptureProduct(f.ctx, f.org, event, automation.Outputs{CampaignID: outputs.CampaignID}, action)
+	if err != nil || retried.CaptureID != outputs.CaptureID || f.capturer.calls.Load() != 1 {
+		t.Fatalf("retried=%+v err=%v calls=%d", retried, err, f.capturer.calls.Load())
+	}
+
+	// A newer image appears before the render: the render still shows this
+	// deployment's capture, not the latest.
+	manual := "manual" + f.id
+	if err := f.db.Client.Asset.Create().SetID(manual).SetOrganizationID(f.org).SetObjectKey("org/" + f.org + "/capture/" + manual + "/1/screen.png").SetMediaType("image/png").SetBytes(100).SetStatus(asset.StatusUPLOADED).Exec(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, `UPDATE surface_capture SET "supersededAt"=now() WHERE "surfaceId"=$1 AND "supersededAt" IS NULL`, f.surface)
+	f.exec(t, `INSERT INTO surface_capture (id,"organizationId","surfaceId","assetId",source,"capturedAt") VALUES ($1,$2,$3,$4,'manual',now())`, manual, f.org, f.surface, manual)
+	rendered, err := f.repo.AutomationNode(f.ctx, f.org, runID, "art", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.renderer.requests) != 1 || f.renderer.requests[0].CaptureAssetID != outputs.CaptureAssetID || rendered.CaptureID != outputs.CaptureID || len(rendered.DesignIDs) != 1 {
+		t.Fatalf("requests=%+v rendered=%+v", f.renderer.requests, rendered)
+	}
+}
+
+func TestAutomationCaptureProductLabelsCurrentStateAndRefusesWhatItCannotShow(t *testing.T) {
+	t.Run("current state is labeled and claims no revision", func(t *testing.T) {
+		f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+		outputs, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 710, "production"), "capture", nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if outputs.CaptureProof != automation.CaptureProofCurrentState || f.db.Client.SurfaceCapture.GetX(f.ctx, outputs.CaptureID).ObservedRevision != nil {
+			t.Fatalf("outputs=%+v", outputs)
+		}
+	})
+	t.Run("a sign-in redirect is never recorded as the page", func(t *testing.T) {
+		f := newCaptureFixture(t, "/dashboard", automation.Action{CurrentState: true})
+		runID := f.deploy(t, 720, "production")
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, runID, "capture", nil, 0); !errors.Is(err, ErrCaptureRefused) || !PermanentAutomationError(err) || f.failureCode(t, runID, "capture") != "capture_refused" {
+			t.Fatalf("sign-in page: %v", err)
+		}
+		if n := f.db.Client.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(f.surface)).CountX(f.ctx); n != 0 || f.capturer.calls.Load() != 0 {
+			t.Fatalf("captures=%d calls=%d", n, f.capturer.calls.Load())
+		}
+	})
+	t.Run("a surface registered at its sign-in page is that page", func(t *testing.T) {
+		f := newCaptureFixture(t, "/login", automation.Action{CurrentState: true})
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 730, "production"), "capture", nil, 0); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("a deployment that was not recorded has nothing to bind to", func(t *testing.T) {
+		f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+		if _, err := f.repo.AutomationNode(f.ctx, f.org, f.deploy(t, 740, "staging"), "capture", nil, 0); !errors.Is(err, ErrCaptureRefused) {
+			t.Fatalf("staging deployment: %v", err)
+		}
+	})
+	t.Run("another workspace's surface cannot be activated", func(t *testing.T) {
+		f := newCaptureFixture(t, "/app", automation.Action{CurrentState: true})
+		other := newTestWorkspace(t)
+		theirs := "theirs" + other.id
+		other.exec(t, `INSERT INTO product_surface (id,"organizationId",name,slug,url,"featureTags","screenshotAssetIds","createdAt","updatedAt") VALUES ($1,$2,'Theirs','theirs','https://theirs.example.com','[]','[]',now(),now())`, theirs, other.org)
+		for i := range f.graph.Nodes {
+			if f.graph.Nodes[i].ID == "capture" {
+				f.graph.Nodes[i].Action.SurfaceID = theirs
+			}
+		}
+		draft, err := f.repo.SaveReleaseAutomation(f.ctx, f.owner, SaveAutomationInput{SourceAppID: f.source.ID, Name: "Theirs", Priority: 20, Graph: f.graph, Layout: map[string]automation.Position{}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.repo.ActivateReleaseAutomation(f.ctx, f.owner, draft.ID, draft.Revision); err == nil {
+			t.Fatal("activated a workflow that captures another workspace's surface")
+		}
+	})
+}
+
+func TestAutomationCaptureProductNeedsACapableWorker(t *testing.T) {
+	f := newAutomationFixture(t)
+	f.repo.WithObjectStore(&recordingAssetObjects{}).WithCapturer(fakeCapturer{})
+	if !slices.Contains(f.repo.AutomationCapabilities(), automation.CapabilityCapture) {
+		t.Fatal("a worker that can capture does not advertise it")
+	}
+	if slices.Contains(NewConfiguration(f.db.Client).AutomationCapabilities(), automation.CapabilityCapture) {
+		t.Fatal("a worker that cannot capture advertised it")
+	}
+	if got := requiredCapabilities(automation.Graph{Nodes: []automation.Node{{Type: "action", Action: &automation.Action{Type: "capture_product"}}}}); !slices.Equal(got, []string{automation.CapabilityCapture}) {
+		t.Fatalf("required=%v", got)
 	}
 }

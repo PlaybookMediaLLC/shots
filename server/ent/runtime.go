@@ -30,12 +30,16 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchitem"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
@@ -70,6 +74,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
@@ -411,6 +416,66 @@ func init() {
 	campaignrevision.DefaultUpdatedAt = campaignrevisionDescUpdatedAt.Default.(func() time.Time)
 	// campaignrevision.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	campaignrevision.UpdateDefaultUpdatedAt = campaignrevisionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	captureattemptFields := schema.CaptureAttempt{}.Fields()
+	_ = captureattemptFields
+	// captureattemptDescFencingToken is the schema descriptor for fencing_token field.
+	captureattemptDescFencingToken := captureattemptFields[16].Descriptor()
+	// captureattempt.DefaultFencingToken holds the default value on creation for the fencing_token field.
+	captureattempt.DefaultFencingToken = captureattemptDescFencingToken.Default.(int64)
+	// captureattemptDescRefusedRequests is the schema descriptor for refused_requests field.
+	captureattemptDescRefusedRequests := captureattemptFields[17].Descriptor()
+	// captureattempt.DefaultRefusedRequests holds the default value on creation for the refused_requests field.
+	captureattempt.DefaultRefusedRequests = captureattemptDescRefusedRequests.Default.(int)
+	// captureattemptDescCreatedAt is the schema descriptor for created_at field.
+	captureattemptDescCreatedAt := captureattemptFields[19].Descriptor()
+	// captureattempt.DefaultCreatedAt holds the default value on creation for the created_at field.
+	captureattempt.DefaultCreatedAt = captureattemptDescCreatedAt.Default.(func() time.Time)
+	// captureattemptDescUpdatedAt is the schema descriptor for updated_at field.
+	captureattemptDescUpdatedAt := captureattemptFields[20].Descriptor()
+	// captureattempt.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	captureattempt.DefaultUpdatedAt = captureattemptDescUpdatedAt.Default.(func() time.Time)
+	// captureattempt.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	captureattempt.UpdateDefaultUpdatedAt = captureattemptDescUpdatedAt.UpdateDefault.(func() time.Time)
+	capturejobFields := schema.CaptureJob{}.Fields()
+	_ = capturejobFields
+	// capturejobDescAttempts is the schema descriptor for attempts field.
+	capturejobDescAttempts := capturejobFields[10].Descriptor()
+	// capturejob.DefaultAttempts holds the default value on creation for the attempts field.
+	capturejob.DefaultAttempts = capturejobDescAttempts.Default.(int)
+	// capturejobDescConnectionGeneration is the schema descriptor for connection_generation field.
+	capturejobDescConnectionGeneration := capturejobFields[13].Descriptor()
+	// capturejob.DefaultConnectionGeneration holds the default value on creation for the connection_generation field.
+	capturejob.DefaultConnectionGeneration = capturejobDescConnectionGeneration.Default.(int)
+	// capturejobDescFencingToken is the schema descriptor for fencing_token field.
+	capturejobDescFencingToken := capturejobFields[17].Descriptor()
+	// capturejob.DefaultFencingToken holds the default value on creation for the fencing_token field.
+	capturejob.DefaultFencingToken = capturejobDescFencingToken.Default.(int64)
+	// capturejobDescResumeCount is the schema descriptor for resume_count field.
+	capturejobDescResumeCount := capturejobFields[23].Descriptor()
+	// capturejob.DefaultResumeCount holds the default value on creation for the resume_count field.
+	capturejob.DefaultResumeCount = capturejobDescResumeCount.Default.(int)
+	// capturejobDescCreatedAt is the schema descriptor for created_at field.
+	capturejobDescCreatedAt := capturejobFields[24].Descriptor()
+	// capturejob.DefaultCreatedAt holds the default value on creation for the created_at field.
+	capturejob.DefaultCreatedAt = capturejobDescCreatedAt.Default.(func() time.Time)
+	// capturejobDescUpdatedAt is the schema descriptor for updated_at field.
+	capturejobDescUpdatedAt := capturejobFields[25].Descriptor()
+	// capturejob.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	capturejob.DefaultUpdatedAt = capturejobDescUpdatedAt.Default.(func() time.Time)
+	// capturejob.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	capturejob.UpdateDefaultUpdatedAt = capturejobDescUpdatedAt.UpdateDefault.(func() time.Time)
+	capturerecipeFields := schema.CaptureRecipe{}.Fields()
+	_ = capturerecipeFields
+	// capturerecipeDescCreatedAt is the schema descriptor for created_at field.
+	capturerecipeDescCreatedAt := capturerecipeFields[12].Descriptor()
+	// capturerecipe.DefaultCreatedAt holds the default value on creation for the created_at field.
+	capturerecipe.DefaultCreatedAt = capturerecipeDescCreatedAt.Default.(func() time.Time)
+	// capturerecipeDescUpdatedAt is the schema descriptor for updated_at field.
+	capturerecipeDescUpdatedAt := capturerecipeFields[13].Descriptor()
+	// capturerecipe.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	capturerecipe.DefaultUpdatedAt = capturerecipeDescUpdatedAt.Default.(func() time.Time)
+	// capturerecipe.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	capturerecipe.UpdateDefaultUpdatedAt = capturerecipeDescUpdatedAt.UpdateDefault.(func() time.Time)
 	channelconnectionFields := schema.ChannelConnection{}.Fields()
 	_ = channelconnectionFields
 	// channelconnectionDescProvider is the schema descriptor for provider field.
@@ -481,20 +546,36 @@ func init() {
 	contentbatch.UpdateDefaultUpdatedAt = contentbatchDescUpdatedAt.UpdateDefault.(func() time.Time)
 	contentbatchitemFields := schema.ContentBatchItem{}.Fields()
 	_ = contentbatchitemFields
+	// contentbatchitemDescSourceKey is the schema descriptor for source_key field.
+	contentbatchitemDescSourceKey := contentbatchitemFields[5].Descriptor()
+	// contentbatchitem.DefaultSourceKey holds the default value on creation for the source_key field.
+	contentbatchitem.DefaultSourceKey = contentbatchitemDescSourceKey.Default.(string)
 	// contentbatchitemDescCaption is the schema descriptor for caption field.
-	contentbatchitemDescCaption := contentbatchitemFields[6].Descriptor()
+	contentbatchitemDescCaption := contentbatchitemFields[7].Descriptor()
 	// contentbatchitem.DefaultCaption holds the default value on creation for the caption field.
 	contentbatchitem.DefaultCaption = contentbatchitemDescCaption.Default.(string)
 	// contentbatchitemDescCreatedAt is the schema descriptor for created_at field.
-	contentbatchitemDescCreatedAt := contentbatchitemFields[11].Descriptor()
+	contentbatchitemDescCreatedAt := contentbatchitemFields[13].Descriptor()
 	// contentbatchitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentbatchitem.DefaultCreatedAt = contentbatchitemDescCreatedAt.Default.(func() time.Time)
 	// contentbatchitemDescUpdatedAt is the schema descriptor for updated_at field.
-	contentbatchitemDescUpdatedAt := contentbatchitemFields[12].Descriptor()
+	contentbatchitemDescUpdatedAt := contentbatchitemFields[14].Descriptor()
 	// contentbatchitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentbatchitem.DefaultUpdatedAt = contentbatchitemDescUpdatedAt.Default.(func() time.Time)
 	// contentbatchitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	contentbatchitem.UpdateDefaultUpdatedAt = contentbatchitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	contentbatchrunFields := schema.ContentBatchRun{}.Fields()
+	_ = contentbatchrunFields
+	// contentbatchrunDescCreatedAt is the schema descriptor for created_at field.
+	contentbatchrunDescCreatedAt := contentbatchrunFields[9].Descriptor()
+	// contentbatchrun.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentbatchrun.DefaultCreatedAt = contentbatchrunDescCreatedAt.Default.(func() time.Time)
+	// contentbatchrunDescUpdatedAt is the schema descriptor for updated_at field.
+	contentbatchrunDescUpdatedAt := contentbatchrunFields[10].Descriptor()
+	// contentbatchrun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	contentbatchrun.DefaultUpdatedAt = contentbatchrunDescUpdatedAt.Default.(func() time.Time)
+	// contentbatchrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	contentbatchrun.UpdateDefaultUpdatedAt = contentbatchrunDescUpdatedAt.UpdateDefault.(func() time.Time)
 	contentdraftFields := schema.ContentDraft{}.Fields()
 	_ = contentdraftFields
 	// contentdraftDescDiscussions is the schema descriptor for discussions field.
@@ -1135,6 +1216,30 @@ func init() {
 	permissiongroup.DefaultUpdatedAt = permissiongroupDescUpdatedAt.Default.(func() time.Time)
 	// permissiongroup.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	permissiongroup.UpdateDefaultUpdatedAt = permissiongroupDescUpdatedAt.UpdateDefault.(func() time.Time)
+	platformappconnectionFields := schema.PlatformAppConnection{}.Fields()
+	_ = platformappconnectionFields
+	// platformappconnectionDescGeneration is the schema descriptor for generation field.
+	platformappconnectionDescGeneration := platformappconnectionFields[13].Descriptor()
+	// platformappconnection.DefaultGeneration holds the default value on creation for the generation field.
+	platformappconnection.DefaultGeneration = platformappconnectionDescGeneration.Default.(int)
+	// platformappconnectionDescStateRevision is the schema descriptor for state_revision field.
+	platformappconnectionDescStateRevision := platformappconnectionFields[14].Descriptor()
+	// platformappconnection.DefaultStateRevision holds the default value on creation for the state_revision field.
+	platformappconnection.DefaultStateRevision = platformappconnectionDescStateRevision.Default.(int)
+	// platformappconnectionDescLeaseToken is the schema descriptor for lease_token field.
+	platformappconnectionDescLeaseToken := platformappconnectionFields[24].Descriptor()
+	// platformappconnection.DefaultLeaseToken holds the default value on creation for the lease_token field.
+	platformappconnection.DefaultLeaseToken = platformappconnectionDescLeaseToken.Default.(int64)
+	// platformappconnectionDescCreatedAt is the schema descriptor for created_at field.
+	platformappconnectionDescCreatedAt := platformappconnectionFields[28].Descriptor()
+	// platformappconnection.DefaultCreatedAt holds the default value on creation for the created_at field.
+	platformappconnection.DefaultCreatedAt = platformappconnectionDescCreatedAt.Default.(func() time.Time)
+	// platformappconnectionDescUpdatedAt is the schema descriptor for updated_at field.
+	platformappconnectionDescUpdatedAt := platformappconnectionFields[29].Descriptor()
+	// platformappconnection.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	platformappconnection.DefaultUpdatedAt = platformappconnectionDescUpdatedAt.Default.(func() time.Time)
+	// platformappconnection.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	platformappconnection.UpdateDefaultUpdatedAt = platformappconnectionDescUpdatedAt.UpdateDefault.(func() time.Time)
 	platformautodmcampaignFields := schema.PlatformAutoDMCampaign{}.Fields()
 	_ = platformautodmcampaignFields
 	// platformautodmcampaignDescDisabled is the schema descriptor for disabled field.

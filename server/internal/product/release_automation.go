@@ -13,6 +13,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/githubinstallation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	releaseautomation "github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationexecutor"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationversion"
@@ -190,6 +191,25 @@ func (c *Configuration) SaveReleaseAutomation(ctx context.Context, actor Actor, 
 
 func (c *Configuration) automationResources(ctx context.Context, org string, graph automation.Graph) error {
 	for _, node := range graph.Nodes {
+		if node.Action != nil && node.Action.Type == "capture_product" {
+			var owned bool
+			var err error
+			if node.Action.RecipeID != "" {
+				_, err = activeRecipeVersion(ctx, c.client.CaptureRecipe, org, node.Action.RecipeID)
+				owned = err == nil
+				if ent.IsNotFound(err) {
+					err = nil
+				}
+			} else {
+				owned, err = c.client.ProductSurface.Query().Where(productsurface.ID(node.Action.SurfaceID), productsurface.OrganizationID(org)).Exist(ctx)
+			}
+			if err != nil {
+				return err
+			}
+			if !owned {
+				return publishing.ErrNotFound
+			}
+		}
 		if node.Action == nil || node.Action.Type != "create_campaign" {
 			continue
 		}
@@ -266,6 +286,10 @@ func requiredCapabilities(graph automation.Graph) []string {
 			capability = automation.CapabilityRender
 		case n.Action != nil && n.Action.Type == "create_canvas":
 			capability = automation.CapabilityCanvas
+		case n.Action != nil && n.Action.Type == "capture_product" && n.Action.RecipeID != "":
+			capability = automation.CapabilityBrowser
+		case n.Action != nil && n.Action.Type == "capture_product":
+			capability = automation.CapabilityCapture
 		}
 		if capability != "" && !slices.Contains(required, capability) {
 			required = append(required, capability)

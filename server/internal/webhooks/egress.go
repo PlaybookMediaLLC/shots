@@ -2,18 +2,13 @@ package webhooks
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 )
 
 // ErrUnsafeEndpoint refuses an endpoint the platform will not call.
@@ -86,28 +81,13 @@ func portSuffix(u *url.URL) string {
 }
 
 // errBlockedDestination marks a dial refused because the address is not public.
-var errBlockedDestination = errors.New("blocked destination")
+var errBlockedDestination = publicnet.ErrBlocked
 
 // NewHTTPClient is the delivery client: it dials only public addresses
 // (checked on the address actually dialed, so DNS rebinding cannot reach a
 // private one), uses no environment proxy, never follows a redirect, and
 // gives up after ten seconds.
 func NewHTTPClient() *http.Client {
-	dialer := &net.Dialer{Timeout: 5 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
-		host, _, err := net.SplitHostPort(address)
-		if err != nil {
-			return err
-		}
-		parsed, err := netip.ParseAddr(host)
-		if err != nil || !PublicAddress(parsed) {
-			return fmt.Errorf("%w: %s", errBlockedDestination, host)
-		}
-		return nil
-	}}
-	transport := telemetry.UntracedTransport.Clone()
-	transport.Proxy = nil
-	transport.DialContext = dialer.DialContext
-	transport.MaxResponseHeaderBytes = 16 << 10
-	return &http.Client{Transport: transport, Timeout: 10 * time.Second,
+	return &http.Client{Transport: publicnet.Transport(), Timeout: 10 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }

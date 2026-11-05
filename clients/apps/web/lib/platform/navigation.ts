@@ -96,6 +96,7 @@ export const AUTOMATE_LINKS = [
   { href: '/workflows', label: 'Workflows' },
   { href: '/workflows/runs', label: 'Runs' },
   { href: '/workflows/deployments', label: 'Deployments' },
+  { href: '/workflows/connections', label: 'Signed-in capture' },
   { href: '/workflows?view=sources', label: 'Sources' },
 ]
 export const CREATE_LINKS = [
@@ -156,6 +157,7 @@ export function publishLinks(scope = '') {
   return [
     { href: `/publish${scope}`, label: 'Drafts' },
     { href: `/publish/calendar${scope}`, label: 'Calendar' },
+    { href: `/publish/batches${scope}`, label: 'Bulk tools' },
     { href: `/publish/analyze${scope}`, label: 'Analyze' },
     { href: `/publish/link-checks${scope}`, label: 'Link checks' },
   ]

@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/config"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/enrichment"
@@ -28,6 +30,8 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/tenantpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalbatches"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalcapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalmaintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalonboarding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
@@ -166,7 +170,18 @@ func main() {
 		slog.Error("invalid GitHub App configuration")
 		os.Exit(1)
 	}
-	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore)
+	// Batch submits schedule here, so this store judges an account as the API does.
+	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore).WithAccountStanding(provider).
+		WithCapturer(capture.FromEnvironment())
+	captureKeys, err := sessionstate.FromEnvironment()
+	if err != nil {
+		slog.Error("invalid capture session key")
+		os.Exit(1)
+	}
+	captureProvider := browser.FromEnvironment()
+	if captureKeys != nil && captureProvider != nil {
+		automationStore.WithAuthenticatedCapture(browser.Runner{Provider: captureProvider}, captureKeys)
+	}
 	if github != nil {
 		// render_code_visual reads a merged pull request's diff only where its owner allowed it.
 		automationStore.WithGitHubApp(github).WithCodeReader(github)
@@ -194,6 +209,53 @@ func main() {
 		}
 		automationStore.WithMonthlyMeter(meter)
 	}
+	// A batch submit schedules with the same media, standing and quota as the API.
+	if os.Getenv("PLATFORM_E2E_DRAFT_PLATFORM") == "enabled" {
+		product.EnableE2EDraftPlatform()
+	}
+	if !slices.Contains(cfg.ExcludedQueues, temporalbatches.TaskQueue) {
+		batchWorker := worker.New(temporalClient, temporalbatches.TaskQueue, worker.Options{
+			MaxConcurrentActivityExecutionSize: max(1, 5/cfg.WorkerConcurrencyDivider),
+			OnFatalError:                       func(err error) { slog.Error("Temporal batch worker failed", "error", err); stop() },
+		})
+		temporalbatches.Register(batchWorker, &temporalbatches.Activities{Publisher: scheduler, Store: automationStore})
+		if err := batchWorker.Start(); err != nil {
+			slog.Error("batch worker did not start", "error", err)
+			os.Exit(1)
+		}
+		defer batchWorker.Stop()
+	}
+	if automationStore.CaptureAvailable() && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
+		captureWorker := worker.New(temporalClient, temporalcapture.TaskQueue, worker.Options{
+			// Shared with design rendering's provider account: a low ceiling keeps
+			// capacity for renders, and a stalled page holds one slot, not the queue.
+			MaxConcurrentActivityExecutionSize: max(1, 3/cfg.WorkerConcurrencyDivider), MaxHeartbeatThrottleInterval: 5 * time.Second,
+			OnFatalError: func(err error) { slog.Error("Temporal capture worker failed"); stop() },
+		})
+		temporalcapture.Register(captureWorker, &temporalcapture.Activities{Store: automationStore})
+		if err := captureWorker.Start(); err != nil {
+			slog.Error("capture worker did not start")
+			os.Exit(1)
+		}
+		defer captureWorker.Stop()
+		go func() {
+			ticker := time.NewTicker(time.Minute)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+				}
+				reclaimCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
+				if err := automationStore.ReclaimCaptureResources(reclaimCtx); err != nil {
+					slog.Warn("capture cleanup did not finish")
+				}
+				cancel()
+			}
+		}()
+	}
+
 	if !slices.Contains(cfg.ExcludedQueues, temporalreleaseautomation.TaskQueue) {
 		automationWorker := worker.New(temporalClient, temporalreleaseautomation.TaskQueue, worker.Options{
 			MaxConcurrentActivityExecutionSize: max(1, 5/cfg.WorkerConcurrencyDivider), MaxHeartbeatThrottleInterval: 5 * time.Second,
@@ -238,6 +300,7 @@ func main() {
 			events.WithObjectStore(objectStore)
 		}
 		events.WithAutomationDispatcher(&temporalreleaseautomation.Client{Temporal: temporalClient})
+		events.WithCaptureDispatcher(&temporalcapture.Client{Temporal: temporalClient})
 		if github != nil {
 			events.WithGitHubApp(github)
 		}

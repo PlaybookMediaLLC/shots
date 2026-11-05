@@ -39,12 +39,16 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentangle"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatch"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchitem"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentbatchrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftfinisher"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
@@ -80,6 +84,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroupmember"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmoptout"
@@ -194,6 +199,12 @@ type Client struct {
 	CampaignPost *CampaignPostClient
 	// CampaignRevision is the client for interacting with the CampaignRevision builders.
 	CampaignRevision *CampaignRevisionClient
+	// CaptureAttempt is the client for interacting with the CaptureAttempt builders.
+	CaptureAttempt *CaptureAttemptClient
+	// CaptureJob is the client for interacting with the CaptureJob builders.
+	CaptureJob *CaptureJobClient
+	// CaptureRecipe is the client for interacting with the CaptureRecipe builders.
+	CaptureRecipe *CaptureRecipeClient
 	// ChannelConnection is the client for interacting with the ChannelConnection builders.
 	ChannelConnection *ChannelConnectionClient
 	// CommunicationAttempt is the client for interacting with the CommunicationAttempt builders.
@@ -206,6 +217,8 @@ type Client struct {
 	ContentBatch *ContentBatchClient
 	// ContentBatchItem is the client for interacting with the ContentBatchItem builders.
 	ContentBatchItem *ContentBatchItemClient
+	// ContentBatchRun is the client for interacting with the ContentBatchRun builders.
+	ContentBatchRun *ContentBatchRunClient
 	// ContentDraft is the client for interacting with the ContentDraft builders.
 	ContentDraft *ContentDraftClient
 	// ContentDraftFinisher is the client for interacting with the ContentDraftFinisher builders.
@@ -276,6 +289,8 @@ type Client struct {
 	PermissionGroup *PermissionGroupClient
 	// PermissionGroupMember is the client for interacting with the PermissionGroupMember builders.
 	PermissionGroupMember *PermissionGroupMemberClient
+	// PlatformAppConnection is the client for interacting with the PlatformAppConnection builders.
+	PlatformAppConnection *PlatformAppConnectionClient
 	// PlatformAutoDMCampaign is the client for interacting with the PlatformAutoDMCampaign builders.
 	PlatformAutoDMCampaign *PlatformAutoDMCampaignClient
 	// PlatformAutoDMDelivery is the client for interacting with the PlatformAutoDMDelivery builders.
@@ -429,12 +444,16 @@ func (c *Client) init() {
 	c.CampaignPlan = NewCampaignPlanClient(c.config)
 	c.CampaignPost = NewCampaignPostClient(c.config)
 	c.CampaignRevision = NewCampaignRevisionClient(c.config)
+	c.CaptureAttempt = NewCaptureAttemptClient(c.config)
+	c.CaptureJob = NewCaptureJobClient(c.config)
+	c.CaptureRecipe = NewCaptureRecipeClient(c.config)
 	c.ChannelConnection = NewChannelConnectionClient(c.config)
 	c.CommunicationAttempt = NewCommunicationAttemptClient(c.config)
 	c.CommunicationRecipient = NewCommunicationRecipientClient(c.config)
 	c.ContentAngle = NewContentAngleClient(c.config)
 	c.ContentBatch = NewContentBatchClient(c.config)
 	c.ContentBatchItem = NewContentBatchItemClient(c.config)
+	c.ContentBatchRun = NewContentBatchRunClient(c.config)
 	c.ContentDraft = NewContentDraftClient(c.config)
 	c.ContentDraftFinisher = NewContentDraftFinisherClient(c.config)
 	c.ContentDraftRevision = NewContentDraftRevisionClient(c.config)
@@ -470,6 +489,7 @@ func (c *Client) init() {
 	c.PageKnowledge = NewPageKnowledgeClient(c.config)
 	c.PermissionGroup = NewPermissionGroupClient(c.config)
 	c.PermissionGroupMember = NewPermissionGroupMemberClient(c.config)
+	c.PlatformAppConnection = NewPlatformAppConnectionClient(c.config)
 	c.PlatformAutoDMCampaign = NewPlatformAutoDMCampaignClient(c.config)
 	c.PlatformAutoDMDelivery = NewPlatformAutoDMDeliveryClient(c.config)
 	c.PlatformAutoDMOptOut = NewPlatformAutoDMOptOutClient(c.config)
@@ -645,12 +665,16 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CampaignPlan:                    NewCampaignPlanClient(cfg),
 		CampaignPost:                    NewCampaignPostClient(cfg),
 		CampaignRevision:                NewCampaignRevisionClient(cfg),
+		CaptureAttempt:                  NewCaptureAttemptClient(cfg),
+		CaptureJob:                      NewCaptureJobClient(cfg),
+		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
 		CommunicationAttempt:            NewCommunicationAttemptClient(cfg),
 		CommunicationRecipient:          NewCommunicationRecipientClient(cfg),
 		ContentAngle:                    NewContentAngleClient(cfg),
 		ContentBatch:                    NewContentBatchClient(cfg),
 		ContentBatchItem:                NewContentBatchItemClient(cfg),
+		ContentBatchRun:                 NewContentBatchRunClient(cfg),
 		ContentDraft:                    NewContentDraftClient(cfg),
 		ContentDraftFinisher:            NewContentDraftFinisherClient(cfg),
 		ContentDraftRevision:            NewContentDraftRevisionClient(cfg),
@@ -686,6 +710,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PageKnowledge:                   NewPageKnowledgeClient(cfg),
 		PermissionGroup:                 NewPermissionGroupClient(cfg),
 		PermissionGroupMember:           NewPermissionGroupMemberClient(cfg),
+		PlatformAppConnection:           NewPlatformAppConnectionClient(cfg),
 		PlatformAutoDMCampaign:          NewPlatformAutoDMCampaignClient(cfg),
 		PlatformAutoDMDelivery:          NewPlatformAutoDMDeliveryClient(cfg),
 		PlatformAutoDMOptOut:            NewPlatformAutoDMOptOutClient(cfg),
@@ -788,12 +813,16 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CampaignPlan:                    NewCampaignPlanClient(cfg),
 		CampaignPost:                    NewCampaignPostClient(cfg),
 		CampaignRevision:                NewCampaignRevisionClient(cfg),
+		CaptureAttempt:                  NewCaptureAttemptClient(cfg),
+		CaptureJob:                      NewCaptureJobClient(cfg),
+		CaptureRecipe:                   NewCaptureRecipeClient(cfg),
 		ChannelConnection:               NewChannelConnectionClient(cfg),
 		CommunicationAttempt:            NewCommunicationAttemptClient(cfg),
 		CommunicationRecipient:          NewCommunicationRecipientClient(cfg),
 		ContentAngle:                    NewContentAngleClient(cfg),
 		ContentBatch:                    NewContentBatchClient(cfg),
 		ContentBatchItem:                NewContentBatchItemClient(cfg),
+		ContentBatchRun:                 NewContentBatchRunClient(cfg),
 		ContentDraft:                    NewContentDraftClient(cfg),
 		ContentDraftFinisher:            NewContentDraftFinisherClient(cfg),
 		ContentDraftRevision:            NewContentDraftRevisionClient(cfg),
@@ -829,6 +858,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PageKnowledge:                   NewPageKnowledgeClient(cfg),
 		PermissionGroup:                 NewPermissionGroupClient(cfg),
 		PermissionGroupMember:           NewPermissionGroupMemberClient(cfg),
+		PlatformAppConnection:           NewPlatformAppConnectionClient(cfg),
 		PlatformAutoDMCampaign:          NewPlatformAutoDMCampaignClient(cfg),
 		PlatformAutoDMDelivery:          NewPlatformAutoDMDeliveryClient(cfg),
 		PlatformAutoDMOptOut:            NewPlatformAutoDMOptOutClient(cfg),
@@ -923,8 +953,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
-		c.ChannelConnection, c.CommunicationAttempt, c.CommunicationRecipient,
-		c.ContentAngle, c.ContentBatch, c.ContentBatchItem, c.ContentDraft,
+		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
+		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
+		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
 		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
 		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
 		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
@@ -935,12 +966,13 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
 		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
 		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
-		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
-		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
-		c.PlatformDraftImport, c.PlatformNotificationDelivery,
-		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
-		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
-		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
+		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
+		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
+		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
+		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
+		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
+		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -970,8 +1002,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
 		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
 		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
-		c.ChannelConnection, c.CommunicationAttempt, c.CommunicationRecipient,
-		c.ContentAngle, c.ContentBatch, c.ContentBatchItem, c.ContentDraft,
+		c.CaptureAttempt, c.CaptureJob, c.CaptureRecipe, c.ChannelConnection,
+		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
+		c.ContentBatch, c.ContentBatchItem, c.ContentBatchRun, c.ContentDraft,
 		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
 		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
 		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
@@ -982,12 +1015,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
 		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
 		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
-		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
-		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
-		c.PlatformDraftImport, c.PlatformNotificationDelivery,
-		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
-		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
-		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
+		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
+		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
+		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
+		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
+		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
+		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -1058,6 +1092,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CampaignPost.mutate(ctx, m)
 	case *CampaignRevisionMutation:
 		return c.CampaignRevision.mutate(ctx, m)
+	case *CaptureAttemptMutation:
+		return c.CaptureAttempt.mutate(ctx, m)
+	case *CaptureJobMutation:
+		return c.CaptureJob.mutate(ctx, m)
+	case *CaptureRecipeMutation:
+		return c.CaptureRecipe.mutate(ctx, m)
 	case *ChannelConnectionMutation:
 		return c.ChannelConnection.mutate(ctx, m)
 	case *CommunicationAttemptMutation:
@@ -1070,6 +1110,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ContentBatch.mutate(ctx, m)
 	case *ContentBatchItemMutation:
 		return c.ContentBatchItem.mutate(ctx, m)
+	case *ContentBatchRunMutation:
+		return c.ContentBatchRun.mutate(ctx, m)
 	case *ContentDraftMutation:
 		return c.ContentDraft.mutate(ctx, m)
 	case *ContentDraftFinisherMutation:
@@ -1140,6 +1182,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PermissionGroup.mutate(ctx, m)
 	case *PermissionGroupMemberMutation:
 		return c.PermissionGroupMember.mutate(ctx, m)
+	case *PlatformAppConnectionMutation:
+		return c.PlatformAppConnection.mutate(ctx, m)
 	case *PlatformAutoDMCampaignMutation:
 		return c.PlatformAutoDMCampaign.mutate(ctx, m)
 	case *PlatformAutoDMDeliveryMutation:
@@ -4487,6 +4531,405 @@ func (c *CampaignRevisionClient) mutate(ctx context.Context, m *CampaignRevision
 	}
 }
 
+// CaptureAttemptClient is a client for the CaptureAttempt schema.
+type CaptureAttemptClient struct {
+	config
+}
+
+// NewCaptureAttemptClient returns a client for the CaptureAttempt from the given config.
+func NewCaptureAttemptClient(c config) *CaptureAttemptClient {
+	return &CaptureAttemptClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `captureattempt.Hooks(f(g(h())))`.
+func (c *CaptureAttemptClient) Use(hooks ...Hook) {
+	c.hooks.CaptureAttempt = append(c.hooks.CaptureAttempt, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `captureattempt.Intercept(f(g(h())))`.
+func (c *CaptureAttemptClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureAttempt = append(c.inters.CaptureAttempt, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureAttempt entity.
+func (c *CaptureAttemptClient) Create() *CaptureAttemptCreate {
+	mutation := newCaptureAttemptMutation(c.config, OpCreate)
+	return &CaptureAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureAttempt entities.
+func (c *CaptureAttemptClient) CreateBulk(builders ...*CaptureAttemptCreate) *CaptureAttemptCreateBulk {
+	return &CaptureAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureAttemptClient) MapCreateBulk(slice any, setFunc func(*CaptureAttemptCreate, int)) *CaptureAttemptCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureAttemptCreateBulk{err: fmt.Errorf("calling to CaptureAttemptClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureAttemptCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureAttemptCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureAttempt.
+func (c *CaptureAttemptClient) Update() *CaptureAttemptUpdate {
+	mutation := newCaptureAttemptMutation(c.config, OpUpdate)
+	return &CaptureAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureAttemptClient) UpdateOne(_m *CaptureAttempt) *CaptureAttemptUpdateOne {
+	mutation := newCaptureAttemptMutation(c.config, OpUpdateOne, withCaptureAttempt(_m))
+	return &CaptureAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureAttemptClient) UpdateOneID(id string) *CaptureAttemptUpdateOne {
+	mutation := newCaptureAttemptMutation(c.config, OpUpdateOne, withCaptureAttemptID(id))
+	return &CaptureAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureAttempt.
+func (c *CaptureAttemptClient) Delete() *CaptureAttemptDelete {
+	mutation := newCaptureAttemptMutation(c.config, OpDelete)
+	return &CaptureAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureAttemptClient) DeleteOne(_m *CaptureAttempt) *CaptureAttemptDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureAttemptClient) DeleteOneID(id string) *CaptureAttemptDeleteOne {
+	builder := c.Delete().Where(captureattempt.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureAttemptDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureAttempt.
+func (c *CaptureAttemptClient) Query() *CaptureAttemptQuery {
+	return &CaptureAttemptQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureAttempt},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureAttempt entity by its id.
+func (c *CaptureAttemptClient) Get(ctx context.Context, id string) (*CaptureAttempt, error) {
+	return c.Query().Where(captureattempt.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureAttemptClient) GetX(ctx context.Context, id string) *CaptureAttempt {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureAttemptClient) Hooks() []Hook {
+	return c.hooks.CaptureAttempt
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureAttemptClient) Interceptors() []Interceptor {
+	return c.inters.CaptureAttempt
+}
+
+func (c *CaptureAttemptClient) mutate(ctx context.Context, m *CaptureAttemptMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureAttemptCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureAttemptUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureAttemptUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureAttemptDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureAttempt mutation op: %q", m.Op())
+	}
+}
+
+// CaptureJobClient is a client for the CaptureJob schema.
+type CaptureJobClient struct {
+	config
+}
+
+// NewCaptureJobClient returns a client for the CaptureJob from the given config.
+func NewCaptureJobClient(c config) *CaptureJobClient {
+	return &CaptureJobClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `capturejob.Hooks(f(g(h())))`.
+func (c *CaptureJobClient) Use(hooks ...Hook) {
+	c.hooks.CaptureJob = append(c.hooks.CaptureJob, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `capturejob.Intercept(f(g(h())))`.
+func (c *CaptureJobClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureJob = append(c.inters.CaptureJob, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureJob entity.
+func (c *CaptureJobClient) Create() *CaptureJobCreate {
+	mutation := newCaptureJobMutation(c.config, OpCreate)
+	return &CaptureJobCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureJob entities.
+func (c *CaptureJobClient) CreateBulk(builders ...*CaptureJobCreate) *CaptureJobCreateBulk {
+	return &CaptureJobCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureJobClient) MapCreateBulk(slice any, setFunc func(*CaptureJobCreate, int)) *CaptureJobCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureJobCreateBulk{err: fmt.Errorf("calling to CaptureJobClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureJobCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureJobCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureJob.
+func (c *CaptureJobClient) Update() *CaptureJobUpdate {
+	mutation := newCaptureJobMutation(c.config, OpUpdate)
+	return &CaptureJobUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureJobClient) UpdateOne(_m *CaptureJob) *CaptureJobUpdateOne {
+	mutation := newCaptureJobMutation(c.config, OpUpdateOne, withCaptureJob(_m))
+	return &CaptureJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureJobClient) UpdateOneID(id string) *CaptureJobUpdateOne {
+	mutation := newCaptureJobMutation(c.config, OpUpdateOne, withCaptureJobID(id))
+	return &CaptureJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureJob.
+func (c *CaptureJobClient) Delete() *CaptureJobDelete {
+	mutation := newCaptureJobMutation(c.config, OpDelete)
+	return &CaptureJobDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureJobClient) DeleteOne(_m *CaptureJob) *CaptureJobDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureJobClient) DeleteOneID(id string) *CaptureJobDeleteOne {
+	builder := c.Delete().Where(capturejob.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureJobDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureJob.
+func (c *CaptureJobClient) Query() *CaptureJobQuery {
+	return &CaptureJobQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureJob},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureJob entity by its id.
+func (c *CaptureJobClient) Get(ctx context.Context, id string) (*CaptureJob, error) {
+	return c.Query().Where(capturejob.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureJobClient) GetX(ctx context.Context, id string) *CaptureJob {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureJobClient) Hooks() []Hook {
+	return c.hooks.CaptureJob
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureJobClient) Interceptors() []Interceptor {
+	return c.inters.CaptureJob
+}
+
+func (c *CaptureJobClient) mutate(ctx context.Context, m *CaptureJobMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureJobCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureJobUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureJobUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureJobDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureJob mutation op: %q", m.Op())
+	}
+}
+
+// CaptureRecipeClient is a client for the CaptureRecipe schema.
+type CaptureRecipeClient struct {
+	config
+}
+
+// NewCaptureRecipeClient returns a client for the CaptureRecipe from the given config.
+func NewCaptureRecipeClient(c config) *CaptureRecipeClient {
+	return &CaptureRecipeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `capturerecipe.Hooks(f(g(h())))`.
+func (c *CaptureRecipeClient) Use(hooks ...Hook) {
+	c.hooks.CaptureRecipe = append(c.hooks.CaptureRecipe, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `capturerecipe.Intercept(f(g(h())))`.
+func (c *CaptureRecipeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CaptureRecipe = append(c.inters.CaptureRecipe, interceptors...)
+}
+
+// Create returns a builder for creating a CaptureRecipe entity.
+func (c *CaptureRecipeClient) Create() *CaptureRecipeCreate {
+	mutation := newCaptureRecipeMutation(c.config, OpCreate)
+	return &CaptureRecipeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CaptureRecipe entities.
+func (c *CaptureRecipeClient) CreateBulk(builders ...*CaptureRecipeCreate) *CaptureRecipeCreateBulk {
+	return &CaptureRecipeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CaptureRecipeClient) MapCreateBulk(slice any, setFunc func(*CaptureRecipeCreate, int)) *CaptureRecipeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CaptureRecipeCreateBulk{err: fmt.Errorf("calling to CaptureRecipeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CaptureRecipeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CaptureRecipeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CaptureRecipe.
+func (c *CaptureRecipeClient) Update() *CaptureRecipeUpdate {
+	mutation := newCaptureRecipeMutation(c.config, OpUpdate)
+	return &CaptureRecipeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CaptureRecipeClient) UpdateOne(_m *CaptureRecipe) *CaptureRecipeUpdateOne {
+	mutation := newCaptureRecipeMutation(c.config, OpUpdateOne, withCaptureRecipe(_m))
+	return &CaptureRecipeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CaptureRecipeClient) UpdateOneID(id string) *CaptureRecipeUpdateOne {
+	mutation := newCaptureRecipeMutation(c.config, OpUpdateOne, withCaptureRecipeID(id))
+	return &CaptureRecipeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CaptureRecipe.
+func (c *CaptureRecipeClient) Delete() *CaptureRecipeDelete {
+	mutation := newCaptureRecipeMutation(c.config, OpDelete)
+	return &CaptureRecipeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CaptureRecipeClient) DeleteOne(_m *CaptureRecipe) *CaptureRecipeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CaptureRecipeClient) DeleteOneID(id string) *CaptureRecipeDeleteOne {
+	builder := c.Delete().Where(capturerecipe.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CaptureRecipeDeleteOne{builder}
+}
+
+// Query returns a query builder for CaptureRecipe.
+func (c *CaptureRecipeClient) Query() *CaptureRecipeQuery {
+	return &CaptureRecipeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCaptureRecipe},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CaptureRecipe entity by its id.
+func (c *CaptureRecipeClient) Get(ctx context.Context, id string) (*CaptureRecipe, error) {
+	return c.Query().Where(capturerecipe.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CaptureRecipeClient) GetX(ctx context.Context, id string) *CaptureRecipe {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CaptureRecipeClient) Hooks() []Hook {
+	return c.hooks.CaptureRecipe
+}
+
+// Interceptors returns the client interceptors.
+func (c *CaptureRecipeClient) Interceptors() []Interceptor {
+	return c.inters.CaptureRecipe
+}
+
+func (c *CaptureRecipeClient) mutate(ctx context.Context, m *CaptureRecipeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CaptureRecipeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CaptureRecipeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CaptureRecipeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CaptureRecipeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CaptureRecipe mutation op: %q", m.Op())
+	}
+}
+
 // ChannelConnectionClient is a client for the ChannelConnection schema.
 type ChannelConnectionClient struct {
 	config
@@ -5298,6 +5741,139 @@ func (c *ContentBatchItemClient) mutate(ctx context.Context, m *ContentBatchItem
 		return (&ContentBatchItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ContentBatchItem mutation op: %q", m.Op())
+	}
+}
+
+// ContentBatchRunClient is a client for the ContentBatchRun schema.
+type ContentBatchRunClient struct {
+	config
+}
+
+// NewContentBatchRunClient returns a client for the ContentBatchRun from the given config.
+func NewContentBatchRunClient(c config) *ContentBatchRunClient {
+	return &ContentBatchRunClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentbatchrun.Hooks(f(g(h())))`.
+func (c *ContentBatchRunClient) Use(hooks ...Hook) {
+	c.hooks.ContentBatchRun = append(c.hooks.ContentBatchRun, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentbatchrun.Intercept(f(g(h())))`.
+func (c *ContentBatchRunClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentBatchRun = append(c.inters.ContentBatchRun, interceptors...)
+}
+
+// Create returns a builder for creating a ContentBatchRun entity.
+func (c *ContentBatchRunClient) Create() *ContentBatchRunCreate {
+	mutation := newContentBatchRunMutation(c.config, OpCreate)
+	return &ContentBatchRunCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentBatchRun entities.
+func (c *ContentBatchRunClient) CreateBulk(builders ...*ContentBatchRunCreate) *ContentBatchRunCreateBulk {
+	return &ContentBatchRunCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentBatchRunClient) MapCreateBulk(slice any, setFunc func(*ContentBatchRunCreate, int)) *ContentBatchRunCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentBatchRunCreateBulk{err: fmt.Errorf("calling to ContentBatchRunClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentBatchRunCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentBatchRunCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentBatchRun.
+func (c *ContentBatchRunClient) Update() *ContentBatchRunUpdate {
+	mutation := newContentBatchRunMutation(c.config, OpUpdate)
+	return &ContentBatchRunUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentBatchRunClient) UpdateOne(_m *ContentBatchRun) *ContentBatchRunUpdateOne {
+	mutation := newContentBatchRunMutation(c.config, OpUpdateOne, withContentBatchRun(_m))
+	return &ContentBatchRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentBatchRunClient) UpdateOneID(id string) *ContentBatchRunUpdateOne {
+	mutation := newContentBatchRunMutation(c.config, OpUpdateOne, withContentBatchRunID(id))
+	return &ContentBatchRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentBatchRun.
+func (c *ContentBatchRunClient) Delete() *ContentBatchRunDelete {
+	mutation := newContentBatchRunMutation(c.config, OpDelete)
+	return &ContentBatchRunDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentBatchRunClient) DeleteOne(_m *ContentBatchRun) *ContentBatchRunDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentBatchRunClient) DeleteOneID(id string) *ContentBatchRunDeleteOne {
+	builder := c.Delete().Where(contentbatchrun.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentBatchRunDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentBatchRun.
+func (c *ContentBatchRunClient) Query() *ContentBatchRunQuery {
+	return &ContentBatchRunQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentBatchRun},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentBatchRun entity by its id.
+func (c *ContentBatchRunClient) Get(ctx context.Context, id string) (*ContentBatchRun, error) {
+	return c.Query().Where(contentbatchrun.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentBatchRunClient) GetX(ctx context.Context, id string) *ContentBatchRun {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentBatchRunClient) Hooks() []Hook {
+	return c.hooks.ContentBatchRun
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentBatchRunClient) Interceptors() []Interceptor {
+	return c.inters.ContentBatchRun
+}
+
+func (c *ContentBatchRunClient) mutate(ctx context.Context, m *ContentBatchRunMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentBatchRunCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentBatchRunUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentBatchRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentBatchRunDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentBatchRun mutation op: %q", m.Op())
 	}
 }
 
@@ -9985,6 +10561,139 @@ func (c *PermissionGroupMemberClient) mutate(ctx context.Context, m *PermissionG
 		return (&PermissionGroupMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PermissionGroupMember mutation op: %q", m.Op())
+	}
+}
+
+// PlatformAppConnectionClient is a client for the PlatformAppConnection schema.
+type PlatformAppConnectionClient struct {
+	config
+}
+
+// NewPlatformAppConnectionClient returns a client for the PlatformAppConnection from the given config.
+func NewPlatformAppConnectionClient(c config) *PlatformAppConnectionClient {
+	return &PlatformAppConnectionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformappconnection.Hooks(f(g(h())))`.
+func (c *PlatformAppConnectionClient) Use(hooks ...Hook) {
+	c.hooks.PlatformAppConnection = append(c.hooks.PlatformAppConnection, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformappconnection.Intercept(f(g(h())))`.
+func (c *PlatformAppConnectionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformAppConnection = append(c.inters.PlatformAppConnection, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformAppConnection entity.
+func (c *PlatformAppConnectionClient) Create() *PlatformAppConnectionCreate {
+	mutation := newPlatformAppConnectionMutation(c.config, OpCreate)
+	return &PlatformAppConnectionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformAppConnection entities.
+func (c *PlatformAppConnectionClient) CreateBulk(builders ...*PlatformAppConnectionCreate) *PlatformAppConnectionCreateBulk {
+	return &PlatformAppConnectionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformAppConnectionClient) MapCreateBulk(slice any, setFunc func(*PlatformAppConnectionCreate, int)) *PlatformAppConnectionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformAppConnectionCreateBulk{err: fmt.Errorf("calling to PlatformAppConnectionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformAppConnectionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformAppConnectionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformAppConnection.
+func (c *PlatformAppConnectionClient) Update() *PlatformAppConnectionUpdate {
+	mutation := newPlatformAppConnectionMutation(c.config, OpUpdate)
+	return &PlatformAppConnectionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformAppConnectionClient) UpdateOne(_m *PlatformAppConnection) *PlatformAppConnectionUpdateOne {
+	mutation := newPlatformAppConnectionMutation(c.config, OpUpdateOne, withPlatformAppConnection(_m))
+	return &PlatformAppConnectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformAppConnectionClient) UpdateOneID(id string) *PlatformAppConnectionUpdateOne {
+	mutation := newPlatformAppConnectionMutation(c.config, OpUpdateOne, withPlatformAppConnectionID(id))
+	return &PlatformAppConnectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformAppConnection.
+func (c *PlatformAppConnectionClient) Delete() *PlatformAppConnectionDelete {
+	mutation := newPlatformAppConnectionMutation(c.config, OpDelete)
+	return &PlatformAppConnectionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformAppConnectionClient) DeleteOne(_m *PlatformAppConnection) *PlatformAppConnectionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformAppConnectionClient) DeleteOneID(id string) *PlatformAppConnectionDeleteOne {
+	builder := c.Delete().Where(platformappconnection.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformAppConnectionDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformAppConnection.
+func (c *PlatformAppConnectionClient) Query() *PlatformAppConnectionQuery {
+	return &PlatformAppConnectionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformAppConnection},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformAppConnection entity by its id.
+func (c *PlatformAppConnectionClient) Get(ctx context.Context, id string) (*PlatformAppConnection, error) {
+	return c.Query().Where(platformappconnection.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformAppConnectionClient) GetX(ctx context.Context, id string) *PlatformAppConnection {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformAppConnectionClient) Hooks() []Hook {
+	return c.hooks.PlatformAppConnection
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformAppConnectionClient) Interceptors() []Interceptor {
+	return c.inters.PlatformAppConnection
+}
+
+func (c *PlatformAppConnectionClient) mutate(ctx context.Context, m *PlatformAppConnectionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformAppConnectionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformAppConnectionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformAppConnectionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformAppConnectionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformAppConnection mutation op: %q", m.Op())
 	}
 }
 
@@ -17891,23 +18600,24 @@ type (
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, ChannelConnection, CommunicationAttempt,
-		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
-		ContentDraft, ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
-		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
-		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
-		EnrichmentRecord, FrontendActivation, FrontendObservation, FrontendSource,
-		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
-		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
-		IdealCustomerProfile, IntegrationConnection, Invitation, LaunchRun,
-		LaunchRunStep, Member, OnboardingRun, Organization,
-		OrganizationEnterpriseSettings, OutboxEvent, PageKnowledge, PermissionGroup,
-		PermissionGroupMember, PlatformAutoDMCampaign, PlatformAutoDMDelivery,
-		PlatformAutoDMOptOut, PlatformAutoDMRecipient, PlatformCreativeSet,
-		PlatformCreativeSetVersion, PlatformDraftImport, PlatformNotificationDelivery,
-		PlatformNotificationInbox, PlatformNotificationPolicy,
-		PlatformNotificationPreference, PlatformNotificationSeenAction,
-		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
+		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
+		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
+		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
+		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
+		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
+		DeploymentEvent, Design, EnrichmentRecord, FrontendActivation,
+		FrontendObservation, FrontendSource, GitHubDeliveryRecovery,
+		GitHubInstallStart, GitHubInstallation, GitHubObservation,
+		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
+		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
+		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
+		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
+		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
+		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
+		PlatformDraftImport, PlatformNotificationDelivery, PlatformNotificationInbox,
+		PlatformNotificationPolicy, PlatformNotificationPreference,
+		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
@@ -17927,23 +18637,24 @@ type (
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
 		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
 		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
-		CampaignRevision, ChannelConnection, CommunicationAttempt,
-		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
-		ContentDraft, ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
-		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
-		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
-		EnrichmentRecord, FrontendActivation, FrontendObservation, FrontendSource,
-		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
-		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
-		IdealCustomerProfile, IntegrationConnection, Invitation, LaunchRun,
-		LaunchRunStep, Member, OnboardingRun, Organization,
-		OrganizationEnterpriseSettings, OutboxEvent, PageKnowledge, PermissionGroup,
-		PermissionGroupMember, PlatformAutoDMCampaign, PlatformAutoDMDelivery,
-		PlatformAutoDMOptOut, PlatformAutoDMRecipient, PlatformCreativeSet,
-		PlatformCreativeSetVersion, PlatformDraftImport, PlatformNotificationDelivery,
-		PlatformNotificationInbox, PlatformNotificationPolicy,
-		PlatformNotificationPreference, PlatformNotificationSeenAction,
-		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
+		CampaignRevision, CaptureAttempt, CaptureJob, CaptureRecipe, ChannelConnection,
+		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
+		ContentBatchItem, ContentBatchRun, ContentDraft, ContentDraftFinisher,
+		ContentDraftRevision, ContentDraftSettings, ContentDraftTag, Conversation,
+		ConversationMessage, CreativeTemplate, CreativeVariant, CustomerCommunication,
+		DeploymentEvent, Design, EnrichmentRecord, FrontendActivation,
+		FrontendObservation, FrontendSource, GitHubDeliveryRecovery,
+		GitHubInstallStart, GitHubInstallation, GitHubObservation,
+		GitHubProductionPolicy, GitHubRecoveryScan, IdealCustomerProfile,
+		IntegrationConnection, Invitation, LaunchRun, LaunchRunStep, Member,
+		OnboardingRun, Organization, OrganizationEnterpriseSettings, OutboxEvent,
+		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
+		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
+		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
+		PlatformDraftImport, PlatformNotificationDelivery, PlatformNotificationInbox,
+		PlatformNotificationPolicy, PlatformNotificationPreference,
+		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
