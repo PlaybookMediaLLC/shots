@@ -42,8 +42,8 @@ test('warm project navigation reuses its list and rename invalidates it', async 
     page.getByRole('link', { name: 'Cache navigation project', exact: true })
   ).toBeVisible()
   expect(listRequests).toBe(1)
-  await page.locator('a[href="/workflows"]').first().click()
-  await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible()
+  await page.locator('a[href="/workflows/overview"]').first().click()
+  await expect(page.getByRole('heading', { name: 'Automate', exact: true })).toBeVisible()
   await page.locator('a[href="/library"]').first().click()
   await expect(
     page.getByRole('link', { name: 'Cache navigation project', exact: true })
