@@ -23,7 +23,6 @@ async function shoot(page: Page, name: string) {
         root.classList.add(next)
         root.style.colorScheme = next
       }, theme)
-      await page.waitForTimeout(150)
       const image = await page.screenshot({ fullPage: true, quality: 62, type: 'jpeg' })
       screenshots[`${name}-${width}-${theme}.jpg`] = image.toString('base64')
     }
