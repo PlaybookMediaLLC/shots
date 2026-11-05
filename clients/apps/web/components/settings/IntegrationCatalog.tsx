@@ -10,6 +10,7 @@ import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/u
 import { isPlanRefusal } from '@/lib/api/platform-errors'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { useTRPCClient } from '@/lib/trpc/react'
+import { connectedSources } from '@/lib/workflows/actions'
 
 /** Where an integration stands in this workspace. */
 const statusSchema = z.enum(['connected', 'available', 'not_configured', 'not_available'])
@@ -51,6 +52,33 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
     queryFn: () => trpcClient.apiKey.list.query(),
     queryKey: ['api-keys', 'agents'],
   })
+  const github = useQuery({
+    enabled: canManage,
+    queryFn: () => trpcClient.github.connections.query(),
+    queryKey: ['integrations', 'github'],
+  })
+  const automation = useQuery({
+    queryFn: () => trpcClient.releaseAutomation.overview.query(),
+    queryKey: ['integrations', 'automation'],
+  })
+  const hosts = useQuery({
+    queryFn: () => trpcClient.frontendDeployments.sources.query(),
+    queryKey: ['integrations', 'hosts'],
+  })
+  const hostStatus = (...providers: string[]): Status =>
+    hosts.data?.sources.some((source) => providers.includes(source.provider))
+      ? statusSchema.enum.connected
+      : statusSchema.enum.available
+  const hostEntry = (name: string, ...providers: string[]): Entry => ({
+    action: { href: '/workflows/deployments', label: 'Deployments' },
+    authorization: 'A read token from your host, kept encrypted.',
+    name,
+    purpose: `Send an alert or start a workflow when ${name} publishes to production.`,
+    scopes: 'Read access to deployments for the project you connect.',
+    setup: 'Connect it in Automate, under Deployments.',
+    status: hostStatus(...providers),
+  })
+  const watched = automation.data ? connectedSources(automation.data).length : 0
   const agentClients = (agents.data?.keys ?? [])
     .filter((key) => key.agentClient)
     .map((key) => key.agentClient ?? '')
@@ -64,6 +92,25 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       : statusSchema.enum.available
 
   const entries: Entry[] = [
+    {
+      action: { href: '/workflows/sources', label: 'Repositories' },
+      authorization: 'The Shots GitHub App, installed by a workspace owner or admin.',
+      name: 'GitHub',
+      purpose: watched
+        ? `Starts workflows from ${watched} watched ${watched === 1 ? 'repository' : 'repositories'}.`
+        : 'Starts workflows when a repository you watch ships something.',
+      scopes: 'Read access to the repositories you install the App on.',
+      setup: 'Connect GitHub in Automate, under Repositories, then watch a repository.',
+      status:
+        github.data?.configured === false
+          ? statusSchema.enum.not_configured
+          : watched || github.data?.connections.some(({ status }) => status === 'ACTIVE')
+            ? statusSchema.enum.connected
+            : statusSchema.enum.available,
+    },
+    hostEntry('Vercel', 'vercel'),
+    hostEntry('Netlify', 'netlify'),
+    hostEntry('Cloudflare', 'cloudflare_pages', 'cloudflare_workers'),
     {
       action: { href: '/settings/ai-agents', label: 'Set up' },
       authorization:

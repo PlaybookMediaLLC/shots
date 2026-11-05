@@ -85,7 +85,7 @@ const SECTIONS: Section[] = [
   },
   {
     empty: 'Releases arrive from a connected repository or the API.',
-    emptyAction: { href: '/workflows?view=sources', label: 'Connect a release source' },
+    emptyAction: { href: '/workflows/sources', label: 'Watch a repository' },
     key: 'releases',
     load: async (trpc) => {
       const { releases } = await trpc.release.list.query()

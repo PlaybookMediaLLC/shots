@@ -1,4 +1,4 @@
-import { AUTOMATE_LINKS } from '@/lib/platform/navigation'
+import { automateLinks } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
@@ -17,9 +17,9 @@ export default async function DeploymentPage({ params }: { params: Promise<{ loc
     >
       <Page
         title="Deployments"
-        description="Choose your production evidence, require checks, and inspect each decision."
+        description="Send an alert or start a workflow when a production deployment goes live."
       >
-        <AreaNavigation label="Automate" items={AUTOMATE_LINKS} />
+        <AreaNavigation label="Automate" items={automateLinks(access.canManage)} />
         <FrontendDeployments canManage={access.canManage} key={access.organization.id} />
       </Page>
     </PlatformShell>

@@ -8,11 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNotificationPageVisible } from '@/lib/notifications/client'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
-import { EmptyState, Group, Pill, Row, Section } from '@/components/platform-ui'
+import { EmptyState, Group, Pill, Row } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
   SelectContent,
@@ -30,7 +31,7 @@ import { FAMILY_NAMES } from './workflow-canvas'
 import { RunStatusPill, relativeTime } from './workflow-ui'
 import { WorkflowArchiveButton } from './WorkflowArchiveButton'
 import { WorkflowRunLink } from './WorkflowRunLink'
-import { WorkflowSources } from './WorkflowSources'
+import { WorkflowSetup } from './WorkflowSetup'
 
 const PAGE_SIZE = 10
 const STATES = {
@@ -57,17 +58,9 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
   const pathname = usePathname()
   const router = useRouter()
   useEffect(() => {
-    if (
-      (window.location.hash !== '#sources' && !params.has('github')) ||
-      params.get('view') === 'sources'
-    )
-      return
-    const next = new URLSearchParams(params.toString())
-    next.set('view', 'sources')
-    // On first load this effect runs before the app router patches history,
-    // so a plain replaceState would change the address but not the view.
-    router.replace(`${pathname}?${next}#sources`, { scroll: false })
-  }, [params, pathname, router])
+    // The old address of Repositories, kept for existing links; a hash never reaches the server.
+    if (window.location.hash === '#sources') router.replace('/workflows/sources')
+  }, [router])
   const trpc = useTRPC()
   const overviewQuery = useQuery(
     trpc.releaseAutomation.overview.queryOptions(undefined, {
@@ -77,7 +70,6 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
     })
   )
   const overview = overviewQuery.data
-  const view = params.get('view') === 'sources' ? 'sources' : 'workflows'
   const [actionError, setError] = useState<string | null>(null)
   const queryError = overviewQuery.error
   const error = actionError ?? (queryError ? getErrorMessage(queryError) : null)
@@ -163,9 +155,11 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
         <AlertDescription>{error}</AlertDescription>
       </Alert>
     ) : (
-      <p className="text-sm text-muted-foreground" role="status">
-        Loading workflows…
-      </p>
+      <div aria-label="Loading workflows" className="grid gap-3" role="status">
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+        <Skeleton className="h-16 w-full rounded-xl" />
+      </div>
     )
   }
 
@@ -173,22 +167,6 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE))
   const currentPage = Math.min(page, pages - 1)
   const shown = visible.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE)
-  if (view === 'sources')
-    return (
-      <Section
-        id="sources"
-        title="Sources"
-        description="Repositories and installations that can trigger workflows. A connected source does not activate a workflow."
-      >
-        {error ? (
-          <Alert variant="destructive">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
-        <WorkflowSources busy={busy} canManage={canManage} overview={overview} perform={perform} />
-      </Section>
-    )
-
   return (
     <div className="flex flex-col gap-10">
       {error ? (
@@ -207,24 +185,16 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
         </p>
       ) : null}
 
-      <div id="definitions" />
-      <Section
-        description="Each workflow runs one GitHub event family for one repository. Lower priority wins; the first match runs."
-        title="Workflows"
-      >
+      <div className="flex min-w-0 flex-col gap-4" id="definitions">
+        {canManage ? <WorkflowSetup overview={overview} /> : null}
         {overview.definitions.length === 0 ? (
-          <EmptyState
-            action={
-              overview.sources.length === 0 ? (
-                <ButtonLink href={`${pathname}?view=sources#sources`} variant="outline">
-                  Connect a source first
-                </ButtonLink>
-              ) : null
-            }
-            description="Turn a published release, a merged pull request, or a production deployment into campaign drafts for review."
-            icon={WorkflowSquare03Icon}
-            title="No workflows yet"
-          />
+          canManage ? null : (
+            <EmptyState
+              description="Turn a published release, a merged pull request, or a production deployment into campaign drafts for review. An owner or administrator sets up workflows."
+              icon={WorkflowSquare03Icon}
+              title="No workflows yet"
+            />
+          )
         ) : (
           <>
             <div className="flex flex-col gap-3 md:flex-row md:items-center">
@@ -348,8 +318,8 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
                           ))}
                           {ties.length ? (
                             <span className="block text-amber-700 dark:text-amber-300">
-                              Priority tie with {ties.map((item) => item.name).join(', ')}. Active
-                              ties run by definition ID; inactive drafts do not compete.
+                              Same priority as {ties.map((item) => item.name).join(', ')}. Active workflows
+                              with the same number run in a fixed order; drafts do not compete.
                             </span>
                           ) : null}
                           {definition.enabled && order.length > 1 ? (
@@ -493,7 +463,7 @@ export function WorkflowsDashboard({ canManage }: { canManage: boolean }) {
             ) : null}
           </>
         )}
-      </Section>
+      </div>
     </div>
   )
 }

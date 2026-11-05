@@ -44,9 +44,23 @@ test('frontend rules save once, preview without side effects, and isolate eviden
   )
   const otherContext = await browser.newContext()
   try {
+    // With a host connected and none chosen, the form waits for one.
+    await app.open('/workflows/deployments')
+    await expect(page.getByRole('heading', { name: 'Connected hosts' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Save production policy' })).toHaveCount(0)
+    // A new host cannot be saved half filled in, and the form says what is missing.
+    await page.getByRole('button', { name: 'Connect a host', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Save production policy' })).toBeDisabled()
+    await expect(page.getByRole('status').filter({ hasText: 'Still needed:' })).toContainText(
+      'a webhook signing secret'
+    )
+    // A deployment workflow is reachable from here: the empty list says how to get one.
+    await expect(page.getByRole('link', { name: 'Watch a repository', exact: true })).toBeVisible()
+    await expect(page.getByLabel('Required GitHub workflow ID')).toHaveCount(0)
+
     await app.open(`/workflows/deployments?source=${id}`)
     await expect(page.getByRole('heading', { name: 'Edit production policy' })).toBeVisible()
-    await page.getByLabel('Frontend name', { exact: true }).fill('Production frontend')
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Production frontend')
     await page.getByRole('button', { name: 'Save production policy', exact: true }).click()
     await expect(
       page.getByText('Production policy saved. Historical events will not be replayed.')
@@ -117,7 +131,7 @@ test('frontend rules save once, preview without side effects, and isolate eviden
       revision: 2,
     })
     await app.reload()
-    await expect(page.getByLabel('Frontend name', { exact: true })).toHaveValue(
+    await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(
       'Production frontend'
     )
   } finally {

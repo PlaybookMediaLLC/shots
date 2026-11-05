@@ -1,6 +1,7 @@
 'use client'
 
 import { publicImageUrl } from '@/lib/assets/public-image'
+import { accessAllows } from '@/lib/auth/permissions'
 
 import {
   ActivityIcon,
@@ -19,6 +20,7 @@ import {
 } from './icons'
 import {
   AREA_LINKS,
+  automateLinks,
   type AreaLink,
   areaLocked,
   campaignLinks,
@@ -71,13 +73,14 @@ const ICONS = {
   activity: ActivityIcon,
   settings: SettingsIcon,
 }
-const NAV_GROUPS = [
-  { items: PLATFORM_DESTINATIONS.slice(0, 6) },
-  { items: PLATFORM_DESTINATIONS.slice(6), label: 'Workspace' },
-].map((group) => ({
-  ...group,
-  items: group.items.map((item) => ({ ...item, icon: ICONS[item.key] })),
-}))
+const withIcons = (items: readonly (typeof PLATFORM_DESTINATIONS)[number][]) =>
+  items.map((item) => ({ ...item, icon: ICONS[item.key] }))
+type NavGroup = { items: ReturnType<typeof withIcons>; label?: string }
+const AREAS_GROUP: NavGroup = { items: withIcons(PLATFORM_DESTINATIONS.slice(0, 6)) }
+const WORKSPACE_GROUP: NavGroup = {
+  items: withIcons(PLATFORM_DESTINATIONS.slice(6)),
+  label: 'Workspace',
+}
 
 function NavLink({
   collapsed,
@@ -186,46 +189,54 @@ function Navigation({
   if (platformArea(usePathname()) === 'settings') {
     return <SettingsNav collapsed={collapsed} onNavigate={onNavigate} />
   }
+  const navGroup = (group: NavGroup) => (
+    <div className="grid gap-0.5">
+      {group.label && !collapsed ? (
+        <p className="platform-eyebrow mb-1 px-3">{t('workspace')}</p>
+      ) : null}
+      {group.items
+        .filter((item) => campaignsEnabled || item.href !== '/campaigns')
+        .map((item) => withPublishAccess(item, draftsEnabled))
+        .map((item) => (
+          <NavLink
+            collapsed={collapsed}
+            item={item}
+            key={item.href}
+            locked={areaLocked(item.key, { draftsEnabled, draftsPlan, paidPlan })}
+            onNavigate={onNavigate}
+            subs={
+              item.key === 'publish'
+                ? draftsEnabled
+                  ? publishLinks()
+                  : undefined
+                : item.key === 'campaigns'
+                  ? campaignLinks(draftsEnabled)
+                  : item.key === 'automate'
+                    ? automateLinks(accessAllows({ deniedPermissions, role }, 'workspace:update'))
+                    : AREA_LINKS[item.key]
+            }
+          />
+        ))}
+    </div>
+  )
   return (
-    <nav aria-label={t('workspace')} className="flex min-h-full flex-col gap-4">
-      <ShellActions
-        collapsed={collapsed}
-        campaignsEnabled={campaignsEnabled}
-        draftsEnabled={draftsEnabled}
-        draftsPlan={draftsPlan}
-        onNavigate={onNavigate}
-        paidPlan={paidPlan}
-        deniedPermissions={deniedPermissions}
-        role={role}
-      />
-      {NAV_GROUPS.map((group, index) => (
-        <div className={cn('grid gap-0.5', index === 1 && 'mt-auto pt-4')} key={index}>
-          {group.label && !collapsed ? (
-            <p className="platform-eyebrow mb-1 px-3">{t('workspace')}</p>
-          ) : null}
-          {group.items
-            .filter((item) => campaignsEnabled || item.href !== '/campaigns')
-            .map((item) => withPublishAccess(item, draftsEnabled))
-            .map((item) => (
-              <NavLink
-                collapsed={collapsed}
-                item={item}
-                key={item.href}
-                locked={areaLocked(item.key, { draftsEnabled, draftsPlan, paidPlan })}
-                onNavigate={onNavigate}
-                subs={
-                  item.key === 'publish'
-                    ? draftsEnabled
-                      ? publishLinks()
-                      : undefined
-                    : item.key === 'campaigns'
-                      ? campaignLinks(draftsEnabled)
-                      : AREA_LINKS[item.key]
-                }
-              />
-            ))}
-        </div>
-      ))}
+    <nav aria-label={t('workspace')} className="flex h-full min-h-0 flex-col gap-3">
+      {/* Only the areas scroll, so Activity and Settings are never cut off on a short window.
+          The fade says there is more below; the padding clears it at rest. */}
+      <div className="flex min-h-24 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain pb-6 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent)]">
+        <ShellActions
+          collapsed={collapsed}
+          campaignsEnabled={campaignsEnabled}
+          draftsEnabled={draftsEnabled}
+          draftsPlan={draftsPlan}
+          onNavigate={onNavigate}
+          paidPlan={paidPlan}
+          deniedPermissions={deniedPermissions}
+          role={role}
+        />
+        {navGroup(AREAS_GROUP)}
+      </div>
+      <div className="shrink-0">{navGroup(WORKSPACE_GROUP)}</div>
     </nav>
   )
 }
@@ -503,6 +514,7 @@ export function PlatformSidebar({
       </Suspense>
       <ShellSearch
         campaignsEnabled={campaignsEnabled}
+        canManage={accessAllows({ deniedPermissions, role }, 'workspace:update')}
         // Posts are searched only where the plan can read them.
         draftsEnabled={draftsEnabled && draftsPlan}
         paidPlan={paidPlan}

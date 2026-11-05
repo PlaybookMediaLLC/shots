@@ -59,7 +59,8 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
-import { actionAvailability, graphSchemaVersion, savedGraph } from '@/lib/workflows/actions'
+import { actionAvailability, savedGraph } from '@/lib/workflows/actions'
+import type { WorkflowTemplate } from '@/lib/workflows/templates'
 import { releaseExample } from '@/lib/workflows/examples'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import { ActionEditor } from './ActionEditor'
@@ -72,6 +73,8 @@ import {
   nodeLabel,
   workflowNodeTypes,
 } from './workflow-canvas'
+import { DeploymentHint } from './workflow-ui'
+import { WorkflowTemplateSetup } from './WorkflowTemplateSetup'
 
 type Snapshot = { graph: AutomationGraph; layout: AutomationLayout }
 
@@ -87,6 +90,8 @@ export function WorkflowEditor({
   readOnly = false,
   initialNode,
   presentation = 'dialog',
+  startsDirty = false,
+  template,
 }: {
   definition: AutomationDefinition
   overview: AutomationOverview
@@ -97,6 +102,10 @@ export function WorkflowEditor({
   readOnly?: boolean
   initialNode?: string
   presentation?: 'dialog' | 'page'
+  /** Closing asks first even before an edit: a duplicate is work someone asked for. */
+  startsDirty?: boolean
+  /** A draft fresh from this template: until it is saved, its Setup tab shapes the steps. */
+  template?: WorkflowTemplate
 }) {
   const client = useTRPCClient()
   const trpc = useTRPC()
@@ -110,7 +119,7 @@ export function WorkflowEditor({
   const [description, setDescription] = useState(definition.description)
   const [priority, setPriority] = useState(String(definition.priority))
   const [selected, setSelected] = useState(initialNode ?? 'condition')
-  const [panel, setPanel] = useState('node')
+  const [panel, setPanel] = useState(template ? 'setup' : 'node')
   const [mobilePanel, setMobilePanel] = useState<'canvas' | 'inspector'>(
     initialNode ? 'inspector' : 'canvas'
   )
@@ -128,7 +137,10 @@ export function WorkflowEditor({
   const [conflict, setConflict] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<{ field: string; message: string }[]>([])
   const fieldError = (field: string) => fieldErrors.find((issue) => issue.field === field)?.message
-  const [dirty, setDirty] = useState(!definition.id)
+  // Edited since it opened. A new draft needs saving too, but leaving a template untouched loses nothing.
+  const [dirty, setDirty] = useState(startsDirty)
+  const unsaved = dirty || !record.id
+  const setupTemplate = record.id ? undefined : template
   const source = overview.sources.find((item) => item.id === record.sourceAppId)
   const selectedNode = graph.nodes.find((node) => node.id === selected)
   const fields = overview.fields[graph.family]
@@ -444,14 +456,14 @@ export function WorkflowEditor({
                   {record.enabled ? 'Active version' : 'Draft'}
                 </span>
                 {readOnly ? <span>· Read only</span> : null}
-                {dirty && !readOnly ? (
+                {unsaved && !readOnly ? (
                   <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-400">
                     Unsaved
                   </span>
                 ) : null}
               </div>
               <Input
-                aria-label="Definition name"
+                aria-label="Workflow name"
                 aria-invalid={Boolean(fieldError('name'))}
                 aria-describedby={fieldError('name') ? 'workflow-name-error' : undefined}
                 disabled={busy || readOnly}
@@ -507,7 +519,7 @@ export function WorkflowEditor({
                 disabled={
                   busy ||
                   !!priorityError ||
-                  (!dirty && issues.length > 0) ||
+                  (!unsaved && issues.length > 0) ||
                   !overview.executorAvailable ||
                   unavailable.length > 0
                 }
@@ -515,7 +527,7 @@ export function WorkflowEditor({
                 type="button"
                 onClick={() =>
                   void perform(async () => {
-                    const saved = dirty ? await save() : record
+                    const saved = unsaved ? await save() : record
                     const active = await client.releaseAutomation.activate.mutate({
                       id: saved.id,
                       revision: saved.revision,
@@ -527,7 +539,9 @@ export function WorkflowEditor({
                     })
                     onSaved(active)
                     setMessage(
-                      'Version activated for future events. Previously accepted events retain their versions.'
+                      graph.family === 'deployment.succeeded'
+                        ? 'Version activated. Select it in Automate › Deployments so a production deployment starts it.'
+                        : 'Version activated for future events. Previously accepted events retain their versions.'
                     )
                   })
                 }
@@ -681,17 +695,33 @@ export function WorkflowEditor({
                 aria-label="Workflow inspector panels"
                 className="mx-4 my-3 grid w-auto shrink-0 grid-cols-4"
               >
+                {setupTemplate ? <TabsTrigger value="setup">Setup</TabsTrigger> : null}
                 <TabsTrigger value="node">Node</TabsTrigger>
                 <TabsTrigger value="workflow">Workflow</TabsTrigger>
                 <TabsTrigger value="test" disabled={readOnly}>
                   Test {preview ? <span className="size-1.5 rounded-full bg-emerald-500" /> : null}
                 </TabsTrigger>
-                <TabsTrigger value="versions" disabled={!record.id}>
-                  Versions
-                </TabsTrigger>
+                {setupTemplate ? null : (
+                  <TabsTrigger value="versions" disabled={!record.id}>
+                    Versions
+                  </TabsTrigger>
+                )}
               </TabsList>
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
                 <fieldset disabled={busy || readOnly} className="min-w-0">
+                  {setupTemplate ? (
+                    <TabsContent value="setup">
+                      <WorkflowTemplateSetup
+                        onChange={(next) => changeGraph(next.graph, next.layout)}
+                        onSource={(sourceAppId) =>
+                          setRecord((current) => ({ ...current, sourceAppId }))
+                        }
+                        overview={overview}
+                        sourceId={record.sourceAppId}
+                        template={setupTemplate}
+                      />
+                    </TabsContent>
+                  ) : null}
                   <TabsContent value="node" className="space-y-5">
                     <div>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -759,8 +789,8 @@ export function WorkflowEditor({
                         {selectedNode.type === 'trigger' ? (
                           <div className="space-y-3">
                             <p className="text-sm">
-                              This trigger is bound to {FAMILY_NAMES[graph.family]}. A different
-                              event family needs another definition.
+                              This workflow starts on {FAMILY_NAMES[graph.family]}. For a different event,
+                              create another workflow.
                             </p>
                             <Table
                               aria-label="Event fields"
@@ -914,6 +944,7 @@ export function WorkflowEditor({
                         {source?.name}
                         {source?.branch ? ` · watching ${source.branch}` : ''}
                       </p>
+                      {graph.family === 'deployment.succeeded' ? <DeploymentHint /> : null}
                     </div>
                     <Label className="grid gap-1.5 text-sm">
                       Description
@@ -961,8 +992,8 @@ export function WorkflowEditor({
                       </p>
                     ) : null}
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Lower numbers run first for this repository and event. Ties use the definition
-                      ID. The first matching workflow wins.
+                      Lower numbers run first for this repository and event, and the first matching
+                      workflow wins. Workflows with the same number run in a fixed order.
                     </p>
                     <ConditionEditor
                       label="Qualification"
@@ -973,13 +1004,12 @@ export function WorkflowEditor({
                     <div className="flex gap-2 rounded-lg bg-muted/40 p-3 text-xs leading-5 text-muted-foreground">
                       <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                       <p>
-                        Drafts use recorded source text, and AI copy treats it as evidence only. A
+                        Drafts quote what GitHub recorded, and AI copy treats it as evidence only. A
                         person must approve and schedule content after review.
                       </p>
                     </div>
                     <p className="text-xs leading-5 text-muted-foreground">
-                      Draft revision {record.revision || 'new'} · language v
-                      {graphSchemaVersion(graph)}
+                      Draft revision {record.revision || 'new'}
                       {record.updatedAt
                         ? ` · Saved ${new Date(record.updatedAt).toLocaleString()}`
                         : ''}
@@ -1006,7 +1036,7 @@ export function WorkflowEditor({
                             })
                             onSaved(disabled)
                             setMessage(
-                              'Disabled. Cancellation requested; source stays in automation mode and history is kept.'
+                              'Deactivated. Runs in progress are being cancelled. This repository stays with workflows, and its history is kept.'
                             )
                           })
                         }
@@ -1273,7 +1303,7 @@ export function WorkflowEditor({
                       </ul>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        {dirty
+                        {unsaved
                           ? 'Save or test this draft for current server validation.'
                           : 'The saved graph is valid.'}
                       </p>
@@ -1295,12 +1325,12 @@ export function WorkflowEditor({
               <span
                 className={cn(
                   'size-1.5 shrink-0 rounded-full',
-                  dirty ? 'bg-amber-500' : 'bg-emerald-500'
+                  unsaved ? 'bg-amber-500' : 'bg-emerald-500'
                 )}
               />
             )}
             <p role="status">
-              {message || (dirty ? 'Unsaved draft changes.' : 'All changes saved.')}
+              {message || (unsaved ? 'Unsaved draft changes.' : 'All changes saved.')}
             </p>
           </div>
           <span className="flex items-center gap-1.5 text-muted-foreground">
@@ -1316,7 +1346,7 @@ export function WorkflowEditor({
               Activation is blocked: {unavailable[0]?.reason}
             </p>
           ) : null}
-          {!dirty && issues.length ? (
+          {!unsaved && issues.length ? (
             <p className="w-full text-amber-600 dark:text-amber-400">
               Activation is blocked: {issues[0]?.message}. Select the validation issue to fix it.
             </p>

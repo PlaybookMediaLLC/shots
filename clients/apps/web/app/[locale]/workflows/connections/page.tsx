@@ -1,4 +1,4 @@
-import { AUTOMATE_LINKS } from '@/lib/platform/navigation'
+import { automateLinks } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
@@ -19,7 +19,7 @@ export default async function ConnectionsPage({ params }: { params: Promise<{ lo
         title="Signed-in capture"
         description="Screenshot the screens behind your app's sign-in, from a session you connect."
       >
-        <AreaNavigation label="Automate" items={AUTOMATE_LINKS} />
+        <AreaNavigation label="Automate" items={automateLinks(access.canManage)} />
         <SignedInCapture canManage={access.canManage} key={access.organization.id} />
       </Page>
     </PlatformShell>

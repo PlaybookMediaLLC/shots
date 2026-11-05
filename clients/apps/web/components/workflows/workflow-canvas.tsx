@@ -98,9 +98,9 @@ export function nodeDetail(node: AutomationNode, sourceName?: string) {
     case 'create_release':
       return node.action.include === 'unreleased'
         ? 'Event plus every unreleased merged PR'
-        : 'From the source event'
+        : 'From the GitHub event'
   }
-  return 'From the source event'
+  return 'From the GitHub event'
 }
 
 function WorkflowNode({ data, selected }: NodeProps<CanvasNode>) {

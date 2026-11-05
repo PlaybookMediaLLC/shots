@@ -27,10 +27,13 @@ export function NotificationFeed({
   identity,
   view,
   close,
+  onUnreadKnown,
 }: {
   identity: ReturnType<typeof useNotificationIdentity>
   view: NotificationView
   close: () => void
+  /** Told once the first page loads, and on changes, whether this feed has anything unread. */
+  onUnreadKnown?: (unread: boolean) => void
 }) {
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -93,6 +96,10 @@ export function NotificationFeed({
   })
   const items = feed.isError ? [] : (feed.data?.pages.flatMap((page) => page.items) ?? [])
   const uniqueItems = [...new Map(items.map((item) => [item.id, item])).values()]
+  const unread = feed.isSuccess ? uniqueItems.some((item) => !item.readAt) : null
+  useEffect(() => {
+    if (unread !== null) onUnreadKnown?.(unread)
+  }, [unread, onUnreadKnown])
   const busy = change.isPending
   function mutate(action: NotificationStateInput['action'], ids: string[] = []) {
     const input = { action, ids, all: ids.length === 0, view, key: crypto.randomUUID() }
@@ -181,7 +188,9 @@ export function NotificationFeed({
                 ? 'Restore archived updates to their original feed.'
                 : view === 'inbox'
                   ? 'Comments, mentions, and reviews will appear here.'
-                  : 'Publishing and account updates will appear here.'}
+                  : view === 'all'
+                    ? 'Comments, reviews, and workspace updates will appear here.'
+                    : 'Publishing and account updates will appear here.'}
             </p>
           </div>
         ) : null}

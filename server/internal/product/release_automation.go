@@ -343,7 +343,7 @@ func (c *Configuration) ActivateReleaseAutomation(ctx context.Context, actor Act
 		return nil, err
 	}
 	if activeCount >= 20 {
-		return nil, conflict("At most 20 definitions can be active for one source and event family.")
+		return nil, conflict("At most 20 workflows can be active for one repository and event.")
 	}
 	_, err = tx.ReleaseAutomationVersion.Create().SetID(versionID).SetOrganizationID(actor.OrganizationID).SetDefinitionID(id).SetRevision(revision).SetGraph(row.Draft).SetContentHash(automation.ContentHash(row.Draft)).SetActivatedBy(actor.UserID).Save(ctx)
 	if ent.IsConstraintError(err) {

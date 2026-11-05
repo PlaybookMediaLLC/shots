@@ -42,7 +42,7 @@ func (c *Configuration) GetGitHubRecovery(ctx context.Context, actor Actor, sour
 	if err != nil {
 		return nil, err
 	}
-	result := &GitHubRecoveryStatus{Status: "unknown", Reason: "Delivery history has not been inspected. Missing webhooks do not prove no deployment occurred.", Gap: true, Deliveries: []GitHubRecoveryDelivery{}}
+	result := &GitHubRecoveryStatus{Status: "unknown", Reason: "Not checked yet. A missing event does not prove that nothing was deployed.", Gap: true, Deliveries: []GitHubRecoveryDelivery{}}
 	scan, err := c.client.GitHubRecoveryScan.Query().Where(githubrecoveryscan.OrganizationID(actor.OrganizationID), githubrecoveryscan.SourceAppID(sourceID)).Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
@@ -199,7 +199,7 @@ func (c *Configuration) InspectGitHubRecovery(ctx context.Context, actor Actor, 
 	update := scan.Update().SetCursor(page.NextCursor).SetWindowStart(window).SetStatus("partial").SetReason("Inspection is paginated. Continue inspection; event history is not yet complete.").SetNextAttemptAt(now.Add(time.Second))
 	if page.NextCursor == "" {
 		gap := scan.LastCompleteAt == nil || scan.LastCompleteAt.Before(window) || scan.Gap
-		reason := "Available provider delivery history inspected. Events never generated or outside provider retention remain unknown; reconcile releases and deployment records with an owner."
+		reason := "Checked what GitHub still has. Anything GitHub never sent or no longer keeps stays unknown, so compare releases and deployments with whoever owns the repository."
 		update.SetStatus("inspected").SetGap(gap).SetLastCompleteAt(now).SetReason(reason).SetNextAttemptAt(now.Add(time.Minute))
 	}
 	if err := update.Exec(ctx); err != nil {

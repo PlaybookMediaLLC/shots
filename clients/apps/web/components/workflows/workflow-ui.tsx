@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { Pill, type PillTone } from '@/components/platform-ui'
 import { type AutomationRunSummary } from '@/lib/api/contracts/workflow-runs'
 import {
@@ -78,7 +79,7 @@ export const FAILURE_CODES: Record<string, string> = {
   insufficient_credits: 'Not enough AI credits for the generation budget.',
   not_entitled: 'The workspace plan does not include this action.',
   prohibited_terms: 'Copy used a term the brand prohibits.',
-  model_unavailable: 'No worker had an AI model provider configured.',
+  model_unavailable: 'No worker had an AI model configured.',
   renderer_unavailable: 'No worker could reach the design renderer.',
   capture_missing: 'No product page has a current capture to put in the creatives.',
   capture_unavailable: 'No worker could capture and store product pages.',
@@ -94,4 +95,46 @@ export const FAILURE_CODES: Record<string, string> = {
   unavailable: 'Event evidence was unavailable, so no branch was chosen.',
   invalid: 'A condition was invalid for the recorded evidence.',
   no_match: 'No active workflow matched this event.',
+}
+
+/** Where a page sits in Automate; the last item is this page. */
+export function AutomateBreadcrumb({
+  current,
+  trail,
+}: {
+  current: string
+  trail: { href: string; label: string }[]
+}) {
+  return (
+    <nav aria-label="Breadcrumb">
+      <ol className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        <li>Automate</li>
+        {trail.map((item) => (
+          <li className="flex items-center gap-1.5" key={item.href}>
+            <span aria-hidden="true">/</span>
+            <Link className="hover:text-foreground hover:underline" href={item.href}>
+              {item.label}
+            </Link>
+          </li>
+        ))}
+        <li aria-current="page" className="flex items-center gap-1.5 text-foreground">
+          <span aria-hidden="true">/</span>
+          {current}
+        </li>
+      </ol>
+    </nav>
+  )
+}
+
+/** Where a deployment workflow gets its trigger, which its own settings cannot show. */
+export function DeploymentHint() {
+  return (
+    <p className="mt-2 text-xs text-muted-foreground">
+      A deployment starts this workflow only after you activate it and select it in{' '}
+      <Link className="underline" href="/workflows/deployments">
+        Deployments
+      </Link>
+      .
+    </p>
+  )
 }

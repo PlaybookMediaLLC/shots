@@ -397,7 +397,8 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
       >
         <ol aria-label="Run timeline" className="flex flex-col gap-2">
           <li className="rounded-xl p-3 text-sm ring-1 ring-border">
-            Event received · {new Date(event.receivedAt).toLocaleString()} · {event.mode} mode
+            Event received · {new Date(event.receivedAt).toLocaleString()} · Handled by{' '}
+            {event.mode === 'legacy' ? 'Release inbox' : 'workflows'}
           </li>
           {receipts.map((item) => (
             <li key={item.nodeId}>
@@ -442,7 +443,7 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
       </Section>
 
       <Section
-        description="The normalized event this run evaluated. Source text is untrusted evidence; no raw payload or credential is kept."
+        description="The event this run checked. Its text comes from GitHub and is not trusted as instructions; no raw payload or credential is kept."
         title="Event evidence"
       >
         <div className="overflow-x-auto rounded-2xl ring-1 ring-border">
@@ -476,7 +477,7 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
         </div>
         {event.snapshot.notes ? (
           <div>
-            <h3 className="mb-2 text-ui-lg font-medium">Release notes (Markdown source)</h3>
+            <h3 className="mb-2 text-ui-lg font-medium">Release notes (Markdown)</h3>
             <pre className="max-h-64 overflow-auto rounded-2xl p-4 text-xs whitespace-pre-wrap text-muted-foreground ring-1 ring-border">
               {event.snapshot.notes}
             </pre>

@@ -2,6 +2,8 @@ import { SETTINGS_SECTIONS, settingsHref } from '@/components/workspace/settings
 import {
   activeLink,
   AREA_LINKS,
+  AUTOMATE_COMMANDS,
+  automateLinks,
   campaignLinks,
   PLATFORM_DESTINATIONS,
   type PlatformArea,
@@ -21,10 +23,13 @@ export type PalettePage = {
 /** Every page of the sections this workspace sees, then every settings page. */
 export function palettePages({
   campaignsEnabled,
+  canManage = true,
   draftsEnabled,
   sectionLabel,
 }: {
   campaignsEnabled: boolean
+  /** Owners and admins also get Automate's setup pages and actions. */
+  canManage?: boolean
   draftsEnabled: boolean
   sectionLabel: (key: PlatformArea) => string
 }): PalettePage[] {
@@ -38,7 +43,9 @@ export function palettePages({
           : [{ href: '/publish/link-checks', label: 'Link checks' }]
         : key === 'campaigns'
           ? campaignLinks(draftsEnabled)
-          : AREA_LINKS[key]
+          : key === 'automate'
+            ? automateLinks(canManage)
+            : AREA_LINKS[key]
     return links
       ? links.map((link) => ({ ...link, section: sectionLabel(key), terms: link.label }))
       : [{ href, label: sectionLabel(key), section: '', terms: sectionLabel(key) }]
@@ -51,7 +58,10 @@ export function palettePages({
       terms: `${section.title} ${section.keywords ?? ''}`,
     })
   )
-  return [...areas, ...settings]
+  const commands = canManage
+    ? AUTOMATE_COMMANDS.map((command) => ({ ...command, section: sectionLabel('automate') }))
+    : []
+  return [...areas, ...commands, ...settings]
 }
 
 /** The pages a search names, by page name or settings keyword. */

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { z } from 'zod'
@@ -8,12 +9,15 @@ import {
   frontendSourceInputSchema,
   frontendProviderSchema,
   frontendDecisionSchema,
+  githubProductionCatalogSchema,
   type FrontendSource,
   type FrontendSourceInput,
   type FrontendPolicy,
 } from 'screenshot-studio-backend-sdk'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 import { deploymentExample } from '@/lib/workflows/deployment-examples'
+import { EmptyState } from '@/components/platform-ui'
+import { RocketLaunchIcon } from '@phosphor-icons/react/dist/ssr/RocketLaunch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +31,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
-import { getErrorMessage } from '@/components/workspace/settings-client'
+import { getErrorMessage, requestJson } from '@/components/workspace/settings-client'
 
 /** The menu's stand-in for an empty value, which a Select item cannot hold. */
 const NONE = '__none'
@@ -39,17 +43,107 @@ const providers = {
   cloudflare_pages: 'Cloudflare Pages',
   cloudflare_workers: 'Cloudflare Workers',
 }
-const providerEvidence = {
-  github:
-    'Requires a successful deployment status for the selected environment. Actions completion alone cannot qualify.',
-  vercel:
-    'Requires a signed deployment.promoted event. Ready builds and accepted rollback requests stay pending.',
-  netlify:
-    'Requires the authenticated site API to identify this deployment as published_deploy. Locked, unpublished builds stay pending.',
-  cloudflare_pages:
-    'Requires the project canonical_deployment and a successful final deploy stage. Polling cannot reconstruct every intermediate restoration.',
-  cloudflare_workers:
-    'Requires the current Worker deployment to route 100% of traffic to one version. Builds and split traffic stay pending.',
+/** Where each value comes from, in the words of that host. */
+const hostGuides: Record<
+  keyof typeof providers,
+  {
+    account: string
+    evidence: string
+    help: { href: string; label: string }[]
+    project: string
+    steps: string[]
+  }
+> = {
+  github: {
+    account: '',
+    evidence: 'Counts a successful deployment status for your production environment.',
+    help: [],
+    project: '',
+    steps: [
+      'Choose the watched repository below.',
+      'Save. Shots fills in the rest from your GitHub connection.',
+    ],
+  },
+  vercel: {
+    account: 'Team or account ID',
+    evidence: 'Counts a signed promotion to production. A build that is only ready does not count.',
+    help: [
+      { href: 'https://vercel.com/account/tokens', label: 'Create a Vercel token' },
+      { href: 'https://vercel.com/docs/webhooks', label: 'Where to find the webhook secret' },
+    ],
+    project: 'Project ID',
+    steps: [
+      'Copy the team ID and project ID from their Settings pages in Vercel.',
+      'Create a read token, and a webhook for deployment.promoted.',
+      'Save here, then point the webhook at the address Shots shows.',
+    ],
+  },
+  netlify: {
+    account: 'Team (account) ID',
+    evidence: 'Counts the deployment Netlify reports as published. Locked builds do not count.',
+    help: [
+      {
+        href: 'https://docs.netlify.com/api-and-cli-guides/api-guides/get-started-with-api/',
+        label: 'Create a Netlify token',
+      },
+      {
+        href: 'https://docs.netlify.com/site-deploys/notifications/',
+        label: 'Where to set the webhook secret',
+      },
+    ],
+    project: 'Site ID',
+    steps: [
+      'Copy the site ID from Site configuration in Netlify.',
+      'Create a personal access token, and an outgoing deploy webhook with a signing secret.',
+      'Save here, then point the webhook at the address Shots shows.',
+    ],
+  },
+  cloudflare_pages: {
+    account: 'Cloudflare account ID',
+    evidence: 'Counts the deployment serving your project after its final stage succeeds.',
+    help: [
+      {
+        href: 'https://developers.cloudflare.com/fundamentals/api/get-started/create-token/',
+        label: 'Create a Cloudflare token',
+      },
+      {
+        href: 'https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/',
+        label: 'Find your account ID',
+      },
+    ],
+    project: 'Pages project name',
+    steps: [
+      'Copy your account ID and Pages project name from Cloudflare.',
+      'Create an API token that can read Pages.',
+      'Save here. Shots checks the project on a schedule, with no webhook.',
+    ],
+  },
+  cloudflare_workers: {
+    account: 'Cloudflare account ID',
+    evidence: 'Counts the Worker version receiving all traffic. Split traffic does not count.',
+    help: [
+      {
+        href: 'https://developers.cloudflare.com/fundamentals/api/get-started/create-token/',
+        label: 'Create a Cloudflare token',
+      },
+      {
+        href: 'https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/',
+        label: 'Find your account ID',
+      },
+    ],
+    project: 'Worker script name',
+    steps: [
+      'Copy your account ID and Worker name from Cloudflare.',
+      'Create an API token that can read Workers.',
+      'Save here. Shots checks the Worker on a schedule, with no webhook.',
+    ],
+  },
+}
+/** What a decision's `checks` value means; each is set by the backend evaluator. */
+const checkLabels: Record<string, string> = {
+  not_configured: 'none required',
+  missing: 'not reported yet',
+  passed: 'passed',
 }
 const initialPolicy: FrontendPolicy = {
   schemaVersion: 1,
@@ -85,20 +179,29 @@ const states = {
   failed: 'Failed',
 }
 const healthLabels: Record<string, string> = {
-  ready: 'Connected; provider reads are current.',
+  ready: 'Connected, and Shots can read your host.',
   baseline_pending: 'Waiting for the first poll to establish history without live alerts.',
   promotion_history_requires_webhooks:
-    'Vercel promotions require signed webhooks. Its project API cannot reconstruct a missed promotion; check provider delivery history after an outage.',
+    'Vercel promotions require signed webhooks. Its project API cannot reconstruct a missed promotion; check the delivery history in Vercel after an outage.',
   workers_history_bounded:
     'Workers API history is bounded. Builds alone and versions outside that history do not prove production activation.',
   activation_history_gap_review_required:
-    'Polling gap: intermediate promotions or restorations may be missing. Review provider history.',
+    'Shots may have missed some promotions or restorations. Check the history on your host.',
   history_gap_page_limit:
     'History exceeded the bounded polling window. Review the gap before relying on this source.',
   github_delivery_history_gap:
     'GitHub delivery history could not cover the gap. Review App deliveries and redeliver missing events.',
-  credential_revoked: 'Provider credentials were rejected. Replace the token.',
-  permission_missing: 'Provider read permission is missing.',
+  credential_revoked: 'Your host rejected the token. Replace it.',
+  permission_missing: 'The token cannot read this project on your host.',
+}
+
+/** Marks a field the form cannot save without; `required` tells assistive technology the same. */
+function RequiredMark() {
+  return (
+    <span aria-hidden="true" className="text-destructive">
+      {' *'}
+    </span>
+  )
 }
 
 /** Admin configuration and member-readable evidence share the backend evaluator. */
@@ -113,6 +216,7 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
   const [busy, setBusy] = useState(false)
   const [scenario, setScenario] = useState('active')
   const [preview, setPreview] = useState<z.infer<typeof frontendDecisionSchema> | null>(null)
+  const [connecting, setConnecting] = useState(false)
   const sources = useQuery(
     trpc.frontendDeployments.sources.queryOptions(undefined, { refetchInterval: 30_000 })
   )
@@ -166,6 +270,29 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
   useEffect(() => {
     if (source && form.id !== selected) choose(source)
   }, [source, form.id, selected, choose])
+  const guide = hostGuides[form.provider]
+  const required = (filled: unknown, label: string) => (filled ? [] : [label])
+  const missing = [
+    ...required(form.name.trim(), 'a name'),
+    ...(form.provider === 'github'
+      ? required(form.githubSourceId && form.accountId, 'a watched repository')
+      : [
+          ...required(form.accountId.trim(), guide.account),
+          ...required(form.projectId.trim(), guide.project),
+        ]),
+    ...required(form.revision || form.provider === 'github' || form.token, 'a read token'),
+    ...required(
+      form.revision || !['vercel', 'netlify'].includes(form.provider) || form.secret,
+      'a webhook signing secret'
+    ),
+    ...required(form.policy.environments.join('').trim(), 'a production environment'),
+  ]
+  const repositoryId = form.githubSourceId || form.id
+  const deploymentWorkflows = (overview.data?.definitions ?? []).filter(
+    (d) =>
+      d.sourceAppId === repositoryId && d.draft.family === 'deployment.succeeded' && !d.archived
+  )
+  const activeWorkflows = deploymentWorkflows.filter((d) => d.enabled && d.activeVersionId)
   const problem =
     error ??
     (sources.error
@@ -175,10 +302,6 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
         : null)
   return (
     <div className="space-y-8">
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        A successful build is separate from production publication and required checks. Deployment
-        evidence does not verify the live revision or approve a release for customers.
-      </p>
       {problem ? (
         <Alert variant="destructive">
           <AlertDescription>{problem}</AlertDescription>
@@ -186,27 +309,43 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
       ) : null}
       {message ? <p role="status">{message}</p> : null}
       <section aria-label="Connected frontends" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold">Connected frontends</h2>
-          {canManage ? (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setForm(initial)
-                setSelected('')
-                setPreview(null)
-              }}
-            >
-              Connect frontend
-            </Button>
-          ) : null}
-        </div>
+        {sources.data?.sources.length ? (
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Connected hosts</h2>
+            {canManage ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setForm(initial)
+                  setSelected('')
+                  setPreview(null)
+                  setConnecting(true)
+                }}
+              >
+                Connect a host
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         {sources.isPending ? (
-          <p>Loading sources…</p>
-        ) : !sources.data?.sources.length ? (
-          <p className="text-sm text-muted-foreground">
-            No frontend policies configured. Existing GitHub workflows continue unchanged.
-          </p>
+          <p>Loading hosts…</p>
+        ) : !sources.data?.sources.length && !connecting ? (
+          <EmptyState
+            action={
+              canManage ? <Button onClick={() => setConnecting(true)}>Connect a host</Button> : null
+            }
+            description={
+              <>
+                Connect where your site is hosted, such as Vercel, Netlify or Cloudflare. A
+                production deployment can then send an alert and start a workflow.{' '}
+                <Link className="underline" href="/docs/automate" rel="noopener" target="_blank">
+                  Read the guide
+                </Link>
+              </>
+            }
+            icon={RocketLaunchIcon}
+            title="No hosts connected"
+          />
         ) : null}
         {sources.data?.sources.map((item) => (
           <Button
@@ -241,7 +380,7 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
           ) : null}
         </section>
       ) : null}
-      {canManage ? (
+      {canManage && (source || connecting) ? (
         <form
           className="space-y-5 rounded-lg border p-5"
           onSubmit={(event) => {
@@ -256,13 +395,41 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             })
           }}
         >
-          <p className="text-sm text-muted-foreground">{providerEvidence[form.provider]}</p>
           <h2 className="font-semibold">
-            {form.revision ? 'Edit production policy' : 'Configure frontend'}
+            {form.revision ? 'Edit production policy' : 'Connect a host'}
           </h2>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>{guide.evidence}</p>
+            {form.revision ? null : (
+              <ol className="list-decimal space-y-1 ps-5">
+                {guide.steps.map((step) => (
+                  <li key={step}>{step}</li>
+                ))}
+              </ol>
+            )}
+            {guide.help.length ? (
+              <p className="flex flex-wrap gap-x-4 gap-y-1">
+                {guide.help.map((link) => (
+                  <a
+                    className="underline"
+                    href={link.href}
+                    key={link.href}
+                    rel="noopener noreferrer"
+                    target="_blank"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </p>
+            ) : null}
+            <p>Fields marked * are required.</p>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <Label htmlFor="frontend-name">Frontend name</Label>
+              <Label htmlFor="frontend-name">
+                Name
+                <RequiredMark />
+              </Label>
               <Input
                 id="frontend-name"
                 value={form.name}
@@ -271,7 +438,7 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="frontend-provider">Authoritative production provider</Label>
+              <Label htmlFor="frontend-provider">Host</Label>
               <Select
                 value={form.provider}
                 disabled={form.revision > 0}
@@ -297,7 +464,8 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             </div>
             <div className="space-y-1">
               <Label htmlFor="frontend-repository">
-                Connected GitHub source (optional for hosting providers)
+                Watched repository
+                {form.provider === 'github' ? <RequiredMark /> : ' (needed to start a workflow)'}
               </Label>
               <Select
                 value={form.githubSourceId || NONE}
@@ -306,18 +474,27 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                   const value = choice === NONE ? '' : choice
                   const s = overview.data?.sources.find((s) => s.id === value)
                   update('githubSourceId', value)
-                  if (form.provider === 'github') update('id', value)
-                  if (s && form.provider === 'github') {
-                    update('projectId', s.repositoryId)
-                    update('name', s.name)
-                  }
+                  if (form.provider !== 'github') return
+                  update('id', value)
+                  update('accountId', '')
+                  if (!s) return
+                  update('projectId', s.repositoryId)
+                  update('name', s.name)
+                  void perform(async () => {
+                    const { installationId, reason } = await requestJson(
+                      `/api/v1/github/sources/${encodeURIComponent(value)}/production-catalog`,
+                      githubProductionCatalogSchema
+                    )
+                    if (!installationId) throw new Error(reason)
+                    update('accountId', String(installationId))
+                  })
                 }}
               >
                 <SelectTrigger id="frontend-repository" className={selectClass}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>New frontend source</SelectItem>
+                  <SelectItem value={NONE}>None</SelectItem>
                   {overview.data?.sources.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}
@@ -326,32 +503,40 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="frontend-account">Account / team ID (GitHub: installation ID)</Label>
-              <Input
-                id="frontend-account"
-                value={form.accountId}
-                disabled={form.revision > 0}
-                onChange={(e) => update('accountId', e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="frontend-project">
-                Project / site ID (Cloudflare: project or script name)
-              </Label>
-              <Input
-                id="frontend-project"
-                value={form.projectId}
-                disabled={form.revision > 0}
-                onChange={(e) => update('projectId', e.target.value)}
-                required
-              />
-            </div>
+            {form.provider !== 'github' ? (
+              <>
+                <div className="space-y-1">
+                  <Label htmlFor="frontend-account">
+                    {guide.account}
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id="frontend-account"
+                    value={form.accountId}
+                    disabled={form.revision > 0}
+                    onChange={(e) => update('accountId', e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="frontend-project">
+                    {guide.project}
+                    <RequiredMark />
+                  </Label>
+                  <Input
+                    id="frontend-project"
+                    value={form.projectId}
+                    disabled={form.revision > 0}
+                    onChange={(e) => update('projectId', e.target.value)}
+                    required
+                  />
+                </div>
+              </>
+            ) : null}
             {form.provider !== 'github' ? (
               <div className="space-y-1">
                 <Label htmlFor="frontend-token">
-                  Provider read token {form.revision ? '(leave blank to retain)' : ''}
+                  Read token {form.revision ? '(leave blank to keep it)' : <RequiredMark />}
                 </Label>
                 <Input
                   id="frontend-token"
@@ -366,7 +551,8 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             {['vercel', 'netlify'].includes(form.provider) ? (
               <div className="space-y-1">
                 <Label htmlFor="frontend-secret">
-                  Webhook signing secret {form.revision ? '(leave blank to retain)' : ''}
+                  Webhook signing secret{' '}
+                  {form.revision ? '(leave blank to keep it)' : <RequiredMark />}
                 </Label>
                 <Input
                   id="frontend-secret"
@@ -380,7 +566,8 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             ) : null}
             <div className="space-y-1">
               <Label htmlFor="frontend-environments">
-                Production environments or approved aliases (comma separated)
+                Production environments (comma separated)
+                <RequiredMark />
               </Label>
               <Input
                 id="frontend-environments"
@@ -399,19 +586,22 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                 ['branch', 'Required branch'],
                 ['tag', 'Required tag'],
                 ['domain', 'Required production domain'],
+                // Hosts cannot prove these today, so a value here blocks every match; shown only to clear one.
                 ['workflowId', 'Required GitHub workflow ID'],
                 ['job', 'Required GitHub deployment job'],
               ] as const
-            ).map(([key, label]) => (
-              <div className="space-y-1" key={key}>
-                <Label htmlFor={`frontend-${key}`}>{label} (optional)</Label>
-                <Input
-                  id={`frontend-${key}`}
-                  value={form.policy[key]}
-                  onChange={(e) => policy(key, e.target.value)}
-                />
-              </div>
-            ))}
+            )
+              .filter(([key]) => !(key === 'workflowId' || key === 'job') || form.policy[key])
+              .map(([key, label]) => (
+                <div className="space-y-1" key={key}>
+                  <Label htmlFor={`frontend-${key}`}>{label} (optional)</Label>
+                  <Input
+                    id={`frontend-${key}`}
+                    value={form.policy[key]}
+                    onChange={(e) => policy(key, e.target.value)}
+                  />
+                </div>
+              ))}
             <div className="space-y-1">
               <Label htmlFor="frontend-workflow">Shots workflow after a match</Label>
               <Select
@@ -423,35 +613,57 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Alerts only</SelectItem>
-                  {overview.data?.definitions
-                    .filter(
-                      (d) =>
-                        d.sourceAppId === (form.githubSourceId || form.id) &&
-                        d.draft.family === 'deployment.succeeded' &&
-                        d.enabled &&
-                        d.activeVersionId
-                    )
-                    .map((d) => (
-                      <SelectItem key={d.id} value={d.activeVersionId ?? ''}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
+                  {activeWorkflows.map((d) => (
+                    <SelectItem key={d.id} value={d.activeVersionId ?? ''}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {activeWorkflows.length ? null : (
+                <p className="text-sm text-muted-foreground">
+                  {!overview.data?.sources.length ? (
+                    <>
+                      <Link className="underline" href="/workflows/sources">
+                        Watch a repository
+                      </Link>{' '}
+                      to start a workflow from a deployment.
+                    </>
+                  ) : !repositoryId ? (
+                    'Choose a watched repository above to list its deployment workflows.'
+                  ) : deploymentWorkflows[0] ? (
+                    <>
+                      {deploymentWorkflows[0].name} is not active yet.{' '}
+                      <Link className="underline" href={`/workflows/${deploymentWorkflows[0].id}`}>
+                        Activate it
+                      </Link>
+                      , then choose it here.
+                    </>
+                  ) : (
+                    <>
+                      This repository has no deployment workflow yet.{' '}
+                      <Link
+                        className="underline"
+                        href="/workflows/new?template=deployment-marketing"
+                      >
+                        Start from Deployment-driven marketing
+                      </Link>
+                      , activate it, then choose it here.
+                    </>
+                  )}
+                </p>
+              )}
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Selecting a GitHub source makes this policy authoritative for its new deployment events.
-            Release, PR, tag and milestone rules are preserved. Workflow/job filters require a
-            provider-established association. Current native payloads do not supply a trustworthy
-            workflow/job link, so those selectors block a match. Domain selectors require an exact
-            provider-reported URL; missing branch, domain, tag or workflow evidence needs attention.
+            A value the host does not report needs your attention instead of matching. Your release,
+            pull request, tag and milestone workflows are not affected.
           </p>
           <fieldset className="space-y-3">
             <legend className="font-medium">Required checks</legend>
             {!form.policy.checks.length ? (
               <p className="text-sm text-muted-foreground">
-                No additional checks. Success alerts will say only that the provider reported a
+                No additional checks. Success alerts will say only that your host reported a
                 production deployment.
               </p>
             ) : null}
@@ -474,19 +686,16 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                               }
                             : c
                         )
-                      )}
+                      )
+                    }
                   >
                     <SelectTrigger className={selectClass}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="github_check">GitHub check run</SelectItem>
-                      <SelectItem value="github_status">
-                        GitHub commit status
-                      </SelectItem>
-                      <SelectItem value="vercel_check">
-                        Vercel deployment check
-                      </SelectItem>
+                      <SelectItem value="github_status">GitHub commit status</SelectItem>
+                      <SelectItem value="vercel_check">Vercel deployment check</SelectItem>
                     </SelectContent>
                   </Select>
                 </Label>
@@ -533,7 +742,8 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                               }
                             : c
                         )
-                      )}
+                      )
+                    }
                   >
                     <SelectTrigger className={selectClass}>
                       <SelectValue />
@@ -615,8 +825,7 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
               Add required check
             </Button>
             <p className="text-sm text-muted-foreground">
-              Missing, inaccessible, stale and skipped results need attention; running results
-              remain pending. Failed results block success.
+              A failed check blocks the match. A missing, stale or skipped one needs your attention.
             </p>
           </fieldset>
           <fieldset className="flex flex-wrap gap-4">
@@ -653,83 +862,98 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
             />
             Enable alerts and the selected workflow for new events
           </Label>
-          <Button type="submit" disabled={busy}>
-            {busy ? 'Saving…' : 'Save production policy'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={busy || missing.length > 0}>
+              {busy ? 'Saving…' : 'Save production policy'}
+            </Button>
+            {source ? null : (
+              <Button onClick={() => setConnecting(false)} type="button" variant="ghost">
+                Cancel
+              </Button>
+            )}
+            {missing.length ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                Still needed: {missing.join(', ')}.
+              </p>
+            ) : null}
+          </div>
         </form>
       ) : null}
-      <section aria-label="Policy preview" className="space-y-3 rounded-lg border p-5">
-        <h2 className="font-semibold">Preview without sending alerts</h2>
-        <p className="text-sm text-muted-foreground">
-          Examples are illustrative. Preview uses the selected policy (or unsaved form rules for
-          administrators) and never sends notifications or starts a workflow.
-        </p>
-        <Label className="block text-sm">
-          Representative event
-          <Select
-            value={scenario}
-            onValueChange={(value) => {
-              setScenario(value)
-              setPreview(null)
-            }}
+      {source || connecting ? (
+        <section aria-label="Policy preview" className="space-y-3 rounded-lg border p-5">
+          <h2 className="font-semibold">Preview without sending alerts</h2>
+          <p className="text-sm text-muted-foreground">
+            Try this policy on an example event. Preview sends nothing and starts no workflow.
+          </p>
+          <Label className="block text-sm">
+            Representative event
+            <Select
+              value={scenario}
+              onValueChange={(value) => {
+                setScenario(value)
+                setPreview(null)
+              }}
+            >
+              <SelectTrigger className={selectClass}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Production active, checks pass</SelectItem>
+                <SelectItem value="preview">Preview environment</SelectItem>
+                <SelectItem value="build">Build ready, publication pending</SelectItem>
+                <SelectItem value="workflow">Workflow success without deployment proof</SelectItem>
+                <SelectItem value="rollback">Rollback request accepted</SelectItem>
+                <SelectItem value="missing-check">Required checks missing</SelectItem>
+                <SelectItem value="failed-check">Required check failed</SelectItem>
+                <SelectItem value="wrong-revision">Checks belong to another revision</SelectItem>
+                {history.data?.items.map((item) => (
+                  <SelectItem key={item.id} value={`record:${item.id}`}>
+                    Recorded: {item.observation.kind} · {item.observation.deploymentId}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Label>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() =>
+              void perform(async () => {
+                const record = history.data?.items.find((item) => `record:${item.id}` === scenario)
+                setPreview(
+                  await client.frontendDeployments.preview.mutate({
+                    policy: form.policy,
+                    observation:
+                      record?.observation ??
+                      deploymentExample(form.provider, scenario, form.policy),
+                  })
+                )
+              })
+            }
           >
-            <SelectTrigger className={selectClass}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Production active, checks pass</SelectItem>
-              <SelectItem value="preview">Preview environment</SelectItem>
-              <SelectItem value="build">Build ready, publication pending</SelectItem>
-              <SelectItem value="workflow">
-                Workflow success without deployment proof
-              </SelectItem>
-              <SelectItem value="rollback">Rollback request accepted</SelectItem>
-              <SelectItem value="missing-check">Required checks missing</SelectItem>
-              <SelectItem value="failed-check">Required check failed</SelectItem>
-              <SelectItem value="wrong-revision">
-                Checks belong to another revision
-              </SelectItem>
-              {history.data?.items.map((item) => (
-                <SelectItem key={item.id} value={`record:${item.id}`}>
-                  Recorded: {item.observation.kind} · {item.observation.deploymentId}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Label>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy}
-          onClick={() =>
-            void perform(async () => {
-              const record = history.data?.items.find((item) => `record:${item.id}` === scenario)
-              setPreview(
-                await client.frontendDeployments.preview.mutate({
-                  policy: form.policy,
-                  observation:
-                    record?.observation ?? deploymentExample(form.provider, scenario, form.policy),
-                })
-              )
-            })
-          }
-        >
-          Preview policy
-        </Button>
-        {preview ? (
-          <div role="status">
-            <strong>{states[preview.state]}</strong>
-            <p>{preview.reason}</p>
-            <p>Checks: {preview.checks}</p>
-          </div>
-        ) : null}
-      </section>
+            Preview policy
+          </Button>
+          {preview ? (
+            <div role="status">
+              <strong>{states[preview.state]}</strong>
+              <p>{preview.reason}</p>
+              <p>Required checks: {checkLabels[preview.checks] ?? preview.checks}</p>
+              {source ? null : (
+                <p className="text-sm text-muted-foreground">
+                  This is an example. Nothing is connected to check yet.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
       {selected ? (
         <section aria-label="Deployment evidence" className="space-y-3">
           <h2 className="font-semibold">Deployment evidence</h2>
           <p className="text-sm text-muted-foreground">
-            Latest 100 observations. Provider occurrence, receipt and processing times are kept
-            separately. Historical entries never trigger live alerts.
+            The latest 100 events, with when each happened, arrived and was processed. Past events
+            never send alerts.
           </p>
           {history.data?.items.map((item) => (
             <Disclosure key={item.id} className="rounded-lg border p-4">
@@ -775,7 +999,7 @@ export function FrontendDeployments({ canManage }: { canManage: boolean }) {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open provider evidence
+                      Open this deployment on your host
                     </a>
                   ) : null}
                   <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded bg-muted p-3">

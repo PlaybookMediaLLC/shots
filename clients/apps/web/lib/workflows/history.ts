@@ -18,13 +18,13 @@ export function runDateDay(boundary?: string, end = false): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
-/** Explain runs without a selected definition without attributing legacy work to workflows. */
+/** Name who handled a run with no workflow, without crediting a workflow with the Release inbox's work. */
 export function runHandler(item: {
   event: Pick<AutomationHistoryItem['event'], 'mode'>
   run: Pick<AutomationHistoryItem['run'], 'definitionId'>
 }): string {
   return item.event.mode === 'legacy'
-    ? 'Manual release intake'
+    ? 'Release inbox'
     : item.run.definitionId
       ? 'Archived workflow'
       : 'No matching workflow'

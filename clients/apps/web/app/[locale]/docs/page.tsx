@@ -234,6 +234,13 @@ export default function DocsPage() {
           </Link>
           .
         </p>
+        <p className="-mt-8 mb-12 leading-relaxed text-muted-foreground">
+          Setting up the product rather than calling its API? Read{" "}
+          <Link href="/docs/automate" className={linkClassName}>
+            Automate your launches
+          </Link>
+          .
+        </p>
 
         <div className="space-y-12">
           <section id="quickstart">

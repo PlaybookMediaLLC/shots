@@ -75,7 +75,7 @@ func (c *Configuration) automationActions(ctx context.Context, org string, execu
 		case (action.kind == "generate_copy" || action.kind == "classify" || action.kind == "render_creatives" || action.kind == "render_code_visual" || action.kind == "create_canvas") && executor.SchemaVersion < 2:
 			item.Reason = "Running workers predate workflow language version 2. Deploy the current product worker."
 		case (action.kind == "generate_copy" || action.kind == "classify") && !slices.Contains(executor.Capabilities, automation.CapabilityAI):
-			item.Reason = "No worker has an AI model provider and credit meter configured (OPENROUTER_API_KEY, REDIS_URL)."
+			item.Reason = "No worker has an AI model and credit meter configured (OPENROUTER_API_KEY, REDIS_URL)."
 		case action.kind == "capture_product" && executor.SchemaVersion < 3:
 			item.Reason = "Running workers predate workflow language version 3. Deploy the current product worker."
 		case action.kind == "capture_product" && !slices.Contains(executor.Capabilities, automation.CapabilityCapture) && !slices.Contains(executor.Capabilities, automation.CapabilityBrowser):

@@ -133,8 +133,10 @@ test(
   'workflow and release views are separate, and an explicit compact preference survives',
   { tag: '@journey' },
   async ({ app, page }) => {
+    // The old address of Repositories still works.
     await app.open('/workflows?view=sources')
-    await expect(page.getByRole('heading', { name: 'Sources', exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/workflows\/sources$/)
+    await expect(page.getByRole('heading', { name: 'Repositories', exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Workflow summary' })).toHaveCount(0)
     await page
       .getByRole('navigation', { name: 'Automate', exact: true })
@@ -153,7 +155,7 @@ test(
     )
     // The compact rail lists every settings section as an icon, without the search box.
     const sections = page.getByRole('navigation', { name: 'Settings sections', exact: true })
-    await expect(sections.getByRole('link')).toHaveCount(21)
+    await expect(sections.getByRole('link')).toHaveCount(23)
     await expect(sections.getByRole('searchbox')).toHaveCount(0)
     await page.getByRole('button', { name: 'Expand navigation' }).click()
     await expect(page.getByRole('complementary', { name: 'Primary navigation' })).toHaveAttribute(
@@ -372,7 +374,7 @@ test(
       await expect(editor).toBeVisible()
       await expect(page.getByRole('dialog')).toHaveCount(0)
       await expect(page.getByRole('complementary', { name: 'Primary navigation' })).toBeVisible()
-      await page.getByLabel('Definition name').fill('Shell workflow proof')
+      await page.getByLabel('Workflow name', { exact: true }).fill('Shell workflow proof')
       await page.getByRole('button', { name: 'Save draft', exact: true }).click()
       await expect(page).toHaveURL(/\/workflows\/c[a-z0-9]+$/)
       await page.getByRole('tab', { name: 'Workflow', exact: true }).click()
@@ -483,7 +485,9 @@ test(
       }
       if (category === 'Workflows') {
         await expect(previews).toHaveCount(5)
-        await expect(catalog.locator('svg').first()).toBeVisible()
+        await expect(
+          catalog.getByText('Skips pre-releases and patch versions.', { exact: true })
+        ).toBeVisible()
         await page.screenshot({
           path: '.context/ux-redesign/template-catalog.png',
           fullPage: true,
@@ -493,11 +497,21 @@ test(
     }
     expect((await trpcQuery(page, 'releaseAutomation.overview')).body).toEqual(before.body)
     await app.open('/workflows/new')
-    const diagrams = page.getByRole('img', { name: /workflow preview$/ })
-    await expect(diagrams).toHaveCount(5)
-    expect((await diagrams.first().boundingBox())?.height).toBeGreaterThan(200)
-    await page.getByRole('button', { name: /Product launch from a GitHub release/ }).click()
-    await expect(page.getByRole('heading', { name: 'Configure', exact: true })).toBeVisible()
+    // The cards do not wait for the workspace: each says what sets it apart, in words.
+    await expect(page.getByRole('link', { name: /Use this template/ })).toHaveCount(0)
+    await expect(page.getByText('Only production deployments.')).toBeVisible()
+    // Each shows what comes out: a sample draft, its channel, and who decides.
+    await expect(page.getByText(/^Example draft for /)).toHaveCount(5)
+    await expect(page.getByText('Waits for a person to approve it')).toHaveCount(5)
+    await expect(page.getByText('Weekly recurring campaign')).toHaveCount(0)
+    await page
+      .getByRole('link', { name: 'Product launch from a GitHub release', exact: true })
+      .click()
+    // The choice is in the address, so a detour keeps it, and only what is missing is asked for.
+    await expect(page).toHaveURL(/template=release-launch/)
+    await expect(
+      page.getByRole('heading', { name: 'Product launch from a GitHub release', level: 1 })
+    ).toBeVisible()
     expect((await trpcQuery(page, 'releaseAutomation.overview')).body).toEqual(before.body)
     await page.screenshot({
       path: '.context/ux-redesign/workflow-template-previews.png',
@@ -633,7 +647,7 @@ test(
       .getByRole('link', { name: 'Automate', exact: true })
       .click()
     await expect(
-      page.getByRole('heading', { name: 'Workflows', exact: true, level: 1 })
+      page.getByRole('heading', { name: 'Automate', exact: true, level: 1 })
     ).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
   }

@@ -281,7 +281,7 @@ test('a concurrent policy save is refused as a conflict and the editor can reloa
   // Another administrator saves revision 2; the background refetch must not rebase the draft.
   revisions = [...revisions, { ...savedPolicy, refs: ['refs/heads/release'] }]
   await click('Refresh events')
-  await click('Save policy revision')
+  await click('Save policy')
 
   assert.equal(revisions.length, 2, 'the other administrator’s revision was overwritten')
   const [put] = sent('PUT', '/production')
@@ -295,9 +295,9 @@ test('a concurrent policy save is refused as a conflict and the editor can reloa
   await click('Reload latest revision')
   assert.equal(element<HTMLTextAreaElement>('#production-refs').value, 'refs/heads/release')
   assert.equal(element<HTMLTextAreaElement>('#production-environments').value, 'production')
-  await click('Save policy revision')
+  await click('Save policy')
   assert.deepEqual(revisions, [savedPolicy, revisions[1], revisions[1]])
-  assert.match(text(), /Policy revision saved/)
+  assert.match(text(), /Policy saved/)
 })
 
 test('a save refused before the newer revision was fetched offers the reload', async () => {
@@ -305,7 +305,7 @@ test('a save refused before the newer revision was fetched offers the reload', a
   await mount()
   await type('#production-environments', 'live')
   revisions = [...revisions, savedPolicy]
-  await click('Save policy revision')
+  await click('Save policy')
 
   assert.equal(revisions.length, 2)
   assert.match(text(), /publishing resource already exists/)
@@ -322,8 +322,8 @@ test('preview and save submit the same normalized policy', async () => {
   await type('#production-environments', ' production \n')
   await type('#production-refs', '')
   await type('#production-jobs', 'deploy\n\n')
-  await click('Preview current policy')
-  await click('Save policy revision')
+  await click('Preview this policy')
+  await click('Save policy')
 
   const normalized = { ...savedPolicy, refs: [] }
   const [preview] = sent('POST', '/production-preview')
@@ -331,4 +331,15 @@ test('preview and save submit the same normalized policy', async () => {
   const [save] = sent('PUT', '/production')
   assert.deepEqual(save?.body, { expectedRevision: 1, policy: normalized })
   assert.match(text(), /matched — Matched\./)
+})
+
+test('the page speaks in plain words, with a past event and its decision open', async () => {
+  revisions = [savedPolicy]
+  await mount()
+  await choose('#production-observation', /deployment_status/)
+  assert.match(text(), /What Shots decided at the time/)
+  assert.doesNotMatch(
+    text(),
+    /\b(intake|legacy|installations?|release automation|sources?|providers?)\b/i
+  )
 })
