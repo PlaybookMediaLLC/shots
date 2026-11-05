@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 from pathlib import Path
 import unittest
@@ -92,6 +93,17 @@ class UpdateWebImageTest(unittest.TestCase):
         self.assertIn("collab", {item["name"] for item in result["services"]})
         again = module.update_web_image(result, tag, {**base, "PLATFORM_CONTENT_DRAFTS": "enabled"})
         self.assertEqual(len(again["services"][0]["envs"]), len({item["key"] for item in again["services"][0]["envs"]}))
+
+    def test_password_sign_in_follows_infisical_and_unset_keeps_the_live_value(self):
+        tag = "web-" + "b" * 40
+        base = {"REDIS_URL": "runtime-redis", "PLATFORM_RENDER_CDP_URL": "wss://render.example/devtools",
+                "PLATFORM_RENDER_CDP_TOKEN": "cdp-token", "BETTER_AUTH_URL": "https://shots.example.com"}
+        live = copy.deepcopy(self.base)
+        live["spec"]["services"][0]["envs"].append({"key": "AUTH_ENABLE_PASSWORD", "value": "false", "type": "GENERAL", "scope": "RUN_TIME"})
+        def values(result):
+            return [item["value"] for item in result["services"][0]["envs"] if item["key"] == "AUTH_ENABLE_PASSWORD"]
+        self.assertEqual(values(module.update_web_image(copy.deepcopy(live), tag, base)), ["false"])
+        self.assertEqual(values(module.update_web_image(copy.deepcopy(live), tag, {**base, "AUTH_ENABLE_PASSWORD": "true"})), ["true"])
 
     def test_every_web_secret_comes_from_infisical(self):
         tag = "web-" + "b" * 40

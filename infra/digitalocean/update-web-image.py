@@ -85,6 +85,12 @@ def update_web_image(base, tag, secrets=None):
                      # Filled from Infisical with the other secrets below.
                      {"key": "PLATFORM_RENDER_CDP_TOKEN", "value": "", "type": "SECRET", "scope": "RUN_TIME"}]
         configure_content_drafts(web_envs, secrets, "collab" in services)
+        # Password sign-in follows Infisical. An unset value keeps the live one,
+        # because the web treats a missing variable as password sign-in on.
+        if secrets.get("AUTH_ENABLE_PASSWORD"):
+            web_envs[:] = [item for item in web_envs if item["key"] != "AUTH_ENABLE_PASSWORD"]
+            web_envs.append({"key": "AUTH_ENABLE_PASSWORD", "value": secrets["AUTH_ENABLE_PASSWORD"],
+                             "type": "GENERAL", "scope": "RUN_TIME"})
         for key in (key for key in STRIPE_SECRET_KEYS + STRIPE_PRICE_KEYS if secrets.get(key)):
             web_envs[:] = [item for item in web_envs if item["key"] != key]
             web_envs.append({"key": key, "value": secrets[key], "scope": "RUN_TIME",

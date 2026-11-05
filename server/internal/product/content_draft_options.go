@@ -55,12 +55,14 @@ func checkPostOptions(channel string, options *postoptions.PublishOptions, first
 	}
 	xOnly := len(o.PhotoTagIDs) > 0 || len(o.TaggedUserIDs) > 0 || o.ReplySettings != "" || o.MadeWithAI || o.PaidPartnership || o.CommunityID != "" || o.ShareWithFollowers ||
 		o.ArticleTitle != "" || o.ArticleCoverAssetID != "" || o.ArticleHTML != ""
-	linkedInOnly := o.Visibility != "" || o.FirstComment != "" || o.DocumentAssetID != "" || o.DocumentTitle != "" || o.PollQuestion != ""
+	linkedInOnly := o.Visibility != "" || o.DocumentAssetID != "" || o.DocumentTitle != "" || o.PollQuestion != ""
 	switch {
 	case xOnly && channel != "x":
 		return invalid("Reply settings, labels, communities and articles are X settings.")
 	case linkedInOnly && channel != "linkedin":
-		return invalid("Visibility, first comments, documents and poll questions are LinkedIn settings here.")
+		return invalid("Visibility, documents and poll questions are LinkedIn settings here.")
+	case o.FirstComment != "" && channel != "linkedin" && channel != "instagram":
+		return invalid("First comments are for LinkedIn and Instagram posts.")
 	case (o.QuoteRemoteID != "" || o.QuoteFirstPost) && channel != "x" && channel != "linkedin" && channel != "bluesky" && channel != "mastodon":
 		return invalid("Quotes are for X, LinkedIn, Bluesky and supported Mastodon servers.")
 	}
@@ -98,8 +100,8 @@ func checkPostOptions(channel string, options *postoptions.PublishOptions, first
 	if o.Visibility != "" && !slices.Contains(linkedInVisibility, o.Visibility) {
 		return invalid("A LinkedIn post is visible to anyone (PUBLIC) or connections (CONNECTIONS).")
 	}
-	if utf8.RuneCountInString(strings.TrimSpace(o.FirstComment)) > linkedInFirstCommentLimit {
-		return invalid(fmt.Sprintf("Keep the first comment under %d characters.", linkedInFirstCommentLimit))
+	if utf8.RuneCountInString(strings.TrimSpace(o.FirstComment)) > firstCommentLimit {
+		return invalid(fmt.Sprintf("Keep the first comment under %d characters.", firstCommentLimit))
 	}
 	if o.DocumentAssetID != "" && !contentDraftRefPattern.MatchString(o.DocumentAssetID) ||
 		utf8.RuneCountInString(o.DocumentTitle) > linkedInDocumentTitleLimit {

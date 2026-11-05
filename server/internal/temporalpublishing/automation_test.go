@@ -61,6 +61,14 @@ func TestAutomationPlan(t *testing.T) {
 	if len(linkedIn) != 1 || linkedIn[0].Kind != AutomationFirstComment || !linkedIn[0].At.Equal(published) {
 		t.Fatalf("linkedin = %+v", linkedIn)
 	}
+	for _, platform := range []string{"instagram", "instagram-standalone"} {
+		instagram := automationPlan(PreparedPublication{
+			Platform: platform, Options: &postoptions.PublishOptions{FirstComment: "#launch"},
+		}, published)
+		if len(instagram) != 1 || instagram[0].Kind != AutomationFirstComment || !instagram[0].At.Equal(published) {
+			t.Fatalf("%s = %+v", platform, instagram)
+		}
+	}
 }
 
 type receiptStore struct {
