@@ -16,8 +16,8 @@ export default async function ReleaseInbox({ params }: { params: Promise<{ local
         title="Release inbox"
         description="What shipped, ready to launch: product changes and source evidence for your next campaign."
         actions={
-          <ButtonLink href="/workflows?view=sources" variant="outline">
-            Connect a release source
+          <ButtonLink href="/workflows/sources" variant="outline">
+            Watch a repository
           </ButtonLink>
         }
       >

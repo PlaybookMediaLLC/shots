@@ -107,7 +107,8 @@ export async function PlatformShell({
                 aria-label="Page content"
                 role="region"
                 className={cn(
-                  'h-full min-h-0 overflow-y-auto overscroll-contain md:rounded-2xl md:border',
+                  // `relative` keeps hidden form inputs in here, or they make the window scroll too.
+                  'relative h-full min-h-0 overflow-y-auto overscroll-contain md:rounded-2xl md:border',
                   surface.panel,
                   surface.border
                 )}

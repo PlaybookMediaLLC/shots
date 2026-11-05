@@ -143,7 +143,7 @@ func (c *Configuration) GetGitHubProduction(ctx context.Context, actor Actor, so
 			if work != nil && work.DeadLetteredAt != nil {
 				view.DispatchStatus = "failed"
 				view.Status = "needs_attention"
-				view.Decision.Reason = "Evidence processing exhausted its retry budget. An operator must inspect the outbox failure before retrying."
+				view.Decision.Reason = "Shots could not process this event after several tries. Ask whoever runs this Shots server to check it."
 			} else if work != nil && work.Attempts > 0 {
 				view.DispatchStatus = "retrying"
 			}
@@ -274,12 +274,12 @@ func recordGitHubObservation(ctx context.Context, tx *ent.Tx, source *ent.Source
 		create.SetOrigin(origin)
 	}
 	status := "received"
-	decision := automation.ProductionDecision{Status: "needs_attention", Reason: "Configure a production policy; no deployment automation was activated.", Checks: []automation.ProductionCheck{}}
+	decision := automation.ProductionDecision{Status: "needs_attention", Reason: "Set a production policy for this repository. No workflow ran.", Checks: []automation.ProductionCheck{}}
 	if policy != nil {
 		create.SetPolicyID(policy.ID)
 		if legacy {
 			status = "legacy"
-			decision.Reason = "Preserved legacy production heuristic; no v1 policy qualification is claimed."
+			decision.Reason = "Counted by the older production rule, not by a policy."
 		} else {
 			definition, err := tx.ReleaseAutomation.Query().Where(releaseautomation.ID(policy.Policy.DefinitionID), releaseautomation.OrganizationID(source.OrganizationID), releaseautomation.SourceAppID(source.ID), releaseautomation.Enabled(true), releaseautomation.Archived(false)).Only(ctx)
 			if err != nil && !ent.IsNotFound(err) {
@@ -298,13 +298,13 @@ func recordGitHubObservation(ctx context.Context, tx *ent.Tx, source *ent.Source
 	if frontend {
 		status = "not_matched"
 		decision.Status = "not_matched"
-		decision.Reason = "The configured frontend policy is authoritative for new deployment alerts and workflows."
+		decision.Reason = "A host connected under Deployments handles this repository's new deployments."
 	}
 	if origin != "live" {
 		status = "review_only"
-		decision.Reason = "Recovered or historical evidence; live automation is suppressed."
+		decision.Reason = "A past or recovered event, kept for review. No workflow ran."
 		if origin == "historical" {
-			decision.Reason = "Evidence predates this policy or arrived beyond the 15-minute live window. Review or preview it; live automation is suppressed."
+			decision.Reason = "This event is older than the policy, or arrived more than 15 minutes late, so it is kept for review. No workflow ran."
 		}
 	}
 	create.SetStatus(status).SetDecision(decision)
@@ -492,7 +492,7 @@ func (c *Configuration) processGitHubObservation(ctx context.Context, org, id st
 		if prior != nil {
 			update.SetStatus("duplicate").SetEventID(prior.ID)
 		} else if captured {
-			decision.Reason = "This deployment was already recorded by the production-capture path. No new workflow was started."
+			decision.Reason = "Shots already recorded this deployment for a product capture. No new workflow started."
 			update.SetStatus("duplicate").SetDecision(decision)
 		} else {
 			version, err := tx.ReleaseAutomationVersion.Query().Where(releaseautomationversion.ID(*observation.WorkflowVersionID), releaseautomationversion.OrganizationID(org), releaseautomationversion.DefinitionID(policy.Policy.DefinitionID)).Only(ctx)
@@ -547,10 +547,10 @@ func (c *Configuration) retryProductionEvidence(ctx context.Context, observation
 	if err != nil {
 		return err
 	}
-	decision := automation.ProductionDecision{Status: "needs_attention", Reason: "GitHub evidence is temporarily unavailable or rate limited. A bounded outbox retry is pending; no workflow has run.", Checks: []automation.ProductionCheck{}}
+	decision := automation.ProductionDecision{Status: "needs_attention", Reason: "GitHub is unavailable or rate limited right now. Shots will retry; no workflow has run.", Checks: []automation.ProductionCheck{}}
 	update := c.client.GitHubObservation.Update().Where(githubobservation.ID(observation.ID), githubobservation.OrganizationID(observation.OrganizationID), githubobservation.Status("received")).SetDecision(decision)
 	if work.Attempts >= 8 {
-		decision.Reason = "GitHub evidence remained unavailable after eight attempts. Review access and this observation; automation did not run."
+		decision.Reason = "GitHub stayed unavailable after eight tries. Check access and this event. No workflow ran."
 		update.SetDecision(decision).SetStatus("needs_attention").SetProcessedAt(time.Now())
 	}
 	if err := update.Exec(ctx); err != nil {
@@ -579,7 +579,7 @@ func (c *Configuration) GitHubProductionCatalog(ctx context.Context, actor Actor
 	}
 	result := &GitHubProductionCatalog{Access: "unavailable", Workflows: []automation.GitHubWorkflow{}, Jobs: []githubapp.WorkflowJob{}}
 	if err := automationSourceAccess(ctx, c.client, source); err != nil {
-		result.Reason = "Installation suspended, disconnected, or repository removed."
+		result.Reason = "The Shots GitHub App is suspended or disconnected, or the repository was removed."
 		return result, nil
 	}
 	installation, err := c.client.GitHubInstallation.Query().Where(githubinstallation.ID(*source.GithubInstallationID)).Only(ctx)
@@ -589,12 +589,12 @@ func (c *Configuration) GitHubProductionCatalog(ctx context.Context, actor Actor
 	result.InstallationID, result.RepositoryID = installation.InstallationID, *source.ExternalID
 	reader, ok := c.github.(GitHubProductionReader)
 	if !ok {
-		result.Reason = "GitHub provider is not configured."
+		result.Reason = "This server has no GitHub App configured."
 		return result, nil
 	}
 	caps, err := reader.ProductionCapabilities(ctx, installation.InstallationID, *source.ExternalID)
 	if err != nil {
-		result.Reason = "Repository or App capabilities are unavailable; check access and retry."
+		result.Reason = "Shots could not read what it can access in this repository. Check access and try again."
 		return result, nil
 	}
 	result.Capabilities = &caps

@@ -63,6 +63,11 @@ const RESOURCES = [
     detail: "Connect Claude, ChatGPT, Cursor, and other agents to a workspace through the Shots MCP server.",
   },
   {
+    href: "/docs/automate",
+    label: "Automate your launches",
+    detail: "Turn a release, a merged pull request, or a deployment into campaign drafts for review.",
+  },
+  {
     href: "/llms.txt",
     label: "llms.txt",
     detail: "Markdown site overview for AI agents and LLM crawlers.",

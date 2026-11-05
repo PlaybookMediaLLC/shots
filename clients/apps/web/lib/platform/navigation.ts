@@ -8,7 +8,7 @@ export const PLATFORM_DESTINATIONS = [
   { href: '/campaigns', label: 'Campaigns', key: 'campaigns' },
   { href: '/publish', label: 'Publish', key: 'publish' },
   { href: '/library', label: 'Library', key: 'library' },
-  { href: '/workflows', label: 'Automate', key: 'automate' },
+  { href: '/workflows/overview', label: 'Automate', key: 'automate' },
   { href: '/activity', label: 'Activity', key: 'activity' },
   { href: '/settings', label: 'Settings', key: 'settings' },
 ] as const
@@ -56,7 +56,7 @@ const DESTINATION_ALIASES: Record<PlatformArea, string[]> = {
   campaigns: ['launch', 'release', 'brief'],
   publish: ['write', 'draft', 'post', 'schedule', 'calendar', 'thread', 'link check', 'profile', 'brand'],
   library: ['project', 'asset', 'template', 'brand kit', 'media'],
-  automate: ['workflow', 'automation', 'source', 'run'],
+  automate: ['workflow', 'automation', 'source', 'run', 'github', 'repository', 'deployment'],
   activity: ['history', 'log', 'feed'],
   settings: ['billing', 'plan', 'member', 'team', 'account', 'integration', 'workspace'],
 }
@@ -92,12 +92,27 @@ const CAMPAIGN_LINKS = [
   { href: '/campaigns/deliveries', label: 'Deliveries' },
   { href: '/campaigns?status=ARCHIVED', label: 'Archived' },
 ]
+const SIGNED_IN_CAPTURE = { href: '/workflows/connections', label: 'Signed-in capture' }
 export const AUTOMATE_LINKS = [
+  { href: '/workflows/overview', label: 'Overview' },
   { href: '/workflows', label: 'Workflows' },
+  { href: '/workflows/sources', label: 'Repositories' },
   { href: '/workflows/runs', label: 'Runs' },
   { href: '/workflows/deployments', label: 'Deployments' },
-  { href: '/workflows/connections', label: 'Signed-in capture' },
-  { href: '/workflows?view=sources', label: 'Sources' },
+  SIGNED_IN_CAPTURE,
+]
+/** Automate's pages for this person; only owners and admins set up signed-in capture. */
+export function automateLinks(canManage: boolean): AreaLink[] {
+  return canManage ? AUTOMATE_LINKS : AUTOMATE_LINKS.filter((link) => link !== SIGNED_IN_CAPTURE)
+}
+/** What Search offers people who can change Automate, for what they mean to do rather than where to go. */
+export const AUTOMATE_COMMANDS = [
+  { href: '/workflows/new', label: 'New workflow', terms: 'new workflow template automation' },
+  {
+    href: '/workflows/sources',
+    label: 'Watch a repository',
+    terms: 'watch repository github connect source',
+  },
 ]
 export const CREATE_LINKS = [
   { href: '/create', label: 'New' },

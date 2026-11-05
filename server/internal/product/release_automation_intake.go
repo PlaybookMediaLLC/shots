@@ -151,7 +151,7 @@ func (c *Configuration) acceptGitHubEvent(ctx context.Context, delivery string, 
 		}
 		versions := []string{}
 		mode := "legacy"
-		status, reason := "queued", "Accepted for legacy source processing."
+		status, reason := "queued", "Accepted for the Release inbox."
 		if source.ReleaseAutomation {
 			mode = "automation"
 			definitions, err := tx.ReleaseAutomation.Query().Where(releaseautomation.OrganizationID(source.OrganizationID), releaseautomation.SourceAppID(source.ID), releaseautomation.Family(string(event.Family)), releaseautomation.Enabled(true)).Order(ent.Asc(releaseautomation.FieldActivePriority), ent.Asc(releaseautomation.FieldID)).All(ctx)
@@ -163,9 +163,9 @@ func (c *Configuration) acceptGitHubEvent(ctx context.Context, delivery string, 
 					versions = append(versions, *definition.ActiveVersionID)
 				}
 			}
-			reason = "Definition versions pinned in priority order; first match wins."
+			reason = "Workflows are checked in priority order; the first match runs."
 			if len(versions) == 0 && !(event.Family == automation.Merged && source.AutomationCollectUnmatched) && !(event.Family == automation.Deployed && productionDeployment(event)) {
-				status, reason = "skipped", "Automation mode has no enabled definition for this event; legacy release creation remains off."
+				status, reason = "skipped", "No active workflow handles this event, so nothing ran."
 			}
 		}
 		if filter := automationSourceFilter(source, event); filter != "" {
@@ -227,10 +227,10 @@ func automationSourceFilter(source *ent.SourceApp, event automation.Event) strin
 			branch = *source.Branch
 		}
 		if branch == "" || eventString(event, "pr.base") != branch {
-			return "Pull request does not target the watched source branch."
+			return "This pull request does not target the watched branch."
 		}
 		if ignoresAuthor(source, eventString(event, "pr.author")) {
-			return "Pull request author is excluded by the source."
+			return "This repository excludes pull requests from this author."
 		}
 		bot := event.Fields["pr.bot"]
 		if source.IgnoreBotPullRequests && (bot.Boolean == nil || *bot.Boolean) {
@@ -238,7 +238,7 @@ func automationSourceFilter(source *ent.SourceApp, event automation.Event) strin
 		}
 	case automation.Deployed:
 		if !source.ReleaseAutomation && !productionDeployment(event) {
-			return "Legacy capture accepts successful production deployments only."
+			return "Only successful production deployments are captured."
 		}
 	case automation.TagPushed:
 		if source.SkipPrereleases && eventString(event, "version.level") == "prerelease" {

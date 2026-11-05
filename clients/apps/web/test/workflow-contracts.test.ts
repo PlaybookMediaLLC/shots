@@ -5,6 +5,8 @@ import {
   automationActionSchema,
   automationActionTypeSchema,
   automationGraphSchema,
+  automationFamilySchema,
+  type AutomationOverview,
 } from '../lib/api/contracts/release-automation'
 import {
   automationHistoryFilterSchema,
@@ -17,7 +19,12 @@ import {
   WORKFLOW_ACTIONS,
   WORKFLOW_SCHEMA_VERSION,
 } from '../lib/workflows/actions'
-import { buildWorkflowTemplate, workflowTemplateIdSchema } from '../lib/workflows/templates'
+import {
+  buildWorkflowTemplate,
+  defaultTemplateInput,
+  WORKFLOW_TEMPLATES,
+  workflowTemplateIdSchema,
+} from '../lib/workflows/templates'
 
 // The Go validator reads the same file in server/internal/releaseautomation,
 // so a template that drifts from the executor's language fails on both sides.
@@ -59,6 +66,56 @@ test('templates build the shared fixture graphs the Go validator accepts', () =>
       assert.deepEqual(Object.keys(layout).sort(), graph.nodes.map((node) => node.id).sort())
     }
   }
+})
+
+test('templates list the events in the same order as the event menus', () => {
+  assert.deepEqual(
+    WORKFLOW_TEMPLATES.map((template) => template.family),
+    automationFamilySchema.options
+  )
+})
+
+test('a template starts from what the workspace has, without inventing a choice', () => {
+  const overview = {
+    actions: [],
+    brands: [{ id: 'brand', name: 'Brand' }],
+    definitions: [],
+    destinations: [
+      { id: 'first', name: 'First' },
+      { id: 'second', name: 'Second' },
+    ],
+    executorAvailable: true,
+    fields: {},
+    sources: [
+      { branch: 'old', connectionState: 'disconnected' },
+      { branch: 'trunk', connectionState: 'connected' },
+    ],
+  } as unknown as AutomationOverview
+  const release = WORKFLOW_TEMPLATES.find((template) => template.id === 'release-launch')!
+  const milestone = WORKFLOW_TEMPLATES.find((template) => template.id === 'milestone-release')!
+  const input = defaultTemplateInput(release, overview)
+  assert.equal(input.brandKitId, 'brand')
+  assert.deepEqual(input.destinationIds, ['first'])
+  // Paid AI stays off unless the backend says it can run.
+  assert.equal(input.creditLimit, 0)
+  assert.equal(input.branch, 'trunk')
+  assert.equal(input.majorMinorOnly, true)
+  assert.equal(defaultTemplateInput(milestone, overview).majorMinorOnly, false)
+  const generating = defaultTemplateInput(release, {
+    ...overview,
+    actions: [{ available: true, reason: '', type: 'generate_copy' }],
+  })
+  assert.equal(generating.creditLimit, 25)
+  // An empty workspace leaves its choices for the Setup tab and the backend's validation.
+  const empty = defaultTemplateInput(release, {
+    ...overview,
+    brands: [],
+    destinations: [],
+    sources: [],
+  })
+  assert.equal(empty.brandKitId, '')
+  assert.deepEqual(empty.destinationIds, [])
+  assert.equal(empty.branch, 'main')
 })
 
 test('a deployment template captures before it renders, on the language version it needs', () => {

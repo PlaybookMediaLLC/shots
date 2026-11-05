@@ -12,7 +12,7 @@ const SECTIONS = [
     'Library',
     ['Screenshots', 'Canvas', 'Story Sets', 'Store screenshots', 'Assets', 'Brand assets'],
   ],
-  ['Automate', ['Workflows', 'Runs', 'Deployments', 'Sources']],
+  ['Automate', ['Overview', 'Workflows', 'Repositories', 'Runs', 'Deployments']],
 ] as const
 
 test(
@@ -55,6 +55,30 @@ test(
     }
   }
 )
+
+test('Activity and Settings stay on screen on a short window, whichever section is open', async ({
+  app,
+  page,
+}) => {
+  await page.setViewportSize({ width: 1156, height: 600 })
+  for (const path of ['/workflows/overview', '/library']) {
+    await app.open(path)
+    const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
+    for (const name of ['Activity', 'Settings']) {
+      const link = sidebar.getByRole('link', { name, exact: true })
+      await expect(link).toBeInViewport({ ratio: 1 })
+      // On top where it is drawn: nothing covers or clips it.
+      expect(
+        await link.evaluate((element) => {
+          const { bottom, left, right, top } = element.getBoundingClientRect()
+          const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2)
+          const edge = document.elementFromPoint((left + right) / 2, bottom - 1)
+          return element.contains(hit) && element.contains(edge)
+        })
+      ).toBe(true)
+    }
+  }
+})
 
 test('Library shows brand kits in place, and leaving Settings returns there', async ({
   app,

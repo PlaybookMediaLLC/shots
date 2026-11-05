@@ -94,7 +94,7 @@ general availability, or bypasses the existing review/publishing controls.
 
 ## Selecting workflows and previewing a rule
 
-Open **Automate → Sources → Production evidence** for a watched GitHub repository.
+Open **Automate → Repositories → Production policy and event history** for a watched GitHub repository.
 Members can inspect evidence; workspace owners/admins with a session can save
 policies and request recovery. Go rechecks membership, source ownership,
 installation linkage and repository access. Web routes use the existing auth,
@@ -211,9 +211,9 @@ repository selection if an installation exceeds the supported list budget.
 
 ## Delivery recovery and gaps
 
-The UI's **Inspect delivery history** reads one App-delivery page (100 entries) per
+The UI's **Check for missed events** reads one App-delivery page (100 entries) per
 request, persisting a source-scoped cursor, lease, history window and status. Continue
-with **Inspect next page**. **Recover failed deliveries for review** additionally
+with **Check the next page**. **Recover missed events for review** additionally
 requests at most five due redeliveries, at most three attempts per provider GUID,
 with 1/2/4-minute backoff. This is an administrator-operated mechanism; no automatic
 background scan or customer GitHub settings changes are enabled by this migration.

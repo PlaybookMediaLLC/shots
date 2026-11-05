@@ -85,7 +85,7 @@ func execute(ctx workflow.Context, input Input, finish *Finish) error {
 		return err
 	}
 	if loaded.Mode == "legacy" {
-		finish.Reason = "Legacy source processing completed."
+		finish.Reason = "Sent to the Release inbox."
 		return workflow.ExecuteActivity(ctx, LegacyActivity, input).Get(ctx, nil)
 	}
 	event := loaded.Event
@@ -130,7 +130,7 @@ func execute(ctx workflow.Context, input Input, finish *Finish) error {
 				return err
 			}
 		}
-		finish.Status, finish.Code, finish.Reason = "skipped", "no_match", "No accepted definition matched; no release or campaign was created."
+		finish.Status, finish.Code, finish.Reason = "skipped", "no_match", "No workflow matched; no release or campaign was created."
 		if event.Family == automation.Merged && loaded.CollectUnmatched {
 			finish.Reason += " The merged PR was held as a change under the accepted source policy."
 		}

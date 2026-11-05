@@ -3,7 +3,7 @@
 import { NotificationFeed } from '@/components/notifications/NotificationFeed'
 import { useNotificationIdentity } from '@/lib/notifications/client'
 
-/** Reuse the authorized, paginated inbox and its current-access resolver. */
+/** Everything the notification badge counts, through the same authorized, paginated feed. */
 export function NeedsAttention() {
   const identity = useNotificationIdentity()
   if (!identity.ready) return null
@@ -16,7 +16,7 @@ export function NeedsAttention() {
         </p>
       </div>
       <div className="home-notifications">
-        <NotificationFeed identity={identity} view="inbox" close={() => {}} />
+        <NotificationFeed identity={identity} view="all" close={() => {}} />
       </div>
     </section>
   )

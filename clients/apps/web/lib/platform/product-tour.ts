@@ -73,7 +73,8 @@ export const PRODUCT_TOURS = [
         id: 'create',
         anchor: 'nav-create',
         title: 'Create',
-        description: 'Start a screenshot, canvas or store image, pick up recent work, or begin from a template.',
+        description:
+          'Start a screenshot, canvas or store image, pick up recent work, or begin from a template.',
       },
       {
         id: 'publish',
@@ -92,7 +93,8 @@ export const PRODUCT_TOURS = [
         id: 'automate',
         anchor: 'nav-automate',
         title: 'Automate',
-        description: 'Workflows that turn deployments and other sources into campaigns, with their runs.',
+        description:
+          'Workflows that turn releases and deployments into campaigns, with their runs.',
       },
       {
         id: 'search',
@@ -116,6 +118,7 @@ export const PRODUCT_TOURS = [
     version: 1,
     // Publish opens drafts only where they are rolled out and in the plan.
     available: (access: PlatformAccess) => access.draftsEnabled && !areaLocked('publish', access),
+    next: 'automate',
     steps: [
       {
         id: 'brand',
@@ -147,6 +150,45 @@ export const PRODUCT_TOURS = [
         route: '/publish',
         title: 'Schedule many posts at once',
         description: 'Bulk tools plan a batch of separate posts in one pass.',
+      },
+    ],
+  },
+  {
+    id: 'automate',
+    title: 'Automate your launches',
+    summary: 'Watch a repository, pick a template, activate it, see a run.',
+    version: 1,
+    available: (access: PlatformAccess) => !areaLocked('automate', access),
+    steps: [
+      {
+        id: 'watch',
+        anchor: 'automate-repositories',
+        route: '/workflows/sources',
+        title: 'Watch a repository',
+        description: 'Connect GitHub and choose the repository you ship from. Nothing runs yet.',
+      },
+      {
+        id: 'template',
+        anchor: 'automate-templates',
+        route: '/workflows/new',
+        title: 'Pick a template',
+        description:
+          'Each one opens as a draft you can change, with its trigger already filled in.',
+      },
+      {
+        id: 'activate',
+        anchor: 'nav-automate',
+        title: 'Activate it',
+        description:
+          'Test the draft, then select Activate version in the editor. Only then does it run on new events.',
+      },
+      {
+        id: 'runs',
+        anchor: 'automate-runs',
+        route: '/workflows/runs',
+        title: 'See each run',
+        description:
+          'When you ship, the run shows what the workflow did. Its campaign drafts wait for a person to approve them.',
       },
     ],
   },

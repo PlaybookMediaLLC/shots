@@ -54,25 +54,31 @@ export function NotificationCenter({
   const identity = useNotificationIdentity(initialIdentity)
   const visible = useNotificationPageVisible()
   const queryClient = useQueryClient()
-  const [open, setOpen] = useState(false)
+  const [open, setPanelOpen] = useState(false)
   const [settings, setSettings] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const storageKey = `notifications:tab:${identity.userId}:${identity.workspaceId}`
-  const view = useSyncExternalStore(
+  const chosen = useSyncExternalStore(
     subscribeTab,
     useCallback(() => {
       try {
         return (
           rememberedTabs.get(storageKey) ??
           panelViewSchema.safeParse(sessionStorage.getItem(storageKey)).data ??
-          'inbox'
+          null
         )
       } catch {
-        return rememberedTabs.get(storageKey) ?? 'inbox'
+        return rememberedTabs.get(storageKey) ?? null
       }
     }, [storageKey]),
-    () => 'inbox'
+    () => null
   )
+  // Until someone picks a tab, the panel opens where the unread count points.
+  const [inboxRead, setInboxRead] = useState(false)
+  function setOpen(next: boolean) {
+    setPanelOpen(next)
+    if (!next) setInboxRead(false)
+  }
   function selectTab(value: string) {
     const parsed = panelViewSchema.safeParse(value)
     if (!parsed.success) return
@@ -107,6 +113,7 @@ export function NotificationCenter({
   }, [identity.key, identity.userId, identity.workspaceId, queryClient])
   if (!identity.ready) return null
   const n = count.isError ? 0 : (count.data?.unseenCount ?? 0)
+  const view = chosen ?? (inboxRead && n > 0 ? 'activity' : 'inbox')
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
@@ -178,6 +185,7 @@ export function NotificationCenter({
                     identity={identity}
                     view={tab}
                     close={() => setOpen(false)}
+                    onUnreadKnown={tab === 'inbox' ? (unread) => setInboxRead(!unread) : undefined}
                   />
                 ) : null}
               </TabsContent>

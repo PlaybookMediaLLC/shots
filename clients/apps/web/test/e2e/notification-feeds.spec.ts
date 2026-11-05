@@ -192,6 +192,8 @@ test(
         { times: 1 }
       )
       await trigger.click()
+      // The Inbox has unread items, so the panel opens there; ask for Activity to hold its response.
+      await panel.getByRole('tab', { name: 'Activity', exact: true }).click()
       await fetched.waiting
       await expect(panel.getByText('Loading notifications…', { exact: true })).toBeVisible()
       await expect(panel.getByText('No notifications', { exact: true })).toHaveCount(0)
@@ -203,7 +205,7 @@ test(
       held.release()
       await delivered.waiting
       await expect(panel.getByRole('tab', { name: 'Inbox', selected: true })).toBeVisible()
-      await expect(panel.getByText('Source connected', { exact: true })).toHaveCount(0)
+      await expect(panel.getByText('Repository connected', { exact: true })).toHaveCount(0)
       await page.screenshot({
         path: '.context/notification-inbox-sources.png',
         animations: 'disabled',
@@ -229,7 +231,7 @@ test(
       await expect(panel.getByText('No notifications', { exact: true })).toHaveCount(0)
       failReads = false
       await panel.getByRole('button', { name: 'Retry loading', exact: true }).click()
-      await expect(panel.getByText('Source connected', { exact: true })).toBeVisible()
+      await expect(panel.getByText('Repository connected', { exact: true })).toBeVisible()
       await page.unroute(activityURL)
 
       // The denial is returned by real scope validation, never a mocked auth result.
@@ -279,7 +281,7 @@ test(
         await expect(panel.getByText('No notifications', { exact: true })).toBeVisible({
           timeout: 1000,
         })
-        await expect(panel.getByText('Source connected', { exact: true })).toHaveCount(0)
+        await expect(panel.getByText('Repository connected', { exact: true })).toHaveCount(0)
       }).toPass({ timeout: 30_000, intervals: [1000, 5000] })
       late.release()
       await lateDelivered.waiting

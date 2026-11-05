@@ -17,7 +17,7 @@ import { CANVAS_RECIPES, canvasRecipeSchema } from '@/lib/canvas/recipes'
 import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { BUILT_IN_TEMPLATES, type StoreTemplate } from '@/lib/store-screenshots/templates'
 import { listSavedTemplates } from '@/lib/store-screenshots/persistence/library'
-import { WORKFLOW_TEMPLATES, buildWorkflowTemplate } from '@/lib/workflows/templates'
+import { WORKFLOW_TEMPLATES } from '@/lib/workflows/templates'
 
 const CATEGORIES = [
   'Screenshots',
@@ -232,22 +232,10 @@ export default function TemplateCatalog() {
                 key={template.id}
                 name={template.name}
                 description={template.description}
-                href="/workflows/new"
-                action="New workflow"
+                href={`/workflows/new?template=${template.id}`}
+                action="Use template"
               >
-                <WorkflowTemplatePreview
-                  name={template.name}
-                  {...buildWorkflowTemplate(template.id, {
-                    brandKitId: '',
-                    destinationIds: [],
-                    creditLimit: 0,
-                    branch: 'main',
-                    aiRelevance: false,
-                    majorMinorOnly: template.versioned,
-                    renderTemplateIds: [],
-                    canvas: false,
-                  })}
-                />
+                <WorkflowTemplatePreview template={template} />
               </PreviewCard>
             ))
           : null}

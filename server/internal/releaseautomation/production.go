@@ -146,7 +146,7 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 	}
 	equal := func(condition, got, want string) {
 		if got == "" {
-			add(condition, "needs_attention", "Required provider evidence is missing.")
+			add(condition, "needs_attention", "GitHub did not report this value.")
 		} else if got != want {
 			add(condition, "not_matched", "Observed value contradicts the policy.")
 		} else {
@@ -158,7 +158,7 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 			return
 		}
 		if got == "" {
-			add(condition, "needs_attention", "Required provider evidence is missing.")
+			add(condition, "needs_attention", "GitHub did not report this value.")
 		} else if !slices.Contains(want, got) {
 			add(condition, "not_matched", "Observed value is outside the configured values.")
 		} else {
@@ -166,7 +166,7 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 		}
 	}
 	if ValidateProductionPolicy(p) != nil {
-		add("policy", "needs_attention", "Configure a version 1 production policy.")
+		add("policy", "needs_attention", "Set a production policy for this repository.")
 		d.Reason = d.Checks[0].Reason
 		return d
 	}
@@ -177,14 +177,14 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 	if p.Signal != "deployment_status" {
 		equal("completion", e.Action, "completed")
 		if e.RunAttempt <= 0 {
-			add("run_attempt", "needs_attention", "The exact run attempt is missing; latest-run evidence cannot be substituted.")
+			add("run_attempt", "needs_attention", "GitHub did not say which run attempt this was, so Shots did not assume the latest one.")
 		}
 	}
 	if !p.Enabled {
 		add("enabled", "not_matched", "This policy is paused.")
 	}
 	if e.Conflict {
-		add("correlation", "needs_attention", "Provider identities conflict; no association was guessed.")
+		add("correlation", "needs_attention", "GitHub's identifiers conflict, so Shots did not guess a match.")
 	}
 	if p.Signal == "deployment_status" {
 		member("environment", e.Environment, p.Environments)
@@ -196,8 +196,8 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 		}
 	} else {
 		d.Strength = "trusted_actions_outcome"
-		add("environment", "matched", "The administrator binds this Actions outcome to the configured environment; GitHub did not report an environment.")
-		add("limits", "matched", "Explicitly trusted outcome only: success may be a no-op and does not verify a new or live revision.")
+		add("environment", "matched", "You chose to count this Actions result as your production environment; GitHub did not report one.")
+		add("limits", "matched", "You chose to trust this result. A success can mean nothing changed, and does not prove a new version is live.")
 	}
 	member("ref", e.Ref, p.Refs)
 	if len(p.TrustedAppIDs) > 0 {
@@ -211,7 +211,7 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 	}
 	if len(p.Workflows) > 0 {
 		if e.Workflow.ID == 0 || e.Association == "" {
-			add("workflow", "needs_attention", "No provider-supported workflow association is available.")
+			add("workflow", "needs_attention", "GitHub does not link this event to a workflow.")
 		} else {
 			i := slices.IndexFunc(p.Workflows, func(w GitHubWorkflow) bool { return w.ID == e.Workflow.ID })
 			if i < 0 {
@@ -221,29 +221,29 @@ func EvaluateProduction(p ProductionPolicy, e GitHubEvidence) ProductionDecision
 			} else if p.Workflows[i].Path != e.Workflow.Path || p.Workflows[i].Name != e.Workflow.Name {
 				add("workflow", "needs_attention", "Selected workflow was renamed or moved; review the selection.")
 			} else {
-				add("workflow", "matched", "Stable workflow ID, name and path match.")
+				add("workflow", "matched", "The workflow matches by ID, name and path.")
 			}
 		}
 	}
 	if len(p.JobNames) > 0 {
 		if e.JobID == 0 || e.Association == "" {
-			add("job", "needs_attention", "No provider-supported job instance is associated with this event.")
+			add("job", "needs_attention", "GitHub does not link this event to a job.")
 		} else {
 			member("job", e.JobName, p.JobNames)
 		}
 	}
 	if p.RequireChangeReceipt {
 		if e.ReceiptAppID == 0 || !slices.Contains(p.TrustedAppIDs, e.ReceiptAppID) {
-			add("receipt_reporter", "needs_attention", "The deployment receipt was not created by a configured trusted App.")
+			add("receipt_reporter", "needs_attention", "The proof of change did not come from an app you trust.")
 		}
 		if e.ChangeReceipt == nil || e.ReceiptRevision == "" || e.SHA == "" {
-			add("change_receipt", "needs_attention", "A trusted shots-deploy-v1 receipt for the intended revision is required; success alone can be a no-op.")
+			add("change_receipt", "needs_attention", "This needs proof from a trusted app (shots-deploy-v1) that this commit changed production. A success alone can mean nothing changed.")
 		} else if !*e.ChangeReceipt {
-			add("change_receipt", "not_matched", "The reporting App explicitly reported no deployment change.")
+			add("change_receipt", "not_matched", "The app reported that nothing changed.")
 		} else if e.ReceiptRevision != e.SHA {
-			add("change_receipt", "needs_attention", "Receipt revision conflicts with deployment SHA.")
+			add("change_receipt", "needs_attention", "The proof of change names a different commit from the deployment.")
 		} else {
-			add("change_receipt", "matched", "Trusted reporter asserts a change to the intended revision.")
+			add("change_receipt", "matched", "A trusted app confirms this commit changed production.")
 			d.Strength = "trusted_change_receipt"
 		}
 	}

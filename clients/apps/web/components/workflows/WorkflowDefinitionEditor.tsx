@@ -3,7 +3,8 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
-import { Page } from '@/components/platform-ui'
+import { AutomateIcon } from '@/components/platform-shell/icons'
+import { EmptyState, Page } from '@/components/platform-ui'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import type {
   AutomationDefinition,
@@ -26,6 +27,7 @@ export function WorkflowDefinitionEditor({ canManage, id }: { canManage: boolean
     overview: AutomationOverview
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [missing, setMissing] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -34,8 +36,7 @@ export function WorkflowDefinitionEditor({ canManage, id }: { canManage: boolean
         const overview = await client.releaseAutomation.overview.query()
         const definition = overview.definitions.find((candidate) => candidate.id === id)
         if (!definition) {
-          if (cancelled) return
-          setError('This workflow does not exist in this workspace.')
+          if (!cancelled) setMissing(true)
           return
         }
         const history = await client.releaseAutomation.history.query({
@@ -44,6 +45,7 @@ export function WorkflowDefinitionEditor({ canManage, id }: { canManage: boolean
         })
         if (cancelled) return
         setError(null)
+        setMissing(false)
         setState({
           key: `${id}:${copy}`,
           definition: copy
@@ -86,6 +88,24 @@ export function WorkflowDefinitionEditor({ canManage, id }: { canManage: boolean
   }, [client])
 
   if (!state || state.key !== `${id}:${copy}`) {
+    if (missing)
+      return (
+        <Page title="Workflow not found">
+          <EmptyState
+            action={
+              <>
+                <ButtonLink href="/workflows">All workflows</ButtonLink>
+                <ButtonLink href="/workflows/runs" variant="outline">
+                  Runs
+                </ButtonLink>
+              </>
+            }
+            description="This workflow does not exist in this workspace. It may be in another workspace, or the link may be wrong."
+            icon={AutomateIcon}
+            title="We could not find this workflow"
+          />
+        </Page>
+      )
     return (
       <Page
         actions={
@@ -117,6 +137,7 @@ export function WorkflowDefinitionEditor({ canManage, id }: { canManage: boolean
       }}
       overview={state.overview}
       readOnly={!canManage || !!state.definition.archived}
+      startsDirty={copy}
     />
   )
 }
