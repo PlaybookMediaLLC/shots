@@ -6,7 +6,7 @@
 ## Summary
 
 - This addendum covers personal data that a customer puts into a Shots workspace.
-- The customer is the business (controller). PlaybookMedia LLC is its service provider (processor).
+- The customer is the business (controller). Playbook Interactive Media, LLC is its service provider (processor).
 - We process the data only to provide Shots, on the customer's instructions.
 - We use the subprocessors on our list. We give notice before we add one, and the customer can
   object.
@@ -32,7 +32,7 @@
 
 Version `[[VERSION]]`. Effective `[[EFFECTIVE DATE]]`.
 
-This addendum is part of the [Terms of Service](terms-of-service.md) between PlaybookMedia LLC, a
+This addendum is part of the [Terms of Service](terms-of-service.md) between Playbook Interactive Media, LLC, a
 Delaware limited liability company ("Processor"), and the customer ("Customer").
 
 ### 1. Definitions

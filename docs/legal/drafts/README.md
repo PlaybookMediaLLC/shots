@@ -36,7 +36,7 @@ These answers are now in the drafts. They are no longer placeholders.
 
 | Topic                   | Decision                                                |
 | ----------------------- | ------------------------------------------------------- |
-| Legal entity            | PlaybookMedia LLC, a Delaware limited liability company |
+| Legal entity            | Playbook Interactive Media, LLC, a Delaware limited liability company |
 | Target market           | United States only. No EU or UK terms in these drafts.  |
 | Role for workspace data | Service provider (processor) for the customer           |
 | AI training             | We do not use customer data to train models             |
@@ -93,7 +93,7 @@ The private audit report lists each change with evidence and size. The IDs are:
 | P5  | A sign-up step that records the accepted document versions               |
 | P6  | Versioned legal documents and an "updated" notice                        |
 | P7  | `/.well-known/security.txt` and a security mailbox                       |
-| P8  | A social channel disconnect that deletes tokens, and a Meta deletion URL |
+| P8  | A social channel disconnect that deletes tokens (the Meta deletion URL is built) |
 | P9  | Encryption at rest for social and sign-in OAuth tokens                   |
 | P10 | A review of the public social API routes                                  |
 | P11 | AI provider data controls set in code                                    |
