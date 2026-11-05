@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
@@ -381,6 +383,64 @@ func TestSocialSetsPlatform(t *testing.T) {
 		if _, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version,
 			Targets: []ContentDraftScheduleTarget{{Caption: "Removed", ChannelConnectionID: ids["x"]}}}); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("a removed account was scheduled to: %v", err)
+		}
+	})
+
+	t.Run("a provider callback revokes an account without waiting for a post", func(t *testing.T) {
+		connection, err := db.Client.ChannelConnection.Get(ctx, ids["linkedin"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Posts the previous removal cancelled give this account a queue.
+		queued, err := db.Client.ScheduledPost.Query().Where(scheduledpost.ChannelConnectionID(ids["x"]),
+			scheduledpost.StatusEQ(scheduledpost.StatusCANCELLED)).Limit(3).All(ctx)
+		if err != nil || len(queued) != 3 {
+			t.Fatalf("queued=%d err=%v", len(queued), err)
+		}
+		for _, post := range queued {
+			exec(`UPDATE scheduled_post SET "channelConnectionId"=$1, status='SCHEDULED' WHERE id=$2`, connection.ID, post.ID)
+		}
+		// A member's removal refuses this; the provider's request cannot wait for it.
+		publishingPost := queued[0].ID
+		if err := db.Client.ScheduledPost.UpdateOneID(publishingPost).SetStatus(scheduledpost.StatusPROCESSING).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		connect("x", nil)
+		other, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org),
+			channelconnection.StatusEQ(channelconnection.StatusACTIVE), channelconnection.IDNEQ(connection.ID)).First(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		cancelled, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "CONFIRM-CODE")
+		if err != nil || len(cancelled) != len(queued)-1 || slices.Contains(cancelled, publishingPost) {
+			t.Fatalf("cancelled=%v of %d err=%v", cancelled, len(queued), err)
+		}
+		revoked, err := db.Client.ChannelConnection.Get(ctx, connection.ID)
+		if err != nil || revoked.Status != channelconnection.StatusREVOKED || revoked.DisplayName != nil ||
+			revoked.Handle != nil || revoked.AvatarURL != nil {
+			t.Fatalf("revoked=%+v err=%v", revoked, err)
+		}
+		if post, _ := db.Client.ScheduledPost.Get(ctx, publishingPost); post.Status != scheduledpost.StatusPROCESSING {
+			t.Fatalf("the publishing post became %s", post.Status)
+		}
+		if untouched, _ := db.Client.ChannelConnection.Get(ctx, other.ID); untouched.Status != channelconnection.StatusACTIVE {
+			t.Fatalf("another account became %s", untouched.Status)
+		}
+		if connection.SocialSetID != nil {
+			set, err := db.Client.SocialSet.Get(ctx, *connection.SocialSetID)
+			if err != nil || slices.Contains(set.DefaultPlatforms, connection.Platform) {
+				t.Fatalf("defaults=%v err=%v", set.DefaultPlatforms, err)
+			}
+		}
+		logged, err := db.Client.AuditLog.Query().Where(auditlog.Action("product.channel_account_revoked"), auditlog.EntityID(connection.ID)).Only(ctx)
+		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" {
+			t.Fatalf("audit=%+v err=%v", logged, err)
+		}
+		if again, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "SECOND"); err != nil || len(again) != 0 {
+			t.Fatalf("a retry did more work: %v err=%v", again, err)
+		}
+		if err := db.Client.ScheduledPost.UpdateOneID(publishingPost).SetStatus(scheduledpost.StatusCANCELLED).Exec(ctx); err != nil {
+			t.Fatal(err)
 		}
 	})
 

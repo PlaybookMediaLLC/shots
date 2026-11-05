@@ -330,6 +330,14 @@ func (s *Service) DeleteChannel(ctx context.Context, org, id string) (*IDResult,
 	return s.repo.DeleteChannel(ctx, org, id)
 }
 
+func (s *Service) ProviderAccountIntegrationIDs(ctx context.Context, provider, internalID string) ([]string, error) {
+	return s.repo.ProviderAccountIntegrationIDs(ctx, provider, internalID)
+}
+
+func (s *Service) ForgetProviderAccount(ctx context.Context, provider, internalID string) error {
+	return s.repo.ForgetProviderAccount(ctx, provider, internalID)
+}
+
 func (s *Service) DisableIntegrations(ctx context.Context, org string, totalChannels int) error {
 	return s.repo.DisableIntegrations(ctx, org, totalChannels)
 }

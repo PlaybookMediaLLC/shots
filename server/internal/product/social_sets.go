@@ -973,6 +973,11 @@ func cancelQueuedPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionI
 	if busy {
 		return nil, conflict("A post is publishing, or may already be live, on this account. Wait for it to finish, then try again.")
 	}
+	return cancelPosts(ctx, tx, actor, connectionIDs, reason)
+}
+
+// cancelPosts cancels the posts still waiting to publish on these accounts.
+func cancelPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionIDs []string, reason string) ([]string, error) {
 	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
 		scheduledpost.ChannelConnectionIDIn(connectionIDs...),
 		scheduledpost.StatusIn(scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).All(ctx)
@@ -1048,6 +1053,15 @@ func removeAccount(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent
 		return cancelled, appendConfigurationAudit(ctx, tx, actor, "product.channel_account_removed", "channel_connection", connection.ID,
 			map[string]any{"cancelledPosts": len(cancelled)})
 	}
+	if err := dropAccountFromSetDefaults(ctx, tx, connection, set); err != nil {
+		return nil, err
+	}
+	return cancelled, appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_removed", "channel_connection", connection.ID,
+		map[string]any{"cancelledPosts": len(cancelled), "socialSetId": set.ID})
+}
+
+// dropAccountFromSetDefaults stops a set defaulting to an account's platform.
+func dropAccountFromSetDefaults(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection, set *ent.SocialSet) error {
 	defaults := make([]string, 0, len(set.DefaultPlatforms))
 	for _, platform := range set.DefaultPlatforms {
 		if socialplatform.Canonical(platform) != socialplatform.Canonical(connection.Platform) {
@@ -1063,10 +1077,9 @@ func removeAccount(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent
 		}
 	}
 	if _, err := update.Save(ctx); err != nil {
-		return nil, err
+		return err
 	}
-	return cancelled, appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_removed", "channel_connection", connection.ID,
-		map[string]any{"cancelledPosts": len(cancelled), "socialSetId": set.ID})
+	return nil
 }
 
 // AssignSocialSetAccount puts an account that belongs to no set into a set.
