@@ -51,6 +51,24 @@ export const stripeWebhookContract = defineContract({
   summary: 'Sync a workspace plan from a Stripe subscription event',
 })
 
+/** Meta's deauthorize and data deletion callbacks: a form-encoded `signed_request`, verified by the backend. */
+export const metaDataCallbackContract = defineContract({
+  body: z.string(),
+  bodyFormat: 'text',
+  maxBodyBytes: 16 * 1024,
+  method: 'POST',
+  name: 'webhooks.meta',
+  output: z.object({ url: z.string().url(), confirmation_code: z.string().min(1) }),
+  params: z.object({ provider: z.enum(['instagram-standalone', 'threads']) }),
+  path: '/api/webhooks/meta/{provider}',
+  summary: 'Revoke a Meta account and erase its stored data when Meta asks',
+})
+
+/** The `signed_request` field of Meta's form-encoded callback body. */
+export function metaSignedRequest(body: string): string | null {
+  return new URLSearchParams(body).get('signed_request') || null
+}
+
 /** Provider signature verification happens in the backend before JSON normalization. */
 export const frontendWebhookContract = defineContract({
   body: z.string(),

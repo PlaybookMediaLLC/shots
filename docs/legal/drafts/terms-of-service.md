@@ -5,7 +5,7 @@
 
 ## Summary
 
-- These Terms are a business contract between PlaybookMedia LLC, a Delaware company, and the
+- These Terms are a business contract between Playbook Interactive Media, LLC, a Delaware company, and the
   customer that owns a workspace. Shots is offered in the United States.
 - Every workspace needs a paid plan. Plans renew automatically until you cancel. Cancellation takes
   effect at the end of the paid period.
@@ -22,7 +22,7 @@
 
 | Topic         | Decision                                                |
 | ------------- | ------------------------------------------------------- |
-| Legal entity  | PlaybookMedia LLC, a Delaware limited liability company |
+| Legal entity  | Playbook Interactive Media, LLC, a Delaware limited liability company |
 | Target market | United States only                                      |
 | Refunds       | Full refund if the customer asks within 30 days         |
 | Sales tax     | Calculated and collected with Stripe Tax                |
@@ -55,7 +55,7 @@ Version `[[VERSION]]`. Effective `[[EFFECTIVE DATE]]`.
 
 ### 1. The agreement
 
-1. These Terms are a contract between PlaybookMedia LLC, a Delaware limited liability company,
+1. These Terms are a contract between Playbook Interactive Media, LLC, a Delaware limited liability company,
    `[[ADDRESS]]` ("we", "us"), and the customer that creates or owns a workspace ("you").
 2. You accept these Terms when you select the acceptance control at sign-up, sign an order form
    that refers to them, or use Shots. ⚑ Requires product change P5 for the acceptance control.
@@ -287,4 +287,4 @@ independently developed.
 
 ### 24. Contact
 
-PlaybookMedia LLC, `[[ADDRESS]]`. Email `[[LEGAL EMAIL]]`.
+Playbook Interactive Media, LLC, `[[ADDRESS]]`. Email `[[LEGAL EMAIL]]`.

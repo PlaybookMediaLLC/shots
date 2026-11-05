@@ -4606,6 +4606,15 @@ export class ScreenshotStudioBackendSDK {
     )
   }
   /** Forward unmodified body text; the backend verifies the provider signature. */
+  async metaDataCallback(provider: string, signedRequest: string) {
+    return z.object({ url: z.string().url(), confirmation_code: z.string().min(1) }).parse(
+      await this.request<unknown>(`v1/internal/meta-callbacks/${encodeURIComponent(provider)}`, {
+        method: 'POST',
+        body: { signedRequest },
+      })
+    )
+  }
+
   async acceptFrontendWebhook(id: string, signature: string, body: string) {
     return z.object({ accepted: z.literal(true) }).parse(
       await this.request<unknown>(`v1/internal/frontend-webhooks/${encodeURIComponent(id)}`, {

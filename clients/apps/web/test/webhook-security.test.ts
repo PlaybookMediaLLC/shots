@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import test from 'node:test'
+import { NextRequest } from 'next/server'
+import { metaDataCallbackContract, metaSignedRequest } from '@/lib/api/contracts/webhooks'
+import { route } from '@/lib/api/route'
 import {
   sourceAppCreateSchema,
   sourceAppUpdateSchema,
@@ -508,4 +511,36 @@ test('a successful production deployment is recorded once per deployment', () =>
     parse(github, 'deployment', { action: 'created' }),
   ]
   assert.deepEqual(ignored, Array(ignored.length).fill(null))
+})
+
+test('Meta callback facade reads the form field, limits providers and bounds the body', async (t) => {
+  t.mock.method(console, 'info', () => undefined)
+  t.mock.method(console, 'warn', () => undefined)
+  const forwarded: string[] = []
+  const handler = route(metaDataCallbackContract, {
+    auth: async () => null,
+    handler: async ({ body, params }) => {
+      forwarded.push(`${params.provider}:${metaSignedRequest(body)}`)
+      return { url: 'https://shots.test/data-deletion?code=ABC', confirmation_code: 'ABC' }
+    },
+  })
+  const call = (provider: string, body: string) =>
+    handler(
+      new NextRequest(`https://shots.test/api/webhooks/meta/${provider}`, {
+        method: 'POST',
+        body,
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+      { params: Promise.resolve({ provider }) }
+    )
+  const accepted = await call('threads', 'signed_request=sig-_1.pay_load-2')
+  assert.equal(accepted.status, 200)
+  assert.equal((await accepted.json()).confirmation_code, 'ABC')
+  assert.deepEqual(forwarded, ['threads:sig-_1.pay_load-2'])
+  forwarded.length = 0
+  assert.equal((await call('x', 'signed_request=a.b')).status >= 400, true)
+  assert.equal((await call('threads', 'x'.repeat(16 * 1024 + 1))).status, 413)
+  assert.deepEqual(forwarded, [])
+  assert.equal(metaSignedRequest('other=1'), null)
+  assert.equal(metaSignedRequest('signed_request='), null)
 })

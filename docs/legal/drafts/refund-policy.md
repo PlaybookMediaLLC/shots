@@ -47,7 +47,7 @@
 
 Version `[[VERSION]]`. Effective `[[EFFECTIVE DATE]]`.
 
-This policy is part of the [Terms of Service](terms-of-service.md) between PlaybookMedia LLC and
+This policy is part of the [Terms of Service](terms-of-service.md) between Playbook Interactive Media, LLC and
 the customer.
 
 ### 1. Cancel

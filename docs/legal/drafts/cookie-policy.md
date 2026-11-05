@@ -37,7 +37,7 @@ Version `[[VERSION]]`. Effective `[[EFFECTIVE DATE]]`.
 
 ### 1. What this policy covers
 
-This policy explains the cookies and browser storage that PlaybookMedia LLC uses on Shots at
+This policy explains the cookies and browser storage that Playbook Interactive Media, LLC uses on Shots at
 `shots.playbookmedia.io`. The [Privacy Policy](privacy-policy.md) explains how we use the data.
 
 ### 2. Your choices

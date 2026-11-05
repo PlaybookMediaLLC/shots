@@ -867,23 +867,52 @@ func (r *Repository) DeleteIntegrationsForAccount(ctx context.Context, org strin
 	// by checkPreviousConnections when the same channel is connected again
 	// from a new account.
 	for _, i := range list {
-		deletedAt := time.Now()
-		if i.DeletedAt != nil {
-			deletedAt = *i.DeletedAt
+		if err := r.anonymize(ctx, i); err != nil {
+			return err
 		}
-		u := r.client.Integration.UpdateOneID(i.ID).
-			SetName(md5hex(i.Name)).
-			SetInternalID(md5hex(i.InternalID)).
-			SetToken(md5hex(i.Token)).
-			ClearPicture().
-			SetDeletedAt(deletedAt)
-		setOrClear(hashOrNil(i.RootInternalID), u.SetRootInternalID, u.ClearRootInternalID)
-		setOrClear(hashOrNil(i.RefreshToken), func(value string) *ent.IntegrationUpdateOne {
-			return u.SetRefreshToken(&value)
-		}, u.ClearRefreshToken)
-		setOrClear(hashOrNil(i.Profile), u.SetProfile, u.ClearProfile)
-		setOrClear(hashOrNil(i.CustomInstanceDetails), u.SetCustomInstanceDetails, u.ClearCustomInstanceDetails)
-		if err := u.Exec(ctx); err != nil {
+	}
+	return nil
+}
+
+// anonymize overwrites an integration's credentials and profile with hashes,
+// keeping the row for the records that refer to it.
+func (r *Repository) anonymize(ctx context.Context, i *ent.Integration) error {
+	deletedAt := time.Now()
+	if i.DeletedAt != nil {
+		deletedAt = *i.DeletedAt
+	}
+	u := r.client.Integration.UpdateOneID(i.ID).
+		SetName(md5hex(i.Name)).
+		SetInternalID(md5hex(i.InternalID)).
+		SetToken(md5hex(i.Token)).
+		ClearPicture().
+		SetDeletedAt(deletedAt)
+	setOrClear(hashOrNil(i.RootInternalID), u.SetRootInternalID, u.ClearRootInternalID)
+	setOrClear(hashOrNil(i.RefreshToken), func(value string) *ent.IntegrationUpdateOne {
+		return u.SetRefreshToken(&value)
+	}, u.ClearRefreshToken)
+	setOrClear(hashOrNil(i.Profile), u.SetProfile, u.ClearProfile)
+	setOrClear(hashOrNil(i.CustomInstanceDetails), u.SetCustomInstanceDetails, u.ClearCustomInstanceDetails)
+	return u.Exec(ctx)
+}
+
+// ProviderAccountIntegrationIDs finds one provider account's integrations in
+// every organization. Removed rows count: they still hold its tokens.
+func (r *Repository) ProviderAccountIntegrationIDs(ctx context.Context, provider, internalID string) ([]string, error) {
+	return r.client.Integration.Query().
+		Where(integration.ProviderIdentifier(provider), integration.InternalID(internalID)).
+		IDs(ctx)
+}
+
+// ForgetProviderAccount anonymizes those integrations. A later call finds none.
+func (r *Repository) ForgetProviderAccount(ctx context.Context, provider, internalID string) error {
+	list, err := r.client.Integration.Query().
+		Where(integration.ProviderIdentifier(provider), integration.InternalID(internalID)).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, i := range list {
+		if err := r.anonymize(ctx, i); err != nil {
 			return err
 		}
 	}
