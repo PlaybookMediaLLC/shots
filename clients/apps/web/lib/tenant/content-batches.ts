@@ -107,7 +107,7 @@ export async function submitContentBatch(
     const item = byId.get(itemId)
     if (!item) throw new ScheduledPostError('A selected item is not in this batch.', 404)
     if (!item.draftId || !item.draft) {
-      items.push({ itemId, refusal: 'Save this item as a draft first.' })
+      items.push({ channelConnectionIds, itemId, refusal: 'Save this item as a draft first.' })
       continue
     }
     const { timing } = item
@@ -127,12 +127,12 @@ export async function submitContentBatch(
       })
       items.push(
         schedule
-          ? { itemId, schedule }
-          : { itemId, refusal: 'This item’s draft is no longer available.' }
+          ? { channelConnectionIds, itemId, schedule }
+          : { channelConnectionIds, itemId, refusal: 'This item’s draft is no longer available.' }
       )
     } catch (error) {
       if (!(error instanceof ScheduledPostError)) throw error
-      items.push({ itemId, refusal: error.message })
+      items.push({ channelConnectionIds, itemId, refusal: error.message })
     }
   }
   return withDates(await sdk.submitContentBatch(id, { items, requestKey: input.requestKey }))

@@ -360,9 +360,9 @@ func TestContentBatches(t *testing.T) {
 			return &ScheduleContentDraftInput{Version: entry.Draft.Version, LocalTime: entry.Timing.LocalTime, TimeZone: entry.Timing.TimeZone, Targets: targets}
 		}
 		input := BatchSubmitInput{RequestKey: "submit-request-key-0001", Items: []BatchSubmitItem{
-			{ItemID: reloaded.Items[0].ID, Schedule: frozen(0)},
-			{ItemID: reloaded.Items[1].ID, Refusal: "x: This video is too long."},
-			{ItemID: reloaded.Items[2].ID, Schedule: frozen(2)},
+			{ItemID: reloaded.Items[0].ID, ChannelConnectionIDs: []string{linkedin, threads}, Schedule: frozen(0)},
+			{ItemID: reloaded.Items[1].ID, ChannelConnectionIDs: []string{linkedin, threads}, Refusal: "x: This video is too long."},
+			{ItemID: reloaded.Items[2].ID, ChannelConnectionIDs: []string{linkedin, threads}, Schedule: frozen(2)},
 		}}
 		// A person only: a key cannot schedule a batch.
 		if _, err := repo.SubmitContentBatch(ctx, Actor{OrganizationID: w.org, Kind: "service"}, batch.ID, input); !errors.Is(err, publishing.ErrForbidden) {
@@ -423,6 +423,15 @@ func TestContentBatches(t *testing.T) {
 		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 || finished.Items[2].Status != "FAILED" || !strings.Contains(finished.Items[2].Error, "session ended") {
 			t.Fatalf("outcomes: %+v", finished.Items)
 		}
+		// A retry after the run went through replays it, though the draft's version moved
+		// on and the schedule built for it is no longer the same.
+		moved := frozen(0)
+		moved.Version++
+		retry := input
+		retry.Items = append([]BatchSubmitItem{{ItemID: reloaded.Items[0].ID, ChannelConnectionIDs: []string{linkedin, threads}, Schedule: moved}}, input.Items[1:]...)
+		if replayed, err := repo.SubmitContentBatch(ctx, owner, batch.ID, retry); err != nil || replayed.ID != run.ID || replayed.Status != "FINISHED" {
+			t.Fatalf("replay after finishing: %+v %v", replayed, err)
+		}
 		// The batch shows its latest run on a reload, and a stranger sees neither.
 		shown, err := repo.GetContentBatch(ctx, owner, batch.ID)
 		if err != nil || shown.Submission == nil || shown.Submission.ID != run.ID {
@@ -439,7 +448,7 @@ func TestContentBatches(t *testing.T) {
 
 		// Retries that find no answer mark the item, and a replay of the step is done.
 		stuck, err := repo.SubmitContentBatch(ctx, owner, batch.ID, BatchSubmitInput{RequestKey: "submit-request-key-0002",
-			Items: []BatchSubmitItem{{ItemID: reloaded.Items[2].ID, Schedule: frozen(2)}}})
+			Items: []BatchSubmitItem{{ItemID: reloaded.Items[2].ID, ChannelConnectionIDs: []string{linkedin}, Schedule: frozen(2)}}})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -3393,6 +3393,7 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     input: {
       items: {
+        channelConnectionIds: string[]
         itemId: string
         refusal?: string
         schedule?: Parameters<ScreenshotStudioBackendSDK['scheduleContentDraft']>[1]

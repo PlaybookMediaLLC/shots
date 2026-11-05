@@ -113,11 +113,13 @@ func runForKey(ctx context.Context, client *ent.Client, batchID, key, fingerprin
 	return run, nil
 }
 
-// BatchSubmitItem is one item's frozen schedule, or why the web could not build it.
+// BatchSubmitItem is what was asked of one item, with its frozen schedule or why
+// the web could not build it.
 type BatchSubmitItem struct {
-	ItemID   string                     `json:"itemId"`
-	Refusal  string                     `json:"refusal"`
-	Schedule *ScheduleContentDraftInput `json:"schedule"`
+	ChannelConnectionIDs []string                   `json:"channelConnectionIds"`
+	ItemID               string                     `json:"itemId"`
+	Refusal              string                     `json:"refusal"`
+	Schedule             *ScheduleContentDraftInput `json:"schedule"`
 }
 
 // BatchSubmitInput is a schedule of many items. RequestKey makes a retry replay.
@@ -149,7 +151,13 @@ func (c *Configuration) SubmitContentBatch(ctx context.Context, actor Actor, bat
 	if row.ArchivedAt != nil {
 		return nil, conflict("This batch is closed. Start a new batch.")
 	}
-	fingerprint := runFingerprint(input)
+	// What was asked, not the schedule built for it: scheduling moves the draft's
+	// version, so a retry after the run went through builds a different request.
+	asked := make([][2]any, len(input.Items))
+	for i, item := range input.Items {
+		asked[i] = [2]any{item.ItemID, item.ChannelConnectionIDs}
+	}
+	fingerprint := runFingerprint(asked)
 	run, err := runForKey(ctx, c.client, row.ID, input.RequestKey, fingerprint)
 	if err != nil {
 		return nil, err
