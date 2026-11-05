@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.45.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.44.0...v2.45.0) (2026-11-05)
+
+
+### Features
+
+* **capture:** add authenticated release capture behind configuration ([#443](https://github.com/PlaybookMediaLLC/shots/issues/443)) ([4274de5](https://github.com/PlaybookMediaLLC/shots/commit/4274de595b022f50ee3d7bbc4d57972878889aca))
+
 ## [2.44.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.43.0...v2.44.0) (2026-11-04)
 
 
