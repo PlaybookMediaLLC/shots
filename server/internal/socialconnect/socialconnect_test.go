@@ -15,7 +15,14 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 )
 
-type fakeTenants struct{ references, states map[string]string }
+type fakeTenants struct{ references, states, workspaces map[string]string }
+
+func (f fakeTenants) WorkspaceOrganization(_ context.Context, workspace string) (string, error) {
+	if organization, ok := f.workspaces[workspace]; ok {
+		return organization, nil
+	}
+	return "", errors.New("binding not found")
+}
 
 func (f fakeTenants) Organization(_ context.Context, reference string) (string, error) {
 	if organization, ok := f.references[reference]; ok {
@@ -66,6 +73,46 @@ func oauthConnector(t *testing.T) (*Connector, *fakeProvider, redis.Store) {
 		tenants: fakeTenants{references: map[string]string{"SOCIAL_KEY_A": "org-a"}, states: map[string]string{}},
 		manager: integrations.NewManager([]integrations.Provider{provider}), store: store,
 	}, provider, store
+}
+
+func TestHiddenProviderOpensOnlyToExemptWorkspaces(t *testing.T) {
+	ctx := context.Background()
+	connector, _, _ := oauthConnector(t)
+	connector.tenants = fakeTenants{
+		references: map[string]string{"SOCIAL_KEY_A": "org-a", "SOCIAL_KEY_B": "org-b"},
+		workspaces: map[string]string{"workspace-a": "org-a", "workspace-b": "org-b"},
+	}
+	t.Setenv("HIDDEN_PROVIDERS", "x")
+	begin := func(organization, reference string) error {
+		_, err := connector.BeginOAuth(ctx, socialapi.BeginOAuthInput{ExpectedGoOrganizationID: organization, Provider: "x", SecretReference: reference})
+		return err
+	}
+	status := func(organization, reference string) string {
+		catalog, err := connector.ConnectionAvailability(ctx, organization, reference)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range catalog.Providers {
+			if item.Provider == "x" {
+				return item.Status
+			}
+		}
+		t.Fatal("x missing from catalog")
+		return ""
+	}
+	for _, list := range []string{"", " , ", "workspace-unknown"} {
+		t.Setenv("PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES", list)
+		if begin("org-a", "SOCIAL_KEY_A") == nil || status("org-a", "SOCIAL_KEY_A") != "disabled" {
+			t.Fatalf("list %q opened a hidden provider", list)
+		}
+	}
+	t.Setenv("PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES", "workspace-unknown, workspace-a")
+	if err := begin("org-a", "SOCIAL_KEY_A"); err != nil || status("org-a", "SOCIAL_KEY_A") != "available" {
+		t.Fatalf("exempt workspace stayed hidden: %v", err)
+	}
+	if begin("org-b", "SOCIAL_KEY_B") == nil || status("org-b", "SOCIAL_KEY_B") != "disabled" {
+		t.Fatal("exemption reached another workspace")
+	}
 }
 
 func TestBeginOAuthStoresStateAndReturnsProviderURL(t *testing.T) {

@@ -11,10 +11,10 @@ import (
 
 // ConnectionAvailability reads the adapter's current environment and registry.
 // This is configuration readiness only: remote grants are checked at connection.
-func (m *Manager) ConnectionAvailability() socialidentity.ConnectionAvailability {
+func (m *Manager) ConnectionAvailability(showHidden bool) socialidentity.ConnectionAvailability {
 	result := socialidentity.ConnectionAvailability{Version: 1, Providers: []socialidentity.ProviderAvailability{}}
 	for _, id := range socialidentity.ConnectionProviders() {
-		status, _ := m.ConnectionStatus(id)
+		status, _ := m.ConnectionStatus(id, showHidden)
 		result.Providers = append(result.Providers, socialidentity.ProviderAvailability{Provider: id, Status: status})
 	}
 	return result
@@ -23,7 +23,8 @@ func (m *Manager) ConnectionAvailability() socialidentity.ConnectionAvailability
 // ConnectionStatus reports readiness for the product's managed providers. The
 // bool is false for unrelated legacy adapters whose connection policy is unchanged.
 // Start endpoints call this again before registration or generating OAuth state.
-func (m *Manager) ConnectionStatus(id string) (string, bool) {
+// showHidden skips HIDDEN_PROVIDERS for a workspace exempt from it.
+func (m *Manager) ConnectionStatus(id string, showHidden bool) (string, bool) {
 	var keys []string
 	callback := os.Getenv("FRONTEND_URL")
 	switch id {
@@ -70,7 +71,7 @@ func (m *Manager) ConnectionStatus(id string) (string, bool) {
 	if m == nil || m.GetSocialIntegration(id) == nil {
 		return "unsupported", true
 	}
-	if m.IsHiddenProvider(id) {
+	if m.IsHiddenProvider(id) && !showHidden {
 		return "disabled", true
 	}
 	if credentialcipher.ValidateKey() != nil {

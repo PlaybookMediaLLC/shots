@@ -106,7 +106,10 @@ so confirm that match with a live test account before relying on it.
 The credentials also turn on Connect for every customer. Until Meta approves the
 app, set `HIDDEN_PROVIDERS=threads,instagram-standalone` in Infisical `prod`: the
 deploy passes it to the backend, both stay "Coming soon" and refuse new connections,
-and these callbacks keep working.
+and these callbacks keep working. Meta's reviewers connect their own account on
+production, so list the reviewer's workspace, and yours for recording, in
+`PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES` (comma-separated workspace IDs). Those
+workspaces can connect hidden providers. Remove both settings after approval.
 
 Private product media stays in R2. The canonical asset row holds a stable
 object key; the worker signs it when publishing and again for a retry. Do not
