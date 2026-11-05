@@ -505,7 +505,7 @@ func TestProductionLateFirstReceiptCannotReplayOldLivePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := f.db.Client.GitHubObservation.Query().Where(githubobservation.OrganizationID(f.org)).OnlyX(f.ctx)
-	if row.Status != "review_only" || row.EventID != nil || !strings.Contains(row.Decision.Reason, "15-minute") {
+	if row.Status != "review_only" || row.EventID != nil || !strings.Contains(row.Decision.Reason, "15 minutes") {
 		t.Fatal(row)
 	}
 	decision, err := f.repo.PreviewGitHubProduction(f.ctx, f.owner, f.source.ID, ProductionPreviewInput{Policy: policy, ObservationID: row.ID})
