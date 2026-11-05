@@ -130,7 +130,8 @@ type BatchSubmitInput struct {
 
 // SubmitContentBatch records what to schedule and starts its workflow. Only a
 // person may ask, and the run keeps acting as that person: when their session
-// ends or their role changes, the rest of the run is refused.
+// ends or they lose their role or membership, the rest of the run is refused.
+// Moving to another workspace does not stop it.
 func (c *Configuration) SubmitContentBatch(ctx context.Context, actor Actor, batchID string, input BatchSubmitInput) (*BatchRunRecord, error) {
 	if err := c.authorizeDecision(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
@@ -266,8 +267,14 @@ func batchRunRefusal(err error) bool {
 }
 
 func batchRunRefusalText(err error) string {
-	if errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrForbidden) {
-		return "You can no longer schedule this: your session ended or your role changed. Sign in and schedule it again."
+	var user userError
+	switch {
+	case errors.As(err, &user):
+		return err.Error()
+	case errors.Is(err, publishing.ErrUnauthorized):
+		return "Your session ended before this post was scheduled. Sign in and schedule it again."
+	case errors.Is(err, publishing.ErrForbidden):
+		return "You can no longer schedule in this workspace: your role or membership changed, or it is being deleted."
 	}
 	return err.Error()
 }
@@ -312,7 +319,9 @@ func firstPendingItem(items []schema.BatchRunItem) int {
 }
 
 // ScheduleNextBatchRunItem schedules a submit run's next waiting item, as the
-// person who asked. A definite refusal is that item's outcome and the run goes on.
+// person who asked. Their access is checked again for each item, except that they
+// may have moved on to another workspace: they asked from this one. A definite
+// refusal is that item's outcome and the run goes on.
 func (c *Configuration) ScheduleNextBatchRunItem(ctx context.Context, organizationID, runID string) (*BatchRunStep, error) {
 	run, err := c.client.ContentBatchRun.Query().Where(contentbatchrun.ID(runID), contentbatchrun.OrganizationID(organizationID),
 		contentbatchrun.Kind(batchRunSubmit)).Only(ctx)
@@ -338,7 +347,7 @@ func (c *Configuration) ScheduleNextBatchRunItem(ctx context.Context, organizati
 	if run.SessionID != nil {
 		actor.SessionID = *run.SessionID
 	}
-	result, err := c.ScheduleContentDraft(ctx, actor, item.DraftID, input)
+	result, err := c.ScheduleContentDraft(publishing.ForStartedRun(ctx), actor, item.DraftID, input)
 	if err != nil && !batchRunRefusal(err) {
 		return nil, err
 	}

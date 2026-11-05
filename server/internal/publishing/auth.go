@@ -46,6 +46,17 @@ type authorizedRole struct {
 	organizationID, userID, sessionID, role string
 }
 
+// startedRunKey marks work that was authorized when a person started it.
+type startedRunKey struct{}
+
+// ForStartedRun is for background work a person started in a workspace. It may
+// finish after they switch to another workspace, so AuthorizeRole under ctx does
+// not require that workspace to stay active. Every other check still applies: the
+// session, membership, role and deletion state are read again each time.
+func ForStartedRun(ctx context.Context) context.Context {
+	return context.WithValue(ctx, startedRunKey{}, true)
+}
+
 // RecordAuthorization keeps what AuthorizeRole admits under ctx in memo.
 func RecordAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
 	return context.WithValue(ctx, recordAuthorizationKey{}, memo)
@@ -85,7 +96,8 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 	if err != nil {
 		return "", err
 	}
-	if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
+	startedRun, _ := ctx.Value(startedRunKey{}).(bool)
+	if !startedRun && current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
 		return "", ErrForbidden
 	}
 	participants, err := r.client.Member.Query().Where(

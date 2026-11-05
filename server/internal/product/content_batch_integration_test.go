@@ -464,6 +464,95 @@ func TestContentBatches(t *testing.T) {
 		}
 	})
 
+	t.Run("a submit run survives switching workspace, and stops when access is lost", func(t *testing.T) {
+		w.addMember(t, "runner", "publisher")
+		runner := w.actor("runner")
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Switching"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		inputs := []ContentBatchItemInput{item("switch", 0, photos[0]), item("switch", 1, photos[1]), item("switch", 2, photos[2]), item("switch", 3, photos[0])}
+		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, inputs); err != nil {
+			t.Fatal(err)
+		}
+		draftAll(batch)
+		reloaded, err := repo.GetContentBatch(ctx, owner, batch.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		frozen := func(index int) *ScheduleContentDraftInput {
+			entry := reloaded.Items[index]
+			targets := []ContentDraftScheduleTarget{}
+			for _, channel := range entry.ChannelConnectionIDs {
+				targets = append(targets, ContentDraftScheduleTarget{ChannelConnectionID: channel, Caption: entry.Draft.PlainText, AssetIDs: entry.Draft.AssetIDs})
+			}
+			return &ScheduleContentDraftInput{Version: entry.Draft.Version, LocalTime: entry.Timing.LocalTime, TimeZone: entry.Timing.TimeZone, Targets: targets}
+		}
+		asked := func(index int) BatchSubmitItem {
+			return BatchSubmitItem{ItemID: reloaded.Items[index].ID, ChannelConnectionIDs: []string{linkedin, threads}, Schedule: frozen(index)}
+		}
+		run, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-switching-key-0001",
+			Items: []BatchSubmitItem{asked(0), asked(1), asked(2)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		other := newTestWorkspace(t)
+		subscribe(t, ctx, repo, other.org, "pro")
+		w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, runner.SessionID, other.org)
+
+		// Only the run is exempt: an ordinary request from that session is still refused,
+		// here and on every other way in, and nothing is scheduled by trying.
+		if _, err := repo.ScheduleContentDraft(ctx, runner, *reloaded.Items[3].DraftID, *frozen(3)); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("an ordinary schedule from another workspace: %v", err)
+		}
+		if _, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-switching-key-0002",
+			Items: []BatchSubmitItem{asked(3)}}); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("a new submit from another workspace: %v", err)
+		}
+		if _, err := repo.GetContentBatchRun(ctx, runner, batch.ID, run.ID); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("reading the run from another workspace: %v", err)
+		}
+
+		// The run goes on: switching away is not losing access.
+		step, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
+		if err != nil || step.Done || len(step.Scheduled) != 2 {
+			t.Fatalf("after switching workspace: %+v %v", step, err)
+		}
+		// Losing the role stops it, with the reason, and the workspace still has to match the run's.
+		w.exec(t, `UPDATE member SET role='creator' WHERE id=$1`, "member_runner_"+w.id)
+		if _, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		// So does losing the membership.
+		w.exec(t, `DELETE FROM member WHERE id=$1`, "member_runner_"+w.id)
+		if _, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		w.exec(t, `INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'publisher',now())`, "member_runner_"+w.id, w.org, runner.UserID)
+		w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, runner.SessionID, w.org)
+		finished, err := repo.GetContentBatchRun(ctx, runner, batch.ID, run.ID)
+		if err != nil || finished.Status != "FINISHED" {
+			t.Fatalf("finished: %+v %v", finished, err)
+		}
+		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 {
+			t.Fatalf("scheduled after switching: %+v", finished.Items[0])
+		}
+		for _, entry := range finished.Items[1:] {
+			if entry.Status != "FAILED" || !strings.Contains(entry.Error, "role or membership") {
+				t.Fatalf("after losing access: %+v", entry)
+			}
+		}
+		// What was scheduled before access was lost stays scheduled.
+		var queued int
+		if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM scheduled_post WHERE "contentDraftId"=$1 AND status='SCHEDULED'`, *reloaded.Items[0].DraftID).Scan(&queued); err != nil || queued != 2 {
+			t.Fatalf("queued posts: %d %v", queued, err)
+		}
+		// A run cannot be stepped for a workspace it does not belong to, whatever the session says.
+		if _, err := repo.ScheduleNextBatchRunItem(ctx, other.org, run.ID); err == nil {
+			t.Fatal("another workspace stepped this run")
+		}
+	})
+
 	t.Run("a render run freezes concepts, so a stale or superseded video cannot land", func(t *testing.T) {
 		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Renders"})
 		if err != nil {

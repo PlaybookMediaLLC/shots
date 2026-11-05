@@ -247,9 +247,13 @@ definite refusal is that item's outcome and the rest carry on. A failure to get 
 answer is retried, which replays rather than duplicates, and after its retries the
 item is `UNCONFIRMED` and the run moves on. The page can close at any point, and
 reopening it shows the progress. The run acts as the person who asked, using their
-session: scheduling stays a person's decision, so when their session ends or their
-role changes, the rest of the run is refused with a reason. A long run can outlive
-a session this way, and the person schedules the remainder again. Scheduling here
+session: scheduling stays a person's decision, so each item checks their session,
+membership and role again. When they sign out, their session expires, or they lose
+the role or membership, the rest of the run is refused with a reason and what was
+already scheduled stays; they schedule the remainder again. Switching to another
+workspace does not stop a run, because they asked from this one. Only the worker's
+step has that exemption (`publishing.ForStartedRun`): ordinary requests from another
+workspace are still refused. Scheduling here
 must judge an account as the API does, so the worker's store has the API's media,
 account standing and quota meter.
 
