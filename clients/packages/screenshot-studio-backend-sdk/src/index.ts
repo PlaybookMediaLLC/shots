@@ -102,6 +102,16 @@ import type {
 } from './release-automation.js'
 export type * from './release-automation.js'
 import type {
+  CaptureConnection,
+  CaptureConnectionInput,
+  CaptureConnectStart,
+  CaptureJob,
+  CaptureOverview,
+  CaptureRecipe,
+  CaptureRecipeInput,
+} from './capture.js'
+export type * from './capture.js'
+import type {
   AccountDeletionStatus,
   CopyableSocialSet,
   Engagement,
@@ -4679,6 +4689,80 @@ export class ScreenshotStudioBackendSDK {
       `v1/release-automation/runs/${encodeURIComponent(id)}/retry`,
       { method: 'POST' }
     )
+  }
+
+  /** This workspace's connections, recipes and recent jobs; any member may read them. */
+  async captureOverview() {
+    return this.request<CaptureOverview>('v1/capture')
+  }
+
+  async createCaptureConnection(input: CaptureConnectionInput) {
+    return this.request<{ connection: CaptureConnection }>('v1/capture/connections', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Opens a sign-in browser for an owner or admin session; see {@link CaptureConnectStart}. */
+  async startCaptureConnect(id: string) {
+    return this.request<CaptureConnectStart>(
+      `v1/capture/connections/${encodeURIComponent(id)}/connect`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Records "I signed in"; the worker must still restore it in a fresh browser. */
+  async finishCaptureConnect(id: string, intentId: string) {
+    return this.request<{ accepted: true }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/connect/finish`,
+      { body: { intentId }, method: 'POST' }
+    )
+  }
+
+  async revokeCaptureConnection(id: string) {
+    return this.request<{ revoked: true }>(
+      `v1/capture/connections/${encodeURIComponent(id)}/revoke`,
+      { method: 'POST' }
+    )
+  }
+
+  async createCaptureRecipe(input: CaptureRecipeInput) {
+    return this.request<{ recipe: CaptureRecipe }>('v1/capture/recipes', {
+      body: input,
+      method: 'POST',
+    })
+  }
+
+  /** Enables capture after deployment for a tested version, replacing any earlier one. */
+  async activateCaptureRecipe(id: string) {
+    return this.request<{ recipe: CaptureRecipe }>(
+      `v1/capture/recipes/${encodeURIComponent(id)}/activate`,
+      { method: 'POST' }
+    )
+  }
+
+  async archiveCaptureRecipe(id: string) {
+    return this.request<{ archived: true }>(
+      `v1/capture/recipes/${encodeURIComponent(id)}/archive`,
+      { method: 'POST' }
+    )
+  }
+
+  /** Runs a recipe now: a test may use a draft; anything else needs an active recipe. */
+  async requestCaptureJob(
+    recipeId: string,
+    input: { test: boolean; source?: 'agent' | 'manual'; sourceId?: string }
+  ) {
+    return this.request<{ job: CaptureJob }>(
+      `v1/capture/recipes/${encodeURIComponent(recipeId)}/jobs`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  async cancelCaptureJob(id: string) {
+    return this.request<{ cancelled: true }>(`v1/capture/jobs/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+    })
   }
 
   async completeGitHubConnection(input: { code: string; installationId: number; state: string }) {

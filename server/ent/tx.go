@@ -60,6 +60,12 @@ type Tx struct {
 	CampaignPost *CampaignPostClient
 	// CampaignRevision is the client for interacting with the CampaignRevision builders.
 	CampaignRevision *CampaignRevisionClient
+	// CaptureAttempt is the client for interacting with the CaptureAttempt builders.
+	CaptureAttempt *CaptureAttemptClient
+	// CaptureJob is the client for interacting with the CaptureJob builders.
+	CaptureJob *CaptureJobClient
+	// CaptureRecipe is the client for interacting with the CaptureRecipe builders.
+	CaptureRecipe *CaptureRecipeClient
 	// ChannelConnection is the client for interacting with the ChannelConnection builders.
 	ChannelConnection *ChannelConnectionClient
 	// CommunicationAttempt is the client for interacting with the CommunicationAttempt builders.
@@ -142,6 +148,8 @@ type Tx struct {
 	PermissionGroup *PermissionGroupClient
 	// PermissionGroupMember is the client for interacting with the PermissionGroupMember builders.
 	PermissionGroupMember *PermissionGroupMemberClient
+	// PlatformAppConnection is the client for interacting with the PlatformAppConnection builders.
+	PlatformAppConnection *PlatformAppConnectionClient
 	// PlatformAutoDMCampaign is the client for interacting with the PlatformAutoDMCampaign builders.
 	PlatformAutoDMCampaign *PlatformAutoDMCampaignClient
 	// PlatformAutoDMDelivery is the client for interacting with the PlatformAutoDMDelivery builders.
@@ -415,6 +423,9 @@ func (tx *Tx) init() {
 	tx.CampaignPlan = NewCampaignPlanClient(tx.config)
 	tx.CampaignPost = NewCampaignPostClient(tx.config)
 	tx.CampaignRevision = NewCampaignRevisionClient(tx.config)
+	tx.CaptureAttempt = NewCaptureAttemptClient(tx.config)
+	tx.CaptureJob = NewCaptureJobClient(tx.config)
+	tx.CaptureRecipe = NewCaptureRecipeClient(tx.config)
 	tx.ChannelConnection = NewChannelConnectionClient(tx.config)
 	tx.CommunicationAttempt = NewCommunicationAttemptClient(tx.config)
 	tx.CommunicationRecipient = NewCommunicationRecipientClient(tx.config)
@@ -456,6 +467,7 @@ func (tx *Tx) init() {
 	tx.PageKnowledge = NewPageKnowledgeClient(tx.config)
 	tx.PermissionGroup = NewPermissionGroupClient(tx.config)
 	tx.PermissionGroupMember = NewPermissionGroupMemberClient(tx.config)
+	tx.PlatformAppConnection = NewPlatformAppConnectionClient(tx.config)
 	tx.PlatformAutoDMCampaign = NewPlatformAutoDMCampaignClient(tx.config)
 	tx.PlatformAutoDMDelivery = NewPlatformAutoDMDeliveryClient(tx.config)
 	tx.PlatformAutoDMOptOut = NewPlatformAutoDMOptOutClient(tx.config)

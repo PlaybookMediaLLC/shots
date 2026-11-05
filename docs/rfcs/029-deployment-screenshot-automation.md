@@ -332,14 +332,23 @@ repository webhook subscribed to `deployment_status`:
   `production` (or GitHub's `production_environment` flag) becomes a
   `deployment_event`, once per GitHub deployment, with its https URL.
 - Targets: only the workspace's `production` product surfaces on the deployed
-  host are captured (at most ten), never a URL from the payload; another host
-  is skipped as `deployment_host_rejected`, a missing URL as
-  `deployment_url_missing`.
+  origin (scheme, host and port) are captured (at most ten), never a URL from the
+  payload; another origin is skipped as `deployment_host_rejected`, a missing URL
+  as `deployment_url_missing`, a private address as `deployment_url_refused`, and an
+  archived source as `source_inactive`.
 - Readiness: the first surface must answer; until it does, the outbox retries
-  each minute, which is the readiness window.
+  each minute, which is the readiness window. The backend dials public addresses
+  only and checks every redirect hop.
 - Capture: through the same Microlink-compatible API as the web
-  (`SCREENSHOT_API_URL`), downloading only from that API's host or Microlink's
-  CDN. Each capture is a workspace asset added to the surface's screenshots
-  and recorded on the event, which ends `CAPTURED`, `SKIPPED`, or `FAILED`.
-- Not yet: two consecutive healthy checks, SHA verification, stability
-  controls, authenticated capture, and before-and-after pairs.
+  (`SCREENSHOT_API_URL`), bypassing its cache, downloading only from that API's
+  host or Microlink's CDN on every hop. Each capture is a workspace asset added to
+  the surface's screenshots and recorded on the event, with one receipt per page: a
+  retried run captures only the missing pages. The event ends `CAPTURED`, `PARTIAL`
+  (`capture_incomplete`), `SKIPPED`, or `FAILED`. A page that redirects to a sign-in
+  form fails as `capture_login_page`, and an older deployment that finishes late
+  never replaces a newer deployment's current image.
+- SHA verification is available to workflows through
+  [`capture_product`](../release-automation.md#deployment-capture), not on this path.
+- A page with an active authenticated recipe gets a durable capture job instead of
+  a public screenshot ([status](authenticated-release-capture-review.md#10-implementation-status)).
+- Not yet: two consecutive healthy checks, stability controls, and before-and-after pairs.

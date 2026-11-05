@@ -88,9 +88,12 @@ func (c *Configuration) automationCreateCanvas(ctx context.Context, org, runID, 
 	if err := c.requireWorkspaceFeature(ctx, org, "workspace:paid"); err != nil {
 		return automation.Outputs{}, err
 	}
-	capture, err := c.currentCapture(ctx, org, action.SurfaceID)
-	if err != nil && !errors.Is(err, ErrCaptureMissing) {
-		return automation.Outputs{}, err
+	capture := input.CaptureAssetID
+	if capture == "" {
+		var err error
+		if capture, err = c.currentCapture(ctx, org, action.SurfaceID); err != nil && !errors.Is(err, ErrCaptureMissing) {
+			return automation.Outputs{}, err
+		}
 	}
 	canvasID, err := c.automationCanvases.BuildCanvas(ctx, AutomationCanvasRequest{OrganizationID: org, RunID: runID, NodeID: nodeID,
 		ReleaseID: input.ReleaseID, CampaignID: input.CampaignID, CaptureAssetID: capture, RecipeIDs: action.RecipeIDs})

@@ -315,8 +315,15 @@ function SurfaceRow({
   async function capture() {
     setCapturing(true)
     try {
-      await trpcClient.productSurface.capture.mutate({ surfaceId: surface.id })
-      toast.success(`${surface.name} captured`)
+      const result = await trpcClient.productSurface.capture.mutate({ surfaceId: surface.id })
+      if ('job' in result) {
+        toast.success(`${surface.name} is being captured`, {
+          description:
+            'This page is behind a sign-in, so its screenshot arrives when the run ends.',
+        })
+      } else {
+        toast.success(`${surface.name} captured`)
+      }
       onCaptured()
     } catch (requestError) {
       toast.error(`${surface.name} could not be captured`, {

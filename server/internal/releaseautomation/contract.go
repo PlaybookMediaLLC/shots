@@ -8,8 +8,8 @@ import "time"
 // graphs stay valid unchanged. Version 2 adds AI relevance checks, paid copy
 // generation, tag-push and milestone triggers, version and size fields,
 // numeric operators, and release contents, so a worker that only advertises
-// version 1 can never be handed one.
-const SchemaVersion = 2
+// version 1 can never be handed one. Version 3 adds capture_product.
+const SchemaVersion = 3
 const MaxNodes = 64
 
 // MaxGenerationNodes bounds paid generation calls in one run.
@@ -37,6 +37,14 @@ const CapabilityRender = "render"
 // builder. Building a canvas composes documents only; it needs no browser.
 const CapabilityCanvas = "canvas"
 
+// CapabilityCapture is advertised by a worker that can screenshot pages and
+// store the images.
+const CapabilityCapture = "capture"
+
+// CapabilityBrowser is advertised by a worker that can run authenticated
+// capture recipes: a browser provider and the session state key.
+const CapabilityBrowser = "browser"
+
 // CapabilityAI is advertised by a worker that has a model provider and the
 // credit meter that bills it; AI checks and copy generation both need it.
 const CapabilityAI = "ai"
@@ -57,7 +65,21 @@ type Outputs struct {
 	CanvasID string `json:"canvasId,omitempty"`
 	// CodeProjectID is the Code Studio project render_code_visual made from the change.
 	CodeProjectID string `json:"codeProjectId,omitempty"`
+	// CaptureID and CaptureAssetID are the image capture_product took of this
+	// deployment; a later render shows exactly it. CaptureProof is how the
+	// image is tied to the deployment: CaptureProofVersion or CaptureProofCurrentState.
+	CaptureID      string `json:"captureId,omitempty"`
+	CaptureAssetID string `json:"captureAssetId,omitempty"`
+	CaptureProof   string `json:"captureProof,omitempty"`
 }
+
+const (
+	// CaptureProofVersion means the app reported the deployment's commit first.
+	CaptureProofVersion = "version"
+	// CaptureProofCurrentState means an administrator chose to capture without
+	// version proof: the page as it was, not a claim about this deployment.
+	CaptureProofCurrentState = "current_state"
+)
 
 // Generation is model output persisted before it is applied, so a retried
 // activity reuses it instead of paying for the same work twice.
@@ -180,6 +202,15 @@ type Action struct {
 	// render_code_visual to read the merged pull request's diff (Code Studio
 	// source-code policy). No other action reads code.
 	ReadSourceCode bool `json:"readSourceCode,omitempty"`
+	// VersionPath is the path on the surface's origin that must report the
+	// deployment's commit before capture_product shoots. CurrentState is the
+	// explicit choice to capture without that proof; exactly one is set.
+	VersionPath  string `json:"versionPath,omitempty"`
+	CurrentState bool   `json:"currentState,omitempty"`
+	// RecipeID is a pinned authenticated capture recipe version. It replaces
+	// SurfaceID and VersionPath: the recipe names the page and its version proof.
+	// CurrentState then allows a recipe that has no version proof.
+	RecipeID string `json:"recipeId,omitempty"`
 }
 
 type Node struct {

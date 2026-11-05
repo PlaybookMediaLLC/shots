@@ -34,6 +34,13 @@ the old `design-renderer` component and requires `PLATFORM_RENDER_CDP_URL`
 and `PLATFORM_RENDER_CDP_TOKEN` (a Cloudflare API token with Browser Rendering
 Edit) in Infisical.
 
+Authenticated capture uses a separate token and is off without its settings. Set
+`PLATFORM_CAPTURE_CDP_URL`
+(`https://api.cloudflare.com/client/v4/accounts/<account>/browser-run`),
+`PLATFORM_CAPTURE_CDP_TOKEN` (Browser Rendering Edit), and
+`PLATFORM_CAPTURE_STATE_KEY` (`openssl rand -base64 32`) in Infisical. The backend
+deploy passes them to the backend only, never to the web.
+
 The MCP server (RFC 026) runs in `screenshot-studio-backend` and is public at
 `https://shots-mcp.playbookmedia.io/mcp`. Set `PLATFORM_MCP_URL` to that URL
 in Infisical. The backend deploy then adds the host as an alias domain and, on

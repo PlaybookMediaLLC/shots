@@ -3,21 +3,37 @@
 package capture
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	goimage "image"
+	_ "image/jpeg"
+	_ "image/png"
 	"io"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
+
+	_ "golang.org/x/image/webp"
+
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publicnet"
 )
 
-// maxScreenshotBytes bounds one downloaded screenshot.
-const maxScreenshotBytes = 20 << 20
+// maxScreenshotBytes bounds one downloaded screenshot, and
+// maxScreenshotSide each of its decoded dimensions.
+const (
+	maxScreenshotBytes = 20 << 20
+	maxScreenshotSide  = 16384
+)
+
+// ErrUnsafeURL refuses a page or image address the capture will not reach.
+var ErrUnsafeURL = errors.New("capture address refused")
 
 // Client calls the screenshot API.
 type Client struct {
@@ -33,7 +49,7 @@ func FromEnvironment() *Client {
 	if api == "" {
 		api = "https://api.microlink.io"
 	}
-	return &Client{API: api, Key: os.Getenv("SCREENSHOT_API_KEY"), HTTP: &http.Client{Timeout: 45 * time.Second}}
+	return &Client{API: api, Key: os.Getenv("SCREENSHOT_API_KEY"), HTTP: &http.Client{Timeout: 45 * time.Second, Transport: publicnet.Transport()}}
 }
 
 // Options choose the viewport and color scheme, as the web's
@@ -42,16 +58,24 @@ type Options struct {
 	Mobile bool
 	// ColorScheme is "light" or "dark"; empty leaves the page's default.
 	ColorScheme string
+	// Fresh bypasses the service's cache, which otherwise answers a repeated
+	// URL with an image up to a day old.
+	Fresh bool
 }
 
-// Capture screenshots a public page at a desktop viewport and returns the image.
+// Capture screenshots a public page as it is now, at a desktop viewport, and
+// returns the image. A deployment must show what it shipped, not a cached copy.
 func (c *Client) Capture(ctx context.Context, pageURL string) ([]byte, error) {
-	return c.CaptureWith(ctx, pageURL, Options{})
+	return c.CaptureWith(ctx, pageURL, Options{Fresh: true})
 }
 
 // CaptureWith screenshots a public page with the given viewport and color
 // scheme. A mobile capture is a current iPhone viewport, like the web's.
+// Every caller gets the same refusal of local and private pages.
 func (c *Client) CaptureWith(ctx context.Context, pageURL string, options Options) ([]byte, error) {
+	if !PublicPageURL(pageURL) {
+		return nil, ErrUnsafeURL
+	}
 	query := url.Values{"meta": {"false"}, "screenshot": {"true"}, "url": {pageURL},
 		"viewport.height": {"1080"}, "viewport.isMobile": {"false"}, "viewport.width": {"1920"}}
 	if options.Mobile {
@@ -61,6 +85,9 @@ func (c *Client) CaptureWith(ctx context.Context, pageURL string, options Option
 	}
 	if options.ColorScheme != "" {
 		query.Set("colorScheme", options.ColorScheme)
+	}
+	if options.Fresh {
+		query.Set("force", "true")
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.API+"/?"+query.Encode(), nil)
 	if err != nil {
@@ -92,20 +119,39 @@ func (c *Client) CaptureWith(ctx context.Context, pageURL string, options Option
 	return c.download(ctx, out.Data.Screenshot.URL)
 }
 
+// imageHost reports whether an image address is on the API's own host or,
+// over HTTPS, Microlink's CDN.
+func (c *Client) imageHost(image *url.URL) bool {
+	api, err := url.Parse(c.API)
+	if err != nil || image.User != nil {
+		return false
+	}
+	if image.Host == api.Host {
+		return image.Scheme == api.Scheme
+	}
+	return image.Scheme == "https" && image.Port() == "" && strings.HasSuffix(strings.ToLower(image.Hostname()), ".microlink.io")
+}
+
 // download fetches the image only from the API's own host or Microlink's CDN,
-// so a hostile answer cannot point the worker at an internal address.
+// checked again on every redirect hop, so a hostile answer cannot point the
+// worker at another host. The transport refuses private addresses besides.
 func (c *Client) download(ctx context.Context, imageURL string) ([]byte, error) {
 	image, err := url.Parse(imageURL)
-	api, apiErr := url.Parse(c.API)
-	if err != nil || apiErr != nil || (image.Scheme != "https" && image.Host != api.Host) ||
-		(image.Host != api.Host && !strings.HasSuffix(image.Hostname(), ".microlink.io")) {
-		return nil, errors.New("screenshot host refused")
+	if err != nil || !c.imageHost(image) {
+		return nil, ErrUnsafeURL
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.HTTP.Do(request)
+	client := *c.HTTP
+	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+		if len(via) >= 3 || !c.imageHost(next.URL) {
+			return ErrUnsafeURL
+		}
+		return nil
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +165,13 @@ func (c *Client) download(ctx context.Context, imageURL string) ([]byte, error) 
 	}
 	if len(body) > maxScreenshotBytes {
 		return nil, errors.New("screenshot too large")
+	}
+	if kind := http.DetectContentType(body); kind != "image/png" && kind != "image/jpeg" && kind != "image/webp" {
+		return nil, errors.New("screenshot is not a PNG, JPEG, or WebP image")
+	}
+	config, _, err := goimage.DecodeConfig(bytes.NewReader(body))
+	if err != nil || config.Width < 1 || config.Height < 1 || config.Width > maxScreenshotSide || config.Height > maxScreenshotSide {
+		return nil, errors.New("screenshot dimensions refused")
 	}
 	return body, nil
 }
@@ -143,4 +196,38 @@ func PublicPageURL(raw string) bool {
 	return !(address.IsLoopback() || address.IsPrivate() || address.IsLinkLocalUnicast() ||
 		address.IsLinkLocalMulticast() || address.IsUnspecified() || address.IsMulticast() ||
 		(address.Is4() && (address.As4()[0] == 0 || (address.As4()[0] == 100 && address.As4()[1]&0xc0 == 64))))
+}
+
+var (
+	revisionToken = regexp.MustCompile(`(?i)\b[0-9a-f]{7,64}\b`)
+	signInPath    = regexp.MustCompile(`(?i)(^|/)(log[-_]?in|sign[-_]?in|sign[-_]?on|sso|oauth2?|authorize)(/|$)`)
+)
+
+// IsSignInPath reports whether a URL path is a sign-in page.
+func IsSignInPath(path string) bool { return signInPath.MatchString(path) }
+
+// RevisionAnswer is what an app's version report says about a commit.
+type RevisionAnswer int
+
+const (
+	// RevisionUnreported means the text names no commit at all.
+	RevisionUnreported RevisionAnswer = iota
+	// RevisionOther means it names only other commits.
+	RevisionOther
+	// RevisionMatches means it names this commit, full or at least seven characters.
+	RevisionMatches
+)
+
+// CompareRevision reads a version report against the expected commit.
+func CompareRevision(report, sha string) RevisionAnswer {
+	tokens := revisionToken.FindAllString(report, -1)
+	if len(tokens) == 0 {
+		return RevisionUnreported
+	}
+	for _, token := range tokens {
+		if strings.HasPrefix(strings.ToLower(sha), strings.ToLower(token)) {
+			return RevisionMatches
+		}
+	}
+	return RevisionOther
 }

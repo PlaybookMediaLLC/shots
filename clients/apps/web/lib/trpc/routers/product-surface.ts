@@ -45,7 +45,7 @@ export const productSurfaceRouter = router({
     .query(async ({ ctx, input }) => ({
       matches: await findSurfacesForFeature(ctx.access, input),
     })),
-  /** Screenshot the surface's page now and make it the current capture. */
+  /** Screenshot the surface's page now; a signed-in page returns the job capturing it instead. */
   capture: organizationProcedure('brand:manage')
     .input(z.object({ surfaceId: surfaceIdSchema }))
     .mutation(async ({ ctx, input }) => {
@@ -59,7 +59,7 @@ export const productSurfaceRouter = router({
           message: result.failure.message,
         })
       }
-      return { capture: result.capture }
+      return 'job' in result ? { job: result.job } : { capture: result.capture }
     }),
   create: organizationProcedure('brand:manage')
     .input(productSurfaceCreateSchema)

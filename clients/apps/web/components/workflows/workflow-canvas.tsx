@@ -76,8 +76,17 @@ export function nodeDetail(node: AutomationNode, sourceName?: string) {
       return `${node.action.destinationIds?.length ?? 0} draft destinations`
     case 'generate_copy':
       return `AI copy · up to ${node.action.creditLimit ?? 0} credits`
+    case 'capture_product':
+      if (node.action.recipeId) {
+        return node.action.currentState
+          ? 'Signed-in screen, current state only'
+          : 'Signed-in screen, after the app reports this commit'
+      }
+      return node.action.currentState
+        ? 'Current state, without version proof'
+        : 'After the app reports this commit'
     case 'render_creatives':
-      return `${node.action.templateIds?.length ?? 0} templates from the latest capture`
+      return `${node.action.templateIds?.length ?? 0} templates from the product capture`
     case 'create_canvas':
       return `${node.action.recipeIds?.length ?? 0} canvas templates from the release`
     case 'render_code_visual':

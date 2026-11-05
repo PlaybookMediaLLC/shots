@@ -61,7 +61,7 @@ type AutomationOverview struct {
 func (c *Configuration) automationActions(ctx context.Context, org string, executor AutomationExecutor) ([]AutomationActionAvailability, error) {
 	result := []AutomationActionAvailability{}
 	for _, action := range []struct{ kind, feature string }{{"create_release", "release:create"}, {"create_campaign", "campaign:workflow"}, {"generate_copy", "campaign:workflow"},
-		{"render_creatives", "campaign:workflow"}, {"render_code_visual", "campaign:workflow"}, {"create_canvas", "workspace:paid"}, {"submit_review", "release:create"}, {"classify", "release:create"}} {
+		{"capture_product", "campaign:workflow"}, {"render_creatives", "campaign:workflow"}, {"render_code_visual", "campaign:workflow"}, {"create_canvas", "workspace:paid"}, {"submit_review", "release:create"}, {"classify", "release:create"}} {
 		item := AutomationActionAvailability{Type: action.kind, Available: true}
 		err := c.requireWorkspaceFeature(ctx, org, action.feature)
 		var entitlement *FeatureNotEntitledError
@@ -76,6 +76,10 @@ func (c *Configuration) automationActions(ctx context.Context, org string, execu
 			item.Reason = "Running workers predate workflow language version 2. Deploy the current product worker."
 		case (action.kind == "generate_copy" || action.kind == "classify") && !slices.Contains(executor.Capabilities, automation.CapabilityAI):
 			item.Reason = "No worker has an AI model provider and credit meter configured (OPENROUTER_API_KEY, REDIS_URL)."
+		case action.kind == "capture_product" && executor.SchemaVersion < 3:
+			item.Reason = "Running workers predate workflow language version 3. Deploy the current product worker."
+		case action.kind == "capture_product" && !slices.Contains(executor.Capabilities, automation.CapabilityCapture) && !slices.Contains(executor.Capabilities, automation.CapabilityBrowser):
+			item.Reason = "No worker can capture and store product pages (object storage)."
 		case (action.kind == "render_creatives" || action.kind == "render_code_visual") && !slices.Contains(executor.Capabilities, automation.CapabilityRender):
 			item.Reason = "No worker can reach the design renderer (PLATFORM_WORKFLOW_RENDER_URL, PLATFORM_WORKFLOW_RENDER_KEY)."
 		case action.kind == "create_canvas" && !slices.Contains(executor.Capabilities, automation.CapabilityCanvas):

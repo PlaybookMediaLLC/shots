@@ -186,6 +186,12 @@ func execute(ctx workflow.Context, input Input, finish *Finish) error {
 		if node.Type == "action" && (node.Action.Type == "generate_copy" || node.Action.Type == "render_creatives" || node.Action.Type == "render_code_visual" || node.Action.Type == "create_canvas") {
 			nodeCtx = paidCtx
 		}
+		// Only version 3 graphs capture. The app may take minutes to serve the
+		// deployed commit, so these attempts back off for about ten minutes, and
+		// each one reuses a receipt that an earlier attempt left.
+		if node.Type == "action" && node.Action.Type == "capture_product" {
+			nodeCtx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{StartToCloseTimeout: 3 * time.Minute, RetryPolicy: &temporal.RetryPolicy{InitialInterval: 15 * time.Second, MaximumInterval: 2 * time.Minute, MaximumAttempts: 8, NonRetryableErrorTypes: []string{StoppedError, PermanentError}}})
+		}
 		if err := workflow.ExecuteActivity(nodeCtx, NodeActivity, step).Get(ctx, nil); err != nil {
 			return err
 		}

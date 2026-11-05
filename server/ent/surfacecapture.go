@@ -31,7 +31,9 @@ type SurfaceCapture struct {
 	CapturedAt time.Time `json:"captured_at,omitempty"`
 	// SupersededAt holds the value of the "superseded_at" field.
 	SupersededAt *time.Time `json:"superseded_at,omitempty"`
-	selectValues sql.SelectValues
+	// ObservedRevision holds the value of the "observed_revision" field.
+	ObservedRevision *string `json:"observed_revision,omitempty"`
+	selectValues     sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -39,7 +41,7 @@ func (*SurfaceCapture) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case surfacecapture.FieldID, surfacecapture.FieldOrganizationID, surfacecapture.FieldSurfaceID, surfacecapture.FieldAssetID, surfacecapture.FieldSource, surfacecapture.FieldSourceID:
+		case surfacecapture.FieldID, surfacecapture.FieldOrganizationID, surfacecapture.FieldSurfaceID, surfacecapture.FieldAssetID, surfacecapture.FieldSource, surfacecapture.FieldSourceID, surfacecapture.FieldObservedRevision:
 			values[i] = new(sql.NullString)
 		case surfacecapture.FieldCapturedAt, surfacecapture.FieldSupersededAt:
 			values[i] = new(sql.NullTime)
@@ -108,6 +110,13 @@ func (_m *SurfaceCapture) assignValues(columns []string, values []any) error {
 				_m.SupersededAt = new(time.Time)
 				*_m.SupersededAt = value.Time
 			}
+		case surfacecapture.FieldObservedRevision:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field observed_revision", values[i])
+			} else if value.Valid {
+				_m.ObservedRevision = new(string)
+				*_m.ObservedRevision = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -167,6 +176,11 @@ func (_m *SurfaceCapture) String() string {
 	if v := _m.SupersededAt; v != nil {
 		builder.WriteString("superseded_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.ObservedRevision; v != nil {
+		builder.WriteString("observed_revision=")
+		builder.WriteString(*v)
 	}
 	builder.WriteByte(')')
 	return builder.String()

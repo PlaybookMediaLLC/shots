@@ -10,7 +10,13 @@ import {
   automationHistoryFilterSchema,
   automationSourceModeSchema,
 } from '../lib/api/contracts/workflow-runs'
-import { producersOf, WORKFLOW_ACTIONS, WORKFLOW_SCHEMA_VERSION } from '../lib/workflows/actions'
+import {
+  graphSchemaVersion,
+  producersOf,
+  savedGraph,
+  WORKFLOW_ACTIONS,
+  WORKFLOW_SCHEMA_VERSION,
+} from '../lib/workflows/actions'
 import { buildWorkflowTemplate, workflowTemplateIdSchema } from '../lib/workflows/templates'
 
 // The Go validator reads the same file in server/internal/releaseautomation,
@@ -55,6 +61,54 @@ test('templates build the shared fixture graphs the Go validator accepts', () =>
   }
 })
 
+test('a deployment template captures before it renders, on the language version it needs', () => {
+  const { graph, layout } = buildWorkflowTemplate('deployment-marketing', {
+    brandKitId: 'brand-fixture',
+    destinationIds: ['destination-fixture'],
+    branch: 'main',
+    creditLimit: 0,
+    aiRelevance: false,
+    majorMinorOnly: false,
+    renderTemplateIds: ['layout-browser-launch'],
+    canvas: false,
+    capture: { surfaceId: 'surface-fixture', versionPath: '/api/version' },
+  })
+  assert.deepEqual(graph, fixture['deployment-marketing+capture'])
+  assert.deepEqual(automationGraphSchema.parse(graph), graph)
+  assert.equal(graph.schemaVersion, 3)
+  assert.deepEqual(Object.keys(layout).sort(), graph.nodes.map((node) => node.id).sort())
+  const art = graph.nodes.find((node) => node.id === 'art')?.action
+  assert.equal(art?.type, 'render_creatives')
+  assert.deepEqual(art.input, { nodeId: 'capture', output: 'campaignId' })
+  // Only a template that captures needs the newer worker.
+  const { graph: release } = buildWorkflowTemplate('release-launch', {
+    brandKitId: 'brand-fixture',
+    destinationIds: ['destination-fixture'],
+    branch: 'main',
+    creditLimit: 0,
+    aiRelevance: false,
+    majorMinorOnly: false,
+    renderTemplateIds: [],
+    canvas: false,
+    capture: { surfaceId: 'surface-fixture' },
+  })
+  assert.equal(
+    release.nodes.some((node) => node.action?.type === 'capture_product'),
+    false
+  )
+  assert.equal(release.schemaVersion, WORKFLOW_SCHEMA_VERSION)
+  assert.equal(graphSchemaVersion(graph), 3)
+  assert.equal(savedGraph({ ...graph, schemaVersion: 2 }).schemaVersion, 3)
+  assert.equal(savedGraph({ ...release, schemaVersion: 1 }).schemaVersion, WORKFLOW_SCHEMA_VERSION)
+})
+
+test('a capture action may name a signed-in recipe instead of a public page', () => {
+  const action = { type: 'capture_product', recipeId: 'recipe-1', currentState: true }
+  assert.deepEqual(automationActionSchema.parse(action), action)
+  const tooLong = { type: 'capture_product', recipeId: 'r'.repeat(65) }
+  assert.equal(automationActionSchema.safeParse(tooLong).success, false)
+})
+
 test('the action registry covers every executor action and wires outputs to inputs', () => {
   assert.deepEqual(
     Object.keys(WORKFLOW_ACTIONS).sort(),
@@ -63,6 +117,7 @@ test('the action registry covers every executor action and wires outputs to inpu
   assert.deepEqual(producersOf('submit_review'), [
     'create_campaign',
     'generate_copy',
+    'capture_product',
     'render_creatives',
     'render_code_visual',
   ])
@@ -88,6 +143,13 @@ test('action configurations are a discriminated union with no publishing or appr
     automationActionSchema.safeParse({
       type: 'render_creatives',
       templateIds: ['layout-phone-duo'],
+    }).success
+  )
+  assert.ok(
+    automationActionSchema.safeParse({
+      type: 'capture_product',
+      surfaceId: 'surface',
+      versionPath: '/api/version',
     }).success
   )
   for (const type of ['publish', 'approve', 'schedule', 'notify']) {

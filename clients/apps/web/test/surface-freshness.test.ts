@@ -23,3 +23,34 @@ test('capture failure codes read as sentences, unknown ones included', () => {
   // Not a prototype key.
   assert.match(captureFailureMessage('toString'), /^The last capture failed/)
 })
+
+test('every safe code from signed-in capture has its own sentence', () => {
+  for (const code of [
+    'needs_auth',
+    'wrong_account',
+    'waiting_for_deployment',
+    'deployment_unverified',
+    'marker_missing',
+    'forbidden_view',
+    'mask_missing',
+    'origin_refused',
+    'recipe_invalid',
+    'image_invalid',
+    'page_failed',
+    'provider_unavailable',
+    'connection_missing',
+    'connection_revoked',
+    'connect_expired',
+    'stale_authorization',
+    'deadline_exceeded',
+    'cancelled',
+    'source_inactive',
+    'recipe_archived',
+    'recipe_missing',
+    'surface_missing',
+    'deployment_missing',
+    'workspace_unavailable',
+  ]) {
+    assert.doesNotMatch(captureFailureMessage(code), /last capture failed|_/, code)
+  }
+})

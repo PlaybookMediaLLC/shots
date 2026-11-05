@@ -15,6 +15,9 @@ var nodeID = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,64}$`)
 // templateID matches the web's design template catalog identifiers.
 var templateID = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 
+// versionPath is a path and optional query on the surface's own origin.
+var versionPath = regexp.MustCompile(`^/[A-Za-z0-9._~%/?=&-]{0,255}$`)
+
 // BoundedDraft applies storage limits even when a draft is semantically incomplete.
 func BoundedDraft(graph Graph) bool {
 	if len(graph.Nodes) > MaxNodes || len(graph.Edges) > MaxNodes*2 {
@@ -75,7 +78,7 @@ func Validate(graph Graph) []Issue {
 		return issues
 	}
 	nodes, outgoing, incoming := map[string]Node{}, map[string][]Edge{}, map[string][]string{}
-	trigger, generations, classifiers, renders, canvases, codeVisuals := "", 0, 0, 0, 0, 0
+	trigger, generations, classifiers, renders, canvases, codeVisuals, captures := "", 0, 0, 0, 0, 0, 0
 	for _, n := range graph.Nodes {
 		if _, ok := nodes[n.ID]; ok || !nodeID.MatchString(n.ID) {
 			add(n.ID, "node_id", "Node IDs must be unique letters, numbers, underscores, or hyphens.")
@@ -121,6 +124,16 @@ func Validate(graph Graph) []Issue {
 				}
 				if graph.Family != Merged {
 					add(n.ID, "code_visual_trigger", "Code visuals render from a merged pull request; use the pull request trigger.")
+				}
+			}
+			if n.Action != nil && n.Action.Type == "capture_product" {
+				// A deployment names its commit. A published release names a tag, which
+				// resolves to a commit the run must then see deployed, so it needs proof.
+				if graph.Family != Deployed && (graph.Family != Published || n.Action.CurrentState) {
+					add(n.ID, "capture_trigger", "Capture product runs on a deployment, or on a published release with version proof.")
+				}
+				if captures++; captures > 1 {
+					add(n.ID, "capture_limit", "A workflow can capture the product once per run.")
 				}
 			}
 		case "classify":
@@ -241,11 +254,27 @@ func Validate(graph Graph) []Issue {
 	return issues
 }
 
+// capturedBefore reports whether an action's input chain passes through
+// capture_product, whose output it then shows instead of the latest capture.
+func capturedBefore(graph Graph, action *Action) bool {
+	for steps := 0; action != nil && action.Input != nil && steps < MaxNodes; steps++ {
+		producer := FindNode(graph, action.Input.NodeID)
+		if producer.Action == nil {
+			return false
+		}
+		if producer.Action.Type == "capture_product" {
+			return true
+		}
+		action = producer.Action
+	}
+	return false
+}
+
 func outputOf(action string) string {
 	switch action {
 	case "create_release":
 		return "releaseId"
-	case "create_campaign", "generate_copy", "render_creatives", "render_code_visual":
+	case "create_campaign", "generate_copy", "render_creatives", "render_code_visual", "capture_product":
 		return "campaignId"
 	case "submit_review":
 		return "reviewIds"
@@ -271,8 +300,11 @@ func validateAction(action *Action, version int) string {
 	if len(action.TemplateIDs) > 0 && action.Type != "render_creatives" {
 		return "Templates and surfaces belong to render creatives."
 	}
-	if action.SurfaceID != "" && action.Type != "render_creatives" && action.Type != "create_canvas" {
+	if action.SurfaceID != "" && action.Type != "render_creatives" && action.Type != "create_canvas" && action.Type != "capture_product" {
 		return "Templates and surfaces belong to render creatives."
+	}
+	if (action.VersionPath != "" || action.CurrentState || action.RecipeID != "") && action.Type != "capture_product" {
+		return "Version proof belongs to capture product."
 	}
 	if len(action.RecipeIDs) > 0 && action.Type != "create_canvas" {
 		return "Canvas templates belong to create canvas."
@@ -311,6 +343,31 @@ func validateAction(action *Action, version int) string {
 		}
 		if action.BrandKitID != "" || len(action.DestinationIDs) > 0 || action.Audience != "" || action.CallToAction != "" {
 			return "Generate copy uses the campaign's brand and destinations."
+		}
+	case "capture_product":
+		if version < 3 {
+			return "Capturing a deployment requires workflow language version 3."
+		}
+		if action.Input == nil || action.Input.Output != "campaignId" {
+			return "Capture product requires a campaign output."
+		}
+		if action.RecipeID != "" {
+			if len(action.RecipeID) > 64 || action.SurfaceID != "" || action.VersionPath != "" {
+				return "An authenticated capture takes its page and version proof from its recipe."
+			}
+		} else {
+			if action.SurfaceID == "" || len(action.SurfaceID) > 64 {
+				return "Choose the product surface to capture."
+			}
+			if action.CurrentState == (action.VersionPath != "") {
+				return "Set the path that reports the deployed version, or choose to capture the current state without proof."
+			}
+		}
+		if action.VersionPath != "" && (!versionPath.MatchString(action.VersionPath) || strings.HasPrefix(action.VersionPath, "//")) {
+			return "The version path must be a path on the product's own site, such as /api/version."
+		}
+		if action.BrandKitID != "" || len(action.DestinationIDs) > 0 || action.Audience != "" || action.CallToAction != "" {
+			return "Capture product uses only a product surface and version proof."
 		}
 	case "render_creatives":
 		if version < 2 {
@@ -497,8 +554,15 @@ func DryRunAssuming(graph Graph, event Event, relevant bool) Preview {
 			if n.Action.Type == "generate_copy" {
 				step.Outcome = fmt.Sprintf("Predicted paid copy generation of up to %d AI credits; preview never calls a model.", n.Action.CreditLimit)
 			}
+			if n.Action.Type == "capture_product" {
+				step.Outcome = "Predicted capture of the deployed product page; preview captures nothing."
+			}
 			if n.Action.Type == "render_creatives" {
-				step.Outcome = fmt.Sprintf("Predicted render of %d creatives from the latest product capture; preview renders nothing.", len(n.Action.TemplateIDs))
+				source := "the latest product capture"
+				if capturedBefore(graph, n.Action) {
+					source = "this deployment's capture"
+				}
+				step.Outcome = fmt.Sprintf("Predicted render of %d creatives from %s; preview renders nothing.", len(n.Action.TemplateIDs), source)
 			}
 			if n.Action.Type == "create_canvas" {
 				step.Outcome = fmt.Sprintf("Predicted canvas laid out from the release with %d templates; preview creates nothing.", len(n.Action.RecipeIDs))

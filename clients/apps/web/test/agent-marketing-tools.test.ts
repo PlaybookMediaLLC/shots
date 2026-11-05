@@ -80,6 +80,7 @@ function setup(role: OrganizationRole = 'creator', campaignId: string | null = C
     calls,
     events,
     run,
+    services,
     tools: marketingTools(run, { campaignId: campaignId ?? undefined, services }),
   }
 }
@@ -122,6 +123,19 @@ test('captureProductSurface resolves a slug and records an agent capture for the
   assert.deepEqual(calls.at(-1), {
     args: ['surface_1', { source: 'agent', sourceId: run.runId }],
     name: 'captureProductSurface',
+  })
+})
+
+test('captureProductSurface reports a queued capture as running, not as a failure', async () => {
+  const { services, tools } = setup()
+  services.captureProductSurface = (async () => ({ job: { id: 'job_1' } })) as never
+  const result = await tools.captureProductSurface.execute({ slug: 'invoices' }, options)
+  assert.deepEqual(result, {
+    message:
+      'The capture is running. The screenshot becomes the page’s current capture when it ends.',
+    ok: true,
+    pending: true,
+    slug: 'invoices',
   })
 })
 

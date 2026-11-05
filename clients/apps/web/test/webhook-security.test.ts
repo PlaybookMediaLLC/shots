@@ -361,6 +361,19 @@ test('pre-releases create releases unless the source skips them', () => {
   assert.equal(published(skipping, undefined), 'release:123:77')
 })
 
+test('a correctly signed release from another repository is ignored by a source that names one', () => {
+  const body = JSON.stringify({ ...githubRelease('published'), repository: { id: 999 } })
+  const secret = 'webhook-secret'
+  const signature = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`
+  assert.equal(verifyWebhookSignature(body, signature, secret), true)
+  const published = (externalId: string | null) =>
+    key(parse({ ...github, externalId }, 'release', body))
+  assert.equal(published('123'), null)
+  assert.equal(published('999'), 'release:999:77')
+  // A source that names no repository takes releases from any.
+  assert.equal(published(null), 'release:999:77')
+})
+
 test('a generic signature binds the event ID and timestamp to the body', () => {
   const secret = 'generic-secret'
   const body = '{"title":"Launch","benefitStatement":"Faster exports"}'

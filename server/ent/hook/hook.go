@@ -297,6 +297,42 @@ func (f CampaignRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.V
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CampaignRevisionMutation", m)
 }
 
+// The CaptureAttemptFunc type is an adapter to allow the use of ordinary
+// function as CaptureAttempt mutator.
+type CaptureAttemptFunc func(context.Context, *ent.CaptureAttemptMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureAttemptFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureAttemptMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureAttemptMutation", m)
+}
+
+// The CaptureJobFunc type is an adapter to allow the use of ordinary
+// function as CaptureJob mutator.
+type CaptureJobFunc func(context.Context, *ent.CaptureJobMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureJobFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureJobMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureJobMutation", m)
+}
+
+// The CaptureRecipeFunc type is an adapter to allow the use of ordinary
+// function as CaptureRecipe mutator.
+type CaptureRecipeFunc func(context.Context, *ent.CaptureRecipeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CaptureRecipeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CaptureRecipeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CaptureRecipeMutation", m)
+}
+
 // The ChannelConnectionFunc type is an adapter to allow the use of ordinary
 // function as ChannelConnection mutator.
 type ChannelConnectionFunc func(context.Context, *ent.ChannelConnectionMutation) (ent.Value, error)
@@ -787,6 +823,18 @@ func (f PermissionGroupMemberFunc) Mutate(ctx context.Context, m ent.Mutation) (
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PermissionGroupMemberMutation", m)
+}
+
+// The PlatformAppConnectionFunc type is an adapter to allow the use of ordinary
+// function as PlatformAppConnection mutator.
+type PlatformAppConnectionFunc func(context.Context, *ent.PlatformAppConnectionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformAppConnectionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformAppConnectionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformAppConnectionMutation", m)
 }
 
 // The PlatformAutoDMCampaignFunc type is an adapter to allow the use of ordinary
