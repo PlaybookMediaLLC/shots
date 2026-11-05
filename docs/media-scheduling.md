@@ -365,17 +365,20 @@ the two asset columns in a new reviewed migration.
 ## Evidence
 
 Bulk tools, 4 November 2026. `make -C server check` passed with the four CI
-databases, and `npm run format:check`, lint and the web unit suite passed; the web's
-production image built before the run and regenerate work. `renderGridVideo` ran in Chrome against
-served images and a tone: `ffprobe` read H.264, 1080×1920, 30 fps, 180 frames and
-6 s, with AAC at 6.08 s when there is music, and every frame decoded.
-`test/e2e/bulk-tools.spec.ts` and the grid case in `social-gate.spec.ts`, which
-renders a video and schedules it through the worker with no page open, could not
-run locally because Docker's storage failed when the host disk filled, so they ran
-in CI. Pull requests into `develop` run only `@smoke` browser tests, so
-`bulk-tools.spec.ts` otherwise runs in the full suite after merge. `make
-tenant-isolation` was not run. The worker's steps are proven against PostgreSQL and
-its workflow in Temporal's test environment.
+databases, and `npm run format:check`, lint, typecheck and the web unit suite passed.
+Docker's storage failed when the development machine's disk filled, so the browser
+checks ran in CI. `test/e2e/bulk-tools.spec.ts` passed there, covering a folder upload
+to drafts, caption CSVs and variations, reload, and a grid video with music, read back
+as H.264 and AAC. `social-gate.spec.ts` passed with its grid case: a video rendered in
+the browser and scheduled by the worker with no page open, then delivered once with
+matching bytes. Pull requests into `develop` run only `@smoke` browser tests, so these
+journeys were tagged for one pull request and otherwise run in the full suite.
+Screens at 1440, 1024 and 390 pixels in both themes are in
+`docs/product/qa-evidence/2026-11-04/bulk-tools/`; they come from `next dev`, so its
+badge shows. `make tenant-isolation` was not run, and neither was a real provider or
+R2. Tenancy of runs and grid assets is covered in `TestContentBatches`. A full batch of
+100 was not timed in a browser. At 390 pixels a post's account table clips its Result
+column.
 
 Run on this branch, against local PostgreSQL (Docker was unavailable). The
 full Go suite and its race set pass except
