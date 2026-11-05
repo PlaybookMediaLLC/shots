@@ -22,7 +22,7 @@ import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { useSocialSetScope } from './scope'
 import {
-  DEFAULT_BRAND_NAME,
+  hasDefaultProfileName,
   HEALTH_GUIDANCE,
   providerFor,
   type SocialSetRecord,
@@ -48,21 +48,21 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
   const trimmed = name.trim()
   const dirty = name !== set.name
   useUnsavedSettings(dirty)
-  // A new brand lands here from its first connection, so this is where it gets asked for a name.
-  const unnamed = canManage && set.name === DEFAULT_BRAND_NAME
+  // A new profile lands here from its first connection, so this is where it gets asked for a name.
+  const unnamed = canManage && hasDefaultProfileName(set.name)
   return (
     <>
       {unnamed ? (
         <Alert className="border-0 rounded-none">
-          <AlertTitle>Name this publishing brand</AlertTitle>
+          <AlertTitle>Name this profile</AlertTitle>
           <AlertDescription>
-            “{DEFAULT_BRAND_NAME}” is a placeholder. Use the person or company this brand posts as,
+            “{set.name}” is a placeholder. Use the person or company this profile posts as,
             so your team can tell it apart.
           </AlertDescription>
         </Alert>
       ) : null}
       <Row
-        description="Choose a name that helps your team recognize this publishing brand."
+        description="Choose a name that helps your team recognize this profile."
         label="Name"
       >
         <form
@@ -76,7 +76,7 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
           }}
         >
           <Input
-            aria-label="Publishing brand name"
+            aria-label="Profile name"
             autoFocus={unnamed}
             className="w-64"
             disabled={!canManage || nameState === 'saving'}
@@ -98,7 +98,7 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
       <Row label="Colour">
         <div className="flex flex-wrap items-center gap-2">
           <RadioGroup
-            aria-label="Publishing brand colour"
+            aria-label="Profile colour"
             className="flex flex-wrap items-center gap-2"
             disabled={!canManage}
             name={`color-${set.id}`}
@@ -126,7 +126,7 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
 function Accounts({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
   return (
     <Row
-      description="One account per platform. Drafts in this publishing brand publish to these accounts."
+      description="One account per platform. Drafts in this profile publish to these accounts."
       label={<span id="accounts">Connected accounts</span>}
       layout="stacked"
     >
@@ -233,7 +233,7 @@ function Ownership({ canManage, set }: { canManage: boolean; set: SocialSetRecor
   if (set.visibility === 'WORKSPACE') {
     return (
       <Row
-        description="Everyone in this workspace can use this publishing brand under their role: viewers read, creators write, publishers schedule."
+        description="Everyone in this workspace can use this profile under their role: viewers read, creators write, publishers schedule."
         label="Ownership and sharing"
       >
         <Pill>Shared with workspace</Pill>
@@ -242,7 +242,7 @@ function Ownership({ canManage, set }: { canManage: boolean; set: SocialSetRecor
   }
   return (
     <Row
-      description="Only you can see this publishing brand, its accounts and its drafts. Moving it to the team shares all of them with the workspace under each member's role. This cannot be undone here."
+      description="Only you can see this profile, its accounts and its drafts. Moving it to the team shares all of them with the workspace under each member's role. This cannot be undone here."
       label="Ownership and sharing"
     >
       {set.isOwner && canManage ? (
@@ -289,10 +289,10 @@ function DangerZone({ permissions, set }: { permissions: SetPermissions; set: So
     <Group className="ring-red-500/30">
       <Row
         description="Its accounts are disabled so nothing more publishes through them, its drafts are archived, and its published posts keep their history. A set with queued or publishing posts cannot be deleted; cancel them first."
-        label="Delete publishing brand"
+        label="Delete profile"
       >
         <ConfirmDialog
-          confirmLabel="Delete publishing brand"
+          confirmLabel="Delete profile"
           confirmText={set.name}
           description={<p>This removes {set.name} for everyone who can see it.</p>}
           destructive
@@ -314,7 +314,7 @@ function DangerZone({ permissions, set }: { permissions: SetPermissions; set: So
             }
           }}
           title={`Delete ${set.name}?`}
-          triggerLabel="Delete publishing brand"
+          triggerLabel="Delete profile"
         />
       </Row>
     </Group>

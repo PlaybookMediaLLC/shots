@@ -111,14 +111,14 @@ test('a webhook secret shows once, and private addresses are refused', async ({
 })
 
 test(
-  'publishing brands keep their own names, schedules and settings beside the composer',
+  'profiles keep their own names, schedules and settings beside the composer',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
 
     await app.open('/settings/publishing-brands')
     await expect(
-      page.getByRole('heading', { exact: true, level: 1, name: 'Publishing brands' })
+      page.getByRole('heading', { exact: true, level: 1, name: 'Profiles' })
     ).toBeVisible()
 
     // Two sets may share a name; each is its own by ID.

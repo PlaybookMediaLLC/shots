@@ -36,7 +36,7 @@ const TOOLS = [
   },
 ] as const
 
-/** Two steps: pick a kind of batch, then name it and start it in a publishing brand. */
+/** Two steps: pick a kind of batch, then name it and start it in a profile. */
 export function NewBatchButton({
   sets,
   defaultSetId,
@@ -116,13 +116,13 @@ export function NewBatchButton({
               />
             </Label>
             <Label className="grid gap-1 font-normal">
-              Publishing brand
+              Profile
               <Combobox
-                aria-label="Publishing brand"
+                aria-label="Profile"
                 className="w-full"
                 onValueChange={setSetId}
                 options={sets.map((set) => ({ label: set.name, value: set.id }))}
-                searchPlaceholder="Search publishing brands"
+                searchPlaceholder="Search profiles"
                 value={setId}
               />
             </Label>

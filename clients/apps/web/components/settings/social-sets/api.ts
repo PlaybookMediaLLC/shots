@@ -60,7 +60,7 @@ export function useSaveSocialSet(id: string): (change: SocialSetChange) => Promi
       const run = queue.current.then(async (): Promise<SaveResult> => {
         if (!scope.ready) return { error: 'Your workspace is still loading.', ok: false }
         const current = queryClient.getQueryData<SocialSetRecord>(socialSetKey(scope, id))
-        if (!current) return { error: 'This publishing brand is still loading.', ok: false }
+        if (!current) return { error: 'This profile is still loading.', ok: false }
         try {
           const saved = await scope.request(
             `/api/v1/social-sets/${encodeURIComponent(id)}`,
@@ -81,7 +81,7 @@ export function useSaveSocialSet(id: string): (change: SocialSetChange) => Promi
             error.code !== 'workspace_changed'
           ) {
             await queryClient.invalidateQueries({ queryKey: socialSetKey(scope, id) })
-            toast.info('Someone else changed this publishing brand. Showing the latest version.')
+            toast.info('Someone else changed this profile. Showing the latest version.')
           }
           return { error: settingsErrorMessage(error), ok: false }
         }
@@ -131,8 +131,13 @@ export const CONNECT_PROVIDERS = [
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },
 ] as const
 
-/** The name the backend gives a brand it creates with its first account (publishing/oauth_creation.go). */
-export const DEFAULT_BRAND_NAME = 'New brand'
+/**
+ * Whether a profile still has the name the backend gave it with its first
+ * account (publishing/oauth_creation.go), or the name it used to give.
+ */
+export function hasDefaultProfileName(name: string): boolean {
+  return name === 'New profile' || name === 'New brand'
+}
 
 /** What to tell someone about an account that is not connected. */
 export const HEALTH_GUIDANCE: Record<SocialSetRecord['accounts'][number]['health'], string> = {

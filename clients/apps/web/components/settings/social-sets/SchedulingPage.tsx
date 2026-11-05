@@ -100,7 +100,7 @@ export function SchedulingPage({
     <div className="grid gap-6">
       <Group>
         <Row
-          description="Every time for this publishing brand reads in this zone: its queue, slots and calendar. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
+          description="Every time for this profile reads in this zone: its queue, slots and calendar. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
           label={
             <span className="flex items-center gap-2">
               Time zone <SaveStatus state={zoneState} />

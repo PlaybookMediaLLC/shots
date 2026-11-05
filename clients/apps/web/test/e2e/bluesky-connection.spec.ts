@@ -110,9 +110,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
         )
         await app.open('/settings/publishing-brands?bluesky=preserve')
         const originalURL = page.url()
-        await page
-          .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
-          .click()
+        await page.getByRole('button', { name: 'Add profile to your personal workspace' }).click()
         const dialog = page.getByRole('dialog')
         await dialog.getByRole('button', { name: 'Bluesky', exact: true }).click()
         await expect(dialog.getByRole('heading', { name: 'Connect Bluesky account' })).toBeVisible()
@@ -188,7 +186,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
           } finally {
             await anonymous.close()
           }
-          await dialog.getByRole('link', { name: 'Open publishing brand' }).click()
+          await dialog.getByRole('link', { name: 'Open profile' }).click()
           await expect(page).toHaveURL(new RegExp(`/settings/publishing-brands/${created.id}$`))
           await app.reload()
           await expect(page.getByText(account.name, { exact: false }).first()).toBeVisible()

@@ -126,9 +126,7 @@ test(
         recordDelivery()
       }
     })
-    await page
-      .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
-      .click()
+    await page.getByRole('button', { name: 'Add profile to your personal workspace' }).click()
     await page.getByRole('button', { name: 'X / Twitter', exact: true }).click()
     const cancelledCreation = page.waitForEvent(
       'requestfailed',
@@ -223,14 +221,12 @@ test(
         page.getByRole('link', { name: 'Settings for Private Beta', exact: true })
       ).toHaveCount(0)
       await page.getByRole('link', { name: 'Settings for Private Alpha', exact: true }).click()
-      await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(
-        'Private Alpha'
-      )
-      await page.getByLabel('Publishing brand name', { exact: true }).fill('Private Alpha saved')
-      await page.getByLabel('Publishing brand name', { exact: true }).press('Enter')
+      await expect(page.getByLabel('Profile name', { exact: true })).toHaveValue('Private Alpha')
+      await page.getByLabel('Profile name', { exact: true }).fill('Private Alpha saved')
+      await page.getByLabel('Profile name', { exact: true }).press('Enter')
       await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
       await app.reload()
-      await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(
+      await expect(page.getByLabel('Profile name', { exact: true })).toHaveValue(
         'Private Alpha saved'
       )
       await app.open(`/settings/publishing-brands/${alpha.set.id}/writing-assistant`)

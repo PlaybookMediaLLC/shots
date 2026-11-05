@@ -53,7 +53,7 @@ func (c *Configuration) ChannelAccountStates(ctx context.Context, organizationID
 }
 
 // RemoveChannelAccount takes an account out of the workspace, whether it is in
-// a publishing brand or in none: its queued posts are cancelled (refused while
+// a profile or in none: its queued posts are cancelled (refused while
 // one is publishing), it is disabled so nothing further publishes through it,
 // and its published posts and receipts stay. An account in another person's
 // private brand is not found.

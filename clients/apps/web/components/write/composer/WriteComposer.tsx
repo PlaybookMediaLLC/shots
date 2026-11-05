@@ -1524,7 +1524,7 @@ export function WriteComposer({
                           className="md:hidden"
                           onSelect={() => openBrandSettings('scheduling', set.id)}
                         >
-                          Brand settings…
+                          Profile settings…
                         </DropdownMenuItem>
                       ) : null}
                     </>

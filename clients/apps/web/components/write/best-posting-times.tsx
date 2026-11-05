@@ -32,7 +32,7 @@ export function BestPostingTimes({
     try {
       const current = await call<SocialSetWire>(`/api/v1/social-sets/${setId}`)
       if (current.timeZone !== timeZone)
-        throw new Error('The brand time zone changed. Reload these suggestions first.')
+        throw new Error('The profile’s time zone changed. Reload these suggestions first.')
       const date = new Date(at)
       const parts = zonedParts(date, timeZone)
       const slot = {

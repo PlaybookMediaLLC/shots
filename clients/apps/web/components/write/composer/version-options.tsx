@@ -440,7 +440,7 @@ export function FinisherDialog({
           <DialogTitle>Closing-post templates</DialogTitle>
           <DialogDescription>
             A closing post that asks readers to follow or engage. Your finishers belong to this
-            brand. Nothing is ever added to a draft without you choosing it.
+            profile. Nothing is ever added to a draft without you choosing it.
           </DialogDescription>
         </DialogHeader>
         {editing ? (

@@ -402,7 +402,7 @@ export function PlanWorkspace({
     { key: 't', label: 'Today', run: () => setAnchor(today) },
     { key: 'arrowleft', label: 'Previous period', run: () => changePeriod(-1) },
     { key: 'arrowright', label: 'Next period', run: () => changePeriod(1) },
-    { key: 'escape', label: 'Back to publishing brands', run: () => setSidebar(null) },
+    { key: 'escape', label: 'Back to profiles', run: () => setSidebar(null) },
   ])
   const placement = (item: PlanItem, at: string | null): CalendarPlacement => ({
     draftId: item.draftId,
@@ -654,7 +654,7 @@ export function PlanWorkspace({
           {sidebar ? (
             <>
               <Button variant="ghost" onClick={() => setSidebar(null)}>
-                ← Back to publishing brands
+                ← Back to profiles
               </Button>
               <h2 className="my-2 font-medium">{sets.find((s) => s.id === sidebar)?.name}</h2>
               <div className="flex gap-2">
@@ -719,7 +719,7 @@ export function PlanWorkspace({
             <>
               <Label className="mb-3">
                 <Checkbox
-                  aria-label="All publishing brands"
+                  aria-label="All profiles"
                   checked={
                     allState === 'all' ? true : allState === 'mixed' ? 'indeterminate' : false
                   }
@@ -1361,7 +1361,7 @@ function PlanComposer({
     try {
       if (!set || !set.accounts.some((a) => a.health === 'connected'))
         throw new Error(
-          'Choose a connected account. Reconnect it in Settings › Publishing brands if needed.'
+          'Choose a connected account. Reconnect it in Settings › Profiles if needed.'
         )
       const instant = selectedInstant(local, zone, choice)
       if (picker && !selected) throw new Error('Choose content first.')
@@ -1610,7 +1610,7 @@ function PlanComposer({
               {tags === null ? (
                 <p className="text-xs">Tags unavailable. Enable draft tags in Settings.</p>
               ) : !tags.length ? (
-                <p className="text-xs">No tags in this publishing brand.</p>
+                <p className="text-xs">No tags in this profile.</p>
               ) : (
                 tags.map((t) => (
                   <Label className="mr-3 inline-flex py-1 font-normal" key={t.id}>
@@ -1976,7 +1976,7 @@ function PlanDetail({
             </Button>
           </div>
           <Label className="grid gap-1.5">
-            Copy to publishing brand{' '}
+            Copy to profile{' '}
             <Select value={copySet} onValueChange={(value) => setCopySet(value)}>
               <SelectTrigger>
                 <SelectValue />
@@ -2007,7 +2007,7 @@ function PlanDetail({
             {detailTags === null ? (
               <p className="text-xs">Tags unavailable. Enable draft tags in Settings.</p>
             ) : detailTags.length === 0 ? (
-              <p className="text-xs">No tags in this publishing brand.</p>
+              <p className="text-xs">No tags in this profile.</p>
             ) : (
               detailTags.map((tag) => (
                 <Label key={tag.id} className="font-normal">

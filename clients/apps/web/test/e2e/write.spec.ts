@@ -499,9 +499,9 @@ test(
     // A second set with the same name as the default stays a separate identity.
     // Sets are made in workspace settings (RFC 024); the switcher links there.
     const setName =
-      (await page.getByRole('button', { name: /^Publishing brand: / }).textContent())?.trim() ?? ''
-    await page.getByRole('button', { name: /^Publishing brand: / }).click()
-    await expect(page.getByRole('menuitem', { name: 'New publishing brand…' })).toHaveAttribute(
+      (await page.getByRole('button', { name: /^Profile: / }).textContent())?.trim() ?? ''
+    await page.getByRole('button', { name: /^Profile: / }).click()
+    await expect(page.getByRole('menuitem', { name: 'New profile…' })).toHaveAttribute(
       'href',
       /\/settings\/publishing-brands$/
     )
@@ -520,7 +520,7 @@ test(
     const switchSet = async (index: number) => {
       // eslint-disable-next-line no-restricted-syntax -- see above.
       await page.waitForLoadState('networkidle')
-      await page.getByRole('button', { name: /^Publishing brand: / }).click()
+      await page.getByRole('button', { name: /^Profile: / }).click()
       const item = page
         .getByRole('menuitem')
         .filter({ hasText: setName.replace(/▾$/, '').trim() })
@@ -531,10 +531,10 @@ test(
       await page.waitForLoadState('networkidle')
     }
     await app.open(`/publish?set=${secondSet}`)
-    await expect(page.getByText('No drafts in this publishing brand.')).toBeVisible()
+    await expect(page.getByText('No drafts in this profile.')).toBeVisible()
     await switchSet(0)
     await rowMenu('Pricing')
-    await page.getByRole('menuitem', { name: 'Copy to publishing brand' }).click()
+    await page.getByRole('menuitem', { name: 'Copy to profile' }).click()
     await page.getByRole('menu').last().getByRole('menuitem').first().click()
     await page.getByRole('button', { name: 'Copy without tags' }).click()
     await expect(page.getByText(/Copied/).first()).toBeVisible()

@@ -275,7 +275,7 @@ export async function openNewDraft(page: Page): Promise<string> {
 
 /**
  * Start a bulk batch (RFC 042) from Write's batches page, in the workspace's
- * publishing brand, and return its id once its page can be used.
+ * profile, and return its id once its page can be used.
  */
 export async function openNewBatch(
   page: Page,

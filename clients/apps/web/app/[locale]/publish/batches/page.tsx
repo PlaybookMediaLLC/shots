@@ -12,7 +12,7 @@ import { requireDraftsPageAccess } from '../../drafts/page-access'
 
 export const metadata = { title: 'Bulk tools · Publish' }
 
-/** Open bulk batches, and a way to start one in a publishing brand. */
+/** Open bulk batches, and a way to start one in a profile. */
 export default async function BatchesPage({
   params,
   searchParams,
@@ -39,7 +39,7 @@ export default async function BatchesPage({
         {canEdit ? (
           <Section
             title="Start a batch"
-            description="Pick what you are posting, then name it and choose the publishing brand whose accounts its posts go to."
+            description="Pick what you are posting, then name it and choose the profile whose accounts its posts go to."
           >
             {sets.length ? (
               <Group>
@@ -70,7 +70,7 @@ export default async function BatchesPage({
                     </SidebarLink>
                   }
                   description={
-                    sets.find((set) => set.id === batch.socialSetId)?.name ?? 'Publishing brand'
+                    sets.find((set) => set.id === batch.socialSetId)?.name ?? 'Profile'
                   }
                 >
                   <Pill>

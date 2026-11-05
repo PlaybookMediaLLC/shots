@@ -402,7 +402,7 @@ function FrameLayout({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Drafts</SheetTitle>
-            <SheetDescription>The drafts of this brand.</SheetDescription>
+            <SheetDescription>The drafts of this profile.</SheetDescription>
           </SheetHeader>
           <WriteRail key={data.activeSet?.id ?? 'none'} />
         </SheetContent>

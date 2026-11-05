@@ -79,7 +79,7 @@ export function BrandSummary({
   return (
     <section className="rounded-xl border p-4">
       <div className="mb-3 flex items-center gap-1">
-        <h2 className="font-semibold">Accounts in this brand</h2>
+        <h2 className="font-semibold">Accounts in this profile</h2>
         <InfoTip label="About these totals">
           Totals add up each account’s own numbers, and networks count them differently. Followers
           aren’t added up, because one person can follow you on several networks. Open an account

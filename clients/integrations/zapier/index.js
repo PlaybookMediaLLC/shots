@@ -19,15 +19,15 @@ module.exports = {
   },
   triggers: {
     ...triggers(),
-    social_sets:{key:'social_sets',noun:'Publishing brand',display:{label:'List Publishing Brands',description:'Lists the brands this key can use.',hidden:true},operation:{perform:sets,sample:{id:'brand-example',name:'Example brand'}}},
+    social_sets:{key:'social_sets',noun:'Profile',display:{label:'List Profiles',description:'Lists the profiles this key can use.',hidden:true},operation:{perform:sets,sample:{id:'brand-example',name:'Example brand'}}},
   },
   creates: {
     create_draft:{key:'create_draft',noun:'Draft',display:{label:'Create Draft',description:'Creates editable content for human review. Retries reuse the source event ID.'},operation:{perform:createDraft,inputFields:[
       {key:'requestId',label:'Source event ID',required:true,type:'string',helpText:'A stable ID for this source event/version. Reuse it after a timeout. A changed payload with the same ID is refused.'},
-      {key:'socialSetId',label:'Publishing brand',required:true,type:'string',dynamic:'social_sets.id.name'},
+      {key:'socialSetId',label:'Profile',required:true,type:'string',dynamic:'social_sets.id.name'},
       {key:'text',label:'Draft text',required:true,type:'text',helpText:'Separate thread posts with --- on its own line.'},
       {key:'title',label:'Internal title',type:'string'},
-      {key:'platforms',label:'Platforms',type:'string',list:true,helpText:'Optional platform identifiers. Empty uses the brand defaults.'},
+      {key:'platforms',label:'Platforms',type:'string',list:true,helpText:'Optional platform identifiers. Empty uses the profile defaults.'},
     ],sample:{id:'draft-example',title:'Example draft',plainText:'Ready for review',version:1,status:'draft'}}},
     plan_draft:{key:'plan_draft',noun:'Draft',display:{label:'Plan Draft',description:'Adds a tentative calendar time. Does not schedule or publish the draft.'},operation:{perform:(z,bundle) => request(z,bundle,`/api/v1/content-drafts/${encodeURIComponent(bundle.inputData.id)}/plan`,'POST',{plannedFor:bundle.inputData.plannedFor,timeZone:bundle.inputData.timeZone}),inputFields:[{key:'id',label:'Draft ID',type:'string',required:true},{key:'plannedFor',label:'Tentative time',type:'datetime',required:true},{key:'timeZone',label:'IANA time zone',type:'string',required:true}],sample:{id:'draft-example',status:'draft',plannedFor:'2026-11-01T12:00:00Z'}}},
   },

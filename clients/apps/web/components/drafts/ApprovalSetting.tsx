@@ -11,7 +11,7 @@ const SETTINGS_KEY = ['content-draft-settings'] as const
 
 /**
  * Whether a draft needs approval before it is scheduled. It applies to the
- * whole workspace; each publishing brand keeps its own posting times.
+ * whole workspace; each profile keeps its own posting times.
  */
 export function ApprovalSetting({ canManage }: { canManage: boolean }) {
   const client = useQueryClient()
@@ -34,12 +34,12 @@ export function ApprovalSetting({ canManage }: { canManage: boolean }) {
         }
       }
     })
-  // Without the plan, the Publishing brands page already says what it needs.
+  // Without the plan, the Profiles page already says what it needs.
   if (isPlanRefusal(settings.error)) return null
   return (
     <Group>
       <Row
-        description="A publisher or admin approves each draft before it is scheduled, for every publishing brand."
+        description="A publisher or admin approves each draft before it is scheduled, for every profile."
         label="Approvals"
       >
         {settings.isError ? (

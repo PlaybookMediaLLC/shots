@@ -18,7 +18,7 @@ const ANALYZE_LINKS = [
   { href: '/publish/analyze/observations', label: 'Recorded observations and CSV' },
 ]
 
-/** The Publish tab bar, pinned in the same place on every Publish page; `scope` keeps the publishing brand. */
+/** The Publish tab bar, pinned in the same place on every Publish page; `scope` keeps the profile. */
 export function WorkspaceNav({
   active,
   scope = '',

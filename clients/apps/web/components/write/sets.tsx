@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
-import { DEFAULT_BRAND_NAME } from '@/components/settings/social-sets/api'
+import { hasDefaultProfileName } from '@/components/settings/social-sets/api'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { cn } from '@/lib/utils'
 import { rememberSet, useWrite, type WriteSet } from './write-context'
@@ -53,7 +53,7 @@ export function SetDot({ color, className }: { color: string; className?: string
 }
 
 /**
- * The brand the library and composer write as (RFC 024). Sets with the
+ * The profile the library and composer write as (RFC 024). Sets with the
  * same name stay apart: each shows its accounts' handles, and the id is what
  * is used. Sets are created and edited in workspace settings.
  */
@@ -65,7 +65,7 @@ export function SocialSetSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          aria-label={`Publishing brand: ${active?.name ?? 'none'}`}
+          aria-label={`Profile: ${active?.name ?? 'none'}`}
           className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg px-2 text-left text-sm text-foreground hover:bg-foreground/[0.05]"
           data-testid="social-set-switcher"
           size={null}
@@ -74,7 +74,7 @@ export function SocialSetSwitcher() {
         >
           {active ? <SetDot color={active.color} /> : null}
           <span className="min-w-0 flex-1 truncate font-medium">
-            {active?.name ?? 'No publishing brand'}
+            {active?.name ?? 'No profile'}
           </span>
           {active ? <SetAccounts set={active} /> : null}
           {active?.needsAttention ? (
@@ -89,7 +89,7 @@ export function SocialSetSwitcher() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
-        <DropdownMenuLabel>Publishing brands</DropdownMenuLabel>
+        <DropdownMenuLabel>Profiles</DropdownMenuLabel>
         {data.sets.map((set) => (
           <DropdownMenuItem
             className="flex items-center gap-2"
@@ -133,12 +133,12 @@ export function SocialSetSwitcher() {
             {active ? (
               <DropdownMenuItem asChild>
                 <Link href={socialSetHref(active.id)}>
-                  {active.name === DEFAULT_BRAND_NAME ? 'Name this brand…' : `Edit ${active.name}…`}
+                  {hasDefaultProfileName(active.name) ? 'Name this profile…' : `Edit ${active.name}…`}
                 </Link>
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem asChild>
-              <Link href="/settings/publishing-brands">New publishing brand…</Link>
+              <Link href="/settings/publishing-brands">New profile…</Link>
             </DropdownMenuItem>
           </>
         ) : null}

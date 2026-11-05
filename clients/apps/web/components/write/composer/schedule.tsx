@@ -132,7 +132,7 @@ export function scheduleBlockers(
   if (context.items.length === 0)
     problems.push({
       fix: 'account',
-      text: 'Connect or turn on at least one account in this publishing brand.',
+      text: 'Connect or turn on at least one account in this profile.',
     })
   for (const item of context.items) {
     const channel = item.account.channel

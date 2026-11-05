@@ -51,7 +51,7 @@ export default async function WritePage({ params, searchParams }: WritePageProps
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Open a draft on the left, or start a new one in{' '}
-                {data.activeSet?.name ?? 'this publishing brand'}.
+                {data.activeSet?.name ?? 'this profile'}.
               </p>
               {canEdit ? (
                 <div className="mt-4 flex justify-center">

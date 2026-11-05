@@ -28,7 +28,7 @@ export type EditorCommandEntry = {
 /** The library a Write page loaded. */
 export type WriteLibrary = WriteData
 
-/** A brand as the browser holds it. */
+/** A profile as the browser holds it. */
 export type WriteSet = WriteData['sets'][number]
 
 /** One action of the open draft, as the command palette lists it. */

@@ -265,7 +265,7 @@ export type ChannelConnection = {
   avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
-  /** The publishing brand it belongs to; null when it is in none. */
+  /** The profile it belongs to; null when it is in none. */
   socialSetId?: string | null
   /** Its verified state, when the product configuration could read it. */
   health?: SocialAccountHealth
@@ -2348,7 +2348,7 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ items: ChannelConnection[] }>('v1/channel-connections')
   }
 
-  /** Removes an account from the workspace, in a publishing brand or in none; its queued posts are cancelled. */
+  /** Removes an account from the workspace, in a profile or in none; its queued posts are cancelled. */
   async removeConnection(id: string) {
     return this.request<SocialSetRemoval>(`v1/channel-connections/${encodeURIComponent(id)}`, {
       method: 'DELETE',

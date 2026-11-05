@@ -72,7 +72,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toBeVisible()
   })
   await test.step('P03 P05 P06 all mixed and none selection use stable account IDs', async () => {
-    const all = page.getByRole('checkbox', { name: 'All publishing brands' })
+    const all = page.getByRole('checkbox', { name: 'All profiles' })
     await expect(all).toBeChecked()
     await page.getByRole('checkbox', { name: 'Show Same name linkedin', exact: true }).uncheck()
     await expect(all).toBeChecked({ indeterminate: true })
@@ -113,7 +113,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.getByRole('button', { name: 'Posted', exact: true }).click()
     await expect(page.getByRole('link', { name: /Picker source draft/ })).toHaveCount(0)
     await expect(page.getByRole('combobox', { name: 'Calendar view' })).toContainText('Month')
-    await page.getByRole('button', { name: 'Back to publishing brands' }).click()
+    await page.getByRole('button', { name: 'Back to profiles' }).click()
   })
   await test.step('P10 P11 P12 P13 P14 P15 view controls and keyboard keep a usable period', async () => {
     await chooseOption(page.getByRole('combobox', { name: 'Calendar view' }), 'Week')
@@ -540,7 +540,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.keyboard.press('w')
     await expect(search).toHaveValue('w')
     await expect(page.getByLabel('Calendar view')).toContainText('Month')
-    await page.getByRole('button', { name: 'Back to publishing brands' }).click()
+    await page.getByRole('button', { name: 'Back to profiles' }).click()
     await page.locator('body').click({ position: { x: 1270, y: 10 } })
     await page.keyboard.press('v')
     await expect(page.getByLabel('Calendar view')).toContainText('Week')

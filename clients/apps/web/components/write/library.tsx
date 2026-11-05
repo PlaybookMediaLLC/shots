@@ -176,7 +176,7 @@ export function WriteRail() {
           )}
         </div>
       </div>
-      <p className="platform-eyebrow px-3 pt-3">Publishing brand</p>
+      <p className="platform-eyebrow px-3 pt-3">Profile</p>
       <div className="flex items-center gap-1 px-3 pt-1 pb-2" data-tour-id="write-brand">
         <div className="min-w-0 flex-1">
           <SocialSetSwitcher />
@@ -304,11 +304,11 @@ export function WriteRail() {
             {filtered
               ? 'No drafts match these filters.'
               : {
-                  all: 'Nothing in this publishing brand yet. Start a draft above.',
+                  all: 'Nothing in this profile yet. Start a draft above.',
                   archived: 'Nothing archived.',
-                  drafts: 'No drafts in this publishing brand. Start one above.',
+                  drafts: 'No drafts in this profile. Start one above.',
                   failed: 'Nothing failed. Every post went out or is still on its way.',
-                  posted: 'Nothing posted from this publishing brand yet.',
+                  posted: 'Nothing posted from this profile yet.',
                   queue: '',
                 }[tab]}
             {filtered ? (
@@ -699,7 +699,7 @@ export function TargetDialog({
           <DialogTitle>{kind.label}</DialogTitle>
           <DialogDescription>
             {kind.needs === 'source'
-              ? 'Start from a post this publishing brand published, or paste the URL of any published post.'
+              ? 'Start from a post this profile published, or paste the URL of any published post.'
               : 'Paste the post’s URL. It is stored as the draft’s target, not as text in the post.'}
           </DialogDescription>
         </DialogHeader>
@@ -998,7 +998,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
                 Duplicate
               </DropdownMenuItem>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Copy to publishing brand</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>Copy to profile</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-60">
                   {data.sets
                     .filter((set) => set.id !== data.activeSet?.id)
@@ -1097,7 +1097,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
             onSelect={() => {
               void navigator.clipboard.writeText(internalLink())
               toast.success(
-                'Internal link copied. Only members who can see this publishing brand can open it.'
+                'Internal link copied. Only members who can see this profile can open it.'
               )
             }}
           >
@@ -1557,7 +1557,7 @@ function QueueList() {
         <div className="px-4 py-6 text-xs text-muted-foreground">
           {filtered
             ? 'Nothing in the queue matches these filters.'
-            : 'Nothing queued or planned for this publishing brand. Add weekly slots in Edit schedule, or schedule a draft.'}
+            : 'Nothing queued or planned for this profile. Add weekly slots in Edit schedule, or schedule a draft.'}
           {filtered ? (
             <Button
               className="mt-2 block"

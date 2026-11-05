@@ -45,7 +45,7 @@ export function ImportDraft({
     >
       <h1 className="font-medium">Import draft</h1>
       <p className="text-sm text-muted-foreground">
-        Review this text before saving it to your publishing brand. A line containing --- or four
+        Review this text before saving it to your profile. A line containing --- or four
         newlines separates posts.
       </p>
       <Textarea

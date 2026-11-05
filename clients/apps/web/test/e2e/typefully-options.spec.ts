@@ -1,7 +1,7 @@
 import { draftEditor, expect, expectSaved, openNewDraft, settleSelection, test } from './framework'
 
 test(
-  'scheduling opens a fresh draft in the same publishing brand and keeps the commitment in Queue',
+  'scheduling opens a fresh draft in the same profile and keeps the commitment in Queue',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })

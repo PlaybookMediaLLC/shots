@@ -161,7 +161,7 @@ function initials(name: string): string {
 
 /**
  * The workspace's social accounts, one row per platform: each connected
- * account with its health, its publishing brand and a menu of the actions an
+ * account with its health, its profile and a menu of the actions an
  * admin takes on it, then Connect, or Add another once the platform has one.
  */
 export function ChannelConnections({ canManage }: { canManage: boolean }) {
@@ -206,7 +206,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
     if (canManage) void load()
   }, [canManage, load])
 
-  // Brands are only there when the workspace has publishing brands; without them the page still works.
+  // Brands are only there when the workspace has profiles; without them the page still works.
   const brands = useMemo(() => sets.data?.items ?? [], [sets.data])
   const brandOf = (connection: ChannelConnection) =>
     connection.socialSetId ? brands.find((set) => set.id === connection.socialSetId) : undefined
@@ -258,7 +258,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
         { method: 'POST' }
       )
       await Promise.all([load(), sets.refetch()])
-      toast.success('Account added to the publishing brand.')
+      toast.success('Account added to the profile.')
     } catch (assignError) {
       toast.error(settingsErrorMessage(assignError))
     }
@@ -300,7 +300,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
     // Another person's private brand is not in the list; an unread list says nothing.
     const place =
       brand?.name ??
-      (connection.socialSetId ? (sets.data ? 'Private brand' : null) : 'Not in any brand')
+      (connection.socialSetId ? (sets.data ? 'Private profile' : null) : 'Not in any profile')
     return (
       <div
         className={cn(
@@ -405,7 +405,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
             ) : null}
             {canManage && open.length ? (
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Assign to brand</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>Assign to profile</DropdownMenuSubTrigger>
                 <DropdownMenuSubContent>
                   <DropdownMenuRadioGroup
                     onValueChange={(setId) => void assign(connection, setId)}
@@ -463,7 +463,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
 
   return (
     <Section
-      description="Connect an account here once; each publishing brand posts from the accounts assigned to it."
+      description="Connect an account here once; each profile posts from the accounts assigned to it."
       title="Connected accounts"
     >
       {connected && CONNECTED[connected] ? (
@@ -478,7 +478,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
           <AlertDescription>
             <p>
               Accounts you connect here are shared with everyone in this workspace. Assign each one
-              to a publishing brand to post from it.
+              to a profile to post from it.
             </p>
             <Button
               className="mt-2 h-auto p-0"
@@ -515,7 +515,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
               <SelectContent align="end">
                 <SelectItem value="all">All accounts</SelectItem>
                 <SelectItem value="attention">Needs attention</SelectItem>
-                <SelectItem value="unassigned">Not in any brand</SelectItem>
+                <SelectItem value="unassigned">Not in any profile</SelectItem>
                 {brands.map((set) => (
                   <SelectItem key={set.id} value={`brand:${set.id}`}>
                     {set.name}
@@ -591,7 +591,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                 <span className="text-sm font-medium">
                   Other accounts
                   <span className="block text-xs font-normal text-muted-foreground">
-                    Connect these from a publishing brand.
+                    Connect these from a profile.
                   </span>
                 </span>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">{others.map(chip)}</div>
@@ -618,7 +618,7 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                 {removingBrand
                   ? ` and leaves ${removingBrand.name}`
                   : removing.socialSetId
-                    ? ' and leaves its private brand'
+                    ? ' and leaves its private profile'
                     : ''}
                 .
               </p>

@@ -51,7 +51,7 @@ test('provider readiness fails closed, recovers, and rechecks before authorizati
     await app.open('/settings/publishing-brands?availability=preserve')
     const originalURL = page.url()
     const launch = page.getByRole('button', {
-      name: 'Add publishing brand to your personal workspace',
+      name: 'Add profile to your personal workspace',
     })
     await launch.click()
     const dialog = page.getByRole('dialog')
