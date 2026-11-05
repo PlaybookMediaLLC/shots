@@ -410,8 +410,9 @@ export default function PrivacyPolicyPage() {
             <p className="leading-relaxed text-muted-foreground">
               To remove this access, remove Shots in your Instagram or Threads account settings, or
               ask Meta to delete your data. Shots then disconnects the account in every workspace,
-              cancels the posts waiting to publish on it, and erases its stored tokens and profile.
-              Posts already published and their records stay with the workspace that created them.
+              cancels the posts waiting to publish on it, and erases its stored tokens, profile, and
+              the analytics collected for it. Posts already published and their records stay with
+              the workspace that created them.
               Read{' '}
               <Link href="/data-deletion" className={linkClassName}>
                 how data deletion works

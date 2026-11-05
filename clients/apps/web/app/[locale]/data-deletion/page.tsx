@@ -38,6 +38,7 @@ export default async function DataDeletionPage({
           <li>The account is disconnected in every workspace that connected it.</li>
           <li>Posts waiting to publish on the account are cancelled.</li>
           <li>Its stored tokens, account name, username, and profile picture are erased.</li>
+          <li>Analytics that Shots collected from Meta for the account are deleted.</li>
         </ul>
         <p className="leading-relaxed text-muted-foreground">
           Posts already published and their records stay with the workspace that created them. To

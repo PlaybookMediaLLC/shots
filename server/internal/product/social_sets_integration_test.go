@@ -11,8 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticsaccount"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticspost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticssnapshot"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsocialobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -411,6 +415,30 @@ func TestSocialSetsPlatform(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		seedAnalytics := func(id string) {
+			t.Helper()
+			if exists, _ := db.Client.AnalyticsAccount.Query().Where(analyticsaccount.ID(id)).Exist(ctx); !exists {
+				db.Client.AnalyticsAccount.Create().SetID(id).SetOrganizationID(org).ExecX(ctx)
+			}
+			db.Client.AnalyticsSnapshot.Create().SetID(cuid.New()).SetOrganizationID(org).SetConnectionID(id).SetSubjectID(id).
+				SetKind(analyticssnapshot.KindAccount).SetObservedAt(time.Now()).SetCounters(map[string]float64{"followers": 1}).
+				SetPayloadHash(cuid.New()).ExecX(ctx)
+			db.Client.AnalyticsPost.Create().SetID(cuid.New()).SetOrganizationID(org).SetConnectionID(id).SetRemoteID(cuid.New()).
+				SetPublishedAt(time.Now()).ExecX(ctx)
+			db.Client.PlatformSocialObservation.Create().SetID(cuid.New()).SetOrganizationID(org).SetSocialSetID(defaultSet.ID).
+				SetConnectionID(id).SetSubjectID(id).SetKind(platformsocialobservation.KindAccount).SetPlatform("linkedin").
+				SetDay(time.Now()).SetStatus(platformsocialobservation.StatusAvailable).ExecX(ctx)
+		}
+		seedAnalytics(connection.ID)
+		seedAnalytics(other.ID)
+		analyticsRows := func(id string) int {
+			t.Helper()
+			accounts := db.Client.AnalyticsAccount.Query().Where(analyticsaccount.ID(id)).CountX(ctx)
+			snapshots := db.Client.AnalyticsSnapshot.Query().Where(analyticssnapshot.ConnectionID(id)).CountX(ctx)
+			posts := db.Client.AnalyticsPost.Query().Where(analyticspost.ConnectionID(id)).CountX(ctx)
+			observations := db.Client.PlatformSocialObservation.Query().Where(platformsocialobservation.ConnectionID(id)).CountX(ctx)
+			return accounts + snapshots + posts + observations
+		}
 		cancelled, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "CONFIRM-CODE")
 		if err != nil || len(cancelled) != len(queued)-1 || slices.Contains(cancelled, publishingPost) {
 			t.Fatalf("cancelled=%v of %d err=%v", cancelled, len(queued), err)
@@ -419,6 +447,9 @@ func TestSocialSetsPlatform(t *testing.T) {
 		if err != nil || revoked.Status != channelconnection.StatusREVOKED || revoked.DisplayName != nil ||
 			revoked.Handle != nil || revoked.AvatarURL != nil {
 			t.Fatalf("revoked=%+v err=%v", revoked, err)
+		}
+		if left, kept := analyticsRows(connection.ID), analyticsRows(other.ID); left != 0 || kept != 4 {
+			t.Fatalf("analytics left on the revoked account=%d, on the other account=%d", left, kept)
 		}
 		if post, _ := db.Client.ScheduledPost.Get(ctx, publishingPost); post.Status != scheduledpost.StatusPROCESSING {
 			t.Fatalf("the publishing post became %s", post.Status)

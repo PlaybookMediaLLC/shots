@@ -97,8 +97,8 @@ Register the same URL in both of each app's callback fields:
 The backend verifies `signed_request` with `INSTAGRAM_APP_SECRET` or
 `THREADS_APP_SECRET`, so both requests need that credential deployed. Each
 request disconnects the account in every workspace, cancels its queued posts,
-and erases its tokens and profile. Published posts, their receipts, and stored
-analytics stay with the workspace. The response's confirmation code is in the
+and erases its tokens, profile, and collected analytics. Published posts and their
+receipts stay with the workspace. The response's confirmation code is in the
 `product.channel_account_revoked` audit record, and in the logs when no workspace
 held the account. The callback matches Meta's `user_id` to the stored provider ID,
 so confirm that match with a live test account before relying on it.
