@@ -409,18 +409,18 @@ func TestContentBatches(t *testing.T) {
 			t.Fatalf("replay made posts: %d then %d %v", countBefore, countAfter, err)
 		}
 
-		// A session that ends stops the rest, with a reason: nothing runs as a service.
+		// An ended session does not stop the rest: the person already asked.
 		w.exec(t, `UPDATE session SET "expiresAt"=now()-interval '1 hour' WHERE id=$1`, owner.SessionID)
 		last, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
 		w.exec(t, `UPDATE session SET "expiresAt"=now()+interval '1 hour' WHERE id=$1`, owner.SessionID)
-		if err != nil || !last.Done || len(last.Scheduled) != 0 {
-			t.Fatalf("ended session: %+v %v", last, err)
+		if err != nil || !last.Done || len(last.Scheduled) != 2 {
+			t.Fatalf("expired session: %+v %v", last, err)
 		}
 		finished, err := repo.GetContentBatchRun(ctx, owner, batch.ID, run.ID)
 		if err != nil || finished.Status != "FINISHED" {
 			t.Fatalf("finished: %+v %v", finished, err)
 		}
-		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 || finished.Items[2].Status != "FAILED" || !strings.Contains(finished.Items[2].Error, "session ended") {
+		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 || finished.Items[2].Status != "DONE" || len(finished.Items[2].PostIDs) != 2 {
 			t.Fatalf("outcomes: %+v", finished.Items)
 		}
 		// A retry after the run went through replays it, though the draft's version moved
@@ -464,14 +464,17 @@ func TestContentBatches(t *testing.T) {
 		}
 	})
 
-	t.Run("a submit run survives switching workspace, and stops when access is lost", func(t *testing.T) {
+	t.Run("a submit run survives its session and workspace switch, and stops when access is lost", func(t *testing.T) {
 		w.addMember(t, "runner", "publisher")
 		runner := w.actor("runner")
-		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Switching"})
+		batch, err := repo.CreateContentBatch(ctx, owner, ContentBatchInput{Title: "Access"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		inputs := []ContentBatchItemInput{item("switch", 0, photos[0]), item("switch", 1, photos[1]), item("switch", 2, photos[2]), item("switch", 3, photos[0])}
+		inputs := []ContentBatchItemInput{}
+		for i := 0; i < 6; i++ {
+			inputs = append(inputs, item("access", i, photos[i%3]))
+		}
 		if batch, err = repo.AddContentBatchItems(ctx, owner, batch.ID, inputs); err != nil {
 			t.Fatal(err)
 		}
@@ -491,8 +494,8 @@ func TestContentBatches(t *testing.T) {
 		asked := func(index int) BatchSubmitItem {
 			return BatchSubmitItem{ItemID: reloaded.Items[index].ID, ChannelConnectionIDs: []string{linkedin, threads}, Schedule: frozen(index)}
 		}
-		run, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-switching-key-0001",
-			Items: []BatchSubmitItem{asked(0), asked(1), asked(2)}})
+		run, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-access-key-0001",
+			Items: []BatchSubmitItem{asked(0), asked(1), asked(2), asked(3), asked(4)}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -501,45 +504,61 @@ func TestContentBatches(t *testing.T) {
 		w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, runner.SessionID, other.org)
 
 		// Only the run is exempt: an ordinary request from that session is still refused,
-		// here and on every other way in, and nothing is scheduled by trying.
-		if _, err := repo.ScheduleContentDraft(ctx, runner, *reloaded.Items[3].DraftID, *frozen(3)); !errors.Is(err, publishing.ErrForbidden) {
+		// on every way in, and nothing is scheduled by trying.
+		if _, err := repo.ScheduleContentDraft(ctx, runner, *reloaded.Items[5].DraftID, *frozen(5)); !errors.Is(err, publishing.ErrForbidden) {
 			t.Fatalf("an ordinary schedule from another workspace: %v", err)
 		}
-		if _, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-switching-key-0002",
-			Items: []BatchSubmitItem{asked(3)}}); !errors.Is(err, publishing.ErrForbidden) {
+		if _, err := repo.SubmitContentBatch(ctx, runner, batch.ID, BatchSubmitInput{RequestKey: "submit-access-key-0002",
+			Items: []BatchSubmitItem{asked(5)}}); !errors.Is(err, publishing.ErrForbidden) {
 			t.Fatalf("a new submit from another workspace: %v", err)
 		}
 		if _, err := repo.GetContentBatchRun(ctx, runner, batch.ID, run.ID); !errors.Is(err, publishing.ErrForbidden) {
 			t.Fatalf("reading the run from another workspace: %v", err)
 		}
 
-		// The run goes on: switching away is not losing access.
+		// Switching away is not losing access.
 		step, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
 		if err != nil || step.Done || len(step.Scheduled) != 2 {
 			t.Fatalf("after switching workspace: %+v %v", step, err)
 		}
-		// Losing the role stops it, with the reason, and the workspace still has to match the run's.
+		// Nor is signing out: posts already queued would publish without a session too.
+		w.exec(t, `DELETE FROM session WHERE id=$1`, runner.SessionID)
+		step, err = repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID)
+		if err != nil || step.Done || len(step.Scheduled) != 2 {
+			t.Fatalf("after signing out: %+v %v", step, err)
+		}
+		// Only the run is exempt from that too: without a session, a person can ask for nothing.
+		if _, err := repo.ScheduleContentDraft(ctx, runner, *reloaded.Items[5].DraftID, *frozen(5)); !errors.Is(err, publishing.ErrUnauthorized) {
+			t.Fatalf("an ordinary schedule after signing out: %v", err)
+		}
+		if _, err := repo.ScheduleContentDraft(ctx, Actor{OrganizationID: w.org, UserID: runner.UserID}, *reloaded.Items[5].DraftID, *frozen(5)); !errors.Is(err, publishing.ErrUnauthorized) {
+			t.Fatalf("an ordinary schedule with no session: %v", err)
+		}
+
+		// A banned account, a lost role and a lost membership each stop it, with the reason.
+		w.exec(t, `UPDATE "user" SET banned=true WHERE id=$1`, runner.UserID)
+		if _, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		w.exec(t, `UPDATE "user" SET banned=false WHERE id=$1`, runner.UserID)
 		w.exec(t, `UPDATE member SET role='creator' WHERE id=$1`, "member_runner_"+w.id)
 		if _, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID); err != nil {
 			t.Fatal(err)
 		}
-		// So does losing the membership.
 		w.exec(t, `DELETE FROM member WHERE id=$1`, "member_runner_"+w.id)
 		if _, err := repo.ScheduleNextBatchRunItem(ctx, w.org, run.ID); err != nil {
 			t.Fatal(err)
 		}
-		w.exec(t, `INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'publisher',now())`, "member_runner_"+w.id, w.org, runner.UserID)
-		w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, runner.SessionID, w.org)
-		finished, err := repo.GetContentBatchRun(ctx, runner, batch.ID, run.ID)
+		finished, err := repo.GetContentBatchRun(ctx, owner, batch.ID, run.ID)
 		if err != nil || finished.Status != "FINISHED" {
 			t.Fatalf("finished: %+v %v", finished, err)
 		}
-		if finished.Items[0].Status != "DONE" || len(finished.Items[0].PostIDs) != 2 {
-			t.Fatalf("scheduled after switching: %+v", finished.Items[0])
-		}
-		for _, entry := range finished.Items[1:] {
-			if entry.Status != "FAILED" || !strings.Contains(entry.Error, "role or membership") {
-				t.Fatalf("after losing access: %+v", entry)
+		for i, entry := range finished.Items {
+			if i < 2 && (entry.Status != "DONE" || len(entry.PostIDs) != 2) {
+				t.Fatalf("item %d went on: %+v", i, entry)
+			}
+			if i >= 2 && (entry.Status != "FAILED" || !strings.Contains(entry.Error, "no longer schedule")) {
+				t.Fatalf("item %d after losing access: %+v", i, entry)
 			}
 		}
 		// What was scheduled before access was lost stays scheduled.
@@ -547,7 +566,7 @@ func TestContentBatches(t *testing.T) {
 		if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM scheduled_post WHERE "contentDraftId"=$1 AND status='SCHEDULED'`, *reloaded.Items[0].DraftID).Scan(&queued); err != nil || queued != 2 {
 			t.Fatalf("queued posts: %d %v", queued, err)
 		}
-		// A run cannot be stepped for a workspace it does not belong to, whatever the session says.
+		// A run cannot be stepped for a workspace it does not belong to.
 		if _, err := repo.ScheduleNextBatchRunItem(ctx, other.org, run.ID); err == nil {
 			t.Fatal("another workspace stepped this run")
 		}

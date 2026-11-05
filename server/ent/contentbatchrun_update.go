@@ -126,9 +126,6 @@ func (_u *ContentBatchRunUpdate) sqlSave(ctx context.Context) (_node int, err er
 	if _u.mutation.CreatedByUserIDCleared() {
 		_spec.ClearField(contentbatchrun.FieldCreatedByUserID, field.TypeString)
 	}
-	if _u.mutation.SessionIDCleared() {
-		_spec.ClearField(contentbatchrun.FieldSessionID, field.TypeString)
-	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentbatchrun.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -277,9 +274,6 @@ func (_u *ContentBatchRunUpdateOne) sqlSave(ctx context.Context) (_node *Content
 	}
 	if _u.mutation.CreatedByUserIDCleared() {
 		_spec.ClearField(contentbatchrun.FieldCreatedByUserID, field.TypeString)
-	}
-	if _u.mutation.SessionIDCleared() {
-		_spec.ClearField(contentbatchrun.FieldSessionID, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentbatchrun.FieldUpdatedAt, field.TypeTime, value)

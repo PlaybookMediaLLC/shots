@@ -567,11 +567,11 @@ func init() {
 	contentbatchrunFields := schema.ContentBatchRun{}.Fields()
 	_ = contentbatchrunFields
 	// contentbatchrunDescCreatedAt is the schema descriptor for created_at field.
-	contentbatchrunDescCreatedAt := contentbatchrunFields[10].Descriptor()
+	contentbatchrunDescCreatedAt := contentbatchrunFields[9].Descriptor()
 	// contentbatchrun.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentbatchrun.DefaultCreatedAt = contentbatchrunDescCreatedAt.Default.(func() time.Time)
 	// contentbatchrunDescUpdatedAt is the schema descriptor for updated_at field.
-	contentbatchrunDescUpdatedAt := contentbatchrunFields[11].Descriptor()
+	contentbatchrunDescUpdatedAt := contentbatchrunFields[10].Descriptor()
 	// contentbatchrun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentbatchrun.DefaultUpdatedAt = contentbatchrunDescUpdatedAt.Default.(func() time.Time)
 	// contentbatchrun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

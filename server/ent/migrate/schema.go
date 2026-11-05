@@ -1057,7 +1057,6 @@ var (
 		{Name: "status", Type: field.TypeString},
 		{Name: "items", Type: field.TypeJSON},
 		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
-		{Name: "sessionId", Type: field.TypeString, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -1075,7 +1074,7 @@ var (
 			{
 				Name:    "contentbatchrun_batchId_kind_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[3], ContentBatchRunColumns[10]},
+				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[3], ContentBatchRunColumns[9]},
 			},
 		},
 	}

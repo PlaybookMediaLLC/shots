@@ -129,9 +129,9 @@ type BatchSubmitInput struct {
 }
 
 // SubmitContentBatch records what to schedule and starts its workflow. Only a
-// person may ask, and the run keeps acting as that person: when their session
-// ends or they lose their role or membership, the rest of the run is refused.
-// Moving to another workspace does not stop it.
+// person with a real session may ask. The run then keeps going after they sign out
+// or switch workspace, as a post they queued would, until they lose their account,
+// role or membership: those refuse the rest of the run.
 func (c *Configuration) SubmitContentBatch(ctx context.Context, actor Actor, batchID string, input BatchSubmitInput) (*BatchRunRecord, error) {
 	if err := c.authorizeDecision(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (c *Configuration) createSubmitRun(ctx context.Context, actor Actor, row *e
 	}
 	create := c.client.ContentBatchRun.Create().SetID(cuid.New()).SetBatchID(row.ID).SetOrganizationID(actor.OrganizationID).
 		SetKind(batchRunSubmit).SetRequestKey(input.RequestKey).SetFingerprint(fingerprint).SetStatus(status).SetItems(items).
-		SetNillableCreatedByUserID(projectActor(actor)).SetSessionID(actor.SessionID)
+		SetNillableCreatedByUserID(projectActor(actor))
 	run, err := create.Save(ctx)
 	if ent.IsConstraintError(err) {
 		// Two submits with one key: the loser returns the winner's run.
@@ -271,10 +271,8 @@ func batchRunRefusalText(err error) string {
 	switch {
 	case errors.As(err, &user):
 		return err.Error()
-	case errors.Is(err, publishing.ErrUnauthorized):
-		return "Your session ended before this post was scheduled. Sign in and schedule it again."
-	case errors.Is(err, publishing.ErrForbidden):
-		return "You can no longer schedule in this workspace: your role or membership changed, or it is being deleted."
+	case errors.Is(err, publishing.ErrUnauthorized), errors.Is(err, publishing.ErrForbidden):
+		return "You can no longer schedule in this workspace: your account, role or membership changed, or it is being deleted."
 	}
 	return err.Error()
 }
@@ -319,9 +317,9 @@ func firstPendingItem(items []schema.BatchRunItem) int {
 }
 
 // ScheduleNextBatchRunItem schedules a submit run's next waiting item, as the
-// person who asked. Their access is checked again for each item, except that they
-// may have moved on to another workspace: they asked from this one. A definite
-// refusal is that item's outcome and the run goes on.
+// person who asked. Their account, role and membership are read again for each
+// item; their session is not, because they already asked. A definite refusal is
+// that item's outcome and the run goes on.
 func (c *Configuration) ScheduleNextBatchRunItem(ctx context.Context, organizationID, runID string) (*BatchRunStep, error) {
 	run, err := c.client.ContentBatchRun.Query().Where(contentbatchrun.ID(runID), contentbatchrun.OrganizationID(organizationID),
 		contentbatchrun.Kind(batchRunSubmit)).Only(ctx)
@@ -343,9 +341,6 @@ func (c *Configuration) ScheduleNextBatchRunItem(ctx context.Context, organizati
 	actor := Actor{OrganizationID: organizationID, RequestID: runID}
 	if run.CreatedByUserID != nil {
 		actor.UserID = *run.CreatedByUserID
-	}
-	if run.SessionID != nil {
-		actor.SessionID = *run.SessionID
 	}
 	result, err := c.ScheduleContentDraft(publishing.ForStartedRun(ctx), actor, item.DraftID, input)
 	if err != nil && !batchRunRefusal(err) {

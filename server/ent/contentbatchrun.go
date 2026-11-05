@@ -35,8 +35,6 @@ type ContentBatchRun struct {
 	Items []schema.BatchRunItem `json:"items,omitempty"`
 	// CreatedByUserID holds the value of the "created_by_user_id" field.
 	CreatedByUserID *string `json:"created_by_user_id,omitempty"`
-	// SessionID holds the value of the "session_id" field.
-	SessionID *string `json:"session_id,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -51,7 +49,7 @@ func (*ContentBatchRun) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case contentbatchrun.FieldItems:
 			values[i] = new([]byte)
-		case contentbatchrun.FieldID, contentbatchrun.FieldBatchID, contentbatchrun.FieldOrganizationID, contentbatchrun.FieldKind, contentbatchrun.FieldRequestKey, contentbatchrun.FieldFingerprint, contentbatchrun.FieldStatus, contentbatchrun.FieldCreatedByUserID, contentbatchrun.FieldSessionID:
+		case contentbatchrun.FieldID, contentbatchrun.FieldBatchID, contentbatchrun.FieldOrganizationID, contentbatchrun.FieldKind, contentbatchrun.FieldRequestKey, contentbatchrun.FieldFingerprint, contentbatchrun.FieldStatus, contentbatchrun.FieldCreatedByUserID:
 			values[i] = new(sql.NullString)
 		case contentbatchrun.FieldCreatedAt, contentbatchrun.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -127,13 +125,6 @@ func (_m *ContentBatchRun) assignValues(columns []string, values []any) error {
 				_m.CreatedByUserID = new(string)
 				*_m.CreatedByUserID = value.String
 			}
-		case contentbatchrun.FieldSessionID:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field session_id", values[i])
-			} else if value.Valid {
-				_m.SessionID = new(string)
-				*_m.SessionID = value.String
-			}
 		case contentbatchrun.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -205,11 +196,6 @@ func (_m *ContentBatchRun) String() string {
 	builder.WriteString(", ")
 	if v := _m.CreatedByUserID; v != nil {
 		builder.WriteString("created_by_user_id=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
-	if v := _m.SessionID; v != nil {
-		builder.WriteString("session_id=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

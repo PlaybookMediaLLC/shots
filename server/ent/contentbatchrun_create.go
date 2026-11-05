@@ -77,20 +77,6 @@ func (_c *ContentBatchRunCreate) SetNillableCreatedByUserID(v *string) *ContentB
 	return _c
 }
 
-// SetSessionID sets the "session_id" field.
-func (_c *ContentBatchRunCreate) SetSessionID(v string) *ContentBatchRunCreate {
-	_c.mutation.SetSessionID(v)
-	return _c
-}
-
-// SetNillableSessionID sets the "session_id" field if the given value is not nil.
-func (_c *ContentBatchRunCreate) SetNillableSessionID(v *string) *ContentBatchRunCreate {
-	if v != nil {
-		_c.SetSessionID(*v)
-	}
-	return _c
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (_c *ContentBatchRunCreate) SetCreatedAt(v time.Time) *ContentBatchRunCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -265,10 +251,6 @@ func (_c *ContentBatchRunCreate) createSpec() (*ContentBatchRun, *sqlgraph.Creat
 	if value, ok := _c.mutation.CreatedByUserID(); ok {
 		_spec.SetField(contentbatchrun.FieldCreatedByUserID, field.TypeString, value)
 		_node.CreatedByUserID = &value
-	}
-	if value, ok := _c.mutation.SessionID(); ok {
-		_spec.SetField(contentbatchrun.FieldSessionID, field.TypeString, value)
-		_node.SessionID = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(contentbatchrun.FieldCreatedAt, field.TypeTime, value)

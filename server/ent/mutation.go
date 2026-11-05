@@ -32391,7 +32391,6 @@ type ContentBatchRunMutation struct {
 	items              *[]schema.BatchRunItem
 	appenditems        []schema.BatchRunItem
 	created_by_user_id *string
-	session_id         *string
 	created_at         *time.Time
 	updated_at         *time.Time
 	clearedFields      map[string]struct{}
@@ -32820,55 +32819,6 @@ func (m *ContentBatchRunMutation) ResetCreatedByUserID() {
 	delete(m.clearedFields, contentbatchrun.FieldCreatedByUserID)
 }
 
-// SetSessionID sets the "session_id" field.
-func (m *ContentBatchRunMutation) SetSessionID(s string) {
-	m.session_id = &s
-}
-
-// SessionID returns the value of the "session_id" field in the mutation.
-func (m *ContentBatchRunMutation) SessionID() (r string, exists bool) {
-	v := m.session_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldSessionID returns the old "session_id" field's value of the ContentBatchRun entity.
-// If the ContentBatchRun object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ContentBatchRunMutation) OldSessionID(ctx context.Context) (v *string, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldSessionID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
-	}
-	return oldValue.SessionID, nil
-}
-
-// ClearSessionID clears the value of the "session_id" field.
-func (m *ContentBatchRunMutation) ClearSessionID() {
-	m.session_id = nil
-	m.clearedFields[contentbatchrun.FieldSessionID] = struct{}{}
-}
-
-// SessionIDCleared returns if the "session_id" field was cleared in this mutation.
-func (m *ContentBatchRunMutation) SessionIDCleared() bool {
-	_, ok := m.clearedFields[contentbatchrun.FieldSessionID]
-	return ok
-}
-
-// ResetSessionID resets all changes to the "session_id" field.
-func (m *ContentBatchRunMutation) ResetSessionID() {
-	m.session_id = nil
-	delete(m.clearedFields, contentbatchrun.FieldSessionID)
-}
-
 // SetCreatedAt sets the "created_at" field.
 func (m *ContentBatchRunMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -32975,7 +32925,7 @@ func (m *ContentBatchRunMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentBatchRunMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 10)
 	if m.batch_id != nil {
 		fields = append(fields, contentbatchrun.FieldBatchID)
 	}
@@ -32999,9 +32949,6 @@ func (m *ContentBatchRunMutation) Fields() []string {
 	}
 	if m.created_by_user_id != nil {
 		fields = append(fields, contentbatchrun.FieldCreatedByUserID)
-	}
-	if m.session_id != nil {
-		fields = append(fields, contentbatchrun.FieldSessionID)
 	}
 	if m.created_at != nil {
 		fields = append(fields, contentbatchrun.FieldCreatedAt)
@@ -33033,8 +32980,6 @@ func (m *ContentBatchRunMutation) Field(name string) (ent.Value, bool) {
 		return m.Items()
 	case contentbatchrun.FieldCreatedByUserID:
 		return m.CreatedByUserID()
-	case contentbatchrun.FieldSessionID:
-		return m.SessionID()
 	case contentbatchrun.FieldCreatedAt:
 		return m.CreatedAt()
 	case contentbatchrun.FieldUpdatedAt:
@@ -33064,8 +33009,6 @@ func (m *ContentBatchRunMutation) OldField(ctx context.Context, name string) (en
 		return m.OldItems(ctx)
 	case contentbatchrun.FieldCreatedByUserID:
 		return m.OldCreatedByUserID(ctx)
-	case contentbatchrun.FieldSessionID:
-		return m.OldSessionID(ctx)
 	case contentbatchrun.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case contentbatchrun.FieldUpdatedAt:
@@ -33135,13 +33078,6 @@ func (m *ContentBatchRunMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCreatedByUserID(v)
 		return nil
-	case contentbatchrun.FieldSessionID:
-		v, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetSessionID(v)
-		return nil
 	case contentbatchrun.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -33189,9 +33125,6 @@ func (m *ContentBatchRunMutation) ClearedFields() []string {
 	if m.FieldCleared(contentbatchrun.FieldCreatedByUserID) {
 		fields = append(fields, contentbatchrun.FieldCreatedByUserID)
 	}
-	if m.FieldCleared(contentbatchrun.FieldSessionID) {
-		fields = append(fields, contentbatchrun.FieldSessionID)
-	}
 	return fields
 }
 
@@ -33208,9 +33141,6 @@ func (m *ContentBatchRunMutation) ClearField(name string) error {
 	switch name {
 	case contentbatchrun.FieldCreatedByUserID:
 		m.ClearCreatedByUserID()
-		return nil
-	case contentbatchrun.FieldSessionID:
-		m.ClearSessionID()
 		return nil
 	}
 	return fmt.Errorf("unknown ContentBatchRun nullable field %s", name)
@@ -33243,9 +33173,6 @@ func (m *ContentBatchRunMutation) ResetField(name string) error {
 		return nil
 	case contentbatchrun.FieldCreatedByUserID:
 		m.ResetCreatedByUserID()
-		return nil
-	case contentbatchrun.FieldSessionID:
-		m.ResetSessionID()
 		return nil
 	case contentbatchrun.FieldCreatedAt:
 		m.ResetCreatedAt()

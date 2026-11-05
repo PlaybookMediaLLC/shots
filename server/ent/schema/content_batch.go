@@ -145,7 +145,6 @@ func (ContentBatchRun) Fields() []ent.Field {
 		field.String("status"),
 		field.JSON("items", []BatchRunItem{}).StorageKey("items"),
 		field.String("created_by_user_id").StorageKey("createdByUserId").Optional().Nillable().Immutable(),
-		field.String("session_id").StorageKey("sessionId").Optional().Nillable().Immutable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

@@ -46,13 +46,14 @@ type authorizedRole struct {
 	organizationID, userID, sessionID, role string
 }
 
-// startedRunKey marks work that was authorized when a person started it.
+// startedRunKey marks work a person already authorized when they started it.
 type startedRunKey struct{}
 
-// ForStartedRun is for background work a person started in a workspace. It may
-// finish after they switch to another workspace, so AuthorizeRole under ctx does
-// not require that workspace to stay active. Every other check still applies: the
-// session, membership, role and deletion state are read again each time.
+// ForStartedRun is for background work a person started from a real session. It
+// may finish after they sign out or move to another workspace, as a post they
+// queued would, so AuthorizeRole under ctx asks for neither. Every other check
+// still applies each time: the account exists and is not banned, and it holds the
+// role in a workspace that is not being deleted.
 func ForStartedRun(ctx context.Context) context.Context {
 	return context.WithValue(ctx, startedRunKey{}, true)
 }
@@ -79,7 +80,8 @@ func (r *Repository) AuthorizeRole(ctx context.Context, organizationID, userID, 
 
 // AuthorizedRole is AuthorizeRole, returning the member's stored role.
 func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID, sessionID string, allowedRoles ...string) (string, error) {
-	if organizationID == "" || userID == "" || sessionID == "" {
+	startedRun, _ := ctx.Value(startedRunKey{}).(bool)
+	if organizationID == "" || userID == "" || (sessionID == "" && !startedRun) {
 		return "", ErrUnauthorized
 	}
 	if memo, _ := ctx.Value(replayAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
@@ -92,13 +94,18 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			return last.role, nil
 		}
 	}
-	current, err := r.AuthorizeSession(ctx, userID, sessionID)
-	if err != nil {
-		return "", err
-	}
-	startedRun, _ := ctx.Value(startedRunKey{}).(bool)
-	if !startedRun && current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
-		return "", ErrForbidden
+	if startedRun {
+		if err := r.requireActivePerson(ctx, userID); err != nil {
+			return "", err
+		}
+	} else {
+		current, err := r.AuthorizeSession(ctx, userID, sessionID)
+		if err != nil {
+			return "", err
+		}
+		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
+			return "", ErrForbidden
+		}
 	}
 	participants, err := r.client.Member.Query().Where(
 		member.OrganizationID(organizationID), member.UserID(userID),
@@ -152,17 +159,25 @@ func (r *Repository) AuthorizeSession(ctx context.Context, userID, sessionID str
 	if err != nil {
 		return nil, err
 	}
-	person, err := r.client.User.Query().Where(user.ID(userID)).Only(ctx)
-	if ent.IsNotFound(err) {
-		return nil, ErrUnauthorized
-	}
-	if err != nil {
+	if err := r.requireActivePerson(ctx, userID); err != nil {
 		return nil, err
 	}
-	if person.Banned != nil && *person.Banned {
-		return nil, ErrForbidden
-	}
 	return current, nil
+}
+
+// requireActivePerson rejects an account that is gone or banned.
+func (r *Repository) requireActivePerson(ctx context.Context, userID string) error {
+	person, err := r.client.User.Query().Where(user.ID(userID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return ErrUnauthorized
+	}
+	if err != nil {
+		return err
+	}
+	if person.Banned != nil && *person.Banned {
+		return ErrForbidden
+	}
+	return nil
 }
 
 // AuthorizeWorkspace admits a service caller acting for an existing,

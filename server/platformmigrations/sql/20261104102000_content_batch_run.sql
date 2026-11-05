@@ -13,9 +13,8 @@ CREATE TABLE content_batch_run (
  fingerprint text NOT NULL,
  status text NOT NULL CHECK (status IN ('RUNNING', 'FINISHED', 'SUPERSEDED')),
  items jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(items) = 'array'),
+ -- A submit acts as the person who asked, for as long as they keep their access.
  "createdByUserId" text,
- -- A submit acts as the person who asked, and stops when their session ends.
- "sessionId" text,
  "createdAt" timestamptz NOT NULL DEFAULT now(),
  "updatedAt" timestamptz NOT NULL DEFAULT now(),
  UNIQUE ("batchId", "requestKey")

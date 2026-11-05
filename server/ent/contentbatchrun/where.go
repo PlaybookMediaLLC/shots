@@ -99,11 +99,6 @@ func CreatedByUserID(v string) predicate.ContentBatchRun {
 	return predicate.ContentBatchRun(sql.FieldEQ(FieldCreatedByUserID, v))
 }
 
-// SessionID applies equality check predicate on the "session_id" field. It's identical to SessionIDEQ.
-func SessionID(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldEQ(FieldSessionID, v))
-}
-
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ContentBatchRun {
 	return predicate.ContentBatchRun(sql.FieldEQ(FieldCreatedAt, v))
@@ -577,81 +572,6 @@ func CreatedByUserIDEqualFold(v string) predicate.ContentBatchRun {
 // CreatedByUserIDContainsFold applies the ContainsFold predicate on the "created_by_user_id" field.
 func CreatedByUserIDContainsFold(v string) predicate.ContentBatchRun {
 	return predicate.ContentBatchRun(sql.FieldContainsFold(FieldCreatedByUserID, v))
-}
-
-// SessionIDEQ applies the EQ predicate on the "session_id" field.
-func SessionIDEQ(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldEQ(FieldSessionID, v))
-}
-
-// SessionIDNEQ applies the NEQ predicate on the "session_id" field.
-func SessionIDNEQ(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldNEQ(FieldSessionID, v))
-}
-
-// SessionIDIn applies the In predicate on the "session_id" field.
-func SessionIDIn(vs ...string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldIn(FieldSessionID, vs...))
-}
-
-// SessionIDNotIn applies the NotIn predicate on the "session_id" field.
-func SessionIDNotIn(vs ...string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldNotIn(FieldSessionID, vs...))
-}
-
-// SessionIDGT applies the GT predicate on the "session_id" field.
-func SessionIDGT(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldGT(FieldSessionID, v))
-}
-
-// SessionIDGTE applies the GTE predicate on the "session_id" field.
-func SessionIDGTE(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldGTE(FieldSessionID, v))
-}
-
-// SessionIDLT applies the LT predicate on the "session_id" field.
-func SessionIDLT(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldLT(FieldSessionID, v))
-}
-
-// SessionIDLTE applies the LTE predicate on the "session_id" field.
-func SessionIDLTE(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldLTE(FieldSessionID, v))
-}
-
-// SessionIDContains applies the Contains predicate on the "session_id" field.
-func SessionIDContains(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldContains(FieldSessionID, v))
-}
-
-// SessionIDHasPrefix applies the HasPrefix predicate on the "session_id" field.
-func SessionIDHasPrefix(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldHasPrefix(FieldSessionID, v))
-}
-
-// SessionIDHasSuffix applies the HasSuffix predicate on the "session_id" field.
-func SessionIDHasSuffix(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldHasSuffix(FieldSessionID, v))
-}
-
-// SessionIDIsNil applies the IsNil predicate on the "session_id" field.
-func SessionIDIsNil() predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldIsNull(FieldSessionID))
-}
-
-// SessionIDNotNil applies the NotNil predicate on the "session_id" field.
-func SessionIDNotNil() predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldNotNull(FieldSessionID))
-}
-
-// SessionIDEqualFold applies the EqualFold predicate on the "session_id" field.
-func SessionIDEqualFold(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldEqualFold(FieldSessionID, v))
-}
-
-// SessionIDContainsFold applies the ContainsFold predicate on the "session_id" field.
-func SessionIDContainsFold(v string) predicate.ContentBatchRun {
-	return predicate.ContentBatchRun(sql.FieldContainsFold(FieldSessionID, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
