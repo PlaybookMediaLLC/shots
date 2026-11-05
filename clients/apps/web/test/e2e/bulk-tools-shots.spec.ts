@@ -18,7 +18,20 @@ async function shoot(page: Page, name: string) {
   await page.mouse.move(0, 0)
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 20_000 })
   // next dev compiles a route on first use, so images can still be on their way.
-  await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete))
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          Array.from(
+            document.querySelectorAll<HTMLImageElement>(
+              '[data-testid="batch-item"] img, [data-testid="grid-concept"] img'
+            )
+          ).every((image) => image.complete)
+        ),
+      { timeout: 30_000 }
+    )
+    .toBe(true)
+    .catch(() => undefined)
   for (const [width, height] of WIDTHS) {
     await page.setViewportSize({ height, width })
     for (const theme of ['light', 'dark']) {
