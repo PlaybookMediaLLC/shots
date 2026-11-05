@@ -52,7 +52,9 @@ because the invited user has no account yet and is reached by email alone.
 
 `AUTH_ENABLE_PASSWORD` controls email/password sign-in. It defaults to
 enabled so local development and self-hosted deployments work without extra
-configuration. Set it to `false` to run OAuth-only.
+configuration. Set it to `false` to run OAuth-only. In production, the web
+deploy copies the value from Infisical `prod`; when Infisical has no value, the
+web keeps the one already on the service.
 
 Password auth depends on outbound email. Verification and password reset both
 deliver links through `AUTH_EMAIL_WEBHOOK_URL`, so enabling passwords without
