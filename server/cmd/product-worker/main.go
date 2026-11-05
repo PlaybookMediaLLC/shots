@@ -30,6 +30,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/quota"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/tenantpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalbatches"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalcapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalmaintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalonboarding"
@@ -169,7 +170,9 @@ func main() {
 		slog.Error("invalid GitHub App configuration")
 		os.Exit(1)
 	}
-	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore).WithCapturer(capture.FromEnvironment())
+	// Batch submits schedule here, so this store judges an account as the API does.
+	automationStore := product.NewConfiguration(db.Client).WithObjectStore(objectStore).WithAccountStanding(provider).
+		WithCapturer(capture.FromEnvironment())
 	captureKeys, err := sessionstate.FromEnvironment()
 	if err != nil {
 		slog.Error("invalid capture session key")
@@ -205,6 +208,22 @@ func main() {
 			os.Exit(1)
 		}
 		automationStore.WithMonthlyMeter(meter)
+	}
+	// A batch submit schedules with the same media, standing and quota as the API.
+	if os.Getenv("PLATFORM_E2E_DRAFT_PLATFORM") == "enabled" {
+		product.EnableE2EDraftPlatform()
+	}
+	if !slices.Contains(cfg.ExcludedQueues, temporalbatches.TaskQueue) {
+		batchWorker := worker.New(temporalClient, temporalbatches.TaskQueue, worker.Options{
+			MaxConcurrentActivityExecutionSize: max(1, 5/cfg.WorkerConcurrencyDivider),
+			OnFatalError:                       func(err error) { slog.Error("Temporal batch worker failed", "error", err); stop() },
+		})
+		temporalbatches.Register(batchWorker, &temporalbatches.Activities{Publisher: scheduler, Store: automationStore})
+		if err := batchWorker.Start(); err != nil {
+			slog.Error("batch worker did not start", "error", err)
+			os.Exit(1)
+		}
+		defer batchWorker.Stop()
 	}
 	if automationStore.CaptureAvailable() && !slices.Contains(cfg.ExcludedQueues, temporalcapture.TaskQueue) {
 		captureWorker := worker.New(temporalClient, temporalcapture.TaskQueue, worker.Options{

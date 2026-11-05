@@ -19,6 +19,7 @@ import * as draftCollaboration from '@/lib/api/contracts/draft-collaboration'
 import * as contentDraftPlatform from '@/lib/api/contracts/content-draft-platform'
 import * as writeAi from '@/lib/api/contracts/write-ai'
 import * as draftBatch from '@/lib/api/contracts/draft-batch'
+import * as contentBatchRuns from '@/lib/api/contracts/content-batch-runs'
 import * as permissionGroups from '@/lib/api/contracts/permission-groups'
 import * as whitelabel from '@/lib/api/contracts/whitelabel'
 import * as contentBatches from '@/lib/api/contracts/content-batches'
@@ -79,6 +80,7 @@ const contracts = new Map<string, RouteContract>(
     draftComments,
     draftBatch,
     contentBatches,
+    contentBatchRuns,
     socialAnalytics,
     integrations,
     githubProduction,

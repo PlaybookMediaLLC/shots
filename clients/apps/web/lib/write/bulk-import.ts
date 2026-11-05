@@ -1,3 +1,4 @@
+import { BATCH_ITEM_LIMIT } from '@/lib/api/contracts/content-batches'
 import { safeAssetFileName } from '@/lib/workspace/save-export'
 import { draftChannelSchema } from '@/lib/write/document'
 import { isTimeZone, localDateTimeSchema } from '@/lib/write/zoned-time'
@@ -121,7 +122,8 @@ export function parseBatchCSV(input: string): { mapping: ImportMapping; rows: Im
   if (!fields.includes('caption'))
     throw new Error('Add a caption column. Asset, channels, time and timezone are optional.')
   if (new Set(fields).size !== fields.length) throw new Error('Each CSV field may appear once.')
-  if (!rows.length || rows.length > 50) throw new Error('Import between 1 and 50 rows.')
+  if (!rows.length || rows.length > BATCH_ITEM_LIMIT)
+    throw new Error(`Import between 1 and ${BATCH_ITEM_LIMIT} rows.`)
   return {
     mapping,
     rows: rows.map(({ line, values }) => {
@@ -217,4 +219,87 @@ export function matchRowMedia(
 export function unusedFiles(rows: Pick<ImportRow, 'assets'>[], files: readonly { name: string }[]) {
   const used = new Set(rows.flatMap((row) => row.assets))
   return files.filter((file) => !used.has(file.name)).map((file) => file.name)
+}
+
+/** One row of a caption CSV: the post it names, if any, and its caption. */
+export type CaptionRow = { line: number; key?: string; caption: string; problems: string[] }
+
+/**
+ * Parse a caption CSV. Two columns are `filename, caption`; one column gives
+ * captions to posts in order. A header row is optional and recognized by name.
+ */
+export function parseCaptionCSV(input: string): CaptionRow[] {
+  const rows = csvRows(input)
+  if (!rows.length) throw new Error('This CSV has no captions.')
+  const columns = rows[0]!.values.length
+  if (columns > 2) throw new Error('Use two columns, filename and caption, or one caption column.')
+  const first = rows[0]!.values.map((value) => value.trim().toLowerCase())
+  const header =
+    columns === 1
+      ? first[0] === 'caption'
+      : ['filename', 'file', 'name', 'folder'].includes(first[0]!) && first[1] === 'caption'
+  if (header) rows.shift()
+  if (!rows.length || rows.length > BATCH_ITEM_LIMIT)
+    throw new Error(`Import between 1 and ${BATCH_ITEM_LIMIT} captions.`)
+  return rows.map(({ line, values }) => {
+    const problems =
+      values.length === columns ? [] : [`Line ${line} has the wrong number of fields.`]
+    return columns === 1
+      ? { line, caption: values[0] ?? '', problems }
+      : { line, key: values[0]?.trim() ?? '', caption: values[1] ?? '', problems }
+  })
+}
+
+const nameKey = (name: string) => name.trim().normalize('NFC').toLowerCase()
+
+/** A post a caption CSV can name: its file or folder names. */
+export type CaptionTarget = { id: string; names: string[] }
+
+/** A CSV row and the post its caption goes to, or why it goes nowhere. */
+export type CaptionMatch = CaptionRow & { itemId?: string }
+
+/**
+ * Match caption rows to posts. Names compare without case, with the extension
+ * optional. A row naming two posts, or two rows naming one post, are problems:
+ * nothing is guessed. A one-column CSV follows the posts' order.
+ */
+export function matchCaptions(rows: CaptionRow[], targets: readonly CaptionTarget[]) {
+  const named = rows.some((row) => row.key !== undefined)
+  const matches: CaptionMatch[] = rows.map((row, index) => {
+    if (row.problems.length) return row
+    if (!named) {
+      const target = targets[index]
+      return target
+        ? { ...row, itemId: target.id }
+        : { ...row, problems: [`Line ${row.line} has no post left to go to.`] }
+    }
+    const key = nameKey(row.key ?? '')
+    if (!key) return { ...row, problems: [`Line ${row.line} names no file or folder.`] }
+    // Stored file names are sanitized, so a name is also tried the way it was saved.
+    const wanted = new Set([key, nameKey(safeAssetFileName(row.key ?? ''))])
+    const found = targets.filter((target) =>
+      target.names.some((name) => {
+        const normalized = nameKey(name)
+        return wanted.has(normalized) || wanted.has(normalized.replace(/\.[^.]+$/, ''))
+      })
+    )
+    if (found.length > 1)
+      return { ...row, problems: [`Line ${row.line}: ${row.key} matches ${found.length} posts.`] }
+    return found[0]
+      ? { ...row, itemId: found[0].id }
+      : { ...row, problems: [`Line ${row.line}: no post is named ${row.key}.`] }
+  })
+  for (const match of matches) {
+    if (!match.itemId) continue
+    const sharing = matches.filter((other) => other.itemId === match.itemId)
+    if (sharing.length > 1) {
+      const lines = sharing.map((other) => other.line).join(' and ')
+      for (const other of sharing) {
+        delete other.itemId
+        other.problems = [`Lines ${lines} name the same post. Keep one.`]
+      }
+    }
+  }
+  const matched = new Set(matches.flatMap((match) => match.itemId ?? []))
+  return { matches, unchanged: targets.filter((target) => !matched.has(target.id)) }
 }

@@ -1324,6 +1324,13 @@ export type BackendBatchMedia = {
   uploadAssetId?: string
 }
 
+/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+export type BackendBatchGrid = {
+  headline: string
+  musicAssetId?: string
+  slots: { assetId?: string; topic: string }[]
+}
+
 /** When a batch item is meant to go out: a local time in a zone, or the queue at a previewed slot. */
 export type BackendBatchTiming = {
   mode?: 'time' | 'queue'
@@ -1339,6 +1346,10 @@ export type BackendContentBatchItemInput = {
   channelConnectionIds: string[]
   importKey: string
   media: BackendBatchMedia[]
+  /** A grid video concept; its rendered video becomes the item's media. */
+  grid?: BackendBatchGrid
+  /** The file or folder name the item came from, as the person knows it. */
+  sourceKey?: string
   timing: BackendBatchTiming
 }
 
@@ -1368,7 +1379,27 @@ export type BackendContentBatchItem = {
   })[]
   position: number
   posts: BackendContentDraftPost[]
+  grid?: BackendBatchGrid
+  sourceKey?: string
   timing: BackendBatchTiming
+}
+
+/** One pass over a batch: scheduling its items, or rendering its grid concepts. */
+export type BackendContentBatchRun = {
+  createdAt: string
+  id: string
+  items: {
+    assetId?: string
+    draftId?: string
+    error?: string
+    grid?: BackendBatchGrid
+    itemId: string
+    postIds?: string[]
+    status: 'PENDING' | 'DONE' | 'FAILED' | 'UNCONFIRMED'
+  }[]
+  kind: 'submit' | 'render'
+  status: 'RUNNING' | 'FINISHED' | 'SUPERSEDED'
+  updatedAt: string
 }
 
 /** A durable batch of separate posts in one social set. */
@@ -1378,6 +1409,8 @@ export type BackendContentBatch = {
   id: string
   itemCount: number
   items?: BackendContentBatchItem[]
+  render?: BackendContentBatchRun
+  submission?: BackendContentBatchRun
   socialSetId: string
   timeZone: string
   title: string
@@ -3367,7 +3400,10 @@ export class ScreenshotStudioBackendSDK {
     id: string,
     itemId: string,
     input: Partial<
-      Pick<BackendContentBatchItemInput, 'caption' | 'channelConnectionIds' | 'media' | 'timing'>
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
     > & {
       position?: number
     }
@@ -3375,6 +3411,69 @@ export class ScreenshotStudioBackendSDK {
     return this.request<BackendContentBatchItem>(
       `v1/content-batches/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`,
       { body: input, method: 'PATCH' }
+    )
+  }
+
+  /** Change many items as one operation: a refused item refuses them all. */
+  async updateContentBatchItems(
+    id: string,
+    items: (Partial<
+      Pick<
+        BackendContentBatchItemInput,
+        'caption' | 'channelConnectionIds' | 'grid' | 'media' | 'timing'
+      >
+    > & { itemId: string; position?: number })[]
+  ) {
+    return this.request<BackendContentBatch>(`v1/content-batches/${encodeURIComponent(id)}/items`, {
+      body: { items },
+      method: 'PATCH',
+    })
+  }
+
+  /** Schedule frozen requests in the background; the same key replays its run. */
+  async submitContentBatch(
+    id: string,
+    input: {
+      items: {
+        channelConnectionIds: string[]
+        itemId: string
+        refusal?: string
+        schedule?: Parameters<ScreenshotStudioBackendSDK['scheduleContentDraft']>[1]
+      }[]
+      requestKey: string
+    }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/submit`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** What a schedule or render of a batch did. */
+  async getContentBatchRun(id: string, runId: string) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/runs/${encodeURIComponent(runId)}`
+    )
+  }
+
+  /** Freeze grid concepts for a browser to render; the same key replays its run. */
+  async createContentBatchRender(id: string, input: { itemIds: string[]; requestKey: string }) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders`,
+      { body: input, method: 'POST' }
+    )
+  }
+
+  /** Record a rendered video on its item, or why it failed. */
+  async reportContentBatchRender(
+    id: string,
+    runId: string,
+    itemId: string,
+    input: { assetId?: string; error?: string; fileName?: string }
+  ) {
+    return this.request<BackendContentBatchRun>(
+      `v1/content-batches/${encodeURIComponent(id)}/renders/${encodeURIComponent(runId)}/items/${encodeURIComponent(itemId)}`,
+      { body: input, method: 'POST' }
     )
   }
 

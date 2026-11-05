@@ -21,6 +21,8 @@ const (
 	FieldImportKey = "importKey"
 	// FieldFingerprint holds the string denoting the fingerprint field in the database.
 	FieldFingerprint = "fingerprint"
+	// FieldSourceKey holds the string denoting the source_key field in the database.
+	FieldSourceKey = "sourceKey"
 	// FieldPosition holds the string denoting the position field in the database.
 	FieldPosition = "position"
 	// FieldCaption holds the string denoting the caption field in the database.
@@ -31,6 +33,8 @@ const (
 	FieldChannelConnectionIds = "channelConnectionIds"
 	// FieldTiming holds the string denoting the timing field in the database.
 	FieldTiming = "timing"
+	// FieldGrid holds the string denoting the grid field in the database.
+	FieldGrid = "grid"
 	// FieldDraftID holds the string denoting the draft_id field in the database.
 	FieldDraftID = "draftId"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -48,11 +52,13 @@ var Columns = []string{
 	FieldOrganizationID,
 	FieldImportKey,
 	FieldFingerprint,
+	FieldSourceKey,
 	FieldPosition,
 	FieldCaption,
 	FieldMedia,
 	FieldChannelConnectionIds,
 	FieldTiming,
+	FieldGrid,
 	FieldDraftID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -69,6 +75,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// DefaultSourceKey holds the default value on creation for the "source_key" field.
+	DefaultSourceKey string
 	// DefaultCaption holds the default value on creation for the "caption" field.
 	DefaultCaption string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -105,6 +113,11 @@ func ByImportKey(opts ...sql.OrderTermOption) OrderOption {
 // ByFingerprint orders the results by the fingerprint field.
 func ByFingerprint(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFingerprint, opts...).ToFunc()
+}
+
+// BySourceKey orders the results by the source_key field.
+func BySourceKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceKey, opts...).ToFunc()
 }
 
 // ByPosition orders the results by the position field.

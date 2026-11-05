@@ -1012,11 +1012,13 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "importKey", Type: field.TypeString},
 		{Name: "fingerprint", Type: field.TypeString},
+		{Name: "sourceKey", Type: field.TypeString, Default: ""},
 		{Name: "position", Type: field.TypeInt},
 		{Name: "caption", Type: field.TypeString, Default: ""},
 		{Name: "media", Type: field.TypeJSON},
 		{Name: "channelConnectionIds", Type: field.TypeJSON},
 		{Name: "timing", Type: field.TypeJSON},
+		{Name: "grid", Type: field.TypeJSON, Nullable: true},
 		{Name: "draftId", Type: field.TypeString, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
@@ -1035,12 +1037,44 @@ var (
 			{
 				Name:    "contentbatchitem_batchId_position",
 				Unique:  false,
-				Columns: []*schema.Column{ContentBatchItemColumns[1], ContentBatchItemColumns[5]},
+				Columns: []*schema.Column{ContentBatchItemColumns[1], ContentBatchItemColumns[6]},
 			},
 			{
 				Name:    "contentbatchitem_draftId",
 				Unique:  true,
-				Columns: []*schema.Column{ContentBatchItemColumns[10]},
+				Columns: []*schema.Column{ContentBatchItemColumns[12]},
+			},
+		},
+	}
+	// ContentBatchRunColumns holds the columns for the "content_batch_run" table.
+	ContentBatchRunColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "batchId", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "requestKey", Type: field.TypeString},
+		{Name: "fingerprint", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString},
+		{Name: "items", Type: field.TypeJSON},
+		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// ContentBatchRunTable holds the schema information for the "content_batch_run" table.
+	ContentBatchRunTable = &schema.Table{
+		Name:       "content_batch_run",
+		Columns:    ContentBatchRunColumns,
+		PrimaryKey: []*schema.Column{ContentBatchRunColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentbatchrun_batchId_requestKey",
+				Unique:  true,
+				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[4]},
+			},
+			{
+				Name:    "contentbatchrun_batchId_kind_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{ContentBatchRunColumns[1], ContentBatchRunColumns[3], ContentBatchRunColumns[9]},
 			},
 		},
 	}
@@ -3973,6 +4007,7 @@ var (
 		ContentAngleTable,
 		ContentBatchTable,
 		ContentBatchItemTable,
+		ContentBatchRunTable,
 		ContentDraftTable,
 		ContentDraftFinisherTable,
 		ContentDraftRevisionTable,
@@ -4171,6 +4206,9 @@ func init() {
 	}
 	ContentBatchItemTable.Annotation = &entsql.Annotation{
 		Table: "content_batch_item",
+	}
+	ContentBatchRunTable.Annotation = &entsql.Annotation{
+		Table: "content_batch_run",
 	}
 	ContentDraftTable.Annotation = &entsql.Annotation{
 		Table: "content_draft",

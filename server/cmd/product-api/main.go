@@ -34,6 +34,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialconnect"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalbatches"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalonboarding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 	"github.com/getsentry/sentry-go"
@@ -158,6 +159,7 @@ func main() {
 		configuration.WithMonthlyMeter(meter)
 	}
 
+	configuration.WithBatchRuns(&temporalbatches.Client{Temporal: temporalClient})
 	temporalonboarding.InitSentry("publishing-backend")
 	defer sentry.Flush(2 * time.Second)
 	// Without OPENROUTER_API_KEY the onboarding drafts come from page metadata.

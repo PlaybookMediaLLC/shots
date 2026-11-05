@@ -105,6 +105,9 @@ type ContentBatch func(*sql.Selector)
 // ContentBatchItem is the predicate function for contentbatchitem builders.
 type ContentBatchItem func(*sql.Selector)
 
+// ContentBatchRun is the predicate function for contentbatchrun builders.
+type ContentBatchRun func(*sql.Selector)
+
 // ContentDraft is the predicate function for contentdraft builders.
 type ContentDraft func(*sql.Selector)
 

@@ -103,6 +103,18 @@ func (_u *ContentBatchItemUpdate) SetNillableTiming(v *schema.BatchTiming) *Cont
 	return _u
 }
 
+// SetGrid sets the "grid" field.
+func (_u *ContentBatchItemUpdate) SetGrid(v *schema.BatchGrid) *ContentBatchItemUpdate {
+	_u.mutation.SetGrid(v)
+	return _u
+}
+
+// ClearGrid clears the value of the "grid" field.
+func (_u *ContentBatchItemUpdate) ClearGrid() *ContentBatchItemUpdate {
+	_u.mutation.ClearGrid()
+	return _u
+}
+
 // SetDraftID sets the "draft_id" field.
 func (_u *ContentBatchItemUpdate) SetDraftID(v string) *ContentBatchItemUpdate {
 	_u.mutation.SetDraftID(v)
@@ -207,6 +219,12 @@ func (_u *ContentBatchItemUpdate) sqlSave(ctx context.Context) (_node int, err e
 	if value, ok := _u.mutation.Timing(); ok {
 		_spec.SetField(contentbatchitem.FieldTiming, field.TypeJSON, value)
 	}
+	if value, ok := _u.mutation.Grid(); ok {
+		_spec.SetField(contentbatchitem.FieldGrid, field.TypeJSON, value)
+	}
+	if _u.mutation.GridCleared() {
+		_spec.ClearField(contentbatchitem.FieldGrid, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.DraftID(); ok {
 		_spec.SetField(contentbatchitem.FieldDraftID, field.TypeString, value)
 	}
@@ -306,6 +324,18 @@ func (_u *ContentBatchItemUpdateOne) SetNillableTiming(v *schema.BatchTiming) *C
 	if v != nil {
 		_u.SetTiming(*v)
 	}
+	return _u
+}
+
+// SetGrid sets the "grid" field.
+func (_u *ContentBatchItemUpdateOne) SetGrid(v *schema.BatchGrid) *ContentBatchItemUpdateOne {
+	_u.mutation.SetGrid(v)
+	return _u
+}
+
+// ClearGrid clears the value of the "grid" field.
+func (_u *ContentBatchItemUpdateOne) ClearGrid() *ContentBatchItemUpdateOne {
+	_u.mutation.ClearGrid()
 	return _u
 }
 
@@ -442,6 +472,12 @@ func (_u *ContentBatchItemUpdateOne) sqlSave(ctx context.Context) (_node *Conten
 	}
 	if value, ok := _u.mutation.Timing(); ok {
 		_spec.SetField(contentbatchitem.FieldTiming, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.Grid(); ok {
+		_spec.SetField(contentbatchitem.FieldGrid, field.TypeJSON, value)
+	}
+	if _u.mutation.GridCleared() {
+		_spec.ClearField(contentbatchitem.FieldGrid, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.DraftID(); ok {
 		_spec.SetField(contentbatchitem.FieldDraftID, field.TypeString, value)

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -28,7 +29,13 @@ import (
 // Scheduling uses the ordinary per-draft schedule, so idempotency, approval,
 // quota and publication status stay in one place.
 
-const contentBatchItemLimit = 50
+const contentBatchItemLimit = 100
+
+const (
+	batchGridSlots         = 4
+	batchGridHeadlineLimit = 60
+	batchGridTopicLimit    = 100
+)
 
 // ContentBatchInput starts a batch in a social set (the default set when empty).
 type ContentBatchInput struct {
@@ -38,15 +45,18 @@ type ContentBatchInput struct {
 
 // ContentBatchRecord is a batch; Items is set when one batch is read.
 type ContentBatchRecord struct {
-	ArchivedAt  *time.Time               `json:"archivedAt"`
-	CreatedAt   time.Time                `json:"createdAt"`
-	ID          string                   `json:"id"`
-	ItemCount   int                      `json:"itemCount"`
-	Items       []ContentBatchItemRecord `json:"items,omitempty"`
-	SocialSetID string                   `json:"socialSetId"`
-	TimeZone    string                   `json:"timeZone"`
-	Title       string                   `json:"title"`
-	UpdatedAt   time.Time                `json:"updatedAt"`
+	ArchivedAt *time.Time               `json:"archivedAt"`
+	CreatedAt  time.Time                `json:"createdAt"`
+	ID         string                   `json:"id"`
+	ItemCount  int                      `json:"itemCount"`
+	Items      []ContentBatchItemRecord `json:"items,omitempty"`
+	// Render and Submission are the latest of each run, when one batch is read.
+	Render      *BatchRunRecord `json:"render,omitempty"`
+	SocialSetID string          `json:"socialSetId"`
+	Submission  *BatchRunRecord `json:"submission,omitempty"`
+	TimeZone    string          `json:"timeZone"`
+	Title       string          `json:"title"`
+	UpdatedAt   time.Time       `json:"updatedAt"`
 }
 
 // BatchMediaRecord is an attachment and what its asset holds now. Status is
@@ -81,11 +91,13 @@ type ContentBatchItemRecord struct {
 	ChannelConnectionIDs []string           `json:"channelConnectionIds"`
 	Draft                *BatchDraftSummary `json:"draft"`
 	DraftID              *string            `json:"draftId"`
+	Grid                 *schema.BatchGrid  `json:"grid,omitempty"`
 	ID                   string             `json:"id"`
 	ImportKey            string             `json:"importKey"`
 	Media                []BatchMediaRecord `json:"media"`
 	Position             int                `json:"position"`
 	Posts                []ContentDraftPost `json:"posts"`
+	SourceKey            string             `json:"sourceKey,omitempty"`
 	Timing               schema.BatchTiming `json:"timing"`
 }
 
@@ -93,8 +105,10 @@ type ContentBatchItemRecord struct {
 type ContentBatchItemInput struct {
 	Caption              string              `json:"caption"`
 	ChannelConnectionIDs []string            `json:"channelConnectionIds"`
+	Grid                 *schema.BatchGrid   `json:"grid,omitempty"`
 	ImportKey            string              `json:"importKey"`
 	Media                []schema.BatchMedia `json:"media"`
+	SourceKey            string              `json:"sourceKey,omitempty"`
 	Timing               schema.BatchTiming  `json:"timing"`
 }
 
@@ -103,6 +117,7 @@ type ContentBatchItemInput struct {
 type ContentBatchItemUpdate struct {
 	Caption              *string              `json:"caption"`
 	ChannelConnectionIDs *[]string            `json:"channelConnectionIds"`
+	Grid                 *schema.BatchGrid    `json:"grid"`
 	Media                *[]schema.BatchMedia `json:"media"`
 	Position             *int                 `json:"position"`
 	Timing               *schema.BatchTiming  `json:"timing"`
@@ -200,8 +215,28 @@ func (c *Configuration) GetContentBatch(ctx context.Context, actor Actor, id str
 	if err != nil {
 		return nil, err
 	}
-	items, err := c.client.ContentBatchItem.Query().Where(contentbatchitem.BatchID(row.ID), contentbatchitem.OrganizationID(actor.OrganizationID)).
-		Order(ent.Asc(contentbatchitem.FieldPosition), ent.Asc(contentbatchitem.FieldCreatedAt), ent.Asc(contentbatchitem.FieldID)).All(ctx)
+	record, err := c.batchWithItems(ctx, actor, row, set)
+	if err != nil {
+		return nil, err
+	}
+	if record.Submission, err = c.latestBatchRun(ctx, row.ID, batchRunSubmit); err != nil {
+		return nil, err
+	}
+	if record.Render, err = c.latestBatchRun(ctx, row.ID, batchRunRender); err != nil {
+		return nil, err
+	}
+	return record, nil
+}
+
+// batchWithItems reads a batch's items, or only those named by only, with their
+// media, drafts and scheduled posts. Saving one item reads just that item, so
+// uploading a whole batch stays linear in its size.
+func (c *Configuration) batchWithItems(ctx context.Context, actor Actor, row *ent.ContentBatch, set *ent.SocialSet, only ...string) (*ContentBatchRecord, error) {
+	query := c.client.ContentBatchItem.Query().Where(contentbatchitem.BatchID(row.ID), contentbatchitem.OrganizationID(actor.OrganizationID))
+	if len(only) > 0 {
+		query = query.Where(contentbatchitem.IDIn(only...))
+	}
+	items, err := query.Order(ent.Asc(contentbatchitem.FieldPosition), ent.Asc(contentbatchitem.FieldCreatedAt), ent.Asc(contentbatchitem.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -249,8 +284,8 @@ func (c *Configuration) GetContentBatch(ctx context.Context, actor Actor, id str
 	record := batchRecord(row, set, len(items))
 	record.Items = make([]ContentBatchItemRecord, 0, len(items))
 	for _, item := range items {
-		entry := ContentBatchItemRecord{Caption: item.Caption, ChannelConnectionIDs: item.ChannelConnectionIds, DraftID: item.DraftID, ID: item.ID,
-			ImportKey: item.ImportKey, Position: item.Position, Posts: []ContentDraftPost{}, Timing: item.Timing, Media: make([]BatchMediaRecord, 0, len(item.Media))}
+		entry := ContentBatchItemRecord{Caption: item.Caption, ChannelConnectionIDs: item.ChannelConnectionIds, DraftID: item.DraftID, Grid: item.Grid, ID: item.ID,
+			ImportKey: item.ImportKey, Position: item.Position, Posts: []ContentDraftPost{}, SourceKey: item.SourceKey, Timing: item.Timing, Media: make([]BatchMediaRecord, 0, len(item.Media))}
 		for _, media := range item.Media {
 			// A file not uploaded yet keeps its own size, so the item can be saved back as it is.
 			view := BatchMediaRecord{BatchMedia: media, Bytes: media.Bytes, Status: "local"}
@@ -369,6 +404,31 @@ func checkBatchMedia(ctx context.Context, client *ent.Client, organizationID str
 	return nil
 }
 
+// checkBatchGrid checks a grid concept: its text fits what renders, and its
+// images and music are uploaded assets of this workspace.
+func checkBatchGrid(ctx context.Context, client *ent.Client, organizationID string, grid *schema.BatchGrid) error {
+	headline := strings.TrimSpace(grid.Headline)
+	if headline == "" || utf8.RuneCountInString(headline) > batchGridHeadlineLimit {
+		return invalid(fmt.Sprintf("A grid video needs a headline of 1 to %d characters.", batchGridHeadlineLimit))
+	}
+	if len(grid.Slots) != batchGridSlots {
+		return invalid(fmt.Sprintf("A grid video has %d images.", batchGridSlots))
+	}
+	assets := []schema.BatchMedia{}
+	for _, slot := range grid.Slots {
+		if utf8.RuneCountInString(slot.Topic) > batchGridTopicLimit {
+			return invalid(fmt.Sprintf("A grid label is at most %d characters.", batchGridTopicLimit))
+		}
+		if slot.AssetID != "" {
+			assets = append(assets, schema.BatchMedia{AssetID: slot.AssetID})
+		}
+	}
+	if grid.MusicAssetID != "" {
+		assets = append(assets, schema.BatchMedia{AssetID: grid.MusicAssetID})
+	}
+	return checkBatchMedia(ctx, client, organizationID, assets, false)
+}
+
 func batchItemFingerprint(input ContentBatchItemInput) string {
 	encoded, _ := json.Marshal(input)
 	return fmt.Sprintf("%x", sha256.Sum256(encoded))
@@ -422,6 +482,9 @@ func (c *Configuration) AddContentBatchItems(ctx context.Context, actor Actor, b
 			}
 			continue
 		}
+		if utf8.RuneCountInString(input.SourceKey) > 255 || !utf8.ValidString(input.SourceKey) {
+			return nil, invalid("Each item's source name is at most 255 characters.")
+		}
 		if _, err := contentDraftText(input.Caption); err != nil {
 			return nil, err
 		}
@@ -430,6 +493,11 @@ func (c *Configuration) AddContentBatchItems(ctx context.Context, actor Actor, b
 		}
 		if err := checkBatchTiming(input.Timing); err != nil {
 			return nil, err
+		}
+		if input.Grid != nil {
+			if err := checkBatchGrid(ctx, tx.Client(), actor.OrganizationID, input.Grid); err != nil {
+				return nil, err
+			}
 		}
 		channels := []string{}
 		if len(input.ChannelConnectionIDs) > 0 {
@@ -441,9 +509,13 @@ func (c *Configuration) AddContentBatchItems(ctx context.Context, actor Actor, b
 		if media == nil {
 			media = []schema.BatchMedia{}
 		}
-		item, err := tx.ContentBatchItem.Create().SetID(cuid.New()).SetBatchID(row.ID).SetOrganizationID(actor.OrganizationID).
-			SetImportKey(input.ImportKey).SetFingerprint(fingerprint).SetPosition(position).SetCaption(input.Caption).
-			SetMedia(media).SetChannelConnectionIds(channels).SetTiming(input.Timing).Save(ctx)
+		create := tx.ContentBatchItem.Create().SetID(cuid.New()).SetBatchID(row.ID).SetOrganizationID(actor.OrganizationID).
+			SetImportKey(input.ImportKey).SetFingerprint(fingerprint).SetSourceKey(input.SourceKey).SetPosition(position).SetCaption(input.Caption).
+			SetMedia(media).SetChannelConnectionIds(channels).SetTiming(input.Timing)
+		if input.Grid != nil {
+			create.SetGrid(input.Grid)
+		}
+		item, err := create.Save(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -474,18 +546,24 @@ func (c *Configuration) batchItem(ctx context.Context, tx *ent.Tx, actor Actor, 
 	if row.ArchivedAt != nil {
 		return nil, nil, nil, conflict("This batch is closed. Start a new batch.")
 	}
+	item, err := lockedBatchItem(ctx, tx, actor, row.ID, itemID)
+	return row, set, item, err
+}
+
+// lockedBatchItem loads an item of a batch under its row lock.
+func lockedBatchItem(ctx context.Context, tx *ent.Tx, actor Actor, batchID, itemID string) (*ent.ContentBatchItem, error) {
 	if !contentDraftRefPattern.MatchString(itemID) {
-		return nil, nil, nil, notFound("Item not found.")
+		return nil, notFound("Item not found.")
 	}
-	if _, err := tx.PlatformExec(ctx, `SELECT id FROM content_batch_item WHERE id=$1 AND "batchId"=$2 FOR UPDATE`, itemID, row.ID); err != nil {
-		return nil, nil, nil, err
+	if _, err := tx.PlatformExec(ctx, `SELECT id FROM content_batch_item WHERE id=$1 AND "batchId"=$2 FOR UPDATE`, itemID, batchID); err != nil {
+		return nil, err
 	}
-	item, err := tx.ContentBatchItem.Query().Where(contentbatchitem.ID(itemID), contentbatchitem.BatchID(row.ID),
+	item, err := tx.ContentBatchItem.Query().Where(contentbatchitem.ID(itemID), contentbatchitem.BatchID(batchID),
 		contentbatchitem.OrganizationID(actor.OrganizationID)).Only(ctx)
 	if ent.IsNotFound(err) {
-		return nil, nil, nil, notFound("Item not found.")
+		return nil, notFound("Item not found.")
 	}
-	return row, set, item, err
+	return item, err
 }
 
 // UpdateContentBatchItem changes a staged item, or a drafted item's time and order.
@@ -502,44 +580,7 @@ func (c *Configuration) UpdateContentBatchItem(ctx context.Context, actor Actor,
 	if err != nil {
 		return nil, err
 	}
-	update := tx.ContentBatchItem.UpdateOneID(item.ID)
-	if item.DraftID != nil && (input.Caption != nil || input.Media != nil || input.ChannelConnectionIDs != nil) {
-		return nil, conflict("This item is a draft now. Edit its content in Write.")
-	}
-	if input.Caption != nil {
-		if _, err := contentDraftText(*input.Caption); err != nil {
-			return nil, err
-		}
-		update.SetCaption(*input.Caption)
-	}
-	if input.Media != nil {
-		if err := checkBatchMedia(ctx, tx.Client(), actor.OrganizationID, *input.Media, true); err != nil {
-			return nil, err
-		}
-		update.SetMedia(*input.Media)
-	}
-	if input.ChannelConnectionIDs != nil {
-		channels := []string{}
-		if len(*input.ChannelConnectionIDs) > 0 {
-			if channels, err = contentDraftChannels(ctx, tx, actor.OrganizationID, &set.ID, *input.ChannelConnectionIDs); err != nil {
-				return nil, err
-			}
-		}
-		update.SetChannelConnectionIds(channels)
-	}
-	if input.Timing != nil {
-		if err := checkBatchTiming(*input.Timing); err != nil {
-			return nil, err
-		}
-		update.SetTiming(*input.Timing)
-	}
-	if input.Position != nil {
-		if *input.Position < 0 || *input.Position > 10*contentBatchItemLimit {
-			return nil, invalid("Choose a position in the batch.")
-		}
-		update.SetPosition(*input.Position)
-	}
-	if err := update.Exec(ctx); err != nil {
+	if err := applyBatchItemUpdate(ctx, tx, actor, set, item, input); err != nil {
 		return nil, err
 	}
 	if err := tx.ContentBatch.UpdateOneID(row.ID).Exec(ctx); err != nil {
@@ -551,17 +592,125 @@ func (c *Configuration) UpdateContentBatchItem(ctx context.Context, actor Actor,
 	return c.batchItemRecord(ctx, actor, batchID, itemID)
 }
 
-func (c *Configuration) batchItemRecord(ctx context.Context, actor Actor, batchID, itemID string) (*ContentBatchItemRecord, error) {
-	batch, err := c.GetContentBatch(ctx, actor, batchID)
+// applyBatchItemUpdate checks and writes one item's changes inside a transaction.
+func applyBatchItemUpdate(ctx context.Context, tx *ent.Tx, actor Actor, set *ent.SocialSet, item *ent.ContentBatchItem, input ContentBatchItemUpdate) error {
+	update := tx.ContentBatchItem.UpdateOneID(item.ID)
+	if item.DraftID != nil && (input.Caption != nil || input.Media != nil || input.ChannelConnectionIDs != nil || input.Grid != nil) {
+		return conflict("This item is a draft now. Edit its content in Write.")
+	}
+	if input.Grid != nil {
+		if item.Grid == nil {
+			return conflict("This item is not a grid video.")
+		}
+		if err := checkBatchGrid(ctx, tx.Client(), actor.OrganizationID, input.Grid); err != nil {
+			return err
+		}
+		update.SetGrid(input.Grid)
+		// A rendered video no longer shows a concept that changed, so it must render again.
+		if input.Media == nil && !reflect.DeepEqual(item.Grid, input.Grid) {
+			update.SetMedia([]schema.BatchMedia{})
+		}
+	}
+	if input.Caption != nil {
+		if _, err := contentDraftText(*input.Caption); err != nil {
+			return err
+		}
+		update.SetCaption(*input.Caption)
+	}
+	if input.Media != nil {
+		if err := checkBatchMedia(ctx, tx.Client(), actor.OrganizationID, *input.Media, true); err != nil {
+			return err
+		}
+		update.SetMedia(*input.Media)
+	}
+	if input.ChannelConnectionIDs != nil {
+		channels := []string{}
+		if len(*input.ChannelConnectionIDs) > 0 {
+			var err error
+			if channels, err = contentDraftChannels(ctx, tx, actor.OrganizationID, &set.ID, *input.ChannelConnectionIDs); err != nil {
+				return err
+			}
+		}
+		update.SetChannelConnectionIds(channels)
+	}
+	if input.Timing != nil {
+		if err := checkBatchTiming(*input.Timing); err != nil {
+			return err
+		}
+		update.SetTiming(*input.Timing)
+	}
+	if input.Position != nil {
+		if *input.Position < 0 || *input.Position > 10*contentBatchItemLimit {
+			return invalid("Choose a position in the batch.")
+		}
+		update.SetPosition(*input.Position)
+	}
+	return update.Exec(ctx)
+}
+
+// ContentBatchItemPatch is one item's changes in a bulk update.
+type ContentBatchItemPatch struct {
+	ItemID string `json:"itemId"`
+	ContentBatchItemUpdate
+}
+
+// UpdateContentBatchItems applies a bulk caption, account or time change as one
+// operation: any refused item refuses them all, so no item is left half applied.
+func (c *Configuration) UpdateContentBatchItems(ctx context.Context, actor Actor, batchID string, patches []ContentBatchItemPatch) (*ContentBatchRecord, error) {
+	if err := c.authorizeContentDrafts(ctx, actor, true); err != nil {
+		return nil, err
+	}
+	if len(patches) == 0 || len(patches) > contentBatchItemLimit {
+		return nil, invalid(fmt.Sprintf("Change 1 to %d items.", contentBatchItemLimit))
+	}
+	// Locks are taken in ID order so two bulk updates of a batch cannot deadlock.
+	ordered := slices.SortedFunc(slices.Values(patches), func(a, b ContentBatchItemPatch) int { return strings.Compare(a.ItemID, b.ItemID) })
+	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for i := range batch.Items {
-		if batch.Items[i].ID == itemID {
-			return &batch.Items[i], nil
+	defer tx.Rollback()
+	row, set, err := visibleBatch(ctx, tx.Client(), actor, batchID)
+	if err != nil {
+		return nil, err
+	}
+	if row.ArchivedAt != nil {
+		return nil, conflict("This batch is closed. Start a new batch.")
+	}
+	for i, patch := range ordered {
+		if i > 0 && ordered[i-1].ItemID == patch.ItemID {
+			return nil, invalid("Change each item once.")
+		}
+		item, err := lockedBatchItem(ctx, tx, actor, row.ID, patch.ItemID)
+		if err != nil {
+			return nil, err
+		}
+		if err := applyBatchItemUpdate(ctx, tx, actor, set, item, patch.ContentBatchItemUpdate); err != nil {
+			return nil, err
 		}
 	}
-	return nil, notFound("Item not found.")
+	if err := tx.ContentBatch.UpdateOneID(row.ID).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return c.GetContentBatch(ctx, actor, row.ID)
+}
+
+func (c *Configuration) batchItemRecord(ctx context.Context, actor Actor, batchID, itemID string) (*ContentBatchItemRecord, error) {
+	row, set, err := visibleBatch(ctx, c.client, actor, batchID)
+	if err != nil {
+		return nil, err
+	}
+	batch, err := c.batchWithItems(ctx, actor, row, set, itemID)
+	if err != nil {
+		return nil, err
+	}
+	if len(batch.Items) == 0 {
+		return nil, notFound("Item not found.")
+	}
+	return &batch.Items[0], nil
 }
 
 // RemoveContentBatchItem takes an item out of its batch. A draft it made stays in Write.
@@ -621,6 +770,9 @@ func (c *Configuration) CreateContentBatchItemDraft(ctx context.Context, actor A
 		return nil, err
 	}
 	if item.DraftID == nil {
+		if item.Grid != nil && len(item.Media) == 0 {
+			return nil, conflict("Render this video before saving it as a draft.")
+		}
 		assets := []string{}
 		for _, media := range item.Media {
 			if media.AssetID == "" {

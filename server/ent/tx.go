@@ -78,6 +78,8 @@ type Tx struct {
 	ContentBatch *ContentBatchClient
 	// ContentBatchItem is the client for interacting with the ContentBatchItem builders.
 	ContentBatchItem *ContentBatchItemClient
+	// ContentBatchRun is the client for interacting with the ContentBatchRun builders.
+	ContentBatchRun *ContentBatchRunClient
 	// ContentDraft is the client for interacting with the ContentDraft builders.
 	ContentDraft *ContentDraftClient
 	// ContentDraftFinisher is the client for interacting with the ContentDraftFinisher builders.
@@ -432,6 +434,7 @@ func (tx *Tx) init() {
 	tx.ContentAngle = NewContentAngleClient(tx.config)
 	tx.ContentBatch = NewContentBatchClient(tx.config)
 	tx.ContentBatchItem = NewContentBatchItemClient(tx.config)
+	tx.ContentBatchRun = NewContentBatchRunClient(tx.config)
 	tx.ContentDraft = NewContentDraftClient(tx.config)
 	tx.ContentDraftFinisher = NewContentDraftFinisherClient(tx.config)
 	tx.ContentDraftRevision = NewContentDraftRevisionClient(tx.config)

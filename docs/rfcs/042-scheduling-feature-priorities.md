@@ -11,6 +11,7 @@
 **Scope update (2026-10-28):** A specific assignment authorizes completing the reliability of the existing scheduling path: reviewed queue slots, scheduling identity, batch partial submission, failure recovery and visibility. See [scheduling reliability](../scheduling/reliability.md). It adds no channels or bulk import.
 **Scope update (2026-11-04):** A specific assignment authorizes the gaps the [Post Bridge post management study](../scheduling/post-bridge/post-management/implementation.md) found in existing surfaces: a month day cap and date notes, library filters, and the account allowance. It adds no channels, data model for posts or client connect links. No paid-customer evidence is recorded for it.
 **Scope update (2026-10-24):** A specific assignment authorizes the [Plan calendar and Analyze workspace](../scheduling/typefully/plan-and-analyze/implementation.md), including their [80 acceptance criteria](../scheduling/typefully/plan-and-analyze/implementation-matrix.md). This exception implements calendar filtering, placement/lifecycle interactions and account analytics. It does not reactivate the entire bulk-scheduling or network-expansion roadmap.
+**Scope update (2026-11-04):** A specific assignment authorizes the [Bulk Tools analysis](../scheduling/post-bridge/bulk-tools/post-bridge-bulk-tools-technical-analysis.md) on top of bulk batches: batches of up to 100 posts, folder intake, spintax and caption CSVs, and browser-rendered 2×2 grid videos, each a batch item. Network expansion and social dashboards stay deferred.
 **Scope update (2026-10-28):** A specific assignment authorizes media scheduling: one photo or video with its caption, one post with several attachments, and Priority 2's bulk batches of up to 50 separate posts, with large-file uploads in parts. The design, capability matrix and evidence are in [media scheduling](../media-scheduling.md). Network expansion and social dashboards stay deferred.
 
 **Date:** 2026-10-19  
@@ -138,7 +139,8 @@ idempotency key per draft, channel, and version (RFC 013).
 
 ### Not in this step
 
-Bulk video generation, such as Post Bridge's 2×2 grid videos.
+Bulk video generation, such as Post Bridge's 2×2 grid videos. The 2026-11-04
+scope update above later authorized it.
 
 ## Priority 3: an analytics dashboard
 

@@ -7,7 +7,7 @@ test.use({ workspaceOptions: { plan: 'pro' } })
 const SECTIONS = [
   ['Create', ['New', 'Recent', 'Templates', 'Tools']],
   ['Campaigns', ['All campaigns', 'Release inbox', 'Deliveries', 'Archived']],
-  ['Publish', ['Drafts', 'Calendar', 'Analyze', 'Link checks']],
+  ['Publish', ['Drafts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']],
   [
     'Library',
     ['Screenshots', 'Canvas', 'Story Sets', 'Store screenshots', 'Assets', 'Brand assets'],

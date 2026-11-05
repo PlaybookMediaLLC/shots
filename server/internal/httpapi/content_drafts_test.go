@@ -120,6 +120,22 @@ func TestScheduleContentDraftReportsSavedScheduleWhenWorkflowWakeupFails(t *test
 	}
 }
 
+type unstartedRunFake struct{ fakeConfiguration }
+
+func (*unstartedRunFake) SubmitContentBatch(context.Context, product.Actor, string, product.BatchSubmitInput) (*product.BatchRunRecord, error) {
+	return nil, product.ErrBatchRunNotStarted
+}
+
+// A run saved without its workflow answers as a failure saying a retry is safe.
+func TestSubmitContentBatchSaysARetryIsSafeWhenTheWorkflowDoesNotStart(t *testing.T) {
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", &unstartedRunFake{})
+	response := configurationRequest(handler, http.MethodPost, "/v1/content-batches/c123456789012345678901234/submit",
+		`{"requestKey":"submit-request-key-0001","items":[{"itemId":"c123456789012345678901235","refusal":"No."}]}`)
+	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "nothing is scheduled twice") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 type takenSlotFake struct{ fakeConfiguration }
 
 func (*takenSlotFake) ScheduleContentDraft(context.Context, product.Actor, string, product.ScheduleContentDraftInput) (*product.ScheduleContentDraftResult, error) {

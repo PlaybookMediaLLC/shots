@@ -1,6 +1,11 @@
-import type { BatchItem, BatchTiming } from '@/lib/api/contracts/content-batches'
-import type { DraftChannel } from '@/lib/write/document'
+import type { BatchItem, BatchRun, BatchTiming } from '@/lib/api/contracts/content-batches'
+import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
+import { zonedDayKey } from '@/lib/settings/zoned-time'
+import type { AccountStanding } from '@/lib/write/capabilities'
+import type { DraftChannel, VersionOptions } from '@/lib/write/document'
 import { mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { analyzeSpintax } from '@/lib/write/spintax'
+import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
 
 /**
@@ -10,7 +15,14 @@ import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
  */
 
 /** An account of the batch's set that an item can go to. */
-export type BatchAccount = { channel: DraftChannel; id: string; name: string }
+export type BatchAccount = {
+  channel: DraftChannel
+  id: string
+  name: string
+  /** This account's own caption limit, when it differs from its channel's. */
+  captionLimit?: number
+  tiktokCreator?: AccountStanding['tiktokCreator']
+}
 
 /**
  * An item's media facts once every attachment is uploaded; null while one is
@@ -54,14 +66,99 @@ export function stagedChecks(item: BatchItem, accounts: BatchAccount[]) {
         account.id,
         {
           changes: facts && !pdf ? mediaChanges(account.channel, facts) : [],
-          problems: !facts
-            ? ['Finish uploading this item’s files first.']
-            : pdf
-              ? documentProblems(account.channel, facts)
-              : mediaProblems(account.channel, facts),
+          problems: waitingToRender(item)
+            ? ['Render this video first.']
+            : !facts
+              ? ['Finish uploading this item’s files first.']
+              : pdf
+                ? documentProblems(account.channel, facts)
+                : mediaProblems(account.channel, facts),
         },
       ])
   )
+}
+
+/**
+ * Whether a caption source's longest expansion fits every account given, or
+ * what to shorten. Literal captions, variations and CSV rows all come here.
+ */
+export function captionProblem(source: string, accounts: readonly BatchAccount[]) {
+  for (const account of accounts) {
+    const measure = (text: string) => platformCaptionLength(account.channel, text)
+    const limit = account.captionLimit ?? DRAFT_CHANNEL_LIMITS[account.channel]
+    const length = measure(analyzeSpintax(source, measure).longest)
+    if (length > limit)
+      return `The longest caption is ${length} characters, and ${account.name} takes ${limit}. Shorten it or remove this account.`
+  }
+}
+
+/** A grid video concept whose video is not made yet; it cannot become a draft. */
+export function waitingToRender(item: Pick<BatchItem, 'draftId' | 'grid' | 'media'>) {
+  return Boolean(item.grid && !item.draftId && !item.media.length)
+}
+
+/** A YouTube title for an item: its caption's first line, else the name of its file. */
+function videoTitle(item: BatchItem) {
+  const name = (item.sourceKey || item.media[0]?.fileName || '').replace(/\.[^.]+$/, '')
+  const line = item.caption.trim().split('\n')[0] ?? ''
+  return (line.length >= 2 ? line : name).replace(/[<>]/g, '').slice(0, 100).trim()
+}
+
+/**
+ * The platform versions a staged item's draft starts with: its LinkedIn
+ * document, and the batch's YouTube and TikTok options for the channels the
+ * item goes to. A title chosen for the batch wins; otherwise each post has its
+ * own. Options are edited per post in Write from then on.
+ */
+export function stagedVersions(
+  item: BatchItem,
+  channels: readonly DraftChannel[],
+  options: VersionOptions
+) {
+  const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+  let versions = readVersions(undefined)
+  let changed = false
+  if (pdf?.assetId) {
+    versions = withOptions(versions, 'linkedin', {
+      document: {
+        assetId: pdf.assetId,
+        title: pdf.fileName?.replace(/\.pdf$/i, '').slice(0, 200) || 'Document',
+      },
+    })
+    changed = true
+  }
+  if (channels.includes('youtube') && options.youtube) {
+    const title = options.youtube.title.trim() || videoTitle(item)
+    versions = withOptions(versions, 'youtube', { youtube: { ...options.youtube, title } })
+    changed = true
+  }
+  if (channels.includes('tiktok') && options.tiktok) {
+    versions = withOptions(versions, 'tiktok', { tiktok: options.tiktok })
+    changed = true
+  }
+  return changed ? versions : undefined
+}
+
+/** The hours between posts that keep a day's posts inside its 24 hours. */
+export function spreadHourOptions(postsPerDay: number) {
+  return [1, 2, 3, 4, 6, 8, 12, 24].filter((hours) => hours * postsPerDay <= 24)
+}
+
+/** What a batch will do once scheduled, in real instants and calendar days of `zone`. */
+export function batchSummary(items: readonly BatchItem[], zone: string, now = new Date()) {
+  const instants = items.flatMap((item) => {
+    const timing = readTiming(item.timing, now)
+    return timing.kind === 'at' ? [timing.at] : []
+  })
+  const times = instants.map((at) => at.getTime())
+  return {
+    calendarDays: new Set(instants.map((at) => zonedDayKey(at, zone))).size,
+    destinations: items.reduce((total, item) => total + itemAccounts(item).length, 0),
+    first: times.length ? new Date(Math.min(...times)) : null,
+    last: times.length ? new Date(Math.max(...times)) : null,
+    posts: items.length,
+    withoutTime: items.length - instants.length,
+  }
 }
 
 /** When an item is meant to go out, or why that cannot be read yet. */
@@ -137,6 +234,25 @@ export function itemAccounts(item: BatchItem): string[] {
   return [...new Set([...item.channelConnectionIds, ...(item.draft?.channelConnectionIds ?? [])])]
 }
 
+/** Whether a draft already has queued or sent posts, so a new account goes beside them. */
+export function hasLivePosts(posts: readonly { status: string }[]) {
+  return posts.some((post) => post.status !== 'CANCELLED' && post.status !== 'FAILED')
+}
+
+/** What a schedule run did to each item, in words for the page. */
+export function runOutcomes(run: Pick<BatchRun, 'items'> | null | undefined) {
+  return Object.fromEntries(
+    (run?.items ?? []).map((item) => [
+      item.itemId,
+      item.status === 'DONE'
+        ? 'Scheduled'
+        : item.status === 'PENDING'
+          ? 'Waiting to be scheduled…'
+          : (item.error ?? 'This post was not scheduled.'),
+    ])
+  )
+}
+
 /** The accounts an item still needs scheduled to, and whether it already has live posts. */
 export function pendingAccounts(item: BatchItem, accountIds: string[]) {
   const live = accountIds.filter((id) => {
@@ -144,7 +260,7 @@ export function pendingAccounts(item: BatchItem, accountIds: string[]) {
     return post && post.status !== 'FAILED'
   })
   return {
-    add: item.posts.some((post) => post.status !== 'CANCELLED' && post.status !== 'FAILED'),
+    add: hasLivePosts(item.posts),
     remaining: accountIds.filter((id) => !live.includes(id)),
   }
 }
