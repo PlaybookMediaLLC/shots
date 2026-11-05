@@ -84,6 +84,7 @@ export function PropertiesPanel({
   draft,
   plainText,
   publications,
+  status,
   title,
   onTitle,
 }: {
@@ -93,6 +94,8 @@ export function PropertiesPanel({
   draft: DraftWire
   plainText: string
   publications: { channel: Publication['serialized']['channel']; publication: Publication }[]
+  /** The status the header shows, derived from the draft's posts. */
+  status: string
   title: string
   onTitle: (title: string) => void
 }) {
@@ -304,15 +307,7 @@ export function PropertiesPanel({
           <LocalTime value={draft.updatedAt} />
         </dd>
         <dt className="text-muted-foreground">Status</dt>
-        <dd>
-          {draft.status === 'archived'
-            ? 'Archived'
-            : draft.plannedFor
-              ? 'Planned, not scheduled'
-              : draft.status === 'scheduled'
-                ? 'Scheduled'
-                : 'Draft'}
-        </dd>
+        <dd data-testid="properties-status">{status}</dd>
       </dl>
       <section>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">

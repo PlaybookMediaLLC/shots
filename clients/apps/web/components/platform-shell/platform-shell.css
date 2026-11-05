@@ -636,10 +636,14 @@ body:has([data-platform-shell]) input:-webkit-autofill {
 }
 
 /* An open composer panel (preview, comments) takes the drafts rail's room on
-   screens too narrow for both, so the editor keeps a readable column. */
+   screens too narrow for both, so the editor keeps a readable column. The
+   drafts stay one click away: the header's Drafts button opens them. */
 @media (max-width: 1535px) {
   [data-testid='write-frame']:has([data-composer-panel]) [data-write-rail-column] {
     display: none;
+  }
+  [data-testid='write-frame']:has([data-composer-panel]) [data-drafts-drawer-button] {
+    display: inline-flex;
   }
 }
 

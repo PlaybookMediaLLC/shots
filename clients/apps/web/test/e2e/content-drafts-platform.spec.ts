@@ -154,11 +154,7 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
 
-    await app.open('/publish')
-    await page
-      .getByTestId('write-rail')
-      .getByRole('link', { name: 'Settings', exact: true })
-      .click()
+    await app.open('/settings/publishing-brands')
     // Settings save as they change.
     await page.getByLabel('Require approval').check()
     await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()

@@ -355,15 +355,17 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         })
         expect(incomplete.status).toBe(409)
         await page.goto(`/publish/${id}`)
+        // Post options open beside the draft from the platform's chip.
+        await page.getByTestId('options-chip').click()
         if (draft.channel === 'youtube') {
           await page.getByLabel('YouTube title', { exact: true }).fill('Fixture video')
           await page.getByRole('combobox', { name: 'YouTube privacy' }).click()
-          await page.getByRole('option', { name: 'private', exact: true }).click()
+          await page.getByRole('option', { name: 'Private', exact: true }).click()
           await page.getByRole('combobox', { name: 'YouTube audience' }).click()
           await page.getByRole('option', { name: 'Not made for kids', exact: true }).click()
         } else {
           await page.getByRole('combobox', { name: 'TikTok privacy' }).click()
-          await page.getByRole('option', { name: 'SELF_ONLY', exact: true }).click()
+          await page.getByRole('option', { name: 'Only me', exact: true }).click()
           await page
             .getByRole('checkbox', {
               name: 'I consent to send this video to TikTok at the scheduled time.',
@@ -372,20 +374,19 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         }
         await expectSaved(page)
         await page.reload()
+        await page.getByTestId('options-chip').click()
         if (draft.channel === 'youtube') {
           await expect(page.getByLabel('YouTube title', { exact: true })).toHaveValue(
             'Fixture video'
           )
           await expect(page.getByRole('combobox', { name: 'YouTube privacy' })).toHaveText(
-            'private'
+            'Private'
           )
           await expect(page.getByRole('combobox', { name: 'YouTube audience' })).toHaveText(
             'Not made for kids'
           )
         } else {
-          await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveText(
-            'SELF_ONLY'
-          )
+          await expect(page.getByRole('combobox', { name: 'TikTok privacy' })).toHaveText('Only me')
           await expect(
             page.getByRole('checkbox', {
               name: 'I consent to send this video to TikTok at the scheduled time.',

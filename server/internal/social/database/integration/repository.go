@@ -321,9 +321,7 @@ func envOrUndefined(name string) string {
 }
 
 func (r *Repository) UpdateIntegration(ctx context.Context, id string, params UpdateIntegrationParams) (*ent.Integration, error) {
-	if params.Picture != "" &&
-		(!strings.Contains(params.Picture, envOrUndefined("CLOUDFLARE_BUCKET_URL")) ||
-			!strings.Contains(params.Picture, envOrUndefined("FRONTEND_URL"))) {
+	if params.Picture != "" && !keptPicture(params.Picture) {
 		uploaded, err := r.storage.UploadSimple(ctx, params.Picture)
 		if err != nil {
 			return nil, err

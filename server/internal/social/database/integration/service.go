@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -95,10 +96,19 @@ func (s *Service) CheckPreviousConnections(ctx context.Context, org, id string) 
 	return s.repo.CheckPreviousConnections(ctx, org, id)
 }
 
+// keptPicture reports whether a provider's picture is stored as it is. Only a
+// Cloudflare Images link is. Any other picture is copied into storage with a
+// new name, so a stored picture never names a file that the copy did not make
+// (a provider could otherwise name another workspace's file in the bucket).
+func keptPicture(picture string) bool {
+	u, err := url.Parse(picture)
+	return err == nil && u.Scheme == "https" && u.User == nil && strings.EqualFold(u.Host, "imagedelivery.net")
+}
+
 // CreateOrUpdateIntegration uploads the picture to storage first (Cloudflare
 // Images URLs are kept as they are); a failed upload drops the picture.
 func (s *Service) CreateOrUpdateIntegration(ctx context.Context, p CreateOrUpdateIntegrationParams) (*ent.Integration, error) {
-	if p.Picture != "" && !strings.Contains(p.Picture, "imagedelivery.net") {
+	if p.Picture != "" && !keptPicture(p.Picture) {
 		uploaded, err := s.storage.UploadSimple(ctx, p.Picture)
 		if err != nil {
 			slog.Warn("Failed to upload profile picture:", "picture", p.Picture, "error", err)

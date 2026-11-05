@@ -32,6 +32,7 @@ test(
     }
     await subscription(true)
     const id = await openNewDraft(page)
+    await page.getByTestId('options-chip').click()
     await expect(page.getByLabel('Characters per post')).toHaveAttribute('max', '25000')
     const text = 'A longer post preserves every word and paragraph. '.repeat(90).trim()
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
@@ -71,6 +72,7 @@ test(
     })
     expect(seeded.status).toBe(200)
     await app.reload()
+    await page.getByTestId('options-chip').click()
     await expect(page.getByLabel('Characters per post')).toHaveAttribute('max', '280')
     await expect(draftEditor(page)).toContainText(text)
     await page.getByTestId('publish-button').click()

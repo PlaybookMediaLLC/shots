@@ -15,10 +15,14 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { NeedsAttention } from '@/components/platform-hub/NeedsAttention'
 import { RecentWork } from '@/components/platform-hub/RecentWork'
 import { TemplateHighlights } from '@/components/platform-hub/TemplateBrowser'
-import { requirePaidPageAccess } from '@/lib/auth/page-access'
+import { requirePaidPageAccess, sessionTenant } from '@/lib/auth/page-access'
+import type { OrganizationAccess } from '@/lib/auth/access'
+import { Suspense } from 'react'
 import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { roleLabels } from '@/lib/auth/role-descriptions'
 import { StartPostAction } from '@/components/platform-hub/StartPostAction'
+import { QueueNudge } from '@/components/platform-hub/QueueNudge'
+import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 export const metadata = { title: 'Home' }
@@ -40,7 +44,8 @@ export default async function HomePage({
     redirect(platformHref(locale === 'en' ? '/' : `/${locale}`, `/?${search}`))
   }
   // A contract that grants drafts without a paid plan gets Home too; paid starters lead to the plan page.
-  const access = await requirePaidPageAccess(await headers(), locale, '/home', 'content:drafts')
+  const requestHeaders = await headers()
+  const access = await requirePaidPageAccess(requestHeaders, locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
   const can = (permission: Permission) => accessAllows(access, permission)
@@ -164,6 +169,11 @@ export default async function HomePage({
           </ul>
         </section>
 
+        {paid && contentDraftsEnabled() && can('artifact:edit') && access.organization ? (
+          <Suspense fallback={null}>
+            <UpcomingQueue tenant={sessionTenant(access, access.organization.id, requestHeaders)} />
+          </Suspense>
+        ) : null}
         <div className="home-work platform-home">
           <RecentWork
             organizationId={access.organization!.id}
@@ -217,4 +227,27 @@ export default async function HomePage({
       </Page>
     </PlatformShell>
   )
+}
+
+/**
+ * Drafts queued for the next seven days, streamed after the page: Home nudges
+ * below three. A failed read is logged and shows nothing.
+ */
+async function UpcomingQueue({ tenant }: { tenant: OrganizationAccess }) {
+  const now = new Date()
+  const posts = await listContentDraftPostsBetween(
+    tenant,
+    now,
+    new Date(now.getTime() + 7 * 86_400_000)
+  ).catch((error: unknown) => {
+    console.error('Home could not read the queue for its nudge', error)
+    return null
+  })
+  if (!posts) return null
+  const queued = new Set(
+    posts
+      .filter((post) => post.status === 'SCHEDULED' || post.status === 'PROCESSING')
+      .map((post) => post.draftId)
+  ).size
+  return queued < 3 ? <QueueNudge queued={queued} /> : null
 }

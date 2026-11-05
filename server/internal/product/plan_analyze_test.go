@@ -300,6 +300,10 @@ func TestPlanAnalyzeDatabase(t *testing.T) {
 		if n, e := repo.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID), scheduledpost.StatusEQ(scheduledpost.StatusSCHEDULED)).Count(ctx); e != nil || n != 0 {
 			t.Fatalf("live jobs=%d %v", n, e)
 		}
+		// Teammates told the post was scheduled are told it was cancelled.
+		if n, e := repo.client.AuditLog.Query().Where(auditlog.Action("post.cancelled"), auditlog.EntityID(result.Posts[0].ID)).Count(ctx); e != nil || n != 1 {
+			t.Fatalf("cancel records=%d %v", n, e)
+		}
 	})
 
 	t.Run("P33 archive restoration preserves publication commitments without replanning", func(t *testing.T) {

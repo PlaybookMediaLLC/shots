@@ -19,7 +19,6 @@ test(
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
     await app.open(`/publish/${id}?panel=assistant`)
-    await page.getByRole('button', { name: 'Skip for now', exact: true }).click()
     const panel = page.getByTestId('assistant-panel')
     await panel.getByText('Writing prompts and examples', { exact: true }).click()
     await panel.getByRole('button', { name: 'Share a lesson', exact: true }).click()

@@ -85,10 +85,21 @@ func (c *Configuration) RetryContentDraftPost(ctx context.Context, actor Actor, 
 			return nil, conflict("This post was already retried; that retry is " + strings.ToLower(string(retry.Status)) + ".")
 		}
 	}
+	// A newer post to this account (a retry or a new schedule) replaced this
+	// one: retrying the old one could publish the same text twice.
+	replaced, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(*post.ContentDraftID),
+		scheduledpost.ChannelConnectionID(post.ChannelConnectionID), scheduledpost.CreatedAtGT(post.CreatedAt),
+		scheduledpost.StatusNEQ(scheduledpost.StatusCANCELLED)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if replaced {
+		return nil, conflict("A newer post to this account replaced this one. Retry the newest one instead.")
+	}
 	key := fmt.Sprintf("%s:retry:%d", original, len(retries)+1)
 	create := tx.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(post.OrganizationID).
 		SetNillableContentDraftID(post.ContentDraftID).SetNillableAssetID(post.AssetID).
-		SetChannelConnectionID(post.ChannelConnectionID).SetScheduledFor(time.Now().UTC()).
+		SetChannelConnectionID(post.ChannelConnectionID).SetNillableSocialSetID(post.SocialSetID).SetScheduledFor(time.Now().UTC()).
 		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(post.Caption).SetIdempotencyKey(key)
 	if len(post.AssetIds) > 0 {
 		create.SetAssetIds(post.AssetIds)

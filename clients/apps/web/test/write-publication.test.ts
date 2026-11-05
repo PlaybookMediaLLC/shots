@@ -4,6 +4,7 @@ import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 import type { PlateBody } from '@/lib/write/document'
 import { buildPublication, type PublicationDraft } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
+import { optionsSummary } from '@/components/write/composer/video-options'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
 const brk = (extra: object = {}) => ({ children: [{ text: '' }], type: POST_BREAK, ...extra })
@@ -600,4 +601,41 @@ test('video publication keeps explicit privacy and refuses missing choices', () 
     connectionId: 'ct0000000001',
   })
   assert.ok(unavailable.problems.some((problem) => problem.includes('permissions are unavailable')))
+})
+
+test('a platform chip names its options in words, and option problems open the options', () => {
+  assert.equal(optionsSummary('tiktok', {}), 'Choose privacy')
+  const tiktok = {
+    allowComments: true,
+    allowDuet: false,
+    allowStitch: false,
+    brandOrganic: false,
+    brandedContent: false,
+    consent: false,
+    madeWithAi: false,
+    privacy: 'SELF_ONLY',
+  } as const
+  assert.equal(optionsSummary('tiktok', { tiktok }), 'Only me · comments on · consent needed')
+  assert.equal(
+    optionsSummary('tiktok', { tiktok: { ...tiktok, consent: true } }),
+    'Only me · comments on'
+  )
+  assert.equal(optionsSummary('youtube', {}), 'Title, privacy and audience needed')
+  assert.equal(optionsSummary('x', {}), '')
+  // TikTok privacy and consent are separate problems, each named and each in the options.
+  const missing = buildPublication(draft({ body: [p('Video caption')] }), {
+    channel: 'tiktok',
+    connectionId: 'ct0000000001',
+  })
+  assert.ok(missing.problems.some((problem) => problem.includes('who can see')))
+  assert.ok(missing.problems.some((problem) => problem.includes('Confirm consent')))
+  assert.ok(missing.optionProblems.every((problem) => missing.problems.includes(problem)))
+  assert.ok(missing.optionProblems.some((problem) => problem.includes('Confirm consent')))
+  // A text problem is not an options problem.
+  const long = buildPublication(draft({ body: [p('x'.repeat(300))] }), {
+    channel: 'x',
+    connectionId: 'cx0000000001',
+  })
+  assert.ok(long.problems.length > 0)
+  assert.deepEqual(long.optionProblems, [])
 })

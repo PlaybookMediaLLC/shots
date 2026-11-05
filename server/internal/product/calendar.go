@@ -318,6 +318,10 @@ func (c *Configuration) MutateCalendar(ctx context.Context, actor Actor, input C
 				if count != 1 {
 					return nil, publishing.ErrConflict
 				}
+				if e := recordProductActivity(ctx, tx, actor, "post.cancelled", "post.cancelled", "scheduled_post", p.ID,
+					map[string]any{"contentDraftId": d.ID, "reason": "unscheduled"}); e != nil {
+					return nil, e
+				}
 				result.Cancelled = append(result.Cancelled, p.ID)
 			}
 			published, e := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.ContentDraftID(d.ID), scheduledpost.RemotePostIDNotNil()).Exist(ctx)

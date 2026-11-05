@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { createHash, randomBytes } from 'node:crypto'
 import {
   apiRequest,
+  caretAtDocumentEnd,
   chooseOption,
   db,
   draftEditor,
@@ -544,6 +545,9 @@ test(
     await expectSaved(page)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const panel = page.getByTestId('preview-panel')
+    // The preview starts on a phone; these baselines are the desktop column.
+    await panel.getByRole('combobox', { name: 'Preview device' }).click()
+    await page.getByRole('option', { name: 'Desktop', exact: true }).click()
     await expect(panel.getByRole('button', { name: 'Show more', exact: true })).toBeVisible()
     await expect(panel).toHaveScreenshot('x-desktop-collapsed.png', {
       animations: 'disabled',
@@ -576,8 +580,8 @@ test(
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
-    await draftEditor(page).click()
-    await page.keyboard.press('ControlOrMeta+End')
+    // A click then End can leave the caret where the click landed: set it at the end.
+    await caretAtDocumentEnd(page)
     await page.keyboard.type(' Live update.')
     await expect(panel).toContainText('Live update.')
     await page.keyboard.press('ControlOrMeta+Enter')
@@ -633,6 +637,7 @@ test(
     const pdf = await readFile(
       '../../../server/internal/social/integrations/social/linkedin/testdata/two-pages.pdf'
     )
+    await page.getByTestId('options-chip').click()
     await page
       .locator('input[type=file][aria-label="PDF document"]')
       .setInputFiles({ name: 'two-pages.pdf', mimeType: 'application/pdf', buffer: pdf })
@@ -647,6 +652,7 @@ test(
     await expectSaved(page)
     await app.reload()
     await page.getByTestId('platform-tab-linkedin').click()
+    await page.getByTestId('options-chip').click()
     await expect(page.getByRole('button', { name: 'PDF: two-pages', exact: true })).toBeVisible()
     await page.getByTestId('schedule-button').click()
     await page

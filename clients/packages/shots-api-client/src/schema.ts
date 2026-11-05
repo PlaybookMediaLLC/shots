@@ -1730,6 +1730,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -2825,6 +2829,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -3017,6 +3025,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -3341,6 +3353,10 @@ export interface components {
                 title: string;
             } | null;
             attentionPosts: number;
+            /** @default 0 */
+            checkPosts: number;
+            /** @default 0 */
+            publishingPosts: number;
             /** @enum {string} */
             kind: "standard" | "reply" | "quote" | "repurpose" | "article";
             nextPostAt: string | null;
@@ -3724,6 +3740,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;

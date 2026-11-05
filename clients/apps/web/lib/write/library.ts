@@ -37,11 +37,13 @@ export function libraryDraft(draft: DraftWire) {
   return {
     attentionPosts: draft.attentionPosts,
     channelConnectionIds: draft.channelConnectionIds,
+    checkPosts: draft.checkPosts,
     excerpt: text.slice(0, 180),
     id: draft.id,
     searchText: `${text} ${draft.scratchpad}`,
     kind: draft.kind,
     nextPostAt: draft.nextPostAt,
+    publishingPosts: draft.publishingPosts,
     pinned: draft.pinnedAt !== null,
     plannedFor: draft.plannedFor,
     publishedPosts: draft.publishedPosts,

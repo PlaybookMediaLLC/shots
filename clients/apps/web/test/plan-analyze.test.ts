@@ -7,9 +7,13 @@ import {
 } from '../lib/api/contracts/calendar-notes'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
+  currentPosts,
   draftPostsState,
+  draftStatus,
+  listedAttention,
   OVERDUE_AFTER_MS,
   POST_STATE_TONE,
+  postFailureFix,
   postFailureReason,
   postState,
   STATUS_GROUPS,
@@ -553,6 +557,109 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Publishing',
     'Scheduled',
   ])
+})
+
+test('every surface reads a draft with the same status words, from its current posts', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z')
+  const later = '2026-11-05T12:00:00Z'
+  const post = (
+    id: string,
+    status: 'FAILED' | 'PUBLISHED' | 'CANCELLED' | 'UNKNOWN_DELIVERY' | 'SCHEDULED',
+    createdAt: string
+  ) => ({
+    channelConnectionId: id,
+    createdAt,
+    scheduledFor: later,
+    status,
+  })
+  // The demo draft: TikTok failed, then its retry failed; the retry is its current state.
+  const demo = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'FAILED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(currentPosts(demo).length, 1)
+  const header = draftStatus(
+    { plannedFor: null, status: 'scheduled' },
+    draftPostsState(currentPosts(demo), now)
+  )
+  assert.deepEqual(header, { label: 'Failed', tone: 'red' })
+  // The list reads its counts in the same words.
+  const listed = listedAttention({
+    attentionPosts: 1,
+    checkPosts: 0,
+    publishedPosts: 0,
+    queuedPosts: 0,
+  })
+  assert.equal(listed?.state, 'Failed')
+  // A successful retry replaces the failure it followed; a cancelled one does not.
+  const retried = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'PUBLISHED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.deepEqual(draftPostsState(currentPosts(retried), now), {
+    count: 1,
+    state: 'Published',
+    total: 1,
+  })
+  const cancelled = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'CANCELLED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(cancelled), now)?.state, 'Failed')
+  // An unconfirmed post may be live: a newer post never hides it.
+  const unconfirmed = [
+    post('tiktok', 'UNKNOWN_DELIVERY', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'SCHEDULED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(unconfirmed), now)?.state, 'Needs check')
+  assert.equal(
+    listedAttention({ attentionPosts: 2, checkPosts: 1, publishedPosts: 1, queuedPosts: 0 })?.state,
+    'Needs check'
+  )
+  assert.equal(
+    listedAttention({ attentionPosts: 0, checkPosts: 0, publishedPosts: 1, queuedPosts: 0 }),
+    null
+  )
+  assert.deepEqual(draftStatus({ plannedFor: null, status: 'archived' }, null), {
+    label: 'Archived',
+    tone: 'gray',
+  })
+  // An archived draft whose post may be live says so, as the drafts list does.
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Needs check', total: 2 }
+    )?.label,
+    'Needs check · 1 of 2'
+  )
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Published', total: 1 }
+    )?.label,
+    'Archived'
+  )
+  assert.equal(draftStatus({ plannedFor: null, status: 'scheduled' }, null), null)
+})
+
+test('every failure names a cause and an action besides retrying when one exists', () => {
+  for (const code of [
+    'UNKNOWN',
+    'PUBLISHER_ERROR',
+    'PUBLISHER_UNAVAILABLE',
+    'ACCOUNT_RECONNECT',
+    'POST_OPTIONS',
+    'VIDEO_TOO_LONG',
+    'MEDIA_UNSUPPORTED',
+    'PROVIDER_PERMISSIONS',
+  ])
+    assert.doesNotMatch(postFailureReason(code) ?? '', /\(/, code)
+  assert.equal(postFailureFix('ACCOUNT_RECONNECT'), 'reconnect')
+  assert.equal(postFailureFix('403'), 'reconnect')
+  assert.equal(postFailureFix('VIDEO_TOO_LONG'), 'edit')
+  assert.equal(postFailureFix('400'), 'edit')
+  assert.equal(postFailureFix('429'), null)
+  assert.equal(postFailureFix(null), null)
 })
 
 test('a month day caps its posts but never hides one that needs attention', () => {

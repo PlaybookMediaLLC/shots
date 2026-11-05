@@ -109,6 +109,7 @@ test(
     await page.keyboard.press('Escape')
     await expectSaved(page)
     await page.getByTestId('platform-tab-linkedin').click()
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Add LinkedIn comment', exact: true }).click()
     await page.getByLabel('First comment', { exact: true }).fill('Here is the first comment')
     await page.keyboard.press('Escape')

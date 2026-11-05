@@ -15,6 +15,7 @@ test(
     await page.getByTestId('platform-tab-bluesky').click()
     const fork = page.getByRole('button', { name: 'Edit for Bluesky independently' })
     if (await fork.isVisible()) await fork.click()
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Closing-post templates', exact: true }).click()
     let dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: 'Create new template' }).click()
@@ -45,6 +46,7 @@ test(
         saved.platformVersions.versions.find((item) => item.channel === 'bluesky')?.body
       )
     ).toContain('"quoteFirstPost":true')
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Closing-post templates', exact: true }).click()
     dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: 'Delete', exact: true }).click()
@@ -89,6 +91,7 @@ test(
     )
     const id = new URL(page.url()).pathname.split('/').pop()!
     await expect(draftEditor(page)).toContainText('My perspective on this release')
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: 'Add LinkedIn comment', exact: true }).click()
     await page
       .getByLabel('First comment', { exact: true })

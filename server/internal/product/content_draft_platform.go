@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -523,6 +524,23 @@ func (c *Configuration) ListContentDraftPostsBetween(ctx context.Context, actor 
 		WithChannelConnection().Order(ent.Asc(scheduledpost.FieldScheduledFor)).All(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// A failure that a newer post replaced is history, as in the editor and
+	// the drafts list, even when the newer post is outside this range.
+	failedDrafts := []string{}
+	for _, post := range posts {
+		if post.Status == scheduledpost.StatusFAILED && post.ContentDraftID != nil {
+			failedDrafts = append(failedDrafts, *post.ContentDraftID)
+		}
+	}
+	if len(failedDrafts) > 0 {
+		related, err := c.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
+			scheduledpost.ContentDraftIDIn(failedDrafts...), scheduledpost.StatusIn(liveOrFailedStatuses...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		replaced := replacedFailures(related)
+		posts = slices.DeleteFunc(posts, func(post *ent.ScheduledPost) bool { return replaced[post.ID] })
 	}
 	ids := map[string]bool{}
 	for _, post := range posts {
