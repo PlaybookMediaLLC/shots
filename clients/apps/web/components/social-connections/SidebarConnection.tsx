@@ -23,8 +23,8 @@ export function SidebarConnection({ collapsed }: { collapsed: boolean }) {
   return (
     <ConnectionLauncher intent={{ operation: 'CREATE_SET', creationVisibility: 'PRIVATE' }}>
       <Button
-        aria-label="Add publishing brand"
-        title="Add publishing brand"
+        aria-label="Add profile"
+        title="Add profile"
         variant="ghost"
         size={collapsed ? 'icon' : 'sm'}
         className={
@@ -34,7 +34,7 @@ export function SidebarConnection({ collapsed }: { collapsed: boolean }) {
         }
       >
         <Plus className="size-4 shrink-0" aria-hidden />
-        {collapsed ? null : 'Add publishing brand'}
+        {collapsed ? null : 'Add profile'}
       </Button>
     </ConnectionLauncher>
   )

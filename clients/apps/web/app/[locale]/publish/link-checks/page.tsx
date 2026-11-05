@@ -18,7 +18,7 @@ type LinkPreviewPageProps = {
 
 export default async function LinkPreviewPage({ params, searchParams }: LinkPreviewPageProps) {
   const [{ locale }, query, requestHeaders] = await Promise.all([params, searchParams, headers()])
-  // The Publish tabs keep the publishing brand.
+  // The Publish tabs keep the profile.
   const set = typeof query.set === 'string' && /^[\w-]+$/.test(query.set) ? query.set : null
   const scope = set ? `?set=${set}` : ''
   const access = await getPageAccess(requestHeaders)

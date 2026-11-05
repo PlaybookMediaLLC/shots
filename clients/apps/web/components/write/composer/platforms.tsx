@@ -40,6 +40,10 @@ import { healthLabel } from '../sets'
 import { optionsSummary } from './video-options'
 import type { WriteSet } from '../write-context'
 import { CONNECT_PROVIDERS } from '@/components/settings/social-sets/api'
+import {
+  providerComingSoon,
+  useConnectionAvailability,
+} from '@/components/social-connections/availability'
 
 /** A set's account as the composer shows it. */
 export type ComposerAccount = WriteSet['accounts'][number]
@@ -59,6 +63,7 @@ export function PlatformTabs({
   options,
   over = [],
   primary,
+  value,
   versions,
 }: {
   accounts: ComposerAccount[]
@@ -71,16 +76,25 @@ export function PlatformTabs({
   /** The edited platform's options chip, at the row's end. */
   options?: React.ReactNode
   primary: DraftChannel
+  /** The primary's text, which a platform's own text is told apart from. */
+  value: PlateBody
   versions: PlatformVersions
 }) {
   const channels = tabChannels(accounts, enabled, primary)
   return (
-    <div className="flex items-center gap-2 overflow-x-auto px-4 py-3" data-testid="platform-tabs">
-      <div aria-label="Platform being edited" className="flex items-center gap-2" role="tablist">
+    // The row wraps rather than scrolls, so no tab or options chip is cut off at the edge.
+    <div className="flex flex-wrap items-center gap-2 px-4 py-3" data-testid="platform-tabs">
+      <div aria-label="Platform being edited" className="flex flex-wrap items-center gap-2" role="tablist">
         {channels.map((channel) => {
           const account = accounts.find((item) => item.channel === channel)
           const publishing = account ? enabled.includes(account.id) : false
-          const mode = channel === primary ? 'primary' : versionFor(versions, channel).mode
+          const version = versionFor(versions, channel)
+          const mode = channel === primary ? 'primary' : version.mode
+          // Forked but word for word the same is not yet its own text.
+          const own =
+            mode === 'manual' &&
+            serializeDraft(version.body ?? [], channel).caption !==
+              serializeDraft(value, channel).caption
           return (
             <Button
               aria-selected={active === channel}
@@ -103,7 +117,7 @@ export function PlatformTabs({
               {/* A synced version is the default, so only main and own text are named. */}
               {mode === 'primary' ? (
                 <span className="text-label text-muted-foreground">Main</span>
-              ) : mode === 'manual' ? (
+              ) : own ? (
                 <span className="rounded-full bg-amber-400/15 px-1.5 text-label text-amber-700 dark:text-amber-200">
                   Own text
                 </span>
@@ -141,7 +155,7 @@ export function PlatformTabs({
           Manage platforms
         </Button>
       ) : null}
-      {options ? <div className="ml-auto shrink-0">{options}</div> : null}
+      {options ? <div className="ml-auto max-w-full min-w-0">{options}</div> : null}
     </div>
   )
 }
@@ -171,7 +185,7 @@ export function OptionsChip({
     <Button
       aria-expanded={open}
       className={cn(
-        'h-8 gap-1.5 text-ui',
+        'h-auto min-h-8 max-w-full gap-1.5 text-ui whitespace-normal text-left',
         blocked && 'text-amber-700 dark:text-amber-300'
       )}
       data-testid="options-chip"
@@ -239,6 +253,7 @@ export function ManagePlatformsDialog({
   versions: PlatformVersions
 }) {
   const [resync, setResync] = React.useState<DraftChannel | null>(null)
+  const availability = useConnectionAvailability()
   const orphaned = resync ? resyncVersion(versions, resync).orphaned : []
   const toggle = (account: ComposerAccount, on: boolean) => {
     const next = on
@@ -393,7 +408,7 @@ export function ManagePlatformsDialog({
           )}
           {onConnect ? (
             <div className="flex flex-wrap gap-2" aria-label="Connect an account">
-              {CONNECT_PROVIDERS.filter((provider) => !accounts.some((account) => account.platform === provider.platform && account.health === 'connected')).map((provider) => (
+              {CONNECT_PROVIDERS.filter((provider) => !providerComingSoon(availability.data, provider.provider) && !accounts.some((account) => account.platform === provider.platform && account.health === 'connected')).map((provider) => (
                 <Button key={provider.provider} size="sm" variant="outline" onClick={() => void onConnect(provider.provider)}>
                   Connect {provider.label}
                 </Button>

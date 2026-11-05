@@ -62,6 +62,10 @@ export const contentDraftSchema = z.object({
   ),
   /** The draft's live posts (lists only). */
   publishedPosts: z.number().int(),
+  /** When its newest post that needs someone last changed (lists only). */
+  attentionAt: timestampSchema.nullable().default(null),
+  /** When its newest live post went out (lists only). */
+  lastPublishedAt: timestampSchema.nullable().default(null),
   /**
    * The draft's social set and what it copied from the set's defaults when it
    * was created (RFC 024). Defaults keep an older backend's answer readable.

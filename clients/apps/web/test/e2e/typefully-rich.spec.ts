@@ -64,6 +64,10 @@ test(
     ).toHaveValue('Hello {{first_name}}, here is the guide.')
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByTestId('publish-button').click()
+    await expect(page.getByTestId('blockers')).toContainText(
+      'Reconnect X to check this account’s Articles access.'
+    )
+    await page.getByRole('button', { name: 'See the review anyway' }).click()
     await expect(page.getByRole('dialog')).toContainText(
       'Reconnect X to check this account’s Articles access.'
     )
@@ -85,6 +89,7 @@ test(
     )
     await page.getByRole('button', { name: 'Close', exact: true }).click()
     await page.getByTestId('publish-button').click()
+    await page.getByRole('button', { name: 'See the review anyway' }).click()
     await page.screenshot({ path: '.context/shots/typefully-article-gated.png', fullPage: true })
   }
 )

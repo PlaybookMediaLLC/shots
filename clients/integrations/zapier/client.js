@@ -31,11 +31,11 @@ async function createDraft(z, bundle) {
   const input = bundle.inputData;
   if (!input.requestId || input.requestId.length > 512) throw new Error('Supply the stable source event ID; reuse it on a retry.');
   const set = (await sets(z, bundle)).find(item => item.id === input.socialSetId);
-  if (!set) throw new Error('This publishing brand is unavailable to this API key.');
+  if (!set) throw new Error('This profile is unavailable to this API key.');
   const platforms = input.platforms?.length ? input.platforms : set.defaultPlatforms;
   const channelConnectionIds = [...new Set(platforms)].map(platform => {
     const account = set.accounts.find(item => item.platform === platform);
-    if (!account) throw new Error(`No ${platform} account is connected to this publishing brand.`);
+    if (!account) throw new Error(`No ${platform} account is connected to this profile.`);
     return account.id;
   });
   const text = input.text || '';

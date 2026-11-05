@@ -105,14 +105,14 @@ export const PRODUCT_TOURS = [
         anchor: 'nav-settings',
         title: 'Settings',
         description:
-          'Connect social accounts in Publishing brands, invite your team and manage your plan.',
+          'Connect social accounts in Profiles, invite your team and manage your plan.',
       },
     ],
   },
   {
     id: 'publish',
     title: 'Publish your first post',
-    summary: 'Publishing brands, drafts and the posting queue.',
+    summary: 'Profiles, drafts and the posting queue.',
     version: 1,
     // Publish opens drafts only where they are rolled out and in the plan.
     available: (access: PlatformAccess) => access.draftsEnabled && !areaLocked('publish', access),
@@ -121,9 +121,9 @@ export const PRODUCT_TOURS = [
         id: 'brand',
         anchor: 'write-brand',
         route: '/publish',
-        title: 'Choose a publishing brand',
+        title: 'Choose a profile',
         description:
-          'A brand is a set of social accounts. Drafts in it publish to those accounts. Settings opens its accounts and posting schedule.',
+          'A profile is a set of social accounts. Drafts in it publish to those accounts. Settings opens its accounts and posting schedule.',
       },
       {
         id: 'new-draft',
@@ -146,7 +146,7 @@ export const PRODUCT_TOURS = [
         anchor: 'write-bulk',
         route: '/publish',
         title: 'Schedule many posts at once',
-        description: 'Bulk schedule plans a batch of separate posts in one pass.',
+        description: 'Bulk tools plan a batch of separate posts in one pass.',
       },
     ],
   },

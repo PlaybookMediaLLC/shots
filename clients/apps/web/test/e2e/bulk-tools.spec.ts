@@ -197,8 +197,9 @@ test(
     await app.open('/publish/batches')
     await page
       .getByTestId('bulk-tools')
-      .getByRole('button', { name: /^Grid videos/ })
+      .getByRole('radio', { name: /^Grid videos/ })
       .click()
+    await page.getByRole('button', { name: 'Start a batch', exact: true }).click()
     await page.waitForURL(/\/publish\/batches\/[^/?]+\?start=grid$/)
     await expect(page.getByRole('heading', { name: 'Grid videos', exact: true })).toBeVisible()
 

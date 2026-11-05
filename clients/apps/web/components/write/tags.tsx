@@ -73,7 +73,7 @@ export function TagManager({ onClose, setId }: { onClose: () => void; setId: str
         <DialogHeader>
           <DialogTitle>Tags in {setName_}</DialogTitle>
           <DialogDescription>
-            Each brand has its own tags. Deleting a tag takes it off its drafts.
+            Each profile has its own tags. Deleting a tag takes it off its drafts.
           </DialogDescription>
         </DialogHeader>
         <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto">

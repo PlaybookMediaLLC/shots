@@ -11,6 +11,7 @@ import {
   inPreview,
   type Locator,
   openNewDraft,
+  openBlockedSchedule,
   openSchedule,
   type Page,
   png,
@@ -144,7 +145,7 @@ test(
         'of 280 characters'
       )
     })
-    const blocked = await openSchedule(page)
+    const blocked = await openBlockedSchedule(page)
     await expect(blocked.getByTestId('blocking-problems')).toContainText('of 280 characters')
     await expect(blocked.getByRole('button', { name: 'Confirm schedule' })).toBeDisabled()
     await page.keyboard.press('Escape')

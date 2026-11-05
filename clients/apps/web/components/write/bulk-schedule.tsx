@@ -115,7 +115,7 @@ export function BulkScheduleDialog({
           row.destinations = draft.channelConnectionIds.map(
             (account) => accounts.get(account) ?? account
           )
-          if (draft.socialSetId !== set.id) throw new Error('Use one publishing brand per batch.')
+          if (draft.socialSetId !== set.id) throw new Error('Use one profile per batch.')
           row.input = {
             channelConnectionIds: draft.channelConnectionIds,
             version: draft.version,

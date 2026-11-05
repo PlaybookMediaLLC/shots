@@ -59,16 +59,8 @@ test.describe('a workspace without a plan', () => {
     for (const [section, notice, from] of [
       ['Shared links', 'Publishing designs at a link needs Pro.', 'shared-links'],
       ['Integrations', 'Delivering designs to Slack, Notion and Figma needs Pro.', 'integrations'],
-      [
-        'Publishing brands',
-        'Publishing brands, and the accounts and schedules',
-        'publishing-brands',
-      ],
-      [
-        'Notifications',
-        'Publishing brands, and notifications for each, need Pro.',
-        'notifications',
-      ],
+      ['Profiles', 'Profiles, and the accounts and schedules', 'publishing-brands'],
+      ['Notifications', 'Profiles, and notifications for each, need Pro.', 'notifications'],
       ['Developer API', 'Outbound webhooks need Pro.', 'developers'],
     ]) {
       await openWorkspaceSetting(page, section)

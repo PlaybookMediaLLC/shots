@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { DAY_STYLE, useWhen } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
@@ -23,6 +24,9 @@ export function MetricChart({
   metric: AnalyticsReport['metrics'][string]
   growth?: boolean
 }) {
+  const when = useWhen()
+  // Intervals are calendar days, not moments: read them in UTC so the day stays the one named.
+  const day = (at: string) => when(at, 'UTC', DAY_STYLE)
   const points = chartPoints(metric, growth)
   const [active, setActive] = React.useState<number | null>(null)
   const values = points.flatMap((p) => (p.value === null ? [] : [p.value]))
@@ -52,7 +56,7 @@ export function MetricChart({
         viewBox="0 0 960 320"
         className="w-full"
         role="img"
-        aria-label={`${growth ? 'Interval growth' : 'Observed values'} from ${points[0]?.at} to ${points.at(-1)?.at}. Exact values are in the data table.`}
+        aria-label={`${growth ? 'Interval growth' : 'Observed values'} from ${day(points[0]!.at)} to ${day(points.at(-1)!.at)}. Exact values are in the data table.`}
       >
         {[0, 1, 2, 3, 4].map((i) => {
           const value = min + ((max - min) * i) / 4
@@ -82,28 +86,28 @@ export function MetricChart({
               r={active === i ? 6 : 4}
               fill="#0284c7"
               tabIndex={0}
-              aria-label={`${p.at}: ${p.value}, ${p.samples} observations`}
+              aria-label={`${day(p.at)}: ${p.value}, ${p.samples} observations`}
               onFocus={() => setActive(i)}
               onMouseEnter={() => setActive(i)}
               onBlur={() => setActive(null)}
               onMouseLeave={() => setActive(null)}
             >
               <title>
-                {p.at}: {p.value} ({p.samples} observations)
+                {day(p.at)}: {p.value} ({p.samples} observations)
               </title>
             </circle>
           )
         )}
         <text x="70" y="295" fontSize="14" fill="currentColor">
-          {points[0]?.at}
+          {day(points[0]!.at)}
         </text>
         <text x="910" y="295" textAnchor="end" fontSize="14" fill="currentColor">
-          {points.at(-1)?.at}
+          {day(points.at(-1)!.at)}
         </text>
       </svg>
       <figcaption className="min-h-6 text-sm">
         {active !== null && points[active]
-          ? `${points[active].at}: ${formatValue(points[active].value)} · ${points[active].samples} observations`
+          ? `${day(points[active].at)}: ${formatValue(points[active].value)} · ${points[active].samples} observations`
           : 'Focus or hover over a point for its value. Gaps indicate missing observations.'}
       </figcaption>
       <Disclosure className="mt-3 text-sm">
@@ -122,7 +126,7 @@ export function MetricChart({
               <TableBody>
                 {points.map((p) => (
                   <TableRow key={p.at}>
-                    <TableHead scope="row">{p.at}</TableHead>
+                    <TableHead scope="row">{day(p.at)}</TableHead>
                     <TableCell>{formatValue(p.value)}</TableCell>
                     <TableCell>{p.samples}</TableCell>
                   </TableRow>

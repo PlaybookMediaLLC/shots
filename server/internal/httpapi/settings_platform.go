@@ -263,7 +263,7 @@ func (s *Server) removeSocialSetAccount(w http.ResponseWriter, r *http.Request) 
 }
 
 // removeChannelConnection removes an account from the workspace, in a
-// publishing brand or in none, and stops the workflows of the posts it cancelled.
+// profile or in none, and stops the workflows of the posts it cancelled.
 func (s *Server) removeChannelConnection(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {

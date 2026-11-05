@@ -6,13 +6,13 @@ import { platformArea } from '@/lib/platform/navigation'
 import { withoutLocale } from '@/lib/settings/appearance'
 
 /**
- * Toasts on the signed-in app pages sit top-centre: bottom-left covered the
- * sidebar's account switcher and sat far from centred dialogs. The editors
- * keep the bottom-left their panels were laid out around.
+ * Toasts on the signed-in app pages sit bottom-centre: bottom-left covered the
+ * sidebar's account switcher, and the top covered a draft's title and save
+ * state. The editors keep the bottom-left their panels were laid out around.
  */
 export function AppToaster() {
   const path = withoutLocale(usePathname() ?? '/')
   const area = platformArea(path)
   const app = (area !== undefined && area !== 'create') || path === '/create' || path === '/upgrade'
-  return <Toaster position={app ? 'top-center' : undefined} />
+  return <Toaster position={app ? 'bottom-center' : undefined} />
 }

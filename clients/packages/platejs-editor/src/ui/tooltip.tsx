@@ -118,7 +118,16 @@ export function withTooltip<T extends React.ElementType>(Component: T) {
   }: TooltipProps<T>) {
     const isMounted = useMounted();
 
-    const component = <Component {...(props as React.ComponentProps<T>)} />;
+    const own = props as { "aria-label"?: string; children?: React.ReactNode };
+    // An icon-only control's tooltip is also its name for assistive technology.
+    const label =
+      typeof tooltip === "string" &&
+      !own["aria-label"] &&
+      typeof own.children !== "string"
+        ? tooltip
+        : undefined;
+    const named = { "aria-label": label, ...props } as React.ComponentProps<T>;
+    const component = <Component {...named} />;
 
     if (tooltip && isMounted) {
       return (

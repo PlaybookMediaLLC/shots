@@ -104,7 +104,7 @@ export function AssistantPanel({
         </Button>
       </p>
       <p className="text-xs text-muted-foreground">
-        Workspace defaults → Publishing brand overrides → Your instructions for this draft. Prohibited
+        Workspace defaults → Profile overrides → Your instructions for this draft. Prohibited
         terms always apply.
       </p>
       <Label className="grid gap-1 text-xs">
@@ -138,7 +138,7 @@ export function AssistantPanel({
       </Disclosure>
       {nudge ? (
         <p className="rounded-lg border border-border p-3 text-xs text-muted-foreground" role="status">
-          Add a style guide and writing samples so answers sound like {set?.name ?? 'this brand'}.{' '}
+          Add a style guide and writing samples so answers sound like {set?.name ?? 'this profile'}.{' '}
           <Button
             className="text-sky-700 dark:text-sky-300"
             onClick={() => setSetup(true)}
@@ -256,7 +256,7 @@ function AssistantSetup({ onDone, set }: { onDone: () => void; set: WriteSet | n
     <div className="grid gap-3 p-4 text-sm" data-testid="assistant-setup">
       <p className="text-foreground">Set up the assistant for {set?.name ?? 'this set'}</p>
       <p className="text-xs text-muted-foreground">
-        The assistant and Rewrite write in the brand&rsquo;s voice: its style guide and writing
+        The assistant and Rewrite write in the profile&rsquo;s voice: its style guide and writing
         samples. Everyone who writes in the set shares it.
       </p>
       {set && canManageSets ? (

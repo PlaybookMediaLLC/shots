@@ -46,7 +46,7 @@ export const SHORTCUT_REFERENCE: {
     items: [
       { key: 'k', label: 'Search and commands', mod: true },
       { key: '/', label: 'Show or hide the drafts list', mod: true },
-      { key: '1', label: 'Drafts', mod: true, shift: true },
+      { key: '1', label: 'Posts', mod: true, shift: true },
       { key: '2', label: 'Calendar', mod: true, shift: true },
       { key: '.', label: 'New draft', mod: true },
       { alt: true, key: 'arrowdown', label: 'Next draft', mod: true },
@@ -402,7 +402,7 @@ function FrameLayout({
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Drafts</SheetTitle>
-            <SheetDescription>The drafts of this brand.</SheetDescription>
+            <SheetDescription>The drafts of this profile.</SheetDescription>
           </SheetHeader>
           <WriteRail key={data.activeSet?.id ?? 'none'} />
         </SheetContent>

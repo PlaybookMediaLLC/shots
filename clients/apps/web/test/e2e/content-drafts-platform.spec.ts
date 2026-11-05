@@ -7,6 +7,7 @@ import {
   expectSaved,
   inPreview,
   openNewDraft,
+  openBlockedSchedule,
   openSchedule,
   type Page,
   previewOf,
@@ -163,7 +164,7 @@ test(
     await write(page, 'Needs a second pair of eyes')
     await chooseChannels(page, ['x'])
     await expectSaved(page)
-    const blocked = await openSchedule(page)
+    const blocked = await openBlockedSchedule(page)
     await expect(blocked.getByTestId('blocking-problems')).toContainText('approves drafts')
     await expect(blocked.getByRole('button', { name: 'Confirm schedule' })).toBeDisabled()
     await page.keyboard.press('Escape')

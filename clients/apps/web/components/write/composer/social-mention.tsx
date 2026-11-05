@@ -341,7 +341,7 @@ export function MentionPicker({
             ? 'Looked up on X with this set’s account, by exact username.'
             : kind === 'person'
               ? 'Search followers of this LinkedIn Page. Requires approved People Typeahead access and r_organization_followers permission.'
-              : 'Search company pages or reuse companies mentioned in this publishing brand. Mentions use native LinkedIn identities.'}
+              : 'Search company pages or reuse companies mentioned in this profile. Mentions use native LinkedIn identities.'}
         </p>
         {channel === 'linkedin' ? (
           <Button disabled={busy} variant="ghost" size="sm" onClick={() => void search('')}>

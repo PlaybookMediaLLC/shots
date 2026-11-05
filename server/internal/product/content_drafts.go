@@ -89,6 +89,10 @@ type ContentDraftRecord struct {
 	GuestComments    []map[string]string `json:"guestComments"`
 	// PublishedPosts counts the draft's live posts (lists only).
 	PublishedPosts int `json:"publishedPosts"`
+	// AttentionAt and LastPublishedAt date the newest post that needs someone
+	// and the newest live post (lists only).
+	AttentionAt     *time.Time `json:"attentionAt"`
+	LastPublishedAt *time.Time `json:"lastPublishedAt"`
 	// The draft's social set and what it copied from the set's defaults when
 	// it was created (RFC 024); later changes to the set leave these alone.
 	SuppressSlackOnPublish bool              `json:"suppressSlackOnPublish"`
@@ -129,7 +133,8 @@ type ContentDraftPage struct {
 
 // ContentDraftListQuery filters a draft list. Status is empty for every
 // status except archived. View, when set, is a lifecycle tab: drafts (not
-// yet live), posted (something went live), or archived. Sort is updated_desc
+// yet live, and nothing needs someone), posted (something went live), failed
+// (a post needs someone), or archived. Sort is updated_desc
 // (the default), updated_asc, created_desc or created_asc.
 type ContentDraftListQuery struct {
 	Cursor      string
@@ -754,6 +759,33 @@ func draftPostExists(statuses ...string) predicate.ContentDraft {
 	}
 }
 
+// draftNeedsAttention matches a draft with a post someone must act on: its
+// outcome is unknown, or it failed and no newer post to its destination
+// replaced it. replacedFailures applies the same rule to loaded posts.
+func draftNeedsAttention() predicate.ContentDraft {
+	return func(s *sql.Selector) {
+		posts := sql.Table(scheduledpost.Table).As("attention_post")
+		newer := sql.Table(scheduledpost.Table).As("newer_post")
+		current := make([]any, 0, len(liveOrFailedStatuses))
+		for _, status := range liveOrFailedStatuses {
+			current = append(current, string(status))
+		}
+		replaced := sql.Exists(sql.Select(newer.C(scheduledpost.FieldID)).From(newer).Where(sql.And(
+			sql.ColumnsEQ(newer.C(scheduledpost.FieldContentDraftID), posts.C(scheduledpost.FieldContentDraftID)),
+			sql.ColumnsEQ(newer.C(scheduledpost.FieldChannelConnectionID), posts.C(scheduledpost.FieldChannelConnectionID)),
+			sql.In(newer.C(scheduledpost.FieldStatus), current...),
+			sql.ColumnsGT(newer.C(scheduledpost.FieldCreatedAt), posts.C(scheduledpost.FieldCreatedAt)),
+		)))
+		s.Where(sql.Exists(sql.Select(posts.C(scheduledpost.FieldID)).From(posts).Where(sql.And(
+			sql.ColumnsEQ(posts.C(scheduledpost.FieldContentDraftID), s.C(contentdraft.FieldID)),
+			sql.Or(
+				sql.EQ(posts.C(scheduledpost.FieldStatus), "UNKNOWN_DELIVERY"),
+				sql.And(sql.EQ(posts.C(scheduledpost.FieldStatus), "FAILED"), sql.Not(replaced)),
+			),
+		))))
+	}
+}
+
 // draftPostsMatch matches a draft when one live post meets every criterion:
 // a draft with an X post last week and a LinkedIn post today does not match
 // "X, today". A draft with no live post matches on what it intends instead,
@@ -820,13 +852,15 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 	switch query.View {
 	case "":
 	case "drafts":
-		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), contentdraft.Not(draftPostExists("PUBLISHED")))
+		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), contentdraft.Not(draftPostExists("PUBLISHED")), contentdraft.Not(draftNeedsAttention()))
 	case "posted":
 		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), draftPostExists("PUBLISHED"))
+	case "failed":
+		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), draftNeedsAttention())
 	case "archived":
 		filters = append(filters, contentdraft.StatusEQ(contentdraft.StatusArchived))
 	default:
-		return nil, invalid("A view is drafts, posted, or archived.")
+		return nil, invalid("A view is drafts, posted, failed, or archived.")
 	}
 	if query.ConnectionID != "" && !contentDraftRefPattern.MatchString(query.ConnectionID) {
 		return nil, invalid("Filter by a valid account.")
@@ -948,7 +982,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	}
 	type summary struct {
 		attention, check, published, publishing, queued int
-		next                                            *time.Time
+		next, attentionAt, lastPublished                *time.Time
 	}
 	byDraft := map[string]*summary{}
 	// A failure needs attention only while it is its destination's newest
@@ -964,6 +998,9 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		switch post.Status {
 		case scheduledpost.StatusPUBLISHED:
 			item.published++
+			if post.PublishedAt != nil && (item.lastPublished == nil || post.PublishedAt.After(*item.lastPublished)) {
+				item.lastPublished = post.PublishedAt
+			}
 		case scheduledpost.StatusPROCESSING:
 			item.queued++
 			item.publishing++
@@ -976,9 +1013,17 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		case scheduledpost.StatusUNKNOWN_DELIVERY:
 			item.attention++
 			item.check++
+			if item.attentionAt == nil || post.UpdatedAt.After(*item.attentionAt) {
+				at := post.UpdatedAt
+				item.attentionAt = &at
+			}
 		default:
 			if !replaced[post.ID] {
 				item.attention++
+				if item.attentionAt == nil || post.UpdatedAt.After(*item.attentionAt) {
+					at := post.UpdatedAt
+					item.attentionAt = &at
+				}
 			}
 		}
 	}
@@ -987,6 +1032,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
 			record.PublishingPosts = item.publishing
+			record.AttentionAt, record.LastPublishedAt = item.attentionAt, item.lastPublished
 		}
 		return record
 	}, nil

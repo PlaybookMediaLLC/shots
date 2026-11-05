@@ -31,15 +31,25 @@ export function libraryQuery(location: () => string) {
   }
 }
 
+/** What a draft is called everywhere: its title, else its text's first line. */
+export function draftName(draft: { excerpt?: string | null; title: string }): string {
+  const title = draft.title.trim()
+  if (title && title !== 'Untitled draft') return title
+  const line = draft.excerpt?.split('\n').find((text) => text.trim())
+  return line?.trim().slice(0, 80) || 'Untitled draft'
+}
+
 /** The saved fields a draft contributes to the Write library. */
 export function libraryDraft(draft: DraftWire) {
   const text = draft.plainText || draftPlainText(draft.body)
   return {
+    attentionAt: draft.attentionAt,
     attentionPosts: draft.attentionPosts,
     channelConnectionIds: draft.channelConnectionIds,
     checkPosts: draft.checkPosts,
     excerpt: text.slice(0, 180),
     id: draft.id,
+    lastPublishedAt: draft.lastPublishedAt,
     searchText: `${text} ${draft.scratchpad}`,
     kind: draft.kind,
     nextPostAt: draft.nextPostAt,

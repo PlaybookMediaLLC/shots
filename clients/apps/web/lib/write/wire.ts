@@ -88,8 +88,8 @@ export const contentDraftSortSchema = z.enum([
 /** One of {@link contentDraftSortSchema}. */
 export type ContentDraftSort = z.infer<typeof contentDraftSortSchema>
 
-/** A lifecycle tab: not yet live, something went live, or archived. */
-export const contentDraftViewSchema = z.enum(['drafts', 'posted', 'archived'])
+/** A lifecycle tab: not yet live, something went live, a post needs someone, or archived. */
+export const contentDraftViewSchema = z.enum(['drafts', 'posted', 'failed', 'archived'])
 
 /** One of {@link contentDraftViewSchema}. */
 export type ContentDraftView = z.infer<typeof contentDraftViewSchema>

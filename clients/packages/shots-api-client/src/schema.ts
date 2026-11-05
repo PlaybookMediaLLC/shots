@@ -1692,6 +1692,10 @@ export interface components {
                     text: string;
                 }[];
                 publishedPosts: number;
+                /** @default null */
+                attentionAt: string | null;
+                /** @default null */
+                lastPublishedAt: string | null;
                 /**
                  * @default {
                  *       "autoPlug": {
@@ -2791,6 +2795,10 @@ export interface components {
                     text: string;
                 }[];
                 publishedPosts: number;
+                /** @default null */
+                attentionAt: string | null;
+                /** @default null */
+                lastPublishedAt: string | null;
                 /**
                  * @default {
                  *       "autoPlug": {
@@ -2987,6 +2995,10 @@ export interface components {
                     text: string;
                 }[];
                 publishedPosts: number;
+                /** @default null */
+                attentionAt: string | null;
+                /** @default null */
+                lastPublishedAt: string | null;
                 /**
                  * @default {
                  *       "autoPlug": {
@@ -3315,6 +3327,10 @@ export interface components {
                 text: string;
             }[];
             publishedPosts: number;
+            /** @default null */
+            attentionAt: string | null;
+            /** @default null */
+            lastPublishedAt: string | null;
             /**
              * @default {
              *       "autoPlug": {
@@ -3702,6 +3718,10 @@ export interface components {
                     text: string;
                 }[];
                 publishedPosts: number;
+                /** @default null */
+                attentionAt: string | null;
+                /** @default null */
+                lastPublishedAt: string | null;
                 /**
                  * @default {
                  *       "autoPlug": {
@@ -9187,7 +9207,7 @@ export interface operations {
                 status?: "draft" | "scheduled" | "archived";
                 tagId?: string;
                 to?: string;
-                view?: "drafts" | "posted" | "archived";
+                view?: "drafts" | "posted" | "failed" | "archived";
             };
             header?: never;
             path?: never;

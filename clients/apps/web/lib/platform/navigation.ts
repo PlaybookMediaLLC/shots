@@ -54,7 +54,7 @@ const DESTINATION_ALIASES: Record<PlatformArea, string[]> = {
   home: ['dashboard', 'start'],
   create: ['screenshot', 'editor', 'canvas', 'visual', 'design', 'mockup', 'store', 'image'],
   campaigns: ['launch', 'release', 'brief'],
-  publish: ['write', 'draft', 'post', 'schedule', 'calendar', 'thread', 'link check', 'brand'],
+  publish: ['write', 'draft', 'post', 'schedule', 'calendar', 'thread', 'link check', 'profile', 'brand'],
   library: ['project', 'asset', 'template', 'brand kit', 'media'],
   automate: ['workflow', 'automation', 'source', 'run'],
   activity: ['history', 'log', 'feed'],
@@ -116,7 +116,7 @@ export function campaignLinks(draftsEnabled: boolean): AreaLink[] {
 
 /**
  * Each area's pages, for the sidebar and the page tabs. Publish's pages carry
- * the publishing brand and Campaigns' depend on drafts, so they come from
+ * the profile and Campaigns' depend on drafts, so they come from
  * `publishLinks` and `campaignLinks` instead.
  */
 export const AREA_LINKS: Partial<Record<PlatformArea, AreaLink[]>> = {
@@ -147,15 +147,15 @@ export function activeLink<T extends { href: string }>(
   return (
     items.find((item) => item.href.includes('?') && matches(item.href)) ??
     items.find((item) => matches(item.href)) ??
-    // A link that only carries context, like a publishing brand, still marks its page.
+    // A link that only carries context, like a profile, still marks its page.
     items.find((item) => item.href.split('?')[0] === page)
   )
 }
 
-/** One Publish vocabulary for every page in the area; `scope` keeps the publishing brand. */
+/** One Publish vocabulary for every page in the area; `scope` keeps the profile. */
 export function publishLinks(scope = '') {
   return [
-    { href: `/publish${scope}`, label: 'Drafts' },
+    { href: `/publish${scope}`, label: 'Posts' },
     { href: `/publish/calendar${scope}`, label: 'Calendar' },
     { href: `/publish/batches${scope}`, label: 'Bulk tools' },
     { href: `/publish/analyze${scope}`, label: 'Analyze' },

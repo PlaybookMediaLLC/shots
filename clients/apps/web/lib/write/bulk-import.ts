@@ -44,7 +44,7 @@ export function channelProblem(channels: string[], connected: readonly string[])
     return `Unknown channel ${unknown.join(', ')}. Use ${draftChannelSchema.options.join(', ')}, separated by semicolons.`
   const missing = channels.filter((channel) => !connected.includes(channel))
   if (missing.length)
-    return `No connected ${missing.join(', ')} account in this publishing brand. Connect it, or remove it from this row's channels.`
+    return `No connected ${missing.join(', ')} account in this profile. Connect it, or remove it from this row's channels.`
 }
 
 /**

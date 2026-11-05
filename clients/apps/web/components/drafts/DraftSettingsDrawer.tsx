@@ -71,7 +71,7 @@ export function BrandSettingsButton({ id, name }: { id: string; name: string }) 
 
 /**
  * A brand's settings in a sheet over the page (RFC 024): the same pages as
- * Settings › Publishing brands, named in the address (`?settings=scheduling`),
+ * Settings › Profiles, named in the address (`?settings=scheduling`),
  * so opening, moving between pages and closing never unmounts the work under
  * it: unsaved text, selection, media, channel text and comments stay as they were.
  */
@@ -104,14 +104,14 @@ export function DraftSettingsDrawer({
     shown.current = set.data
   }, [router, set.data])
 
-  const name = set.data?.name ?? 'Brand'
+  const name = set.data?.name ?? 'Profile'
   return (
     <Sheet onOpenChange={(open) => (open ? null : openBrandSettings(null))} open={page !== null}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
         <SheetHeader>
           <SheetTitle>{name} settings</SheetTitle>
           <SheetDescription>
-            The same settings as Settings › Publishing brands. Changes apply to new drafts and the
+            The same settings as Settings › Profiles. Changes apply to new drafts and the
             queue; open drafts keep their text.
           </SheetDescription>
         </SheetHeader>

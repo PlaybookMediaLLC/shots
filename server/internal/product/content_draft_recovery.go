@@ -100,6 +100,7 @@ func (c *Configuration) RetryContentDraftPost(ctx context.Context, actor Actor, 
 	create := tx.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(post.OrganizationID).
 		SetNillableContentDraftID(post.ContentDraftID).SetNillableAssetID(post.AssetID).
 		SetChannelConnectionID(post.ChannelConnectionID).SetNillableSocialSetID(post.SocialSetID).SetScheduledFor(time.Now().UTC()).
+		SetNillableScheduleTimeZone(post.ScheduleTimeZone).
 		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(post.Caption).SetIdempotencyKey(key)
 	if len(post.AssetIds) > 0 {
 		create.SetAssetIds(post.AssetIds)

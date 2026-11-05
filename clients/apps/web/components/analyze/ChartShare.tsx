@@ -101,7 +101,7 @@ export function ChartShare({
         <DialogHeader>
           <DialogTitle>Create chart image</DialogTitle>
           <DialogDescription>
-            {name}. The image includes the selected account, metric, period, and observation cutoff.
+            The image includes the selected account, metric, period, and when the stats were read.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 sm:grid-cols-2">

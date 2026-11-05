@@ -6,8 +6,8 @@ A private Zapier Platform integration using the canonical Shots API: create draf
 
 1. Install Node 22 or newer and the Zapier Platform CLI. In this directory run `npm ci` and `npm test`.
 2. Log in to your Zapier developer account, register a **private** integration, and push this source. Do not commit `.zapierapprc` or credentials. Zapier may report style warnings for static hooks without automatic subscribe/unsubscribe or live sample listing; these are intentional for this private integration. Public-directory submission is not claimed.
-3. Connect the HTTPS origin of your Shots deployment and an API key with `artifact:read` and `draft:write`. The backend applies workspace plan, scope and content permissions. Personal private brands require a Shots session and are not offered to keys.
-4. For **Create Draft**, map a source event/version ID, publishing brand and text. Separate posts with `---` on its own line. Keep the source event ID stable when retrying an uncertain request; a changed payload with that ID returns a conflict. Use a new event ID for a new source version.
+3. Connect the HTTPS origin of your Shots deployment and an API key with `artifact:read` and `draft:write`. The backend applies workspace plan, scope and content permissions. Personal private profiles require a Shots session and are not offered to keys.
+4. For **Create Draft**, map a source event/version ID, profile and text. Separate posts with `---` on its own line. Keep the source event ID stable when retrying an uncertain request; a changed payload with that ID returns a conflict. Use a new event ID for a new source version.
 5. **Plan Draft** sets a tentative timestamp and IANA time zone. Open the draft in Shots to review and publish.
 
 ## Instant triggers
