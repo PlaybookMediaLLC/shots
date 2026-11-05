@@ -353,7 +353,7 @@ test('the backend worker publishes draft photos, video, and ordered images once 
           method: 'POST',
         })
         expect(incomplete.status).toBe(409)
-        await page.goto(`/write/${id}`)
+        await page.goto(`/publish/${id}`)
         // Post options open beside the draft from the platform's chip.
         await page.getByTestId('options-chip').click()
         if (draft.channel === 'youtube') {

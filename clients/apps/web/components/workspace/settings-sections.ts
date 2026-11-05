@@ -1,5 +1,5 @@
 /**
- * Settings sections, each its own route under /workspace; shared by the
+ * Settings sections, each its own route under /settings; shared by the
  * settings sidebar, the page and its content map (RFC 024). Sections are
  * grouped by who owns what they change: the person, the workspace, or a
  * publishing identity (a brand).
@@ -29,7 +29,7 @@ type SettingSectionDefinition = {
   id: string
   /** Extra search terms the settings search matches but the page does not show. */
   keywords?: string
-  /** URL segment under /workspace; General lives at /workspace itself. */
+  /** URL segment under /settings; General lives at /settings itself. */
   slug: string
   title: string
 }
@@ -150,11 +150,11 @@ const SECTIONS = [
       'The people and brands you post as: their accounts, schedules, defaults, and voice.',
     group: 'publishing',
     id: 'social-sets',
-    slug: 'social-sets',
+    slug: 'publishing-brands',
     title: 'Publishing brands',
   },
   {
-    description: 'Every connected account in the workspace and the set it belongs to.',
+    description: 'Manage the social accounts this workspace posts from, and the publishing brand each belongs to.',
     group: 'publishing',
     id: 'channels',
     slug: 'channels',
@@ -224,12 +224,12 @@ export const SOCIAL_SET_PAGES = [
 export type SocialSetPage = (typeof SOCIAL_SET_PAGES)[number]['slug']
 
 export function settingsHref(section: SettingSection): string {
-  return section.slug ? `/workspace/${section.slug}` : '/workspace'
+  return section.slug ? `/settings/${section.slug}` : '/settings'
 }
 
 /** The address of one brand's settings page. */
 export function socialSetHref(id: string, page: SocialSetPage = 'general'): string {
-  return `/workspace/social-sets/${encodeURIComponent(id)}${page === 'general' ? '' : `/${page}`}`
+  return `/settings/publishing-brands/${encodeURIComponent(id)}${page === 'general' ? '' : `/${page}`}`
 }
 
 export function findSettingsSection(slug: string | undefined): SettingSection | undefined {
@@ -237,12 +237,12 @@ export function findSettingsSection(slug: string | undefined): SettingSection | 
 }
 
 /**
- * The section a pathname shows, from its first segment under /workspace, so a
+ * The section a pathname shows, from its first segment under /settings, so a
  * brand's own pages light Publishing brands. Pass the pathname without a locale.
  */
 export function settingsSectionAt(pathname: string): SettingSection | undefined {
   const [area, slug] = pathname.split('/').filter(Boolean)
-  return area === 'workspace' ? findSettingsSection(slug) : undefined
+  return area === 'settings' ? findSettingsSection(slug) : undefined
 }
 
 /** A brand settings page by its slug; General when omitted. */

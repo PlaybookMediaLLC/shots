@@ -1,5 +1,7 @@
 'use client'
 
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { BulkScheduleDialog } from './bulk-schedule'
 
 import { useWriteRouter } from '@/components/write/write-context'
@@ -50,6 +52,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
@@ -139,7 +142,7 @@ export function WriteRail() {
               {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
               <Link
                 data-tour-id="write-bulk"
-                href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
+                href={`/publish/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
               >
                 Bulk schedule
               </Link>
@@ -152,12 +155,17 @@ export function WriteRail() {
         <div className="min-w-0 flex-1">
           <SocialSetSwitcher />
         </div>
-        <Link
-          className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
-          href={data.activeSet ? `/write/settings?set=${data.activeSet.id}` : '/write/settings'}
-        >
-          Settings
-        </Link>
+        {data.activeSet ? (
+          <Button
+            className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => openBrandSettings('scheduling')}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            Settings
+          </Button>
+        ) : null}
       </div>
       {/* Underlined tabs: the current one is medium weight over a 2px line. */}
       <div
@@ -220,7 +228,8 @@ export function WriteRail() {
                 variant="outline"
                 onClick={() => setQuery({ [filter.key]: undefined })}
               >
-                {filter.label} ×
+                {filter.label}
+                <XIcon aria-hidden className="size-3.5" />
               </Button>
             ))}
           <Button
@@ -392,7 +401,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
           type="button"
           variant="custom"
         >
-          ✕
+          <XIcon aria-hidden className="size-3.5" />
         </Button>
       ) : null}
     </div>
@@ -829,7 +838,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
             type="button"
             variant="custom"
           >
-            ⋯
+            <DotsThreeIcon aria-hidden className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
@@ -1037,7 +1046,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
                         await beforeLeaveRef.current?.()
                         await draftsApi.remove(draft.id)
                         hideDraft(draft.id)
-                        if (activeId === draft.id) router.replace('/write')
+                        if (activeId === draft.id) router.replace('/publish')
                         else router.refresh()
                       },
                       'Draft deleted.',
@@ -1160,7 +1169,7 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
     else toast.success(`${label}: ${selected.length} drafts.`)
     setProgress(null)
     onDone()
-    if (removedActive) router.replace(data.activeSet ? `/write?set=${data.activeSet.id}` : '/write')
+    if (removedActive) router.replace(data.activeSet ? `/publish?set=${data.activeSet.id}` : '/publish')
     else router.refresh()
   }
   const version = (id: string) => data.library.find((draft) => draft.id === id)
@@ -1225,7 +1234,7 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
         type="button"
         variant="ghost"
       >
-        ✕
+        <XIcon aria-hidden className="size-4" />
       </Button>
       <AlertDialog onOpenChange={setConfirm} open={confirm}>
         <AlertDialogContent>

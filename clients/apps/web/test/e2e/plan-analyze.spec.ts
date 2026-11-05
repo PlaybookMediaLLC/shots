@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { format } from 'date-fns'
-import { apiRequest, db, enableDraftTags, expect, test } from './framework'
+import { apiRequest, chooseOption, db, enableDraftTags, expect, test } from './framework'
 
 test.use({ actionTimeout: 30000 })
 
@@ -59,7 +59,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   })
   expect(sourceDraft.status, JSON.stringify(sourceDraft.body)).toBe(201)
   const sourceId = (sourceDraft.body as { id: string }).id
-  await app.open(`/write/plan?day=${day}`)
+  await app.open(`/publish/calendar?day=${day}`)
   await test.step('P01 Calendar retains shared Publish navigation', async () => {
     await expect(page.getByRole('link', { name: 'Analyze', exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Drafts', exact: true }).first()).toBeVisible()
@@ -92,34 +92,34 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       'true'
     )
     await page.getByTestId('available-slot').first().click()
-    await expect(page.getByLabel('Scheduling timezone', { exact: true })).toHaveValue(
-      'America/New_York'
-    )
-    await expect(page.getByLabel('Time', { exact: true })).toHaveValue('09:15')
+    await expect(
+      page.getByRole('combobox', { exact: true, name: 'Scheduling timezone' })
+    ).toContainText('New York')
+    await expect(page.getByLabel('Time', { exact: true })).toHaveValue('9:15 AM')
     await page.keyboard.press('Escape')
-    await page.getByLabel('Calendar view').selectOption('week')
+    await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByTestId('available-slot').first()).toBeVisible()
     await expect(page.getByTestId('available-slot').first().locator('..')).toHaveCSS(
       'position',
       'absolute'
     )
-    await page.getByLabel('Calendar view').selectOption('month')
+    await chooseOption(page.getByLabel('Calendar view'), 'Month')
     await page.getByRole('button', { name: 'Show all accounts' }).click()
     await page.getByText('Display', { exact: true }).click()
     await expect(page.getByRole('checkbox', { name: 'Show empty slots' })).toHaveCount(0)
     await page.getByText('Display', { exact: true }).click()
   })
   await test.step('P07 P08 P09 draft sidebar retains the view and date anchor', async () => {
-    await page.getByRole('combobox', { name: 'Calendar view' }).selectOption('month')
+    await chooseOption(page.getByRole('combobox', { name: 'Calendar view' }), 'Month')
     await page.getByRole('button', { name: 'Drafts', exact: true }).first().click()
     await expect(page.getByRole('link', { name: /Picker source draft.*x.*Edited/ })).toBeVisible()
     await page.getByRole('button', { name: 'Posted', exact: true }).click()
     await expect(page.getByRole('link', { name: /Picker source draft/ })).toHaveCount(0)
-    await expect(page.getByRole('combobox', { name: 'Calendar view' })).toHaveValue('month')
+    await expect(page.getByRole('combobox', { name: 'Calendar view' })).toContainText('Month')
     await page.getByRole('button', { name: 'Back to publishing brands' }).click()
   })
   await test.step('P10 P11 P12 P13 P14 P15 view controls and keyboard keep a usable period', async () => {
-    await page.getByRole('combobox', { name: 'Calendar view' }).selectOption('week')
+    await chooseOption(page.getByRole('combobox', { name: 'Calendar view' }), 'Week')
     await expect(page.getByRole('button', { name: '00:00', exact: true })).toHaveCount(7)
     // CAL-01: today's badge must not move its hour grid off the other days'.
     await page.getByRole('button', { name: 'Today', exact: true }).click()
@@ -129,17 +129,17 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top))
     expect(new Set(midnights).size, midnights.join(', ')).toBe(1)
     await page.keyboard.press('m')
-    await expect(page.getByRole('combobox', { name: 'Calendar view' })).toHaveValue('month')
+    await expect(page.getByRole('combobox', { name: 'Calendar view' })).toContainText('Month')
     await page.getByRole('button', { name: 'Next month', exact: true }).click()
     await page.getByRole('button', { name: 'Previous month', exact: true }).click()
   })
   await test.step('P10 Flex resizes its rendered weeks with the actual viewport', async () => {
-    await page.getByLabel('Calendar view').selectOption('flex')
+    await chooseOption(page.getByLabel('Calendar view'), 'Flex')
     const initial = await page.locator('[data-calendar-date]').count()
     await page.setViewportSize({ width: 1280, height: 1100 })
     await expect.poll(() => page.locator('[data-calendar-date]').count()).toBeGreaterThan(initial)
     await page.setViewportSize({ width: 1280, height: 720 })
-    await page.getByLabel('Calendar view').selectOption('month')
+    await chooseOption(page.getByLabel('Calendar view'), 'Month')
   })
   await test.step('P15 Today restores the current period and P11 marks the exact display day', async () => {
     await page.getByRole('button', { name: 'Next month', exact: true }).click()
@@ -181,7 +181,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(page.getByRole('button', { name: 'Day', exact: true })).toContainText(
       format(new Date(`${day}T12:00`), 'PP')
     )
-    await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00')
+    await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00 PM')
     await expect(page.getByRole('checkbox', { name: 'Open in editor' })).toBeChecked()
     await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Article')
     await page.getByRole('button', { name: 'Plan draft', exact: true }).click()
@@ -232,8 +232,8 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       body: { plannedFor, timeZone: 'UTC', baseCalendarVersion: overlapping.calendarVersion },
     })
     expect(planned.status, JSON.stringify(planned.body)).toBe(200)
-    await app.open(`/write/plan?day=${day}`)
-    await page.getByLabel('Calendar view').selectOption('week')
+    await app.open(`/publish/calendar?day=${day}`)
+    await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
     const other = page
       .getByTestId('calendar-planned')
@@ -270,7 +270,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
         )
       ).status
     ).toBe(200)
-    await page.getByLabel('Calendar view').selectOption('month')
+    await chooseOption(page.getByLabel('Calendar view'), 'Month')
     await app.reload()
   })
   await test.step('P16 P17 P18 filters density week start and unavailable-tag recovery retain accounts', async () => {
@@ -281,8 +281,8 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.getByText('Filters', { exact: true }).click()
     await expect(card).toBeVisible()
     await page.getByText('Display', { exact: true }).click()
-    await page.getByRole('combobox', { name: 'Card density' }).selectOption('compact')
-    await page.getByRole('combobox', { name: 'Week starts' }).selectOption('0')
+    await chooseOption(page.getByRole('combobox', { name: 'Card density' }), 'Compact')
+    await chooseOption(page.getByRole('combobox', { name: 'Week starts' }), 'Sunday')
     await page.getByText('Display', { exact: true }).click()
     await app.reload()
     await expect(
@@ -369,8 +369,11 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(card).toBeVisible()
   })
   await test.step('P22 P23 changing display zones preserves the stored UTC placement', async () => {
-    await page.getByLabel('Display timezone', { exact: true }).fill('Asia/Tokyo')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^Tokyo · /,
+      'Tokyo'
+    )
     expect(
       (
         await db.query('SELECT "plannedFor" FROM content_draft WHERE id=$1', [draftId])
@@ -378,8 +381,11 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toBe(plannedFor)
     // Restore the display zone: in Tokyo a post late on a month's last day
     // shows in the next month, outside the calendar the later steps read.
-    await page.getByLabel('Display timezone', { exact: true }).fill('America/New_York')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^New York · /,
+      'New York'
+    )
   })
   await test.step('P34 P36 a move has a durable inverse and stale replay cannot overwrite it', async () => {
     const target = new Date(Date.parse(plannedFor) + 86400000).toISOString()
@@ -418,7 +424,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await expect(page.getByText('Original scheduling timezone:', { exact: false })).toBeVisible()
     // Plan never commits a schedule itself: it opens the draft's own review at that time.
     await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
-    await page.waitForURL(new RegExp(`/write/${draftId}\\?.*panel=schedule`))
+    await page.waitForURL(new RegExp(`/publish/${draftId}\\?.*panel=schedule`))
     const review = page.getByTestId('schedule-dialog')
     await expect(review.getByTestId('schedule-summary')).toContainText('America/New_York')
     await expect(review.getByTestId('destinations')).toBeVisible()
@@ -431,7 +437,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     )
     expect(scheduled.rows.length).toBeGreaterThan(0)
     expect(scheduled.rows.every((r) => r.status === 'SCHEDULED')).toBe(true)
-    await app.open(`/write/plan?day=${day}`)
+    await app.open(`/publish/calendar?day=${day}`)
     await expect(
       page.getByTestId('calendar-post').filter({ hasText: 'A planned post', visible: true })
     ).toBeVisible()
@@ -504,15 +510,17 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toEqual([{ status: 'PUBLISHED', remotePostId: 'history-fixture' }])
   })
   await test.step('P40 mobile queue and keyboard controls are usable', async () => {
-    await page.getByLabel('Display timezone', { exact: true }).focus()
+    // Typing in a picker's search field is text, not a calendar shortcut.
+    const zone = page.getByRole('combobox', { exact: true, name: 'Display timezone' })
+    await zone.click()
     await page.keyboard.press('w')
-    await expect(page.getByLabel('Calendar view')).toHaveValue('month')
+    await expect(page.getByLabel('Calendar view')).toContainText('Month')
+    await page.keyboard.press('Escape')
     // West of New York, so the planned post keeps its day (and month) on screen.
-    await page.getByLabel('Display timezone', { exact: true }).fill('America/Los_Angeles')
-    await page.getByLabel('Display timezone', { exact: true }).blur()
+    await chooseOption(zone, /^Los Angeles · /, 'Los Angeles')
     await page.locator('body').click({ position: { x: 1270, y: 10 } })
     await page.keyboard.press('v')
-    await expect(page.getByLabel('Calendar view')).toHaveValue('week')
+    await expect(page.getByLabel('Calendar view')).toContainText('Week')
     await page.keyboard.press('m')
     await page.screenshot({ path: '.local/plan-analyze/plan-desktop.png', fullPage: true })
     await page.setViewportSize({ width: 390, height: 844 })
@@ -579,9 +587,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     'INSERT INTO analytics_snapshot (id,"organizationId","connectionId","subjectId",kind,"observedAt",counters,"payloadHash") VALUES ($1,$2,$3,$3,\'account\',$4,\'{"followers":1200000}\',$5)',
     [randomUUID(), workspace.id, workspace.channels.x, observed, randomUUID()]
   )
-  await app.open(`/write/analyze?account=${workspace.channels.x}&limit=1`)
+  await app.open(`/publish/analyze?account=${workspace.channels.x}&limit=1`)
   await test.step('A01 A06 A07 all seven areas show account scope and exact accessible totals', async () => {
-    await expect(page.getByLabel('Analytics account')).toHaveValue(workspace.channels.x)
+    await expect(page.getByLabel('Analytics account')).toContainText(' · x · ')
     for (const title of [
       'Followers',
       'Impressions',
@@ -595,12 +603,12 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveText('1.2M')
   })
   await test.step('A02 A03 A04 account changes clear old values and show capability-based availability', async () => {
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.linkedin)
+    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
     await expect(
       page.getByRole('heading', { name: 'Followers', exact: true }).first()
     ).toBeVisible()
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.x)
+    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A05 decorative loading is inaccessible and A02 aborted responses cannot cross accounts', async () => {
@@ -609,7 +617,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.linkedin)
+    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
@@ -618,18 +626,18 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
       await gate
       await route.fulfill({ response }).catch(() => {})
     })
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.x)
+    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
     await expect(page.getByRole('status').filter({ hasText: 'Loading analytics' })).toBeVisible()
     await expect(page.locator('[aria-hidden="true"] .animate-pulse')).toHaveCount(6)
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.linkedin)
+    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
     release()
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
     await page.unroute(path)
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.x)
+    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A04 A17 one malformed metric preserves neighboring cards and recovers independently', async () => {
@@ -654,7 +662,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByRole('button', { name: 'Retry metric', exact: true })).toHaveCount(0)
   })
   await test.step('A16 A28 A35 legitimate zero chart exports independently from an empty post list', async () => {
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.linkedin)
+    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
@@ -666,7 +674,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByRole('button', { name: 'Export chart CSV' })).toBeEnabled()
     await expect(page.getByRole('img', { name: /Observed values/ })).toBeVisible()
     await page.getByRole('button', { name: 'Overview' }).click()
-    await page.getByLabel('Analytics account').selectOption(workspace.channels.x)
+    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A18 metric help opens its actual definition', async () => {
@@ -674,7 +682,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.locator('#definition-followers')).toBeVisible()
   })
   await test.step('A40 transient report failure retries without logging out or changing scope', async () => {
-    const account = await page.getByLabel('Analytics account').inputValue()
+    const account = (await page.getByLabel('Analytics account').textContent()) ?? ''
     const path = `**/api/v1/analytics/${workspace.channels.x}?*`
     await page.route(path, (route) =>
       route.fulfill({ status: 503, json: { message: 'Fixture analytics outage' } })
@@ -686,28 +694,41 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await page.unroute(path)
     await page.getByRole('button', { name: 'Retry analytics', exact: true }).click()
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
-    await expect(page.getByLabel('Analytics account')).toHaveValue(account)
+    await expect(page.getByLabel('Analytics account')).toHaveText(account)
   })
   await test.step('A09 A10 A11 A12 dates grouping and explicit scope stay synchronized', async () => {
-    await expect(page.getByLabel('Date preset').locator('option')).toHaveCount(11)
-    await page.getByLabel('Date preset').selectOption('1 year')
-    await expect(page.getByLabel('Grouping')).toHaveValue('monthly')
-    await page.getByLabel('Date preset').selectOption('1 month')
-    await expect(page.getByLabel('Grouping')).toHaveValue('daily')
-    // A From after To: 40 days out is past the preset's end (today).
-    await page.getByLabel('From', { exact: true }).click()
-    const laterDay = page
-      .getByRole('button', { name: format(new Date(Date.now() + 40 * 86_400_000), 'PPPP') })
+    const range = page.getByRole('button', { name: 'Date range', exact: true })
+    const preset = async (name: string) => {
+      await range.click()
+      await page
+        .getByRole('group', { name: 'Presets' })
+        .getByRole('button', { name, exact: true })
+        .click()
+    }
+    await range.click()
+    await expect(page.getByRole('group', { name: 'Presets' }).getByRole('button')).toHaveCount(10)
+    await page.keyboard.press('Escape')
+    await preset('1 year')
+    await expect(page.getByLabel('Grouping')).toContainText('Monthly')
+    await preset('1 month')
+    await expect(page.getByLabel('Grouping')).toContainText('Daily')
+    // Picking the later day first still gives a valid range, applied with no Apply button.
+    const today = new Date()
+    const earlier = new Date(Date.now() - 3 * 86_400_000)
+    await range.click()
+    await page
+      .getByRole('button', { name: format(today, 'PPPP') })
       .first()
-    while (!(await laterDay.isVisible()))
-      await page.getByRole('button', { name: 'Go to the Next Month' }).click()
-    await laterDay.click()
-    await page.getByRole('button', { name: 'Apply range' }).click()
-    await expect(page.getByRole('alert').filter({ hasText: 'Choose valid dates' })).toContainText(
-      'valid dates'
-    )
-    await page.getByLabel('Date preset').selectOption('7 days')
-    await page.getByRole('button', { name: 'Apply range' }).click()
+      .click()
+    await page
+      .getByRole('button', { name: format(earlier, 'PPPP') })
+      .first()
+      .click()
+    await expect(page).toHaveURL(new RegExp(`from=${format(earlier, 'yyyy-MM-dd')}`))
+    await expect(page).toHaveURL(new RegExp(`to=${format(today, 'yyyy-MM-dd')}`))
+    await expect(range).toContainText(format(today, 'MMM d, yyyy'))
+    await preset('7 days')
+    await expect(range).toContainText('7 days')
   })
   await test.step('A13 A14 A15 A16 A17 A18 A34 A35 expanded chart works independently of post data', async () => {
     await page
@@ -718,7 +739,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await page.getByLabel('Interval growth').check()
     await expect(page.getByText('No observations for this series.', { exact: false })).toBeVisible()
     await page.getByLabel('Interval growth').uncheck()
-    await page.getByLabel('Grouping').selectOption('weekly')
+    await chooseOption(page.getByLabel('Grouping'), 'Weekly')
     await expect(page.getByRole('img', { name: /Observed values/ })).toBeVisible()
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export chart CSV' }).click()
@@ -729,9 +750,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await page.getByRole('button', { name: 'Overview' }).click()
   })
   await test.step('A21 A22 A23 A24 A25 hourly modes and exact cell drilldown show sample evidence', async () => {
-    await page.getByLabel('Hourly mode').selectOption('days')
+    await chooseOption(page.getByLabel('Hourly mode'), 'Days')
     await expect(page.getByLabel('Weekday').locator('option')).toHaveCount(7)
-    await page.getByLabel('Hourly mode').selectOption('heatmap')
+    await chooseOption(page.getByLabel('Hourly mode'), 'Heatmap')
     await expect(
       page
         .getByRole('table')
@@ -747,17 +768,17 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
   })
   await test.step('A26 A27 goal cancel does not persist and explicit save does', async () => {
     await page.getByRole('button', { name: 'Set posting goal' }).click()
-    await page.getByLabel('Goal cadence').selectOption('weekly')
+    await chooseOption(page.getByLabel('Goal cadence'), 'Weekly')
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await page.getByRole('button', { name: 'Set posting goal' }).click()
-    await expect(page.getByLabel('Goal cadence')).toHaveValue('daily')
-    await page.getByLabel('Goal cadence').selectOption('weekly')
+    await expect(page.getByLabel('Goal cadence')).toContainText('Daily')
+    await chooseOption(page.getByLabel('Goal cadence'), 'Weekly')
     await page.getByRole('button', { name: 'Save goal' }).click()
     await expect(page.getByRole('button', { name: 'Edit goal' })).toBeVisible()
   })
   await test.step('A29 A30 A31 A32 A33 A34 exact post rows sort and export safe full-precision CSV', async () => {
-    await page.getByLabel('Sort posts').selectOption('likes')
-    await page.getByLabel('Post scope').selectOption('replies')
+    await chooseOption(page.getByLabel('Sort posts'), 'Likes')
+    await chooseOption(page.getByLabel('Post scope'), 'Replies')
     await expect(page.getByRole('row').filter({ hasText: 'A thread continuation' })).toHaveCount(1)
     await page.getByRole('button', { name: 'Statistics', exact: true }).click()
     await expect(page.getByRole('link', { name: 'View this post' })).toHaveAttribute(
@@ -765,9 +786,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
       'https://x.com/i/status/fixture-1'
     )
     await page.keyboard.press('Escape')
-    await page.getByLabel('Post scope').selectOption('all')
+    await chooseOption(page.getByLabel('Post scope'), 'All')
     await page.getByRole('columnheader').getByRole('button', { name: 'Likes', exact: true }).click()
-    await expect(page.getByLabel('Sort posts')).toHaveValue('likes')
+    await expect(page.getByLabel('Sort posts')).toContainText('Likes')
     const firstPost = await page
       .getByRole('row')
       .filter({ has: page.getByRole('button', { name: 'Statistics', exact: true }) })
@@ -778,7 +799,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
         .getByRole('row')
         .filter({ has: page.getByRole('button', { name: 'Statistics', exact: true }) })
     ).not.toHaveText(firstPost, { useInnerText: true })
-    await expect(page.getByLabel('Sort posts')).toHaveValue('likes')
+    await expect(page.getByLabel('Sort posts')).toContainText('Likes')
     await page.getByRole('button', { name: 'Previous page', exact: true }).click()
     await expect(
       page
@@ -832,11 +853,13 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
       'Image shadow',
     ])
       await expect(page.getByLabel(label, { exact: true })).toBeVisible()
-    await page.getByLabel('Image crop').selectOption('square')
+    await chooseOption(page.getByLabel('Image crop'), 'Square')
     await page.getByLabel('Image color').fill('#2a4860')
-    await page.getByLabel('Image frame').selectOption({ index: 1 })
-    await page.getByLabel('Image gradient').selectOption({ index: 1 })
-    await page.getByLabel('Image shadow').selectOption('strong')
+    await page.getByLabel('Image frame').click()
+    await page.getByRole('option').nth(1).click()
+    await page.getByLabel('Image gradient').click()
+    await page.getByRole('option').nth(1).click()
+    await chooseOption(page.getByLabel('Image shadow'), 'strong')
     for (const label of ['Inset', 'Corner radius', 'Rotation', 'Crop zoom']) {
       const control = page.getByRole('slider', { name: label, exact: true })
       const before = Number(await control.getAttribute('aria-valuenow'))

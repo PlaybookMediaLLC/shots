@@ -181,7 +181,7 @@ test(
     await blockers.getByRole('button', { name: /^X: 290 of 280/ }).click()
     await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-selected', 'true')
 
-    await page.getByRole('button', { name: 'Add another post' }).click()
+    await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await expect(page.getByTestId('empty-post-2')).toContainText('Empty, not sent')
     await page.getByRole('button', { name: 'Remove empty post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)
@@ -209,6 +209,9 @@ test(
     await expect(page.getByLabel('Day', { exact: true })).toHaveText(
       new Date(year, month - 1, date).toLocaleDateString('en-US', { dateStyle: 'medium' })
     )
-    await expect(page.getByLabel('Time', { exact: true })).toHaveValue(time)
+    const [hour, minute] = time.split(':').map(Number)
+    await expect(page.getByLabel('Time', { exact: true })).toHaveValue(
+      `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
+    )
   }
 )

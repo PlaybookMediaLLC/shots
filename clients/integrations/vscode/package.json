@@ -1,0 +1,45 @@
+{
+  "name": "shots-code",
+  "displayName": "Shots Code Studio",
+  "description": "Send a code selection to Shots Code Studio to turn it into an image, carousel or video and post it.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "playbookmedia",
+  "license": "Apache-2.0",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
+  },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "shots.sendSelection", "title": "Send selection to Shots", "category": "Shots" },
+      { "command": "shots.setApiKey", "title": "Set API key", "category": "Shots" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "shots.sendSelection", "group": "9_cutcopypaste@9" }
+      ]
+    },
+    "configuration": {
+      "title": "Shots",
+      "properties": {
+        "shots.origin": {
+          "type": "string",
+          "default": "https://shots.playbookmedia.io",
+          "description": "The Shots origin to send code to."
+        },
+        "shots.theme": {
+          "type": "string",
+          "default": "",
+          "description": "A Code Studio theme for new projects, such as midnight or sunset. Empty uses the default."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  }
+}

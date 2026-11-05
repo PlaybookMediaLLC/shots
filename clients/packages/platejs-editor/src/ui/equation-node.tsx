@@ -52,7 +52,7 @@ export function EquationElement(props: PlateElementProps) {
         <PopoverTrigger asChild>
           <button
             className={cn(
-              "group flex cursor-pointer select-none items-center justify-center rounded-none hover:bg-primary/10 data-[selected=true]:bg-primary/10",
+              "group flex cursor-pointer select-none items-center justify-center rounded-md hover:bg-primary/10 data-[selected=true]:bg-primary/10",
               element.texExpression.length === 0
                 ? "bg-muted p-3 pr-9"
                 : "px-2 py-1"
@@ -126,17 +126,17 @@ export function InlineEquationElement(
 
   return (
     <PlateElement
-      className="mx-1 inline-block select-none rounded-none [&_.katex-display]:my-0!"
+      className="mx-1 inline-block select-none rounded-md [&_.katex-display]:my-0!"
       {...props}
     >
       <Popover modal={false} onOpenChange={setOpen} open={open}>
         <PopoverTrigger asChild>
           <button
             className={cn(
-              'after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:z-1 after:h-[calc(100%)+4px] after:w-[calc(100%+8px)] after:rounded-none after:content-[""]',
+              'after:absolute after:inset-0 after:-top-0.5 after:-left-1 after:z-1 after:h-[calc(100%)+4px] after:w-[calc(100%+8px)] after:rounded-md after:content-[""]',
               "relative h-6",
               ((element.texExpression.length > 0 && open) || selected) &&
-                "after:bg-brand/15",
+                "after:bg-primary/15",
               element.texExpression.length === 0 &&
                 "text-muted-foreground after:bg-neutral-500/10"
             )}

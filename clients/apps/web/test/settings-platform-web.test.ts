@@ -88,19 +88,19 @@ test('settings sections are grouped and each has its own address', () => {
     ['integrations', 'integrations'],
     ['developers', 'advanced'],
     ['experimental', 'advanced'],
-    ['social-sets', 'publishing'],
+    ['publishing-brands', 'publishing'],
   ]) {
     assert.equal(findSettingsSection(slug)?.group, group, slug)
   }
-  assert.equal(socialSetHref('set1'), '/workspace/social-sets/set1')
-  assert.equal(socialSetHref('set1', 'scheduling'), '/workspace/social-sets/set1/scheduling')
+  assert.equal(socialSetHref('set1'), '/settings/publishing-brands/set1')
+  assert.equal(socialSetHref('set1', 'scheduling'), '/settings/publishing-brands/set1/scheduling')
   assert.equal(findSocialSetPage(undefined), 'general')
   assert.equal(findSocialSetPage('nope'), undefined)
   // The settings sidebar lights the section a path is under.
-  assert.equal(settingsSectionAt('/workspace')?.id, 'general')
-  assert.equal(settingsSectionAt('/workspace/billing')?.id, 'billing')
-  assert.equal(settingsSectionAt('/workspace/social-sets/set1/scheduling')?.id, 'social-sets')
-  assert.equal(settingsSectionAt('/workspace/nope'), undefined)
+  assert.equal(settingsSectionAt('/settings')?.id, 'general')
+  assert.equal(settingsSectionAt('/settings/billing')?.id, 'billing')
+  assert.equal(settingsSectionAt('/settings/publishing-brands/set1/scheduling')?.id, 'social-sets')
+  assert.equal(settingsSectionAt('/settings/nope'), undefined)
   assert.equal(settingsSectionAt('/home'), undefined)
 })
 

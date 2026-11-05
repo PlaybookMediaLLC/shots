@@ -45,23 +45,24 @@ test(
       (await (await fetch(`${notices}/sink`)).json()) as {
         slack: { channel: string; text: string }[]
       }
-    await app.open('/workspace/notifications')
+    await app.open('/settings/notifications')
     await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
     await page.getByRole('button', { name: 'Connect Slack', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Local Slack fixture' })).toBeVisible()
     await page.getByRole('link', { name: 'Allow selected workspace' }).click()
     await chooseOption(page.getByLabel('Slack workspace'), 'Fixture team')
     await chooseOption(page.getByLabel('Slack channel', { exact: true }), '#workspace-activity')
-    await page
-      .getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true })
-      .selectOption('C067890')
+    await chooseOption(
+      page.getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true }),
+      '#brand-publishing'
+    )
     await page.getByRole('button', { name: 'Save workspace policy', exact: true }).click()
     await expect(page.getByText('Workspace policy saved.', { exact: true })).toBeVisible()
     await app.reload()
     await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
     await expect(
       page.getByLabel(`Slack channel for ${identity.workspaceName}`, { exact: true })
-    ).toHaveValue('C067890')
+    ).toContainText('#brand-publishing')
 
     const id = await openNewDraft(page)
     await page.getByLabel('Draft title', { exact: true }).fill('Lifecycle release')
@@ -146,7 +147,7 @@ test(
         { timeout: 30_000 }
       )
       .toBe(17)
-    await app.open('/write/analyze/observations')
+    await app.open('/publish/analyze/observations')
     await expect(page.getByTestId('social-analytics')).toContainText('17')
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export CSV', exact: true }).click()

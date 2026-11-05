@@ -26,6 +26,8 @@ func (UserPreference) Fields() []ent.Field {
 		field.Enum("theme").StorageKey("theme").Values("light", "dark", "system").Default("dark"),
 		field.Enum("navigation").StorageKey("navigation").Values("compact", "dynamic", "expanded").Default("compact"),
 		field.Enum("week_start").StorageKey("weekStart").Values("monday", "sunday").Default("monday"),
+		// The clock times read on; auto follows the browser locale.
+		field.Enum("time_format").StorageKey("timeFormat").Values("auto", "12h", "24h").Default("auto"),
 		field.Enum("text_direction").StorageKey("textDirection").Values("ltr", "rtl").Default("ltr"),
 		field.Bool("show_scrollbars").StorageKey("showScrollbars").Default(true),
 		field.Bool("developer_mode").StorageKey("developerMode").Default(false),

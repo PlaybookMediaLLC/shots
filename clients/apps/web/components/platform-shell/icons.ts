@@ -5,8 +5,10 @@
  */
 export { PlusIcon as AddIcon } from '@phosphor-icons/react/dist/ssr/Plus'
 export { ArrowLeftIcon as ArrowBackIcon } from '@phosphor-icons/react/dist/ssr/ArrowLeft'
+export { ArrowDownIcon } from '@phosphor-icons/react/dist/ssr/ArrowDown'
 export { ArrowRightIcon as ArrowForwardIcon } from '@phosphor-icons/react/dist/ssr/ArrowRight'
 export { ArrowUpRightIcon as OutwardIcon } from '@phosphor-icons/react/dist/ssr/ArrowUpRight'
+export { ArrowUpIcon } from '@phosphor-icons/react/dist/ssr/ArrowUp'
 export { CheckIcon } from '@phosphor-icons/react/dist/ssr/Check'
 export { WarningCircleIcon as ErrorIcon } from '@phosphor-icons/react/dist/ssr/WarningCircle'
 export { CaretRightIcon as ChevronRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'

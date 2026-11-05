@@ -85,15 +85,6 @@ export function onProjectSaved(listener: (message: SavedMessage) => void): () =>
   return () => subscription.close()
 }
 
-/** Cookie the server reads to choose a loading skeleton. */
-export const STORE_PROJECT_HINT_COOKIE = 'shots-store-active'
-
-function setProjectHint(active: boolean): void {
-  if (typeof document === 'undefined') return
-  const secure = window.location.protocol === 'https:' ? '; Secure' : ''
-  document.cookie = `${STORE_PROJECT_HINT_COOKIE}=${active ? '1' : ''}; Path=/; Max-Age=${active ? 31_536_000 : 0}; SameSite=Lax${secure}`
-}
-
 /** All projects, most recent first. */
 export async function listProjects(): Promise<ProjectSummary[]> {
   const records = await getAllRecords<ProjectRecord>(STORES.projects)
@@ -135,7 +126,6 @@ export async function saveProject(
   })
   announce({ type: 'saved', projectId: saved.id, revision: saved.revision, tabId: TAB_ID })
   await setMeta('lastProjectId', saved.id)
-  setProjectHint(true)
   return saved
 }
 
@@ -173,7 +163,6 @@ export async function deleteProject(id: string): Promise<void> {
     for (const key of keys) await requestResult(versions.delete(key))
   })
   if ((await getMeta<string>('lastProjectId')) === id) await setMeta('lastProjectId', null)
-  if ((await listProjects()).length === 0) setProjectHint(false)
   await collectUnusedAssets(new Set())
 }
 

@@ -107,6 +107,7 @@ import type {
   Engagement,
   ExperimentState,
   PublicProfile,
+  SocialAccountHealth,
   SocialSet,
   SocialSetInput,
   SocialSetList,
@@ -254,6 +255,14 @@ export type ChannelConnection = {
   avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
+  /** The publishing brand it belongs to; null when it is in none. */
+  socialSetId?: string | null
+  /** Its verified state, when the product configuration could read it. */
+  health?: SocialAccountHealth
+  /** Drafts and scheduled posts that removing it would cancel. */
+  queuedPosts?: number
+  /** When the row last changed, such as a refresh of its profile. */
+  updatedAt?: string
 }
 
 export type BrandKit = {
@@ -1422,8 +1431,23 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, or a canvas workspace of artboards. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards, a store screenshot project or a Code Studio project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'store' | 'code'
+
+/** One file of a code import: whole code, or a unified patch of a change. */
+export type BackendCodeImportFile = { name: string; code?: string; patch?: string; status?: string }
+
+/** What a GitHub link holds, for Code Studio (docs/code-studio.md). */
+export type BackendCodeImport = {
+  kind: 'github-file' | 'github-pull' | 'github-commit' | 'gist'
+  url: string
+  repo?: string
+  ref?: string
+  path?: string
+  title?: string
+  startLine?: number
+  files: BackendCodeImportFile[]
+}
 
 /** A cloud creativeSet: an editor composition with revision-checked writes. */
 export type BackendCreativeSet = {
@@ -1433,7 +1457,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas document names itself (`kind: 'canvas'`); every other document is a Story Set. */
+  /** A canvas, store or code document names itself (`kind: 'canvas'`, `'store'` or `'code'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string
@@ -1505,6 +1529,8 @@ export type BackendPublicShareLink = {
   posterMediaType: string | null
   title: string
   width: number | null
+  /** A frozen Code Studio document, for a live code embed. */
+  code?: Record<string, unknown> | null
 }
 
 /** A provider an integration connects. */
@@ -2241,6 +2267,21 @@ export class ScreenshotStudioBackendSDK {
 
   async listConnections() {
     return this.request<{ items: ChannelConnection[] }>('v1/channel-connections')
+  }
+
+  /** Removes an account from the workspace, in a publishing brand or in none; its queued posts are cancelled. */
+  async removeConnection(id: string) {
+    return this.request<SocialSetRemoval>(`v1/channel-connections/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /** Reads an account's name, handle and picture from its platform again, with its current health. */
+  async refreshConnection(id: string) {
+    return this.request<ChannelConnection>(
+      `v1/channel-connections/${encodeURIComponent(id)}/refresh`,
+      { method: 'POST' }
+    )
   }
 
   async createConnection(input: {
@@ -3749,6 +3790,13 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /** Permanently remove a workspace's store screenshot project and its versions; browser copies stay. */
+  async deleteStoreProject(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/store-projects/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
   async archiveCreativeSet(id: string, archived = true) {
     return this.request<{ archived: boolean }>(
       `v1/creative-sets/${encodeURIComponent(id)}/archive?archived=${archived}`,
@@ -3806,6 +3854,11 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Read the code a GitHub file, pull request, commit or gist link points to; nothing is stored. */
+  async importCode(url: string) {
+    return this.request<BackendCodeImport>('v1/code-imports', { body: { url }, method: 'POST' })
+  }
+
   async listShareLinks() {
     return this.request<{ shareLinks: BackendShareLink[] }>('v1/share-links')
   }
@@ -3823,6 +3876,8 @@ export class ScreenshotStudioBackendSDK {
     posterAssetId?: string | null
     projectId?: string | null
     title: string
+    /** A Code Studio document to embed as text; frozen when the link is made. */
+    code?: Record<string, unknown>
   }) {
     return this.request<BackendShareLink>('v1/share-links', { body: input, method: 'POST' })
   }

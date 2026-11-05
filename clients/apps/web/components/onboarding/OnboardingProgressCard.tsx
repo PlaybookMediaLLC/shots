@@ -71,7 +71,7 @@ function Card({ initial }: { initial: StoredOnboardingRun }) {
       </p>
       <Link
         className="w-fit text-xs text-foreground/80 underline underline-offset-4 hover:text-foreground"
-        href="/workspace/product"
+        href="/settings/product"
       >
         Review your profile
       </Link>

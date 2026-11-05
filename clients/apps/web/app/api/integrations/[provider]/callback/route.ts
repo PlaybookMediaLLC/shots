@@ -10,7 +10,7 @@ import { appOrigin } from '@/lib/sharing/page'
 
 function back(slug: ProviderSlug, outcome: { connected: string } | { error: string }): Response {
   const url = new URL(
-    slug === 'slack' ? '/workspace/notifications' : '/workspace/integrations',
+    slug === 'slack' ? '/settings/notifications' : '/settings/integrations',
     appOrigin()
   )
   if ('connected' in outcome) url.searchParams.set('connected', outcome.connected)

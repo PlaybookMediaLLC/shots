@@ -3,7 +3,7 @@ import { defineContract } from '@/lib/api/contract'
 import { billingIntervalSchema, checkoutPlanSchema, creditPackSchema } from '@/lib/billing/plans'
 import { safeReturnPath } from '@/lib/platform/navigation'
 
-/** An in-app path such as `/write`; another site, or anything else, is refused. */
+/** An in-app path such as `/publish`; another site, or anything else, is refused. */
 const returnPathSchema = z
   .string()
   .max(2048)

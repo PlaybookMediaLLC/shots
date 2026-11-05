@@ -4,8 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import { Group, Row } from '@/components/platform-ui'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
+import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
 import { Input } from '@/components/ui/input'
 import { authClient } from '@/lib/auth/client'
@@ -27,88 +26,75 @@ export function ProfileForm({ email, name }: ProfileFormProps) {
   const [draftName, setDraftName] = useState(name)
   const dirty = draftName !== savedName
   useUnsavedSettings(dirty)
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [state, run] = useSaveState()
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setError(null)
-    setMessage(null)
+    if (!dirty || state === 'saving') return
     const input = profileSchema.safeParse(Object.fromEntries(new FormData(event.currentTarget)))
-    if (!input.success) {
-      setError(input.error.issues[0]?.message ?? 'Check the form values.')
-      return
-    }
-
-    setIsSubmitting(true)
-    try {
-      const result = await authClient.updateUser(input.data)
-      if (result.error) throw new Error(result.error.message || 'Could not update your profile.')
-      setSavedName(input.data.name)
-      setDraftName(input.data.name)
-      setMessage('Profile updated.')
-      router.refresh()
-    } catch (requestError) {
-      setError(getAuthErrorMessage(requestError, 'Could not update your profile.'))
-    } finally {
-      setIsSubmitting(false)
-    }
+    const saved = await run(async () => {
+      if (!input.success)
+        return { error: input.error.issues[0]?.message ?? 'Check the form values.', ok: false }
+      try {
+        const result = await authClient.updateUser(input.data)
+        if (result.error) throw new Error(result.error.message || 'Could not update your profile.')
+        return { ok: true }
+      } catch (requestError) {
+        return {
+          error: getAuthErrorMessage(requestError, 'Could not update your profile.'),
+          ok: false,
+        }
+      }
+    })
+    if (!saved || !input.success) return
+    setSavedName(input.data.name)
+    setDraftName(input.data.name)
+    router.refresh()
   }
 
   return (
-    <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
-      <Group>
-        <Row
-          description="Shown to your teammates across the workspace."
-          label={<Label htmlFor="profile-name">Name</Label>}
-        >
+    <Group>
+      <Row
+        description="Shown to your teammates across the workspace."
+        label={
+          <span className="flex items-center gap-2">
+            <Label htmlFor="profile-name">Name</Label> <SaveStatus state={state} />
+          </span>
+        }
+      >
+        {/* The form holds only the name, so Enter submits it. noValidate: zod reports an
+            empty name, where the browser's check would pull focus back on blur. */}
+        <form noValidate onSubmit={handleSubmit}>
           <Input
             autoComplete="name"
             className="h-10 rounded-lg md:w-72"
             value={draftName}
+            // The name saves when you leave the field or press Enter, like the time zone below.
+            onBlur={(event) => event.currentTarget.form?.requestSubmit()}
             onChange={(event) => setDraftName(event.target.value)}
-            disabled={isSubmitting}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setDraftName(savedName)
+            }}
+            disabled={state === 'saving'}
             maxLength={100}
             id="profile-name"
             name="name"
             required
           />
-        </Row>
-        <Row
-          description="Used to sign in and receive notifications. Use Change email below to update it."
-          label={<Label htmlFor="profile-email">Email</Label>}
-        >
-          <Input
-            className="h-10 cursor-not-allowed rounded-lg text-muted-foreground md:w-72"
-            defaultValue={email}
-            disabled
-            id="profile-email"
-            type="email"
-          />
-        </Row>
-      </Group>
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-      {message ? (
-        <Alert>
-          <AlertDescription>{message}</AlertDescription>
-        </Alert>
-      ) : null}
-      <SettingsSaveBar
-        dirty={dirty}
-        busy={isSubmitting}
-        disabled={!draftName.trim()}
-        label="Save profile"
-        onDiscard={() => {
-          setDraftName(savedName)
-          setError(null)
-          setMessage(null)
-        }}
-      />
-    </form>
+        </form>
+      </Row>
+      <Row
+        description="Used to sign in and receive notifications. Use Change email below to update it."
+        label={<Label htmlFor="profile-email">Email</Label>}
+      >
+        <Input
+          className="h-10 cursor-not-allowed rounded-lg text-muted-foreground md:w-72"
+          defaultValue={email}
+          disabled
+          id="profile-email"
+          type="email"
+        />
+      </Row>
+    </Group>
   )
 }

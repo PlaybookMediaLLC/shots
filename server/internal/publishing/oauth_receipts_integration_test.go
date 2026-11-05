@@ -103,7 +103,7 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 		t.Helper()
 		exec(`UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, sessionID, org)
 		state := cuid.New()
-		if err := repo.StartOAuth(ctx, actor, sessionID, state, "x", "SOCIAL_OAUTH_FIXTURE", OAuthStartOptions{SocialSetID: &set.ID, ExpectedConnectionID: expected, ReturnPath: "/workspace/social-sets/" + set.ID}); err != nil {
+		if err := repo.StartOAuth(ctx, actor, sessionID, state, "x", "SOCIAL_OAUTH_FIXTURE", OAuthStartOptions{SocialSetID: &set.ID, ExpectedConnectionID: expected, ReturnPath: "/settings/publishing-brands/" + set.ID}); err != nil {
 			t.Fatal(err)
 		}
 		return state
@@ -198,7 +198,7 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 		}
 		target, err := repo.ResolveOAuthContext(ctx, user, sessionID, state, "x")
 		if err != nil || target.OrganizationID != org || target.SocialSetID == nil || *target.SocialSetID != createdID ||
-			target.Operation != "CREATE_SET" || !target.Completed || target.ReturnPath != "/workspace/social-sets/"+createdID {
+			target.Operation != "CREATE_SET" || !target.Completed || target.ReturnPath != "/settings/publishing-brands/"+createdID {
 			t.Fatalf("wrong creation receipt: %+v %v", target, err)
 		}
 		duplicate := beginCreation("WORKSPACE")
@@ -258,7 +258,7 @@ func TestOAuthReceiptsKeepOriginalContextAndIdentity(t *testing.T) {
 		external := "external-" + state
 		exec(`UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, sessionID, other)
 		target, err := repo.ResolveOAuthContext(ctx, user, sessionID, state, "x")
-		if err != nil || target.Completed || target.OrganizationID != org || target.SocialSetID == nil || *target.SocialSetID != set.ID || target.ReturnPath != "/workspace/social-sets/"+set.ID {
+		if err != nil || target.Completed || target.OrganizationID != org || target.SocialSetID == nil || *target.SocialSetID != set.ID || target.ReturnPath != "/settings/publishing-brands/"+set.ID {
 			t.Fatalf("target=%+v %v", target, err)
 		}
 		if _, err := repo.ResolveOAuthContext(ctx, "another-user", sessionID, state, "x"); !errors.Is(err, ErrNotFound) {

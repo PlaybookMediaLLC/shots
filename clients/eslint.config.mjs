@@ -5,6 +5,44 @@ import tseslint from 'typescript-eslint';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
 
+/** Raw elements app code renders through components/ui instead. */
+const rawControls = [
+  {
+    selector:
+      'JSXOpeningElement[name.name=/^(button|label|select|option|optgroup|textarea|table|thead|tbody|tfoot|tr|th|td|caption)$/]',
+    message:
+      'Use the components/ui primitive (Button, Label, Select or Combobox, Textarea, Table), not the raw element.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='hidden']))",
+    message: 'Use Input, Checkbox, Slider or DatePicker from components/ui, not a raw <input>.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='Input']:has(JSXAttribute[name.name='type'][value.value=/^(date|datetime-local|checkbox|range)$/])",
+    message: 'Use DatePicker for a day, Checkbox for a checkbox and Slider for a range.',
+  },
+]
+
+/** Browser-drawn pickers and disclosures that ignore the app's look. */
+const nativePickers = [
+  {
+    selector: 'JSXOpeningElement[name.name=/^(details|summary|datalist)$/]',
+    message: 'Use Disclosure for a collapsible section and Combobox for suggestions.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='Input']:has(JSXAttribute[name.name='type'][value.value=/^(time|color)$/])",
+    message: 'Use TimePicker for a time and SwatchColorPicker for a color.',
+  },
+  {
+    selector:
+      "JSXOpeningElement[name.name='Input']:has(JSXAttribute[name.name='type'][value.value='file']):not(:has(JSXAttribute[name.name='hidden'])):not(:has(JSXAttribute[name.name='className'][value.value=/(^|\\s)(hidden|sr-only)(\\s|$)/]))",
+    message: 'Use FileDropZone; a hidden Input type="file" behind a Button is fine.',
+  },
+]
+
 export default defineConfig([
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -49,8 +87,8 @@ export default defineConfig([
     ...tseslint.configs.disableTypeChecked,
   },
   {
-    // Zapier's native runtime loads CommonJS modules.
-    files: ['integrations/zapier/**/*.js'],
+    // Zapier's native runtime and the VS Code extension host load CommonJS modules.
+    files: ['integrations/zapier/**/*.js', 'integrations/vscode/**/*.js'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: { Buffer: 'readonly', URL: 'readonly' },
@@ -97,6 +135,10 @@ export default defineConfig([
           selector: "CallExpression[callee.object.name='test'][callee.property.name='slow']",
           message: "Tag a long test { tag: '@journey' } instead.",
         },
+        {
+          selector: "CallExpression[callee.property.name='selectOption']",
+          message: 'The app has no native select; pick an option with chooseOption from ./framework.',
+        },
       ],
     },
   },
@@ -104,26 +146,42 @@ export default defineConfig([
     // AGENTS.md "UI primitives": app code renders controls through components/ui.
     files: ['apps/web/**/*.tsx'],
     ignores: ['apps/web/components/ui/**'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector:
-            'JSXOpeningElement[name.name=/^(button|label|select|option|optgroup|textarea|table|thead|tbody|tfoot|tr|th|td|caption)$/]',
-          message:
-            'Use the components/ui primitive (Button, Label, NativeSelect or Select, Textarea, Table), not the raw element.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='input']:not(:has(JSXAttribute[name.name='type'][value.value='hidden']))",
-          message: 'Use Input, Checkbox, Slider or DatePicker from components/ui, not a raw <input>.',
-        },
-        {
-          selector:
-            "JSXOpeningElement[name.name='Input']:has(JSXAttribute[name.name='type'][value.value=/^(date|datetime-local|checkbox|range)$/])",
-          message: 'Use DatePicker for a day, Checkbox for a checkbox and Slider for a range.',
-        },
-      ],
+    rules: { 'no-restricted-syntax': ['error', ...rawControls] },
+  },
+  {
+    // Platform pages also leave the browser's own pickers and disclosures to
+    // components/ui. The upstream editor directories keep theirs, so upstream
+    // merges stay cheap.
+    files: ['apps/web/**/*.tsx'],
+    ignores: [
+      'apps/web/components/ui/**',
+      ...[
+        'compress-video',
+        'controls',
+        'editor',
+        'export',
+        'frames',
+        'mockups',
+        'remove-background',
+        'store-screenshots',
+        'text-overlay',
+        'tools',
+      ].map((directory) => `apps/web/components/${directory}/**`),
+    ],
+    rules: { 'no-restricted-syntax': ['error', ...rawControls, ...nativePickers] },
+  },
+  {
+    // The Code Studio CLI and VS Code extension run on Node.
+    files: ['integrations/cli/**/*.js', 'integrations/vscode/**/*.js'],
+    languageOptions: {
+      globals: {
+        AbortSignal: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
     },
   },
   {

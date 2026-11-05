@@ -3,12 +3,21 @@
 import * as React from 'react'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { WriteData } from '@/app/[locale]/write/write-data'
+import type { WriteData } from '@/app/[locale]/publish/write-data'
 import { libraryDraft, libraryQuery } from '@/lib/write/library'
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
 import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
+import type { Shortcut } from './shortcuts'
+
+/** An editor command as the palette lists it. */
+export type EditorCommandEntry = {
+  id: string
+  label: string
+  shortcut?: Pick<Shortcut, 'alt' | 'key' | 'mod' | 'shift'>
+  run: () => void
+}
 
 /**
  * Write's shared client state (RFC 025): the library the page loaded, and
@@ -56,6 +65,8 @@ type WriteContextValue = {
   draftCommandsRef: React.MutableRefObject<DraftCommand[]>
   /** Archives or restores the open draft through its composer, which keeps its version. */
   archiveRef: React.MutableRefObject<((status: 'draft' | 'archived') => Promise<void>) | null>
+  /** The open editor's commands (composer/commands.tsx), for the command palette. */
+  editorCommandsRef: React.MutableRefObject<(() => EditorCommandEntry[]) | null>
   saved: Record<string, DraftLine>
   /** The list for the chosen tab or search is still loading. */
   libraryPending: boolean
@@ -100,6 +111,7 @@ export function WriteProvider({
   const openPreviewRef = React.useRef<(() => void) | null>(null)
   const draftCommandsRef = React.useRef<DraftCommand[]>([])
   const archiveRef = React.useRef<((status: 'draft' | 'archived') => Promise<void>) | null>(null)
+  const editorCommandsRef = React.useRef<(() => EditorCommandEntry[]) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
@@ -237,6 +249,7 @@ export function WriteProvider({
       draftCommandsRef,
       openPreviewRef,
       archiveRef,
+      editorCommandsRef,
       hideDraft,
       activeId,
       canEdit,
@@ -271,7 +284,7 @@ export function draftHref(id: string, setId?: string | null, panel?: string): st
   const query = new URLSearchParams()
   if (setId) query.set('set', setId)
   if (panel) query.set('panel', panel)
-  return `/write/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
+  return `/publish/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
 }
 
 /** "now", "5m", "3h", "2d", then a date: how long ago something happened. */

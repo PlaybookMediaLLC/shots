@@ -206,7 +206,7 @@ test(
     await expect(texts(page)).toHaveCount(0)
 
     // Use template opens that template, ready for the person's own screenshot.
-    await app.open('/library?view=templates')
+    await app.open('/create?view=templates')
     await page.getByRole('link', { name: 'Use template: Violet Showcase' }).click()
     await expect(page.getByText('Upload your media')).toBeVisible({ timeout: 60_000 })
     await expect(page).toHaveURL((url) => url.pathname === '/' && !url.search)

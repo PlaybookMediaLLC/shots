@@ -6,7 +6,7 @@ import {
   expectSaved,
   openNewDraft,
   test,
-  toolbarTool,
+  editorMore,
 } from './framework'
 
 test(
@@ -56,13 +56,13 @@ test(
     await draftEditor(page).click()
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.type('Thanks ')
-    await toolbarTool(page, 'More tools', 'Add mention')
+    await editorMore(page, 'Mention')
     let picker = page.getByTestId('mention-picker')
     await picker.getByRole('button', { name: 'People', exact: true }).click()
     await picker.getByRole('button', { name: 'Recently mentioned people', exact: true }).click()
     await picker.getByTestId('mention-result').filter({ hasText: 'Anne (AJ) Doe' }).click()
     await expect(draftEditor(page).getByTestId('social-mention')).toContainText('Anne (AJ) Doe')
-    await toolbarTool(page, 'More tools', 'Add mention')
+    await editorMore(page, 'Mention')
     picker = page.getByTestId('mention-picker')
     await picker.getByRole('button', { name: 'Companies', exact: true }).click()
     await picker.getByRole('button', { name: 'Recently mentioned companies', exact: true }).click()

@@ -11,7 +11,7 @@ import {
   trpcMutation,
   trpcQuery,
   uploadSignedAsset,
-  toolbarTool,
+  editorMore,
 } from './framework'
 import { mkdir } from 'node:fs/promises'
 
@@ -82,7 +82,7 @@ test(
   async ({ app, page }) => {
     for (const width of [320, 390, 767, 768, 769, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 })
-      await app.open('/workspace/appearance')
+      await app.open('/settings/appearance')
       await expect(page.getByRole('heading', { name: 'Appearance', exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -100,7 +100,7 @@ test(
         // Choosing a section closes the drawer on the new page.
         await opener.click()
         await drawer.getByRole('link', { name: 'Security', exact: true }).click()
-        await expect(page).toHaveURL(/\/workspace\/security$/)
+        await expect(page).toHaveURL(/\/settings\/security$/)
         await expect(drawer).toBeHidden()
       } else {
         await expect(
@@ -113,7 +113,10 @@ test(
     await page.setViewportSize({ width: 390, height: 844 })
     await page.screenshot({ path: '.context/ux-redesign/settings-mobile.png', fullPage: true })
     await app.open('/library?type=store')
-    await expect(page.getByText('On this browser only.', { exact: false })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'On this browser', exact: true })).toBeVisible()
+    await expect(
+      page.getByText('These projects belong to this browser profile.', { exact: false })
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Open navigation' }).click()
     await expect(page.getByRole('dialog', { name: 'Navigation', exact: true })).toBeVisible()
     await page
@@ -140,7 +143,7 @@ test(
     await expect(page.getByRole('heading', { name: 'Workflows', exact: true })).toBeVisible()
     await app.open('/campaigns/releases')
     await expect(page.getByRole('heading', { name: 'Release inbox', exact: true })).toBeVisible()
-    await app.open('/workspace/appearance')
+    await app.open('/settings/appearance')
     await page.getByRole('radio', { name: /^Always compact/ }).check()
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await app.reload()
@@ -188,7 +191,7 @@ test(
     const kept = await upload('kept-library.png')
     const removed = await upload('removed-library.png')
     const draftId = await openNewDraft(page)
-    await toolbarTool(page, 'Media', 'Attach from Library')
+    await editorMore(page, 'From Library')
     const picker = page.getByRole('dialog', { name: 'Attach from Library' })
     await picker.getByRole('button', { name: 'removed-library.png', exact: true }).click()
     expect((await trpcMutation(page, 'asset.delete', { assetId: removed })).status).toBe(200)
@@ -217,7 +220,7 @@ test(
     await page.getByRole('menuitem', { name: 'Use in a new post' }).click()
     await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
     await page.waitForURL(
-      (url) => /^\/write\/[a-z0-9]+$/.test(url.pathname) && !url.pathname.endsWith(draftId)
+      (url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname) && !url.pathname.endsWith(draftId)
     )
     const postId = new URL(page.url()).pathname.split('/').pop()!
     await expect(
@@ -308,7 +311,7 @@ test(
   'localized destinations and light-theme reflow retain keyboard access',
   { tag: '@journey' },
   async ({ app, page }) => {
-    await app.open('/workspace/appearance')
+    await app.open('/settings/appearance')
     await page.getByRole('radio', { name: /^Light/ }).check()
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await app.open('/fr/home')
@@ -423,7 +426,7 @@ test(
   { tag: '@journey' },
   async ({ app, page }) => {
     const before = await trpcQuery(page, 'releaseAutomation.overview')
-    await app.open('/library?view=templates')
+    await app.open('/create?view=templates')
     const catalog = page.getByRole('region', { name: 'Template previews' })
     await expect(catalog).toBeVisible()
     const previews = catalog.getByRole('img', { name: /^Preview of / })
@@ -505,7 +508,7 @@ test(
     await app.open('/create?view=templates')
     await expect(page.getByRole('region', { name: 'Template previews' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-    await app.open('/workspace/appearance')
+    await app.open('/settings/appearance')
     await expect(page.getByRole('switch', { name: 'Show scrollbars' })).toHaveCount(0)
   }
 )
@@ -536,7 +539,7 @@ test(
       'compact'
     )
     await page.unroute('**/api/auth/get-session')
-    await app.open('/workspace/appearance')
+    await app.open('/settings/appearance')
     await page.getByRole('radio', { name: /^Always compact/ }).check()
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     const sidebar = page.getByRole('complementary', { name: 'Primary navigation' })
@@ -548,12 +551,17 @@ test(
         documents.push(request.url())
     })
     // Settings pages list their sections; the back link returns to the destinations.
-    await sidebar.getByRole('link', { name: 'Settings, back to Home', exact: true }).click()
-    await expect(page).toHaveURL(/\/home$/)
+    await sidebar.getByRole('link', { name: 'Back, leave settings', exact: true }).click()
+    await expect(sidebar.getByRole('link', { name: 'Home', exact: true })).toBeVisible()
     await expect(sidebar).toHaveAttribute('data-navigation', 'expanded')
-    for (const name of ['Home', 'Library', 'Automate', 'Create']) {
+    for (const [name, heading] of [
+      ['Home', 'Home'],
+      ['Library', 'Library'],
+      ['Automate', 'Workflows'],
+      ['Create', 'Create'],
+    ]) {
       await sidebar.getByRole('link', { name, exact: true }).click()
-      await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible()
+      await expect(page.getByRole('heading', { name: heading, exact: true }).first()).toBeVisible()
       await expect(sidebar).toHaveAttribute('data-navigation', 'expanded')
     }
     expect(documents).toEqual([])
@@ -624,7 +632,9 @@ test(
       .getByRole('dialog', { name: 'Navigation', exact: true })
       .getByRole('link', { name: 'Automate', exact: true })
       .click()
-    await expect(page.getByRole('heading', { name: 'Automate', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'Workflows', exact: true, level: 1 })
+    ).toBeVisible()
     await expect(page.getByRole('dialog')).toHaveCount(0)
   }
 )

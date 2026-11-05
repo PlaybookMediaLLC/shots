@@ -62,7 +62,7 @@ test(
       await items
         .getByRole('link', { name: /^Open draft/ })
         .evaluateAll((links) => links.map((link) => link.getAttribute('href')))
-    ).toEqual([`/write/${first}`, `/write/${acceptedId}`])
+    ).toEqual([`/publish/${first}`, `/publish/${acceptedId}`])
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
     ).toBeDisabled()

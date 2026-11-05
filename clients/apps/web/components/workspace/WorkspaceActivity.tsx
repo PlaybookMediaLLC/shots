@@ -137,7 +137,7 @@ const SECTIONS: Section[] = [
     load: async (trpc) => {
       const { scheduledPosts } = await trpc.scheduledPost.list.query()
       return scheduledPosts.map((post) => ({
-        href: '/write/plan',
+        href: '/publish/calendar',
         id: post.id,
         meta: `${post.channelConnection.platform} · ${formatDate(post.scheduledFor)}`,
         status: post.status,

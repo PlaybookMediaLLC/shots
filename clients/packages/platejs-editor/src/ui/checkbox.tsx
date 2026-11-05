@@ -17,7 +17,7 @@ function Checkbox({
   return (
     <CheckboxRoot
       className={cn(
-        "group peer flex size-4 shrink-0 items-center justify-center rounded-none border border-primary bg-primary ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=unchecked]:bg-background data-[state=checked]:text-primary-foreground data-[state=indeterminate]:text-primary-foreground",
+        "group peer flex size-4 shrink-0 items-center justify-center rounded-md border border-primary bg-primary ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=unchecked]:bg-background data-[state=checked]:text-primary-foreground data-[state=indeterminate]:text-primary-foreground",
         className
       )}
       {...props}

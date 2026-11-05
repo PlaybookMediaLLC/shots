@@ -91,7 +91,7 @@ function SocialMentionInput(props: PlateElementProps) {
           ? 'Looking up account…'
           : (current.error ?? 'No matching account. Escape keeps your text.')
   return (
-    <PlateElement {...props} as="span">
+    <PlateElement {...props} as="span" className="rounded-sm bg-accent px-0.5 text-accent-foreground">
       <InlineCombobox
         element={props.element}
         trigger="@"
@@ -204,14 +204,16 @@ export function MentionPicker({
   open,
   setId,
 }: {
-  channels: DraftChannel[]
-  editor: React.MutableRefObject<PlateEditor | null>
-  /** Opened from the toolbar's More menu; it anchors in the toolbar. */
+  channels: readonly DraftChannel[]
+  editor: React.MutableRefObject<PlateEditor | null> | { current: PlateEditor }
+  /** Opened from the toolbar's More menu or the slash menu's Mention. */
   onOpenChange: (open: boolean) => void
   open: boolean
   setId: string | null
 }) {
-  const lookups = mentionLookups(channels)
+  const lookups = channels.filter(
+    (channel): channel is 'x' | 'linkedin' => channel === 'x' || channel === 'linkedin'
+  )
   const [channel, setChannel] = React.useState<'x' | 'linkedin'>(lookups[0] ?? 'x')
   const [query, setQuery] = React.useState('')
   const [kind, setKind] = React.useState<'organization' | 'person'>('organization')
@@ -253,9 +255,8 @@ export function MentionPicker({
       }}
       open={open}
     >
-      <PopoverAnchor asChild>
-        <span aria-hidden className="self-stretch" />
-      </PopoverAnchor>
+      {/* Opens above the toolbar's end, where the More menu that asked for it was. */}
+      <PopoverAnchor className="h-8 w-0" />
       <PopoverContent
         className="grid w-80 gap-2 p-3"
         data-testid="mention-picker"
@@ -335,7 +336,7 @@ export function MentionPicker({
             Find
           </Button>
         </form>
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-label text-muted-foreground">
           {channel === 'x'
             ? 'Looked up on X with this set’s account, by exact username.'
             : kind === 'person'

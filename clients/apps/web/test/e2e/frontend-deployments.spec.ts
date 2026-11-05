@@ -1,4 +1,12 @@
-import { createWorkspace, db, expect, test, trpcMutation, trpcQuery } from './framework'
+import {
+  chooseOption,
+  createWorkspace,
+  db,
+  expect,
+  test,
+  trpcMutation,
+  trpcQuery,
+} from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -50,10 +58,10 @@ test('frontend rules save once, preview without side effects, and isolate eviden
       name: 'Production frontend',
     })
 
-    await page.getByLabel('Representative event').selectOption('build')
+    await chooseOption(page.getByLabel('Representative event'), 'Build ready, publication pending')
     await page.getByRole('button', { name: 'Preview policy', exact: true }).click()
     await expect(page.getByText('Build or production publication remains pending.')).toBeVisible()
-    await page.getByLabel('Representative event').selectOption('active')
+    await chooseOption(page.getByLabel('Representative event'), 'Production active, checks pass')
     await page.getByRole('button', { name: 'Preview policy', exact: true }).click()
     await expect(
       page.getByText('Provider reported a successful production deployment.', { exact: true })

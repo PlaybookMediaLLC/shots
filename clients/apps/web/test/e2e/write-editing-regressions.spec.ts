@@ -1,4 +1,4 @@
-import { apiRequest, db, draftEditor, expect, expectSaved, test } from './framework'
+import { apiRequest, db, draftEditor, expect, expectSaved, test, postMenu } from './framework'
 
 // @dev-server until fixed: on the production build one early-typed title character is lost.
 test(
@@ -8,7 +8,7 @@ test(
     await startWorkspace({ channels: ['x', 'linkedin'] })
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
-    await app.open('/write')
+    await app.open('/publish')
     // Hold creation so the first keystrokes necessarily precede the route and collab sync.
     await page.route('**/api/v1/content-drafts', async (route) => {
       if (route.request().method() === 'POST')
@@ -19,7 +19,7 @@ test(
     const early = page.getByRole('textbox', { name: 'New draft text' })
     await expect(early).toBeFocused()
     await page.keyboard.type('Hello world from QA')
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const id = new URL(page.url()).pathname.split('/').pop()!
     const editor = draftEditor(page)
     await expect(early).toBeHidden({ timeout: 60_000 })
@@ -32,7 +32,7 @@ test(
     await expectSaved(page)
     expect((await apiRequest(page, `/api/v1/content-drafts/${id}`)).body).toMatchObject({ title })
 
-    await page.getByRole('button', { name: 'Add another post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await editor
       .locator('[data-slate-node="element"]')
       .filter({ has: page.locator('[data-slate-zero-width]') })
@@ -40,13 +40,20 @@ test(
       .click()
     await page.keyboard.type('Second post with padding')
     await expect(editor).toContainText('Second post with padding')
-    await page.getByRole('button', { name: 'More actions for post 2', exact: true }).click()
-    await page.getByRole('menuitem', { name: /^Move post 2 up/ }).click()
-    await page.getByRole('button', { name: 'More actions for post 1', exact: true }).click()
-    await expect(page.getByRole('menuitem', { name: /^Move post 1 up/ })).toBeDisabled()
+    await (
+      await postMenu(page, 2)
+    )
+      .getByRole('menuitem', { name: 'Move post up', exact: true })
+      .click()
+    await expect(
+      (await postMenu(page, 1)).getByRole('menuitem', { name: 'Move post up', exact: true })
+    ).toBeDisabled()
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'More actions for post 2', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Delete post 2', exact: true }).click()
+    await (
+      await postMenu(page, 2)
+    )
+      .getByRole('menuitem', { name: 'Delete post', exact: true })
+      .click()
     await expect(editor).not.toContainText('Hello world from QA')
     await expect(editor).toContainText('Second post with padding')
 
@@ -161,7 +168,7 @@ test(
       .getByRole('alertdialog')
       .getByRole('button', { name: 'Delete drafts', exact: true })
       .click()
-    await expect(page).toHaveURL(/\/write(?:\?|$)/)
+    await expect(page).toHaveURL(/\/publish(?:\?|$)/)
     await expect(
       page.getByTestId('draft-row').filter({ hasText: 'Retry keeps this title' })
     ).toHaveCount(0)
@@ -196,7 +203,7 @@ test(
       .getByRole('dialog', { name: 'New draft' })
       .getByRole('button', { name: 'Retry' })
       .click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     await expect(early).toBeHidden({ timeout: 60_000 })
     await expect(draftEditor(page)).toContainText('Words typed straight away')
     await expectSaved(page)

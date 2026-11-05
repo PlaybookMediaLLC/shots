@@ -17,15 +17,23 @@ test(
     const oldId = await openNewDraft(page)
     const oldResponse = await apiRequest(page, `/api/v1/content-drafts/${oldId}`)
     const old = oldResponse.body as { socialSetId: string; engagement: unknown }
-    await app.open(`/workspace/social-sets/${old.socialSetId}/new-draft`)
+    await app.open(`/settings/publishing-brands/${old.socialSetId}/new-draft`)
     await page.getByRole('switch', { name: 'Auto-Retweet', exact: true }).check()
     await page.getByLabel('Auto-Retweet likes', { exact: true }).fill('7')
     await page.getByRole('switch', { name: 'Auto-Plug', exact: true }).check()
     await page.getByLabel('Auto-Plug likes', { exact: true }).fill('9')
-    await page
-      .getByLabel('Auto-Plug reply text', { exact: true })
-      .fill('The release guide is ready')
-    await page.getByRole('button', { name: 'Save engagement defaults', exact: true }).click()
+    // The defaults save once complete: here, when the reply text is filled in and left.
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        response.ok() &&
+        response.request().postDataJSON()?.engagementDefaults?.autoPlug?.text ===
+          'The release guide is ready'
+    )
+    const reply = page.getByLabel('Auto-Plug reply text', { exact: true })
+    await reply.fill('The release guide is ready')
+    await reply.blur()
+    await saved
     await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
     await app.reload()
     await expect(page.getByLabel('Auto-Plug reply text', { exact: true })).toHaveValue(
@@ -60,7 +68,7 @@ test(
     await expect(page.getByTestId('write-rail')).not.toBeVisible()
     await page.keyboard.press('ControlOrMeta+Shift+F')
     const anchor = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10)
-    await app.open(`/write/plan?view=week&week=${anchor}`)
+    await app.open(`/publish/calendar?view=week&week=${anchor}`)
     await expect(page.locator('[data-calendar-date]')).toHaveCount(7)
     await page.getByRole('button', { name: 'Drafts', exact: true }).first().click()
     const source = page.getByRole('link', { name: /Board draft for review/ })
@@ -74,7 +82,7 @@ test(
     await expect(page.getByRole('dialog')).toHaveCount(0)
     posts = await apiRequest(page, `/api/v1/content-drafts/${nextId}/posts`)
     expect((posts.body as { posts: unknown[] }).posts).toHaveLength(0)
-    await app.open(`/write/plan?view=week&week=${anchor}&scope=workspace`)
+    await app.open(`/publish/calendar?view=week&week=${anchor}&scope=workspace`)
     await expect(page.getByTestId('calendar-planned').filter({ visible: true })).toContainText(
       'Board draft for review'
     )

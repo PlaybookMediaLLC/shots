@@ -142,7 +142,7 @@ test('a lost acceptance response is reconciled without resubmitting or duplicati
     await expect(recipient.getByText('This invitation has already been accepted.')).toBeVisible()
     expect(sends).toBe(1)
     await recipient.getByRole('button', { name: 'Open workspace' }).click()
-    await expect.poll(() => new URL(recipient.url()).pathname).toBe('/workspace')
+    await expect.poll(() => new URL(recipient.url()).pathname).toBe('/settings')
     const result = await db.query(
       'SELECT count(*)::int AS total FROM member WHERE "organizationId"=$1 AND "userId"=(SELECT id FROM "user" WHERE email=$2)',
       [org, email]

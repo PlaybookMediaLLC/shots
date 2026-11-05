@@ -4,6 +4,7 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
 import { Input } from '@/components/ui/input'
@@ -295,11 +296,11 @@ export function DraftPosts({
                 </div>
               ) : null}
               {post.failureCode ? (
-                <details className="text-xs text-muted-foreground" data-testid="failure-details">
-                  <summary className="cursor-pointer select-none hover:text-foreground">
+                <Disclosure className="text-xs text-muted-foreground" data-testid="failure-details">
+                  <DisclosureTrigger className="select-none hover:text-foreground">
                     Details
-                  </summary>
-                  <p className="mt-1 flex flex-wrap items-center gap-2 font-mono">
+                  </DisclosureTrigger>
+                  <DisclosureContent className="mt-1 flex flex-wrap items-center gap-2 font-mono">
                     {support}
                     <Button
                       onClick={() =>
@@ -313,8 +314,8 @@ export function DraftPosts({
                     >
                       Copy for support
                     </Button>
-                  </p>
-                </details>
+                  </DisclosureContent>
+                </Disclosure>
               ) : null}
               {post.replies > 0 && post.status !== 'PUBLISHED' ? (
                 <p className="text-xs text-muted-foreground">
@@ -427,14 +428,16 @@ export function DraftPosts({
         {latest.map((post) => row(post))}
       </ul>
       {earlier.length > 0 ? (
-        <details className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
-          <summary className="cursor-pointer select-none hover:text-foreground">
+        <Disclosure className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
+          <DisclosureTrigger className="select-none hover:text-foreground">
             {earlier.length} earlier attempt{earlier.length === 1 ? '' : 's'}
-          </summary>
-          <ul className="mt-2 divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
-            {earlier.map((post) => row(post, true))}
-          </ul>
-        </details>
+          </DisclosureTrigger>
+          <DisclosureContent>
+            <ul className="mt-2 divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
+              {earlier.map((post) => row(post, true))}
+            </ul>
+          </DisclosureContent>
+        </Disclosure>
       ) : null}
     </section>
   )

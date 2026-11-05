@@ -72,7 +72,7 @@ export function useNewPost(onStart?: () => void): () => void {
     void prepareWorkspaceSwitch().then(
       () =>
         createWritingDraft({}, (id) =>
-          router.push(platformHref(pathname, `/write/${encodeURIComponent(id)}`))
+          router.push(platformHref(pathname, `/publish/${encodeURIComponent(id)}`))
         ),
       () => {}
     )
@@ -148,7 +148,7 @@ export function PendingDraftInput() {
           <div className="flex gap-2">
             {value.planRequired ? (
               <ButtonLink
-                href={`/upgrade?from=${encodeURIComponent('/write')}`}
+                href={`/upgrade?from=${encodeURIComponent('/publish')}`}
                 onClick={() => {
                   retry = null
                   update(null)

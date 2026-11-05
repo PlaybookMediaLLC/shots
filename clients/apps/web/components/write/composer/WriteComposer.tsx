@@ -12,11 +12,16 @@ import { SidebarIcon as PanelRight } from '@phosphor-icons/react/dist/ssr/Sideba
 import { ShareIcon as Share2 } from '@phosphor-icons/react/dist/ssr/Share'
 import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
 import { ListPlusIcon as ListPlus } from '@phosphor-icons/react/dist/ssr/ListPlus'
+import { InfoIcon } from '@phosphor-icons/react/dist/ssr/Info'
+import { ScissorsIcon } from '@phosphor-icons/react/dist/ssr/Scissors'
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { connectHref } from '@/components/settings/social-sets/api'
 import { Pill } from '@/components/platform-ui'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,7 +33,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Sheet,
   SheetContent,
@@ -39,10 +43,21 @@ import {
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { DraftPosts } from '@/components/drafts/DraftPosts'
 import type { DraftCollaboration, DraftEditorUser } from '@/components/drafts/DraftEditor'
-import { DraftSettingsDrawer, settingsOpen } from '@/components/drafts/DraftSettingsDrawer'
+import {
+  BrandSettingsButton,
+  openBrandSettings,
+  settingsOpen,
+} from '@/components/drafts/DraftSettingsDrawer'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { ReviewControls } from '@/components/drafts/DraftTools'
-import { appendPost, deletePost, movePost, postRanges } from '@/components/drafts/thread'
+import {
+  appendPost,
+  deletePost,
+  movePost,
+  postRanges,
+  splitPostAtCaret,
+} from '@/components/drafts/thread'
+import { overflowStart, type PostExcess, setOverLimit } from '@/components/drafts/over-limit'
 import { POST_COLUMN } from '@/components/drafts/layout'
 import {
   DraftRequestError,
@@ -70,7 +85,9 @@ import {
   type VersionOptions,
 } from '@/lib/write/document'
 import { buildPublication } from '@/lib/write/publication'
+import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
+  adaptBody,
   bodyFor,
   bodyPosts,
   forkVersion,
@@ -85,7 +102,6 @@ import { useKeys, useShortcuts } from '../shortcuts'
 import { DraftsDrawerButton } from '../WriteFrame'
 import { useWrite, type WriteSet } from '../write-context'
 import { CommentsPanel } from './comments'
-import { ComposerEmojiPicker } from './emoji-picker'
 import { ThreadTools } from './thread-tools'
 import { ArticleTools } from './article-tools'
 import { MemberComments } from './member-comments'
@@ -98,7 +114,7 @@ import {
   SyncedVersion,
   tabChannels,
 } from './platforms'
-import { PostSettingsTools } from './post-tools'
+import { PostSettingRequestContext, PostSettingsTools, type PostSettingRequest } from './post-tools'
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
 import {
@@ -112,16 +128,20 @@ import { socialSetHref } from '@/components/workspace/settings-sections'
 import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
-import { DescribeImages, PreviewImageDescription } from './describe-images'
-import { MediaTools } from './media-tools'
+import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
-import { RefineButton } from './refine'
+import { RefineMenu, RefineProvider } from './refine'
+import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
+import { ComposerToolbar } from './composer-toolbar'
+import { SelectionToolbarPlugin } from './selection-toolbar'
+import { SlashMenuPlugin } from './slash-menu'
+import { HashtagPlugins, HashtagsContext } from './hashtags'
+import { QuietShortcutPlugins } from './quiet-shortcuts'
+import { PlainPastePlugin } from './plain-paste'
 import {
-  MentionPicker,
-  mentionLookups,
   SocialMentionPlugin,
   SocialMentionInputPlugins,
   SocialMentionContext,
@@ -154,8 +174,20 @@ type Dialog =
   | 'paste'
   | null
 
-/** Plugins Write adds to the editor; stable, so the editor is built once. */
-const WRITE_PLUGINS = [SocialMentionPlugin, ...SocialMentionInputPlugins]
+/**
+ * Plugins Write adds to the editor; stable, so the editor is built once. Typed
+ * loosely on purpose: inferring one union of all their plugin types doubled
+ * the type checker's memory (CI's typecheck ran out of heap).
+ */
+const WRITE_PLUGINS: unknown[] = [
+  SocialMentionPlugin,
+  ...SocialMentionInputPlugins,
+  SlashMenuPlugin,
+  SelectionToolbarPlugin,
+  ...HashtagPlugins,
+  ...QuietShortcutPlugins,
+  PlainPastePlugin,
+]
 
 /** What the save state reads as. */
 const SAVE_LABELS: Record<SaveState, string> = {
@@ -194,6 +226,7 @@ export function WriteComposer({
   collabToken = null,
   collabUrl,
   draft: initial,
+  giphy = false,
   posts: initialPosts,
   requireApproval,
   set,
@@ -205,6 +238,8 @@ export function WriteComposer({
   collabToken?: DraftCollaboration['issued'] | null
   collabUrl: string | null
   draft: DraftWire
+  /** Whether GIF search is approved and configured. */
+  giphy?: boolean
   posts: DraftPostWire[]
   requireApproval: boolean
   set: WriteSet | null
@@ -225,7 +260,6 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
-    data,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -418,9 +452,6 @@ export function WriteComposer({
     if (main && main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
   }, [panel])
   const [pasteNotice, setPasteNotice] = React.useState(false)
-  const [toolDialog, setToolDialog] = React.useState<ToolDialog | null>(null)
-  // Rewrite registers here, so a post's sparkle opens it beside that post.
-  const refineAt = React.useRef<((anchor: HTMLElement) => void) | null>(null)
 
   const renderBlocks = async (): Promise<BlockImages> => {
     if (pendingBlocks.length === 0 || !services.uploadFile) return []
@@ -458,6 +489,53 @@ export function WriteComposer({
     items.find((item) => item.account.channel === active)?.publication ??
     buildPublication(draftFields, { channel: active, connectionId: 'preview' }, pendingBlocks)
   const approved = server.reviewStatus === 'approved' && server.approvedVersion === server.version
+  const limitFor = (channel: DraftChannel) =>
+    items.find((item) => item.account.channel === channel)?.publication.serialized.limit ??
+    CAPABILITIES[channel].captionLimit
+  // Write's tools the toolbar, the More menu and the slash menu open.
+  const [tool, setTool] = React.useState<ComposerTool | null>(null)
+  const [postSetting, setPostSetting] = React.useState<PostSettingRequest | null>(null)
+  // The set's thread finishers are the slash menu's snippets.
+  const snippetSet = server.socialSetId ?? set?.id ?? null
+  const [snippets, setSnippets] = React.useState<Snippet[]>([])
+  const [snippetsRead, setSnippetsRead] = React.useState(0)
+  React.useEffect(() => {
+    if (!snippetSet || !canEdit) return
+    let cancelled = false
+    void writeApi
+      .finishers(snippetSet)
+      .then(({ items: found }) => {
+        if (!cancelled) setSnippets(found.map(({ id, name, text }) => ({ id, name, text })))
+      })
+      .catch(() => {
+        // Without them the menu offers to manage snippets; the dialog shows the error.
+        if (!cancelled) setSnippets([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canEdit, snippetSet, snippetsRead])
+  /** Another platform's own text, written from an accepted Refine review. */
+  const writeVersion = (target: DraftChannel, body: PlateBody) => {
+    const before = document.versions
+    update((current) => {
+      const versions =
+        versionFor(current.versions, target).mode === 'manual'
+          ? current.versions
+          : forkVersion(
+              current.versions,
+              target,
+              current.value as PlateBody,
+              version.current,
+              Boolean(CAPABILITIES[target].thread)
+            )
+      return { versions: withVersion(versions, { ...versionFor(versions, target), body }) }
+    })
+    setTab(target)
+    toast.success(`Written as ${CHANNEL_META[target].label}’s own text.`, {
+      action: { label: 'Undo', onClick: () => update({ versions: before }) },
+    })
+  }
   const refreshPosts = async () => {
     setPosts((await draftsApi.posts(initial.id)).posts)
     router.refresh()
@@ -496,7 +574,7 @@ export function WriteComposer({
       if (newDraft)
         void draftsApi
           .create({ socialSetId: draft.socialSetId ?? undefined })
-          .then((next) => router.push(`/write/${next.id}`))
+          .then((next) => router.push(`/publish/${next.id}`))
           .catch(() =>
             toast.error(
               'Scheduled successfully, but the next draft could not be opened. Create one from the sidebar.'
@@ -679,22 +757,12 @@ export function WriteComposer({
       inEditor: true,
     },
     {
-      key: 'j',
-      label: 'Assistant',
-      mod: true,
-      run: () => togglePanel('assistant'),
-      inEditor: true,
-    },
-    {
       // The editor's own image picker, so the upload takes the usual path.
       key: 'i',
       label: 'Add media',
       mod: true,
       shift: true,
-      run: () =>
-        bodyArea.current
-          ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert media"]')
-          ?.click(),
+      run: () => addMedia(),
       inEditor: true,
     },
     {
@@ -712,6 +780,11 @@ export function WriteComposer({
       run: () => movePostAtCaret(1),
     },
   ])
+  function addMedia() {
+    bodyArea.current
+      ?.querySelector<HTMLInputElement>('input[type="file"][aria-label="Insert media"]')
+      ?.click()
+  }
   function movePostAtCaret(delta: number) {
     const current = editor.current
     const block = current?.api.block({ highest: true })
@@ -816,66 +889,82 @@ export function WriteComposer({
       archiveRef.current = null
     }
   })
-  const postHeader = (number: number) => {
-    const account = accounts.find((item) => item.channel === active)
+  // The publishing account for the tab: the enabled one, else any on that platform.
+  const account =
+    accounts.find((item) => item.channel === active && enabled.includes(item.id)) ??
+    accounts.find((item) => item.channel === active)
+  const author = account?.displayName ?? set?.name ?? user.name
+  const postHeader = () => (
+    <div className="flex items-center gap-2 sm:gap-3" data-testid="post-header">
+      <Avatar
+        // Covers the thread line where it meets the avatar.
+        className="relative z-[1] -ms-10 size-8 ring-4 ring-card sm:-ms-12 sm:size-9"
+        data-post-avatar
+      >
+        {account?.avatarUrl ? <AvatarImage alt="" src={account.avatarUrl} /> : null}
+        {/* Also shown when a provider's avatar link has expired. */}
+        <AvatarFallback className="bg-accent text-ui font-medium text-accent-foreground">
+          {initials(author)}
+        </AvatarFallback>
+      </Avatar>
+      <p className="min-w-0 flex-1 truncate text-ui">
+        <span className="font-medium text-foreground">{author}</span>
+        <span className="ml-1.5 text-muted-foreground">
+          {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
+        </span>
+      </p>
+    </div>
+  )
+  // Each post's characters over the limit; a platform without threads publishes the
+  // posts as one caption, whose overflow is the last post's tail.
+  // shortcut: that tail can start in an earlier post; mark across posts if writers ask.
+  const captionLimit = activePublication.serialized.limit
+  const postCount = postRanges((editorInstance?.children ?? []) as Value).length
+  const excess: PostExcess = Object.fromEntries(
+    activePublication.serialized.posts
+      .filter((post) => post.length > captionLimit)
+      .map((post) => [CAPABILITIES[active].thread ? post.group : postCount, post.length - captionLimit])
+  )
+  const excessKey = JSON.stringify(excess)
+  React.useEffect(() => {
+    if (editorInstance) setOverLimit(editorInstance, active, JSON.parse(excessKey) as PostExcess)
+  }, [active, editorInstance, excessKey])
+  const splitAtLimit = (number: number) => {
+    const current = editor.current
+    const point = current && overflowStart(current.children, number, excess, active)
+    if (!current || !point) return
+    current.tf.select(point)
+    splitPostAtCaret(current)
+    current.tf.focus()
+  }
+  const postCounter = (number: number, inUse: boolean) => {
     const post = activePublication.serialized.posts.find((item) => item.group === number)
-    const limit = activePublication.serialized.limit
-    return (
-      <div className="mb-1 flex items-center gap-3" data-testid="post-header">
+    // An empty post in a thread is dropped when published: say so, and offer to remove it.
+    if (!post)
+      return canEdit && CAPABILITIES[active].thread && postCount > 1 ? (
         <span
-          aria-hidden
-          className="relative z-[1] -ml-12 hidden size-9 shrink-0 overflow-hidden rounded-full ring-4 ring-card sm:flex"
-          data-post-avatar
+          className="flex items-center gap-1 text-caption text-amber-700 dark:text-amber-300"
+          data-testid={`empty-post-${number}`}
         >
-          {/* With no avatar, or one that fails to load, the account gets a face of its own. */}
-          <Avatar className="size-full">
-            {account?.avatarUrl ? (
-              <AvatarImage alt="" className="object-cover" src={account.avatarUrl} />
-            ) : null}
-            <AvatarFallback name={account?.displayName ?? account?.handle ?? set?.name ?? 'Shots'} />
-          </Avatar>
-        </span>
-        <p className="min-w-0 flex-1 truncate text-sm">
-          <span className="font-medium text-foreground">
-            {account?.displayName ?? set?.name ?? 'Draft'}
-          </span>
-          <span className="ml-1.5 text-muted-foreground">
-            {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
-          </span>
-        </p>
-        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-          {post ? (
-            <span
-              className={cn(post.length > limit && 'text-red-700 dark:text-red-400')}
-              data-testid={`post-length-${number}`}
-            >
-              {post.length} / {limit}
-            </span>
-          ) : null}
-          {CAPABILITIES[active].thread ? <span>#{number}</span> : null}
-        </span>
-        {/* An empty post in a thread is dropped when published: say so, and offer to remove it. */}
-        {!post &&
-        canEdit &&
-        CAPABILITIES[active].thread &&
-        editor.current &&
-        postRanges(editor.current.children).length > 1 ? (
-          <span
-            className="flex shrink-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-300"
-            data-testid={`empty-post-${number}`}
+          Empty, not sent
+          <Button
+            className="h-6 px-1.5 text-xs"
+            onClick={() => editor.current && deletePost(editor.current, number)}
+            size={null}
+            variant="ghost"
           >
-            Empty, not sent
-            <Button
-              className="h-6 px-1.5 text-xs"
-              onClick={() => editor.current && deletePost(editor.current, number)}
-              size={null}
-              variant="ghost"
-            >
-              Remove empty post
-            </Button>
-          </span>
-        ) : null}
-      </div>
+            Remove empty post
+          </Button>
+        </span>
+      ) : null
+    return (
+      <PostCount
+        active={inUse}
+        length={post.length}
+        limit={activePublication.serialized.limit}
+        number={number}
+        thread={Boolean(CAPABILITIES[active].thread)}
+      />
     )
   }
   const onDescriptionSaved = (assetId: string, alt: string) => {
@@ -892,13 +981,29 @@ export function WriteComposer({
     }))
   }
   const editorProps = {
-    onRefinePost: aiEnabled ? (anchor: HTMLElement) => refineAt.current?.(anchor) : undefined,
     draftId: initial.id,
     extraPlugins: WRITE_PLUGINS,
     handles: vocabulary.handles,
     hashtags: vocabulary.hashtags,
     postHeader,
-    postSettings: canEdit
+    placeholder: PLACEHOLDERS[active] ?? `Write your ${CHANNEL_META[active].label} post…`,
+    postTools: {
+      counter: postCounter,
+      menu: (number: number) =>
+        excess[number] && CAPABILITIES[active].thread ? (
+          <DropdownMenuItem onSelect={() => splitAtLimit(number)}>
+            <ScissorsIcon aria-hidden />
+            Split at the limit
+          </DropdownMenuItem>
+        ) : null,
+      refine: aiEnabled
+        ? (number: number, button: React.ReactElement) => (
+            <RefineMenu align="end" at={`post-${number}`} side="bottom">
+              {button}
+            </RefineMenu>
+          )
+        : undefined,
+      settings: canEdit
       ? ({
           number,
           settings,
@@ -932,6 +1037,7 @@ export function WriteComposer({
           />
         )
       : undefined,
+    },
     readOnly: !canEdit,
     services,
     // Text runs in the direction the person chose in Appearance (RFC 024).
@@ -941,14 +1047,6 @@ export function WriteComposer({
   }
   // The destinations' state that needs attention first; a plan only when nothing is queued.
   const status = draftStatus(server, draftPostsState(currentPosts(posts)))
-  // The toolbar menus' composer tools: the main editor writes for every platform, a version for one.
-  const canMention = (writing: DraftChannel[]) =>
-    Boolean(server.socialSetId ?? set?.id) && mentionLookups(writing).length > 0
-  const mainTools = toolMenuItems(
-    setToolDialog,
-    canMention(items.map((item) => item.account.channel))
-  )
-  const versionTools = toolMenuItems(setToolDialog, canMention([active]))
   // Thread splitting for the edited platform; only the instance told about a paste splits it.
   const threadTools =
     canEdit &&
@@ -1079,10 +1177,7 @@ export function WriteComposer({
       })
       .map((post) => post.id)
   )
-  return (
-    <SocialMentionContext.Provider
-      value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
-    >
+  const composer = (
       <div
         // Opening a side panel changes text wrapping. Native scroll anchoring
         // would otherwise jump the editor to a different scroll position.
@@ -1119,6 +1214,7 @@ export function WriteComposer({
             </span>
             <Input
               aria-label="Draft title"
+              hidden={focus}
               className="h-8 min-w-20 max-w-64 flex-1 truncate border-transparent bg-transparent text-ui-lg font-medium text-foreground focus:text-foreground"
               disabled={!canEdit}
               maxLength={200}
@@ -1126,17 +1222,24 @@ export function WriteComposer({
               placeholder="Untitled draft"
               value={document.title}
             />
-            <span
-              className={cn(
-                'shrink-0 text-xs',
-                saveState === 'error' || saveState === 'offline'
-                  ? 'text-amber-700 dark:text-amber-300'
-                  : 'text-muted-foreground'
-              )}
-              data-testid="save-state"
-              role="status"
-            >
-              {SAVE_LABELS[saveState]}
+            {/* The everyday labels share one cell sized to the widest, so the header never shifts. */}
+            <span className="grid shrink-0 text-xs [&>*]:col-start-1 [&>*]:row-start-1">
+              {(['saving', 'saved', 'unsaved'] as const).map((state) => (
+                <span aria-hidden className="invisible" key={state}>
+                  {SAVE_LABELS[state]}
+                </span>
+              ))}
+              <span
+                className={cn(
+                  saveState === 'error' || saveState === 'offline'
+                    ? 'text-amber-700 dark:text-amber-300'
+                    : 'text-muted-foreground'
+                )}
+                data-testid="save-state"
+                role="status"
+              >
+                {SAVE_LABELS[saveState]}
+              </span>
             </span>
             {saveState === 'error' || saveState === 'offline' ? (
               <Button
@@ -1170,7 +1273,7 @@ export function WriteComposer({
                 />
               </span>
             ) : null}
-            {/* One row of actions that wraps as a whole; narrow screens keep the rest in ⋯. */}
+            {/* One row of actions that wraps as a whole; narrow screens keep the rest in More. */}
             <div
               className="ml-auto flex shrink-0 items-center gap-1"
               data-testid="composer-actions"
@@ -1207,18 +1310,12 @@ export function WriteComposer({
                       icon={<Sparkles aria-hidden className="size-4" />}
                       label="Assistant"
                       onClick={() => togglePanel('assistant')}
-                      shortcut={`${mod}J`}
                     />
                   ) : null}
                   {/* The set's settings open beside the draft without unmounting it (RFC 024). */}
                   {set ? (
                     <span className="hidden md:contents">
-                      <DraftSettingsDrawer
-                        advancedScheduling={data.advancedScheduling}
-                        canManage={canPublish}
-                        canWrite={canEdit}
-                        socialSet={{ id: set.id, name: set.name, timeZone: set.timeZone }}
-                      />
+                      <BrandSettingsButton id={set.id} name={set.name} />
                     </span>
                   ) : null}
                 </>
@@ -1227,7 +1324,7 @@ export function WriteComposer({
               <Button
                 ref={shareButton}
                 aria-label="Share"
-                className={cn('hidden lg:inline-flex', panel && 'size-8 px-0')}
+                className={cn('hidden', !focus && 'lg:inline-flex', panel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
                 title={`Share (${mod}${alt}S)`}
@@ -1239,7 +1336,7 @@ export function WriteComposer({
                 <>
                   {blockers.length > 0 ? <Blockers blockers={blockers} onJump={jumpTo} /> : null}
                   <Button
-                    className="hidden sm:inline-flex"
+                    className={cn('hidden', !focus && 'sm:inline-flex')}
                     data-testid="publish-button"
                     onClick={() => setDialog('publish')}
                     size="sm"
@@ -1280,7 +1377,7 @@ export function WriteComposer({
                     size="sm"
                     variant="ghost"
                   >
-                    ⋯
+                    <DotsThreeIcon aria-hidden className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
@@ -1326,11 +1423,7 @@ export function WriteComposer({
                       {set ? (
                         <DropdownMenuItem
                           className="md:hidden"
-                          onSelect={() => {
-                            const url = new URL(window.location.href)
-                            url.searchParams.set('settings', 'scheduling')
-                            window.history.pushState(null, '', url)
-                          }}
+                          onSelect={() => openBrandSettings('scheduling', set.id)}
                         >
                           Brand settings…
                         </DropdownMenuItem>
@@ -1446,7 +1539,7 @@ export function WriteComposer({
               </Button>
             </div>
           ) : null}
-          {accounts.length === 0 ? (
+          {accounts.length === 0 && !focus ? (
             <div className="flex flex-wrap items-center gap-2 px-4 py-3 text-sm text-foreground">
               <span>
                 {canManageSets
@@ -1462,6 +1555,9 @@ export function WriteComposer({
               ) : null}
             </div>
           ) : null}
+          {/* Focus mode (⌘⇧F) keeps the posts and Schedule; everything else steps away. */}
+          {focus ? null : (
+            <>
           <PlatformTabs
             accounts={accounts}
             active={active}
@@ -1523,7 +1619,7 @@ export function WriteComposer({
                     target: { url },
                     body: bodyFor(document.value as PlateBody, document.versions, active),
                   })
-                  router.push(`/write/${next.id}`)
+                  router.push(`/publish/${next.id}`)
                 })().catch((error) =>
                   toast.error(
                     error instanceof Error ? error.message : 'The quote draft could not be created.'
@@ -1534,7 +1630,7 @@ export function WriteComposer({
           ) : null}
           {/* A paste can become a thread: its tools show here until it is split or dismissed. */}
           {pasteNotice && threadTools && !optionsShown ? (
-            <div className="relative mx-4 mb-3 rounded-[14.4px] border border-border bg-card">
+            <div className="relative mx-4 mb-3 rounded-xl border border-border bg-card">
               {threadTools(true)}
               <Button
                 aria-label="Dismiss the paste notice"
@@ -1543,16 +1639,39 @@ export function WriteComposer({
                 size="sm"
                 variant="ghost"
               >
-                ✕
+                <XIcon aria-hidden className="size-4" />
               </Button>
             </div>
           ) : null}
+            </>
+          )}
           <div
             className="relative flex-1"
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
           >
+            {canEdit &&
+            legacyCount(active === primary ? document.value : versionOfTab.body) > 0 ? (
+              <div
+                className={cn(
+                  'mb-2 flex flex-wrap items-center gap-2 text-caption text-muted-foreground',
+                  POST_COLUMN
+                )}
+                data-testid="legacy-formatting"
+                role="status"
+              >
+                <InfoIcon aria-hidden className="size-4 shrink-0" />
+                <span>Headings, callouts and colored text in this draft post as plain text.</span>
+                <Button
+                  onClick={() => editor.current && convertLegacyBlocks(editor.current)}
+                  size="sm"
+                  variant="outline"
+                >
+                  Convert to text
+                </Button>
+              </div>
+            ) : null}
             {active === primary ? (
               <DraftEditor
                 {...editorProps}
@@ -1569,23 +1688,18 @@ export function WriteComposer({
                   editorChannel.current = active
                   setEditorInstance(next)
                 }}
-                toolbarExtras={
-                  <ToolbarExtras
+                toolbarExtras={(documentActions) => (
+                  <ComposerToolbar
                     aiEnabled={aiEnabled}
-                    onDescriptionSaved={onDescriptionSaved}
                     channel={active}
-                    limit={activePublication.serialized.limit}
-                    channels={items.map((item) => item.account.channel)}
-                    dialog={toolDialog}
-                    editor={editor}
-                    draftId={initial.id}
-                    onDialog={setToolDialog}
-                    refineAt={refineAt}
-                    setId={server.socialSetId ?? set?.id ?? null}
+                    document={documentActions}
+                    onDescriptionSaved={onDescriptionSaved}
+                    onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
+                    onTool={setTool}
+                    setId={snippetSet}
+                    tool={tool}
                   />
-                }
-                toolbarMediaItems={mainTools.media}
-                toolbarMoreItems={mainTools.more}
+                )}
               />
             ) : versionOfTab.mode === 'manual' ? (
               <>
@@ -1617,23 +1731,18 @@ export function WriteComposer({
                     editorChannel.current = active
                     setEditorInstance(next)
                   }}
-                  toolbarExtras={
-                    <ToolbarExtras
+                  toolbarExtras={(documentActions) => (
+                    <ComposerToolbar
                       aiEnabled={aiEnabled}
-                      onDescriptionSaved={onDescriptionSaved}
                       channel={active}
-                      limit={activePublication.serialized.limit}
-                      channels={[active]}
-                      dialog={toolDialog}
-                      editor={editor}
-                      draftId={initial.id}
-                      onDialog={setToolDialog}
-                      refineAt={refineAt}
-                      setId={server.socialSetId ?? set?.id ?? null}
+                      document={documentActions}
+                      onDescriptionSaved={onDescriptionSaved}
+                      onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
+                      onTool={setTool}
+                      setId={snippetSet}
+                      tool={tool}
                     />
-                  }
-                  toolbarMediaItems={versionTools.media}
-                  toolbarMoreItems={versionTools.more}
+                  )}
                 />
               </>
             ) : (
@@ -1657,6 +1766,8 @@ export function WriteComposer({
                 value={document.value as PlateBody}
               />
             )}
+            {focus ? null : (
+              <>
             <div
               className={cn('mb-6 flex flex-wrap justify-end gap-3', POST_COLUMN)}
               data-testid="platform-counters"
@@ -1716,6 +1827,8 @@ export function WriteComposer({
               }}
               posts={posts}
             />
+              </>
+            )}
             <div className="h-32" />
           </div>
         </div>
@@ -1824,7 +1937,7 @@ export function WriteComposer({
                     try {
                       await flush()
                       window.location.assign(
-                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/write/${initial.id}` })}`
+                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
                       )
                     } catch (error) {
                       toast.error(
@@ -1953,7 +2066,115 @@ export function WriteComposer({
           />
         ) : null}
       </div>
+  )
+  return (
+    <SocialMentionContext.Provider
+      value={{ channel: active, setId: server.socialSetId ?? set?.id ?? null }}
+    >
+      <HashtagsContext.Provider value={vocabulary.hashtags}>
+      <ComposerCommandsContext.Provider
+        value={{
+          addMedia,
+          channel: active,
+          channels,
+          giphy,
+          openTool: setTool,
+          postSetting: (number, setting) => setPostSetting({ at: Date.now(), number, setting }),
+          snippets,
+        }}
+      >
+        <PostSettingRequestContext.Provider value={postSetting}>
+          {aiEnabled ? (
+            <RefineProvider
+              channel={active}
+              draftId={initial.id}
+              editor={editor}
+              limit={activePublication.serialized.limit}
+              limitFor={limitFor}
+              onVersion={writeVersion}
+              versionBase={(target) =>
+                adaptBody(
+                  (editor.current?.children ?? document.value) as PlateBody,
+                  Boolean(CAPABILITIES[target].thread)
+                )
+              }
+            >
+              {composer}
+            </RefineProvider>
+          ) : (
+            composer
+          )}
+        </PostSettingRequestContext.Provider>
+      </ComposerCommandsContext.Provider>
+      </HashtagsContext.Provider>
     </SocialMentionContext.Provider>
+  )
+}
+
+/** The empty post's prompt per platform, as each platform asks it. */
+const PLACEHOLDERS: Partial<Record<DraftChannel, string>> = {
+  tiktok: 'Write your TikTok caption…',
+  x: 'What’s happening?',
+}
+
+/** Up to two initials for an avatar without an image. */
+function initials(name: string): string {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase())
+      .join('') || 'S'
+  )
+}
+
+/**
+ * A post's length for the platform being edited: a ring that fills toward
+ * the limit, amber from 90%, red past it. Quiet posts hide it until it nears
+ * the limit; the post in use always shows it.
+ */
+function PostCount({
+  active,
+  length,
+  limit,
+  number,
+  thread,
+}: {
+  active: boolean
+  length: number
+  limit: number
+  number: number
+  thread: boolean
+}) {
+  const ratio = length / limit
+  const tone =
+    ratio > 1
+      ? 'text-destructive'
+      : ratio >= 0.9
+        ? 'text-amber-600 dark:text-amber-400'
+        : 'text-muted-foreground'
+  return (
+    <span
+      className={cn(
+        'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
+        tone,
+        !active && ratio < 0.9 && 'opacity-0'
+      )}
+    >
+      <span
+        aria-hidden
+        className="size-4 rounded-full"
+        style={{
+          background: `conic-gradient(currentColor ${Math.min(ratio, 1) * 360}deg, color-mix(in srgb, currentColor 20%, transparent) 0)`,
+          mask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2px))',
+        }}
+      />
+      <span data-testid={`post-length-${number}`}>
+        {length} / {limit}
+      </span>
+      {thread ? <span className="text-muted-foreground">#{number}</span> : null}
+    </span>
   )
 }
 
@@ -2037,7 +2258,7 @@ function PanelButton({
   icon: React.ReactNode
   label: string
   onClick: () => void
-  shortcut: string
+  shortcut?: string
 }) {
   return (
     <Button
@@ -2047,7 +2268,7 @@ function PanelButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       size="sm"
-      title={`${label} (${shortcut})`}
+      title={shortcut ? `${label} (${shortcut})` : label}
       variant="ghost"
     >
       {icon}
@@ -2059,8 +2280,15 @@ function PanelHeader({ onClose, title }: { onClose: () => void; title: string })
   return (
     <div className="flex items-center justify-between border-b border-border px-4 py-2">
       <h2 className="text-ui-lg font-medium text-foreground">{title}</h2>
-      <Button aria-label={`Close ${title}`} onClick={onClose} size="sm" variant="ghost">
-        ✕
+      <Button
+        aria-label={`Close ${title}`}
+        className="size-8 px-0"
+        onClick={onClose}
+        size="sm"
+        title={`Close ${title}`}
+        variant="ghost"
+      >
+        <XIcon aria-hidden className="size-4" />
       </Button>
     </div>
   )
@@ -2095,137 +2323,5 @@ function TargetBanner({ draft }: { draft: DraftWire }) {
         <span>a published draft</span>
       )}
     </div>
-  )
-}
-
-/** A tool the toolbar's Media or More menu opened. */
-type ToolDialog = 'alt' | 'gif' | 'link' | 'manage' | 'mention'
-
-/** The toolbar's Media and More menu items the composer adds; each opens a tool. */
-function toolMenuItems(
-  open: (dialog: ToolDialog) => void,
-  mention: boolean
-): { media: React.ReactNode; more: React.ReactNode } {
-  return {
-    media: (
-      <>
-        <DropdownMenuItem onSelect={() => open('link')}>Image from link</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => open('gif')}>GIF</DropdownMenuItem>
-      </>
-    ),
-    more: (
-      <>
-        {mention ? (
-          <DropdownMenuItem onSelect={() => open('mention')}>Add mention</DropdownMenuItem>
-        ) : null}
-        <DropdownMenuItem onSelect={() => open('alt')}>Describe images</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => open('manage')}>Manage media</DropdownMenuItem>
-      </>
-    ),
-  }
-}
-
-/** The bottom toolbar's Write tools: mentions looked up on the platform, and emoji. */
-function ToolbarExtras({
-  onDescriptionSaved,
-  aiEnabled,
-  channel,
-  channels,
-  dialog,
-  editor,
-  limit,
-  draftId,
-  onDialog,
-  refineAt,
-  setId,
-}: {
-  aiEnabled: boolean
-  /** The tool the toolbar's menus opened, if any. */
-  dialog: ToolDialog | null
-  /** Where Rewrite registers its opener for a post's sparkle. */
-  refineAt: React.MutableRefObject<((anchor: HTMLElement) => void) | null>
-  onDialog: (dialog: ToolDialog | null) => void
-  onDescriptionSaved: (assetId: string, alt: string) => void
-  /** The version being edited, which Refine writes for. */
-  channel: DraftChannel
-  channels: DraftChannel[]
-  editor: React.MutableRefObject<PlateEditor | null>
-  limit: number
-  draftId: string
-  setId: string | null
-}) {
-  const { mod } = useKeys()
-  const [open, setOpen] = React.useState(false)
-  useShortcuts([
-    { key: '>', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
-    { key: '.', label: 'Emoji', mod: true, shift: true, run: () => setOpen(true), inEditor: true },
-  ])
-  return (
-    <>
-      {aiEnabled ? (
-        <RefineButton
-          channel={channel}
-          draftId={draftId}
-          editor={editor}
-          limit={limit}
-          opener={refineAt}
-        />
-      ) : null}
-      <MentionPicker
-        channels={channels}
-        editor={editor}
-        onOpenChange={(next) => onDialog(next ? 'mention' : null)}
-        open={dialog === 'mention'}
-        setId={setId}
-      />
-      <MediaTools
-        channel={channel}
-        dialog={dialog === 'gif' || dialog === 'link' || dialog === 'manage' ? dialog : null}
-        onDialog={onDialog}
-        setId={setId}
-        onDescriptionSaved={onDescriptionSaved}
-      />
-      {dialog === 'alt' && editor.current ? (
-        <DescribeImages
-          aiEnabled={aiEnabled}
-          editor={editor.current}
-          onClose={() => onDialog(null)}
-          onSaved={onDescriptionSaved}
-        />
-      ) : null}
-      <Popover onOpenChange={setOpen} open={open}>
-        <PopoverTrigger asChild>
-          <Button
-            aria-label="Emoji"
-            className="h-7 rounded-md px-2 text-sm"
-            size={null}
-            title={`Emoji (${mod}⇧.)`}
-            type="button"
-            variant="ghost"
-          >
-            ☺
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          className="w-80 p-2"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            editor.current?.tf.focus()
-          }}
-          side="top"
-        >
-          <ComposerEmojiPicker
-            onSelect={(emoji) => {
-              const current = editor.current
-              if (!current) return
-              if (!current.selection) current.tf.select(current.api.end([]))
-              current.tf.insertText(emoji)
-              current.tf.focus()
-              setOpen(false)
-            }}
-          />
-        </PopoverContent>
-      </Popover>
-    </>
   )
 }

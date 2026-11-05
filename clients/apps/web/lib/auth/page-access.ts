@@ -136,7 +136,7 @@ export async function requirePaidPageAccess(
     redirect(getLocalizedPath(locale, `/sign-in?callbackURL=${encodeURIComponent(returnTo)}`))
   }
   if (!access.hasOrganization) redirect(getLocalizedPath(locale, '/onboarding'))
-  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/workspace'))
+  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/settings'))
   if (!(feature === 'content:drafts' ? access.hasBasicScheduling : access.hasPaidPlan))
     redirect(upgradePath(locale, returnTo))
   return access

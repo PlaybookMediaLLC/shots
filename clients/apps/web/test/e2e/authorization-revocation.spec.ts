@@ -50,7 +50,7 @@ test(
 
     try {
       await signUp(member, memberPage)
-      // Accepting navigates to /workspace by itself; a second goto here raced
+      // Accepting navigates to /settings by itself; a second goto here raced
       // it and aborted. The helper waits for that navigation instead.
       await acceptInvitation(memberPage, invitation.id)
       const memberId = await getMemberId(member.email, organizationId)

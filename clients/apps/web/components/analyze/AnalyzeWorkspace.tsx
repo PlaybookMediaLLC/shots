@@ -1,14 +1,24 @@
 'use client'
 
 import * as React from 'react'
+import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { domToPng } from 'modern-screenshot'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { DatePicker } from '@/components/ui/date-picker'
+import { Combobox } from '@/components/ui/combobox'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -27,7 +37,6 @@ import {
 } from '@/components/ui/dialog'
 import { AnalyzeNav, WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import {
-  analyticsQuerySchema,
   analyticsSettingsSchema,
   type AnalyticsQuery,
   type AnalyticsReport,
@@ -59,14 +68,11 @@ type Row = AnalyticsReport['posts'][number]
 /** All views derive from one account/query key; stale responses never cross that boundary. */
 export function AnalyzeWorkspace({
   sets = [],
-  campaignsEnabled = false,
   canManage = false,
   initial = {},
   publicToken,
 }: {
   sets?: SocialSetWire[]
-  /** Campaigns are usable here, so Publish lists Campaign deliveries. */
-  campaignsEnabled?: boolean
   canManage?: boolean
   initial?: Record<string, string | undefined>
   publicToken?: string
@@ -81,12 +87,8 @@ export function AnalyzeWorkspace({
   const [query, setQuery] = React.useState<AnalyticsQuery>(() =>
     initialQuery(initial, selectedAccount?.timeZone ?? 'UTC')
   )
-  const [form, setForm] = React.useState({
-    from: query.from,
-    to: query.to,
-    timeZone: query.timeZone,
-  })
   const [preset, setPreset] = React.useState(initial.from ? 'Custom' : '1 month')
+  const [definitionsOpen, setDefinitionsOpen] = React.useState(false)
   const [metric, setMetric] = React.useState(
     initial.metric && METRICS[initial.metric] ? initial.metric : ''
   )
@@ -217,29 +219,14 @@ export function AnalyzeWorkspace({
           await domToPng(chart.current, {
             backgroundColor: '#ffffff',
             scale: 2,
-            filter: (node) => !(node instanceof HTMLElement && node.tagName === 'DETAILS'),
+            filter: (node) => !(node instanceof HTMLElement && node.dataset.slot === 'disclosure'),
           })
         )
     })
-  const applyDates = () => {
-    const parsed = analyticsQuerySchema.safeParse({
-      ...query,
-      ...form,
-      asOf: undefined,
-      cursor: '',
-    })
-    if (!parsed.success || !isTimeZone(form.timeZone)) {
-      setFormError('Choose valid dates, From on or before To, and an IANA timezone.')
-      return
-    }
-    setFormError('')
-    setPreset('Custom')
-    update(form)
-  }
   if (!publicToken && !accounts.length)
     return (
       <div>
-        <WorkspaceNav active="analyze" campaigns={campaignsEnabled} />
+        <WorkspaceNav active="analyze" />
         <AnalyzeNav active="Overview" />
         <main className="mx-auto max-w-7xl space-y-2 p-4 sm:p-6">
           <h1 className="text-2xl font-semibold">Analyze</h1>
@@ -247,7 +234,7 @@ export function AnalyzeWorkspace({
             Connect a social account to collect analytics.
           </p>
           <Button asChild variant="outline">
-            <Link href="/workspace/social-sets">Connect a social account</Link>
+            <Link href="/settings/publishing-brands">Connect a social account</Link>
           </Button>
         </main>
       </div>
@@ -256,7 +243,7 @@ export function AnalyzeWorkspace({
     <div className="h-full min-h-0 overflow-y-auto">
       {!publicToken ? (
         <>
-          <WorkspaceNav active="analyze" campaigns={campaignsEnabled} />
+          <WorkspaceNav active="analyze" />
           <AnalyzeNav active="Overview" />
         </>
       ) : (
@@ -268,24 +255,24 @@ export function AnalyzeWorkspace({
           {!publicToken ? (
             <Label className="grid gap-1.5">
               Account{' '}
-              <NativeSelect
+              <Combobox
                 aria-label="Analytics account"
-                value={accountId}
-                onChange={(e) => {
-                  setAccountId(e.target.value)
+                className="w-72"
+                onValueChange={(value) => {
+                  setAccountId(value)
                   update({})
                   setGoalOpen(false)
                   setSharing(false)
                   setImage(null)
                   setInspection(null)
                 }}
-              >
-                {accounts.map((a) => (
-                  <NativeSelectOption key={a.id} value={a.id}>
-                    {a.setName} · {a.platform} · {a.handle ?? a.displayName ?? a.id}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                options={accounts.map((a) => ({
+                  label: `${a.setName} · ${a.platform} · ${a.handle ?? a.displayName ?? a.id}`,
+                  value: a.id,
+                }))}
+                searchPlaceholder="Search accounts"
+                value={accountId}
+              />
             </Label>
           ) : null}
           {report?.profileUrl ? (
@@ -318,72 +305,47 @@ export function AnalyzeWorkspace({
             </Button>
           ) : null}
         </header>
-        <form
-          className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
-          onSubmit={(e) => {
-            e.preventDefault()
-            applyDates()
-          }}
-        >
+        <div className="flex flex-wrap items-end gap-3 rounded-lg border p-3">
           <Label className="grid gap-1.5">
             Period
-            <NativeSelect
-              aria-label="Date preset"
-              value={preset}
-              onChange={(e) => {
-                setPreset(e.target.value)
-                if (e.target.value !== 'Custom') {
-                  const range = presetRange(e.target.value, query.timeZone)
-                  update(range)
-                  setForm((f) => ({ ...f, from: range.from, to: range.to }))
-                }
+            <DateRangePicker
+              aria-label="Date range"
+              onChange={(range) => {
+                setPreset('Custom')
+                update(range)
               }}
-            >
-              {PRESETS.map((p) => (
-                <NativeSelectOption key={p}>{p}</NativeSelectOption>
-              ))}
-            </NativeSelect>
-          </Label>
-          <Label className="grid gap-1.5">
-            From
-            <DatePicker
-              aria-label="From"
-              value={form.from}
-              onChange={(day) => setForm((f) => ({ ...f, from: day }))}
+              onPreset={(label) => {
+                setPreset(label)
+                update(presetRange(label, query.timeZone))
+              }}
+              preset={preset}
+              presets={PRESETS.filter((label) => label !== 'Custom')}
+              value={{ from: query.from, to: query.to }}
             />
           </Label>
-          <Label className="grid gap-1.5">
-            To
-            <DatePicker
-              aria-label="To"
-              value={form.to}
-              onChange={(day) => setForm((f) => ({ ...f, to: day }))}
-            />
-          </Label>
-          <Label className="grid gap-1.5">
-            Timezone
-            <Input
-              aria-label="Analytics timezone"
-              value={form.timeZone}
-              onChange={(e) => setForm((f) => ({ ...f, timeZone: e.target.value }))}
-            />
-          </Label>
-          <Button variant="outline" type="submit">
-            Apply range
-          </Button>
+          <TimeZonePicker
+            className="w-56"
+            label="Timezone"
+            onChange={(timeZone) => update({ timeZone })}
+            value={query.timeZone}
+          />
           <Label className="grid gap-1.5">
             Grouping
-            <NativeSelect
-              aria-label="Grouping"
+            <Select
               value={query.grouping}
-              onChange={(e) => update({ grouping: e.target.value as AnalyticsQuery['grouping'] })}
+              onValueChange={(value) => update({ grouping: value as AnalyticsQuery['grouping'] })}
             >
-              <NativeSelectOption value="daily">Daily</NativeSelectOption>
-              <NativeSelectOption value="weekly">Weekly</NativeSelectOption>
-              <NativeSelectOption value="monthly">Monthly</NativeSelectOption>
-            </NativeSelect>
+              <SelectTrigger aria-label="Grouping">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
           </Label>
-        </form>
+        </div>
         {formError ? <p role="alert">{formError}</p> : null}
         {error ? (
           <div role="alert" className="rounded border p-6">
@@ -498,15 +460,17 @@ export function AnalyzeWorkspace({
                         Observed through {report.asOf}. {report.metrics[metric].definition}
                       </p>
                     </div>
-                    <details className="mt-4">
-                      <summary>About {METRICS[metric]}</summary>
+                    <Disclosure className="mt-4">
+                      <DisclosureTrigger>About {METRICS[metric]}</DisclosureTrigger>
+                      <DisclosureContent>
                       <p>{report.metrics[metric].definition}</p>
                       <p>
                         Change compares the preceding equal number of calendar days. A zero or
                         missing baseline has no percentage comparison.{' '}
                         {report.metrics[metric].missing} posts lack this metric.
                       </p>
-                    </details>
+                      </DisclosureContent>
+                    </Disclosure>
                   </>
                 ) : (
                   <p role="status">
@@ -550,11 +514,11 @@ export function AnalyzeWorkspace({
                       <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
                         <a
                           href={`#definition-${id}`}
-                          onClick={() => {
-                            const details = document
-                              .getElementById(`definition-${id}`)
-                              ?.closest('details')
-                            if (details) details.open = true
+                          onClick={(event) => {
+                            // Open the definitions first, then go to the one asked for.
+                            event.preventDefault()
+                            flushSync(() => setDefinitionsOpen(true))
+                            document.getElementById(`definition-${id}`)?.scrollIntoView()
                           }}
                         >
                           Metric definition
@@ -617,39 +581,51 @@ export function AnalyzeWorkspace({
                 <h2 className="mr-auto font-semibold">Post performance · {report.totalPosts}</h2>
                 <Label className="grid gap-1.5">
                   Scope
-                  <NativeSelect
-                    aria-label="Post scope"
+                  <Select
                     value={query.scope}
-                    onChange={(e) => update({ scope: e.target.value as AnalyticsQuery['scope'] })}
+                    onValueChange={(value) => update({ scope: value as AnalyticsQuery['scope'] })}
                   >
-                    <NativeSelectOption value="all">All</NativeSelectOption>
-                    <NativeSelectOption value="replies">Replies</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Post scope">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="replies">Replies</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="grid gap-1.5">
                   Sort
-                  <NativeSelect
-                    aria-label="Sort posts"
+                  <Select
                     value={query.sort}
-                    onChange={(e) => update({ sort: e.target.value as AnalyticsQuery['sort'] })}
+                    onValueChange={(value) => update({ sort: value as AnalyticsQuery['sort'] })}
                   >
-                    {Object.entries(SORTS).map(([id, label]) => (
-                      <NativeSelectOption key={id} value={id}>
-                        {label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Sort posts">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SORTS).map(([id, label]) => (
+                        <SelectItem key={id} value={id}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Label className="grid gap-1.5">
                   Order
-                  <NativeSelect
-                    aria-label="Sort direction"
+                  <Select
                     value={query.direction}
-                    onChange={(e) => update({ direction: e.target.value as 'asc' | 'desc' })}
+                    onValueChange={(value) => update({ direction: value as 'asc' | 'desc' })}
                   >
-                    <NativeSelectOption value="desc">Descending</NativeSelectOption>
-                    <NativeSelectOption value="asc">Ascending</NativeSelectOption>
-                  </NativeSelect>
+                    <SelectTrigger aria-label="Sort direction">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="desc">Descending</SelectItem>
+                      <SelectItem value="asc">Ascending</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Label>
                 <Button
                   variant="outline"
@@ -704,8 +680,13 @@ export function AnalyzeWorkspace({
                 </Button>
               </div>
             </section>
-            <details className="text-sm">
-              <summary>Metric definitions and coverage</summary>
+            <Disclosure
+              className="text-sm"
+              onOpenChange={setDefinitionsOpen}
+              defaultOpen={definitionsOpen}
+            >
+              <DisclosureTrigger>Metric definitions and coverage</DisclosureTrigger>
+              <DisclosureContent>
               {Object.entries(METRICS).map(([id, title]) => (
                 <div key={id} id={`definition-${id}`} className="my-3">
                   <h3 className="font-semibold">{title}</h3>
@@ -720,7 +701,8 @@ export function AnalyzeWorkspace({
                 are never assumed to include other thread posts. Follower history starts with actual
                 observations. No missing interval is backfilled.
               </p>
-            </details>
+              </DisclosureContent>
+            </Disclosure>
           </>
         )}
         {row ? (
@@ -1040,14 +1022,18 @@ function GoalDialog({
         </DialogHeader>
         <Label className="grid gap-1.5">
           Cadence
-          <NativeSelect
-            aria-label="Goal cadence"
+          <Select
             value={cadence}
-            onChange={(e) => setCadence(e.target.value as 'daily' | 'weekly')}
+            onValueChange={(value) => setCadence(value as 'daily' | 'weekly')}
           >
-            <NativeSelectOption value="daily">Daily</NativeSelectOption>
-            <NativeSelectOption value="weekly">Weekly</NativeSelectOption>
-          </NativeSelect>
+            <SelectTrigger aria-label="Goal cadence">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Daily</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+            </SelectContent>
+          </Select>
         </Label>
         <Label>
           <Checkbox
@@ -1056,14 +1042,7 @@ function GoalDialog({
           />
           Exclude weekend publications
         </Label>
-        <Label className="grid gap-1.5">
-          Goal timezone
-          <Input
-            aria-label="Goal timezone"
-            value={zone}
-            onChange={(e) => setZone(e.target.value)}
-          />
-        </Label>
+        <TimeZonePicker label="Goal timezone" onChange={setZone} value={zone} />
         <p className="text-xs">
           Weeks begin Monday. A period in progress does not break the streak. Failed, scheduled, and
           planned content never qualifies.

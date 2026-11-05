@@ -9,38 +9,24 @@ const ACTIVE = {
   drafts: 'Drafts',
   plan: 'Calendar',
   analyze: 'Analyze',
-  deliveries: 'Campaign deliveries',
   links: 'Link checks',
 }
 
 const ANALYZE_LINKS = [
-  { href: '/write/analyze', label: 'Overview' },
-  { href: '/write/analyze/posting-times', label: 'Best times and posting slots' },
-  { href: '/write/analyze/observations', label: 'Recorded observations and CSV' },
+  { href: '/publish/analyze', label: 'Overview' },
+  { href: '/publish/analyze/posting-times', label: 'Best times and posting slots' },
+  { href: '/publish/analyze/observations', label: 'Recorded observations and CSV' },
 ]
 
-/**
- * The Publish tab bar, pinned in the same place on every Publish page.
- * `scope` keeps the publishing brand; Campaign deliveries needs campaigns.
- */
+/** The Publish tab bar, pinned in the same place on every Publish page; `scope` keeps the publishing brand. */
 export function WorkspaceNav({
   active,
-  campaigns = false,
   scope = '',
-  returnTo,
 }: {
   active: keyof typeof ACTIVE
-  campaigns?: boolean
   scope?: string
-  returnTo?: string
 }) {
-  return (
-    <TabRow
-      label="Publish"
-      active={ACTIVE[active]}
-      items={publishLinks(scope, returnTo, campaigns)}
-    />
-  )
+  return <TabRow label="Publish" active={ACTIVE[active]} items={publishLinks(scope)} />
 }
 
 /** Analyze's own pages, as a second row under the Publish tabs. */

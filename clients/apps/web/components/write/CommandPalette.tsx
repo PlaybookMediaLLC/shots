@@ -4,7 +4,7 @@ import { useWriteRouter } from '@/components/write/write-context'
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { PLATFORM_DESTINATIONS } from '@/lib/platform/navigation'
+import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { createWritingDraft } from './pending-draft'
 import {
   CommandDialog,
@@ -19,7 +19,7 @@ import { toast } from 'sonner'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
 import { writeApi } from '@/lib/write/client'
 import { useKeys } from './shortcuts'
-import { type DraftCommand, draftHref, rememberSet, useWrite } from './write-context'
+import { type DraftCommand, draftHref, type EditorCommandEntry, rememberSet, useWrite } from './write-context'
 
 /**
  * Search and commands (⌘K): the set's drafts by text, its tags, switching
@@ -41,7 +41,11 @@ export default function CommandPalette({
   const t = useTranslations('platformNavigation')
   const keys = useKeys()
   const router = useWriteRouter()
-  const { beforeLeaveRef, openPreviewRef, activeId, canEdit, data, setQuery } = useWrite()
+  const { beforeLeaveRef, openPreviewRef, editorCommandsRef, activeId, canEdit, data, setQuery } =
+    useWrite()
+  // Read once as the palette opens: the editor's commands for the version being edited.
+  const [editorCommands, setEditorCommands] = React.useState<EditorCommandEntry[]>([])
+  React.useEffect(() => setEditorCommands(editorCommandsRef.current?.() ?? []), [editorCommandsRef])
   // One new-draft command per platform the brand posts to, already set to it.
   const platforms = (data.activeSet?.accounts ?? []).filter(
     (account, index, all) => all.findIndex((item) => item.channel === account.channel) === index
@@ -108,7 +112,7 @@ export default function CommandPalette({
                   go(() =>
                     router.push(
                       item.key === 'publish' && data.activeSet
-                        ? `/write?set=${data.activeSet.id}`
+                        ? `/publish?set=${data.activeSet.id}`
                         : item.href
                     )
                   )
@@ -118,6 +122,12 @@ export default function CommandPalette({
               </CommandItem>
             )
           )}
+          <CommandItem
+            value={`destination ${STORE_SCREENSHOTS.label}`}
+            onSelect={() => go(() => router.push(STORE_SCREENSHOTS.href))}
+          >
+            {STORE_SCREENSHOTS.label}
+          </CommandItem>
         </CommandGroup>
         {results.length > 0 ? (
           <CommandGroup heading="Drafts">
@@ -196,6 +206,23 @@ export default function CommandPalette({
             ))}
           </CommandGroup>
         ) : null}
+        {editorCommands.length ? (
+          <CommandGroup heading="In the editor">
+            {editorCommands.map((command) => (
+              <CommandItem
+                key={command.id}
+                value={`Editor ${command.label}`}
+                // After the palette closes and focus is back in the editor.
+                onSelect={() => go(() => requestAnimationFrame(command.run))}
+              >
+                {command.label}
+                {command.shortcut ? (
+                  <CommandShortcut>{keys.label(command.shortcut)}</CommandShortcut>
+                ) : null}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
         <CommandGroup heading="Commands">
           {activeId ? (
             <CommandItem
@@ -225,16 +252,16 @@ export default function CommandPalette({
           ) : null}
           <CommandItem
             onSelect={() =>
-              go(() => router.push(`/write${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
+              go(() => router.push(`/publish${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
             }
           >
-            Go to Write
+            Go to Drafts
             <CommandShortcut>{keys.label({ key: '1', mod: true, shift: true })}</CommandShortcut>
           </CommandItem>
           <CommandItem
             onSelect={() =>
               go(() =>
-                router.push(`/write/plan${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
+                router.push(`/publish/calendar${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
               )
             }
           >

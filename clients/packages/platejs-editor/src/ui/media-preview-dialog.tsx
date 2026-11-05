@@ -69,7 +69,7 @@ export function ImagePreview() {
 
       <div className="absolute bottom-[30px] left-1/2 z-40 flex -translate-x-1/2 justify-center gap-2 text-white">
         {!(prevDisabled || nextDisabled) && (
-          <div className="flex rounded-none bg-black/70">
+          <div className="flex rounded-md bg-black/70">
             <Button {...prevProps} disabled={prevDisabled}>
               <ArrowLeftIcon className="size-5" />
             </Button>
@@ -79,7 +79,7 @@ export function ImagePreview() {
           </div>
         )}
 
-        <div className="flex rounded-none bg-black/70">
+        <div className="flex rounded-md bg-black/70">
           <Button
             {...zommOutProps}
             disabled={zoomOutDisabled}
@@ -89,7 +89,7 @@ export function ImagePreview() {
           </Button>
           <div className="flex w-[46px] items-center justify-center space-x-1 text-neutral-400">
             {isEditingScale ? (
-              <ScaleInput className="h-[19px] w-full rounded-none border border-brand/70 bg-transparent text-sm text-white outline-hidden" />
+              <ScaleInput className="h-[19px] w-full rounded-md border border-primary/70 bg-transparent text-sm text-white outline-hidden" />
             ) : (
               <div {...scaleTextProps}>{scale * 100}</div>
             )}

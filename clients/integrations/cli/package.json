@@ -1,0 +1,16 @@
+{
+  "name": "shots-cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turn code into Shots Code Studio projects and images from the terminal",
+  "type": "module",
+  "bin": {
+    "shots": "bin/shots.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": "^22.23.4 || ^24.22.1 || ^26.12.1"
+  }
+}

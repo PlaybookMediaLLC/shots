@@ -2065,7 +2065,7 @@ var (
 		{Name: "id", Type: field.TypeString},
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "name", Type: field.TypeString},
-		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas"}, Default: "story-set"},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"story-set", "canvas", "store", "code"}, Default: "story-set"},
 		{Name: "document", Type: field.TypeJSON},
 		{Name: "documentVersion", Type: field.TypeInt},
 		{Name: "revision", Type: field.TypeInt, Default: 1},
@@ -3071,6 +3071,7 @@ var (
 		{Name: "title", Type: field.TypeString},
 		{Name: "description", Type: field.TypeString, Nullable: true},
 		{Name: "altText", Type: field.TypeString, Nullable: true},
+		{Name: "code", Type: field.TypeJSON, Nullable: true},
 		{Name: "access", Type: field.TypeEnum, Enums: []string{"PUBLIC", "WORKSPACE"}, Default: "PUBLIC"},
 		{Name: "expiresAt", Type: field.TypeTime, Nullable: true},
 		{Name: "revokedAt", Type: field.TypeTime, Nullable: true},
@@ -3092,7 +3093,7 @@ var (
 			{
 				Name:    "sharelink_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{ShareLinkColumns[1], ShareLinkColumns[13]},
+				Columns: []*schema.Column{ShareLinkColumns[1], ShareLinkColumns[14]},
 			},
 		},
 	}
@@ -3481,6 +3482,7 @@ var (
 		{Name: "theme", Type: field.TypeEnum, Enums: []string{"light", "dark", "system"}, Default: "dark"},
 		{Name: "navigation", Type: field.TypeEnum, Enums: []string{"compact", "dynamic", "expanded"}, Default: "compact"},
 		{Name: "weekStart", Type: field.TypeEnum, Enums: []string{"monday", "sunday"}, Default: "monday"},
+		{Name: "timeFormat", Type: field.TypeEnum, Enums: []string{"auto", "12h", "24h"}, Default: "auto"},
 		{Name: "textDirection", Type: field.TypeEnum, Enums: []string{"ltr", "rtl"}, Default: "ltr"},
 		{Name: "showScrollbars", Type: field.TypeBool, Default: true},
 		{Name: "developerMode", Type: field.TypeBool, Default: false},

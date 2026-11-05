@@ -708,6 +708,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/code-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a code project
+         * @description Creates a Code Studio project from code, as a CLI or editor extension does with a selection. The project opens in Code Studio for styling, exporting and posting; render it with the render operation.
+         */
+        post: operations["createCodeProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/code-projects/{projectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a code project
+         * @description Reads a Code Studio project's document: its slides, files and style.
+         */
+        get: operations["getCodeProject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/code-projects/{projectId}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render a code project slide
+         * @description Renders one slide as a PNG on the server, exactly as Code Studio exports it, and stores it as a workspace asset. Download it with the asset download URL operation. Renders count against the workspace render limit.
+         */
+        post: operations["renderCodeProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/campaigns": {
         parameters: {
             query?: never;
@@ -2159,6 +2219,190 @@ export interface components {
         AssetAltText: {
             altText: string | null;
             id: string;
+        };
+        CodeProject: {
+            createdAt: unknown;
+            document: {
+                /** @constant */
+                version: 1;
+                /** @constant */
+                kind: "code";
+                style: {
+                    /** @default midnight */
+                    theme: string;
+                    /** @default null */
+                    brandTheme: {
+                        kitId: string;
+                        name: string;
+                        from: string;
+                        to: string;
+                        accent: string;
+                        light: {
+                            foreground: string;
+                            constant?: string;
+                            string?: string;
+                            comment?: string;
+                            keyword?: string;
+                            parameter?: string;
+                            function?: string;
+                            stringExpression?: string;
+                            punctuation?: string;
+                            link?: string;
+                            number?: string;
+                            property?: string;
+                        };
+                        dark: {
+                            foreground: string;
+                            constant?: string;
+                            string?: string;
+                            comment?: string;
+                            keyword?: string;
+                            parameter?: string;
+                            function?: string;
+                            stringExpression?: string;
+                            punctuation?: string;
+                            link?: string;
+                            number?: string;
+                            property?: string;
+                        };
+                    } | null;
+                    /** @default true */
+                    dark: boolean;
+                    /** @default true */
+                    showBackground: boolean;
+                    /**
+                     * @default {
+                     *       "kind": "theme",
+                     *       "id": ""
+                     *     }
+                     */
+                    background: {
+                        /** @enum {string} */
+                        kind: "theme" | "gradient" | "image" | "pattern";
+                        id: string;
+                    };
+                    /** @default 64 */
+                    padding: number;
+                    /** @default jetbrainsMono */
+                    font: string;
+                    /** @default true */
+                    lineNumbers: boolean;
+                    /**
+                     * @default mac
+                     * @enum {string}
+                     */
+                    frame: "mac" | "terminal" | "card" | "none";
+                    /** @default  */
+                    title: string;
+                    /** @default 700 */
+                    width: number;
+                    /**
+                     * @default auto
+                     * @enum {string}
+                     */
+                    aspect: "auto" | "16:9" | "1.91:1" | "1:1" | "4:5" | "9:16";
+                    /**
+                     * @default {
+                     *       "show": false,
+                     *       "name": "",
+                     *       "handle": ""
+                     *     }
+                     */
+                    footer: {
+                        /** @default false */
+                        show: boolean;
+                        /** @default  */
+                        name: string;
+                        /** @default  */
+                        handle: string;
+                        logo?: string;
+                    };
+                };
+                slides: {
+                    id: string;
+                    /**
+                     * @default single
+                     * @enum {string}
+                     */
+                    layout: "single" | "split";
+                    panes: {
+                        id: string;
+                        activeFile: string;
+                        files: {
+                            id: string;
+                            /** @default  */
+                            name: string;
+                            /**
+                             * @default text
+                             * @enum {string}
+                             */
+                            lang: "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "rust" | "java" | "kotlin" | "swift" | "c" | "cpp" | "csharp" | "php" | "ruby" | "dart" | "elixir" | "scala" | "lua" | "r" | "zig" | "sql" | "graphql" | "prisma" | "json" | "yaml" | "toml" | "hcl" | "html" | "xml" | "css" | "scss" | "vue" | "svelte" | "markdown" | "bash" | "shellsession" | "dockerfile" | "diff" | "text";
+                            code: string;
+                            base?: string;
+                            /** @enum {string} */
+                            diff?: "unified" | "split";
+                            marks?: {
+                                /** @default [] */
+                                highlight: [
+                                    number,
+                                    number
+                                ][];
+                                /** @default [] */
+                                focus: [
+                                    number,
+                                    number
+                                ][];
+                                /** @default [] */
+                                blur: [
+                                    number,
+                                    number
+                                ][];
+                            };
+                            annotations?: {
+                                id: string;
+                                /** @enum {string} */
+                                kind: "marker" | "callout";
+                                line: number;
+                                /** @default  */
+                                text: string;
+                            }[];
+                            tape?: string;
+                        }[];
+                    }[];
+                    /** @default  */
+                    caption: string;
+                    /** @default 2500 */
+                    duration: number;
+                    /**
+                     * @default morph
+                     * @enum {string}
+                     */
+                    transition: "morph" | "type" | "highlight" | "cut";
+                    /** @default 800 */
+                    transitionDuration: number;
+                }[];
+                source?: {
+                    /** @enum {string} */
+                    kind: "github-file" | "github-pull" | "github-commit" | "gist" | "file";
+                    url?: string;
+                    repo?: string;
+                    ref?: string;
+                    path?: string;
+                };
+            };
+            id: string;
+            name: string;
+            revision: number;
+            updatedAt: unknown;
+            /** Format: uri */
+            url: string;
+        };
+        RenderedCode: {
+            assetId: string;
+            height: number;
+            /** @constant */
+            mediaType: "image/png";
+            width: number;
         };
         CampaignListResponse: {
             data: {
@@ -7190,6 +7434,213 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    aspect?: "auto" | "16:9" | "1.91:1" | "1:1" | "4:5" | "9:16";
+                    dark?: boolean;
+                    files: {
+                        code: string;
+                        /** @enum {string} */
+                        lang?: "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "rust" | "java" | "kotlin" | "swift" | "c" | "cpp" | "csharp" | "php" | "ruby" | "dart" | "elixir" | "scala" | "lua" | "r" | "zig" | "sql" | "graphql" | "prisma" | "json" | "yaml" | "toml" | "hcl" | "html" | "xml" | "css" | "scss" | "vue" | "svelte" | "markdown" | "bash" | "shellsession" | "dockerfile" | "diff" | "text";
+                        name?: string;
+                    }[];
+                    name?: string;
+                    theme?: string;
+                    title?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new code project. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProject"];
+                };
+            };
+            /** @description The code or settings are not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The code project. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProject"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No code project with that id exists in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renderCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default 2 */
+                    scale?: 1 | 2 | 3;
+                    /** @default 0 */
+                    slide?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The stored image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedCode"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No code project with that id exists in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The workspace is rendering too fast. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceQuotaError"];
                 };
             };
             /** @description A required dependency is unavailable. */

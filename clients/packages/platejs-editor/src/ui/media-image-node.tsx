@@ -17,6 +17,7 @@ import {
   withHOC,
 } from "platejs/react";
 import React, { useEffect, useMemo, useState } from "react";
+import { ClosedCaptioningIcon } from "@phosphor-icons/react/dist/ssr/ClosedCaptioning";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 
 import { cn } from "../lib/utils";
@@ -130,7 +131,7 @@ export const ImageElement = withHOC(
                   /* biome-ignore lint/performance/noImgElement: print mode relies on native img sizing. */
                   <img
                     alt=""
-                    className={cn("h-full rounded-none")}
+                    className={cn("h-full rounded-md")}
                     height={fallbackHeight}
                     style={{ height: "auto", width: "100%" }}
                     width={fallbackWidth}
@@ -139,7 +140,7 @@ export const ImageElement = withHOC(
                 ) : (
                   <LazyLoadImage
                     className={cn(
-                      "h-full rounded-none opacity-100",
+                      "h-full rounded-md opacity-100",
                       loading && "opacity-0",
                       isDragging && "opacity-50"
                     )}
@@ -158,6 +159,16 @@ export const ImageElement = withHOC(
                 )}
 
                 {loading && <ImagePlaceholder file={currentUploadingFile} />}
+                {/* The image has a description for screen readers (alt text). */}
+                {typeof props.element.alt === "string" && props.element.alt ? (
+                  <span
+                    className="pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-sm bg-foreground/75 px-1.5 py-0.5 font-medium text-background text-label"
+                    title={props.element.alt}
+                  >
+                    <ClosedCaptioningIcon aria-hidden className="size-3.5" />
+                    ALT
+                  </span>
+                ) : null}
               </div>
 
               <MediaToolbar />
@@ -201,7 +212,7 @@ const ImagePlaceholder = ({ file }: { file?: File }) => {
         /* biome-ignore lint/performance/noImgElement: object URL previews use a native img for local files. */
         <img
           alt={file.name}
-          className="h-auto w-full rounded-none object-cover"
+          className="h-auto w-full rounded-md object-cover"
           height={200}
           src={objectUrl}
           width={200}

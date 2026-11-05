@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { Group, Pill, Row } from '@/components/platform-ui'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
-import { SettingsSaveBar } from '@/components/settings/SettingsSaveBar'
 import { useUnsavedSettings } from '@/components/settings/useUnsavedSettings'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { Button } from '@/components/ui/button'
@@ -176,10 +175,19 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
   const hasX = set.accounts.some(
     (account) => account.platform === 'x' && account.health === 'connected'
   )
-  const valid =
-    (!draft.autoRepost.enabled || draft.autoRepost.atLikes >= 1) &&
-    (!draft.autoPlug.enabled ||
-      (draft.autoPlug.atLikes >= 1 && (draft.autoPlug.text ?? '').trim().length > 0))
+  const isValid = (value: Engagement) =>
+    (!value.autoRepost.enabled || value.autoRepost.atLikes >= 1) &&
+    (!value.autoPlug.enabled ||
+      (value.autoPlug.atLikes >= 1 && (value.autoPlug.text ?? '').trim().length > 0))
+  // Saves on change once the defaults are complete; useSaveSocialSet runs saves in order.
+  // While a save is pending, set.engagementDefaults is stale, so a change back to it still saves.
+  const commit = (next: Engagement) => {
+    setDraft(next)
+    const changed =
+      state === 'saving' || JSON.stringify(next) !== JSON.stringify(set.engagementDefaults)
+    if (isValid(next) && changed) void run(() => save({ engagementDefaults: next }))
+  }
+  const disabled = !canManage || !hasX
 
   return (
     <Row
@@ -195,22 +203,16 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
       }
       layout="stacked"
     >
-      <form
-        className="grid gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          void run(() => save({ engagementDefaults: draft }))
-        }}
-      >
-        <fieldset className="grid gap-2" disabled={!canManage || !hasX || state === 'saving'}>
+      <div className="grid gap-4">
+        <fieldset className="grid gap-2" disabled={disabled}>
           <legend className="sr-only">Auto-Retweet</legend>
           <Label className="flex items-center gap-3 text-sm">
             <Switch
               aria-label="Auto-Retweet"
               checked={draft.autoRepost.enabled}
-              disabled={!canManage || !hasX || state === 'saving'}
+              disabled={disabled}
               onCheckedChange={(enabled) =>
-                setDraft({
+                commit({
                   ...draft,
                   autoRepost: {
                     ...draft.autoRepost,
@@ -226,6 +228,7 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
               aria-label="Auto-Retweet likes"
               className="w-24"
               min={1}
+              onBlur={() => commit(draft)}
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -238,15 +241,15 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
             <span className="text-muted-foreground">likes</span>
           </Label>
         </fieldset>
-        <fieldset className="grid gap-2" disabled={!canManage || !hasX || state === 'saving'}>
+        <fieldset className="grid gap-2" disabled={disabled}>
           <legend className="sr-only">Auto-Plug</legend>
           <Label className="flex flex-wrap items-center gap-3 text-sm">
             <Switch
               aria-label="Auto-Plug"
               checked={draft.autoPlug.enabled}
-              disabled={!canManage || !hasX || state === 'saving'}
+              disabled={disabled}
               onCheckedChange={(enabled) =>
-                setDraft({
+                commit({
                   ...draft,
                   autoPlug: { ...draft.autoPlug, atLikes: draft.autoPlug.atLikes || 50, enabled },
                 })
@@ -258,6 +261,7 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
               aria-label="Auto-Plug likes"
               className="w-24"
               min={1}
+              onBlur={() => commit(draft)}
               onChange={(event) =>
                 setDraft({
                   ...draft,
@@ -272,6 +276,7 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
           <Input
             aria-label="Auto-Plug reply text"
             maxLength={280}
+            onBlur={() => commit(draft)}
             onChange={(event) =>
               setDraft({ ...draft, autoPlug: { ...draft.autoPlug, text: event.target.value } })
             }
@@ -279,14 +284,12 @@ function EngagementDefaults({ canManage, set }: { canManage: boolean; set: Socia
             value={draft.autoPlug.text ?? ''}
           />
         </fieldset>
-        <SettingsSaveBar
-          dirty={dirty}
-          busy={state === 'saving'}
-          disabled={!canManage || !hasX || !valid}
-          label="Save engagement defaults"
-          onDiscard={() => setDraft(set.engagementDefaults)}
-        />
-      </form>
+        {dirty && !isValid(draft) ? (
+          <p className="text-xs text-muted-foreground">
+            Not saved yet: each follow-up needs at least 1 like, and Auto-Plug needs its reply text.
+          </p>
+        ) : null}
+      </div>
     </Row>
   )
 }

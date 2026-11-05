@@ -22,7 +22,7 @@ export function AILeaf(props: PlateTextProps) {
   return (
     <PlateText
       className={cn(
-        "border-b-2 border-b-brand/10 bg-brand/5 text-[rgb(17,96,174)]",
+        "border-b-2 border-b-primary/10 bg-primary/5 text-[rgb(17,96,174)]",
         "transition-all duration-200 ease-in-out",
         isLast &&
           streaming &&

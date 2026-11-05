@@ -5,6 +5,7 @@ import { importedBody } from '@/lib/write/import-text'
 import {
   addBatchRows,
   apiRequest,
+  chooseOption,
   db,
   draftEditor,
   enableDraftTags,
@@ -14,7 +15,7 @@ import {
   saveBatchDrafts,
   test,
   trpcMutation,
-  toolbarTool,
+  editorMore,
 } from './framework'
 
 test.use({ actionTimeout: 30_000 })
@@ -27,7 +28,7 @@ test(
     await app.open(`/?new=${encodeURIComponent('What comes next? 100% + 🚀')}`)
     await expect(page.getByLabel('Imported draft text')).toHaveValue('What comes next? 100% + 🚀')
     await page.getByRole('button', { name: 'Create draft', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+$/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+$/)
     await expect(draftEditor(page)).toContainText('100% + 🚀')
     const paste = async () => {
       await page.getByRole('button', { name: 'More draft actions' }).click()
@@ -45,8 +46,9 @@ test(
     await expect(page.getByTestId('post-header')).toHaveCount(3)
     await expect(draftEditor(page)).toContainText('Third post')
 
+    // A post's poll sits in the bar under that post.
     await page
-      .locator('[data-post-number="1"]')
+      .getByRole('toolbar', { name: 'Post 1 tools', exact: true })
       .getByRole('button', { name: 'Add a poll', exact: true })
       .click()
     await page.getByRole('button', { name: 'Add poll', exact: true }).click()
@@ -56,7 +58,7 @@ test(
     await expectSaved(page)
     await page.getByRole('button', { name: 'More draft actions' }).click()
     await page.getByRole('menuitem', { name: 'Copy poll to channel…' }).click()
-    await page.getByLabel('Poll destination').selectOption('linkedin')
+    await chooseOption(page.getByLabel('Poll destination'), 'linkedin')
     await page.getByLabel('Poll question').fill('Which option?')
     await page.getByRole('button', { name: 'Review destination version' }).click()
     await page.getByRole('button', { name: 'Copy poll', exact: true }).click()
@@ -97,9 +99,9 @@ test(
       { length: 25 },
       (_, index) => `Post ${index + 1}: a distinct thought with enough room to edit.`
     ).join('\n---\n')
-    await app.open(`/write?new=${encodeURIComponent(text)}`)
+    await app.open(`/publish?new=${encodeURIComponent(text)}`)
     await page.getByRole('button', { name: 'Create draft', exact: true }).click()
-    await page.waitForURL(/\/write\/[a-z0-9]+$/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+$/)
     await expect(page.getByTestId('post-header')).toHaveCount(25)
     const editor = draftEditor(page)
     await editor.click()
@@ -159,17 +161,25 @@ test(
     })
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
-    const calendarURL = `/write/plan?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
+    const calendarURL = `/publish/calendar?view=queue&week=${new Date(Date.now() + 7 * 86400_000).toISOString().slice(0, 10)}`
+    // Plan commits nothing itself: both paths open the draft's one scheduling review.
+    const reviewAndSchedule = async () => {
+      await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
+      const review = page.getByTestId('schedule-dialog')
+      await expect(review.getByTestId('destinations')).toBeVisible()
+      await review.getByRole('checkbox', { name: 'Open a new draft after scheduling' }).uncheck()
+      await review.getByRole('button', { name: /^Confirm schedule/ }).click()
+      await expect(review).toHaveCount(0)
+    }
     await page.goto(calendarURL)
-    await page.getByLabel('Calendar view').selectOption('week')
+    await chooseOption(page.getByLabel('Calendar view'), 'Week')
     await expect(page.getByLabel('week calendar', { exact: true })).toBeVisible()
     const slot = page.getByRole('button', { name: /Available ·/ }).first()
     await slot.click()
     await page.getByRole('button', { name: 'Choose existing content' }).click()
     await page.getByRole('button', { name: /Pick this saved draft/ }).click()
     await page.getByRole('checkbox', { name: 'Open in editor' }).uncheck()
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     const committed = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
     expect(committed.status).toBe(200)
     expect((committed.body as { posts: unknown[] }).posts).toHaveLength(1)
@@ -203,8 +213,7 @@ test(
     )
     expect(beforeConfirm.status).toBe(200)
     expect((beforeConfirm.body as { posts: unknown[] }).posts).toHaveLength(0)
-    await page.getByRole('button', { name: 'Schedule', exact: true }).click()
-    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await reviewAndSchedule()
     await page.goto(calendarURL)
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
     await app.reload()
@@ -230,7 +239,7 @@ test(
       })
       expect(created.status, JSON.stringify(created.body)).toBe(201)
     }
-    await app.open('/write')
+    await app.open('/publish')
     const first = page.getByTestId('draft-row').filter({ hasText: 'Batch first' })
     const second = page.getByTestId('draft-row').filter({ hasText: 'Batch second' })
     await first.getByRole('link').click({ modifiers: ['Shift'] })
@@ -239,7 +248,7 @@ test(
       .getByRole('toolbar', { name: 'Selected drafts' })
       .getByRole('button', { name: 'Schedule', exact: true })
       .click()
-    await page.getByLabel('Batch mode').selectOption('spread')
+    await chooseOption(page.getByLabel('Batch mode'), 'Spread')
     await page.getByRole('button', { name: 'Preview and validate' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Ready')
@@ -247,9 +256,9 @@ test(
     await page.getByRole('button', { name: 'Schedule valid drafts' }).click()
     await expect(dialog.getByRole('listitem').filter({ hasText: 'Scheduled' })).toHaveCount(2)
     await page.keyboard.press('Escape')
-    await app.open('/write/plan?view=month')
+    await app.open('/publish/calendar?view=month')
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
-    await page.getByLabel('Calendar view').selectOption('month')
+    await chooseOption(page.getByLabel('Calendar view'), 'Month')
     await page.getByTestId('calendar-post').filter({ visible: true }).first().click()
     await page.getByLabel('Time', { exact: true }).fill('16:35')
     await page.getByRole('button', { name: 'Move', exact: true }).click()
@@ -265,9 +274,10 @@ test(
       .getByTestId('calendar-post')
       .filter({ hasText: result.rows[0].caption, visible: true })
       .click()
-    await page
-      .getByLabel(`Swap queue position for ${result.rows[0].caption}`)
-      .selectOption(result.rows[1].id)
+    await chooseOption(
+      page.getByLabel(`Swap queue position for ${result.rows[0].caption}`),
+      new RegExp(`^${result.rows[1].caption} · `)
+    )
     await expect
       .poll(
         async () =>
@@ -407,7 +417,7 @@ test(
         }),
       ]
     )
-    await app.open('/write/analyze/observations')
+    await app.open('/publish/analyze/observations')
     await expect(
       page.getByRole('img', { name: 'Average engagement score 8.0 from 5 posts' }).first()
     ).toBeVisible()
@@ -427,7 +437,7 @@ test(
     await expect(page.getByRole('img', { name: /x · Followers/ }).locator('circle')).toHaveCount(2)
     await expect(page.getByTestId('social-analytics')).toContainText('12')
     await expect(page.getByTestId('social-analytics')).toContainText('Unavailable')
-    await page.getByLabel('Period', { exact: true }).selectOption('month')
+    await chooseOption(page.getByLabel('Period', { exact: true }), 'Monthly')
     const download = page.waitForEvent('download')
     await page.getByRole('button', { name: 'Export CSV' }).click()
     expect((await download).suggestedFilename()).toBe('social-observations.csv')
@@ -470,7 +480,7 @@ test(
     await expect(saved).toHaveCount(2)
     expect(
       await saved.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('href')))
-    ).toEqual(ids.map((id) => `/write/${id}`))
+    ).toEqual(ids.map((id) => `/publish/${id}`))
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
     ).toBeDisabled()
@@ -504,9 +514,9 @@ test(
     })
     expect(combined.status, JSON.stringify(combined.body)).toBe(201)
     const id = (combined.body as { id: string }).id
-    await app.open(`/write/${id}`)
+    await app.open(`/publish/${id}`)
     await expect(page.getByTestId('post-header')).toHaveCount(2)
-    await app.open(`/write/${id}?panel=properties`)
+    await app.open(`/publish/${id}?panel=properties`)
     await page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true }).click()
     await expect(
       page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true })
@@ -522,11 +532,11 @@ test(
       .getByRole('button', { name: 'Drag media 1', exact: true })
       .dragTo(media.getByText('Post 1, media 2', { exact: true }))
     await expect(media.getByAltText('Media 1')).toHaveAttribute('src', new RegExp(assets[1]))
-    await media.getByLabel('Media destination post').selectOption('1')
+    await chooseOption(media.getByLabel('Media destination post'), 'Post 2')
     await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
     await expect(media).toContainText('Post 2, media 2')
     await page.keyboard.press('Escape')
-    await toolbarTool(page, 'More tools', 'Describe images')
+    await editorMore(page, 'Alt text')
     await page.getByRole('button', { name: 'Suggest with AI', exact: true }).first().click()
     await expect(page.getByLabel('Description of image 1')).not.toHaveValue('', {
       timeout: 60_000,
@@ -545,7 +555,7 @@ test(
         },
       })
     )
-    await toolbarTool(page, 'More tools', 'Manage media')
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })
@@ -559,12 +569,12 @@ test(
     await page.keyboard.press('Escape')
     await expectSaved(page)
     await app.reload()
-    await toolbarTool(page, 'More tools', 'Describe images')
+    await editorMore(page, 'Alt text')
     await expect(page.getByLabel('Description of image 1')).toHaveValue(
       'A small light square, reviewed by the author.'
     )
     await page.keyboard.press('Escape')
-    await toolbarTool(page, 'More tools', 'Manage media')
+    await editorMore(page, 'Manage media')
     await page
       .getByTestId('media-manager')
       .getByRole('button', { name: 'Tag people', exact: true })
@@ -629,7 +639,7 @@ test(
       },
     })
     expect(scheduled.status, JSON.stringify(scheduled.body)).toBe(201)
-    await app.open(`/write/${draft.id}`)
+    await app.open(`/publish/${draft.id}`)
     // The composer can append only once the live session has loaded the draft;
     // until then the reading link has no editor to go into.
     await expect(draftEditor(page)).toContainText('Unsent reply', { timeout: 60_000 })
@@ -653,7 +663,7 @@ test(
     await app.reload()
     await expect(page.getByText('Delivered root', { exact: false }).first()).toBeVisible()
     await page.screenshot({ path: '.context/shots/typefully-published-reading.png' })
-    await app.open(`/write/${draft.id}`)
+    await app.open(`/publish/${draft.id}`)
     await page.getByRole('button', { name: 'Share', exact: true }).click()
     await page.getByLabel('Public link', { exact: true }).click()
     await expect(page.getByLabel('Public link to share')).toHaveCount(0)
@@ -673,7 +683,7 @@ test(
     })
     expect(issued.status, JSON.stringify(issued.body)).toBe(200)
     const key = (issued.body as { apiKey: { id: string; key: string } }).apiKey
-    await app.open('/write')
+    await app.open('/publish')
     const origin = new URL(page.url()).origin
     const api = new ShotsClient(origin, key.key)
     const sets = await api.sets()
@@ -730,7 +740,7 @@ test(
     }
     const zapDraft = await zapier.createDraft(z, zapInput)
     expect((await zapier.createDraft(z, zapInput)).id).toBe(zapDraft.id)
-    await app.open(`/write/${zapDraft.id}`)
+    await app.open(`/publish/${zapDraft.id}`)
     await expect(draftEditor(page)).toContainText('From a source document.')
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await app.reload()
@@ -754,7 +764,7 @@ test(
     await expect(
       api.request(`/api/v1/social-sets/${sets[0].id}/queue`, 'PATCH', queueBody)
     ).rejects.toThrow()
-    await app.open(`/workspace/social-sets/${sets[0].id}/scheduling`)
+    await app.open(`/settings/publishing-brands/${sets[0].id}/scheduling`)
     await expect(
       page.getByRole('switch', { name: 'Natural posting times for new drafts', exact: true })
     ).toBeChecked()
@@ -801,7 +811,7 @@ test(
       body: JSON.stringify(action),
     })
     expect(replay.status).toBe(409)
-    await app.open(`/write/${created.id}?panel=comments`)
+    await app.open(`/publish/${created.id}?panel=comments`)
     await expect(page.getByTestId('comment-thread')).toContainText('Review assistant (API key)')
     await expect(page.getByTestId('comment-thread')).toContainText('Check the source.')
     await expect(page.getByTestId('orphaned-thread')).toHaveCount(0)

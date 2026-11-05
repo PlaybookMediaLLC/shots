@@ -21,7 +21,7 @@ import {
  *   test.use({ workspaceOptions: { channels: ['x'], plan: 'pro' } })
  *
  *   test('…', async ({ app, workspace }) => {
- *     await app.open('/write')
+ *     await app.open('/publish')
  *     expect(await db.row('SELECT …', [workspace.id])).toMatchObject({ … })
  *   })
  *
@@ -293,20 +293,21 @@ export {
   caretAtDocumentEnd,
   chooseChannels,
   draftEditor,
+  editorMore,
   enableDraftTags,
   expectSaved,
   inPreview,
   openNewBatch,
   openNewDraft,
   openSchedule,
+  postMenu,
   previewOf,
   saveBatchDrafts,
   settleSelection,
   socialMockPort,
-  toolbarTool,
   xVerification,
 } from './content-drafts'
-export { chooseOption } from './controls'
+export { borderContrastOf, chooseOption, contrastOf, openDisclosureFor } from './controls'
 export { mockBrowserJson } from './downstream'
 export { startHttpMockServer, type HttpMockRequest, type HttpMockServer } from './http-server'
 export { getMaintenanceHeaders } from './maintenance'

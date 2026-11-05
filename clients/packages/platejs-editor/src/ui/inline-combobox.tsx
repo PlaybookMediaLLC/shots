@@ -35,7 +35,6 @@ import type {
 } from "react";
 import {
   createContext,
-  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -51,6 +50,8 @@ type FilterFn = (
 ) => boolean;
 
 type InlineComboboxContextValue = {
+  cancelInput: UseComboboxInputResult["cancelInput"];
+  closeOnSpace?: "empty" | "always";
   filter: FilterFn | false;
   owner: boolean;
   inputProps: UseComboboxInputResult["props"];
@@ -115,6 +116,11 @@ function useInlineComboboxStore() {
 
 type InlineComboboxProps = {
   children: ReactNode;
+  /**
+   * Space closes the input and types the text as written: `empty` only right
+   * after the trigger (a plain "/ "), `always` at any point (a finished "#tag ").
+   */
+  closeOnSpace?: "empty" | "always";
   element: TElement;
   trigger: string;
   filter?: FilterFn | false;
@@ -126,6 +132,7 @@ type InlineComboboxProps = {
 
 function InlineCombobox({
   children,
+  closeOnSpace,
   element,
   filter = defaultFilter,
   hideWhenNoValue = false,
@@ -149,8 +156,16 @@ function InlineCombobox({
       if (!hasValueProp) {
         setValueState(newValue);
       }
+      // The query is kept on the node too, so a save while it is open keeps the
+      // typed text (the host turns the input into "#query" text); not an undo step.
+      // Picking an item removes the input first; a stale path names another node or none.
+      const path = editor.api.findPath(element);
+      if (path && editor.api.node(path)?.[0] === element)
+        editor.tf.withoutSaving(() =>
+          editor.tf.setNodes({ value: newValue }, { at: path })
+        );
     },
-    [setValueProp, hasValueProp]
+    [editor, element, setValueProp, hasValueProp]
   );
 
   const insertPoint = useRef<Point | null>(null);
@@ -238,7 +253,11 @@ function InlineCombobox({
     };
   }, [editor, element, owner, readOnly]);
 
-  const { props: inputProps, removeInput } = useComboboxInput({
+  const {
+    cancelInput,
+    props: inputProps,
+    removeInput,
+  } = useComboboxInput({
     autoFocus: owner,
     cancelInputOnBlur: false,
     cancelInputOnDeselect: owner,
@@ -263,6 +282,8 @@ function InlineCombobox({
 
   const contextValue: InlineComboboxContextValue = useMemo(
     () => ({
+      cancelInput,
+      closeOnSpace,
       filter,
       inputProps,
       inputRef,
@@ -272,12 +293,21 @@ function InlineCombobox({
       showTrigger,
       trigger,
     }),
-    [trigger, showTrigger, filter, inputProps, owner, removeInput]
+    [
+      cancelInput,
+      closeOnSpace,
+      trigger,
+      showTrigger,
+      filter,
+      inputProps,
+      owner,
+      removeInput,
+    ]
   );
 
-  const store = useComboboxStore({
-    setValue: (newValue) => startTransition(() => setValue(newValue)),
-  });
+  // The query applies in the same render, not in a transition: Enter right
+  // after typing runs the best match for what was typed, not a stale row.
+  const store = useComboboxStore({ setValue });
 
   const items = store.useState("items");
 
@@ -311,12 +341,15 @@ function InlineComboboxInput({
   ...props
 }: ComponentProps<"input">) {
   const {
+    cancelInput,
+    closeOnSpace,
     inputProps,
     inputRef: contextRef,
     owner,
     showTrigger,
     trigger,
   } = useInlineComboboxContext();
+  const editor = useEditorRef();
 
   const store = useInlineComboboxStore();
   const value = store.useState("value");
@@ -346,6 +379,57 @@ function InlineComboboxInput({
           value={value}
           {...inputProps}
           {...props}
+          // Tab picks the highlighted row, as Enter does, before Ariakit moves focus with it.
+          onKeyDownCapture={(event) => {
+            const active = store.getState().activeId;
+            if (event.key !== "Tab" || event.shiftKey || !active) return;
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById(active)?.click();
+          }}
+          // The host's handler runs first; Plate's (Escape, Backspace, arrows) after it.
+          onKeyDown={(event) => {
+            props.onKeyDown?.(event);
+            if (event.defaultPrevented) return;
+            // Slate still counts the editor as focused while this input has focus, so
+            // its focus() would do nothing and the next keystroke would land in the
+            // removed input. Hand focus to the editable directly, in this keystroke.
+            const refocus = () =>
+              editor.api.toDOMNode(editor)?.focus({ preventScroll: true });
+            // An open-ended query (a hashtag) with nothing highlighted: Enter ends it and breaks the line.
+            if (event.key === "Enter" && closeOnSpace === "always" && !store.getState().activeId) {
+              event.preventDefault();
+              cancelInput("manual");
+              editor.tf.insertBreak();
+              refocus();
+              return;
+            }
+            // Backspace at the query's start removes the trigger. Read the caret from the
+            // input: Plate's tracked cursor state lags a keystroke typed right after "/".
+            const input = event.currentTarget;
+            if (
+              event.key === "Backspace" &&
+              !event.altKey && !event.ctrlKey && !event.metaKey &&
+              input.selectionStart === 0 && input.selectionEnd === 0
+            ) {
+              event.preventDefault();
+              cancelInput("backspace");
+              refocus();
+              return;
+            }
+            if (
+              event.key === " " &&
+              (closeOnSpace === "always" || (closeOnSpace === "empty" && !value))
+            ) {
+              event.preventDefault();
+              // Cancelling puts the trigger and query back as text; the space follows it.
+              cancelInput("manual");
+              editor.tf.insertText(" ");
+              refocus();
+              return;
+            }
+            inputProps.onKeyDown(event);
+          }}
         />
       </span>
     </>
@@ -353,7 +437,7 @@ function InlineComboboxInput({
 }
 
 const comboboxVariants = cva(
-  "z-500 mt-1 h-full max-h-[40vh] min-w-[180px] max-w-[calc(100vw-24px)] animate-popover overflow-y-auto rounded-none bg-popover shadow-floating",
+  "z-500 h-full max-h-[40vh] min-w-[180px] max-w-[calc(100vw-24px)] animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none overflow-y-auto overscroll-contain rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-popover",
   {
     defaultVariants: {
       variant: "default",
@@ -363,14 +447,14 @@ const comboboxVariants = cva(
         default: "",
         emoji: "max-h-[270px] w-[408px]",
         mention: "w-[300px]",
-        slash: "w-[320px]",
+        slash: "max-h-[360px] w-80",
       },
     },
   }
 );
 
 const comboboxItemVariants = cva(
-  "relative mx-1 flex select-none items-center rounded-none px-2 py-1 text-foreground text-sm outline-hidden transition-bg-ease [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "relative flex min-h-8 select-none items-center gap-2 rounded-md px-2 py-1.5 text-foreground text-sm outline-hidden transition-colors motion-reduce:transition-none [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     defaultVariants: {
       interactive: true,
@@ -378,7 +462,8 @@ const comboboxItemVariants = cva(
     variants: {
       interactive: {
         false: "",
-        true: "cursor-pointer hover:bg-accent hover:text-accent-foreground data-[active-item=true]:bg-accent data-[active-item=true]:text-accent-foreground",
+        // One highlight: hovering moves the active row (focusOnHover below).
+        true: "cursor-pointer data-[active-item=true]:bg-accent data-[active-item=true]:text-accent-foreground",
       },
     },
   }
@@ -394,6 +479,8 @@ function InlineComboboxContent({
     <AriakitPortal>
       <AriakitComboboxPopover
         className={cn(comboboxVariants({ variant }), className)}
+        // Below the caret's line (Ariakit's bottom-start) with a gap; it flips above only when there is less room.
+        gutter={8}
         {...props}
       >
         {props.children}
@@ -433,7 +520,9 @@ function InlineComboboxItem({
 
   return (
     <AriakitComboboxItem
+      blurOnHoverEnd={false}
       className={cn(comboboxItemVariants(), className)}
+      focusOnHover
       onClick={(event) => {
         removeInput(focusEditor);
         onClick?.(event);
@@ -465,7 +554,7 @@ function InlineComboboxEmpty({
     <div
       className={cn(
         comboboxItemVariants({ interactive: false }),
-        "my-1.5 text-muted-foreground",
+        "text-muted-foreground",
         className
       )}
     >
@@ -481,7 +570,7 @@ function InlineComboboxGroup({
   return (
     <AriakitComboboxGroup
       className={cn(
-        "hidden not-last:border-b py-1.5 [&:has([role=option])]:block",
+        "hidden not-last:mb-1 not-last:border-border not-last:border-b not-last:pb-1 [&:has([role=option])]:block",
         className
       )}
       {...props}
@@ -496,7 +585,7 @@ function InlineComboboxGroupLabel({
   return (
     <AriakitComboboxGroupLabel
       className={cn(
-        "mt-1.5 mb-2 px-3 font-medium text-muted-foreground text-xs",
+        "px-2 pt-1.5 pb-1 text-caption text-muted-foreground",
         className
       )}
       {...props}

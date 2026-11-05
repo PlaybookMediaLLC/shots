@@ -109,14 +109,14 @@ test(
 
       // 1–3. Workflows is a top-level destination in the workspace sidebar. Two-factor
       // setup left the page in Settings, whose sidebar lists settings, so go back first.
-      await page.getByRole('link', { name: 'Settings, back to Home', exact: true }).click()
-      await expect(page).toHaveURL(/\/home$/)
+      await page.getByRole('link', { name: 'Back, leave settings', exact: true }).click()
+      await expect(page.getByRole('navigation', { name: 'Workspace' })).toBeVisible()
       await page
         .getByRole('navigation', { name: 'Workspace' })
         .getByRole('link', { name: 'Automate', exact: true })
         .click()
       await expect(page).toHaveURL(/\/workflows$/)
-      await expect(page.getByRole('heading', { name: 'Automate', level: 1 })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Workflows', level: 1 })).toBeVisible()
       await expect(page.getByText('No workflows yet')).toBeVisible()
 
       await page
@@ -391,7 +391,7 @@ test(
       await page.screenshot({ path: '.context/workflows-run-attention.png', fullPage: true })
       expect(await count('release')).toBe(1)
 
-      await page.getByRole('link', { name: 'Run history', exact: true }).click()
+      await page.getByRole('link', { name: 'Back to runs', exact: true }).click()
       await expect(page).toHaveURL(/status=needs_attention/)
 
       // 19. Disable from the dashboard; later events no longer run actions.
@@ -428,10 +428,10 @@ test(
       await app.reload()
       await expect(page.getByRole('button', { name: 'Newest runs', exact: true })).toBeVisible()
       await page.getByRole('table', { name: 'Workflow runs' }).getByRole('link').first().click()
-      await page.getByRole('link', { name: 'Run history', exact: true }).click()
+      await page.getByRole('link', { name: 'Back to runs', exact: true }).click()
       await expect(page).toHaveURL(olderURL)
       await page.goBack()
-      await expect(page.getByRole('link', { name: 'Run history', exact: true })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Back to runs', exact: true })).toBeVisible()
       await page.goForward()
       await expect(page).toHaveURL(olderURL)
 
@@ -441,7 +441,7 @@ test(
       await page.getByRole('button', { name: 'Open navigation' }).click()
       await page.getByRole('dialog').getByRole('link', { name: 'Automate', exact: true }).click()
       await expect(page).toHaveURL(/\/workflows$/)
-      await expect(page.getByRole('heading', { name: 'Automate', level: 1 })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Workflows', level: 1 })).toBeVisible()
       await expect(
         page.getByRole('link', { name: 'Stable releases to review', exact: true })
       ).toBeVisible()
@@ -497,7 +497,7 @@ test(
       ).toBeVisible()
 
       // The old settings route keeps working.
-      await app.open('/workspace/release-automation')
+      await app.open('/settings/release-automation')
       await expect(page).toHaveURL(/\/workflows$/)
     } finally {
       await unbindTestGoOrganization(organizationId)
@@ -829,7 +829,7 @@ test(
     await page.getByLabel('Attempt', { exact: true }).fill('1')
     await page.getByRole('button', { name: 'Load jobs for this attempt' }).click()
     await page.getByRole('button', { name: 'Watch this job name' }).click()
-    await page.getByLabel('Shots workflow to run').selectOption(definition.id)
+    await chooseOption(page.getByLabel('Shots workflow to run'), /^Qualified deployment release · /)
     await page.getByLabel('Enable for new live events').check()
     await page.getByRole('button', { name: 'Save policy revision' }).click()
     await expect(
@@ -924,7 +924,9 @@ test(
       .toBe(2)
     expect(await count('release')).toBe(1)
     await page.getByRole('button', { name: 'Refresh events' }).click()
-    await page.getByLabel('Recorded observation').selectOption(matched.id)
+    // The newest observation, the one just matched, leads the list.
+    await page.getByLabel('Recorded observation').click()
+    await page.getByRole('option').first().click()
     await page.getByRole('button', { name: 'Preview current policy' }).click()
     await expect(
       page.getByText('Configured production evidence matched.', { exact: false }).first()

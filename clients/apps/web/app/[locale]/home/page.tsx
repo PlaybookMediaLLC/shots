@@ -5,7 +5,6 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
 import { Stage } from '@/components/platform-landing/primitives'
 import { ArrowForwardIcon as ArrowRight } from '@/components/platform-shell/icons'
-import { OutwardIcon as ArrowUpRight } from '@/components/platform-shell/icons'
 import { ImageIcon as ImagePlus } from '@/components/platform-shell/icons'
 import { EditIcon as PenLine } from '@/components/platform-shell/icons'
 import { CampaignsIcon as Megaphone } from '@/components/platform-shell/icons'
@@ -64,7 +63,7 @@ export default async function HomePage({
           {
             title: 'Write a post',
             description: 'Draft and schedule your posts.',
-            href: '/write',
+            href: '/publish',
             icon: PenLine,
             // Makes the draft at once, as New → Post does.
             startsPost: true,
@@ -114,13 +113,13 @@ export default async function HomePage({
         description="What will you make today?"
         actions={
           paid ? (
-            <ButtonLink href="/library?view=templates" variant="outline" className="gap-2">
+            <ButtonLink href="/create?view=templates" variant="outline" className="gap-2">
               <Shapes size={16} aria-hidden="true" /> Explore templates{' '}
-              <ArrowUpRight size={15} aria-hidden="true" />
+              <ArrowRight size={15} aria-hidden="true" />
             </ButtonLink>
           ) : (
             <ButtonLink href="/upgrade" variant="outline" className="gap-2">
-              See plans <ArrowUpRight size={15} aria-hidden="true" />
+              See plans <ArrowRight size={15} aria-hidden="true" />
             </ButtonLink>
           )
         }
@@ -152,7 +151,7 @@ export default async function HomePage({
                       {description}
                     </span>
                   </span>
-                  <ArrowUpRight size={14} aria-hidden="true" className="home-action-arrow" />
+                  <ArrowRight size={14} aria-hidden="true" className="home-action-arrow" />
                 </>
               )
               return (
@@ -196,10 +195,10 @@ export default async function HomePage({
                 </p>
               </div>
               <SidebarLink
-                href="/library?view=templates"
+                href="/create?view=templates"
                 className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
-                All templates <ArrowUpRight size={14} aria-hidden="true" />
+                All templates <ArrowRight size={14} aria-hidden="true" />
               </SidebarLink>
             </div>
             <TemplateHighlights />
@@ -213,16 +212,16 @@ export default async function HomePage({
             </span>
             <span>
               <span className="flex items-center gap-2 text-ui-lg font-medium">
-                Brand resources
+                Brand assets
                 {paid ? null : <span className="platform-pro-badge">Pro</span>}
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                Manage your brand kit, voice, and products.
+                Your logos, colours and fonts, ready for every visual.
               </span>
             </span>
           </span>
           <span className="flex items-center gap-2 text-xs font-medium">
-            Manage brand <ArrowRight size={15} aria-hidden="true" />
+            Open in Library <ArrowRight size={15} aria-hidden="true" />
           </span>
         </SidebarLink>
       </Page>

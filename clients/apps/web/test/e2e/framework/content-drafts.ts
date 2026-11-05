@@ -239,6 +239,23 @@ export function draftEditor(page: Page) {
   return page.getByRole('textbox', { name: 'Draft body' })
 }
 
+/** Choose an item from the editor toolbar's More menu (insert, media tools, import and export). */
+export async function editorMore(page: Page, item: string): Promise<void> {
+  await page
+    .getByRole('toolbar', { name: 'Draft tools' })
+    .getByRole('button', { name: 'More', exact: true })
+    .click()
+  // An item's name can go on with how it publishes ("Table Publishes as image").
+  const name = new RegExp(`^${item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`)
+  await page.getByRole('menuitem', { name }).click()
+}
+
+/** Open post `number`'s More menu in its bar; returns the menu, to choose an item or check one. */
+export async function postMenu(page: Page, number: number): Promise<Locator> {
+  await page.getByRole('button', { name: `More for post ${number}`, exact: true }).click()
+  return page.getByRole('menu')
+}
+
 /** Wait until autosave has written every change. */
 export async function expectSaved(page: Page): Promise<void> {
   await expect(page.getByTestId('save-state')).toHaveText('Saved', { timeout: 20_000 })
@@ -247,21 +264,11 @@ export async function expectSaved(page: Page): Promise<void> {
 /** How the composer names each platform. */
 const PLATFORM_LABELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X' }
 
-/**
- * Run a tool from the draft toolbar's Media menu (upload, Library, link,
- * GIF) or its More menu (inserts, mention, alt text, media manager,
- * import and export).
- */
-export async function toolbarTool(page: Page, menu: 'Media' | 'More tools', tool: string) {
-  await page.getByRole('button', { name: menu, exact: true }).click()
-  await page.getByRole('menuitem', { name: tool, exact: true }).click()
-}
-
 /** Open a new draft from the Write library; returns its id. */
 export async function openNewDraft(page: Page): Promise<string> {
-  await page.goto('/write')
+  await page.goto('/publish')
   await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/write\/[a-z0-9]+/)
+  await page.waitForURL(/\/publish\/[a-z0-9]+/)
   await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
   return new URL(page.url()).pathname.split('/').pop() ?? ''
 }
@@ -274,9 +281,9 @@ export async function openNewBatch(
   page: Page,
   app: { open(path: string): Promise<void>; reload(): Promise<void> }
 ): Promise<string> {
-  await app.open('/write/batches')
+  await app.open('/publish/batches')
   await page.getByRole('button', { name: 'Start a batch', exact: true }).click()
-  await page.waitForURL(/\/write\/batches\/[^/]+$/)
+  await page.waitForURL(/\/publish\/batches\/[^/]+$/)
   await app.reload()
   await expect(page.getByTestId('bulk-batch')).toBeVisible()
   return new URL(page.url()).pathname.split('/').pop() ?? ''

@@ -25,9 +25,9 @@ export const MediaFileElement = withHOC(
     };
 
     return (
-      <PlateElement className="my-px rounded-none" {...props}>
+      <PlateElement className="my-px rounded-md" {...props}>
         <div
-          className="group relative m-0 rounded px-0.5 py-[3px] transition-bg-ease hover:bg-muted"
+          className="group relative m-0 rounded px-0.5 py-[3px] transition-colors hover:bg-muted"
           contentEditable={false}
         >
           <button

@@ -15,7 +15,7 @@ import { cn } from "../lib/utils";
 const popoverVariants = cva(
   cn(
     "group/popover",
-    "z-50 max-w-[calc(100vw-24px)] animate-popover overflow-hidden rounded-none bg-popover text-popover-foreground shadow-floating outline-hidden"
+    "z-50 max-w-[calc(100vw-24px)] animate-in fade-in-0 zoom-in-95 motion-reduce:animate-none overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-popover outline-hidden"
   ),
   {
     defaultVariants: {
@@ -25,9 +25,9 @@ const popoverVariants = cva(
       variant: {
         combobox: "",
         default: "w-72",
-        equation: "w-[400px] rounded-none px-2.5 py-2",
-        equationInline: "w-[400px] rounded-none px-2.5 py-2",
-        media: "max-h-[70vh] min-w-[180px] rounded-none",
+        equation: "w-[400px] rounded-md px-2.5 py-2",
+        equationInline: "w-[400px] rounded-md px-2.5 py-2",
+        media: "max-h-[70vh] min-w-[180px] rounded-md",
       },
     },
   }

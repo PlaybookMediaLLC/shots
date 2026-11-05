@@ -11,15 +11,15 @@ test(
     await page.getByRole('button', { name: 'Sign out' }).click()
     await expect.poll(() => new URL(page.url()).pathname).toBe('/sign-in')
 
-    await app.open('/workspace')
+    await app.open('/settings')
     await expect.poll(() => new URL(page.url()).pathname).toBe('/sign-in')
 
-    await app.open('/sign-in?callbackURL=/workspace')
+    await app.open('/sign-in?callbackURL=/settings')
     await page.getByLabel('Email', { exact: true }).fill(identity.email)
     await page.getByLabel('Password').fill(identity.password)
     await page.getByRole('button', { name: 'Sign in' }).click()
 
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/workspace')
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/settings')
     await expect(
       page.getByRole('heading', { exact: true, level: 1, name: 'General' })
     ).toBeVisible()

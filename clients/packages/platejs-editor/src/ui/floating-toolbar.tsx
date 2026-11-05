@@ -82,8 +82,8 @@ export function FloatingToolbar({
     <div ref={clickOutsideRef}>
       <Toolbar
         className={cn(
-          "absolute z-50 animate-zoom whitespace-nowrap rounded-none bg-popover p-1 opacity-100 shadow-toolbar print:hidden",
-          "scrollbar-hide max-w-[80vw] overflow-x-auto"
+          "absolute z-50 animate-in zoom-in-95 motion-reduce:animate-none whitespace-nowrap rounded-xl border border-border bg-popover p-1 opacity-100 shadow-popover print:hidden",
+          "[scrollbar-width:none] max-w-[80vw] overflow-x-auto"
         )}
         ref={ref}
         {...rootProps}

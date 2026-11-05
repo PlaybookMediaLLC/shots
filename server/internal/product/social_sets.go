@@ -1023,12 +1023,30 @@ func (c *Configuration) RemoveSocialSetAccount(ctx context.Context, actor Actor,
 	if err != nil {
 		return nil, err
 	}
+	cancelled, err := removeAccount(ctx, tx, actor, connection, set)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return &SocialSetRemoval{CancelledPostIDs: cancelled}, nil
+}
+
+// removeAccount cancels an account's queued posts, refusing while one is
+// publishing, disables it, takes its platform out of its set's defaults when
+// it has a set, and audits the removal. The caller commits.
+func removeAccount(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection, set *ent.SocialSet) ([]string, error) {
 	cancelled, err := cancelQueuedPosts(ctx, tx, actor, []string{connection.ID}, "account_removed")
 	if err != nil {
 		return nil, err
 	}
 	if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).SetStatus(channelconnection.StatusDISABLED).Save(ctx); err != nil {
 		return nil, err
+	}
+	if set == nil {
+		return cancelled, appendConfigurationAudit(ctx, tx, actor, "product.channel_account_removed", "channel_connection", connection.ID,
+			map[string]any{"cancelledPosts": len(cancelled)})
 	}
 	defaults := make([]string, 0, len(set.DefaultPlatforms))
 	for _, platform := range set.DefaultPlatforms {
@@ -1047,14 +1065,8 @@ func (c *Configuration) RemoveSocialSetAccount(ctx context.Context, actor Actor,
 	if _, err := update.Save(ctx); err != nil {
 		return nil, err
 	}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_removed", "channel_connection", connection.ID,
-		map[string]any{"cancelledPosts": len(cancelled), "socialSetId": set.ID}); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return &SocialSetRemoval{CancelledPostIDs: cancelled}, nil
+	return cancelled, appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_removed", "channel_connection", connection.ID,
+		map[string]any{"cancelledPosts": len(cancelled), "socialSetId": set.ID})
 }
 
 // AssignSocialSetAccount puts an account that belongs to no set into a set.

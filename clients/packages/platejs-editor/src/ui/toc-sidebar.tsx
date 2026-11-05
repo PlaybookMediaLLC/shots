@@ -13,12 +13,12 @@ import { Button } from "./button";
 import { popoverVariants } from "./popover";
 
 const tocSidebarButtonVariants = cva(
-  "block h-auto w-full rounded-none p-0 text-left",
+  "block h-auto w-full rounded-md p-0 text-left",
   {
     variants: {
       active: {
         false: "text-muted-foreground hover:text-foreground",
-        true: "text-brand hover:text-brand",
+        true: "text-primary hover:text-primary",
       },
       depth: {
         1: "pl-0",
@@ -55,7 +55,7 @@ export function TocSidebar({
               <div key={item.id}>
                 <div
                   className={cn(
-                    "h-0.5 rounded-none bg-primary/20",
+                    "h-0.5 rounded-md bg-primary/20",
                     activeContentId === item.id && "bg-primary"
                   )}
                   style={{
@@ -81,7 +81,7 @@ export function TocSidebar({
             <div
               className={cn(
                 popoverVariants(),
-                "-mr-2.5 max-h-96 w-[242px] scroll-m-1 overflow-auto rounded-none p-3"
+                "-mr-2.5 max-h-96 w-[242px] scroll-m-1 overflow-auto rounded-md p-3"
               )}
               id="toc_wrap"
             >

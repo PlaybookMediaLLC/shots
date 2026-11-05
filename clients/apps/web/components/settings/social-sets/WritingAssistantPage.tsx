@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   deleteWritingSampleContract,
   listWritingSamplesContract,
@@ -147,7 +148,7 @@ function Lifecycle({ canWrite, set }: { canWrite: boolean; set: SocialSetRecord 
             </Button>
           ) : null}
           <Button asChild variant="outline">
-            <Link href={`/write?set=${encodeURIComponent(set.id)}`}>
+            <Link href={`/publish?set=${encodeURIComponent(set.id)}`}>
               Create a draft to use Writing Assistant
             </Link>
           </Button>
@@ -420,41 +421,43 @@ function WritingSamples({ canWrite, set }: { canWrite: boolean; set: SocialSetRe
       <ul className="grid gap-2">
         {items.map((sample) => (
           <li className="rounded-lg border border-border px-3 py-2" key={sample.id}>
-            <details>
-              <summary className="cursor-pointer text-sm text-foreground">
+            <Disclosure>
+              <DisclosureTrigger className="text-sm text-foreground">
                 {sample.text.slice(0, 90)}
                 {sample.text.length > 90 ? '…' : ''}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {sample.source === 'draft' ? 'From a draft' : 'Written here'} ·{' '}
                   {new Date(sample.createdAt).toLocaleDateString()}
                 </span>
-              </summary>
-              <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{sample.text}</p>
-              {canWrite ? (
-                <div className="mt-2">
-                  <ConfirmDialog
-                    confirmLabel="Remove sample"
-                    description="The assistant stops learning from it. The draft it came from, if any, is not changed."
-                    destructive
-                    onConfirm={async () => {
-                      try {
-                        await scope.request(
-                          `/api/v1/social-sets/${encodeURIComponent(set.id)}/writing-samples/${encodeURIComponent(sample.id)}`,
-                          deleteWritingSampleContract.output,
-                          { method: 'DELETE' }
-                        )
-                        await refresh()
-                        return null
-                      } catch (error) {
-                        return settingsErrorMessage(error)
-                      }
-                    }}
-                    title="Remove this sample?"
-                    triggerLabel="Remove"
-                  />
-                </div>
-              ) : null}
-            </details>
+              </DisclosureTrigger>
+              <DisclosureContent>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-foreground/80">{sample.text}</p>
+                {canWrite ? (
+                  <div className="mt-2">
+                    <ConfirmDialog
+                      confirmLabel="Remove sample"
+                      description="The assistant stops learning from it. The draft it came from, if any, is not changed."
+                      destructive
+                      onConfirm={async () => {
+                        try {
+                          await scope.request(
+                            `/api/v1/social-sets/${encodeURIComponent(set.id)}/writing-samples/${encodeURIComponent(sample.id)}`,
+                            deleteWritingSampleContract.output,
+                            { method: 'DELETE' }
+                          )
+                          await refresh()
+                          return null
+                        } catch (error) {
+                          return settingsErrorMessage(error)
+                        }
+                      }}
+                      title="Remove this sample?"
+                      triggerLabel="Remove"
+                    />
+                  </div>
+                ) : null}
+              </DisclosureContent>
+            </Disclosure>
           </li>
         ))}
       </ul>

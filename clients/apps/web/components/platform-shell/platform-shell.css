@@ -237,8 +237,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :where(
     [data-slot='input'],
     [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
+    [data-slot='select-trigger']
   ):not([type='radio'], [type='checkbox'], [type='range'], [type='color']) {
   border-color: var(--input);
   border-radius: var(--platform-control-radius);
@@ -256,8 +255,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :where(
     [data-slot='input'],
     [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
+    [data-slot='select-trigger']
   ):focus-visible {
   border-color: var(--ring);
   outline: none;
@@ -268,8 +266,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :where(
     [data-slot='input'],
     [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
+    [data-slot='select-trigger']
   )[aria-invalid='true'] {
   border-color: var(--destructive);
 }
@@ -278,8 +275,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :where(
     [data-slot='input'],
     [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
+    [data-slot='select-trigger']
   )[aria-invalid='true']:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--destructive) 18%, transparent);
 }
@@ -288,8 +284,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   :where(
     [data-slot='input'],
     [data-slot='textarea'],
-    [data-slot='select-trigger'],
-    [data-slot='native-select']
+    [data-slot='select-trigger']
   ):disabled {
   background-color: var(--muted);
   cursor: not-allowed;
@@ -302,7 +297,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
 
 /* Single-line fields are 32px high. */
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-  :where([data-slot='input'], [data-slot='select-trigger'], [data-slot='native-select']):not(
+  :where([data-slot='input'], [data-slot='select-trigger']):not(
     [type='radio'],
     [type='checkbox'],
     [type='range'],
@@ -449,8 +444,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     :where(
       [data-slot='input'],
       [data-slot='textarea'],
-      [data-slot='select-trigger'],
-      [data-slot='native-select']
+      [data-slot='select-trigger']
     ):focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
@@ -471,8 +465,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     :where(
       [data-slot='input'],
       [data-slot='textarea'],
-      [data-slot='select-trigger'],
-      [data-slot='native-select']
+      [data-slot='select-trigger']
     ):not(
       :disabled,
       :focus-visible,
@@ -527,8 +520,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     :where(
       [data-slot='button'],
       [data-slot='input'],
-      [data-slot='select-trigger'],
-      [data-slot='native-select']
+      [data-slot='select-trigger']
     ):not([type='radio'], [type='checkbox'], [type='range'], [type='color']) {
     min-height: 2.75rem;
   }
@@ -539,8 +531,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
     :where(
       [data-slot='input'],
       [data-slot='textarea'],
-      [data-slot='select-trigger'],
-      [data-slot='native-select']
+      [data-slot='select-trigger']
     ) {
     font-size: 1rem;
   }

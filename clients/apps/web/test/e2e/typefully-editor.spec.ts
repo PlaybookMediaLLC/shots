@@ -14,9 +14,9 @@ test(
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     await startWorkspace({ channels: ['x'] })
-    await app.open('/write')
+    await app.open('/publish')
     await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const editor = draftEditor(page)
     await expect(editor).toBeVisible()
     await editor.click()
@@ -89,6 +89,11 @@ test(
       navigator.clipboard.writeText('Automatic splitting keeps the rest of the draft. '.repeat(10))
     )
     await page.keyboard.press('ControlOrMeta+V')
+    // The split is previewed first; applying it adds the posts.
+    await page
+      .getByTestId('split-preview')
+      .getByRole('button', { name: /^Split into \d+ posts$/ })
+      .click()
     await expect.poll(() => page.getByTestId('post-header').count()).toBeGreaterThan(count)
     await expect(editor).toContainText('Automatic splitting keeps the rest of the draft.')
     await expectSaved(page)

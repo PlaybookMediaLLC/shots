@@ -3,8 +3,8 @@ import { getLocalizedPath } from '@/lib/auth/page-access'
 
 type SettingsPageProps = { params: Promise<{ locale: string }> }
 
-/** Drafts settings moved to Write (RFC 025); old links keep working. */
+/** Posting times live on each publishing brand; old links open the brands. */
 export default async function DraftsSettingsPage({ params }: SettingsPageProps) {
   const { locale } = await params
-  redirect(getLocalizedPath(locale, '/write/settings'))
+  redirect(getLocalizedPath(locale, '/settings/publishing-brands'))
 }

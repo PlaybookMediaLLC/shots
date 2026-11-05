@@ -134,6 +134,8 @@ export function useDraftDocument({
       setSaveState('saving')
       for (let attempt = 0; ; attempt += 1) {
         const next = latest.current
+        // An open "@", "#" or ":" lookup saves as the text typed so far, in the body and the plain text.
+        const body = normalizeMentions(next.value)
         dirty.current = false
         try {
           const saved = await draftsApi.save(draft.id, {
@@ -141,12 +143,12 @@ export function useDraftDocument({
             assetIds: serializeDraft(next.value, 'linkedin').assetIds,
             baseVersion: version.current,
             collabGeneration: collaborating ? generation.current : undefined,
-            body: normalizeMentions(next.value),
+            body,
             channelConnectionIds: next.channelConnectionIds,
             // Legacy per-channel text moved into platform versions: clear it once.
             ...(legacyText.current ? { channelText: {} } : {}),
             discussions: discussions.current,
-            plainText: draftPlainText(next.value),
+            plainText: draftPlainText(body),
             platformVersions: normalizeMentions(next.versions),
             primaryPlatform: next.primaryPlatform,
             target: next.target ?? undefined,

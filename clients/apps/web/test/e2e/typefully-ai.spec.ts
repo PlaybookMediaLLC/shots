@@ -18,7 +18,7 @@ test(
     })
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
-    await app.open(`/write/${id}?panel=assistant`)
+    await app.open(`/publish/${id}?panel=assistant`)
     const panel = page.getByTestId('assistant-panel')
     await panel.getByText('Writing prompts and examples', { exact: true }).click()
     await panel.getByRole('button', { name: 'Share a lesson', exact: true }).click()
@@ -88,7 +88,7 @@ test(
       items: { id: string }[]
     }
     const setId = sets.items[0].id
-    await app.open(`/workspace/social-sets/${setId}/writing-assistant`)
+    await app.open(`/settings/publishing-brands/${setId}/writing-assistant`)
     await page.getByLabel('Tone', { exact: true }).fill('Direct, warm and specific')
     await page.getByLabel('Phrases to avoid', { exact: true }).fill('game changer')
     await page.getByLabel('Preferred terms', { exact: true }).fill('workspace')
@@ -117,7 +117,7 @@ test(
     })
     expect(created.status).toBe(201)
     const id = (created.body as { id: string }).id
-    await app.open(`/write/${id}?panel=assistant`)
+    await app.open(`/publish/${id}?panel=assistant`)
     const panel = page.getByTestId('assistant-panel')
     await panel.getByLabel('Ask the assistant').fill('Suggest one concrete improvement.')
     await panel.getByRole('button', { name: 'Send', exact: true }).click()
@@ -155,7 +155,7 @@ test(
           .status,
         endpoint
       ).toBe(404)
-    await app.open('/workspace')
+    await app.open('/settings')
     await page.getByRole('checkbox', { name: 'Let AI draft campaigns', exact: true }).uncheck()
     await page.getByRole('button', { name: 'Save workspace', exact: true }).click()
     await expect(page.getByRole('status').filter({ hasText: 'All changes saved' })).toBeVisible()

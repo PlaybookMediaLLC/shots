@@ -55,6 +55,8 @@ type Outputs struct {
 	RenderedAssetIDs []string `json:"renderedAssetIds,omitempty"`
 	// CanvasID is the canvas create_canvas laid out from the release.
 	CanvasID string `json:"canvasId,omitempty"`
+	// CodeProjectID is the Code Studio project render_code_visual made from the change.
+	CodeProjectID string `json:"codeProjectId,omitempty"`
 }
 
 // Generation is model output persisted before it is applied, so a retried
@@ -174,6 +176,10 @@ type Action struct {
 	// release, in order; SurfaceID supplies the capture when the release has
 	// no screenshots.
 	RecipeIDs []string `json:"recipeIds,omitempty"`
+	// ReadSourceCode is the workflow owner's explicit consent for
+	// render_code_visual to read the merged pull request's diff (Code Studio
+	// source-code policy). No other action reads code.
+	ReadSourceCode bool `json:"readSourceCode,omitempty"`
 }
 
 type Node struct {

@@ -262,7 +262,7 @@ func requiredCapabilities(graph automation.Graph) []string {
 		switch {
 		case n.Type == "classify", n.Action != nil && n.Action.Type == "generate_copy":
 			capability = automation.CapabilityAI
-		case n.Action != nil && n.Action.Type == "render_creatives":
+		case n.Action != nil && (n.Action.Type == "render_creatives" || n.Action.Type == "render_code_visual"):
 			capability = automation.CapabilityRender
 		case n.Action != nil && n.Action.Type == "create_canvas":
 			capability = automation.CapabilityCanvas

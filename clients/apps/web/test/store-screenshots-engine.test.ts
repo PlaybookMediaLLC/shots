@@ -7,6 +7,7 @@ import {
   createStarterDocument,
   createTextLayer,
   hashRichText,
+  publicAsset,
 } from '../lib/store-screenshots/document/factory'
 import { migrateV1Project, readStoreDocument } from '../lib/store-screenshots/document/migrate'
 import { storeDocumentSchema, type StoreDocument } from '../lib/store-screenshots/document/schema'
@@ -344,6 +345,21 @@ test('stored documents are validated and future versions refused', () => {
   assert.equal(readStoreDocument(structuredClone(current)).document.slides.length, 8)
   assert.throws(() => readStoreDocument({ ...current, version: 99 }), /newer version/)
   assert.throws(() => readStoreDocument(null), /unreadable/)
+})
+
+test('bundled images served from R2 keep their saved project readable', () => {
+  // Production builds serve samples from `/r2-assets/static/<hash>/<file>`, so their ids pass 64 characters.
+  const document = createStarterDocument()
+  const asset = publicAsset(
+    '/r2-assets/static/f8e2652aa8f3c68d696e/store-screenshot-inspiration.png',
+    'Inspiration'
+  )
+  assert.ok(asset.id.length > 64)
+  document.assets[asset.id] = asset
+  const device = document.slides[0]!.layers.find((layer) => layer.type === 'device')
+  assert.ok(device?.type === 'device')
+  device.assetId = asset.id
+  assert.equal(readStoreDocument(structuredClone(document)).document.assets[asset.id]?.id, asset.id)
 })
 
 test('translations remember the source they were made from', () => {
