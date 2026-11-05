@@ -41,6 +41,14 @@ export function providerReady(
   )
 }
 
+/** The catalog was read and says this provider cannot connect; an unread one says nothing. */
+export function providerComingSoon(
+  data: ConnectionAvailability | undefined,
+  provider: string
+): boolean {
+  return !!data && !providerReady(data, provider, true)
+}
+
 /** Safe user-facing explanations; configuration names never reach the product flow. */
 export function providerUnavailableMessage(
   data: ConnectionAvailability | undefined,

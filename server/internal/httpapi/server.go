@@ -311,6 +311,7 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerReleaseAutomation(mux)
 		s.registerCapture(mux)
 		s.registerFrontendDeployments(mux)
+		s.registerMetaCallbacks(mux)
 		s.registerAnnouncements(mux)
 		s.registerAgentAccess(mux)
 		s.registerScreenshots(mux)

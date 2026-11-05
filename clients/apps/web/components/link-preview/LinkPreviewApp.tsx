@@ -10,9 +10,11 @@ import { LinkIcon as Link2 } from '@/components/platform-shell/icons'
 import { SpinnerGapIcon as Loader2 } from '@phosphor-icons/react/dist/ssr/SpinnerGap'
 import { RefreshIcon as RefreshCw } from '@/components/platform-shell/icons'
 import { CloseIcon as X } from '@/components/platform-shell/icons'
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { z } from 'zod'
+import { useDeveloperMode } from '@/components/settings/PreferencesProvider'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   type LinkPreview,
@@ -138,6 +140,15 @@ const TAB_LIST =
 const TAB_TRIGGER =
   'h-auto flex-none rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 py-3 text-xs uppercase tracking-wide data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none'
 
+const SHORTCUTS = [
+  ['/', 'Go to the URL field'],
+  ['Esc', 'Clear the URL field'],
+  ['R', 'Check again'],
+  ['1', 'All previews'],
+  ['2–9', 'One platform'],
+  ['[ ]', 'Previous or next platform'],
+]
+
 const LOCALHOST_STEPS = [
   { label: 'Install ngrok', command: 'bun add -g ngrok' },
   { label: 'Start your local server on port 3000' },
@@ -243,7 +254,10 @@ function writeRecent(urls: string[]) {
 function isTyping(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
-    (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName))
+    (target.isContentEditable ||
+      ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName) ||
+      // A focused menu takes letters as its own type-to-find.
+      target.closest('[role="listbox"],[role="combobox"]') !== null)
   )
 }
 
@@ -297,6 +311,36 @@ function CopyCommand({ command }: { command: string }) {
   )
 }
 
+function ShortcutsMenu() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          aria-label="Keyboard shortcuts"
+          className="hidden sm:inline-flex"
+          size="icon-sm"
+          type="button"
+          variant="ghost"
+        >
+          ?
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 text-xs">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+          {SHORTCUTS.map(([key, label]) => (
+            <Fragment key={key}>
+              <dt>
+                <kbd className="font-mono">{key}</kbd>
+              </dt>
+              <dd className="text-muted-foreground">{label}</dd>
+            </Fragment>
+          ))}
+        </dl>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function UrlList({ urls, onPick }: { urls: string[]; onPick: (url: string) => void }) {
   return (
     <ul className="flex flex-wrap gap-x-6 gap-y-2">
@@ -324,6 +368,7 @@ function UrlList({ urls, onPick }: { urls: string[]; onPick: (url: string) => vo
  * crawler checks, and every tag behind them. Or check a batch of links.
  */
 export function LinkPreviewApp() {
+  const developerMode = useDeveloperMode()
   const [mode, setMode] = useState<z.infer<typeof linkPreviewModeSchema>>(MODE.single)
   const [agent, setAgent] = useState<LinkPreviewAgent>(linkPreviewAgentSchema.enum.default)
   const [input, setInput] = useState('')
@@ -440,12 +485,12 @@ export function LinkPreviewApp() {
         if (event.target === inputRef.current) clear()
         return
       }
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'r' && url) {
+      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
+      if (event.key.toLowerCase() === 'r' && url) {
         event.preventDefault()
         check(url, agent)
         return
       }
-      if (isTyping(event.target) || event.metaKey || event.ctrlKey || event.altKey) return
       if (event.key === '/') {
         event.preventDefault()
         inputRef.current?.focus()
@@ -505,7 +550,7 @@ export function LinkPreviewApp() {
             </Button>
           ))}
         </div>
-        <Label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
           Fetch as
           <Select
             value={agent}
@@ -525,6 +570,7 @@ export function LinkPreviewApp() {
             </SelectContent>
           </Select>
         </Label>
+        <ShortcutsMenu />
       </div>
 
       <div hidden={mode !== MODE.batch}>
@@ -576,13 +622,6 @@ export function LinkPreviewApp() {
             Preview
           </Button>
         </form>
-        <p className="mt-3 hidden text-xs text-muted-foreground sm:block">
-          <kbd className="font-mono">/</kbd> focus · <kbd className="font-mono">Esc</kbd> clear
-          focused URL · <kbd className="font-mono">⌘/Ctrl R</kbd> check again ·{' '}
-          <kbd className="font-mono">1</kbd> all previews · <kbd className="font-mono">2</kbd>–
-          <kbd className="font-mono">9</kbd> one platform · <kbd className="font-mono">[ / ]</kbd>{' '}
-          previous / next platform
-        </p>
 
         {idle && (
           <div className="mt-10 space-y-8">
@@ -611,30 +650,32 @@ export function LinkPreviewApp() {
                 <UrlList urls={recent} onPick={pick} />
               </div>
             )}
-            <Accordion type="single" collapsible>
-              <AccordionItem value="details" className="group space-y-3">
-                <AccordionTrigger className="[&>svg:last-child]:hidden flex cursor-pointer list-none items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
-                  Testing localhost
-                  <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-                </AccordionTrigger>
-                <AccordionContent className="p-0">
-                  <p className="pt-3 text-sm text-muted-foreground">
-                    Previews are read from our servers, so they cannot reach your machine. Tunnel
-                    your local server with ngrok and preview the public URL.
-                  </p>
-                  <ol className="space-y-3">
-                    {LOCALHOST_STEPS.map((step, index) => (
-                      <li key={step.label} className="space-y-1.5">
-                        <p className="text-xs uppercase text-muted-foreground">
-                          {index + 1}. {step.label}
-                        </p>
-                        {step.command && <CopyCommand command={step.command} />}
-                      </li>
-                    ))}
-                  </ol>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+            {developerMode ? (
+              <Accordion type="single" collapsible>
+                <AccordionItem value="details" className="group space-y-3">
+                  <AccordionTrigger className="[&>svg:last-child]:hidden flex cursor-pointer list-none items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+                    Testing localhost
+                    <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                  </AccordionTrigger>
+                  <AccordionContent className="p-0">
+                    <p className="pt-3 text-sm text-muted-foreground">
+                      Previews are read from our servers, so they cannot reach your machine. Tunnel
+                      your local server with ngrok and preview the public URL.
+                    </p>
+                    <ol className="space-y-3">
+                      {LOCALHOST_STEPS.map((step, index) => (
+                        <li key={step.label} className="space-y-1.5">
+                          <p className="text-xs uppercase text-muted-foreground">
+                            {index + 1}. {step.label}
+                          </p>
+                          {step.command && <CopyCommand command={step.command} />}
+                        </li>
+                      ))}
+                    </ol>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            ) : null}
           </div>
         )}
 

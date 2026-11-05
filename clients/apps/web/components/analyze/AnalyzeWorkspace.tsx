@@ -1,9 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import { flushSync } from 'react-dom'
 import Link from 'next/link'
 import { domToPng } from 'modern-screenshot'
+import { DAY_STYLE, LocalTime, useWhen } from '@/components/drafts/local-time'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Combobox } from '@/components/ui/combobox'
@@ -44,24 +44,32 @@ import {
 import { call } from '@/lib/content-drafts/client'
 import { type SocialSetWire } from '@/lib/write/client'
 import {
+  brandValue,
   readAnalyticsReport,
   chartCSV,
   chartPoints,
+  fetchAnalyticsReport,
   formatValue,
   initialQuery,
+  initialSelection,
   METRICS,
+  noStats,
   postsCSV,
   PRESETS,
   presetRange,
   queryString,
   SORTS,
   STATES,
+  STATS_PENDING,
+  statsPending,
 } from '@/lib/analyze/report'
 import { downloadBlob } from '@/lib/export/export-design'
 import { isTimeZone } from '@/lib/write/zoned-time'
 import { ChartBoundary, MetricChart } from './MetricChart'
+import { BrandSummary } from './BrandSummary'
 import { Hourly } from './Hourly'
 import { ChartShare } from './ChartShare'
+import { InfoTip } from './InfoTip'
 
 type Row = AnalyticsReport['posts'][number]
 
@@ -80,15 +88,14 @@ export function AnalyzeWorkspace({
   const accounts = sets.flatMap((set) =>
     set.accounts.map((account) => ({ ...account, setName: set.name, timeZone: set.timeZone }))
   )
-  const [accountId, setAccountId] = React.useState(
-    accounts.find((a) => a.id === initial.account)?.id ?? accounts[0]?.id ?? ''
-  )
+  const [accountId, setAccountId] = React.useState(() => initialSelection(sets, initial))
   const selectedAccount = accounts.find((a) => a.id === accountId)
+  const brand = sets.find((set) => brandValue(set.id) === accountId)
+  const brandId = brand?.id
   const [query, setQuery] = React.useState<AnalyticsQuery>(() =>
-    initialQuery(initial, selectedAccount?.timeZone ?? 'UTC')
+    initialQuery(initial, selectedAccount?.timeZone ?? brand?.timeZone ?? 'UTC')
   )
   const [preset, setPreset] = React.useState(initial.from ? 'Custom' : '1 month')
-  const [definitionsOpen, setDefinitionsOpen] = React.useState(false)
   const [metric, setMetric] = React.useState(
     initial.metric && METRICS[initial.metric] ? initial.metric : ''
   )
@@ -104,33 +111,28 @@ export function AnalyzeWorkspace({
   const [sharing, setSharing] = React.useState(false)
   const [image, setImage] = React.useState<string | null>(null)
   const chart = React.useRef<HTMLDivElement>(null)
+  const when = useWhen()
+  // Report ranges are calendar days, not moments: read them in UTC so the day stays the one named.
+  const day = (key: string) => when(key, 'UTC', DAY_STYLE)
   const endpoint = publicToken
     ? `/api/analytics/public/${encodeURIComponent(publicToken)}`
     : `/api/v1/analytics/${encodeURIComponent(accountId)}`
   const key = `${endpoint}?${queryString(query)}`
   const report = loaded?.key === key ? loaded.report : null
+  const cards = Object.entries(METRICS).filter(
+    ([id]) => !report || !noStats(report) || id === 'publishedPosts'
+  )
   const update = (patch: Partial<AnalyticsQuery>) => {
     setQuery((q) => ({ ...q, ...patch, cursor: '', asOf: undefined }))
     setCursorStack([])
     setRow(null)
   }
   React.useEffect(() => {
-    if (!publicToken && !accountId) return
+    if ((!publicToken && !accountId) || brandId) return
     const controller = new AbortController()
     setError('')
     setLoaded((current) => (current?.key === key ? current : null))
-    fetch(key, { cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        const body = await response.json()
-        if (!response.ok)
-          throw new Error(
-            body.message ??
-              (response.status === 404
-                ? 'This analytics page is unavailable or sharing has been revoked.'
-                : 'Analytics could not load.')
-          )
-        return readAnalyticsReport(body)
-      })
+    fetchAnalyticsReport(key, controller.signal)
       .then((data) => {
         if (!controller.signal.aborted) setLoaded({ key, report: data })
       })
@@ -138,13 +140,14 @@ export function AnalyzeWorkspace({
         if (!controller.signal.aborted) setError(e.message)
       })
     return () => controller.abort()
-  }, [key, refresh, accountId, publicToken])
+  }, [key, refresh, accountId, brandId, publicToken])
   React.useEffect(() => {
     const params = new URLSearchParams(queryString({ ...query, cursor: '', asOf: undefined }))
-    if (!publicToken) params.set('account', accountId)
+    if (brandId) params.set('set', brandId)
+    else if (!publicToken) params.set('account', accountId)
     if (metric) params.set('metric', metric)
     window.history.replaceState(null, '', `${window.location.pathname}?${params}`)
-  }, [query, accountId, metric, publicToken])
+  }, [query, accountId, brandId, metric, publicToken])
   const action = async (fn: () => Promise<void>) => {
     setWorking(true)
     setFormError('')
@@ -156,15 +159,35 @@ export function AnalyzeWorkspace({
       setWorking(false)
     }
   }
-  const refreshProvider = () =>
+  const refreshOne = async (id: string) => {
+    const result = await call<{ refreshed: boolean }>(
+      `/api/v1/analytics/${encodeURIComponent(id)}/refresh`,
+      { method: 'POST' }
+    )
+    if (!result.refreshed) throw new Error('Stats were just updated. Try again in a minute.')
+  }
+  // Who may ask the networks asks them first; everyone gets the newest stored stats.
+  const refreshStats = () =>
     action(async () => {
-      const result = await call<{ refreshed: boolean }>(`${endpoint}/refresh`, { method: 'POST' })
-      if (!result.refreshed)
-        setFormError(
-          'A refresh is already running or was checked within the last minute. Reload stored data shortly.'
+      try {
+        if (!canManage || publicToken) return
+        const ids = brand ? brand.accounts.map((a) => a.id) : [accountId]
+        const failed = (await Promise.allSettled(ids.map(refreshOne))).find(
+          (result) => result.status === 'rejected'
         )
-      setRefresh((n) => n + 1)
+        if (failed) throw failed.reason
+      } finally {
+        setRefresh((n) => n + 1)
+      }
     })
+  const select = (value: string) => {
+    setAccountId(value)
+    update({})
+    setGoalOpen(false)
+    setSharing(false)
+    setImage(null)
+    setInspection(null)
+  }
   const saveSettings = async (input: {
     action: 'goal' | 'enable' | 'revoke'
     goal?: AnalyticsReport['settings']['goal']
@@ -258,18 +281,19 @@ export function AnalyzeWorkspace({
               <Combobox
                 aria-label="Analytics account"
                 className="w-72"
-                onValueChange={(value) => {
-                  setAccountId(value)
-                  update({})
-                  setGoalOpen(false)
-                  setSharing(false)
-                  setImage(null)
-                  setInspection(null)
-                }}
-                options={accounts.map((a) => ({
-                  label: `${a.setName} · ${a.platform} · ${a.handle ?? a.displayName ?? a.id}`,
-                  value: a.id,
-                }))}
+                onValueChange={select}
+                options={[
+                  ...sets
+                    .filter((set) => set.accounts.length > 1)
+                    .map((set) => ({
+                      label: `${set.name} · All accounts`,
+                      value: brandValue(set.id),
+                    })),
+                  ...accounts.map((a) => ({
+                    label: `${a.setName} · ${a.platform} · ${a.handle ?? a.displayName ?? a.id}`,
+                    value: a.id,
+                  })),
+                ]}
                 searchPlaceholder="Search accounts"
                 value={accountId}
               />
@@ -282,24 +306,17 @@ export function AnalyzeWorkspace({
               </a>
             </Button>
           ) : null}
-          {!publicToken ? (
-            <Button
-              variant="outline"
-              disabled={!canManage || working}
-              title={
-                !canManage
-                  ? 'Publishing permission is required to refresh provider data.'
-                  : undefined
-              }
-              onClick={() => void refreshProvider()}
-            >
-              Refresh from provider
-            </Button>
+          {report ? (
+            <span className="text-xs text-muted-foreground">
+              {report.checkedAt
+                ? `Updated ${when(report.checkedAt, query.timeZone)}`
+                : 'Not updated yet'}
+            </span>
           ) : null}
-          <Button variant="outline" onClick={() => setRefresh((n) => n + 1)}>
-            Reload
+          <Button variant="outline" disabled={working} onClick={() => void refreshStats()}>
+            Refresh
           </Button>
-          {canManage && !publicToken ? (
+          {canManage && !publicToken && !brand ? (
             <Button variant="outline" disabled={!report} onClick={() => setSharing(true)}>
               Public sharing
             </Button>
@@ -329,7 +346,7 @@ export function AnalyzeWorkspace({
             onChange={(timeZone) => update({ timeZone })}
             value={query.timeZone}
           />
-          <Label className="grid gap-1.5">
+          <Label className={brand ? 'hidden' : 'grid gap-1.5'}>
             Grouping
             <Select
               value={query.grouping}
@@ -347,7 +364,9 @@ export function AnalyzeWorkspace({
           </Label>
         </div>
         {formError ? <p role="alert">{formError}</p> : null}
-        {error ? (
+        {brand ? (
+          <BrandSummary accounts={brand.accounts} onOpen={select} query={query} refresh={refresh} />
+        ) : error ? (
           <div role="alert" className="rounded border p-6">
             {error} <Button onClick={() => setRefresh((n) => n + 1)}>Retry analytics</Button>
           </div>
@@ -363,26 +382,23 @@ export function AnalyzeWorkspace({
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {report.name} · {report.platform} · {query.from} through {query.to} ({query.timeZone})
-              · {STATES[report.status]}.{' '}
-              {report.checkedAt
-                ? `Checked ${new Date(report.checkedAt).toLocaleString()}.`
-                : 'No provider check yet.'}{' '}
+              {report.name} · {report.platform} · {day(query.from)} – {day(query.to)} (
+              {query.timeZone}) · {STATES[report.status]}.{' '}
               {report.coverageStart
-                ? `Observations begin ${new Date(report.coverageStart).toLocaleDateString()}.`
-                : 'No historical observations yet.'}
+                ? `Stats start ${when(report.coverageStart, query.timeZone, DAY_STYLE)}.`
+                : null}
             </p>
             {report.status === 'unsupported' || report.status === 'forbidden' ? (
               <aside role="status" className="rounded-lg border p-4">
                 <h2 className="font-semibold">
                   {report.status === 'unsupported'
-                    ? 'Provider analytics unavailable'
-                    : 'Provider permission required'}
+                    ? 'Stats aren’t available for this account'
+                    : 'Reconnect this account to see stats'}
                 </h2>
                 <p>
                   {report.status === 'unsupported'
-                    ? 'The installed adapter does not expose authorized analytics for this account. Known publications remain available below; provider counters are unavailable.'
-                    : 'Reconnect this account with analytics permission to resume collection. Existing observations retain their collection dates.'}
+                    ? 'This network doesn’t share stats with Shots. Your published posts are still listed below.'
+                    : 'Reconnect it and allow access to analytics. The stats collected so far are kept.'}
                 </p>
               </aside>
             ) : null}
@@ -440,7 +456,7 @@ export function AnalyzeWorkspace({
                         {growth && metric === 'followers' ? ' interval growth' : ''}
                       </h3>
                       <p className="text-sm">
-                        {report.platform} · {query.from} – {query.to} · {query.timeZone} ·{' '}
+                        {report.platform} · {day(query.from)} – {day(query.to)} · {query.timeZone} ·{' '}
                         {query.grouping}
                       </p>
                       <p className="my-3 text-3xl">
@@ -456,9 +472,7 @@ export function AnalyzeWorkspace({
                           growth={growth && metric === 'followers'}
                         />
                       </ChartBoundary>
-                      <p className="text-xs">
-                        Observed through {report.asOf}. {report.metrics[metric].definition}
-                      </p>
+                      <p className="text-xs">Stats through {when(report.asOf, query.timeZone)}.</p>
                     </div>
                     <Disclosure className="mt-4">
                       <DisclosureTrigger>About {METRICS[metric]}</DisclosureTrigger>
@@ -483,10 +497,10 @@ export function AnalyzeWorkspace({
               </section>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {Object.entries(METRICS).map(([id, name]) => {
+                {cards.map(([id, name]) => {
                   const m = report.metrics[id]
                   return (
-                    <section key={id} className="rounded-xl border p-4">
+                    <section key={id} className="relative rounded-xl border p-4">
                       <Button
                         className="h-auto w-full flex-col items-start gap-0 p-0 text-left font-normal whitespace-normal"
                         onClick={() => setMetric(id)}
@@ -504,29 +518,19 @@ export function AnalyzeWorkspace({
                         <p className="text-xs text-muted-foreground">
                           {STATES[m?.status ?? 'insufficient']}
                           {m?.change != null
-                            ? ` · ${formatValue(m.change)}% vs previous equal-length period`
-                            : ' · No comparable percentage'}
+                            ? ` · ${formatValue(m.change)}% vs the previous period`
+                            : ''}
                         </p>
                       </Button>
-                      <p className="mt-2 text-xs">
-                        {m?.samples ?? 0} observations · {m?.missing ?? 0} missing
-                      </p>
-                      <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
-                        <a
-                          href={`#definition-${id}`}
-                          onClick={(event) => {
-                            // Open the definitions first, then go to the one asked for.
-                            event.preventDefault()
-                            flushSync(() => setDefinitionsOpen(true))
-                            document.getElementById(`definition-${id}`)?.scrollIntoView()
-                          }}
-                        >
-                          Metric definition
-                        </a>
-                      </Button>
+                      <InfoTip className="absolute top-2 right-2" label={`About ${name}`}>
+                        <p>{m?.definition ?? 'No definition available.'}</p>
+                        <p className="mt-2 text-muted-foreground">
+                          {m?.samples ?? 0} observations · {m?.missing ?? 0} missing
+                        </p>
+                      </InfoTip>
                       {m?.status === 'failed' ? (
                         <Button
-                          className="ml-2 h-auto p-0 text-xs"
+                          className="mt-2 h-auto p-0 text-xs"
                           onClick={() => setRefresh((n) => n + 1)}
                           size={null}
                           variant="link"
@@ -537,9 +541,21 @@ export function AnalyzeWorkspace({
                     </section>
                   )
                 })}
-                {!publicToken ? (
-                  <section className="rounded-xl border p-4">
+                {statsPending(report) ? (
+                  <p
+                    role="status"
+                    className="flex items-center rounded-xl border border-dashed p-4 text-sm text-muted-foreground lg:col-span-2"
+                  >
+                    {STATS_PENDING}
+                  </p>
+                ) : null}
+                {!publicToken && (report.totalPosts > 0 || report.settings.goal) ? (
+                  <section className="relative rounded-xl border p-4">
                     <h2 className="font-medium">Posting Streak</h2>
+                    <InfoTip className="absolute top-2 right-2" label="About Posting Streak">
+                      Original posts that went live count. Replies and later posts in a thread
+                      don’t. Posting regularly doesn’t guarantee more followers.
+                    </InfoTip>
                     {report.settings.goal ? (
                       <>
                         <p className="my-3 text-3xl">
@@ -547,14 +563,12 @@ export function AnalyzeWorkspace({
                           {report.settings.goal.cadence === 'daily' ? 'days' : 'weeks'}
                         </p>
                         <p className="text-sm">
-                          {report.progress.current} qualifying posts this period · goal{' '}
+                          {report.progress.current} posts this period · goal{' '}
                           {report.progress.required}. {report.settings.goal.timeZone}
                         </p>
                       </>
                     ) : (
-                      <p className="my-3 text-sm">
-                        Set a publishing goal to track confirmed posts.
-                      </p>
+                      <p className="my-3 text-sm">Set a goal to track how often you post.</p>
                     )}
                     <Button
                       variant="outline"
@@ -563,10 +577,6 @@ export function AnalyzeWorkspace({
                     >
                       {report.settings.goal ? 'Edit goal' : 'Set posting goal'}
                     </Button>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      One confirmed root publication qualifies. Replies and thread continuations do
-                      not. Consistency does not guarantee audience growth.
-                    </p>
                   </section>
                 ) : null}
               </div>
@@ -636,10 +646,7 @@ export function AnalyzeWorkspace({
                 </Button>
               </div>
               {!report.posts.length ? (
-                <p>
-                  No confirmed posts in this scope. Choose another range or refresh the connected
-                  account. Chart exports remain available when their observations exist.
-                </p>
+                <p>No confirmed posts in this scope. Try another date range.</p>
               ) : (
                 <PostTable
                   rows={report.posts}
@@ -680,29 +687,21 @@ export function AnalyzeWorkspace({
                 </Button>
               </div>
             </section>
-            <Disclosure
-              className="text-sm"
-              onOpenChange={setDefinitionsOpen}
-              defaultOpen={definitionsOpen}
-            >
-              <DisclosureTrigger>Metric definitions and coverage</DisclosureTrigger>
-              <DisclosureContent>
-              {Object.entries(METRICS).map(([id, title]) => (
-                <div key={id} id={`definition-${id}`} className="my-3">
-                  <h3 className="font-semibold">{title}</h3>
-                  <p>{report.metrics[id]?.definition ?? 'No definition available.'}</p>
-                </div>
-              ))}
-              <p>
-                Engagements sum only returned likes, replies, reposts, profile clicks, and link
-                clicks. Components vary by provider. Engagement rate divides those engagements by
-                positive impressions; it is unavailable when impressions are absent or zero. Post
-                counters are latest observed lifetime values, may be revised by the provider, and
-                are never assumed to include other thread posts. Follower history starts with actual
-                observations. No missing interval is backfilled.
-              </p>
-              </DisclosureContent>
-            </Disclosure>
+            {noStats(report) ? null : (
+              <Disclosure className="text-sm">
+                <DisclosureTrigger>How these numbers work</DisclosureTrigger>
+                <DisclosureContent>
+                  <p>
+                    Engagements sum only returned likes, replies, reposts, profile clicks, and link
+                    clicks. Components vary by provider. Engagement rate divides those engagements
+                    by positive impressions; it is unavailable when impressions are absent or zero.
+                    Post counters are latest observed lifetime values, may be revised by the
+                    provider, and are never assumed to include other thread posts. Follower history
+                    starts with actual observations. No missing interval is backfilled.
+                  </p>
+                </DisclosureContent>
+              </Disclosure>
+            )}
           </>
         )}
         {row ? (
@@ -716,7 +715,7 @@ export function AnalyzeWorkspace({
               <DialogHeader>
                 <DialogTitle>Post statistics</DialogTitle>
                 <DialogDescription>
-                  {row.remoteId} · {new Date(row.publishedAt).toLocaleString()}
+                  {row.remoteId} · {when(row.publishedAt, query.timeZone)}
                 </DialogDescription>
               </DialogHeader>
               <p className="whitespace-pre-wrap">{row.excerpt}</p>
@@ -742,8 +741,10 @@ export function AnalyzeWorkspace({
                   ))}
               </dl>
               <p className="text-xs">
-                Observed {row.observedAt ?? 'not yet'}. Availability: {row.status}. Each counter
-                belongs to this exact provider post.
+                {row.observedAt
+                  ? `Stats from ${when(row.observedAt, query.timeZone)}.`
+                  : 'No stats yet.'}{' '}
+                These numbers are for this post only.
               </p>
             </DialogContent>
           </Dialog>
@@ -759,8 +760,7 @@ export function AnalyzeWorkspace({
               <DialogHeader>
                 <DialogTitle>{inspection.label}</DialogTitle>
                 <DialogDescription>
-                  Posts published in this hour during {query.from} through {query.to}; lifetime
-                  engagement observations.
+                  Posts published in this hour, {day(query.from)} – {day(query.to)}.
                 </DialogDescription>
               </DialogHeader>
               <PostTable
@@ -925,19 +925,13 @@ function PostTable({
                 {row.status !== 'available' ? (
                   <small className="block text-muted-foreground">
                     {row.status === 'deleted'
-                      ? 'Deleted at provider · last observed metrics retained'
+                      ? 'Deleted on the network · last stats kept'
                       : (STATES[row.status] ?? 'Metrics unavailable')}
                   </small>
                 ) : null}
               </TableCell>
               <TableCell className="whitespace-nowrap p-2">
-                <time dateTime={row.publishedAt} title={row.publishedAt}>
-                  {new Date(row.publishedAt).toLocaleString(undefined, {
-                    timeZone: zone,
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  })}
-                </time>
+                <LocalTime value={row.publishedAt} zone={zone} />
                 <small className="block text-muted-foreground">
                   {relativeTime(row.publishedAt)}
                 </small>
@@ -1016,8 +1010,8 @@ function GoalDialog({
         <DialogHeader>
           <DialogTitle>Posting goal</DialogTitle>
           <DialogDescription>
-            One confirmed root post per eligible day or week. Goals begin on the save date; earlier
-            history is excluded. Saving a changed goal starts a new streak.
+            One original post a day or a week. The goal starts the day you save it, so earlier posts
+            don’t count. Changing the goal starts a new streak.
           </DialogDescription>
         </DialogHeader>
         <Label className="grid gap-1.5">
@@ -1040,12 +1034,12 @@ function GoalDialog({
             checked={excludeWeekends}
             onCheckedChange={(checked) => setExclude(checked === true)}
           />
-          Exclude weekend publications
+          Exclude weekends
         </Label>
         <TimeZonePicker label="Goal timezone" onChange={setZone} value={zone} />
         <p className="text-xs">
-          Weeks begin Monday. A period in progress does not break the streak. Failed, scheduled, and
-          planned content never qualifies.
+          Weeks begin Monday. A day or week still in progress doesn’t break the streak. Only posts
+          that went live count.
         </p>
         {error ? <p role="alert">{error}</p> : null}
         <Button

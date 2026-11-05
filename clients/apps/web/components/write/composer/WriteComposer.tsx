@@ -14,6 +14,7 @@ import { SparkleIcon as Sparkles } from '@phosphor-icons/react/dist/ssr/Sparkle'
 import { ListPlusIcon as ListPlus } from '@phosphor-icons/react/dist/ssr/ListPlus'
 import { InfoIcon } from '@phosphor-icons/react/dist/ssr/Info'
 import { ScissorsIcon } from '@phosphor-icons/react/dist/ssr/Scissors'
+import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
 import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { toast } from 'sonner'
@@ -21,6 +22,16 @@ import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { connectHref } from '@/components/settings/social-sets/api'
 import { Pill } from '@/components/platform-ui'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -84,6 +95,7 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
+import { draftName } from '@/lib/write/library'
 import { buildPublication } from '@/lib/write/publication'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
@@ -91,6 +103,7 @@ import {
   bodyFor,
   bodyPosts,
   forkVersion,
+  otherPlatformNamed,
   versionFor,
   withOptions,
   withVersion,
@@ -118,6 +131,7 @@ import { PostSettingRequestContext, PostSettingsTools, type PostSettingRequest }
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
 import {
+  blockerFixLabel,
   PublishReview,
   type ScheduleBlocker,
   scheduleBlockers,
@@ -148,6 +162,7 @@ import {
 } from './social-mention'
 import { type SaveState, useDraftDocument } from './useDraftDocument'
 import { VersionOptionsBar } from './version-options'
+import { VideoOptions } from './video-options'
 
 // The editor kit is heavy; only the composer loads it, after the page renders.
 const DraftEditor = dynamic(() => import('@/components/drafts/DraftEditor'), {
@@ -156,6 +171,9 @@ const DraftEditor = dynamic(() => import('@/components/drafts/DraftEditor'), {
   ),
   ssr: false,
 })
+
+/** What the header's publishing buttons start. */
+type PublishAction = 'publish' | 'queue' | 'schedule'
 
 /** The panels beside the draft. */
 type Panel = 'properties' | 'preview' | 'comments' | 'assistant' | 'options'
@@ -302,6 +320,11 @@ export function WriteComposer({
       180
     )
   const title = typed && (typed.title.trim() || 'Untitled draft')
+  // Until a title is set, the draft is called by its first line, as the list does.
+  const [openedExcerpt] = React.useState(() =>
+    draftPlainText(Array.isArray(document.value) ? document.value.slice(0, 12) : document.value)
+  )
+  const firstLine = draftName({ excerpt: excerpt ?? openedExcerpt, title: '' })
   React.useEffect(() => {
     if (excerpt === null || title === null) return
     // A transition, so redrawing the list never holds up the next keystroke.
@@ -556,6 +579,12 @@ export function WriteComposer({
   }
   const setOptions = (channel: DraftChannel, options: VersionOptions) =>
     update((current) => ({ versions: withOptions(current.versions, channel, options) }))
+  // A destination that is live is done: scheduling again would post it twice.
+  const live = new Set(
+    posts.filter((post) => post.status === 'PUBLISHED').map((post) => post.channelConnectionId)
+  )
+  const pending = items.filter((item) => !live.has(item.account.id))
+  const locked = items.length > 0 && pending.length === 0
   const context: ScheduleContext = {
     approved,
     canPublish: canPublish && server.status !== 'archived',
@@ -567,7 +596,7 @@ export function WriteComposer({
         toast.error(error instanceof Error ? error.message : 'Could not save.')
       ),
     saveState,
-    items,
+    items: pending,
     onDone: ({ draft, newDraft }) => {
       setServer(draft)
       void refreshPosts()
@@ -667,6 +696,12 @@ export function WriteComposer({
       : undefined,
   }
   const togglePanel = (next: Panel) => setPanel((current) => (current === next ? null : next))
+  // Copy written for another of this draft's platforms is easy to miss on a synced tab.
+  const namedElsewhere = otherPlatformNamed(
+    activePublication.serialized.posts.map((post) => post.caption).join('\n'),
+    active,
+    channels
+  )
   // The platforms with a post over their limit: their tabs and counters say so.
   const over = items
     .filter((item) =>
@@ -674,17 +709,36 @@ export function WriteComposer({
     )
     .map((item) => item.account.channel)
   // Blockers show beside Schedule once there is something to post, not on an empty draft.
-  const blockers = items.some((item) => item.publication.serialized.posts.length > 0)
-    ? scheduleBlockers({
-        approved,
-        canPublish: canPublish && server.status !== 'archived',
-        conflict: conflict !== null,
-        draft: server,
-        items,
-        requireApproval,
-        saveState,
-      })
-    : []
+  const blockers =
+    !locked && items.some((item) => item.publication.serialized.posts.length > 0)
+      ? scheduleBlockers({
+          approved,
+          canPublish: canPublish && server.status !== 'archived',
+          conflict: conflict !== null,
+          draft: server,
+          items: pending,
+          requireApproval,
+          saveState,
+        })
+      : []
+  const [blockersOpen, setBlockersOpen] = React.useState(false)
+  const [blockedAction, setBlockedAction] = React.useState<PublishAction | null>(null)
+  const [postAgain, setPostAgain] = React.useState(false)
+  // Every way to schedule or publish comes through here: what is missing is fixed first.
+  const startPublishing = (action: PublishAction) => {
+    if (locked) return setPostAgain(true)
+    // An archived draft has no checklist in its header: the review says to restore it.
+    if (blockers.length === 0 || server.status === 'archived') return setDialog(action)
+    setBlockedAction(action)
+    setBlockersOpen(true)
+  }
+  // The checklist closes with its last item, so the next blocker cannot reopen it unasked.
+  const anyBlockers = blockers.length > 0
+  React.useEffect(() => {
+    if (anyBlockers) return
+    setBlockersOpen(false)
+    setBlockedAction(null)
+  }, [anyBlockers])
   React.useEffect(() => {
     openPreviewRef.current = () => setPanel('preview')
     return () => {
@@ -721,7 +775,7 @@ export function WriteComposer({
       label: 'Publish review',
       mod: true,
       shift: true,
-      run: () => canPublish && setDialog('publish'),
+      run: () => canPublish && startPublishing('publish'),
       inEditor: true,
     },
     {
@@ -729,7 +783,7 @@ export function WriteComposer({
       key: 'enter',
       label: 'Next free slot',
       mod: true,
-      run: () => canPublish && setDialog('queue'),
+      run: () => canPublish && startPublishing('queue'),
       inEditor: true,
     },
     {
@@ -828,7 +882,15 @@ export function WriteComposer({
     else if (blocker.fix === 'review') reviewControls.current?.querySelector('button')?.focus()
     else if (blocker.options) {
       setFocus(false)
-      setPanel('options')
+      // The required settings sit above the post; the first one missing takes focus,
+      // after the tab has changed and the popover has handed focus back.
+      setTimeout(() => {
+        const missing = focusRoot.current?.querySelector<HTMLElement>('[data-option-missing]')
+        // Anything else that is wrong is in the rest of the settings, beside the draft.
+        if (!missing) return setPanel('options')
+        missing.scrollIntoView({ block: 'center' })
+        missing.focus()
+      }, 50)
     } else if (blocker.channel) editor.current?.tf.focus()
   }
   // The palette lists this draft's actions with their shortcuts, as its menus do.
@@ -837,13 +899,13 @@ export function WriteComposer({
     draftCommandsRef.current = [
       ...(live
         ? [
-            { label: 'Schedule…', run: () => setDialog('schedule') },
+            { label: 'Schedule…', run: () => startPublishing('schedule') },
             {
               label: 'Add to the next free slot',
-              run: () => setDialog('queue'),
+              run: () => startPublishing('queue'),
               shortcut: `${mod}${alt}↵`,
             },
-            { label: 'Publish now…', run: () => setDialog('publish'), shortcut: `${mod}⇧↵` },
+            { label: 'Publish now…', run: () => startPublishing('publish'), shortcut: `${mod}⇧↵` },
           ]
         : []),
       { label: 'Post options', run: () => setPanel('options') },
@@ -1219,7 +1281,7 @@ export function WriteComposer({
               disabled={!canEdit}
               maxLength={200}
               onChange={(event) => update({ title: event.target.value })}
-              placeholder="Untitled draft"
+              placeholder={firstLine}
               value={document.title}
             />
             {/* The everyday labels share one cell sized to the widest, so the header never shifts. */}
@@ -1259,7 +1321,7 @@ export function WriteComposer({
                 <Pill tone={status.tone}>{status.label}</Pill>
               </span>
             ) : null}
-            {requireApproval || server.reviewStatus !== 'none' ? (
+            {requireApproval || canEdit || server.reviewStatus !== 'none' ? (
               <span className="contents" ref={reviewControls}>
                 <ReviewControls
                   canEdit={canEdit}
@@ -1273,9 +1335,9 @@ export function WriteComposer({
                 />
               </span>
             ) : null}
-            {/* One row of actions that wraps as a whole; narrow screens keep the rest in More. */}
+            {/* The actions wrap inside the column, so a panel beside it is never drawn over. */}
             <div
-              className="ml-auto flex shrink-0 items-center gap-1"
+              className="ml-auto flex max-w-full min-w-0 flex-wrap items-center justify-end gap-1"
               data-testid="composer-actions"
             >
               {focus ? null : (
@@ -1332,15 +1394,41 @@ export function WriteComposer({
               >
                 {panel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
               </Button>
-              {canPublish && server.status !== 'archived' ? (
+              {canPublish && server.status !== 'archived' && locked ? (
+                <Button
+                  data-testid="post-again-button"
+                  onClick={() => setPostAgain(true)}
+                  size="sm"
+                  variant="outline"
+                >
+                  Post again as new…
+                </Button>
+              ) : null}
+              {canPublish && server.status !== 'archived' && !locked ? (
                 <>
-                  {blockers.length > 0 ? <Blockers blockers={blockers} onJump={jumpTo} /> : null}
+                  {blockers.length > 0 ? (
+                    <Blockers
+                      action={blockedAction}
+                      blockers={blockers}
+                      onJump={jumpTo}
+                      onOpenChange={(open) => {
+                        setBlockersOpen(open)
+                        if (!open) setBlockedAction(null)
+                      }}
+                      onProceed={(action) => setDialog(action)}
+                      open={blockersOpen}
+                    />
+                  ) : null}
                   <Button
-                    className={cn('hidden', !focus && 'sm:inline-flex')}
+                    className={cn('hidden', !focus && 'sm:inline-flex', blockers.length > 0 && 'opacity-60')}
                     data-testid="publish-button"
-                    onClick={() => setDialog('publish')}
+                    onClick={() => startPublishing('publish')}
                     size="sm"
-                    title={`Review and publish now (${mod}⇧↵)`}
+                    title={
+                      blockers.length > 0
+                        ? 'Fix what is listed first'
+                        : `Review and publish now (${mod}⇧↵)`
+                    }
                     variant="outline"
                   >
                     Publish now…
@@ -1348,21 +1436,32 @@ export function WriteComposer({
                   {/* Schedule picks a time; its arrow takes the next free queue slot. */}
                   <span className="flex items-center" role="group" aria-label="Schedule">
                     <Button
-                      className="rounded-r-none"
+                      className={cn('rounded-r-none', blockers.length > 0 && 'opacity-60')}
                       data-testid="schedule-button"
-                      onClick={() => setDialog('schedule')}
+                      onClick={() => startPublishing('schedule')}
                       size="sm"
-                      title="Choose a time"
+                      title={blockers.length > 0 ? 'Fix what is listed first' : 'Choose a time'}
                     >
-                      {posts.some((post) => post.status === 'SCHEDULED') ? 'Reschedule' : 'Schedule'}
+                      {posts.some((post) => post.status === 'SCHEDULED')
+                        ? 'Reschedule'
+                        : live.size > 0
+                          ? 'Schedule the rest'
+                          : 'Schedule'}
                     </Button>
                     <Button
                       aria-label="Add to the next free slot"
-                      className="rounded-l-none border-l border-background/25 px-2"
+                      className={cn(
+                        'rounded-l-none border-l border-background/25 px-2',
+                        blockers.length > 0 && 'opacity-60'
+                      )}
                       data-testid="queue-button"
-                      onClick={() => setDialog('queue')}
+                      onClick={() => startPublishing('queue')}
                       size="sm"
-                      title={`Add to the next free slot (${mod}${alt}↵)`}
+                      title={
+                        blockers.length > 0
+                          ? 'Fix what is listed first'
+                          : `Add to the next free slot (${mod}${alt}↵)`
+                      }
                     >
                       <ListPlus aria-hidden className="size-4" />
                     </Button>
@@ -1381,16 +1480,16 @@ export function WriteComposer({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-60">
-                  {canPublish && server.status !== 'archived' ? (
+                  {canPublish && server.status !== 'archived' && !locked ? (
                     <>
-                      <DropdownMenuItem onSelect={() => setDialog('queue')}>
+                      <DropdownMenuItem onSelect={() => startPublishing('queue')}>
                         Add to queue
                         <DropdownMenuShortcut>
                           {mod}
                           {alt}↵
                         </DropdownMenuShortcut>
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="sm:hidden" onSelect={() => setDialog('publish')}>
+                      <DropdownMenuItem className="sm:hidden" onSelect={() => startPublishing('publish')}>
                         Publish now…
                       </DropdownMenuItem>
                     </>
@@ -1425,7 +1524,7 @@ export function WriteComposer({
                           className="md:hidden"
                           onSelect={() => openBrandSettings('scheduling', set.id)}
                         >
-                          Brand settings…
+                          Profile settings…
                         </DropdownMenuItem>
                       ) : null}
                     </>
@@ -1580,8 +1679,42 @@ export function WriteComposer({
               ) : null
             }
             primary={primary}
+            value={document.value as PlateBody}
             versions={document.versions}
           />
+          {/* What this platform must have is on the page, not behind the options chip. */}
+          {(active === 'tiktok' || active === 'youtube') && accounts.length > 0 ? (
+            <section
+              aria-label={`${CHANNEL_META[active].label} settings every post needs`}
+              className={cn(
+                'mx-4 mb-3 rounded-xl border',
+                items.some((item) => item.account.channel === active) &&
+                  activePublication.optionProblems.length > 0
+                  ? 'border-amber-400/50'
+                  : 'border-border'
+              )}
+              data-testid="required-options"
+            >
+              <VideoOptions
+                channel={active}
+                creator={accounts.find((item) => item.channel === active)?.tiktokCreator}
+                disabled={!canEdit}
+                onChange={(options) => setOptions(active, options)}
+                options={versionOfTab.options ?? {}}
+                part="required"
+              />
+            </section>
+          ) : null}
+          {namedElsewhere ? (
+            <p
+              className="mx-4 mb-3 rounded-lg border border-amber-400/30 bg-amber-400/[0.05] px-3 py-2 text-xs text-amber-700 dark:text-amber-200"
+              data-testid="names-other-platform"
+              role="status"
+            >
+              This {CHANNEL_META[active].label} post mentions {namedElsewhere}. Check that is what
+              you mean to say here.
+            </p>
+          ) : null}
           <TargetBanner draft={server} />
           {canEdit && server.kind === 'article' ? (
             <ArticleTools
@@ -1801,6 +1934,28 @@ export function WriteComposer({
             <DraftPosts
               canSchedule={canPublish}
               edited={edited}
+              fixFor={(platform) => {
+                const channel = channelForPlatform(platform)
+                const found = blockers.filter((blocker) => blocker.channel === channel)
+                if (!channel || found.length === 0) return null
+                return {
+                  // A retry resends what was scheduled, so only the account can stop it working.
+                  blocksRetry: found.some((blocker) => blocker.fix === 'account'),
+                  label: blockerFixLabel(found[0]),
+                  open: () => jumpTo(found[0]),
+                  problems: found.map((blocker) =>
+                    blocker.text.replace(`${CHANNEL_META[channel].label}: `, '')
+                  ),
+                }
+              }}
+              notAttempted={items
+                .filter((item) => !posts.some((post) => post.channelConnectionId === item.account.id))
+                .map(({ account: destination }) => ({
+                  channel: destination.channel,
+                  id: destination.id,
+                  label: CHANNEL_META[destination.channel].label,
+                }))}
+              zone={set?.timeZone}
               onReschedule={canPublish && edited.size > 0 ? () => setDialog('schedule') : undefined}
               onCancel={async (postId) => {
                 try {
@@ -1905,6 +2060,36 @@ export function WriteComposer({
             onSaved={(alt) => onDescriptionSaved(description.assetId, alt)}
           />
         ) : null}
+        <AlertDialog onOpenChange={setPostAgain} open={postAgain}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Post this again as a new draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This post is already live, so it stays as it is. The copy starts with no schedule:
+                nothing goes out until you schedule it. Platforms can treat the same text posted
+                twice as spam, so change it if you can.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep this one</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() =>
+                  void (async () => {
+                    await flush()
+                    const copy = await writeApi.duplicate(initial.id)
+                    router.push(`/publish/${copy.draft.id}`)
+                  })().catch((error: unknown) =>
+                    toast.error(
+                      error instanceof Error ? error.message : 'The copy could not be made.'
+                    )
+                  )
+                }
+              >
+                Make a new draft
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         {dialog === 'schedule' || dialog === 'queue' ? (
           <ScheduleDialog
             context={context}
@@ -2178,17 +2363,28 @@ function PostCount({
   )
 }
 
-/** What blocks scheduling, beside Schedule; each item opens where it is fixed. */
+/**
+ * The checklist of what blocks publishing, beside Schedule: the publishing
+ * buttons open it instead of their dialogs, and each item goes where it is fixed.
+ */
 function Blockers({
+  action,
   blockers,
   onJump,
+  onOpenChange,
+  onProceed,
+  open,
 }: {
+  /** The publishing button that opened this, if one did. */
+  action: PublishAction | null
   blockers: ScheduleBlocker[]
   onJump: (blocker: ScheduleBlocker) => void
+  onOpenChange: (open: boolean) => void
+  onProceed: (action: PublishAction) => void
+  open: boolean
 }) {
-  const [open, setOpen] = React.useState(false)
   return (
-    <Popover onOpenChange={setOpen} open={open}>
+    <Popover onOpenChange={onOpenChange} open={open}>
       <PopoverTrigger asChild>
         <Button
           className="text-amber-700 dark:text-amber-300"
@@ -2200,25 +2396,55 @@ function Blockers({
           {blockers.length} to fix
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-2" data-testid="blockers">
-        <p className="px-2 py-1 text-xs text-muted-foreground">Fix these before you schedule:</p>
+      <PopoverContent
+        align="end"
+        className="w-80 p-2"
+        data-testid="blockers"
+        // A menu or the palette hands focus back as it closes; only a click dismisses this.
+        onFocusOutside={(event) => event.preventDefault()}
+      >
+        <p className="px-2 py-1 text-xs text-muted-foreground">
+          Fix {blockers.length === 1 ? 'this' : 'these'} before you{' '}
+          {action === 'publish' ? 'publish' : 'schedule'}:
+        </p>
         <ul className="grid gap-0.5">
           {blockers.map((blocker) => (
             <li key={blocker.text}>
               <Button
-                className="h-auto w-full justify-start px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
+                className="h-auto w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
                 onClick={() => {
-                  setOpen(false)
+                  onOpenChange(false)
                   onJump(blocker)
                 }}
                 size={null}
                 variant="ghost"
               >
-                {blocker.text}
+                <span className="min-w-0">
+                  {blocker.text}
+                  {blockerFixLabel(blocker) ? (
+                    <span className="mt-0.5 block font-medium text-foreground">
+                      {blockerFixLabel(blocker)}
+                    </span>
+                  ) : null}
+                </span>
+                <CaretRightIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
               </Button>
             </li>
           ))}
         </ul>
+        {action ? (
+          <Button
+            className="mt-1 w-full justify-start px-2 text-xs font-normal text-muted-foreground"
+            onClick={() => {
+              onOpenChange(false)
+              onProceed(action)
+            }}
+            size="sm"
+            variant="ghost"
+          >
+            {action === 'schedule' ? 'Save as planned instead…' : 'See the review anyway'}
+          </Button>
+        ) : null}
       </PopoverContent>
     </Popover>
   )

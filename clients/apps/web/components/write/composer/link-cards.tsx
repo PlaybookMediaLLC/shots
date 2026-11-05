@@ -2,8 +2,12 @@
 
 import * as React from 'react'
 import { linkedInPostIdentity } from '@/lib/write/linkedin-target'
+import { LinkPreviewRequestError, requestPreview } from '@/components/link-preview/client'
 import { Button } from '@/components/ui/button'
+import { linkPreviewAgentSchema } from '@/lib/api/contracts/link-preview'
 import { draftsApi } from '@/lib/content-drafts/client'
+import { auditLinkPreview, issueSeveritySchema } from '@/lib/link-preview/audit'
+import { MAX_GATED_LINKS } from '@/lib/link-preview/gate'
 import { linkPreviewSchema, type DraftChannel, type LinkPreview } from '@/lib/write/document'
 
 /** HTTPS links in the visible platform version, in document order. */
@@ -43,6 +47,29 @@ export function LinkPreviewCard({ card }: { card: LinkPreview }) {
   )
 }
 
+/** The automatic check's answer under a link: its errors, or why the page could not be read. */
+function LinkCheckResult({ problem, url }: { problem: string; url: string }) {
+  return (
+    <p
+      role="status"
+      className={
+        problem ? 'text-xs text-amber-700 dark:text-amber-300' : 'text-xs text-muted-foreground'
+      }
+    >
+      Link check: {problem || 'no problems found.'}{' '}
+      <Button asChild className="h-auto p-0 text-xs" size={null} variant="link">
+        <a
+          href={`/publish/link-checks?${new URLSearchParams({ url })}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Details
+        </a>
+      </Button>
+    </p>
+  )
+}
+
 /** Fetch Open Graph data once per link and persist deliberate removal choices. */
 export function LinkCards({
   text,
@@ -63,6 +90,8 @@ export function LinkCards({
   const [retry, setRetry] = React.useState(0)
   const current = React.useEffectEvent(() => cards)
   const save = React.useEffectEvent(onChange)
+  const [checks, setChecks] = React.useState<Record<string, string>>({})
+  const checked = React.useEffectEvent((url: string) => url in checks)
   React.useEffect(() => {
     let cancelled = false
     const timer = window.setTimeout(() => {
@@ -95,6 +124,36 @@ export function LinkCards({
       cancelled = true
     }
   }, [key, retry])
+  // A check reads the whole page, so it waits for a longer pause than the card does.
+  React.useEffect(() => {
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      for (const url of key.split('\n').filter(Boolean).slice(0, MAX_GATED_LINKS)) {
+        if (checked(url)) continue
+        void requestPreview(url, linkPreviewAgentSchema.enum.default, controller.signal)
+          .then((preview) =>
+            auditLinkPreview(preview)
+              .filter((issue) => issue.severity === issueSeveritySchema.enum.error)
+              .map((issue) => issue.title)
+              .join('; ')
+          )
+          // A page that can't be read is the answer. A check that could not run (a busy
+          // limiter, a timeout) says nothing about the link, so it leaves no result and
+          // the next pause tries again.
+          .catch((error: unknown) =>
+            error instanceof LinkPreviewRequestError && error.status === 422 ? error.message : null
+          )
+          .then((problem) => {
+            if (problem !== null && !controller.signal.aborted)
+              setChecks((previous) => ({ ...previous, [url]: problem }))
+          })
+      }
+    }, 1500)
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [key])
   if (!links.length) return null
   return (
     <section aria-label="Link previews" className="mx-4 my-2 max-w-xl space-y-2">
@@ -117,6 +176,7 @@ export function LinkCards({
                 {errors[url] || 'Loading link preview…'}
               </p>
             )}
+            {checks[url] !== undefined ? <LinkCheckResult problem={checks[url]} url={url} /> : null}
             <div className="flex flex-wrap gap-2">
               {card ? (
                 <Button

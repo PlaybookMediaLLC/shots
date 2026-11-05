@@ -84,10 +84,10 @@ export default async function HomePage({
         ]
       : []),
     {
-      title: 'Build a workflow',
-      description: 'Automate repeatable tasks.',
+      title: 'Turn releases into campaigns',
+      description: 'Draft a campaign each time you ship.',
       // Automate opens without a paid plan and says there that its runs need Pro.
-      href: '/workflows',
+      href: paid ? '/workflows/new' : '/workflows',
       icon: Workflow,
       pro: !paid,
       allowed: can('workspace:update'),
@@ -114,7 +114,7 @@ export default async function HomePage({
         actions={
           paid ? (
             <ButtonLink href="/create?view=templates" variant="outline" className="gap-2">
-              <Shapes size={16} aria-hidden="true" /> Explore templates{' '}
+              <Shapes size={16} aria-hidden="true" /> Explore design templates{' '}
               <ArrowRight size={15} aria-hidden="true" />
             </ButtonLink>
           ) : (

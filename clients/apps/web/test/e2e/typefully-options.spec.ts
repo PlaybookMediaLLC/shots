@@ -1,7 +1,7 @@
 import { draftEditor, expect, expectSaved, openNewDraft, settleSelection, test } from './framework'
 
 test(
-  'scheduling opens a fresh draft in the same publishing brand and keeps the commitment in Queue',
+  'scheduling opens a fresh draft in the same profile and keeps the commitment in Queue',
   { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
@@ -44,6 +44,9 @@ test(
         },
       })
     )
+    await page.route('**/api/v1/link-preview?*', (route) =>
+      route.fulfill({ status: 422, json: { message: 'Fixture page could not be read.' } })
+    )
     const original = await openNewDraft(page)
     await draftEditor(page).click()
     await settleSelection(page)
@@ -52,6 +55,9 @@ test(
     await page.keyboard.type('My commentary https://bsky.app/profile/example.com/post/3kabc123')
     await expect(page.getByRole('region', { name: 'Link previews' })).toContainText(
       'A native source post'
+    )
+    await expect(page.getByRole('region', { name: 'Link previews' })).toContainText(
+      'Link check: Fixture page could not be read.'
     )
     await page.getByRole('button', { name: 'Remove preview', exact: true }).click()
     await expectSaved(page)

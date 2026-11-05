@@ -44,7 +44,7 @@ export const WORKFLOW_ACTIONS = {
   create_release: {
     type: 'create_release',
     label: 'Create release',
-    description: 'Records a source-linked release from the verified GitHub event.',
+    description: 'Records a release linked to the verified GitHub event.',
     input: null,
     output: 'releaseId',
     minSchemaVersion: 1,
@@ -79,7 +79,7 @@ export const WORKFLOW_ACTIONS = {
     output: 'campaignId',
     minSchemaVersion: 2,
     permission: ADMIN,
-    integrations: ['AI model provider on the worker', 'AI credits'],
+    integrations: ['An AI model on the worker', 'AI credits'],
     entitlement: 'campaign:workflow',
     retry:
       'Up to 3 attempts, 5 minutes each. The model is called and credits are charged at most once per run.',
@@ -183,7 +183,7 @@ export const WORKFLOW_CLASSIFY = {
   label: 'AI: worth marketing?',
   description:
     'Asks the AI whether this change is worth announcing under your criteria. The true branch needs a "worth marketing" verdict at or above your confidence threshold. Event text is evidence, never instructions.',
-  integrations: ['AI model provider on the worker', 'AI credits'],
+  integrations: ['An AI model on the worker', 'AI credits'],
   entitlement: 'release:create',
   retry:
     'Up to 3 attempts, 5 minutes each. The verdict is recorded once; retries and replays reuse it and never charge twice.',
@@ -205,6 +205,11 @@ export function graphSchemaVersion(graph: Pick<AutomationGraph, 'nodes'>): numbe
       node.action ? WORKFLOW_ACTIONS[node.action.type].minSchemaVersion : 0
     )
   )
+}
+
+/** The repositories Shots is watching now, the only ones a workflow can run for. */
+export function connectedSources(overview: Pick<AutomationOverview, 'sources'>) {
+  return overview.sources.filter((source) => source.connectionState === 'connected')
 }
 
 /** The backend's verdict for an action or AI check, unavailable when unreported. */

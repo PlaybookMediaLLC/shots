@@ -11669,6 +11669,7 @@
               "enum": [
                 "drafts",
                 "posted",
+                "failed",
                 "archived"
               ]
             }
@@ -17231,6 +17232,20 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "attentionAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastPublishedAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "engagement": {
                   "default": {
                     "autoPlug": {
@@ -17894,6 +17909,8 @@
                 "shareToken",
                 "guestComments",
                 "publishedPosts",
+                "attentionAt",
+                "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
                 "plannedFor",
@@ -22179,6 +22196,20 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "attentionAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastPublishedAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "engagement": {
                   "default": {
                     "autoPlug": {
@@ -22842,6 +22873,8 @@
                 "shareToken",
                 "guestComments",
                 "publishedPosts",
+                "attentionAt",
+                "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
                 "plannedFor",
@@ -23037,6 +23070,20 @@
                   "minimum": -9007199254740991,
                   "maximum": 9007199254740991
                 },
+                "attentionAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lastPublishedAt": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "engagement": {
                   "default": {
                     "autoPlug": {
@@ -23700,6 +23747,8 @@
                 "shareToken",
                 "guestComments",
                 "publishedPosts",
+                "attentionAt",
+                "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
                 "plannedFor",
@@ -24478,6 +24527,20 @@
             "minimum": -9007199254740991,
             "maximum": 9007199254740991
           },
+          "attentionAt": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lastPublishedAt": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "engagement": {
             "default": {
               "autoPlug": {
@@ -25141,6 +25204,8 @@
           "shareToken",
           "guestComments",
           "publishedPosts",
+          "attentionAt",
+          "lastPublishedAt",
           "engagement",
           "naturalPostingTime",
           "plannedFor",
@@ -26223,6 +26288,20 @@
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991
               },
+              "attentionAt": {
+                "default": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "lastPublishedAt": {
+                "default": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "engagement": {
                 "default": {
                   "autoPlug": {
@@ -26886,6 +26965,8 @@
               "shareToken",
               "guestComments",
               "publishedPosts",
+              "attentionAt",
+              "lastPublishedAt",
               "engagement",
               "naturalPostingTime",
               "plannedFor",

@@ -1,9 +1,11 @@
 'use client'
 
-import { ButtonLink } from '@/components/platform-shell/ButtonLink'
-
+import Link from 'next/link'
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,57 +16,91 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { GitHubConnections } from '@/components/workspace/GitHubConnections'
+import { GitHubConnections, useGitHubConnections } from '@/components/workspace/GitHubConnections'
+import { getErrorMessage } from '@/components/workspace/settings-client'
 import type { AutomationOverview } from '@/lib/api/contracts/release-automation'
-import { useTRPCClient } from '@/lib/trpc/react'
+import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 
 type Source = AutomationOverview['sources'][number]
 
 const CONNECTION_LABELS: Record<string, string> = {
   connected: 'Connected',
-  disconnected: 'Installation unlinked from this workspace',
+  disconnected: 'GitHub account disconnected from this workspace',
   deleted: 'GitHub App uninstalled',
-  suspended: 'Installation suspended in GitHub',
+  suspended: 'GitHub App suspended in GitHub',
   repository_access_removed: 'Repository access removed or no longer watched',
 }
 
 /**
- * Event sources: GitHub connections, watched repositories, their branch, and
- * the sticky automation mode. Every change is an owner/admin session action.
+ * The repositories workflows run for: the GitHub connection, what is watched,
+ * its branch and who handles its changes. Every change is an owner/admin
+ * session action.
  */
-export function WorkflowSources({
-  canManage,
-  overview,
-  perform,
-  busy,
-}: {
-  canManage: boolean
-  overview: AutomationOverview
-  perform: (action: () => Promise<unknown>) => void
-  busy: boolean
-}) {
+export function WorkflowSources({ canManage }: { canManage: boolean }) {
+  const trpc = useTRPC()
+  const overview = useQuery(
+    trpc.releaseAutomation.overview.queryOptions(undefined, { staleTime: 60_000 })
+  )
+  const github = useGitHubConnections(canManage)
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const failure = actionError ?? (overview.error ? getErrorMessage(overview.error) : null)
+  const perform = (action: () => Promise<unknown>) => {
+    setBusy(true)
+    setActionError(null)
+    void action()
+      .then(() => overview.refetch())
+      .catch((error) => setActionError(getErrorMessage(error)))
+      .finally(() => setBusy(false))
+  }
+  const hasConnection = github.data?.connections.some(({ status }) => status === 'ACTIVE')
   return (
-    <div className="flex flex-col gap-8" id="sources">
-      {canManage ? (
-        <GitHubConnections />
-      ) : (
-        <p className="text-sm text-muted-foreground">
-          An owner or administrator connects GitHub and chooses repositories.
-        </p>
-      )}
+    <div className="flex flex-col gap-8">
+      {failure ? (
+        <Alert variant="destructive">
+          <AlertDescription>{failure}</AlertDescription>
+        </Alert>
+      ) : null}
+      <div data-tour-id="automate-repositories">
+        {canManage ? (
+          <GitHubConnections />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            An owner or administrator connects GitHub and chooses repositories.
+          </p>
+        )}
+      </div>
       <Section
-        description="Once a workflow is active, workflows handle this repository's merged changes. Pausing them does not send changes back to manual release intake."
+        description="Shots listens to these repositories. Nothing runs until you activate a workflow."
         title="Watched repositories"
       >
         <Group>
-          {overview.sources.length === 0 ? (
+          {!overview.data ? (
+            <Row>
+              <p className="text-sm text-muted-foreground" role="status">
+                Loading repositories…
+              </p>
+            </Row>
+          ) : overview.data.sources.length === 0 ? (
             <Row>
               <p className="text-sm text-muted-foreground">
-                Connect GitHub and watch a repository to start.
+                {!canManage
+                  ? 'No repositories are watched yet.'
+                  : hasConnection
+                    ? 'None yet. Choose a repository above and select Watch.'
+                    : 'None yet. Connect GitHub above, then choose a repository.'}
+                <Link
+                  className="ms-1 underline"
+                  href="/docs/automate"
+                  rel="noopener"
+                  target="_blank"
+                >
+                  Read the guide
+                </Link>
               </p>
             </Row>
           ) : (
-            overview.sources.map((source) => (
+            overview.data.sources.map((source) => (
               <SourceRow
                 busy={busy}
                 canManage={canManage}
@@ -98,9 +134,11 @@ function SourceRow({
     perform(() => client.releaseAutomation.sourceMode.mutate({ id: source.id, enabled, ...extra }))
   return (
     <Row
-      description={`${source.account || 'GitHub'} · ${source.mode} mode · ${
-        source.branch ? `PRs into ${source.branch}` : 'PRs into the default branch'
-      }`}
+      description={`${source.account || 'GitHub'} · ${
+        source.mode === 'automation'
+          ? 'Workflows handle its changes'
+          : 'Changes go to the Release inbox'
+      } · ${source.branch ? `PRs into ${source.branch}` : 'PRs into the default branch'}`}
       label={
         <span className="flex flex-wrap items-center gap-2">
           {source.name}
@@ -116,8 +154,8 @@ function SourceRow({
       </ButtonLink>
       {!connected ? (
         <p className="text-sm text-amber-700 dark:text-amber-300">
-          Restore access in GitHub, reconnect the installation above, and watch this repository
-          again. Runs cancelled by the outage stay cancelled; history is kept.
+          Restore access in GitHub, reconnect GitHub above, and watch this repository again. Runs
+          cancelled by the outage stay cancelled; history is kept.
         </p>
       ) : null}
       {canManage && connected ? (
@@ -149,7 +187,7 @@ function SourceRow({
             </Button>
           </form>
           <Label className="grid gap-1 text-xs text-muted-foreground">
-            Unmatched merged PRs
+            Merged PRs no workflow picks up
             <Select
               disabled={busy}
               value={source.collectUnmatched ? 'collect' : 'skip'}
@@ -164,8 +202,8 @@ function SourceRow({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="collect">Hold as source changes</SelectItem>
-                <SelectItem value="skip">Skip without collecting</SelectItem>
+                <SelectItem value="collect">Keep for the next release</SelectItem>
+                <SelectItem value="skip">Skip them</SelectItem>
               </SelectContent>
             </Select>
           </Label>
@@ -177,7 +215,7 @@ function SourceRow({
             variant="outline"
           >
             {source.mode === 'automation'
-              ? 'Return to manual release intake'
+              ? 'Send changes to the Release inbox'
               : 'Let workflows handle releases'}
           </Button>
           <Button

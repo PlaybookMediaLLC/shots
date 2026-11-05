@@ -473,6 +473,15 @@ func (c *Configuration) GetAnalytics(ctx context.Context, actor Actor, id string
 	if err != nil {
 		return nil, err
 	}
+	// Analyze counts what Posted shows: a post Shots published is in the report
+	// at once, not after the next provider read, which some platforms never get.
+	// A later page of a report keeps reading the snapshot its first page saw, and
+	// a public share link only reads what is stored.
+	if q.AsOf == nil {
+		if err := c.importCanonicalAnalyticsPosts(ctx, connection); err != nil {
+			return nil, err
+		}
+	}
 	return c.analyticsReport(ctx, connection, q)
 }
 func (c *Configuration) analyticsReport(ctx context.Context, connection *ent.ChannelConnection, q AnalyticsQuery) (*AnalyticsReport, error) {

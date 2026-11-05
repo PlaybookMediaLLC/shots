@@ -506,6 +506,21 @@ func TestPlanAnalyzeDatabase(t *testing.T) {
 			t.Fatalf("late receipt was never reconciled: %d %v", count, e)
 		}
 	})
+	t.Run("Analyze counts a post confirmed live without waiting for a provider read", func(t *testing.T) {
+		d := draft("confirmed by a person")
+		live := time.Date(2026, 5, 5, 16, 0, 0, 0, time.UTC)
+		id := cuid.New()
+		if _, e := repo.client.ScheduledPost.Create().SetID(id).SetOrganizationID(w.org).SetContentDraftID(d.ID).SetChannelConnectionID(x.ID).SetStatus(scheduledpost.StatusPUBLISHED).SetScheduledFor(live).SetCaption("confirmed").SetIdempotencyKey(id).SetRemotePostID(id).SetPublishedAt(live).Save(ctx); e != nil {
+			t.Fatal(e)
+		}
+		r, e := repo.GetAnalytics(ctx, owner, x.ID, AnalyticsQuery{From: "2026-05-01", To: "2026-05-31", TimeZone: "America/New_York", Grouping: "daily", Sort: "impressions", Limit: 10})
+		if e != nil {
+			t.Fatal(e)
+		}
+		if got := r.Metrics["publishedPosts"].Value; got == nil || *got != 1 {
+			t.Fatalf("published posts = %v, want 1", got)
+		}
+	})
 	t.Run("P33 P37 confirmed receipt completes a scheduled plan once and becomes analytics history", func(t *testing.T) {
 		d := plan(draft("confirmed fixture publication"), at)
 		scheduled, e := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{Version: d.Version, PublishNow: true, Targets: []ContentDraftScheduleTarget{{ChannelConnectionID: x.ID, Caption: d.PlainText}}})

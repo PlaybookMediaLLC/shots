@@ -137,6 +137,16 @@ func TestGitHubConnectionsChangesAndReleases(t *testing.T) {
 	if _, err := repo.CompleteGitHubInstall(ctx, ownerA, stateA, "owner-code", installation); !errors.Is(err, publishing.ErrForbidden) {
 		t.Fatalf("a used state linked again: %v", err)
 	}
+	// Nothing left to link: the web sends the person to GitHub's install page with
+	// this same grant, so finding nothing must not use it up.
+	stateAgain, _ := repo.StartGitHubInstall(ctx, ownerA)
+	if _, err := repo.CompleteGitHubInstall(ctx, ownerA, stateAgain, "owner-code", 0); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("an account with nothing left to link: %v", err)
+	}
+	if _, err := repo.CompleteGitHubInstall(ctx, ownerA, stateAgain, "owner-code", installation); err != nil {
+		t.Fatalf("the grant did not survive the trip to the install page: %v", err)
+	}
+
 	// A second workspace links an installation the user already has: GitHub's
 	// install page has nothing to install, so it finishes from the code alone.
 	stateB, _ := repo.StartGitHubInstall(ctx, ownerB)
@@ -176,7 +186,7 @@ func TestGitHubConnectionsChangesAndReleases(t *testing.T) {
 	if n := count(`SELECT count(*) FROM github_installation WHERE "installationId"=$1`, installation); n != 1 {
 		t.Fatalf("installation rows=%d", n)
 	}
-	if n := count(`SELECT count(*) FROM audit_log WHERE action='product.github_installation_linked' AND "organizationId" IN ($1,$2)`, orgA, orgB); n != 3 {
+	if n := count(`SELECT count(*) FROM audit_log WHERE action='product.github_installation_linked' AND "organizationId" IN ($1,$2)`, orgA, orgB); n != 4 {
 		t.Fatalf("link audits=%d", n)
 	}
 	if links, err := repo.ListGitHubInstallations(ctx, orgA); err != nil || len(links) != 2 || !slices.ContainsFunc(links,

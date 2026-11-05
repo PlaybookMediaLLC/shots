@@ -17,12 +17,14 @@ import {
   postFailureFix,
   postFailureReason,
   postState,
+  retryCanHelp,
 } from '@/lib/content-drafts/post-status'
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
+import type { DraftChannel } from '@/lib/write/document'
 import { cn } from '@/lib/utils'
 import { CHANNEL_META, ChannelIcon } from './channel-meta'
 import { POST_COLUMN } from './layout'
-import { LocalTime } from './local-time'
+import { LocalTime, WHEN_STYLE } from './local-time'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,20 +45,6 @@ const METRICS: [string, string][] = [
   ['impressions', 'views'],
 ]
 
-/** A post's time in the zone it was scheduled in, named, so it matches the review and calendar. */
-function zoned(post: DraftPostWire, seconds = false): Intl.DateTimeFormatOptions {
-  return {
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    month: 'short',
-    ...(seconds ? { second: '2-digit' } : {}),
-    timeZone: post.scheduleTimeZone ?? undefined,
-    timeZoneName: 'short',
-    year: 'numeric',
-  }
-}
-
 function message(error: unknown): string {
   return error instanceof Error ? error.message : 'The request could not be completed.'
 }
@@ -69,15 +57,26 @@ function message(error: unknown): string {
 export function DraftPosts({
   canSchedule,
   edited,
+  fixFor,
+  notAttempted = [],
   onCancel,
   onChange,
   onEdit,
   onReschedule,
   posts,
+  zone,
 }: {
   canSchedule: boolean
   /** Queued posts whose content the draft has changed since: they still send what was scheduled. */
   edited?: ReadonlySet<string>
+  /** What the draft still needs for a platform, and where to fix it; null when nothing does. */
+  fixFor?: (
+    platform: string
+  ) => { blocksRetry: boolean; label: string; open: () => void; problems: string[] } | null
+  /** Destinations the draft targets that no post was ever made for. */
+  notAttempted?: { channel: DraftChannel; id: string; label: string }[]
+  /** The brand's zone, which every time here reads in. */
+  zone?: string | null
   onCancel: (postId: string) => Promise<void>
   /** Open the reschedule review that replaces the queued posts with the current text. */
   onReschedule?: () => void
@@ -103,6 +102,8 @@ export function DraftPosts({
   // A failure a newer post of its destination replaced (a retry) folds away.
   const latest = currentPosts(posts)
   const earlier = posts.filter((post) => !latest.includes(post))
+  // The brand's zone, else the one it was scheduled in if the brand is unknown here.
+  const shownZone = (post: DraftPostWire) => zone ?? post.scheduleTimeZone
   // An earlier attempt is history: it shows what happened, with no action, so
   // it cannot be retried behind the post that replaced it.
   const row = (post: DraftPostWire, history = false) => {
@@ -118,6 +119,12 @@ export function DraftPosts({
           const fix = postFailureFix(post.failureCode)
           const label = channel ? CHANNEL_META[channel].label : post.platform
           const support = `code ${post.failureCode} · post ${post.id} · ${post.platform}`
+          const needed = history ? null : (fixFor?.(post.platform) ?? null)
+          const sameFailures = earlier.filter(
+            (attempt) =>
+              attempt.channelConnectionId === post.channelConnectionId &&
+              attempt.failureCode === post.failureCode
+          ).length
           return (
             <li className="flex flex-col gap-2 px-4 py-3" data-testid="draft-post" key={post.id}>
               <div className="flex items-center justify-between gap-4">
@@ -126,13 +133,16 @@ export function DraftPosts({
                     {channel ? <ChannelIcon channel={channel} /> : null}
                     {label} ·{' '}
                     <LocalTime
-                      options={zoned(post, Boolean(post.naturalOffsetSeconds))}
+                      options={
+                        post.naturalOffsetSeconds ? { ...WHEN_STYLE, second: '2-digit' } : undefined
+                      }
                       value={post.scheduledFor}
+                      zone={shownZone(post)}
                     />
                     {post.naturalOffsetSeconds ? (
                       <span className="text-xs text-muted-foreground">
                         (natural time; slot{' '}
-                        <LocalTime options={zoned(post)} value={post.slotAt ?? post.scheduledFor} />)
+                        <LocalTime value={post.slotAt ?? post.scheduledFor} zone={shownZone(post)} />)
                       </span>
                     ) : null}
                   </p>
@@ -162,7 +172,7 @@ export function DraftPosts({
                           <AlertDialogTitle>Cancel the {label} post?</AlertDialogTitle>
                           <AlertDialogDescription>
                             It will not publish at{' '}
-                            <LocalTime options={zoned(post)} value={post.scheduledFor} />. The
+                            <LocalTime value={post.scheduledFor} zone={shownZone(post)} />. The
                             draft&rsquo;s other destinations stay queued, and you can schedule
                             this one again.
                           </AlertDialogDescription>
@@ -232,7 +242,7 @@ export function DraftPosts({
               ) : null}
               {post.status === 'PUBLISHED' && post.publishedAt ? (
                 <p className="text-xs text-muted-foreground">
-                  Confirmed live <LocalTime value={post.publishedAt} />
+                  Confirmed live <LocalTime value={post.publishedAt} zone={shownZone(post)} />
                 </p>
               ) : null}
               {post.status === 'CANCELLED' && reason ? (
@@ -241,36 +251,61 @@ export function DraftPosts({
                 </p>
               ) : null}
               {post.status === 'FAILED' ? (
-                <p className="flex flex-wrap items-center gap-2 text-xs text-red-700 dark:text-red-300" role="status">
-                  {reason ? `${reason} ` : ''}This destination did not publish; the draft’s other
-                  posts are unaffected.
-                  {!history && fix === 'reconnect' && post.socialSetId ? (
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
-                    </Button>
+                <div className="grid gap-1.5 text-xs text-red-700 dark:text-red-300" role="status">
+                  <p>{reason ? `${reason} ` : ''}This destination did not publish.</p>
+                  {needed ? (
+                    <p data-testid="failure-needs">
+                      {label} still needs this: {needed.problems.join(' ')}
+                    </p>
                   ) : null}
-                  {!history && fix === 'edit' && onEdit ? (
-                    <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
-                      Edit the {label} post
-                    </Button>
+                  {!history && sameFailures > 0 && retryCanHelp(post.failureCode) ? (
+                    <p className="text-muted-foreground">
+                      It failed the same way {sameFailures === 1 ? 'last time' : `${sameFailures} times before`},
+                      and nothing has changed since, so it may fail again.
+                    </p>
                   ) : null}
-                  {!history && canSchedule ? (
-                    <Button
-                      disabled={busy === post.id}
-                      onClick={() =>
-                        void run(
-                          post.id,
-                          () => writeApi.retryPost(post.id),
-                          'Retrying this destination now.'
-                        )
-                      }
-                      size="sm"
-                      variant="outline"
-                    >
-                      Retry this destination
-                    </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {needed && fix !== 'reconnect' ? (
+                      <Button onClick={needed.open} size="sm" variant="outline">
+                        {needed.label}
+                      </Button>
+                    ) : null}
+                    {!history && fix === 'reconnect' && post.socialSetId ? (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
+                      </Button>
+                    ) : null}
+                    {!history && fix === 'edit' && onEdit ? (
+                      <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
+                        Edit the {label} post
+                      </Button>
+                    ) : null}
+                    {/* A retry resends what was scheduled, so it waits until it could work. */}
+                    {!history && canSchedule && !needed?.blocksRetry && retryCanHelp(post.failureCode) ? (
+                      <Button
+                        disabled={busy === post.id}
+                        onClick={() =>
+                          void run(
+                            post.id,
+                            () => writeApi.retryPost(post.id),
+                            'Retrying this destination now.'
+                          )
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        Retry this destination
+                      </Button>
+                    ) : null}
+                  </div>
+                  {!history && (needed || !retryCanHelp(post.failureCode)) ? (
+                    <p className="text-muted-foreground">
+                      {retryCanHelp(post.failureCode)
+                        ? 'A retry resends the version that was scheduled. To send your changes, schedule or publish the draft again.'
+                        : 'Once it is fixed, schedule or publish the draft again: a retry would resend the old version.'}
+                    </p>
                   ) : null}
-                </p>
+                </div>
               ) : null}
               {post.status === 'UNKNOWN_DELIVERY' ? (
                 <div
@@ -296,13 +331,25 @@ export function DraftPosts({
                 </div>
               ) : null}
               {post.failureCode ? (
-                <Disclosure className="text-xs text-muted-foreground" data-testid="failure-details">
-                  <DisclosureTrigger className="select-none hover:text-foreground">
-                    Details
-                  </DisclosureTrigger>
-                  <DisclosureContent className="mt-1 flex flex-wrap items-center gap-2 font-mono">
-                    {support}
+                // A popover, so opening it moves nothing under the pointer.
+                <Popover>
+                  <PopoverTrigger asChild>
                     <Button
+                      className="w-fit text-xs text-muted-foreground hover:text-foreground"
+                      size={null}
+                      variant="custom"
+                    >
+                      Details
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="grid w-80 gap-2 p-3 text-xs text-muted-foreground"
+                    data-testid="failure-details"
+                  >
+                    <p className="font-mono break-all">{support}</p>
+                    <Button
+                      className="w-fit"
                       onClick={() =>
                         void navigator.clipboard
                           .writeText(`${support} · ${post.scheduledFor}`)
@@ -310,12 +357,12 @@ export function DraftPosts({
                           .catch(() => toast.error('The details could not be copied.'))
                       }
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                     >
                       Copy for support
                     </Button>
-                  </DisclosureContent>
-                </Disclosure>
+                  </PopoverContent>
+                </Popover>
               ) : null}
               {post.replies > 0 && post.status !== 'PUBLISHED' ? (
                 <p className="text-xs text-muted-foreground">
@@ -382,7 +429,7 @@ export function DraftPosts({
                   >
                     {post.metricsAt ? (
                       <>
-                        Updated <LocalTime value={post.metricsAt} /> · Refresh
+                        Updated <LocalTime value={post.metricsAt} zone={shownZone(post)} /> · Refresh
                       </>
                     ) : (
                       'Read engagement'
@@ -393,6 +440,7 @@ export function DraftPosts({
               {post.automations.length > 0 ? (
                 <FollowUps
                   busy={busy === post.id}
+                  zone={shownZone(post)}
                   onStop={
                     canSchedule &&
                     post.automations.some(
@@ -426,6 +474,24 @@ export function DraftPosts({
       </div>
       <ul className="divide-y divide-foreground/[0.05] rounded-xl border border-foreground/[0.06]">
         {latest.map((post) => row(post))}
+        {notAttempted.map((destination) => (
+          <li
+            className="flex flex-col gap-1 px-4 py-3"
+            data-testid="draft-post-not-attempted"
+            key={destination.id}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <p className="flex items-center gap-1.5 text-sm text-foreground">
+                <ChannelIcon channel={destination.channel} />
+                {destination.label}
+              </p>
+              <Pill tone="gray">Not attempted</Pill>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Nothing was sent here. Schedule or publish the draft to send it.
+            </p>
+          </li>
+        ))}
       </ul>
       {earlier.length > 0 ? (
         <Disclosure className="mt-2 text-xs text-muted-foreground" data-testid="earlier-attempts">
@@ -468,10 +534,12 @@ function FollowUps({
   busy,
   onStop,
   post,
+  zone,
 }: {
   busy: boolean
   onStop?: () => void
   post: DraftPostWire
+  zone?: string | null
 }) {
   return (
     <div className="grid gap-1 text-xs" data-testid="follow-ups">
@@ -491,7 +559,7 @@ function FollowUps({
             key={item.key}
           >
             <span className="text-foreground">{FOLLOW_UP_LABELS[item.kind]}</span>
-            <LocalTime value={item.dueAt} />
+            <LocalTime value={item.dueAt} zone={zone} />
             <span
               className={cn(
                 item.status === 'failed' && 'text-red-700 dark:text-red-300',

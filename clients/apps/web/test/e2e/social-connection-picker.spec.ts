@@ -81,15 +81,15 @@ test(
       await enableTwoFactor(page, identity.password)
       organizationId = await bindTestGoOrganization(page)
       await app.open('/settings/publishing-brands?picker=preserve')
-      await expect(page.getByText('No publishing brands yet', { exact: true })).toBeVisible()
+      await expect(page.getByText('No profiles yet', { exact: true })).toBeVisible()
       expect(await list()).toHaveLength(0)
       const originalURL = page.url()
       const launch = page.getByRole('button', {
-        name: 'Add publishing brand to your personal workspace',
+        name: 'Add profile to your personal workspace',
       })
       await launch.click()
       const dialog = page.getByRole('dialog')
-      await expect(dialog.getByRole('heading', { name: 'Create a publishing brand' })).toBeVisible()
+      await expect(dialog.getByRole('heading', { name: 'Create a profile' })).toBeVisible()
       await expect(
         dialog.getByText('Private to you in this workspace', { exact: true })
       ).toBeVisible()
@@ -221,12 +221,10 @@ test(
       expect(created.visibility).toBe('PRIVATE')
       expect(created.accounts).toHaveLength(1)
       expect(created.accounts[0]?.platform).toBe('x')
-      await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue(
-        'New brand'
-      )
+      await expect(page.getByLabel('Profile name', { exact: true })).toHaveValue('New profile')
       await page.getByRole('button', { name: 'Add social account', exact: true }).click()
       await expect(
-        dialog.getByRole('heading', { name: 'Add account to “New brand”' })
+        dialog.getByRole('heading', { name: 'Add account to “New profile”' })
       ).toBeVisible()
       await expect(
         dialog.getByRole('button', { name: 'X / Twitter Connected', exact: true })

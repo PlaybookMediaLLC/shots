@@ -24,7 +24,7 @@ export function PublicProfilePage({ canManage, set }: { canManage: boolean; set:
     <div className="grid gap-6">
       <Group>
         <Row
-          description="Every brand has its own profile page. Making it public shows only the identity below; your drafts stay private."
+          description="Every profile has its own public page. Making it public shows only the identity below; your drafts stay private."
           label="Make profile public"
         >
           <div className="flex items-center gap-3">

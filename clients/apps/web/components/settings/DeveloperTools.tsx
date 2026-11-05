@@ -41,7 +41,7 @@ export function DeveloperTools() {
     >
       <Group>
         <Row
-          description="Shows the IDs of publishing brands, drafts, accounts and media next to them, each with a copy button, for use with the API and webhooks."
+          description="Shows the IDs of profiles, drafts, accounts and media next to them, each with a copy button, for use with the API and webhooks."
           label="Development mode"
         >
           <div className="flex items-center gap-3">

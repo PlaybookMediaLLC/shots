@@ -6,11 +6,17 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticsaccount"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticspost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/analyticssnapshot"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsocialobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -381,6 +387,91 @@ func TestSocialSetsPlatform(t *testing.T) {
 		if _, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version,
 			Targets: []ContentDraftScheduleTarget{{Caption: "Removed", ChannelConnectionID: ids["x"]}}}); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("a removed account was scheduled to: %v", err)
+		}
+	})
+
+	t.Run("a provider callback revokes an account without waiting for a post", func(t *testing.T) {
+		connection, err := db.Client.ChannelConnection.Get(ctx, ids["linkedin"])
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Posts the previous removal cancelled give this account a queue.
+		queued, err := db.Client.ScheduledPost.Query().Where(scheduledpost.ChannelConnectionID(ids["x"]),
+			scheduledpost.StatusEQ(scheduledpost.StatusCANCELLED)).Limit(3).All(ctx)
+		if err != nil || len(queued) != 3 {
+			t.Fatalf("queued=%d err=%v", len(queued), err)
+		}
+		for _, post := range queued {
+			exec(`UPDATE scheduled_post SET "channelConnectionId"=$1, status='SCHEDULED' WHERE id=$2`, connection.ID, post.ID)
+		}
+		// A member's removal refuses this; the provider's request cannot wait for it.
+		publishingPost := queued[0].ID
+		if err := db.Client.ScheduledPost.UpdateOneID(publishingPost).SetStatus(scheduledpost.StatusPROCESSING).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		connect("x", nil)
+		other, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org),
+			channelconnection.StatusEQ(channelconnection.StatusACTIVE), channelconnection.IDNEQ(connection.ID)).First(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seedAnalytics := func(id string) {
+			t.Helper()
+			if exists, _ := db.Client.AnalyticsAccount.Query().Where(analyticsaccount.ID(id)).Exist(ctx); !exists {
+				db.Client.AnalyticsAccount.Create().SetID(id).SetOrganizationID(org).ExecX(ctx)
+			}
+			db.Client.AnalyticsSnapshot.Create().SetID(cuid.New()).SetOrganizationID(org).SetConnectionID(id).SetSubjectID(id).
+				SetKind(analyticssnapshot.KindAccount).SetObservedAt(time.Now()).SetCounters(map[string]float64{"followers": 1}).
+				SetPayloadHash(cuid.New()).ExecX(ctx)
+			db.Client.AnalyticsPost.Create().SetID(cuid.New()).SetOrganizationID(org).SetConnectionID(id).SetRemoteID(cuid.New()).
+				SetPublishedAt(time.Now()).ExecX(ctx)
+			db.Client.PlatformSocialObservation.Create().SetID(cuid.New()).SetOrganizationID(org).SetSocialSetID(defaultSet.ID).
+				SetConnectionID(id).SetSubjectID(id).SetKind(platformsocialobservation.KindAccount).SetPlatform("linkedin").
+				SetDay(time.Now()).SetStatus(platformsocialobservation.StatusAvailable).ExecX(ctx)
+		}
+		seedAnalytics(connection.ID)
+		seedAnalytics(other.ID)
+		analyticsRows := func(id string) int {
+			t.Helper()
+			accounts := db.Client.AnalyticsAccount.Query().Where(analyticsaccount.ID(id)).CountX(ctx)
+			snapshots := db.Client.AnalyticsSnapshot.Query().Where(analyticssnapshot.ConnectionID(id)).CountX(ctx)
+			posts := db.Client.AnalyticsPost.Query().Where(analyticspost.ConnectionID(id)).CountX(ctx)
+			observations := db.Client.PlatformSocialObservation.Query().Where(platformsocialobservation.ConnectionID(id)).CountX(ctx)
+			return accounts + snapshots + posts + observations
+		}
+		cancelled, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "CONFIRM-CODE")
+		if err != nil || len(cancelled) != len(queued)-1 || slices.Contains(cancelled, publishingPost) {
+			t.Fatalf("cancelled=%v of %d err=%v", cancelled, len(queued), err)
+		}
+		revoked, err := db.Client.ChannelConnection.Get(ctx, connection.ID)
+		if err != nil || revoked.Status != channelconnection.StatusREVOKED || revoked.DisplayName != nil ||
+			revoked.Handle != nil || revoked.AvatarURL != nil {
+			t.Fatalf("revoked=%+v err=%v", revoked, err)
+		}
+		if left, kept := analyticsRows(connection.ID), analyticsRows(other.ID); left != 0 || kept != 4 {
+			t.Fatalf("analytics left on the revoked account=%d, on the other account=%d", left, kept)
+		}
+		if post, _ := db.Client.ScheduledPost.Get(ctx, publishingPost); post.Status != scheduledpost.StatusPROCESSING {
+			t.Fatalf("the publishing post became %s", post.Status)
+		}
+		if untouched, _ := db.Client.ChannelConnection.Get(ctx, other.ID); untouched.Status != channelconnection.StatusACTIVE {
+			t.Fatalf("another account became %s", untouched.Status)
+		}
+		if connection.SocialSetID != nil {
+			set, err := db.Client.SocialSet.Get(ctx, *connection.SocialSetID)
+			if err != nil || slices.Contains(set.DefaultPlatforms, connection.Platform) {
+				t.Fatalf("defaults=%v err=%v", set.DefaultPlatforms, err)
+			}
+		}
+		logged, err := db.Client.AuditLog.Query().Where(auditlog.Action("product.channel_account_revoked"), auditlog.EntityID(connection.ID)).Only(ctx)
+		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" {
+			t.Fatalf("audit=%+v err=%v", logged, err)
+		}
+		if again, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "SECOND"); err != nil || len(again) != 0 {
+			t.Fatalf("a retry did more work: %v err=%v", again, err)
+		}
+		if err := db.Client.ScheduledPost.UpdateOneID(publishingPost).SetStatus(scheduledpost.StatusCANCELLED).Exec(ctx); err != nil {
+			t.Fatal(err)
 		}
 	})
 

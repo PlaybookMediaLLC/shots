@@ -180,11 +180,13 @@ export function ShellActions({
 /** One shortcut listener owns the shell, including when the mobile menu is open. */
 export function ShellSearch({
   campaignsEnabled,
+  canManage,
   draftsEnabled,
   paidPlan,
   workspaceId,
 }: {
   campaignsEnabled: boolean
+  canManage: boolean
   draftsEnabled: boolean
   /** Screenshots and canvases are a paid feature; without it only posts are searched. */
   paidPlan: boolean
@@ -240,7 +242,12 @@ export function ShellSearch({
       (campaignsEnabled || item.key !== 'campaigns') &&
       matchesDestination(item.key, t(item.key), query)
   ).map((item) => withPublishAccess(item, draftsEnabled))
-  const pages = palettePages({ campaignsEnabled, draftsEnabled, sectionLabel: (key) => t(key) })
+  const pages = palettePages({
+    campaignsEnabled,
+    canManage,
+    draftsEnabled,
+    sectionLabel: (key) => t(key),
+  })
   const visited = query.trim() ? [] : visitedPages(pages, visits).slice(0, 5)
   // A page that opens the same address as a place found above it is listed once.
   const pageMatches = searchPages(pages, query).filter(
@@ -333,7 +340,7 @@ export function ShellSearch({
             </Button>
           ))}
           {pageMatches.map((page) => (
-            <PageResult key={page.href} onSelect={() => setOpen(false)} page={page} />
+            <PageResult key={page.label} onSelect={() => setOpen(false)} page={page} />
           ))}
           {query.trim()
             ? workItems.map((item) => (

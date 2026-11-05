@@ -400,7 +400,32 @@ export default function PrivacyPolicyPage() {
             </p>
           </Section>
 
+          <Section title="Instagram and Threads">
+            <p className="mb-3 leading-relaxed text-muted-foreground">
+              When you connect an Instagram or Threads account, Shots receives its account ID, name,
+              username, and profile picture, along with tokens that let it publish the posts you
+              approve and read their comments, replies, and insights. Shots stores those tokens
+              encrypted.
+            </p>
+            <p className="leading-relaxed text-muted-foreground">
+              To remove this access, remove Shots in your Instagram or Threads account settings, or
+              ask Meta to delete your data. Shots then disconnects the account in every workspace,
+              cancels the posts waiting to publish on it, and erases its stored tokens, profile, and
+              the analytics collected for it. Posts already published and their records stay with
+              the workspace that created them.
+              Read{' '}
+              <Link href="/data-deletion" className={linkClassName}>
+                how data deletion works
+              </Link>
+              .
+            </p>
+          </Section>
+
           <Section title="Contact">
+            <p className="mb-3 leading-relaxed text-muted-foreground">
+              Shots is operated by Playbook Interactive Media, LLC, a Delaware limited liability
+              company.
+            </p>
             <p className="leading-relaxed text-muted-foreground">
               Questions about this policy or your data: email{' '}
               <Link href={`mailto:${CONTACT_EMAIL}`} className={linkClassName}>

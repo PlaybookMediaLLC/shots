@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useHydrated } from '@/components/drafts/local-time'
+import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { useRouter } from 'next/navigation'
 import type { BackendBestTime } from 'screenshot-studio-backend-sdk'
 import { Button } from '@/components/ui/button'
@@ -32,7 +32,7 @@ export function BestPostingTimes({
     try {
       const current = await call<SocialSetWire>(`/api/v1/social-sets/${setId}`)
       if (current.timeZone !== timeZone)
-        throw new Error('The brand time zone changed. Reload these suggestions first.')
+        throw new Error('The profile’s time zone changed. Reload these suggestions first.')
       const date = new Date(at)
       const parts = zonedParts(date, timeZone)
       const slot = {
@@ -72,12 +72,11 @@ export function BestPostingTimes({
         {items.map((item) => (
           <li key={item.at} className="grid content-start gap-2">
             <strong className="text-sm">
-              {new Date(item.at).toLocaleString(undefined, {
-                timeZone,
-                weekday: 'long',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              <LocalTime
+                options={{ weekday: 'long', hour: 'numeric', minute: '2-digit' }}
+                value={item.at}
+                zone={timeZone}
+              />
             </strong>
             {item.score !== undefined ? (
               <>

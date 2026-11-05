@@ -7,6 +7,7 @@ import {
   expectSaved,
   inPreview,
   openNewDraft,
+  openBlockedSchedule,
   openSchedule,
   type Page,
   previewOf,
@@ -163,7 +164,7 @@ test(
     await write(page, 'Needs a second pair of eyes')
     await chooseChannels(page, ['x'])
     await expectSaved(page)
-    const blocked = await openSchedule(page)
+    const blocked = await openBlockedSchedule(page)
     await expect(blocked.getByTestId('blocking-problems')).toContainText('approves drafts')
     await expect(blocked.getByRole('button', { name: 'Confirm schedule' })).toBeDisabled()
     await page.keyboard.press('Escape')
@@ -259,7 +260,8 @@ test(
     await write(page, 'Launch week #shipit')
     const draftId = await openNewDraft(page)
     await draftEditor(page).click()
-    await page.getByRole('button', { name: '#shipit' }).click()
+    // Exact: a draft's row menu is named after its text, which holds the tag too.
+    await page.getByRole('button', { name: '#shipit', exact: true }).click()
     await expect(draftEditor(page)).toContainText('#shipit')
     await page.keyboard.type(' First post')
     await settleSelection(page)
@@ -431,7 +433,7 @@ test('a live post links to itself, shows engagement, and resumes a thread that s
 
   // The rail's Posted tab lists the draft.
   await page.getByRole('tab', { name: /Posted/ }).click()
-  await expect(page.getByRole('navigation').getByText('1 live', { exact: false })).toBeVisible()
+  await expect(page.getByTestId('draft-row')).toContainText('Published')
   expect((await apiRequest(page, `/api/v1/content-drafts/${draftId}/revisions`)).status).toBe(200)
 })
 

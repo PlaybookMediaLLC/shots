@@ -492,7 +492,7 @@ function DraftToolbar({
   return (
     <Toolbar
       aria-label="Draft tools"
-      className="flex items-center gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-popover backdrop-blur"
+      className="flex flex-wrap items-center gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-popover backdrop-blur"
     >
       <InsertButton
         editor={editor}
@@ -969,6 +969,7 @@ function DraftEditorSession({
                   bottom: `calc(${Math.max(20, keyboardInset)}px + env(safe-area-inset-bottom))`,
                 }}
                 className="pointer-events-none sticky z-10 flex justify-start px-2 [contain:inline-size] sm:ps-4"
+                data-draft-toolbar
               >
                 <div className="pointer-events-auto min-w-0 max-w-full">
                   <DraftToolbar

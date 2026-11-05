@@ -595,7 +595,7 @@ function BrandVoiceSection({
   return (
     <Section
       title="Brand voice"
-      description="Workspace defaults for writing. Publishing-brand instructions can refine these; prohibited terms always apply. Voice changes save separately from visual brand kits."
+      description="Workspace defaults for writing. Profile instructions can refine these; prohibited terms always apply. Voice changes save separately from visual brand kits."
     >
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <fieldset disabled={!canManage || saved === null || isSaving} className="grid gap-4">
@@ -625,7 +625,7 @@ function BrandVoiceSection({
             ))}
             <Row
               label="Never use"
-              description="These rules apply to all writing, including publishing brand overrides."
+              description="These rules apply to all writing, including profile overrides."
               layout="stacked"
             >
               <ProhibitedTermsEditor value={draft.terms} onChange={(terms) => change({ terms })} />

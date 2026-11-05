@@ -14,12 +14,13 @@ import {
   OVERDUE_AFTER_MS,
   POST_STATE_TONE,
   postFailureFix,
+  retryCanHelp,
   postFailureReason,
   postState,
   STATUS_GROUPS,
 } from '../lib/content-drafts/post-status'
 import {
-  displayDaySlots,
+  brandDaySlots,
   calendarDays,
   shiftAnchor,
   validDay,
@@ -30,20 +31,28 @@ import {
   visibleItems,
   itemDay,
   movedToDay,
+  naturalWindow,
+  occurrence,
   takenSlots,
   weekCardLayout,
   type PlanItem,
 } from '../lib/plan/calendar'
+import { draftName } from '../lib/write/library'
 import {
+  brandTotal,
+  brandValue,
   readAnalyticsReport,
   chartCSV,
   chartPoints,
   csv,
   formatValue,
   initialQuery,
+  initialSelection,
+  noStats,
   postsCSV,
   presetRange,
   PRESETS,
+  statsPending,
 } from '../lib/analyze/report'
 
 const point = (at: string, value: number | null) => ({ at, value, samples: value === null ? 0 : 1 })
@@ -177,8 +186,8 @@ test('P13 all views contain their anchor without mutating it', () => {
 test('P12 overlapping weekly cards remain separate and reuse lanes only after a card ends', () => {
   const near = { ...items[0], id: 'near', at: '2026-04-01T02:00:00Z' }
   const later = { ...items[0], id: 'later', at: '2026-04-01T03:34:00Z' }
-  const input = [later, items[1], near, items[0]]
-  const layout = weekCardLayout(input, 'UTC', 120)
+  const input = [later, { ...items[1], zone: 'UTC' }, near, items[0]]
+  const layout = weekCardLayout(input, 120)
   assert.equal(layout.lanes, 3)
   assert.deepEqual(
     layout.cards.map(({ item, top, lane }) => [item.id, top, lane]),
@@ -196,16 +205,27 @@ test('P12 overlapping weekly cards remain separate and reuse lanes only after a 
 })
 test('P12 repeated DST wall-clock times occupy separate weekly lanes', () => {
   const input = [
-    { ...items[0], at: '2026-11-01T05:30:00Z' },
-    { ...items[1], at: '2026-11-01T06:30:00Z' },
+    { ...items[0], at: '2026-11-01T05:30:00Z', zone: 'America/New_York' },
+    { ...items[1], at: '2026-11-01T06:30:00Z', zone: 'America/New_York' },
   ]
-  const layout = weekCardLayout(input, 'America/New_York', 88)
+  const layout = weekCardLayout(input, 88)
   assert.equal(layout.lanes, 2)
   assert.deepEqual(
     layout.cards.map(({ top, lane }) => [top, lane]),
     [
       [90, 0],
       [90, 1],
+    ]
+  )
+})
+test('P12 a card sits at the hour its own brand reads, whatever other brands share the week', () => {
+  // The same instant: 01:30 in UTC, 10:30 in Tokyo.
+  const layout = weekCardLayout(items, 120)
+  assert.deepEqual(
+    layout.cards.map(({ item, top }) => [item.id, top]),
+    [
+      ['one', 90],
+      ['two', 630],
     ]
   )
 })
@@ -233,28 +253,36 @@ test('P18 week-start preference changes layout, not item instants', () => {
   assert.equal(calendarDays('2026-04-01', 'week', 0)[0], '2026-03-29')
   assert.equal(calendarDays('2026-04-01', 'week', 1)[0], '2026-03-30')
 })
-test('P22/P23 display zone moves a card across midnight without changing its scheduling zone or UTC instant', () => {
+test('P22/P23 a card sits on its own brand day without changing its UTC instant', () => {
   const before = JSON.stringify(items[0])
-  assert.equal(itemDay(items[0], 'America/New_York'), '2026-03-31')
-  assert.equal(itemDay(items[0], 'Asia/Tokyo'), '2026-04-01')
+  assert.equal(itemDay({ ...items[0], zone: 'America/New_York' }), '2026-03-31')
+  assert.equal(itemDay({ ...items[0], zone: 'Asia/Tokyo' }), '2026-04-01')
   assert.equal(JSON.stringify(items[0]), before)
 })
 test('P23 a card dropped on another day keeps its own zone clock across a daylight-saving change', () => {
   const now = new Date('2026-03-01')
-  // 14:00 London on 25 March (GMT), seen from New York (already on EDT) as 10:00.
+  // 14:00 London on 25 March (GMT).
   const at = '2026-03-25T14:00:00.000Z'
-  // Dropped a week later in the New York display, after London moved to BST:
-  // it stays 14:00 London, not 10:00 New York (which would be 15:00 London).
+  // Dropped a week later, after London moved to BST: it stays 14:00 London.
   assert.equal(
-    movedToDay(at, 'Europe/London', 'America/New_York', '2026-04-01', now).toISOString(),
+    movedToDay(at, 'Europe/London', '2026-04-01', now).toISOString(),
     '2026-04-01T13:00:00.000Z'
   )
-  // A late-evening post whose display day is the next day moves by displayed days.
+  // 23:30 in Tokyo lands on the day it was dropped on, read on Tokyo's clock.
   assert.equal(
-    movedToDay('2026-03-10T23:30:00.000Z', 'UTC', 'Asia/Tokyo', '2026-03-13', now).toISOString(),
-    '2026-03-12T23:30:00.000Z'
+    movedToDay('2026-03-10T14:30:00.000Z', 'Asia/Tokyo', '2026-03-13', now).toISOString(),
+    '2026-03-13T14:30:00.000Z'
   )
-  assert.throws(() => movedToDay(at, 'Europe/London', 'UTC', '2026-02-20', now), /future/)
+  assert.throws(() => movedToDay(at, 'Europe/London', '2026-02-20', now), /future/)
+  // The clocks skip 02:30 on 8 March in New York and repeat 01:30 on 1 November: a drop never guesses.
+  assert.throws(
+    () => movedToDay('2026-03-01T07:30:00.000Z', 'America/New_York', '2026-03-08', now),
+    /skip/
+  )
+  assert.throws(
+    () => movedToDay('2026-03-02T06:30:00.000Z', 'America/New_York', '2026-11-01', now),
+    /twice/
+  )
 })
 test('P19 only posts the queue still holds take their slot', () => {
   const at = '2026-04-02T13:00:00Z'
@@ -311,6 +339,11 @@ test('P38 New York skipped and repeated hours require deterministic resolution',
     selectedInstant('2026-11-01T01:30', 'America/New_York', 'later', now).toISOString(),
     '2026-11-01T06:30:00.000Z'
   )
+})
+test('P38 a post in a repeated hour keeps its own occurrence when opened', () => {
+  assert.equal(occurrence('2026-11-01T05:30:00.000Z', 'America/New_York'), 'earlier')
+  assert.equal(occurrence('2026-11-01T06:30:09.000Z', 'America/New_York'), 'later')
+  assert.equal(occurrence('2026-11-02T06:30:00.000Z', 'America/New_York'), 'earlier')
 })
 test('A04/A16 unavailable, zero, and negative follower growth retain different values', () => {
   assert.equal(formatValue(0), '0')
@@ -428,19 +461,21 @@ test('A35 chart export remains available with a real zero series and no post row
   assert.ok(chartCSV(r, 'followers', false).includes('"2026-03-01","0","1"'))
 })
 
-test('P19/P22 slots cross the date line without shifting the account schedule', () => {
-  const slots = displayDaySlots(
-    '2026-10-24',
-    'Etc/GMT+12',
+test('P19/P22 a brand slot sits on its own day, with the instant it names across the date line', () => {
+  const slots = brandDaySlots(
+    '2026-10-26',
     'Pacific/Kiritimati',
     [{ weekday: 1, time: '00:30' }],
     [],
     new Date('2026-10-01')
   )
-  assert.equal(slots.length, 1)
-  assert.equal(slots[0].localDay, '2026-10-26')
-  assert.equal(slots[0].displayTime, '22:30')
-  assert.equal(slots[0].at, '2026-10-25T10:30:00.000Z')
+  assert.deepEqual(slots, [{ at: '2026-10-25T10:30:00.000Z', time: '00:30' }])
+})
+
+test('natural posting times can move a free slot four minutes either way', () => {
+  const { from, to } = naturalWindow(new Date('2026-04-01T13:15:00.000Z'))
+  assert.equal(from.toISOString(), '2026-04-01T13:11:00.000Z')
+  assert.equal(to.toISOString(), '2026-04-01T13:19:00.000Z')
 })
 
 test('A17 missing null and invalid series fail locally while valid zero metrics survive', () => {
@@ -458,6 +493,53 @@ test('A17 missing null and invalid series fail locally while valid zero metrics 
   assert.equal(result.metrics.impressions.status, 'failed')
   assert.equal(result.metrics.profileClicks.status, 'failed')
   assert.equal(result.metrics.engagements.status, 'insufficient')
+})
+
+test('Analyze opens on the asked-for account, else the whole brand; one account is its brand', () => {
+  const both = { id: 'both', accounts: [{ id: 'a' }, { id: 'b' }] }
+  const solo = { id: 'solo', accounts: [{ id: 'c' }] }
+  const none = { id: 'none', accounts: [] }
+  assert.equal(initialSelection([none, both, solo], {}), brandValue('both'))
+  assert.equal(initialSelection([none, solo, both], {}), 'c')
+  assert.equal(initialSelection([both, solo], { set: 'solo' }), 'c')
+  assert.equal(initialSelection([both, solo], { account: 'b' }), 'b')
+  assert.equal(initialSelection([both], { account: 'foreign', set: 'none' }), brandValue('both'))
+  assert.equal(initialSelection([none], {}), '')
+})
+
+test('a brand total adds what accounts reported, keeps a real zero, and never adds followers', () => {
+  const account = (values: Record<string, number | null>) => {
+    const r = report()
+    r.metrics = Object.fromEntries(
+      Object.entries(values).map(([key, value]) => [key, { ...metric, status: 'available', value }])
+    ) as typeof r.metrics
+    return r
+  }
+  const reports = [
+    account({ followers: 10, impressions: 5, engagements: 0 }),
+    account({ followers: 20, impressions: null, engagements: 0 }),
+  ]
+  assert.equal(brandTotal(reports, 'impressions'), 5)
+  assert.equal(brandTotal(reports, 'engagements'), 0)
+  assert.equal(brandTotal(reports, 'followers'), null)
+  assert.equal(brandTotal(reports, 'profileClicks'), null)
+  assert.equal(brandTotal([], 'impressions'), null)
+})
+
+test('an account with no numbers yet is empty, while its post count, a real zero or a failure is not', () => {
+  const read = (metrics: Record<string, unknown>, status = 'available') =>
+    readAnalyticsReport({ ...report(), status, metrics })
+  const counted = { ...metric, value: 3 }
+  const waiting = read({ publishedPosts: counted })
+  assert.equal(noStats(waiting), true)
+  assert.equal(statsPending(waiting), true)
+  // Published Posts keeps its count; the empty state only speaks for the other metrics.
+  assert.equal(waiting.metrics.publishedPosts.value, 3)
+  // A network that shares no stats has its own notice: "stats appear" would be untrue.
+  assert.equal(statsPending(read({ publishedPosts: counted }, 'unsupported')), false)
+  assert.equal(statsPending(read({ publishedPosts: counted }, 'forbidden')), false)
+  assert.equal(noStats(read({ impressions: metric })), false)
+  assert.equal(noStats(read({ impressions: { ...metric, points: undefined } })), false)
 })
 
 test('a destination reads as overdue, publishing, needing a check or failed, never just scheduled', () => {
@@ -660,6 +742,21 @@ test('every failure names a cause and an action besides retrying when one exists
   assert.equal(postFailureFix('400'), 'edit')
   assert.equal(postFailureFix('429'), null)
   assert.equal(postFailureFix(null), null)
+  // A retry resends what was scheduled, so a failure the post caused needs an edit first.
+  assert.equal(retryCanHelp('POST_OPTIONS'), false)
+  assert.equal(retryCanHelp('400'), false)
+  assert.equal(retryCanHelp('UNKNOWN'), true)
+  assert.equal(retryCanHelp('ACCOUNT_RECONNECT'), true)
+})
+
+test('a draft is called by its title, else its first line of text', () => {
+  assert.equal(draftName({ excerpt: 'First line\nSecond', title: 'Launch' }), 'Launch')
+  assert.equal(
+    draftName({ excerpt: '\nFirst line\nSecond', title: 'Untitled draft' }),
+    'First line'
+  )
+  assert.equal(draftName({ excerpt: 'First line', title: '  ' }), 'First line')
+  assert.equal(draftName({ excerpt: '', title: '' }), 'Untitled draft')
 })
 
 test('a month day caps its posts but never hides one that needs attention', () => {

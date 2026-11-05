@@ -265,7 +265,7 @@ export type ChannelConnection = {
   avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
-  /** The publishing brand it belongs to; null when it is in none. */
+  /** The profile it belongs to; null when it is in none. */
   socialSetId?: string | null
   /** Its verified state, when the product configuration could read it. */
   health?: SocialAccountHealth
@@ -957,6 +957,8 @@ export type BackendContentDraft = {
   guestComments: { createdAt: string; name: string; text: string }[]
   /** The draft's live posts (lists only). */
   publishedPosts: number
+  attentionAt?: string | null
+  lastPublishedAt?: string | null
   /** Write (RFC 025): an article's title and cover, for an article draft. */
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */
@@ -1441,7 +1443,7 @@ export type BackendContentDraftListQuery = {
   status?: BackendContentDraftStatus
   tagId?: string
   to?: string
-  view?: 'drafts' | 'posted' | 'archived'
+  view?: 'drafts' | 'posted' | 'failed' | 'archived'
 }
 
 /** A cloud project: an editor composition with revision-checked writes. */
@@ -2346,7 +2348,7 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ items: ChannelConnection[] }>('v1/channel-connections')
   }
 
-  /** Removes an account from the workspace, in a publishing brand or in none; its queued posts are cancelled. */
+  /** Removes an account from the workspace, in a profile or in none; its queued posts are cancelled. */
   async removeConnection(id: string) {
     return this.request<SocialSetRemoval>(`v1/channel-connections/${encodeURIComponent(id)}`, {
       method: 'DELETE',
@@ -4604,6 +4606,15 @@ export class ScreenshotStudioBackendSDK {
     )
   }
   /** Forward unmodified body text; the backend verifies the provider signature. */
+  async metaDataCallback(provider: string, signedRequest: string) {
+    return z.object({ url: z.string().url(), confirmation_code: z.string().min(1) }).parse(
+      await this.request<unknown>(`v1/internal/meta-callbacks/${encodeURIComponent(provider)}`, {
+        method: 'POST',
+        body: { signedRequest },
+      })
+    )
+  }
+
   async acceptFrontendWebhook(id: string, signature: string, body: string) {
     return z.object({ accepted: z.literal(true) }).parse(
       await this.request<unknown>(`v1/internal/frontend-webhooks/${encodeURIComponent(id)}`, {

@@ -74,7 +74,7 @@ The web's authenticated routes start OAuth at
 SDK. The backend binds one-use state to the workspace and session, exchanges
 the code through the social service, verifies the destination, and registers
 one canonical channel connection. The supported callback names are `x`,
-`linkedin`, `instagram`, and `instagram-standalone`. Facebook Login's
+`linkedin`, `instagram`, `instagram-standalone`, and `threads`. Facebook Login's
 Instagram flow includes Page selection.
 
 Register each exact HTTPS callback URL with its provider for live tests.
@@ -84,6 +84,29 @@ origin in `BETTER_AUTH_TRUSTED_ORIGINS`. Sign in on the tunnel hostname so the
 callback receives its own session cookie. The normal Connect action requires
 two-factor authentication. Avoid putting any provider token in the browser or
 the web container.
+
+### Meta deauthorize and data deletion callbacks
+
+Register the same URL in both of each app's callback fields:
+
+| Provider  | Meta fields                                     | URL                                                                     |
+| --------- | ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Instagram | Deauthorize callback URL, Data deletion request URL | `https://shots.playbookmedia.io/api/webhooks/meta/instagram-standalone` |
+| Threads   | Uninstall Callback URL, Delete Callback URL     | `https://shots.playbookmedia.io/api/webhooks/meta/threads`              |
+
+The backend verifies `signed_request` with `INSTAGRAM_APP_SECRET` or
+`THREADS_APP_SECRET`, so both requests need that credential deployed. Each
+request disconnects the account in every workspace, cancels its queued posts,
+and erases its tokens, profile, and collected analytics. Published posts and their
+receipts stay with the workspace. The response's confirmation code is in the
+`product.channel_account_revoked` audit record, and in the logs when no workspace
+held the account. The callback matches Meta's `user_id` to the stored provider ID,
+so confirm that match with a live test account before relying on it.
+
+The credentials also turn on Connect for every customer. Until Meta approves the
+app, set `HIDDEN_PROVIDERS=threads,instagram-standalone` in Infisical `prod`: the
+deploy passes it to the backend, both stay "Coming soon" and refuse new connections,
+and these callbacks keep working.
 
 Private product media stays in R2. The canonical asset row holds a stable
 object key; the worker signs it when publishing and again for a retry. Do not

@@ -141,10 +141,12 @@ test(
       await chooseOption(page.getByLabel('Slack channel'), '#workspace-activity')
       expect((await sink()).channelPages).toContain('page-two')
       await page.getByRole('button', { name: /^Workspace rules/ }).click()
-      const workspaceEmail = page.getByLabel('Source connected: workspace email', { exact: true })
+      const workspaceEmail = page.getByLabel('Repository connected: workspace email', {
+        exact: true,
+      })
       await openDisclosureFor(workspaceEmail)
       await workspaceEmail.check()
-      await page.getByLabel('Source connected: workspace slack', { exact: true }).check()
+      await page.getByLabel('Repository connected: workspace slack', { exact: true }).check()
       await page.getByRole('button', { name: 'Save workspace policy' }).click()
       await expect(page.getByText('Workspace policy saved.')).toBeVisible()
       await page.getByRole('button', { name: 'My notifications', exact: true }).click()
@@ -174,7 +176,7 @@ test(
             return (await sink()).slack.filter(
               (message) =>
                 String(message.text).includes(identity.workspaceName) &&
-                String(message.text).includes('Source connected')
+                String(message.text).includes('Repository connected')
             ).length
           },
           { timeout: 60_000, intervals: [1200] }
@@ -212,14 +214,15 @@ test(
       expect(
         delivered.email.filter(
           (mail) =>
-            mail.subject === 'Source connected' && JSON.stringify(mail.to).includes(identity.email)
+            mail.subject === 'Repository connected' &&
+            JSON.stringify(mail.to).includes(identity.email)
         )
       ).toHaveLength(12)
       expect(
         delivered.slack.filter(
           (message) =>
             String(message.text).includes(identity.workspaceName) &&
-            String(message.text).includes('Source connected')
+            String(message.text).includes('Repository connected')
         )
       ).toHaveLength(12)
       expect(JSON.stringify(delivered.slack)).not.toContain('Activity source')
@@ -340,7 +343,7 @@ test(
       await peer.close()
 
       await page.getByRole('button', { name: 'My notifications', exact: true }).click()
-      const personalEmail = page.getByLabel('Source connected: your email preference', {
+      const personalEmail = page.getByLabel('Repository connected: your email preference', {
         exact: true,
       })
       await openDisclosureFor(personalEmail)

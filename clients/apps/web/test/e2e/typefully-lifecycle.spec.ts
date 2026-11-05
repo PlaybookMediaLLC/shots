@@ -74,6 +74,8 @@ test(
     await expect(page.getByTestId('preview-x')).toContainText('Edited and reviewed.')
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await page.getByTestId('publish-button').click()
+    await expect(page.getByTestId('blockers')).toContainText('Ask for review first')
+    await page.getByRole('button', { name: 'See the review anyway' }).click()
     await expect(page.getByTestId('publish-review')).toContainText('Ask for review first')
     await expect(
       page.getByTestId('publish-review').getByRole('button', { name: 'Publish now', exact: true })

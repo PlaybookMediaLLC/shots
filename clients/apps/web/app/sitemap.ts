@@ -38,6 +38,7 @@ const STATIC_PATHS = [
   '/docs',
   '/docs/authentication',
   '/docs/agents',
+  '/docs/automate',
   '/developers',
   '/api-reference',
 

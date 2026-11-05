@@ -73,7 +73,8 @@ export const PRODUCT_TOURS = [
         id: 'create',
         anchor: 'nav-create',
         title: 'Create',
-        description: 'Start a screenshot, canvas or store image, pick up recent work, or begin from a template.',
+        description:
+          'Start a screenshot, canvas or store image, pick up recent work, or begin from a template.',
       },
       {
         id: 'publish',
@@ -92,7 +93,8 @@ export const PRODUCT_TOURS = [
         id: 'automate',
         anchor: 'nav-automate',
         title: 'Automate',
-        description: 'Workflows that turn deployments and other sources into campaigns, with their runs.',
+        description:
+          'Workflows that turn releases and deployments into campaigns, with their runs.',
       },
       {
         id: 'search',
@@ -105,25 +107,26 @@ export const PRODUCT_TOURS = [
         anchor: 'nav-settings',
         title: 'Settings',
         description:
-          'Connect social accounts in Publishing brands, invite your team and manage your plan.',
+          'Connect social accounts in Profiles, invite your team and manage your plan.',
       },
     ],
   },
   {
     id: 'publish',
     title: 'Publish your first post',
-    summary: 'Publishing brands, drafts and the posting queue.',
+    summary: 'Profiles, drafts and the posting queue.',
     version: 1,
     // Publish opens drafts only where they are rolled out and in the plan.
     available: (access: PlatformAccess) => access.draftsEnabled && !areaLocked('publish', access),
+    next: 'automate',
     steps: [
       {
         id: 'brand',
         anchor: 'write-brand',
         route: '/publish',
-        title: 'Choose a publishing brand',
+        title: 'Choose a profile',
         description:
-          'A brand is a set of social accounts. Drafts in it publish to those accounts. Settings opens its accounts and posting schedule.',
+          'A profile is a set of social accounts. Drafts in it publish to those accounts. Settings opens its accounts and posting schedule.',
       },
       {
         id: 'new-draft',
@@ -146,7 +149,46 @@ export const PRODUCT_TOURS = [
         anchor: 'write-bulk',
         route: '/publish',
         title: 'Schedule many posts at once',
-        description: 'Bulk schedule plans a batch of separate posts in one pass.',
+        description: 'Bulk tools plan a batch of separate posts in one pass.',
+      },
+    ],
+  },
+  {
+    id: 'automate',
+    title: 'Automate your launches',
+    summary: 'Watch a repository, pick a template, activate it, see a run.',
+    version: 1,
+    available: (access: PlatformAccess) => !areaLocked('automate', access),
+    steps: [
+      {
+        id: 'watch',
+        anchor: 'automate-repositories',
+        route: '/workflows/sources',
+        title: 'Watch a repository',
+        description: 'Connect GitHub and choose the repository you ship from. Nothing runs yet.',
+      },
+      {
+        id: 'template',
+        anchor: 'automate-templates',
+        route: '/workflows/new',
+        title: 'Pick a template',
+        description:
+          'Each one opens as a draft you can change, with its trigger already filled in.',
+      },
+      {
+        id: 'activate',
+        anchor: 'nav-automate',
+        title: 'Activate it',
+        description:
+          'Test the draft, then select Activate version in the editor. Only then does it run on new events.',
+      },
+      {
+        id: 'runs',
+        anchor: 'automate-runs',
+        route: '/workflows/runs',
+        title: 'See each run',
+        description:
+          'When you ship, the run shows what the workflow did. Its campaign drafts wait for a person to approve them.',
       },
     ],
   },

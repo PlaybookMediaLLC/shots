@@ -47,7 +47,7 @@ export function readAnalyticsReport(value: unknown): AnalyticsReport {
               points: [],
               samples: 0,
               missing: 0,
-              definition: 'This metric did not return a usable series. Reload to retry.',
+              definition: 'This metric did not return a usable series. Refresh to retry.',
             },
       ]
     })
@@ -69,12 +69,75 @@ export const SORTS = {
   linkClicks: 'Link clicks',
 } as const
 export const STATES: Record<string, string> = {
-  insufficient: 'Insufficient history',
-  unsupported: 'Not supported by this provider',
-  forbidden: 'Account permission required',
-  failed: 'Retrieval failed',
-  stale: 'Stored data · refresh needed',
+  insufficient: 'No stats yet',
+  unsupported: 'Not available on this network',
+  forbidden: 'Reconnect this account',
+  failed: 'Couldn’t load',
+  stale: 'May be out of date',
   available: 'Available',
+}
+
+/** What an account shows until a network reports its first number. */
+export const STATS_PENDING = 'Stats appear about a day after your first post goes live.'
+
+/**
+ * No network has reported a number for this account. Published Posts is Shots'
+ * own count, so it is not one; a failed metric keeps its card and its retry.
+ */
+export function noStats(report: AnalyticsReport): boolean {
+  return Object.entries(report.metrics).every(
+    ([id, metric]) =>
+      id === 'publishedPosts' || (metric.value === null && metric.status !== 'failed')
+  )
+}
+
+/** Stats are still to come, rather than unavailable here, which has its own notice. */
+export function statsPending(report: AnalyticsReport): boolean {
+  return noStats(report) && report.status !== 'unsupported' && report.status !== 'forbidden'
+}
+
+/** The Analyze selection meaning every account of a brand. */
+export const brandValue = (setId: string) => `set:${setId}`
+
+/** What Analyze opens on: the account asked for, else a brand whole. One account is its brand. */
+export function initialSelection(
+  sets: { id: string; accounts: { id: string }[] }[],
+  raw: Record<string, string | undefined>
+): string {
+  if (raw.account && sets.some((set) => set.accounts.some((a) => a.id === raw.account)))
+    return raw.account
+  const set =
+    sets.find((item) => item.id === raw.set && item.accounts.length) ??
+    sets.find((item) => item.accounts.length)
+  if (!set) return ''
+  return set.accounts.length > 1 ? brandValue(set.id) : set.accounts[0].id
+}
+
+/**
+ * One number across a brand's accounts; an account without it is left out, not
+ * counted as zero. Followers overlap between networks, so they are never added.
+ */
+export function brandTotal(reports: AnalyticsReport[], metric: string): number | null {
+  if (metric === 'followers') return null
+  const values = reports.flatMap((report) => report.metrics[metric]?.value ?? [])
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null
+}
+
+/** One account's report, or the API's own reason it could not load. */
+export async function fetchAnalyticsReport(
+  url: string,
+  signal: AbortSignal
+): Promise<AnalyticsReport> {
+  const response = await fetch(url, { cache: 'no-store', signal })
+  const body = await response.json()
+  if (!response.ok)
+    throw new Error(
+      body.message ??
+        (response.status === 404
+          ? 'This analytics page is unavailable or sharing has been revoked.'
+          : 'Analytics could not load.')
+    )
+  return readAnalyticsReport(body)
 }
 
 /** Rolling month/year presets clamp the day at short-month boundaries. */

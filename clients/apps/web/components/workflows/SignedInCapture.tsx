@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { LockKeyIcon } from '@phosphor-icons/react/dist/ssr/LockKey'
 import { EmptyState } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import { useTRPC } from '@/lib/trpc/react'
 import { captureInProgress } from '@/lib/workflows/capture'
@@ -38,9 +39,30 @@ export function SignedInCapture({ canManage }: { canManage: boolean }) {
     <div className="space-y-8">
       {available ? null : (
         <EmptyState
-          description="An administrator of this deployment needs to set the browser provider (PLATFORM_CAPTURE_CDP_URL, PLATFORM_CAPTURE_CDP_TOKEN) and the session key (PLATFORM_CAPTURE_STATE_KEY). Public product pages can still be captured."
+          action={
+            canManage ? (
+              <Disclosure className="text-start text-sm">
+                <DisclosureTrigger>How to set it up</DisclosureTrigger>
+                <DisclosureContent>
+                  <ol className="mt-2 list-decimal space-y-1 ps-5 text-muted-foreground">
+                    <li>
+                      Point the server at a browser provider with PLATFORM_CAPTURE_CDP_URL and
+                      PLATFORM_CAPTURE_CDP_TOKEN.
+                    </li>
+                    <li>Set PLATFORM_CAPTURE_STATE_KEY, which encrypts saved sign-ins.</li>
+                    <li>Restart the server, then connect a sign-in on this page.</li>
+                  </ol>
+                </DisclosureContent>
+              </Disclosure>
+            ) : null
+          }
+          description={
+            canManage
+              ? 'Whoever runs this Shots server turns it on. Public product pages can still be captured.'
+              : 'A workspace owner or admin can ask to have it turned on. Public product pages can still be captured.'
+          }
           icon={LockKeyIcon}
-          title="Signed-in capture is not configured"
+          title="Signed-in capture is not set up"
         />
       )}
       {available || connections.length > 0 ? (

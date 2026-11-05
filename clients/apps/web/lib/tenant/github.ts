@@ -9,7 +9,7 @@ import { githubChoiceStateSchema, githubInstallationChoiceSchema } from './githu
 import { verifyWebhookSignature } from './webhooks'
 
 /** Where users return in the app after connecting GitHub. */
-const SETTINGS_PATH = '/workflows'
+const SETTINGS_PATH = '/workflows/sources'
 
 /** The outcome shown on the settings page after a connection attempt. */
 export const githubConnectOutcomeSchema = z.enum([
@@ -66,19 +66,27 @@ function authorizeUrl(
   return authorize.toString()
 }
 
+/** GitHub's install page; GitHub returns to the setup route with what was installed. */
+function installUrl(
+  settings: NonNullable<ReturnType<typeof getGitHubAppSettings>>,
+  state: string
+): string {
+  return `${settings.GITHUB_WEB_URL}/apps/${settings.GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`
+}
+
 /**
- * Begin connecting a GitHub App installation to the active workspace: GitHub's
- * install page, carrying a single-use state bound to this user and session.
- * Linking an installation the user already has skips the install page, which
- * GitHub turns into the installation's settings with nothing to submit.
+ * Begin connecting a GitHub App installation to the active workspace, with a
+ * single-use state bound to this user and session. Authorization comes first:
+ * it shows what the user can already reach, so an existing install links with
+ * no install page, and {@link completeGitHubConnection} sends everyone else
+ * there. `install` goes straight to it, for a person choosing another account.
  */
-export async function startGitHubConnection(headers: Headers, existing = false): Promise<string> {
+export async function startGitHubConnection(headers: Headers, install = false): Promise<string> {
   const settings = getGitHubAppSettings()
   if (!settings) return githubSettingsUrl('unavailable')
   const access = await requireActiveOrganizationPermission(headers, 'workspace:update')
   const { state } = await backendSDK(access).startGitHubConnection()
-  if (existing) return authorizeUrl(settings, state, '0')
-  return `${settings.GITHUB_WEB_URL}/apps/${settings.GITHUB_APP_SLUG}/installations/new?state=${encodeURIComponent(state)}`
+  return install ? installUrl(settings, state) : authorizeUrl(settings, state, '0')
 }
 
 const setupSchema = z.object({
@@ -125,15 +133,22 @@ export async function completeGitHubConnection(
   const access = await requireActiveOrganizationPermission(headers, 'workspace:update')
   const separator = callback.data.state.lastIndexOf('.')
   const state = callback.data.state.slice(0, separator)
+  const installationId = Number(callback.data.state.slice(separator + 1))
   try {
     await backendSDK(access).completeGitHubConnection({
       code: callback.data.code,
-      installationId: Number(callback.data.state.slice(separator + 1)),
+      installationId,
       state,
     })
   } catch (error) {
     if (!(error instanceof BackendSDKError)) throw error
-    if (error.status === 404) return githubSettingsUrl('none')
+    if (error.status === 404) {
+      // Nothing to link yet, so install. The unused state carries the return trip.
+      const settings = getGitHubAppSettings()
+      return installationId === 0 && settings
+        ? installUrl(settings, state)
+        : githubSettingsUrl('none')
+    }
     const choice = choiceRequiredSchema.safeParse(error.details)
     if (error.status !== 409 || !choice.success) throw error
     const choices = choice.data.choices.map(({ accountLogin, id }) => `${id}:${accountLogin}`)

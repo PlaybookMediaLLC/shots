@@ -5,8 +5,9 @@ import {
   type AutomationGraph,
   type AutomationLayout,
   type AutomationNode,
+  type AutomationOverview,
 } from '@/lib/api/contracts/release-automation'
-import { graphSchemaVersion } from './actions'
+import { actionAvailability, connectedSources, graphSchemaVersion } from './actions'
 
 /** Templates that open as editable, executable definitions. */
 export const workflowTemplateIdSchema = z.enum([
@@ -55,6 +56,12 @@ export const workflowTemplateSchema = z.strictObject({
   family: automationFamilySchema,
   name: z.string(),
   description: z.string(),
+  /** The rule the template starts with, in plain words. */
+  rule: z.string(),
+  /** What a matching event produces. */
+  result: z.string(),
+  /** A made-up draft, to show what the output reads like and where it goes. */
+  sample: z.strictObject({ channel: z.string(), text: z.string() }),
   /** Whether the version-level option applies. */
   versioned: z.boolean(),
 })
@@ -62,7 +69,7 @@ export const workflowTemplateSchema = z.strictObject({
 /** One template's display facts. */
 export type WorkflowTemplate = z.infer<typeof workflowTemplateSchema>
 
-/** The executable templates, in the order the picker shows them. */
+/** The executable templates, in the same order as the event lists (`automationFamilySchema`). */
 export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: 'release-launch',
@@ -70,23 +77,13 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'Product launch from a GitHub release',
     description:
       'When a stable GitHub Release is published, create a release and campaign drafts and send them for review.',
+    rule: 'Skips pre-releases and patch versions.',
+    result: 'A release and a draft post for each channel, sent to a person for review.',
+    sample: {
+      channel: 'LinkedIn',
+      text: 'Acme 2.4 is out. Scheduled exports and a faster editor are ready for your team today.',
+    },
     versioned: true,
-  },
-  {
-    id: 'tag-launch',
-    family: 'tag.pushed',
-    name: 'Launch from a version tag',
-    description:
-      'For teams that tag without GitHub Releases: a new version tag becomes a release of every PR merged since the last one.',
-    versioned: true,
-  },
-  {
-    id: 'milestone-release',
-    family: 'milestone.closed',
-    name: 'Release a closed milestone',
-    description:
-      'When a milestone closes with nothing left open, its assigned pull requests become one release and campaign.',
-    versioned: false,
   },
   {
     id: 'feature-announcement',
@@ -94,6 +91,12 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'Feature announcement from a merged pull request',
     description:
       'When a human-authored pull request merges into your branch and is worth announcing, by label rules or an AI check, announce it.',
+    rule: 'Skips bots. Needs the label feature, marketing or release, or a title starting with feat.',
+    result: 'An announcement and a draft post for each channel, sent to a person for review.',
+    sample: {
+      channel: 'X',
+      text: 'New in Acme: scheduled exports. Pick a time, and your report lands in your inbox.',
+    },
     versioned: false,
   },
   {
@@ -102,9 +105,60 @@ export const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     name: 'Deployment-driven marketing',
     description:
       'When a production deployment succeeds, draft a campaign for review. Production capture of your product pages still runs for every production deployment.',
+    rule: 'Only production deployments.',
+    result: 'A campaign with a draft post for each channel, sent to a person for review.',
+    sample: {
+      channel: 'LinkedIn',
+      text: 'Now live in Acme: a faster editor, rolling out to every workspace today.',
+    },
+    versioned: false,
+  },
+  {
+    id: 'tag-launch',
+    family: 'tag.pushed',
+    name: 'Launch from a version tag',
+    description:
+      'For teams that tag without GitHub Releases: a new version tag becomes a release of every PR merged since the last one.',
+    rule: 'Only tags starting with v. Skips pre-releases and patch versions.',
+    result: 'A release of every PR merged since the last one, with draft posts for review.',
+    sample: {
+      channel: 'X',
+      text: 'Acme 2.4 ships 12 improvements, led by scheduled exports and a faster editor.',
+    },
+    versioned: true,
+  },
+  {
+    id: 'milestone-release',
+    family: 'milestone.closed',
+    name: 'Release a closed milestone',
+    description:
+      'When a milestone closes with nothing left open, its assigned pull requests become one release and campaign.',
+    rule: 'Only when nothing in the milestone is still open.',
+    result: 'One release of its pull requests, with draft posts for review.',
+    sample: {
+      channel: 'LinkedIn',
+      text: 'Our reporting milestone is done: scheduled exports, shared dashboards and CSV imports.',
+    },
     versioned: false,
   },
 ]
+
+/** What a template starts with in this workspace; its Setup tab in the editor changes these. */
+export function defaultTemplateInput(
+  template: WorkflowTemplate,
+  overview: AutomationOverview
+): WorkflowTemplateInput {
+  return {
+    brandKitId: overview.brands[0]?.id ?? '',
+    destinationIds: overview.destinations[0] ? [overview.destinations[0].id] : [],
+    creditLimit: actionAvailability(overview, 'generate_copy').available ? 25 : 0,
+    branch: connectedSources(overview)[0]?.branch || 'main',
+    aiRelevance: false,
+    majorMinorOnly: template.versioned,
+    renderTemplateIds: [],
+    canvas: false,
+  }
+}
 
 /** The criteria an AI relevance check starts with. */
 export const DEFAULT_RELEVANCE_CRITERIA =

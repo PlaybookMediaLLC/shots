@@ -4,6 +4,7 @@ import {
   activeLink,
   AREA_LINKS,
   areaLocked,
+  automateLinks,
   campaignLinks,
   matchesDestination,
   paidCapability,
@@ -218,7 +219,7 @@ test('the in-app plan page follows the theme like the rest of the app', () => {
 test('Campaigns lists Deliveries only where content drafts are rolled out', () => {
   assert.deepEqual(
     publishLinks('?set=a').map((item) => item.label),
-    ['Drafts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
+    ['Posts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
   )
   assert.deepEqual(
     campaignLinks(true).map((item) => item.label),
@@ -270,6 +271,35 @@ test('the highlighted page matches the address, query views included', () => {
     activeLink(AREA_LINKS.automate ?? [], '/workflows/connections', new URLSearchParams())?.label,
     'Signed-in capture'
   )
+})
+
+test('Repositories is its own page, and signed-in capture setup is for owners and admins', () => {
+  const on = (path: string) =>
+    activeLink(AREA_LINKS.automate ?? [], path, new URLSearchParams())?.label
+  // Automate opens an overview, and each page below it has its own address.
+  assert.equal(on('/workflows/overview'), 'Overview')
+  assert.equal(platformArea('/workflows/overview'), 'automate')
+  const links = (AREA_LINKS.automate ?? []).map((link) => link.href)
+  assert.equal(new Set(links).size, links.length)
+  assert.equal(on('/workflows'), 'Workflows')
+  assert.equal(on('/workflows/sources'), 'Repositories')
+  assert.ok(automateLinks(true).some((link) => link.label === 'Signed-in capture'))
+  assert.equal(
+    automateLinks(false).some((link) => link.label === 'Signed-in capture'),
+    false
+  )
+})
+
+test('search finds what people mean to do in Automate, if they can do it', () => {
+  const pages = (canManage: boolean) =>
+    palettePages({ campaignsEnabled: true, canManage, draftsEnabled: true, sectionLabel: String })
+  const labels = (query: string, canManage = true) =>
+    searchPages(pages(canManage), query).map((page) => page.label)
+  assert.ok(labels('workflow').includes('New workflow'))
+  assert.ok(labels('github').includes('Watch a repository'))
+  assert.deepEqual(labels('github', false), [])
+  assert.deepEqual(labels('signed-in', false), [])
+  assert.equal(matchesDestination('automate', 'Automate', 'github'), true)
 })
 
 test('the plan locks an area as the sidebar shows it, for the sidebar and the product tours', () => {
@@ -348,7 +378,7 @@ test('search finds every page by name, with its section, and the pages visited b
   )
 })
 
-test('every Publish link keeps the publishing brand it was opened from', () => {
+test('every Publish link keeps the profile it was opened from', () => {
   for (const link of publishLinks('?set=brand'))
     assert.ok(link.href.endsWith('?set=brand'), link.href)
 })

@@ -6,7 +6,7 @@
 
 ## Summary
 
-- PlaybookMedia LLC, a Delaware company, runs Shots. Shots is offered to customers in the United
+- Playbook Interactive Media, LLC, a Delaware company, runs Shots. Shots is offered to customers in the United
   States.
 - Shots is a cloud marketing platform. It stores accounts, workspaces, files, and posts on our
   servers. The live policy still describes a browser-only editor.
@@ -24,7 +24,7 @@
 
 | Topic                   | Decision                                      |
 | ----------------------- | --------------------------------------------- |
-| Legal entity            | PlaybookMedia LLC, a Delaware company         |
+| Legal entity            | Playbook Interactive Media, LLC, a Delaware company         |
 | Target market           | United States only                            |
 | Role for workspace data | Service provider (processor) for the customer |
 | AI training             | We do not use customer data to train models   |
@@ -34,7 +34,7 @@
 | Live section                   | Live text (short)                                                                       | Change                                                                              | Reason                                                                                                  |
 | ------------------------------ | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Header                         | "Last updated: September 27, 2026"                                                      | Use `[[EFFECTIVE DATE]]` and a version number.                                      | Versioned documents let us record what each user accepted (P5, P6).                                     |
-| Overview                       | "combines a browser-based image editor with a workspace platform"                       | Describe the full platform. Name PlaybookMedia LLC.                                 | The product now includes cloud projects, AI, publishing, billing, SSO, SCIM, and an API.                |
+| Overview                       | "combines a browser-based image editor with a workspace platform"                       | Describe the full platform. Name Playbook Interactive Media, LLC.                                 | The product now includes cloud projects, AI, publishing, billing, SSO, SCIM, and an API.                |
 | Overview                       | "Editing, compositing, and preview rendering happen on your device"                     | Keep for the editor canvas only. Add the cloud exceptions.                          | Cloud projects upload images, and AI features send canvas snapshots to AI providers.                    |
 | What Stays On Your Device      | "Images you import from your device ... are never uploaded to us for editing"           | Delete. Replace with an exact list of browser-only tools.                           | When a cloud project is open, the editor uploads local images as workspace assets.                      |
 | What Stays On Your Device      | "None of this reaches our servers."                                                     | Delete.                                                                             | Same reason. The sentence is true only for the listed browser tools.                                    |
@@ -52,7 +52,7 @@
 | Children                       | "under 13 (or under 16 in the EEA and UK)"                                              | Use `[[MINIMUM AGE]]`. State that Shots is for business use. Keep the COPPA rule.   | Paid workspaces are a business service.                                                                 |
 | Open Source                    | "Shots is open source under the Apache 2.0 license"                                     | Move to the Terms. Counsel confirms the license statement.                          | A license notice belongs in the Terms. See Terms section 15.                                            |
 | Changes                        | "Changes are reflected on this page with an updated date."                              | Add notice by email or in the product for material changes.                         | Users must learn about material changes before they take effect (P6).                                   |
-| Contact                        | `team@playbookmedia.io`                                                                 | Name PlaybookMedia LLC. Use `[[PRIVACY EMAIL]]` and `[[ADDRESS]]`.                  | A privacy policy must say who runs the service and how to reach it.                                     |
+| Contact                        | `team@playbookmedia.io`                                                                 | Name Playbook Interactive Media, LLC. Use `[[PRIVACY EMAIL]]` and `[[ADDRESS]]`.                  | A privacy policy must say who runs the service and how to reach it.                                     |
 | (new)                          | —                                                                                       | Add AI processing, social platforms, data location, and the service provider role.  | These activities exist in the code and need disclosure.                                                 |
 
 ---
@@ -65,7 +65,7 @@ Version `[[VERSION]]`. Effective `[[EFFECTIVE DATE]]`.
 
 ### 1. Who we are
 
-PlaybookMedia LLC, a Delaware limited liability company ("we", "us"), operates Shots at
+Playbook Interactive Media, LLC, a Delaware limited liability company ("we", "us"), operates Shots at
 `shots.playbookmedia.io`. Our address is `[[ADDRESS]]`. Privacy contact: `[[PRIVACY EMAIL]]`.
 
 Shots is offered to businesses in the United States.
@@ -347,4 +347,4 @@ P6.
 
 ### 17. Contact
 
-PlaybookMedia LLC, `[[ADDRESS]]`. Email `[[PRIVACY EMAIL]]`.
+Playbook Interactive Media, LLC, `[[ADDRESS]]`. Email `[[PRIVACY EMAIL]]`.

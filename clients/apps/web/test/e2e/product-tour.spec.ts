@@ -46,7 +46,7 @@ test('a new member gets the workspace tour once, and the tours menu replays it',
 
   // The menu lists it as seen and replays it from the first step.
   await page.getByRole('button', { name: 'Product tours' }).click()
-  await expect(page.getByText('1 of 2 seen')).toBeVisible()
+  await expect(page.getByText('1 of 3 seen')).toBeVisible()
   await page.getByRole('button', { name: 'Replay Find your way around' }).click()
   await expect(card.getByRole('heading', { name: 'Start anything from New' })).toBeVisible()
   await page.keyboard.press('Escape')
@@ -65,7 +65,7 @@ test('the workspace tour leads into the Publish tour on its page', async ({ app,
   await card.getByRole('button', { name: 'Start' }).click()
 
   await app.expectPath('/publish')
-  await expect(card.getByRole('heading', { name: 'Choose a publishing brand' })).toBeVisible()
+  await expect(card.getByRole('heading', { name: 'Choose a profile' })).toBeVisible()
   await expect(page.locator('[data-tour-id="write-brand"][data-product-tour-active]')).toBeVisible()
   await expect.poll(() => dismissedTips(page)).toContain('tour-workspace-v1')
 
@@ -77,4 +77,46 @@ test('the workspace tour leads into the Publish tour on its page', async ({ app,
   await app.expectPath('/home')
   await expect(card).toHaveCount(0)
   expect(await dismissedTips(page)).not.toContain('tour-publish-v1')
+})
+
+test('the Automate tour goes from a repository to a run, opening each page', async ({
+  app,
+  page,
+}) => {
+  await app.open('/workflows/overview')
+  const card = page.getByTestId('product-tour-step')
+  await card.getByRole('button', { name: 'Skip the tour' }).click()
+  await expect(card).toHaveCount(0)
+  await page.getByRole('button', { name: 'Product tours' }).click()
+  await page.getByRole('button', { name: /Automate your launches/ }).click()
+
+  await app.expectPath('/workflows/sources')
+  await expect(card.getByRole('heading', { name: 'Watch a repository' })).toBeVisible()
+  await expect(
+    page.locator('[data-tour-id="automate-repositories"][data-product-tour-active]')
+  ).toBeVisible()
+
+  await card.getByRole('button', { name: 'Next' }).click()
+  await app.expectPath('/workflows/new')
+  await expect(card.getByRole('heading', { name: 'Pick a template' })).toBeVisible()
+  await expect(
+    page.locator('[data-tour-id="automate-templates"][data-product-tour-active]')
+  ).toBeVisible()
+
+  await card.getByRole('button', { name: 'Next' }).click()
+  await expect(card.getByRole('heading', { name: 'Activate it' })).toBeVisible()
+  await expect(
+    page.locator('[data-tour-id="nav-automate"][data-product-tour-active]')
+  ).toBeVisible()
+
+  await card.getByRole('button', { name: 'Next' }).click()
+  await app.expectPath('/workflows/runs')
+  await expect(card.getByRole('heading', { name: 'See each run' })).toBeVisible()
+  await expect(
+    page.locator('[data-tour-id="automate-runs"][data-product-tour-active]')
+  ).toBeVisible()
+
+  await card.getByRole('button', { name: 'Finish' }).click()
+  await expect(card).toHaveCount(0)
+  await expect.poll(() => dismissedTips(page)).toContain('tour-automate-v1')
 })

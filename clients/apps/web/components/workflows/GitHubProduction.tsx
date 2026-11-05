@@ -39,6 +39,12 @@ const normalized = (policy: GitHubProductionPolicy): GitHubProductionPolicy => (
   jobNames: trimmed(policy.jobNames),
 })
 type Decision = z.infer<typeof githubProductionDecisionSchema>
+/** The checks whose backend names would not mean anything on their own. */
+const CHECK_NAMES: Record<string, string> = {
+  change_receipt: 'proof of change',
+  installation: 'GitHub account',
+  receipt_reporter: 'who reported the change',
+}
 
 function DecisionDetails({ decision }: { decision: Decision }) {
   return (
@@ -48,13 +54,16 @@ function DecisionDetails({ decision }: { decision: Decision }) {
       </p>
       {decision.strength ? (
         <p className="text-sm text-muted-foreground">
-          Evidence: {decision.strength.replaceAll('_', ' ')}
+          Proof: {decision.strength.replaceAll('_', ' ')}
         </p>
       ) : null}
       <ul className="space-y-1 text-sm">
         {decision.checks.map((check, index) => (
           <li key={`${check.condition}:${index}`}>
-            <strong>{check.condition}</strong>: {check.status.replaceAll('_', ' ')} — {check.reason}
+            <strong>
+              {CHECK_NAMES[check.condition] ?? check.condition.replaceAll('_', ' ')}
+            </strong>
+            : {check.status.replaceAll('_', ' ')} — {check.reason}
           </li>
         ))}
       </ul>
@@ -62,7 +71,7 @@ function DecisionDetails({ decision }: { decision: Decision }) {
   )
 }
 
-/** Repository policy, read-only preview and provider recovery share the backend authority. */
+/** A repository's production policy, a preview on past events, and recovery of missed ones. */
 export function GitHubProduction({
   sourceId,
   canManage,
@@ -159,14 +168,13 @@ export function GitHubProduction({
     (recovery.error ? getErrorMessage(recovery.error) : '')
   return (
     <div className="mx-auto w-full max-w-5xl space-y-8">
-      <ButtonLink href="/workflows?view=sources" variant="outline">
-        Back to event sources
+      <ButtonLink href="/workflows/sources" variant="outline">
+        Back to repositories
       </ButtonLink>
       <div>
-        <h2 className="text-xl font-semibold">{source?.name ?? 'Connected repository'}</h2>
+        <h2 className="text-xl font-semibold">{source?.name ?? 'Watched repository'}</h2>
         <p className="text-sm text-muted-foreground">
-          Installation {catalog.data?.installationId || 'unknown'} · repository{' '}
-          {catalog.data?.repositoryId || 'unknown'} · {catalog.data?.access ?? 'Checking access'}
+          GitHub access: {catalog.data?.access.replaceAll('_', ' ') ?? 'checking'}
         </p>
       </div>
       {failure ? (
@@ -176,35 +184,35 @@ export function GitHubProduction({
       ) : null}
       {message ? <p role="status">{message}</p> : null}
       <section className="space-y-3 rounded-lg border p-5" aria-label="GitHub access">
-        <h2 className="text-lg font-semibold">Access and subscriptions</h2>
+        <h2 className="text-lg font-semibold">What Shots can read from GitHub</h2>
         <p>{catalog.data?.reason}</p>
         <p>
-          Deployments read:{' '}
-          {catalog.data?.capabilities?.deployments ? 'available' : 'missing or unknown'}. Actions
-          read: {catalog.data?.capabilities?.actions ? 'available' : 'missing or unknown'}.
+          Deployments: {catalog.data?.capabilities?.deployments ? 'can read' : 'cannot read yet'}.
+          Actions: {catalog.data?.capabilities?.actions ? 'can read' : 'cannot read yet'}.
         </p>
         <p>
-          Subscriptions:{' '}
+          Events GitHub sends:{' '}
           {catalog.data?.capabilities?.subscriptionsKnown
             ? catalog.data.capabilities.events.join(', ') || 'none'
             : 'unknown'}
           .
         </p>
         <p className="text-sm text-muted-foreground">
-          The GitHub App owner must enable deployment_status, workflow_run and workflow_job as
-          needed. Installation owners may need to approve Actions read. Existing release and PR
-          ingestion continues while approval is pending.
+          If an event is missing, ask whoever owns the Shots GitHub App to turn on
+          deployment_status, workflow_run or workflow_job. An owner of the GitHub account may need
+          to approve Actions access. Releases and pull requests keep arriving in the meantime.
         </p>
         <Button variant="outline" onClick={() => void catalog.refetch()}>
           Refresh access
         </Button>
       </section>
       <section className="space-y-4 rounded-lg border p-5" aria-label="Production policy">
-        <h2 className="text-lg font-semibold">Repository production policy</h2>
+        <h2 className="text-lg font-semibold">What counts as production</h2>
         {latest?.policy.schemaVersion === 0 ? (
           <p className="text-amber-700">
-            This repository retains the legacy production flag-or-name rule. Saving a new policy
-            explicitly replaces it for future observations; history and queued runs stay pinned.
+            This repository still uses the older rule, which goes by a deployment&apos;s production
+            flag or environment name. Saving a policy replaces it for new events. Past events and
+            queued runs do not change.
           </p>
         ) : null}
         {latest && latest.revision !== revision ? (
@@ -234,18 +242,18 @@ export function GitHubProduction({
         ) : null}
         {!latest ? (
           <p>
-            New repositories require an explicit policy. Observations are retained for review until
-            you enable one.
+            This repository has no policy yet. Shots keeps its events for review until you turn one
+            on.
           </p>
         ) : null}
         <p className="text-sm text-muted-foreground">
-          Policy schema 1 · current revision {latest?.revision ?? 0}. Qualification is evidence for
-          a release, not approval, proof of a live revision, or general availability. Events first
-          received more than 15 minutes after occurrence are kept for review.
+          {latest ? `Revision ${latest.revision}. ` : ''}A match starts the workflow you choose. It
+          does not approve anything for customers, or prove the new version is live. Events that
+          arrive more than 15 minutes late are kept for review.
         </p>
         <fieldset disabled={!canManage || busy} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="production-signal">Evidence required</Label>
+            <Label htmlFor="production-signal">What proves a production deployment</Label>
             <Select
               value={policy.signal}
               onValueChange={(value) =>
@@ -253,7 +261,8 @@ export function GitHubProduction({
                   signal: value,
                   trustActionsOutcome: false,
                   requireChangeReceipt: value === 'deployment_status',
-                })}
+                })
+              }
             >
               <SelectTrigger
                 id="production-signal"
@@ -263,21 +272,17 @@ export function GitHubProduction({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="deployment_status">
-                  Successful reported deployment
+                  A successful deployment reported to GitHub
                 </SelectItem>
-                <SelectItem value="workflow_run">
-                  Explicitly trusted workflow outcome
-                </SelectItem>
-                <SelectItem value="workflow_job">
-                  Explicitly trusted job outcome
-                </SelectItem>
+                <SelectItem value="workflow_run">A GitHub Actions workflow you trust</SelectItem>
+                <SelectItem value="workflow_job">A GitHub Actions job you trust</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="production-environments">
-                Production environment names and aliases (one per line)
+                Production environment names (one per line)
               </Label>
               <Textarea
                 id="production-environments"
@@ -287,7 +292,7 @@ export function GitHubProduction({
             </div>
             <div className="space-y-2">
               <Label htmlFor="production-refs">
-                Allowed refs (one exact provider value per line; empty allows any)
+                Branches or tags allowed (one exact name per line; empty allows any)
               </Label>
               <Textarea
                 id="production-refs"
@@ -297,11 +302,11 @@ export function GitHubProduction({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="production-apps">Trusted reporting GitHub App IDs</Label>
+            <Label htmlFor="production-apps">GitHub App IDs allowed to report deployments</Label>
             <Input
               id="production-apps"
               value={appIdsText ?? policy.trustedAppIds.join(', ')}
-              placeholder="Required for a change receipt"
+              placeholder="Needed to prove what changed"
               onChange={(event) => {
                 setAppIdsText(event.target.value)
                 change({
@@ -321,9 +326,9 @@ export function GitHubProduction({
                 onCheckedChange={(checked) => change({ requireChangeReceipt: checked === true })}
               />
               <span>
-                Require a trusted deployment-change receipt for this SHA. Without it, a reported
-                success may be a no-op. The reporter must use task shots-deploy-v1 and a version 1
-                payload with changed and revision.
+                Require proof that this commit changed production. Without it, a success may mean
+                nothing changed. Your deploy tool must report the task shots-deploy-v1 with a
+                version 1 payload containing changed and revision.
               </span>
             </Label>
           ) : (
@@ -334,18 +339,17 @@ export function GitHubProduction({
                 onCheckedChange={(checked) => change({ trustActionsOutcome: checked === true })}
               />
               <span>
-                I explicitly trust this selected Actions outcome as production evidence for one
-                configured environment. A success can be a build or no-op; this policy does not
-                prove a new deployment change.
+                I trust this GitHub Actions result as proof of a production deployment. A success
+                can be a build that changed nothing, so this does not prove a new version went live.
               </span>
             </Label>
           )}
           <div className="space-y-2">
             <h3 className="font-medium">GitHub Actions workflows</h3>
             <p className="text-sm text-muted-foreground">
-              Select stable workflow IDs. A renamed, moved, deleted, disabled or inaccessible
-              selection requires review. Leave empty when deployment evidence has no Actions
-              requirement.
+              Choose the ones that deploy to production. If one is renamed, moved, disabled or
+              deleted, Shots asks you to review it. Leave these empty if your deployments do not
+              rely on Actions.
             </p>
             {catalog.data?.workflows.map((workflow) => (
               <Label
@@ -376,8 +380,8 @@ export function GitHubProduction({
               )
               .map((selected) => (
                 <p key={selected.id} className="text-amber-700">
-                  Unavailable selection: {selected.name} #{selected.id} ({selected.path}). Refresh
-                  access or explicitly select a replacement.{' '}
+                  Shots can no longer find {selected.name} #{selected.id} ({selected.path}). Refresh
+                  access or choose a replacement.{' '}
                   <Button
                     variant="outline"
                     size="sm"
@@ -393,17 +397,16 @@ export function GitHubProduction({
               ))}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="production-jobs">
-              Deployment job names (one exact display name per line)
-            </Label>
+            <Label htmlFor="production-jobs">Deployment job names (one exact name per line)</Label>
             <Textarea
               id="production-jobs"
               value={policy.jobNames.join('\n')}
               onChange={(event) => change({ jobNames: lines(event.target.value) })}
             />
             <p className="text-sm text-muted-foreground">
-              GitHub job instance IDs change on reruns. The rule uses an exact job name within the
-              selected stable workflow; missing provider correlation needs attention.
+              GitHub gives a job a new ID on each rerun, so the rule goes by its exact name in the
+              workflow you chose. If GitHub does not link an event to a job, it needs your
+              attention.
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2">
@@ -438,7 +441,7 @@ export function GitHubProduction({
           {catalog.data?.jobs.map((job) => (
             <div key={job.id} className="flex flex-wrap items-center gap-2">
               <span>
-                {job.name} · instance #{job.id} · {job.conclusion || job.status}
+                {job.name} · {job.conclusion || job.status}
               </span>
               <Button
                 size="sm"
@@ -466,15 +469,14 @@ export function GitHubProduction({
               <SelectContent>
                 {definitions.map((definition) => (
                   <SelectItem key={definition.id} value={definition.id}>
-                    {definition.name} · {definition.enabled ? 'active' : 'inactive'} · version{' '}
-                    {definition.activeVersionId ?? 'none'}
+                    {definition.name} · {definition.enabled ? 'active' : 'not active'}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-sm text-muted-foreground">
-              This is the Shots release-automation graph. Its active version is pinned when an event
-              arrives. Activate it in the workflow editor before enabling this policy.
+              The workflow that runs on a match. Activate it in the editor before you turn this
+              policy on. Each run keeps the version that was active when the event arrived.
             </p>
           </div>
           <Label htmlFor="production-enabled">
@@ -483,7 +485,7 @@ export function GitHubProduction({
               checked={policy.enabled}
               onCheckedChange={(checked) => change({ enabled: checked === true })}
             />
-            Enable for new live events
+            Turn on for new events
           </Label>
           <Button
             onClick={() =>
@@ -499,22 +501,22 @@ export function GitHubProduction({
                 setDraft(null)
                 setPreview(null)
                 await state.refetch()
-                setMessage('Policy revision saved. Historical events were not replayed.')
+                setMessage('Policy saved. Past events were not run again.')
               })
             }
           >
-            Save policy revision
+            Save policy
           </Button>
         </fieldset>
         {!canManage ? <p>Owners and administrators can change this policy.</p> : null}
       </section>
-      <section className="space-y-4 rounded-lg border p-5" aria-label="Evidence and preview">
-        <h2 className="text-lg font-semibold">Evidence and read-only preview</h2>
+      <section className="space-y-4 rounded-lg border p-5" aria-label="Past events and preview">
+        <h2 className="text-lg font-semibold">Past events</h2>
         <p>
-          Preview uses recorded evidence and performs no enrichment, writes, workflow execution or
-          paid generation. A missing value remains unknown.
+          See how this policy treats an event GitHub already sent. Nothing runs, nothing is saved,
+          and no credits are spent. A value GitHub did not send stays unknown.
         </p>
-        <Label htmlFor="production-observation">Recorded observation</Label>
+        <Label htmlFor="production-observation">Past event</Label>
         <Select
           value={observationId}
           onValueChange={(value) => {
@@ -551,12 +553,12 @@ export function GitHubProduction({
             })
           }
         >
-          Preview current policy
+          Preview this policy
         </Button>
         {preview ? <DecisionDetails decision={preview} /> : null}
         {selectedObservation ? (
           <div className="space-y-3 border-t pt-4">
-            <h3 className="font-medium">Recorded decision</h3>
+            <h3 className="font-medium">What Shots decided at the time</h3>
             <DecisionDetails decision={selectedObservation.decision} />
             <dl className="grid gap-2 break-all text-sm md:grid-cols-2">
               <div>
@@ -564,7 +566,7 @@ export function GitHubProduction({
                 <dd>{selectedObservation.deliveryId}</dd>
               </div>
               <div>
-                <dt>Source object / observation</dt>
+                <dt>GitHub object / event</dt>
                 <dd>
                   {selectedObservation.evidence.objectKey} /{' '}
                   {selectedObservation.evidence.observationId}
@@ -577,23 +579,23 @@ export function GitHubProduction({
                 </dd>
               </div>
               <div>
-                <dt>Processing / origin / duplicates</dt>
+                <dt>Processed / how it arrived / duplicates</dt>
                 <dd>
                   {selectedObservation.processedAt ?? 'Pending'} / {selectedObservation.origin} /{' '}
                   {selectedObservation.duplicates}
                 </dd>
               </div>
               <div>
-                <dt>Policy / Shots workflow version</dt>
+                <dt>Policy / workflow version</dt>
                 <dd>
-                  {selectedObservation.policyId ?? 'Unconfigured'} /{' '}
+                  {selectedObservation.policyId ?? 'No policy'} /{' '}
                   {selectedObservation.workflowVersionId ?? 'None'}
                 </dd>
               </div>
               <div>
-                <dt>Resulting Shots event</dt>
+                <dt>What it started</dt>
                 <dd>
-                  {selectedObservation.eventId ?? 'No event created'}{' '}
+                  {selectedObservation.eventId ?? 'Nothing'}{' '}
                   {selectedObservation.runId ? (
                     <ButtonLink href={`/workflows/runs/${selectedObservation.runId}`}>
                       View workflow run
@@ -604,7 +606,7 @@ export function GitHubProduction({
               </div>
             </dl>
             <Disclosure>
-              <DisclosureTrigger>Provider evidence</DisclosureTrigger>
+              <DisclosureTrigger>What GitHub sent</DisclosureTrigger>
               <DisclosureContent>
                 <pre className="max-h-96 overflow-auto whitespace-pre-wrap text-xs">
                   {JSON.stringify(selectedObservation.evidence, null, 2)}
@@ -658,25 +660,25 @@ export function GitHubProduction({
           </DisclosureContent>
         </Disclosure>
       </section>
-      <section className="space-y-3 rounded-lg border p-5" aria-label="Delivery recovery">
-        <h2 className="text-lg font-semibold">Delivery recovery and history gaps</h2>
+      <section className="space-y-3 rounded-lg border p-5" aria-label="Missed events">
+        <h2 className="text-lg font-semibold">Missed events</h2>
         <p>
-          <strong>{recovery.data?.status ?? 'Loading'}</strong> — {recovery.data?.reason}
+          <strong>{recovery.data?.status.replaceAll('_', ' ') ?? 'Loading'}</strong> —{' '}
+          {recovery.data?.reason}
         </p>
         <p>
-          Available window begins: {recovery.data?.windowStart ?? 'Unknown'}. Last completed
-          inspection: {recovery.data?.lastCompleteAt ?? 'Never'}.
+          GitHub&apos;s history starts: {recovery.data?.windowStart ?? 'unknown'}. Last checked:{' '}
+          {recovery.data?.lastCompleteAt ?? 'never'}.
         </p>
         <p>
-          History gap:{' '}
           {recovery.data?.gap === false
-            ? 'No gap found in the inspected delivery window; events never sent remain unknown.'
-            : 'Yes or unknown. Review GitHub deployments and releases with the repository owner.'}
+            ? 'Nothing is missing from what GitHub still has. Events it never sent stay unknown.'
+            : 'Events may be missing. Compare GitHub deployments and releases with whoever owns the repository.'}
         </p>
         <p className="text-sm text-muted-foreground">
-          GitHub.com retains delivery history for three days and does not automatically retry
-          failures. Recovery imports evidence for review only, without live automation. A successful
-          redelivery request is not proof of receipt.
+          GitHub keeps its delivery history for three days and does not retry failures by itself.
+          Recovered events are kept for review and do not start workflows. Asking GitHub to resend
+          an event does not prove it arrived.
         </p>
         {canManage ? (
           <div className="flex flex-wrap gap-2">
@@ -693,7 +695,7 @@ export function GitHubProduction({
                 })
               }
             >
-              {recovery.data?.hasMore ? 'Inspect next page' : 'Inspect delivery history'}
+              {recovery.data?.hasMore ? 'Check the next page' : 'Check for missed events'}
             </Button>
             <Button
               variant="outline"
@@ -708,12 +710,12 @@ export function GitHubProduction({
                 })
               }
             >
-              Recover failed deliveries for review
+              Recover missed events for review
             </Button>
           </div>
         ) : null}
         {recovery.data?.nextAttemptAt ? (
-          <p className="text-sm">Next inspection or retry after {recovery.data.nextAttemptAt}.</p>
+          <p className="text-sm">Next check or retry after {recovery.data.nextAttemptAt}.</p>
         ) : null}
         <ul className="space-y-2 text-sm">
           {recovery.data?.deliveries.map((delivery) => (

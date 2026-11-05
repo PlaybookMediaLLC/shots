@@ -65,9 +65,7 @@ test('custom Mastodon authorization keeps the selected origin and commits one pr
       route.fulfill({ contentType: 'text/html', body: '<h1>Fixture Mastodon authorization</h1>' })
     )
     await app.open('/settings/publishing-brands')
-    await page
-      .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
-      .click()
+    await page.getByRole('button', { name: 'Add profile to your personal workspace' }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('button', { name: 'Mastodon', exact: true }).click()
     await chooseOption(dialog.getByRole('combobox', { name: 'Mastodon server' }), /^Custom server/)
@@ -114,7 +112,7 @@ test('custom Mastodon authorization keeps the selected origin and commits one pr
     expect(
       provider.calls.filter((call) => call.url === '/integrations/social-connect/mastodon-custom')
     ).toHaveLength(1)
-    await expect(page.getByLabel('Publishing brand name', { exact: true })).toHaveValue('New brand')
+    await expect(page.getByLabel('Profile name', { exact: true })).toHaveValue('New profile')
     await page.screenshot({
       path: '.context/mastodon-connection-fixture.png',
       animations: 'disabled',

@@ -264,13 +264,17 @@ test('X OAuth start binds its one-use callback to the active workspace', async (
     await app.open(`/integrations/social/x?oauth_token=${state}&oauth_verifier=test-verifier`)
     await expect(page).toHaveURL(/\/settings\/channels\?connected=x$/)
     await expect(page.getByText('X is connected.')).toBeVisible()
-    // One row per platform: its Connect button keeps its width and reads on the light card,
-    // and the new account shows as a chip in its row.
+    // One row per platform: the new account shows as a chip, with its status in words, and
+    // the row's button, now Add another, keeps its width and reads on the light card.
     const xRow = page.locator('#channels-x')
     await expect(xRow.getByTestId('channel-account')).toHaveCount(1)
+    await expect(xRow.getByTestId('channel-account')).toContainText(
+      /Active|Needs reconnect|Disconnected/
+    )
+    await expect(xRow.getByRole('link', { name: 'Connect X', exact: true })).toHaveCount(0)
     for (const width of [584, 1440]) {
       await page.setViewportSize({ width, height: 900 })
-      const connect = xRow.getByRole('link', { name: 'Connect X', exact: true })
+      const connect = xRow.getByRole('link', { name: 'Add another X account', exact: true })
       await expect(connect).toBeVisible()
       expect((await connect.boundingBox())?.width ?? 0).toBeGreaterThan(120)
       expect(await contrastOf(connect)).toBeGreaterThanOrEqual(4.5)

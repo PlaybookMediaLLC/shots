@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import type { SocialObservation, BackendBestTime } from 'screenshot-studio-backend-sdk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { DAY_STYLE, LocalTime, useHydrated, useWhen } from '@/components/drafts/local-time'
 import {
   Accordion,
   AccordionContent,
@@ -59,6 +60,11 @@ export function SocialAnalytics({
   const [period, setPeriod] = useState<'week' | 'month'>('week')
   const [metric, setMetric] = useState('likes')
   const router = useRouter()
+  const hydrated = useHydrated()
+  const when = useWhen()
+  // Blank until hydrated, as LocalTime is. Providers send their own date strings, which may not parse.
+  const day = (value: string) =>
+    !hydrated ? '' : Number.isNaN(Date.parse(value)) ? value : when(value, 'UTC', DAY_STYLE)
   const rows = useMemo(
     () => observations.filter((row) => channel === 'all' || row.platform === channel),
     [observations, channel]
@@ -89,9 +95,9 @@ export function SocialAnalytics({
       <div>
         <h1 className="text-2xl font-semibold">Social analytics</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Provider observations from {range.start} to {range.end} (UTC). Post metrics are cumulative
-          snapshots, not engagement earned during each period. New posts are collected daily for 30
-          days.
+          Provider observations from {day(range.start)} to {day(range.end)} (UTC). Post metrics are
+          cumulative snapshots, not engagement earned during each period. New posts are collected
+          daily for 30 days.
         </p>
       </div>
       {socialSetId && recommendations.length > 0 && (
@@ -208,7 +214,7 @@ export function SocialAnalytics({
                       width={Math.max(1, 600 / buckets.length - 4)}
                       height={Math.max(1, (bucket.value / maximum) * 150)}
                     >
-                      <title>{`${bucket.date}: ${bucket.value}`}</title>
+                      <title>{`${day(bucket.date)}: ${bucket.value}`}</title>
                     </rect>
                   )
                 )}
@@ -224,7 +230,7 @@ export function SocialAnalytics({
                 <TableBody>
                   {buckets.map((bucket) => (
                     <TableRow key={bucket.date}>
-                      <TableCell>{bucket.date}</TableCell>
+                      <TableCell>{day(bucket.date)}</TableCell>
                       <TableCell>{bucket.value ?? 'Unavailable'}</TableCell>
                       <TableCell>{bucket.posts}</TableCell>
                     </TableRow>
@@ -272,7 +278,7 @@ export function SocialAnalytics({
                         : 'Unavailable'}
                     </TableCell>
                     <TableCell>
-                      {new Date(row.observedAt).toISOString().slice(0, 16).replace('T', ' ')} UTC
+                      <LocalTime value={row.observedAt} zone={timeZone} />
                     </TableCell>
                     <TableCell>
                       {row.status === 'failed' ? 'Read failed; retry pending' : row.status}
@@ -311,8 +317,8 @@ export function SocialAnalytics({
                       <TableCell>{bucket.platform}</TableCell>
                       <TableCell className="max-w-40 break-words">{bucket.connection}</TableCell>
                       <TableCell>{bucket.metric}</TableCell>
-                      <TableCell>{bucket.period}</TableCell>
-                      <TableCell>{bucket.date}</TableCell>
+                      <TableCell>{day(bucket.period)}</TableCell>
+                      <TableCell>{day(bucket.date)}</TableCell>
                       <TableCell>{bucket.value.toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
@@ -348,7 +354,7 @@ export function SocialAnalytics({
                             <TableBody>
                               {series.data.map((point, index) => (
                                 <TableRow key={index}>
-                                  <TableCell>{point.date}</TableCell>
+                                  <TableCell>{day(point.date)}</TableCell>
                                   <TableCell>{point.total}</TableCell>
                                 </TableRow>
                               ))}

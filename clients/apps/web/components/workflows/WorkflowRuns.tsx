@@ -4,6 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { WorkflowRunLink } from './WorkflowRunLink'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useMemo } from 'react'
+import Link from 'next/link'
+import { ButtonLink } from '@/components/platform-shell/ButtonLink'
+import { AutomateIcon } from '@/components/platform-shell/icons'
+import { EmptyState } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -31,6 +35,7 @@ import {
   type AutomationHistoryFilter,
 } from '@/lib/api/contracts/workflow-runs'
 import { useTRPC } from '@/lib/trpc/react'
+import { connectedSources } from '@/lib/workflows/actions'
 import { runDateBoundary, runDateDay, runHandler } from '@/lib/workflows/history'
 import { FAMILY_NAMES } from './workflow-canvas'
 import {
@@ -43,6 +48,11 @@ import {
 } from './workflow-ui'
 
 const ALL = 'all'
+
+/** The local calendar day, the latest a run can have started. */
+function today(): string {
+  return runDateDay(new Date().toISOString())
+}
 
 /** Persisted run history with workflow, event, repository, status, and date filters. */
 export function WorkflowRuns() {
@@ -134,83 +144,88 @@ export function WorkflowRuns() {
       label: 'Handled by',
       options: [
         ['automation', 'Workflows'],
-        ['legacy', 'Manual release intake'],
+        ['legacy', 'Release inbox'],
       ],
     },
   ]
 
+  const noRuns = items?.length === 0 && params.size === 0
   return (
-    <div className="flex flex-col gap-6">
-      <form
-        aria-label="Run filters"
-        className="flex flex-wrap items-end gap-3"
-        onSubmit={(event) => event.preventDefault()}
-      >
-        {selects.map(({ key, label, options }) => (
-          <Label className="grid gap-1 text-xs text-muted-foreground" key={key}>
-            {label}
-            <Select onValueChange={(value) => setFilter(key, value)} value={filter[key] ?? ALL}>
-              <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className="h-9 w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                position="popper"
-                align="start"
-                className="max-w-[min(24rem,calc(100vw-2rem))]"
-              >
-                <SelectItem value={ALL}>All</SelectItem>
-                {options.map(([value, text]) => (
-                  <SelectItem className="break-words whitespace-normal" key={value} value={value}>
-                    {text}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Label>
-        ))}
-        {(['since', 'until'] as const).map((key) => (
-          <Label className="grid gap-1 text-xs text-muted-foreground" key={key}>
-            {key === 'since' ? 'From' : 'To (inclusive)'}
-            <DatePicker
-              aria-label={key === 'since' ? 'Runs from date' : 'Runs through date'}
-              className="h-9 w-40"
-              onChange={(day) => setFilter(key, runDateBoundary(day, key === 'until'))}
-              min={key === 'until' ? runDateDay(filter.since) : undefined}
-              max={key === 'since' ? runDateDay(filter.until, true) : undefined}
-              placeholder="Any day"
-              value={runDateDay(filter[key], key === 'until')}
-            />
-          </Label>
-        ))}
-        {filter.since || filter.until ? (
-          <Button
-            onClick={() => setFilter(['since', 'until'], '')}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            Clear dates
-          </Button>
-        ) : null}
-        {filter.versionId ? (
-          <Button
-            onClick={() => setFilter('versionId', '')}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            Clear version filter
-          </Button>
-        ) : null}
-        <p className="w-full text-xs text-muted-foreground">
-          Dates and times use your local timezone. To includes the entire selected day.
-        </p>
-        {params.size ? (
-          <Button size="sm" variant="ghost" onClick={() => router.push(pathname)}>
-            Clear filters
-          </Button>
-        ) : null}
-      </form>
+    <div className="flex flex-col gap-6" data-tour-id="automate-runs">
+      {noRuns ? null : (
+        <form
+          aria-label="Run filters"
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(event) => event.preventDefault()}
+        >
+          {selects.map(({ key, label, options }) => (
+            <Label className="grid gap-1 text-xs text-muted-foreground" key={key}>
+              {label}
+              <Select onValueChange={(value) => setFilter(key, value)} value={filter[key] ?? ALL}>
+                <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className="h-9 w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                  position="popper"
+                  align="start"
+                  className="max-w-[min(24rem,calc(100vw-2rem))]"
+                >
+                  <SelectItem value={ALL}>All</SelectItem>
+                  {options.map(([value, text]) => (
+                    <SelectItem className="break-words whitespace-normal" key={value} value={value}>
+                      {text}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Label>
+          ))}
+          {(['since', 'until'] as const).map((key) => (
+            <Label className="grid gap-1 text-xs text-muted-foreground" key={key}>
+              {key === 'since' ? 'From' : 'To (inclusive)'}
+              <DatePicker
+                aria-label={key === 'since' ? 'Runs from date' : 'Runs through date'}
+                className="h-9 w-40"
+                onChange={(day) => setFilter(key, runDateBoundary(day, key === 'until'))}
+                min={key === 'until' ? runDateDay(filter.since) : undefined}
+                max={(key === 'since' && runDateDay(filter.until, true)) || today()}
+                placeholder="Any day"
+                value={runDateDay(filter[key], key === 'until')}
+              />
+            </Label>
+          ))}
+          {filter.since || filter.until ? (
+            <Button
+              onClick={() => setFilter(['since', 'until'], '')}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Clear dates
+            </Button>
+          ) : null}
+          {filter.versionId ? (
+            <Button
+              onClick={() => setFilter('versionId', '')}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Clear version filter
+            </Button>
+          ) : null}
+          <p className="w-full text-xs text-muted-foreground">
+            Dates and times use your local timezone. To includes the entire selected day. Handled by
+            Release inbox means no workflow handles that repository yet, so its merged pull requests
+            wait in Campaigns.
+          </p>
+          {params.size ? (
+            <Button size="sm" variant="ghost" onClick={() => router.push(pathname)}>
+              Clear filters
+            </Button>
+          ) : null}
+        </form>
+      )}
 
       {error ? (
         <Alert variant="destructive">
@@ -222,6 +237,34 @@ export function WorkflowRuns() {
         <p className="text-sm text-muted-foreground" role="status">
           Loading runs…
         </p>
+      ) : noRuns ? (
+        <EmptyState
+          action={
+            overview && overview.definitions.some((definition) => definition.enabled) ? null : (
+              <ButtonLink
+                href={
+                  overview && connectedSources(overview).length === 0
+                    ? '/workflows/sources'
+                    : '/workflows'
+                }
+              >
+                {overview && connectedSources(overview).length === 0
+                  ? 'Watch a repository'
+                  : 'Set up a workflow'}
+              </ButtonLink>
+            )
+          }
+          description={
+            <>
+              Runs appear after a watched repository ships something and a workflow handles it.{' '}
+              <Link className="underline" href="/docs/automate" rel="noopener" target="_blank">
+                Read the guide
+              </Link>
+            </>
+          }
+          icon={AutomateIcon}
+          title="No runs yet"
+        />
       ) : items.length === 0 ? (
         <p className="rounded-2xl p-10 text-center text-sm text-muted-foreground ring-1 ring-border">
           No runs match these filters.

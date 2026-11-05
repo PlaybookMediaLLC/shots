@@ -1,11 +1,11 @@
 import { startGitHubConnection, githubSettingsUrl } from '@/lib/tenant/github'
 
-/** Send an admin to GitHub to install the App, or (`?existing=1`) to link an installation they have. */
+/** Send an admin to GitHub to link the App, or install it if there is nothing to link; `?install=1` goes straight to installing. */
 export async function GET(request: Request): Promise<Response> {
   let destination: string
   try {
-    const existing = new URL(request.url).searchParams.get('existing') === '1'
-    destination = await startGitHubConnection(request.headers, existing)
+    const install = new URL(request.url).searchParams.get('install') === '1'
+    destination = await startGitHubConnection(request.headers, install)
   } catch {
     destination = githubSettingsUrl('failed')
   }

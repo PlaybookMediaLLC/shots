@@ -5,7 +5,10 @@ import { readWire } from '@/lib/plan/wire'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
-import { NotePencilIcon } from '@phosphor-icons/react/dist/ssr/NotePencil'
+import { CheckCircleIcon } from '@phosphor-icons/react/dist/ssr/CheckCircle'
+import { NoteIcon } from '@phosphor-icons/react/dist/ssr/Note'
+import { WarningIcon } from '@phosphor-icons/react/dist/ssr/Warning'
+import { WarningCircleIcon } from '@phosphor-icons/react/dist/ssr/WarningCircle'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import {
@@ -14,10 +17,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
+import { DAY_STYLE, useWhen, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Pill } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
+import { useTwelveHour } from '@/components/ui/format-preferences'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -28,7 +34,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { TimePicker } from '@/components/ui/time-picker'
 import {
   Dialog,
@@ -64,12 +69,15 @@ import {
   type DraftTagWire,
   type DraftActivityWire,
 } from '@/lib/write/client'
-import { wallTime, isTimeZone, resolveLocalTime } from '@/lib/write/zoned-time'
+import { wallTime, isTimeZone, localDateTimeSchema, resolveLocalTime } from '@/lib/write/zoned-time'
 import { addDays, zonedDayKey, zonedInstant } from '@/lib/settings/zoned-time'
+import { formatTimeOfDay } from '@/lib/time-of-day'
+import { zoneLabel } from '@/lib/time-zones'
 import {
+  brandDaySlots,
   calendarDays,
-  displayDaySlots,
   itemDay,
+  occurrence,
   planPreferencesSchema,
   movedToDay,
   selectedInstant,
@@ -99,6 +107,28 @@ const readable = (
 ) => new Date(`${day}T12:00:00Z`).toLocaleDateString(undefined, { ...options, timeZone: 'UTC' })
 const toggle = (values: string[], value: string) =>
   values.includes(value) ? values.filter((v) => v !== value) : [...values, value]
+const CARD_TIME: Intl.DateTimeFormatOptions = {
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZoneName: 'short',
+}
+const STATUS_ICONS: Record<string, typeof WarningIcon> = {
+  Failed: WarningCircleIcon,
+  'Needs check': WarningIcon,
+  Overdue: WarningIcon,
+  Published: CheckCircleIcon,
+}
+
+/** A card's state in words, with an icon on the outcomes: its border colour never says it alone. */
+function StatusWord({ status }: { status: string }) {
+  const Icon = STATUS_ICONS[status]
+  return (
+    <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
+      {Icon ? <Icon aria-hidden className="size-3 shrink-0" /> : null}
+      {status}
+    </span>
+  )
+}
 
 /** Plan uses the existing drafts and publishing APIs, with independent personal view state. */
 export function PlanWorkspace({
@@ -126,9 +156,10 @@ export function PlanWorkspace({
   advancedScheduling?: boolean
 }) {
   const router = useRouter()
+  const when = useWhen()
+  const twelveHour = useTwelveHour()
   const [prefs, setPrefs] = React.useState<PlanPreferences>(() =>
     planPreferencesSchema.parse({
-      zone: initialZone,
       weekStart: initialWeekStart,
       view:
         initialView === 'queue'
@@ -159,7 +190,6 @@ export function PlanWorkspace({
     day: string
     time: string
     setId: string
-    zone?: string
     selected?: DraftWire
     source?: 'drafts' | 'posted'
   } | null>(null)
@@ -175,17 +205,20 @@ export function PlanWorkspace({
   const activeIds = prefs.visible ?? sets.map((s) => s.id)
   const focused = activeIds.length === 1 ? sets.find((s) => s.id === activeIds[0]) : undefined
   const days = calendarDays(anchor, prefs.view, prefs.weekStart, weeks)
-  const rangeKey = `${days[0]}:${days.at(-1)}:${prefs.zone}`
-  const today = zonedDayKey(new Date(), prefs.zone)
-  const shown = visibleItems(items, prefs)
+  const rangeKey = `${days[0]}:${days.at(-1)}`
+  // Each post sits on its own brand's clock; "today" and a new draft follow the first brand in view.
+  const today = zonedDayKey(
+    new Date(),
+    sets.find((s) => s.id === activeIds[0])?.timeZone ?? initialZone
+  )
+  const shown = visibleItems(items, prefs).filter((item) => days.includes(itemDay(item)))
   const weekCardHeight = prefs.density === 'compact' ? 88 : 120
   const weekLayouts = Object.fromEntries(
     prefs.view === 'week'
       ? days.map((day) => [
           day,
           weekCardLayout(
-            shown.filter((item) => itemDay(item, prefs.zone) === day),
-            prefs.zone,
+            shown.filter((item) => itemDay(item) === day),
             weekCardHeight
           ),
         ])
@@ -237,11 +270,11 @@ export function PlanWorkspace({
     const controller = new AbortController()
     setLoad('loading')
     setItems([])
-    const [start, end, zone] = rangeKey.split(':')
-    // IANA zones contain slashes, not colons; stored instants never change with this preference.
+    const [start, end] = rangeKey.split(':')
+    // Any brand's day falls within a day either side of the range in UTC; `shown` trims the rest.
     const query = new URLSearchParams({
-      from: zonedInstant(start, 0, 0, zone).toISOString(),
-      to: zonedInstant(addDays(end, 1), 0, 0, zone).toISOString(),
+      from: zonedInstant(addDays(start, -1), 0, 0, 'UTC').toISOString(),
+      to: zonedInstant(addDays(end, 2), 0, 0, 'UTC').toISOString(),
     })
     const read = async (path: string) => {
       const r = await fetch(`${path}?${query}`, { signal: controller.signal })
@@ -267,7 +300,10 @@ export function PlanWorkspace({
             // Placed at its slot; publishAt is the instant after any natural offset.
             at: p.slotAt ?? p.scheduledFor,
             publishAt: p.scheduledFor,
-            zone: p.scheduleTimeZone ?? 'UTC',
+            zone:
+              sets.find((s) => s.id === p.socialSetId)?.timeZone ??
+              p.scheduleTimeZone ??
+              initialZone,
             deliveryStatus: p.status,
             status: postState(p.status, p.scheduledFor),
             failureCode: p.failureCode,
@@ -288,7 +324,8 @@ export function PlanWorkspace({
               setId: d.socialSetId ?? '',
               platform: d.primaryPlatform ?? '',
               at: d.plannedFor,
-              zone: d.planTimeZone ?? 'UTC',
+              zone:
+                sets.find((s) => s.id === d.socialSetId)?.timeZone ?? d.planTimeZone ?? initialZone,
               status: 'Planned',
               title: d.title,
               text: d.plainText || draftPlainText(d.body),
@@ -305,13 +342,12 @@ export function PlanWorkspace({
         }
       })
     return () => controller.abort()
-  }, [rangeKey, refresh, hydrated])
+  }, [rangeKey, refresh, hydrated, sets, initialZone])
   // Notes are dates: no zone is applied, and a failure here leaves the posts usable.
-  const noteRange = `${days[0]}:${days.at(-1)}`
   React.useEffect(() => {
     if (!hydrated) return
     const controller = new AbortController()
-    const [from, to] = noteRange.split(':')
+    const [from, to] = rangeKey.split(':')
     setNotesFailed(false)
     fetch(`/api/v1/calendar/notes?${new URLSearchParams({ from, to })}`, {
       signal: controller.signal,
@@ -324,7 +360,7 @@ export function PlanWorkspace({
         if (!controller.signal.aborted) setNotesFailed(true)
       })
     return () => controller.abort()
-  }, [noteRange, refresh, hydrated])
+  }, [rangeKey, refresh, hydrated])
   const scopeKey = activeIds.slice().sort().join(',')
   React.useEffect(() => {
     // The saved brand selection loads first; reading tags before it read them twice.
@@ -366,7 +402,7 @@ export function PlanWorkspace({
     { key: 't', label: 'Today', run: () => setAnchor(today) },
     { key: 'arrowleft', label: 'Previous period', run: () => changePeriod(-1) },
     { key: 'arrowright', label: 'Next period', run: () => changePeriod(1) },
-    { key: 'escape', label: 'Back to publishing brands', run: () => setSidebar(null) },
+    { key: 'escape', label: 'Back to profiles', run: () => setSidebar(null) },
   ])
   const placement = (item: PlanItem, at: string | null): CalendarPlacement => ({
     draftId: item.draftId,
@@ -447,11 +483,11 @@ export function PlanWorkspace({
       return
     }
     try {
-      // A day keeps the post's own clock; a week hour is the one picked in this display.
+      // A day keeps the post's clock; a week hour is that hour on its brand's clock.
       const at =
         hour === undefined
-          ? movedToDay(item.at, item.zone, prefs.zone, day)
-          : selectedInstant(`${day}T${String(hour).padStart(2, '0')}:00`, prefs.zone, 'reject')
+          ? movedToDay(item.at, item.zone, day)
+          : selectedInstant(`${day}T${String(hour).padStart(2, '0')}:00`, item.zone, 'reject')
       void mutate('move', [placement(item, at.toISOString())])
     } catch (e) {
       toast.error((e as Error).message)
@@ -479,32 +515,25 @@ export function PlanWorkspace({
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(DRAG)) e.preventDefault()
       }}
-      onDrop={(e) => drop(e, itemDay(item, prefs.zone), undefined, item)}
+      onDrop={(e) => drop(e, itemDay(item), undefined, item)}
       onClick={() =>
         item.campaignId ? router.push(`/campaigns/${item.campaignId}`) : setDetail(item)
       }
-      className={`block h-auto w-full min-w-0 rounded-lg border p-2 text-left text-xs font-normal whitespace-normal shadow-sm ${weekly ? 'h-full overflow-hidden' : ''} ${item.status === 'Planned' ? 'border-dashed border-violet-400' : item.status === 'Published' ? 'border-emerald-500' : item.status === 'Failed' ? 'border-red-500' : item.status === 'Needs check' || item.status === 'Overdue' ? 'border-amber-500' : 'border-sky-500'} bg-background`}
+      className={`block h-auto w-full min-w-0 rounded-lg border p-1.5 text-left text-xs font-normal whitespace-normal shadow-sm ${weekly ? 'h-full overflow-hidden' : ''} ${item.status === 'Planned' ? 'border-dashed border-violet-400' : item.status === 'Published' ? 'border-emerald-500' : item.status === 'Failed' ? 'border-red-500' : item.status === 'Needs check' || item.status === 'Overdue' ? 'border-amber-500' : 'border-sky-500'} bg-background`}
     >
-      {/* One line, so the post text keeps its room in a fixed-height week card: the
-          time stays whole and the status gives way first. */}
-      <span className="block truncate text-muted-foreground">
-        <span className="whitespace-nowrap">
-          {new Date(item.at).toLocaleTimeString(undefined, {
-            hour: 'numeric',
-            minute: '2-digit',
-            timeZone: prefs.zone,
-          })}
-        </span>{' '}
-        · {item.status}
+      {/* One line while they fit, so the post text keeps its room in a fixed-height week
+          card; in a narrow column they wrap, and neither the time nor the status is cut. */}
+      <span className="flex flex-wrap items-center gap-x-1.5 text-muted-foreground">
+        <span>{when(item.at, item.zone, CARD_TIME)}</span>
+        <StatusWord status={item.status} />
       </span>
       {item.publishAt && new Date(item.publishAt).getTime() !== new Date(item.at).getTime() ? (
-        <span className="block truncate text-muted-foreground" data-testid="calendar-publish-at">
+        <span className="block text-muted-foreground" data-testid="calendar-publish-at">
           publishes{' '}
-          {new Date(item.publishAt).toLocaleTimeString(undefined, {
+          {when(item.publishAt, item.zone, {
             hour: 'numeric',
             minute: '2-digit',
             second: '2-digit',
-            timeZone: prefs.zone,
           })}
         </span>
       ) : null}
@@ -526,7 +555,7 @@ export function PlanWorkspace({
     </Button>
   )
   const dayCards = (day: string) => {
-    const onDay = shown.filter((i) => itemDay(i, prefs.zone) === day)
+    const onDay = shown.filter((i) => itemDay(i) === day)
     const capped = prefs.view === 'month' && !prefs.showAll
     const open = openDays.includes(day)
     const { visible, hidden } = capped ? visibleDayItems(onDay) : { visible: onDay, hidden: 0 }
@@ -551,14 +580,14 @@ export function PlanWorkspace({
   }
   const slotsFor = (day: string, absolute = false) =>
     focused && prefs.slots
-      ? displayDaySlots(
+      ? brandDaySlots(
           day,
-          prefs.zone,
           focused.timeZone,
           focused.postingSlots,
           takenSlots(items, focused.id)
         ).map((slot) => {
-          const [hour, minute] = slot.displayTime.split(':').map(Number)
+          const [hour, minute] = slot.time.split(':').map(Number)
+          const time = formatTimeOfDay(slot.time, twelveHour)
           return (
             <div
               key={slot.at}
@@ -571,17 +600,10 @@ export function PlanWorkspace({
                 variant="custom"
                 disabled={!canEdit}
                 // The zone stays in the name and tooltip; in the cell it wrapped into the next day.
-                aria-label={`Available · ${slot.displayTime} (${prefs.zone})`}
-                title={`Available · ${slot.displayTime} (${prefs.zone})`}
+                aria-label={`Available · ${time} (${zoneLabel(focused.timeZone)})`}
+                title={`Available · ${time} (${zoneLabel(focused.timeZone)})`}
                 className="block h-auto w-full rounded border border-dashed p-2 text-xs font-normal break-words whitespace-normal text-muted-foreground"
-                onClick={() =>
-                  setCompose({
-                    day: slot.localDay,
-                    time: slot.localTime,
-                    setId: focused.id,
-                    zone: focused.timeZone,
-                  })
-                }
+                onClick={() => setCompose({ day, time: slot.time, setId: focused.id })}
                 onDragOver={(event) => event.preventDefault()}
                 onDrop={(event) => {
                   event.preventDefault()
@@ -593,54 +615,25 @@ export function PlanWorkspace({
                   else {
                     const selected = sources?.find((draft) => draft.id === id)
                     if (selected)
-                      setCompose({
-                        day: slot.localDay,
-                        time: slot.localTime,
-                        setId: focused.id,
-                        zone: focused.timeZone,
-                        selected,
-                        source,
-                      })
+                      setCompose({ day, time: slot.time, setId: focused.id, selected, source })
                   }
                 }}
               >
-                Available · {slot.displayTime}
-              </Button>
-              <Button
-                className="block w-full text-right text-[10px] text-muted-foreground underline"
-                onClick={() => openBrandSettings('scheduling', focused.id)}
-                size={null}
-                type="button"
-                variant="custom"
-              >
-                Edit schedule
+                Available · {time}
+                {focused.naturalPostingTimes ? ' ±4 min' : ''}
               </Button>
             </div>
           )
         })
       : null
-  // A grid day and hour are read in the display zone, then composed in the brand's zone.
+  // A grid day and hour are read on the clock of the brand the draft is for.
   const create = (
     day: string,
     time = '12:00',
     from: { setId?: string; selected?: DraftWire; source?: 'drafts' | 'posted' } = {}
   ) => {
     const setId = from.setId || focused?.id || activeIds[0] || sets[0]?.id || ''
-    const scheduleZone = sets.find((set) => set.id === setId)?.timeZone ?? prefs.zone
-    const resolved = resolveLocalTime(`${day}T${time}`, prefs.zone)
-    if (resolved.kind !== 'exact') {
-      // Keep the explicit display-zone occurrence selector for ambiguous grid hours.
-      setCompose({ ...from, day, time, setId, zone: prefs.zone })
-      return
-    }
-    const local = wallTime(resolved.at, scheduleZone)
-    setCompose({
-      ...from,
-      day: local.slice(0, 10),
-      time: local.slice(11),
-      setId,
-      zone: scheduleZone,
-    })
+    setCompose({ ...from, day, time, setId })
   }
   return (
     <div className="flex h-full min-h-0 flex-col" inert={!hydrated} aria-busy={!hydrated}>
@@ -661,7 +654,7 @@ export function PlanWorkspace({
           {sidebar ? (
             <>
               <Button variant="ghost" onClick={() => setSidebar(null)}>
-                ← Back to publishing brands
+                ← Back to profiles
               </Button>
               <h2 className="my-2 font-medium">{sets.find((s) => s.id === sidebar)?.name}</h2>
               <div className="flex gap-2">
@@ -711,7 +704,8 @@ export function PlanWorkspace({
                     <strong className="block">
                       {d.plainText.slice(0, 100) || d.title || 'Untitled draft'}
                     </strong>
-                    {d.primaryPlatform} · Edited {new Date(d.updatedAt).toLocaleDateString()}
+                    {d.primaryPlatform} · Edited{' '}
+                    {when(d.updatedAt, sets.find((s) => s.id === sidebar)?.timeZone, DAY_STYLE)}
                   </Link>
                 ))
               )}
@@ -725,7 +719,7 @@ export function PlanWorkspace({
             <>
               <Label className="mb-3">
                 <Checkbox
-                  aria-label="All publishing brands"
+                  aria-label="All profiles"
                   checked={
                     allState === 'all' ? true : allState === 'mixed' ? 'indeterminate' : false
                   }
@@ -794,17 +788,22 @@ export function PlanWorkspace({
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
           <header className="flex flex-wrap items-center gap-2 border-b p-3">
             <h1 className="mr-auto font-semibold">
-              {prefs.view === 'month'
-                ? readable(anchor, { month: 'long', year: 'numeric' })
-                : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
+              Calendar{' '}
+              <span className="font-normal text-muted-foreground">
+                {prefs.view === 'month'
+                  ? readable(anchor, { month: 'long', year: 'numeric' })
+                  : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
+              </span>
             </h1>
-            <TimeZonePicker
-              className="w-56 text-xs"
-              label="Display timezone"
-              onChange={(zone) => setPref({ zone })}
-              size="sm"
-              value={prefs.zone}
-            />
+            {focused ? (
+              <Button
+                onClick={() => openBrandSettings('scheduling', focused.id)}
+                size="sm"
+                variant="outline"
+              >
+                Edit schedule
+              </Button>
+            ) : null}
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
@@ -968,25 +967,27 @@ export function PlanWorkspace({
                 {prefs.showAll ? 'Showing all posts' : 'Show all posts'}
               </Button>
             ) : null}
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={`Previous ${prefs.view === 'month' ? 'month' : 'period'}`}
-              onClick={() => changePeriod(-1)}
-            >
-              ←
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setAnchor(today)}>
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={`Next ${prefs.view === 'month' ? 'month' : 'period'}`}
-              onClick={() => changePeriod(1)}
-            >
-              →
-            </Button>
+            <div aria-label="Change period" className="flex shrink-0 gap-1" role="group">
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={`Previous ${prefs.view === 'month' ? 'month' : 'period'}`}
+                onClick={() => changePeriod(-1)}
+              >
+                ←
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setAnchor(today)}>
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={`Next ${prefs.view === 'month' ? 'month' : 'period'}`}
+                onClick={() => changePeriod(1)}
+              >
+                →
+              </Button>
+            </div>
           </header>
           {/* Keep the measured Flex viewport stable while a range loads or fails. */}
           <div className="h-10 shrink-0 overflow-y-auto px-4 text-sm">
@@ -1027,7 +1028,7 @@ export function PlanWorkspace({
                 ...shown
                   .sort((a, b) => a.at.localeCompare(b.at))
                   .map((item) => ({
-                    day: itemDay(item, prefs.zone),
+                    day: itemDay(item),
                     key: item.id,
                     node: card(item),
                   })),
@@ -1043,13 +1044,16 @@ export function PlanWorkspace({
               {canEdit ? <Button onClick={() => create(today)}>Plan a post</Button> : null}
             </div>
             <div
-              className="hidden min-w-[760px] grid-cols-7 md:grid"
+              className="hidden min-w-[644px] grid-cols-7 md:grid"
               aria-label={`${prefs.view} calendar`}
               style={
                 prefs.view === 'week'
                   ? {
                       gridTemplateColumns: days
-                        .map((day) => `minmax(${weekLayouts[day].lanes * 160 + 16}px, 1fr)`)
+                        .map(
+                          (day) =>
+                            `minmax(${weekLayouts[day].lanes * 92}px, ${weekLayouts[day].lanes}fr)`
+                        )
                         .join(' '),
                     }
                   : undefined
@@ -1066,7 +1070,7 @@ export function PlanWorkspace({
                   })}
                   data-testid={`calendar-day-${Number(day.slice(8))}`}
                   data-calendar-date={day}
-                  className={`relative min-w-0 border-b border-r p-2 ${prefs.view === 'week' ? '' : 'min-h-40'} ${day.slice(0, 7) !== anchor.slice(0, 7) && prefs.view === 'month' ? 'bg-muted/30' : ''} ${over === day ? 'bg-sky-500/10' : ''}`}
+                  className={`@container relative min-w-0 border-b border-r p-1 ${prefs.view === 'week' ? '' : 'min-h-40'} ${day.slice(0, 7) !== anchor.slice(0, 7) && prefs.view === 'month' ? 'bg-muted/30' : ''} ${over === day ? 'bg-sky-500/10' : ''}`}
                   onDragOver={(e) => {
                     if (e.dataTransfer.types.includes(DRAG)) {
                       e.preventDefault()
@@ -1076,16 +1080,19 @@ export function PlanWorkspace({
                   onDragLeave={() => setOver(null)}
                   onDrop={(e) => drop(e, day)}
                 >
-                  {/* A fixed height: today's badge must not push its hour grid below the others. */}
-                  <div className="sticky top-0 z-10 flex h-8 items-center justify-between bg-background text-xs">
+                  {/* The buttons take a second row in a narrow column. A week's height is fixed:
+                      neither that nor today's badge may push its hour grid below the others. */}
+                  <div
+                    className={`sticky top-0 z-10 flex flex-wrap items-center justify-between bg-background text-xs ${prefs.view === 'week' ? 'h-14 content-start' : 'min-h-8'}`}
+                  >
                     <time
                       dateTime={day}
                       aria-current={day === today ? 'date' : undefined}
-                      className={`min-w-0 truncate ${day === today ? 'rounded-full bg-sky-600 px-1.5 py-0.5 text-white' : ''}`}
+                      className={`whitespace-nowrap ${day === today ? 'rounded-full bg-sky-600 px-1.5 py-0.5 text-white' : ''}`}
                     >
                       {readable(day, { weekday: 'short', day: 'numeric' })}
                     </time>
-                    <span className="flex shrink-0 items-center">
+                    <span className="flex shrink-0 items-center justify-end @max-[6.5rem]:w-full">
                       {prefs.view === 'week'
                         ? notes
                             .filter((note) => note.day === day)
@@ -1107,7 +1114,7 @@ export function PlanWorkspace({
                           title="Add note"
                           variant="ghost"
                         >
-                          <NotePencilIcon aria-hidden />
+                          <NoteIcon aria-hidden />
                         </Button>
                       ) : null}
                       {canEdit && day >= today ? (
@@ -1140,7 +1147,7 @@ export function PlanWorkspace({
                             size={null}
                             variant="ghost"
                           >
-                            {String(hour).padStart(2, '0')}:00
+                            {formatTimeOfDay(`${String(hour).padStart(2, '0')}:00`, twelveHour)}
                           </Button>
                         </div>
                       ))}
@@ -1193,12 +1200,7 @@ export function PlanWorkspace({
       {noteEdit ? (
         <NoteDialog
           day={noteEdit.day}
-          dayLabel={readable(noteEdit.day, {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-            year: 'numeric',
-          })}
+          dayLabel={readable(noteEdit.day, DAY_STYLE)}
           key={noteEdit.note?.id ?? noteEdit.day}
           note={noteEdit.note}
           onClose={() => setNoteEdit(null)}
@@ -1233,25 +1235,33 @@ export function PlanWorkspace({
   )
 }
 
+/** A date and time on the brand's clock. It only asks about daylight saving at the hour the clocks repeat. */
 function TimeFields({
   local,
   zone,
   choice,
   onLocal,
-  onZone,
   onChoice,
 }: {
   local: string
   zone: string
-  choice: 'reject' | 'earlier' | 'later'
+  choice: 'earlier' | 'later'
   onLocal: (v: string) => void
-  onZone: (v: string) => void
-  onChoice: (v: 'reject' | 'earlier' | 'later') => void
+  onChoice: (v: 'earlier' | 'later') => void
 }) {
+  const when = useWhen()
+  const resolved = localDateTimeSchema.safeParse(local).success
+    ? resolveLocalTime(local, zone)
+    : null
   return (
     <div className="grid gap-2">
       <Label className="grid gap-1.5">
-        Date and time{' '}
+        <span>
+          Date and time{' '}
+          <span className="font-normal text-muted-foreground" data-testid="schedule-zone">
+            · {zoneLabel(zone)}
+          </span>
+        </span>
         <span className="grid grid-cols-2 gap-2">
           <DatePicker
             className="w-full"
@@ -1268,23 +1278,20 @@ function TimeFields({
           />
         </span>
       </Label>
-      <TimeZonePicker label="Scheduling timezone" onChange={onZone} value={zone} />
-      <Label className="grid gap-1.5">
-        Repeated hour{' '}
-        <Select value={choice} onValueChange={(value) => onChoice(value as typeof choice)}>
-          <SelectTrigger aria-label="Repeated hour">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="reject">Ask me to choose</SelectItem>
-            <SelectItem value="earlier">Earlier occurrence</SelectItem>
-            <SelectItem value="later">Later occurrence</SelectItem>
-          </SelectContent>
-        </Select>
-      </Label>
-      <p className="text-xs text-muted-foreground">
-        Today: {zonedDayKey(new Date(), isTimeZone(zone) ? zone : 'UTC')}. Any minute is supported.
-      </p>
+      {resolved?.kind === 'ambiguous' ? (
+        <Label className="grid gap-1.5">
+          This time happens twice that day{' '}
+          <Select value={choice} onValueChange={(value) => onChoice(value as typeof choice)}>
+            <SelectTrigger aria-label="Repeated hour">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="earlier">First: {when(resolved.earlier, zone)}</SelectItem>
+              <SelectItem value="later">Second: {when(resolved.later, zone)}</SelectItem>
+            </SelectContent>
+          </Select>
+        </Label>
+      ) : null}
     </div>
   )
 }
@@ -1300,7 +1307,6 @@ function PlanComposer({
     day: string
     time: string
     setId: string
-    zone?: string
     selected?: DraftWire
     source?: 'drafts' | 'posted'
   }
@@ -1310,14 +1316,15 @@ function PlanComposer({
   onSaved: () => void
 }) {
   const router = useRouter()
+  const when = useWhen()
   const [setId, setSetId] = React.useState(context.setId)
   const set = sets.find((s) => s.id === setId)
+  const zone = set?.timeZone ?? 'UTC'
   const [body, setBody] = React.useState<Value>([{ type: 'p', children: [{ text: '' }] }])
   const [kind, setKind] = React.useState<'standard' | 'article'>('standard')
   const [title, setTitle] = React.useState('')
   const [local, setLocal] = React.useState(`${context.day}T${context.time}`)
-  const [zone, setZone] = React.useState(context.zone ?? set?.timeZone ?? 'UTC')
-  const [choice, setChoice] = React.useState<'reject' | 'earlier' | 'later'>('reject')
+  const [choice, setChoice] = React.useState<'earlier' | 'later'>('earlier')
   const [openEditor, setOpenEditor] = React.useState(true)
   const [picker, setPicker] = React.useState(Boolean(context.selected))
   const [source, setSource] = React.useState<'drafts' | 'posted'>(context.source ?? 'drafts')
@@ -1354,7 +1361,7 @@ function PlanComposer({
     try {
       if (!set || !set.accounts.some((a) => a.health === 'connected'))
         throw new Error(
-          'Choose a connected account. Reconnect it in Settings › Publishing brands if needed.'
+          'Choose a connected account. Reconnect it in Settings › Profiles if needed.'
         )
       const instant = selectedInstant(local, zone, choice)
       if (picker && !selected) throw new Error('Choose content first.')
@@ -1404,7 +1411,7 @@ function PlanComposer({
       }
       if (schedule) {
         onClose()
-        router.push(reviewScheduleHref(draft.id, instant, set.timeZone ?? zone))
+        router.push(reviewScheduleHref(draft.id, instant, zone))
         return
       } else {
         planKey.current ??= crypto.randomUUID()
@@ -1469,7 +1476,6 @@ function PlanComposer({
             }
             onValueChange={(value) => {
               setSetId(value)
-              setZone(sets.find((s) => s.id === value)?.timeZone ?? 'UTC')
               setTagIds([])
               setSelected(null)
               setKind('standard')
@@ -1558,8 +1564,7 @@ function PlanComposer({
                   >
                     {d.plainText.slice(0, 130) || d.title || 'Untitled draft'}
                     <small className="block">
-                      {set?.name} · {d.primaryPlatform} · Edited{' '}
-                      {new Date(d.updatedAt).toLocaleString()}
+                      {set?.name} · {d.primaryPlatform} · Edited {when(d.updatedAt, zone)}
                     </small>
                   </Button>
                 ))
@@ -1605,7 +1610,7 @@ function PlanComposer({
               {tags === null ? (
                 <p className="text-xs">Tags unavailable. Enable draft tags in Settings.</p>
               ) : !tags.length ? (
-                <p className="text-xs">No tags in this publishing brand.</p>
+                <p className="text-xs">No tags in this profile.</p>
               ) : (
                 tags.map((t) => (
                   <Label className="mr-3 inline-flex py-1 font-normal" key={t.id}>
@@ -1655,7 +1660,6 @@ function PlanComposer({
           zone={zone}
           choice={choice}
           onLocal={setLocal}
-          onZone={setZone}
           onChoice={setChoice}
         />
         <Label className="font-normal">
@@ -1740,8 +1744,8 @@ function PlanDetail({
   const [revisionCount, setRevisionCount] = React.useState<number | null>(null)
   const [local, setLocal] = React.useState(wallTime(new Date(item.at), item.zone))
   const router = useRouter()
-  const [zone, setZone] = React.useState(item.zone)
-  const [choice, setChoice] = React.useState<'reject' | 'earlier' | 'later'>('reject')
+  const when = useWhen()
+  const [choice, setChoice] = React.useState(occurrence(item.at, item.zone))
   const [reload, setReload] = React.useState(0)
   const [error, setError] = React.useState('')
   const [busy, setBusy] = React.useState(false)
@@ -1799,6 +1803,8 @@ function PlanDetail({
   const queued = receipts.filter((post) => post.status === 'SCHEDULED')
   // A failure a newer attempt replaced is history: retrying it could post twice.
   const current = currentPosts(receipts)
+  const publishAt = item.publishAt ?? item.at
+  const offSlot = new Date(publishAt).getTime() !== new Date(item.at).getTime()
   return (
     <Sheet
       open
@@ -1816,24 +1822,18 @@ function PlanDetail({
         <div className="grid gap-4 p-4">
           <p className="whitespace-pre-wrap text-sm">{item.text}</p>
           <p className="text-xs">
-            Original scheduling timezone: {item.zone}
-            <br />
             {item.postId ? (
               <>
-                {item.publishAt &&
-                new Date(item.publishAt).getTime() !== new Date(item.at).getTime()
-                  ? `Queue slot: ${new Date(item.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: item.zone })} · `
-                  : ''}
-                Scheduled for:{' '}
-                {new Date(item.publishAt ?? item.at).toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'medium',
-                  timeZone: item.zone,
-                })}{' '}
-                ({item.zone}) · {new Date(item.publishAt ?? item.at).toISOString()}
+                Scheduled for{' '}
+                {when(
+                  publishAt,
+                  item.zone,
+                  offSlot ? { ...WHEN_STYLE, second: '2-digit' } : WHEN_STYLE
+                )}
+                {offSlot ? ` · Queue slot: ${when(item.at, item.zone)}` : ''}
               </>
             ) : (
-              <>Planned for: {new Date(item.at).toISOString()} · planning never publishes</>
+              <>Planned for {when(item.at, item.zone)}. Planning never publishes.</>
             )}
           </p>
           {['Failed', 'Needs check', 'Cancelled'].includes(item.status) &&
@@ -1854,10 +1854,9 @@ function PlanDetail({
           </Button>
           <TimeFields
             local={local}
-            zone={zone}
+            zone={item.zone}
             choice={choice}
             onLocal={setLocal}
-            onZone={setZone}
             onChoice={setChoice}
           />
           {item.deliveryStatus === 'SCHEDULED' && swapCandidates.length > 0 ? (
@@ -1880,8 +1879,7 @@ function PlanDetail({
                 <SelectContent>
                   {swapCandidates.map((candidate) => (
                     <SelectItem key={candidate.id} value={candidate.id}>
-                      {candidate.text || candidate.title} ·{' '}
-                      {new Date(candidate.at).toLocaleString()}
+                      {candidate.text || candidate.title} · {when(candidate.at, candidate.zone)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1897,8 +1895,8 @@ function PlanDetail({
               }
               onClick={() =>
                 void run(async () => {
-                  const at = selectedInstant(local, zone, choice)
-                  await mutate('move', [{ ...placement(item, at.toISOString()), timeZone: zone }])
+                  const at = selectedInstant(local, item.zone, choice)
+                  await mutate('move', [placement(item, at.toISOString())])
                 })
               }
             >
@@ -1910,9 +1908,9 @@ function PlanDetail({
                   disabled={busy || !canPublish}
                   onClick={() =>
                     void run(async () => {
-                      const at = selectedInstant(local, zone, choice)
+                      const at = selectedInstant(local, item.zone, choice)
                       onClose()
-                      router.push(reviewScheduleHref(item.draftId, at, set?.timeZone ?? zone))
+                      router.push(reviewScheduleHref(item.draftId, at, item.zone))
                     })
                   }
                 >
@@ -1978,7 +1976,7 @@ function PlanDetail({
             </Button>
           </div>
           <Label className="grid gap-1.5">
-            Copy to publishing brand{' '}
+            Copy to profile{' '}
             <Select value={copySet} onValueChange={(value) => setCopySet(value)}>
               <SelectTrigger>
                 <SelectValue />
@@ -2004,20 +2002,12 @@ function PlanDetail({
           >
             Create copy
           </Button>
-          {draft ? (
-            <p className="text-xs">
-              Content version {draft.version} · {draft.tagIds.length} tags · Review:{' '}
-              {draft.reviewStatus}
-            </p>
-          ) : (
-            <p role="status">Loading details…</p>
-          )}
           <fieldset className="grid gap-2">
             <legend>Tags</legend>
             {detailTags === null ? (
               <p className="text-xs">Tags unavailable. Enable draft tags in Settings.</p>
             ) : detailTags.length === 0 ? (
-              <p className="text-xs">No tags in this publishing brand.</p>
+              <p className="text-xs">No tags in this profile.</p>
             ) : (
               detailTags.map((tag) => (
                 <Label key={tag.id} className="font-normal">
@@ -2053,12 +2043,7 @@ function PlanDetail({
                       {postState(post.status, post.scheduledFor)}
                     </Pill>
                     <span className="text-muted-foreground">
-                      {new Date(post.scheduledFor).toLocaleString(undefined, {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZone: post.scheduleTimeZone ?? item.zone,
-                      })}{' '}
-                      · {post.scheduleTimeZone ?? item.zone}
+                      {when(post.scheduledFor, item.zone)}
                     </span>
                   </p>
                   {postFailureReason(post.failureCode) ? (
@@ -2113,7 +2098,7 @@ function PlanDetail({
                   <p key={a.id} className="my-2 text-xs">
                     {a.actorName ?? 'System'} ·{' '}
                     {a.action.replace(/^product\./, '').replaceAll('_', ' ')} ·{' '}
-                    {new Date(a.at).toLocaleString()}
+                    {when(a.at, item.zone)}
                   </p>
                 ))}
                 <Button asChild className="h-auto p-0" size={null} variant="link">
@@ -2124,6 +2109,29 @@ function PlanDetail({
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+          <Disclosure>
+            <DisclosureTrigger className="text-sm font-medium">Details</DisclosureTrigger>
+            <DisclosureContent className="grid gap-2 pt-2 text-xs text-muted-foreground">
+              {draft ? (
+                <p>
+                  Content version {draft.version} · {draft.tagIds.length} tags · Review:{' '}
+                  {draft.reviewStatus}
+                </p>
+              ) : (
+                <p role="status">Loading details…</p>
+              )}
+              <p>Today: {when(new Date(), item.zone, DAY_STYLE)}. Any minute is supported.</p>
+              <Label className="grid gap-1 font-normal">
+                Exact time in UTC
+                <Input
+                  className="font-mono text-xs"
+                  onFocus={(event) => event.currentTarget.select()}
+                  readOnly
+                  value={new Date(publishAt).toISOString()}
+                />
+              </Label>
+            </DisclosureContent>
+          </Disclosure>
           {confirmDelete ? (
             <div role="alert">
               <p>Delete this draft? Published provider posts remain on their networks.</p>

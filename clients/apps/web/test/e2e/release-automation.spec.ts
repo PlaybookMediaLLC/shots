@@ -12,6 +12,7 @@ import {
   enableTwoFactorInSettings,
   expect,
   getActiveOrganizationId,
+  grantWorkspacePlan,
   type HttpMockRequest,
   openEditor,
   type Page,
@@ -53,16 +54,27 @@ function socialFixture(organizationId: string, destinationId: string) {
 
 const FIXTURE_COPY = 'Fixture AI copy for x: exports now finish faster and more reliably.'
 
-/** Calls the GitHub protocol fixture's counters (mail and fake-model calls). */
+/** Calls the GitHub protocol fixture's counters (install pages, mail and fake-model calls). */
 async function fixtureCounts() {
   const response = await fetch(`http://127.0.0.1:${process.env.E2E_GITHUB_PORT ?? 8039}/__counts`)
   return z
     .object({
+      installPages: z.number(),
       mailCount: z.number(),
       modelCalls: z.number(),
       modelPosts: z.record(z.string(), z.number()),
     })
     .parse(await response.json())
+}
+
+/** Fails on the internal names Automate's copy must not use, across everything on the page. */
+async function expectPlainWords(page: Page): Promise<void> {
+  const text = await page.locator('[data-platform-scroll]').innerText()
+  expect(
+    text.match(
+      /\b(intake|legacy|installations?|release automation|definition id|event famil\w+|sources?|providers?)\b/gi
+    ) ?? []
+  ).toEqual([])
 }
 
 // This suite needs the local GitHub protocol fixture (which also serves a fake
@@ -115,24 +127,26 @@ test(
         .getByRole('navigation', { name: 'Workspace' })
         .getByRole('link', { name: 'Automate', exact: true })
         .click()
-      await expect(page).toHaveURL(/\/workflows$/)
-      await expect(page.getByRole('heading', { name: 'Workflows', level: 1 })).toBeVisible()
-      await expect(page.getByText('No workflows yet')).toBeVisible()
+      // Automate opens its overview, which says what to do next.
+      await expect(page).toHaveURL(/\/workflows\/overview$/)
+      await expect(page.getByRole('heading', { name: 'Automate', level: 1 })).toBeVisible()
+      await expect(page.getByText('Set up your first workflow')).toBeVisible()
+      // Until a repository is watched, that is the main action, and the setup list says so.
+      await expect(page.getByRole('link', { name: 'Connect GitHub', exact: true })).toBeVisible()
 
+      // 4–5. Start from a template. The address keeps the choice through the trip to GitHub, and
+      // the page asks for only the step that is missing.
+      await app.open('/workflows/new')
       await page
-        .getByRole('navigation', { name: 'Automate', exact: true })
-        .getByRole('link', { name: 'Sources', exact: true })
+        .getByRole('link', { name: 'Product launch from a GitHub release', exact: true })
         .click()
-
-      // 4–5. Connect the GitHub fixture and watch a repository from the dashboard.
+      await expect(page).toHaveURL(/\/workflows\/new\?template=release-launch$/)
+      await expect(page.getByText(/^Connect GitHub to use this template/)).toBeVisible()
       await page.getByRole('link', { name: 'Connect GitHub', exact: true }).click()
-      await expect(
-        page.getByText('GitHub is connected. Choose a repository to watch.')
-      ).toBeVisible({
+      await expect(page).toHaveURL(/\/workflows\/new\?template=release-launch$/, {
         timeout: 60_000,
       })
-      await expect(page).toHaveURL(/\/workflows\?github=connected/)
-      await page.getByRole('button', { name: 'Choose a repository' }).click()
+      await expect(page.getByText('Watch a repository to use this template.')).toBeVisible()
       await chooseOption(
         page
           .locator('form')
@@ -141,29 +155,37 @@ test(
         'fixture/product'
       )
       await page.getByRole('button', { name: 'Watch', exact: true }).click()
-      await expect(page.getByText(/Watching fixture\/product/)).toBeVisible()
 
-      // 6–8. Create from a template with paid AI copy and an explicit budget.
-      await app.open('/workflows/new')
-      await page.getByRole('button', { name: /Product launch from a GitHub release/ }).click()
-      await chooseOption(
-        page.getByRole('combobox', { name: 'Repository', exact: true }),
-        'fixture/product'
+      // 6–8. Watching opens the editor with the template loaded; nothing is saved yet.
+      const editor = page.getByRole('main', { name: 'Workflow editor', exact: true })
+      await expect(editor).toBeVisible()
+      await expect(page.getByLabel('Workflow name', { exact: true })).toHaveValue(
+        'Product launch from a GitHub release'
       )
+      await expect(page).toHaveURL(/template=release-launch$/)
       // This journey defines a release as any v* tag; the version-level rule has its own test.
       await page.getByRole('checkbox', { name: 'Only major and minor versions' }).uncheck()
       await expect(page.getByRole('checkbox', { name: 'Generate copy with AI' })).toBeChecked()
       await page.getByLabel('Credit limit').fill('30')
-      await page.getByLabel('Workflow name').fill('Stable releases to review')
-      await page.getByRole('button', { name: 'Create draft', exact: true }).click()
+      await page.getByLabel('Workflow name', { exact: true }).fill('Stable releases to review')
+      await page.getByRole('button', { name: 'Save draft', exact: true }).click()
       await expect(page).toHaveURL(/\/workflows\/[a-z0-9]+$/)
-      const editor = page.getByRole('main', { name: 'Workflow editor', exact: true })
       await expect(editor).toBeVisible()
-      await expect(page.getByLabel('Definition name')).toHaveValue('Stable releases to review')
+      await expect(page.getByLabel('Workflow name', { exact: true })).toHaveValue(
+        'Stable releases to review'
+      )
       await expect(editor.getByText('8 nodes · 7 connections')).toBeVisible()
+      await page.getByRole('tab', { name: 'Workflow', exact: true }).click()
+      await expect(page.getByText('When should this run?')).toBeVisible()
+      await expectPlainWords(page)
 
       // Priority errors identify the field; Back and reload preserve unsaved changes on cancel.
+      // Open the editor from within the app, since Back from a GitHub return leaves the document.
       const editorURL = page.url()
+      await app.open('/workflows')
+      await page.getByRole('link', { name: 'Edit Stable releases to review', exact: true }).click()
+      await expect(page).toHaveURL(editorURL)
+      await expect(editor).toBeVisible()
       await page.getByRole('tab', { name: 'Workflow', exact: true }).click()
       await page.getByLabel('Priority', { exact: true }).fill('99999')
       await page.getByRole('button', { name: 'Save draft', exact: true }).click()
@@ -389,6 +411,7 @@ test(
       )
       await expect(page.getByRole('button', { name: 'Retry failed run' })).toHaveCount(0)
       await page.screenshot({ path: '.context/workflows-run-attention.png', fullPage: true })
+      await expectPlainWords(page)
       expect(await count('release')).toBe(1)
 
       await page.getByRole('link', { name: 'Back to runs', exact: true }).click()
@@ -440,7 +463,23 @@ test(
       await app.open('/campaigns')
       await page.getByRole('button', { name: 'Open navigation' }).click()
       await page.getByRole('dialog').getByRole('link', { name: 'Automate', exact: true }).click()
-      await expect(page).toHaveURL(/\/workflows$/)
+      await expect(page).toHaveURL(/\/workflows\/overview$/)
+      await expect(page.getByRole('heading', { name: 'Automate', level: 1 })).toBeVisible()
+      // The overview says where each page stands, with the runs this journey made.
+      await expect(page.getByText(/^\d+ active, \d+ not active$/)).toBeVisible()
+      await expect(page.getByText('1 repository watched')).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Latest runs' })).toBeVisible()
+      await expectPlainWords(page)
+      await app.open('/workflows/sources')
+      await expect(page.getByText(/^fixture\/product/).first()).toBeVisible()
+      await expectPlainWords(page)
+      await app.open('/workflows/runs')
+      await expect(page.getByRole('table', { name: 'Workflow runs' })).toBeVisible()
+      await expectPlainWords(page)
+      await app.open('/workflows/deployments')
+      await expect(page.getByText('No hosts connected')).toBeVisible()
+      await expectPlainWords(page)
+      await app.open('/workflows')
       await expect(page.getByRole('heading', { name: 'Workflows', level: 1 })).toBeVisible()
       await expect(
         page.getByRole('link', { name: 'Stable releases to review', exact: true })
@@ -453,7 +492,7 @@ test(
         .getByRole('link', { name: 'Duplicate Stable releases to review', exact: true })
         .click()
       expect(await count('release_automation')).toBe(1)
-      await expect(page.getByLabel('Definition name')).toHaveValue(
+      await expect(page.getByLabel('Workflow name', { exact: true })).toHaveValue(
         'Stable releases to review (copy)'
       )
       await page.getByRole('button', { name: 'Close editor', exact: true }).click()
@@ -583,14 +622,13 @@ test(
         [`capture-${randomUUID()}`, organizationId, surfaceId, captureAsset]
       )
 
-      await app.open('/workflows?view=sources')
+      await app.open('/workflows/sources')
       await page.getByRole('link', { name: 'Connect GitHub', exact: true }).click()
       await expect(
         page.getByText('GitHub is connected. Choose a repository to watch.')
       ).toBeVisible({
         timeout: 60_000,
       })
-      await page.getByRole('button', { name: 'Choose a repository' }).click()
       await chooseOption(
         page
           .locator('form')
@@ -603,7 +641,7 @@ test(
 
       // Define the release: a v* tag, major or minor only, judged by AI.
       await app.open('/workflows/new')
-      await page.getByRole('button', { name: /Launch from a version tag/ }).click()
+      await page.getByRole('link', { name: 'Launch from a version tag', exact: true }).click()
       await expect(
         page.getByRole('checkbox', { name: 'Only major and minor versions' })
       ).toBeChecked()
@@ -613,7 +651,8 @@ test(
       await page.getByRole('checkbox', { name: 'Generate copy with AI' }).check()
       await page.getByRole('checkbox', { name: /Browser launch/ }).check()
       await page.getByRole('checkbox', { name: 'Lay out a canvas from the release' }).check()
-      await page.getByRole('button', { name: 'Create draft', exact: true }).click()
+      await page.getByRole('button', { name: 'Save draft', exact: true }).click()
+      await expect(page).toHaveURL(/\/workflows\/[a-z0-9]+$/)
       const editor = page.getByRole('main', { name: 'Workflow editor', exact: true })
       await expect(editor).toBeVisible()
       await expect(editor.getByText('AI: worth marketing?').first()).toBeVisible()
@@ -773,12 +812,23 @@ test(
     )
     await createWorkspace(identity, page)
     const organizationId = await getActiveOrganizationId(page)
-    await app.open('/workflows?view=sources')
+    await app.open('/workflows/sources')
+    // One button: an install this person can already reach links with no install page.
+    const installPages = (await fixtureCounts()).installPages
     await page.getByRole('link', { name: 'Connect GitHub', exact: true }).click()
     await expect(page.getByText('GitHub is connected. Choose a repository to watch.')).toBeVisible({
       timeout: 60_000,
     })
-    await page.getByRole('button', { name: 'Choose a repository' }).click()
+    expect((await fixtureCounts()).installPages).toBe(installPages)
+    // With nothing left to link, the same button goes on to GitHub's install page, and back.
+    await page.getByRole('button', { name: 'Add another GitHub account' }).click()
+    await page.getByRole('link', { name: 'Connect GitHub', exact: true }).click()
+    await expect
+      .poll(async () => (await fixtureCounts()).installPages, { timeout: 60_000 })
+      .toBe(installPages + 1)
+    await expect(page.getByText('GitHub is connected. Choose a repository to watch.')).toBeVisible({
+      timeout: 60_000,
+    })
     await chooseOption(
       page
         .locator('form')
@@ -821,20 +871,18 @@ test(
     expect(activated.status, JSON.stringify(activated.body)).toBe(200)
     const version = z.object({ activeVersionId: z.string() }).parse(activated.body).activeVersionId
     await app.open(`/workflows/sources/${source.id}/production`)
-    await expect(page.getByRole('heading', { name: 'Repository production policy' })).toBeVisible()
-    await expect(page.getByText('Deployments read: available.', { exact: false })).toBeVisible()
-    await page.getByLabel('Trusted reporting GitHub App IDs').fill('900')
+    await expect(page.getByRole('heading', { name: 'What counts as production' })).toBeVisible()
+    await expect(page.getByText('Deployments: can read.', { exact: false })).toBeVisible()
+    await page.getByLabel('GitHub App IDs allowed to report deployments').fill('900')
     await page.getByLabel('Web image · #301', { exact: false }).check()
     await page.getByLabel('GitHub run ID').fill('401')
     await page.getByLabel('Attempt', { exact: true }).fill('1')
     await page.getByRole('button', { name: 'Load jobs for this attempt' }).click()
     await page.getByRole('button', { name: 'Watch this job name' }).click()
     await chooseOption(page.getByLabel('Shots workflow to run'), /^Qualified deployment release · /)
-    await page.getByLabel('Enable for new live events').check()
-    await page.getByRole('button', { name: 'Save policy revision' }).click()
-    await expect(
-      page.getByText('Policy revision saved. Historical events were not replayed.')
-    ).toBeVisible()
+    await page.getByLabel('Turn on for new events').check()
+    await page.getByRole('button', { name: 'Save policy' }).click()
+    await expect(page.getByText('Policy saved. Past events were not run again.')).toBeVisible()
     const base = `/api/v1/github/sources/${source.id}`
     const state = async () => {
       const response = await browserRequest(page, `${base}/production`)
@@ -924,13 +972,18 @@ test(
       .toBe(2)
     expect(await count('release')).toBe(1)
     await page.getByRole('button', { name: 'Refresh events' }).click()
-    // The newest observation, the one just matched, leads the list.
-    await page.getByLabel('Recorded observation').click()
-    await page.getByRole('option').first().click()
-    await page.getByRole('button', { name: 'Preview current policy' }).click()
+    // The event that matched; the two Actions events above it are listed too.
+    await page.getByLabel('Past event', { exact: true }).click()
+    await page
+      .getByRole('option', { name: /^deployment_status · .* · success · / })
+      .first()
+      .click()
+    await page.getByRole('button', { name: 'Preview this policy' }).click()
     await expect(
       page.getByText('Configured production evidence matched.', { exact: false }).first()
     ).toBeVisible()
+    // The Production page with a real event, its decision and every check on screen.
+    await expectPlainWords(page)
     expect(await count('release_automation_run')).toBe(1)
     expect((await fixtureCounts()).modelCalls).toBe(baseline.modelCalls)
     const recovery = await browserRequest(page, `${base}/delivery-recovery`, {
@@ -946,6 +999,8 @@ test(
       slug: `deployment-other-${randomUUID()}`,
     })
     expect(second.status, JSON.stringify(second.body)).toBe(200)
+    // With a plan, so the request reaches the backend's tenant check instead of the plan gate.
+    await grantWorkspacePlan(await getActiveOrganizationId(page), 'pro')
     expect((await browserRequest(page, `${base}/production`)).status).toBe(404)
     await app.open('/workflows')
     // A fresh workspace cannot inspect delivery failures belonging to this source.

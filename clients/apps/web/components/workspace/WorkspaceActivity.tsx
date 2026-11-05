@@ -9,16 +9,17 @@ import {
 } from '@/components/ui/select'
 
 import { TRPCClientError } from '@trpc/client'
+import { LocalTime } from '@/components/drafts/local-time'
 import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { getErrorMessage } from './settings-client'
 
 /**
  * The work a workspace has in flight: projects, releases, campaigns,
- * announcements, and scheduled posts.
+ * announcements, and posts.
  *
  * These domains had list procedures with no screen, so a team could
  * create work through the API and then had nowhere to see it. This page
@@ -29,7 +30,7 @@ import { getErrorMessage } from './settings-client'
 
 type TRPC = ReturnType<typeof useTRPCClient>
 
-type Row = { href?: string; id: string; meta: string; status: string; title: string }
+type Row = { href?: string; id: string; meta: ReactNode; status: string; title: string }
 
 type Section = {
   empty: string
@@ -37,10 +38,6 @@ type Section = {
   key: string
   load: (trpc: TRPC) => Promise<Row[]>
   title: string
-}
-
-function formatDate(value: string | Date): string {
-  return new Date(value).toLocaleString()
 }
 
 function truncate(text: string, max = 80): string {
@@ -75,7 +72,11 @@ const SECTIONS: Section[] = [
       return items.map((project) => ({
         href: `/?project=${encodeURIComponent(project.id)}`,
         id: project.id,
-        meta: `Screenshot · Workspace · Edited ${formatDate(project.updatedAt)}`,
+        meta: (
+          <>
+            Screenshot · Workspace · Edited <LocalTime value={project.updatedAt} />
+          </>
+        ),
         status: 'Saved to workspace',
         title: project.name,
       }))
@@ -84,16 +85,19 @@ const SECTIONS: Section[] = [
   },
   {
     empty: 'Releases arrive from a connected repository or the API.',
-    emptyAction: { href: '/workflows?view=sources', label: 'Connect a release source' },
+    emptyAction: { href: '/workflows/sources', label: 'Watch a repository' },
     key: 'releases',
     load: async (trpc) => {
       const { releases } = await trpc.release.list.query()
       return releases.map((release) => ({
         href: `/releases/${encodeURIComponent(release.id)}`,
         id: release.id,
-        meta: [`Updated ${formatDate(release.updatedAt)}`, releaseContents(release)]
-          .filter(Boolean)
-          .join(' · '),
+        meta: (
+          <>
+            Updated <LocalTime value={release.updatedAt} />
+            {releaseContents(release) ? ` · ${releaseContents(release)}` : null}
+          </>
+        ),
         status: release.status,
         title: release.title,
       }))
@@ -108,7 +112,11 @@ const SECTIONS: Section[] = [
       return campaigns.map((campaign) => ({
         href: `/campaigns/${encodeURIComponent(campaign.id)}`,
         id: campaign.id,
-        meta: `${truncate(campaign.objective)} · ${formatDate(campaign.createdAt)}`,
+        meta: (
+          <>
+            {truncate(campaign.objective)} · <LocalTime value={campaign.createdAt} />
+          </>
+        ),
         status: campaign.status,
         title: campaign.name,
       }))
@@ -122,9 +130,12 @@ const SECTIONS: Section[] = [
       const { announcements } = await trpc.announcement.list.query()
       return announcements.map((announcement) => ({
         id: announcement.id,
-        meta: `${announcement._count.recipients} recipients · ${formatDate(
-          announcement.scheduledFor ?? announcement.createdAt
-        )}`,
+        meta: (
+          <>
+            {announcement._count.recipients} recipients ·{' '}
+            <LocalTime value={announcement.scheduledFor ?? announcement.createdAt} />
+          </>
+        ),
         status: announcement.status,
         title: announcement.releaseDocument?.release.title ?? 'Announcement',
       }))
@@ -137,14 +148,21 @@ const SECTIONS: Section[] = [
     load: async (trpc) => {
       const { scheduledPosts } = await trpc.scheduledPost.list.query()
       return scheduledPosts.map((post) => ({
-        href: '/publish/calendar',
+        // A campaign variant's post has no draft to open.
+        href: post.contentDraftId
+          ? `/publish/${encodeURIComponent(post.contentDraftId)}`
+          : undefined,
         id: post.id,
-        meta: `${post.channelConnection.platform} · ${formatDate(post.scheduledFor)}`,
+        meta: (
+          <>
+            {post.channelConnection.platform} · <LocalTime value={post.scheduledFor} />
+          </>
+        ),
         status: post.status,
         title: truncate(post.caption),
       }))
     },
-    title: 'Scheduled posts',
+    title: 'Posts',
   },
 ]
 

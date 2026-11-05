@@ -59,6 +59,10 @@ test('a tour is offered only where the workspace has its feature', () => {
   // Without the rollout, Publish opens link checks; without the plan, it is marked Pro.
   assert.equal(isTourAvailable(publish, { ...everything, draftsEnabled: false }), false)
   assert.equal(isTourAvailable(publish, { ...everything, draftsPlan: false }), false)
+  // Automate needs a paid plan, as the sidebar shows it.
+  const automate = getProductTour('automate')
+  assert.equal(isTourAvailable(automate, everything), true)
+  assert.equal(isTourAvailable(automate, { ...everything, paidPlan: false }), false)
   // A tour without a gate is always offered.
   assert.equal(
     isTourAvailable(getProductTour('workspace'), { ...everything, paidPlan: false }),

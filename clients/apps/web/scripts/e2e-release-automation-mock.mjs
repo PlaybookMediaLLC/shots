@@ -14,6 +14,7 @@ const installation = {
 }
 let mailCount = 0
 let modelCalls = 0
+let installPages = 0
 // Calls per campaign post: fixture workspaces share one installation, so a
 // test counts the calls for its own posts, not every tenant's.
 const modelPosts = {}
@@ -28,7 +29,7 @@ const server = createServer(async (request, response) => {
     response.end()
   }
   if (url.pathname === '/health') return json({ ready: true })
-  if (url.pathname === '/__counts') return json({ mailCount, modelCalls, modelPosts })
+  if (url.pathname === '/__counts') return json({ installPages, mailCount, modelCalls, modelPosts })
   // A local stand-in for the OpenRouter chat API: it answers each requested
   // post deterministically so tests can prove a run paid for one call only.
   if (url.pathname === '/api/v1/chat/completions' && request.method === 'POST') {
@@ -80,6 +81,7 @@ const server = createServer(async (request, response) => {
     return redirect(callback.toString())
   }
   if (url.pathname === '/apps/release-fixture/installations/new') {
+    installPages++
     const setup = new URL('/integrations/github/setup', appURL)
     setup.searchParams.set('state', url.searchParams.get('state') ?? '')
     setup.searchParams.set('installation_id', '77')

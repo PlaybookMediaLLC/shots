@@ -12,7 +12,6 @@ import { Group, Pill, Row } from '@/components/platform-ui'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
-import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { accountDeletionStatusSchema } from '@/lib/api/contracts/settings-platform'
@@ -85,31 +84,6 @@ function SignInEmail({ email }: { email: string }) {
           {sending ? 'Sending…' : 'Change email'}
         </Button>
       </form>
-    </Row>
-  )
-}
-
-function DisplayTimeZone() {
-  const { preferences, save, status } = usePreferences()
-  const [state, run] = useSaveState()
-  return (
-    <Row
-      description="How times show to you in lists, notifications and the composer. Each publishing brand keeps its own scheduling time zone, and changing this one reschedules nothing."
-      label={
-        <span className="flex items-center gap-2">
-          Display time zone <SaveStatus state={state} />
-        </span>
-      }
-      layout="stacked"
-    >
-      <TimeZonePicker
-        allowBrowser
-        disabled={status !== 'ready' || state === 'saving'}
-        hideLabel
-        label="Display time zone"
-        onChange={(timeZone) => void run(() => save({ timeZone }))}
-        value={preferences?.timeZone ?? null}
-      />
     </Row>
   )
 }
@@ -430,7 +404,6 @@ export function AccountSettings({ email, name }: { email: string; name: string }
       <ProfileForm email={email} name={name} />
       <Group>
         <SignInEmail email={email} />
-        <DisplayTimeZone />
         <SignInMethods />
       </Group>
       <Group>

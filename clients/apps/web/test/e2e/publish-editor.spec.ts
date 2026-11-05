@@ -146,12 +146,60 @@ test(
     const failed = page.getByTestId('draft-post').filter({ hasText: 'Failed' })
     await expect(failed).toContainText('The account must be reconnected')
     await expect(failed.getByRole('link', { name: 'Reconnect the account' })).toBeVisible()
-    await failed.getByText('Details', { exact: true }).click()
-    await expect(failed.getByTestId('failure-details')).toContainText('ACCOUNT_RECONNECT')
+    await failed.getByRole('button', { name: 'Details', exact: true }).click()
+    await expect(page.getByTestId('failure-details')).toContainText('ACCOUNT_RECONNECT')
+    await page.keyboard.press('Escape')
     await page.screenshot({ path: '.context/shots/publish-failure-1440.png', fullPage: true })
     // The drafts list reads the same words.
     await page.goto('/write')
+    // A failure has its own tab and count, and leaves the Drafts tab.
+    await expect(page.getByTestId('failed-count')).toHaveText('1')
+    await expect(page.getByTestId('draft-row')).toHaveCount(0)
+    await page.getByTestId('library-tab-failed').click()
+    await expect(page.getByTestId('draft-row')).toHaveCount(1)
     await expect(page.getByTestId('write-rail')).toContainText('Failed · 1 of 2')
+    // Opening a post keeps the list on the tab it was opened from.
+    await page.getByTestId('draft-row').getByRole('link').first().click()
+    await expect(page).toHaveURL(/tab=failed/)
+    await expect(page.getByTestId('library-tab-failed')).toHaveAttribute('aria-selected', 'true')
+  }
+)
+
+test(
+  'at a laptop width nothing in the editor is cut off or drawn over',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await page.setViewportSize({ height: 800, width: 1156 })
+    await startWorkspace({ channels: ['x', 'bluesky'] })
+    await openNewDraft(page)
+    await page.keyboard.type('Everything fits at a laptop width.')
+    await expectSaved(page)
+    const composer = page.getByTestId('write-composer')
+    // Nothing widens the page: its scroller has no sideways scroll.
+    expect(
+      await composer.evaluate((element) => {
+        const main = element.closest('main')!
+        return main.scrollWidth - main.clientWidth
+      })
+    ).toBeLessThanOrEqual(0)
+    const column = await composer.boundingBox()
+    for (const control of [
+      page.getByRole('toolbar', { name: 'Draft tools' }),
+      page.getByTestId('platform-tabs'),
+      page.getByTestId('options-chip'),
+    ]) {
+      const box = await control.boundingBox()
+      expect(box && column && box.x + box.width <= column.x + column.width).toBeTruthy()
+    }
+    // A panel beside the draft is never drawn over by the header's buttons.
+    await page.getByRole('button', { name: 'Preview', exact: true }).first().click()
+    const panel = await page
+      .getByRole('complementary', { name: 'Preview', exact: true })
+      .boundingBox()
+    for (const button of ['publish-button', 'schedule-button', 'queue-button']) {
+      const box = await page.getByTestId(button).boundingBox()
+      expect(box && panel && box.x + box.width <= panel.x, button).toBeTruthy()
+    }
   }
 )
 
