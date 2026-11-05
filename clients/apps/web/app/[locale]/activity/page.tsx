@@ -19,7 +19,7 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
   if (!access.hasOrganization || !access.organization) {
     redirect(getLocalizedPath(locale, '/onboarding'))
   }
-  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/workspace'))
+  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/settings'))
   if (!access.hasPaidPlan) redirect(upgradePath(locale, '/activity'))
 
   return (

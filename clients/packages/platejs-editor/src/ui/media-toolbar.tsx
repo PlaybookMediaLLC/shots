@@ -197,7 +197,7 @@ function MediaAlignButton({
 
       <DropdownMenuContent
         align="start"
-        className="min-w-0 rounded-none border-none bg-black/60 p-0 shadow-none"
+        className="min-w-0 rounded-md border-none bg-black/60 p-0 shadow-none"
         portal={false}
       >
         <DropdownMenuRadioGroup

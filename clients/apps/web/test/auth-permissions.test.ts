@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  accessAllows,
   hasPermission,
   needsShotsTwoFactor,
   normalizeOrganizationRole,
   organizationRoles,
 } from '@/lib/auth/permissions'
+
+test('a permission group subtracts from a role and never adds to it', () => {
+  const access = { deniedPermissions: ['publish:manage'], role: 'publisher' }
+  assert.equal(accessAllows(access, 'publish:manage'), false)
+  assert.equal(accessAllows(access, 'artifact:read'), true)
+  assert.equal(accessAllows({ deniedPermissions: [], role: 'publisher' }, 'publish:manage'), true)
+  assert.equal(accessAllows({ deniedPermissions: [], role: 'viewer' }, 'publish:manage'), false)
+})
 
 test('fixed roles enforce least-privilege permissions', () => {
   assert.equal(hasPermission('creator', 'release:create'), true)

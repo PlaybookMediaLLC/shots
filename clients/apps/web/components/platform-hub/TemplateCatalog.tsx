@@ -14,6 +14,7 @@ import { designTemplates } from '@/lib/design/templates'
 import { IMAGE_TEMPLATES } from '@/lib/templates/image-templates'
 import { ANIMATED_TEMPLATES } from '@/lib/animation/templates'
 import { CANVAS_RECIPES, canvasRecipeSchema } from '@/lib/canvas/recipes'
+import { STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { BUILT_IN_TEMPLATES, type StoreTemplate } from '@/lib/store-screenshots/templates'
 import { listSavedTemplates } from '@/lib/store-screenshots/persistence/library'
 import { WORKFLOW_TEMPLATES, buildWorkflowTemplate } from '@/lib/workflows/templates'
@@ -218,7 +219,7 @@ export default function TemplateCatalog() {
                 key={template.id}
                 name={template.name}
                 description={template.description}
-                href="/?editor=app-store"
+                href={STORE_SCREENSHOTS.href}
                 action="Open studio"
               >
                 <StoreTemplatePreview template={template} />

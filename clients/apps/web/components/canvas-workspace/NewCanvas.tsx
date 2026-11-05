@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -402,14 +403,14 @@ function ScreenshotStart({
     <div className="grid gap-3">
       <Label className="grid gap-2 text-sm">
         Choose up to six screenshots
-        <Input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          multiple
+        <FileDropZone
+          accept={{ 'image/png': [], 'image/jpeg': [], 'image/webp': [] }}
           disabled={disabled}
-          onChange={async (event) => {
-            const files = Array.from(event.target.files ?? []).slice(0, 6)
-            event.target.value = ''
+          hint="Up to six PNG, JPEG or WebP images."
+          label="Screenshots"
+          multiple
+          onFiles={async (chosen) => {
+            const files = chosen.slice(0, 6)
             if (!files.length) return
             try {
               setError(null)
@@ -578,14 +579,13 @@ export function RecipeForm({
       {info.screenshots > 0 || recipe === 'walkthrough' || recipe === 'release-announcement' ? (
         <Label className="grid gap-1 text-sm">
           {recipe === 'before-after' ? 'Before and after screenshots' : 'Screenshots'}
-          <Input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="h-auto file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1 file:text-secondary-foreground"
+          <FileDropZone
+            accept={{ 'image/png': [], 'image/jpeg': [], 'image/webp': [] }}
+            hint="Up to six PNG, JPEG or WebP images."
+            label="Screenshots"
             multiple
-            onChange={async (event) => {
-              const files = Array.from(event.target.files ?? []).slice(0, 6)
-              event.target.value = ''
+            onFiles={async (chosen) => {
+              const files = chosen.slice(0, 6)
               try {
                 setError(null)
                 setShots(await Promise.all(files.map(screenshotFromFile)))

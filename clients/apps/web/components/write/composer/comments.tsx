@@ -177,13 +177,13 @@ function ThreadList({
                 </p>
               ) : null}
               {orphaned ? (
-                <p className="mb-1 text-[11px] text-amber-700 dark:text-amber-300" data-testid="orphaned-thread">
+                <p className="mb-1 text-label text-amber-700 dark:text-amber-300" data-testid="orphaned-thread">
                   The text this comment was on was removed. It stays here; it is not moved to other
                   text.
                 </p>
               ) : null}
               <p className="text-sm text-foreground">{commentText(first?.contentRich) || ' '}</p>
-              <p className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <p className="mt-1 flex items-center justify-between text-label text-muted-foreground">
                 <span>
                   {users[first?.userId ?? ''] ?? 'Member'}
                   {thread.comments && thread.comments.length > 1

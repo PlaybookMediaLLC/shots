@@ -21,7 +21,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
     const returnTo = back.success
       ? back.data
       : socialSetId
-        ? `/workspace/social-sets/${socialSetId}`
+        ? `/settings/publishing-brands/${socialSetId}`
         : ''
     const expectedConnectionId = query.get('reconnect') || undefined
     const destination = await startSocialOAuth(request.headers, provider, socialSetId, {

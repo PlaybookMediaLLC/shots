@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Runs the local stack as host processes instead of Compose images: Postgres,
-# Redis, Temporal, the Go product API and `next dev`, on the ports
-# dev/compose.yaml publishes. For cloud sessions, where `make up` cannot pull
-# or build its images. RustFS, collab, the publishing orchestrator and the
+# Redis, Temporal, the Go product API, the collab server and `next dev`, on
+# the ports dev/compose.yaml publishes. For cloud sessions, where `make up`
+# cannot pull or build its images. RustFS, the publishing orchestrator and the
 # render browser do not run.
 
 set -euo pipefail
@@ -94,12 +94,13 @@ up() {
 
   # The publishing-backend service in dev/compose.yaml, on host addresses.
   # PUBLIC_PORT moves its MCP listener off 3000, which `next dev` holds.
+  # E2E_SOCIAL_API_URL points it at the e2e suite's social API mock, as dev/studio does.
   if ! curl -fsS -o /dev/null http://127.0.0.1:8080/readyz 2>/dev/null; then
     PORT=8080 PUBLIC_PORT=3100 DATABASE_URL="$DB_URL" \
       REDIS_URL=redis://127.0.0.1:63799 TEMPORAL_ADDRESS=127.0.0.1:7233 \
       BETTER_AUTH_URL="$APP" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
       PLATFORM_CAMPAIGN_WORKFLOW=enabled PLATFORM_CREATIVE_SETS=internal PLATFORM_ACTIVITY_LEGACY_PAUSED=true \
-      SOCIAL_API_URL= JWT_SECRET="$SOCIAL_JWT_SECRET" FRONTEND_URL="$APP" \
+      SOCIAL_API_URL="${E2E_SOCIAL_API_URL:-}" JWT_SECRET="$SOCIAL_JWT_SECRET" FRONTEND_URL="$APP" \
       STORAGE_PROVIDER=local SOCIAL_PRIVATE_MEDIA=false UPLOAD_DIRECTORY=/tmp/social-uploads \
       PLATFORM_MCP_URL=http://localhost:3100/mcp R2_ENDPOINT=http://127.0.0.1:9003 R2_BROWSER_ENDPOINT=http://localhost:9003 \
       PLATFORM_ONBOARDING_AGENT=enabled PUBLISHING_RETRY_DELAY=2m \
@@ -109,6 +110,12 @@ up() {
 
   [[ -d "$ROOT_DIR/clients/node_modules" ]] ||
     (cd "$ROOT_DIR/clients" && npm ci --no-audit --no-fund --ignore-scripts)
+  # The collab service in dev/compose.yaml: drafts open and save through it.
+  if ! curl -fsS -o /dev/null http://127.0.0.1:1234 2>/dev/null; then
+    (cd "$ROOT_DIR/clients/apps/collab-server" &&
+      PORT=1234 COLLAB_BACKEND_URL=http://127.0.0.1:8080 start collab node src/main.ts)
+    wait_for "Collab server" curl -fsS -o /dev/null http://127.0.0.1:1234
+  fi
   # The app service in dev/compose.yaml: the web holds no database or storage credential.
   if ! curl -fsS -o /dev/null "$APP/api/health" 2>/dev/null; then
     (cd "$ROOT_DIR/clients" &&
@@ -160,7 +167,7 @@ login() {
 
 down() {
   local pid
-  for name in web backend temporal; do
+  for name in web collab backend temporal; do
     if [[ -f "$STATE/$name.pid" ]]; then
       pid="$(cat "$STATE/$name.pid")"
       kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
@@ -177,6 +184,7 @@ status() {
   check "Redis 127.0.0.1:63799" redis-cli -p 63799 ping
   check "Temporal 127.0.0.1:7233" "$STATE/temporal" operator cluster health --address 127.0.0.1:7233
   check "Go backend http://127.0.0.1:8080" curl -fsS http://127.0.0.1:8080/readyz
+  check "Collab ws://127.0.0.1:1234" curl -fsS http://127.0.0.1:1234
   check "Web $APP" curl -fsS "$APP/api/health"
 }
 

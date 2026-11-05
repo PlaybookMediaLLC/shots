@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 )
 
@@ -20,6 +22,7 @@ type SettingsPlatformStore interface {
 	RequestAccountDeletion(context.Context, product.Actor, string) (*product.AccountDeletionStatus, error)
 	CancelAccountDeletion(context.Context, product.Actor) (*product.AccountDeletionStatus, error)
 	ListSocialSets(context.Context, product.Actor) (*product.SocialSetList, error)
+	GetChannelCapacity(context.Context, product.Actor) (*product.ChannelCapacity, error)
 	GetSocialSet(context.Context, product.Actor, string) (*product.SocialSetRecord, error)
 	CreateSocialSet(context.Context, product.Actor, product.SocialSetInput) (*product.SocialSetRecord, error)
 	UpdateSocialSet(context.Context, product.Actor, string, product.SocialSetUpdate) (*product.SocialSetRecord, error)
@@ -28,6 +31,9 @@ type SettingsPlatformStore interface {
 	DeleteSocialSet(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	AssignSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
 	RemoveSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
+	ChannelAccountStates(context.Context, string, []*ent.ChannelConnection) (map[string]product.ChannelAccountState, error)
+	RemoveChannelAccount(context.Context, product.Actor, string) (*product.SocialSetRemoval, error)
+	AuthorizeChannelManage(context.Context, product.Actor) error
 	AuthorizeSocialSetConnection(context.Context, product.Actor, string) error
 	ListCopyableSocialSets(context.Context, product.Actor) ([]product.CopyableSocialSet, error)
 	CopySocialSet(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
@@ -59,6 +65,8 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	mux.Handle("POST /v1/social-sets/{id}/share", product(s.shareSocialSet))
 	mux.Handle("POST /v1/social-sets/{id}/accounts/{connectionId}", product(s.assignSocialSetAccount))
 	mux.Handle("DELETE /v1/social-sets/{id}/accounts/{connectionId}", product(s.removeSocialSetAccount))
+	mux.Handle("DELETE /v1/channel-connections/{id}", product(s.removeChannelConnection))
+	mux.Handle("POST /v1/channel-connections/{id}/refresh", product(s.refreshChannelConnection))
 	mux.Handle("PUT /v1/social-sets/{id}/writing-assistant", product(s.updateWritingAssistant))
 	mux.Handle("GET /v1/social-sets/{id}/writing-samples", product(s.listWritingSamples))
 	mux.Handle("POST /v1/social-sets/{id}/writing-samples", product(s.addWritingSample))
@@ -250,15 +258,96 @@ func (s *Server) removeSocialSetAccount(w http.ResponseWriter, r *http.Request) 
 		writeStoreError(w, err)
 		return
 	}
-	for _, postID := range removal.CancelledPostIDs {
-		if s.scheduler == nil {
-			break
+	s.stopCancelledPosts(r.Context(), removal.CancelledPostIDs)
+	writeJSON(w, http.StatusOK, removal)
+}
+
+// removeChannelConnection removes an account from the workspace, in a
+// publishing brand or in none, and stops the workflows of the posts it cancelled.
+func (s *Server) removeChannelConnection(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	removal, err := s.configuration.RemoveChannelAccount(r.Context(), workspaceActor(r), id)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	s.stopCancelledPosts(r.Context(), removal.CancelledPostIDs)
+	writeJSON(w, http.StatusOK, removal)
+}
+
+// refreshChannelConnection reads an account's name, handle and picture from
+// its platform again and answers with its current health. Credentials keep
+// renewing in the background; one that cannot renew shows as needing a reconnect.
+func (s *Server) refreshChannelConnection(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	actor := workspaceActor(r)
+	if err := s.configuration.AuthorizeChannelManage(r.Context(), actor); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	connections, err := s.store.ListConnections(r.Context(), actor.OrganizationID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	var connection *ent.ChannelConnection
+	for _, candidate := range connections {
+		if candidate.ID == id && candidate.Status == channelconnection.StatusACTIVE {
+			connection = candidate
 		}
-		if err := s.scheduler.Cancel(r.Context(), postID); err != nil {
+	}
+	if connection == nil {
+		writeError(w, http.StatusNotFound, "That account is not connected to this workspace.")
+		return
+	}
+	profiler, ok := s.verifier.(destinationProfiles)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "Refreshing accounts is unavailable.")
+		return
+	}
+	binding, err := s.store.Binding(r.Context(), actor.OrganizationID)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	profiles, err := profiler.Profiles(r.Context(), binding.SecretReference)
+	if err != nil {
+		slog.WarnContext(r.Context(), "channel profile refresh failed", "connection", id, "error", err)
+		writeError(w, http.StatusBadGateway, "The platform did not answer. Try again in a moment.")
+		return
+	}
+	if profile, found := profiles[connection.ExternalAccountID]; found && (profile.Name != "" || profile.Handle != "") {
+		if connection, err = s.store.SetConnectionProfile(r.Context(), connection.ID, profile.Name, profile.Handle, profile.AvatarURL); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+	}
+	states, err := s.configuration.ChannelAccountStates(r.Context(), actor.OrganizationID, []*ent.ChannelConnection{connection})
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, connectionWithState(r.Context(), connection, states))
+}
+
+// stopCancelledPosts signals the workflows of posts a removal cancelled. A
+// workflow that cannot be signalled still finds its post cancelled when it
+// wakes, and does not publish it.
+func (s *Server) stopCancelledPosts(ctx context.Context, postIDs []string) {
+	for _, postID := range postIDs {
+		if s.scheduler == nil {
+			return
+		}
+		if err := s.scheduler.Cancel(ctx, postID); err != nil {
 			slog.Warn("cancelled post workflow was not signalled", "post", postID)
 		}
 	}
-	writeJSON(w, http.StatusOK, removal)
 }
 
 func (s *Server) listCopyableSocialSets(w http.ResponseWriter, r *http.Request) {

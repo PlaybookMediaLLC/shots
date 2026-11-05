@@ -17,6 +17,7 @@ import {
   previewOf,
   settleSelection,
   test,
+  editorMore,
 } from './framework'
 import JSZip from 'jszip'
 import { buildDocx } from './fixtures/docx'
@@ -41,10 +42,9 @@ async function caretAtEndOf(page: Page, word: Locator): Promise<void> {
   await settleSelection(page)
 }
 
-/** Export from the toolbar's import and export menu. */
+/** Export from the toolbar's More menu. */
 async function exportAs(page: Page, item: 'Export DOCX' | 'Export Markdown'): Promise<void> {
-  await page.getByRole('button', { name: 'Import and export' }).click()
-  await page.getByRole('menuitem', { name: item }).click()
+  await editorMore(page, item)
 }
 
 /** Click into `target` until the caret is inside it, then type there. */
@@ -129,7 +129,15 @@ test(
     await page.keyboard.type(` ${'x'.repeat(260)}`)
     // X is being edited, so its count is in the post's header.
     await expect(page.getByTestId('post-length-1')).toHaveText(/^3\d\d \/ 280$/)
+    // Each tab shows only its own limit, and a platform over its limit marks its tab.
+    await expect(page.getByTestId('counter-linkedin')).toHaveCount(0)
+    await expect(page.getByTestId('platform-over-x')).toBeVisible()
+    await expect(page.getByTestId('platform-over-linkedin')).toHaveCount(0)
+    // LinkedIn's tab shows LinkedIn's limit, and the X tab keeps its mark there.
+    await page.getByTestId('platform-tab-linkedin').click()
     await expect(page.getByTestId('counter-linkedin')).toHaveText(/ \/ 3000$/)
+    await expect(page.getByTestId('platform-over-x')).toBeVisible()
+    await page.getByTestId('platform-tab-x').click()
     await inPreview(page, async () => {
       await previewOf(page, 'x')
       await expect(page.getByTestId('preview-panel').getByRole('alert')).toContainText(
@@ -297,24 +305,26 @@ test(
 
     // Blocks insert after the block holding the caret.
     await caretAtEndOf(page, draftEditor(page).getByText('Pricing', { exact: true }))
-    await page.getByRole('button', { name: 'Insert', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Math', exact: true }).click()
-    await draftEditor(page).getByRole('button', { name: 'Add a Tex equation' }).click()
-    await page.getByPlaceholder(/f\(x\) =/).fill('E = mc^2')
+    await editorMore(page, 'Math')
+    // The new block opens its equation editor right away, focused.
+    await expect(
+      draftEditor(page).getByRole('button', { name: 'Add a Tex equation' })
+    ).toBeVisible()
+    const tex = page.getByPlaceholder(/f\(x\) =/)
+    await expect(tex).toBeFocused()
+    await tex.fill('E = mc^2')
     await page.getByRole('button', { name: 'Done' }).click()
     await expect(draftEditor(page).locator('.katex').first()).toBeVisible()
 
     await caretAtEndOf(page, draftEditor(page).getByText('Pricing', { exact: true }))
-    await page.getByRole('button', { name: 'Insert', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Table', exact: true }).click()
+    await editorMore(page, 'Table')
     const cells = draftEditor(page).locator('td')
     await typeInto(page, cells.nth(0), 'Plan')
     await typeInto(page, cells.nth(1), 'Price')
 
     // The footnote marker goes at the caret, at the end of the word.
     await caretAtEndOf(page, draftEditor(page).getByText('Pricing', { exact: true }))
-    await page.getByRole('button', { name: 'Insert', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Footnote', exact: true }).click()
+    await editorMore(page, 'Footnote')
     await expect(draftEditor(page)).toBeFocused()
     await page.keyboard.type('Prices exclude tax.')
     await expectSaved(page)

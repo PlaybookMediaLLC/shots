@@ -1,5 +1,6 @@
 'use client'
 
+import { WarningIcon } from '@phosphor-icons/react/dist/ssr/Warning'
 import * as React from 'react'
 import {
   AlertDialog,
@@ -12,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import {
   Dialog,
   DialogContent,
@@ -25,10 +27,17 @@ import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import type { DraftChannel, DraftKind, PlateBody, PlatformVersions } from '@/lib/write/document'
+import type {
+  DraftChannel,
+  DraftKind,
+  PlateBody,
+  PlatformVersions,
+  VersionOptions,
+} from '@/lib/write/document'
 import { forkVersion, primaryChanged, resyncVersion, versionFor } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { healthLabel } from '../sets'
+import { optionsSummary } from './video-options'
 import type { WriteSet } from '../write-context'
 import { CONNECT_PROVIDERS } from '@/components/settings/social-sets/api'
 
@@ -47,6 +56,8 @@ export function PlatformTabs({
   enabled,
   onManage,
   onSelect,
+  options,
+  over = [],
   primary,
   versions,
 }: {
@@ -55,6 +66,10 @@ export function PlatformTabs({
   enabled: string[]
   onManage?: () => void
   onSelect: (channel: DraftChannel) => void
+  /** Platforms whose text runs over their limit; each tab shows only its own count. */
+  over?: DraftChannel[]
+  /** The edited platform's options chip, at the row's end. */
+  options?: React.ReactNode
   primary: DraftChannel
   versions: PlatformVersions
 }) {
@@ -87,20 +102,28 @@ export function PlatformTabs({
               {CHANNEL_META[channel].label}
               {/* A synced version is the default, so only main and own text are named. */}
               {mode === 'primary' ? (
-                <span className="text-[10px] text-muted-foreground">Main</span>
+                <span className="text-label text-muted-foreground">Main</span>
               ) : mode === 'manual' ? (
-                <span className="rounded-full bg-amber-400/15 px-1.5 text-[10px] text-amber-700 dark:text-amber-200">
+                <span className="rounded-full bg-amber-400/15 px-1.5 text-label text-amber-700 dark:text-amber-200">
                   Own text
                 </span>
               ) : null}
+              {over.includes(channel) ? (
+                <span
+                  aria-label="Over its character limit"
+                  className="size-1.5 rounded-full bg-red-500"
+                  data-testid={`platform-over-${channel}`}
+                  role="img"
+                />
+              ) : null}
               {!publishing ? (
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-label text-muted-foreground">
                   {account ? '· off' : '· not connected'}
                 </span>
               ) : null}
               {account && account.health !== 'connected' ? (
                 <span className="text-amber-700 dark:text-amber-300" title={healthLabel(account.health)}>
-                  ⚠
+                  <WarningIcon aria-label={healthLabel(account.health)} className="size-3.5" />
                 </span>
               ) : null}
             </Button>
@@ -118,7 +141,48 @@ export function PlatformTabs({
           Manage platforms
         </Button>
       ) : null}
+      {options ? <div className="ml-auto shrink-0">{options}</div> : null}
     </div>
+  )
+}
+
+/**
+ * The edited platform's options in a few words, such as "TikTok: Only me ·
+ * comments on". It opens them beside the draft, so no form sits above the text.
+ */
+export function OptionsChip({
+  blocked,
+  channel,
+  onClick,
+  open,
+  options,
+}: {
+  /** Something in these options blocks scheduling. */
+  blocked: boolean
+  channel: DraftChannel
+  onClick: () => void
+  open: boolean
+  options: VersionOptions
+}) {
+  const summary = optionsSummary(channel, options)
+  const label = CHANNEL_META[channel].label
+  const text = summary ? `${label}: ${summary}` : `${label} options`
+  return (
+    <Button
+      aria-expanded={open}
+      className={cn(
+        'h-8 gap-1.5 text-ui',
+        blocked && 'text-amber-700 dark:text-amber-300'
+      )}
+      data-testid="options-chip"
+      onClick={onClick}
+      size="sm"
+      title="Post options for this platform"
+      variant="outline"
+    >
+      {blocked ? <span aria-hidden className="size-1.5 rounded-full bg-amber-500" /> : null}
+      {text}
+    </Button>
   )
 }
 
@@ -149,11 +213,15 @@ export function ManagePlatformsDialog({
   onChange,
   onClose,
   onConnect,
+  onPreview,
+  defaultsHref,
   primary,
   value,
   versions,
 }: {
   accounts: ComposerAccount[]
+  /** The brand's new-draft settings, where its default platforms are chosen. */
+  defaultsHref?: string
   draftVersion: number
   enabled: string[]
   kind: DraftKind
@@ -164,6 +232,8 @@ export function ManagePlatformsDialog({
   }) => void
   onClose: () => void
   onConnect?: (provider: string) => Promise<void>
+  /** Show a platform's post in the preview beside the draft. */
+  onPreview?: (channel: DraftChannel) => void
   primary: DraftChannel
   value: PlateBody
   versions: PlatformVersions
@@ -214,7 +284,7 @@ export function ManagePlatformsDialog({
                             account.handle ??
                             CHANNEL_META[account.channel].label}
                         </span>
-                        <span className="block text-[11px] text-muted-foreground">
+                        <span className="block text-label text-muted-foreground">
                           {account.handle ? `@${account.handle} · ` : ''}
                           {healthLabel(account.health)}
                           {account.channel === 'x'
@@ -224,6 +294,20 @@ export function ManagePlatformsDialog({
                             : ''}
                         </span>
                       </span>
+                      {account.channel === primary ? (
+                        <span className="text-label text-muted-foreground">Main</span>
+                      ) : null}
+                      {on && onPreview ? (
+                        <Button
+                          className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                          onClick={() => onPreview(account.channel)}
+                          size={null}
+                          type="button"
+                          variant="custom"
+                        >
+                          Preview
+                        </Button>
+                      ) : null}
                       <Switch
                         aria-label={`Publish to ${CHANNEL_META[account.channel].label}`}
                         checked={on}
@@ -232,14 +316,14 @@ export function ManagePlatformsDialog({
                       />
                     </div>
                     {!supported ? (
-                      <p className="mt-1 text-[11px] text-muted-foreground">
+                      <p className="mt-1 text-label text-muted-foreground">
                         {CHANNEL_META[account.channel].label} does not take this kind of draft.
                       </p>
                     ) : null}
                     {account.health !== 'connected' ? (
                       <a
-                        className="mt-1 block text-[11px] text-amber-700 dark:text-amber-300 underline"
-                        href="/workspace/channels"
+                        className="mt-1 block text-label text-amber-700 dark:text-amber-300 underline"
+                        href="/settings/channels"
                       >
                         Reconnect in workspace settings
                       </a>
@@ -316,7 +400,17 @@ export function ManagePlatformsDialog({
               ))}
             </div>
           ) : accounts.length === 0 ? <p className="text-sm text-muted-foreground">Ask an admin or publisher to connect an account.</p> : null}
-          <DialogFooter>
+          <DialogFooter className="items-center sm:justify-between">
+            {defaultsHref ? (
+              <SidebarLink
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                href={defaultsHref}
+              >
+                Change default platforms
+              </SidebarLink>
+            ) : (
+              <span />
+            )}
             <Button onClick={onClose} type="button">
               Done
             </Button>
@@ -392,7 +486,7 @@ export function SyncedVersion({
       {posts.length === 0 ? <p className="text-sm text-muted-foreground">Nothing written yet.</p> : null}
       {posts.map((post, index) => (
         <article
-          className="mb-3 whitespace-pre-wrap rounded-lg border border-border p-3 text-[15px] leading-relaxed text-foreground"
+          className="mb-3 whitespace-pre-wrap rounded-lg border border-border p-3 text-body leading-relaxed text-foreground"
           key={index}
         >
           {post.caption}

@@ -7,7 +7,7 @@ export function KbdLeaf(props: PlateLeafProps) {
     <PlateLeaf
       {...props}
       as="kbd"
-      className="rounded-none border border-border bg-muted px-1.5 py-0.5 font-mono text-sm shadow-sm"
+      className="rounded-md border border-border bg-muted px-1.5 py-0.5 font-mono text-sm shadow-sm"
     >
       {props.children}
     </PlateLeaf>

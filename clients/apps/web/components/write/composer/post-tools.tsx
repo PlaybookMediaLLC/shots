@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { GroupIcon, InfoIcon, PollIcon, PublicIcon } from '@/components/platform-shell/icons'
+import { CloseIcon, GroupIcon, InfoIcon, PollIcon, PublicIcon } from '@/components/platform-shell/icons'
 import { useEditorRef } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -40,6 +40,22 @@ const REPLY_LABELS: Record<PostSettings['replySettings'] & string, string> = {
   mentionedUsers: 'Only accounts you mention',
   subscribers: 'Your subscribers',
   verified: 'Verified accounts',
+}
+
+/** A post's poll or audience settings, asked for from a command (the slash menu). */
+export type PostSettingRequest = { at: number; number: number; setting: 'audience' | 'poll' }
+
+/** The latest request; each tool opens when one names its post. */
+export const PostSettingRequestContext = React.createContext<PostSettingRequest | null>(null)
+
+/** A settings popover's open state, which a matching request also opens. */
+function useRequestedOpen(number: number, setting: PostSettingRequest['setting']) {
+  const request = React.useContext(PostSettingRequestContext)
+  const [open, setOpen] = React.useState(false)
+  React.useEffect(() => {
+    if (request?.number === number && request.setting === setting) setOpen(true)
+  }, [number, request, setting])
+  return [open, setOpen] as const
 }
 
 /** A duration in minutes as a person reads it. */
@@ -89,6 +105,7 @@ export function PostSettingsTools({
     tools.push(
       <PollTool
         channel={channel}
+        number={number}
         standing={standing}
         key="poll"
         set={set}
@@ -134,13 +151,14 @@ function AudienceTools({
       setPostSettings(editor, post, { replySettings: replies === 'everyone' ? undefined : replies })
     }
   }
+  const [open, setOpen] = useRequestedOpen(number, 'audience')
   return (
-    <Popover>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
           aria-label={`Audience and disclosures for post ${number}`}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-[11px] hover:bg-foreground/[0.06]',
+            'flex size-8 items-center justify-center rounded-md hover:bg-accent',
             replies !== 'everyone' || labelled
               ? 'text-sky-700 dark:text-sky-300'
               : 'text-muted-foreground hover:text-foreground'
@@ -151,9 +169,9 @@ function AudienceTools({
           variant="custom"
         >
           {replies !== 'everyone' ? (
-            <GroupIcon aria-hidden size={15} />
+            <GroupIcon aria-hidden size={16} />
           ) : (
-            <PublicIcon aria-hidden size={15} />
+            <PublicIcon aria-hidden size={16} />
           )}
           {labelled ? <InfoIcon aria-hidden className="ms-0.5" size={13} /> : null}
         </Button>
@@ -184,7 +202,7 @@ function AudienceTools({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-label text-muted-foreground">
               Who can reply never changes who can see the post.
             </p>
             {count > 1 ? (
@@ -239,7 +257,7 @@ function AudienceTools({
           <Label className="flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
             <span>
               Quote the first post
-              <span className="block text-[11px] text-muted-foreground">
+              <span className="block text-label text-muted-foreground">
                 Resolved once the first post is live.
               </span>
             </span>
@@ -260,25 +278,28 @@ function PollTool({
   pollSources,
   standing,
   channel,
+  number,
   set,
   settings,
 }: {
   channel: DraftChannel
+  number: number
   set: (change: Partial<PostSettings>) => void
   settings: PostSettings
   standing?: AccountStanding
   pollSources?: PollSource[]
 }) {
   const rules = pollRules(channel, standing)
+  const [open, setOpen] = useRequestedOpen(number, 'poll')
   if (!rules) return null
   const poll = settings.poll
   return (
-    <Popover>
+    <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
         <Button
           aria-label={poll ? 'Edit the poll' : 'Add a poll'}
           className={cn(
-            'flex h-6 items-center justify-center rounded-md px-1.5 text-[11px] hover:bg-foreground/[0.06]',
+            'flex size-8 items-center justify-center rounded-md hover:bg-accent',
             poll ? 'text-sky-700 dark:text-sky-300' : 'text-muted-foreground hover:text-foreground'
           )}
           size={null}
@@ -286,7 +307,7 @@ function PollTool({
           type="button"
           variant="custom"
         >
-          <PollIcon aria-hidden size={15} />
+          <PollIcon aria-hidden size={16} />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -443,7 +464,7 @@ export function PollEditor({
                 type="button"
                 variant="ghost"
               >
-                ✕
+                <CloseIcon aria-hidden size={14} />
               </Button>
             ) : null}
           </span>

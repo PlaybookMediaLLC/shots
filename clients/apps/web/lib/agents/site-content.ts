@@ -52,15 +52,15 @@ export const AGENT_PAGES: AgentPage[] = [
   },
   {
     path: '/code',
-    title: 'Code to Image: Code Screenshots - Shots',
+    title: 'Code Studio: Code Images, Carousels and Videos - Shots',
     summary:
-      'A focused code to image editor. Paste code, pick a syntax theme and gradient background, toggle line numbers and a window frame, then export a PNG or copy a shareable link. Rendering happens in the browser, so code is not sent to a server to create the image. Included in every plan for signed-in workspaces, with no export watermark.',
+      'Code Studio turns a snippet, a diff, a GitHub pull request or a scripted terminal session into a code image, a carousel or a short video, then opens it as a Publish draft with the code as alt text. Images and videos render in the browser; code is stored only when you save a project to your workspace, and a GitHub link is read only when you import it. Included in every paid plan, with no watermark.',
     points: [
-      `${PRODUCT_FACTS.codeThemes} syntax highlighting themes and ${PRODUCT_FACTS.codeLanguages} languages, with auto-detect`,
-      '11 gradient backgrounds plus a transparent option',
-      `Line numbers, macOS window frame, and ${PRODUCT_FACTS.codeFonts} monospace fonts`,
-      'Shareable links that restore the exact design from the URL',
-      '2x and 3x PNG export, plus copy image to clipboard',
+      `${PRODUCT_FACTS.codeThemes} syntax themes plus themes generated from your brand kit`,
+      'Line highlight, focus and blur, annotations, diffs, file tabs, terminal frames and an attribution footer',
+      'Carousels as PNGs or a LinkedIn PDF, and animated code as MP4, WebM or GIF in 9:16, 1:1 and 16:9',
+      'Import from a GitHub file link with a line range, a pull request, a commit or a gist',
+      'Post this: a Publish draft with the image attached, the code as alt text and an optional code reply',
     ],
   },
   {
@@ -192,7 +192,7 @@ export const AGENT_PAGES: AgentPage[] = [
       'Editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in X-API-Key, and per-IP limits apply on top. Workspace-scoped /api/v1 operations require an X-API-Key organization key or an authorized signed-in session.',
     points: [
       'Editor utility endpoints return 401 unauthorized without a session or X-API-Key workspace key',
-      'Create a workspace API key in Settings → Developer API (/workspace/developers).',
+      'Create a workspace API key in Settings → Developer API (/settings/developers).',
       'Tenant /api/v1 operations enforce workspace permission, API-key scope, plan feature, and quota checks',
       'POST /api/screenshot is limited to 20 requests per minute per IP',
       'Rate-limited responses return HTTP 429 with Retry-After and X-RateLimit-* headers',

@@ -27,9 +27,9 @@ async function snap(page: Page, name: string): Promise<void> {
 
 /** Open a new draft from the library; returns its id. */
 async function newDraft(page: Page): Promise<string> {
-  await page.goto('/write')
+  await page.goto('/publish')
   await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/write\/[a-z0-9]+/)
+  await page.waitForURL(/\/publish\/[a-z0-9]+/)
   await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
   return new URL(page.url()).pathname.split('/').pop() ?? ''
 }
@@ -89,6 +89,7 @@ test(
     await expect(page.getByTestId('post-length-2')).toHaveText('38 / 280')
 
     // Numbering is applied when serialized and counted; the text never holds it.
+    await page.getByTestId('options-chip').click()
     await page.getByRole('button', { name: /Auto-numbering/ }).click()
     await page.getByLabel('Enable auto-numbering').click()
     await expect(page.getByTestId('numbering-preview')).toContainText('1/2')
@@ -191,16 +192,16 @@ test(
     await page.keyboard.press('Escape')
 
     // The library: both posts in the queue; the draft found by its scratchpad, shown by its title.
-    await app.open('/write?tab=queue')
+    await app.open('/publish?tab=queue')
     await expect(page.getByTestId('write-rail')).toContainText('Launch day is here. Today! 1/2')
     await expect(page.getByTestId('write-rail')).toContainText('Read more on our blog.')
-    await app.open('/write?q=legal')
+    await app.open('/publish?q=legal')
     await expect(page.getByTestId('draft-row')).toHaveCount(1)
     await expect(page.getByTestId('draft-row')).toContainText('Launch thread')
     await snap(page, 'write-library-search')
 
     // Backups: browsed, compared, and recovered as a new draft.
-    await app.open(`/write/${draftId}?panel=backups`)
+    await app.open(`/publish/${draftId}?panel=backups`)
     const backups = page.getByTestId('backups-browser')
     await expect(backups).toBeVisible({ timeout: 60_000 })
     await expect(page.getByTestId('backup-time')).toContainText(
@@ -209,7 +210,7 @@ test(
     await snap(page, 'write-backups')
     await backups.getByRole('button', { name: 'Create new draft from this version' }).click()
     await page.waitForURL(
-      (url) => !url.pathname.endsWith(draftId) && /\/write\/[a-z0-9]+/.test(url.pathname)
+      (url) => !url.pathname.endsWith(draftId) && /\/publish\/[a-z0-9]+/.test(url.pathname)
     )
     await expect(draftEditor(page)).toContainText('Launch day is here.', { timeout: 60_000 })
     expect(await draftPosts(draftId)).toHaveLength(2)
@@ -241,7 +242,7 @@ test(
     await expectSaved(page)
 
     // Refine: the answer is previewed; Reject leaves the text as it was.
-    await page.getByRole('button', { name: 'Rewrite', exact: true }).click()
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     await page.getByTestId('refine-menu').getByRole('button', { name: 'Fix grammar' }).click()
     const review = page.getByTestId('refine-review')
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
@@ -251,7 +252,7 @@ test(
     await expect(editor).not.toContainText('(refined)')
 
     // Accept applies it as one change, and Undo takes it back.
-    await page.getByRole('button', { name: 'Rewrite', exact: true }).click()
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     await page.getByTestId('refine-menu').getByRole('button', { name: 'Make it punchier' }).click()
     await expect(review).toContainText('(refined)', { timeout: 60_000 })
     await review.getByRole('button', { name: 'Accept' }).click()
@@ -261,10 +262,23 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // The writing assistant, in the set's voice: set up or skipped, then asked.
+    // Each post has its own Ask AI, and Try again asks the same thing again,
+    // not the empty instruction box.
+    await page.getByRole('button', { name: 'Ask AI about post 1' }).click()
+    const menu = page.getByTestId('refine-menu')
+    await menu.getByLabel('Refine instruction').fill('Make it friendlier')
+    await menu.getByRole('button', { name: 'Go', exact: true }).click()
+    await expect(review).toContainText('Make it friendlier')
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Try again' }).click()
+    await expect(review).toContainText('Make it friendlier', { timeout: 60_000 })
+    await expect(review).toContainText('(refined)', { timeout: 60_000 })
+    await review.getByRole('button', { name: 'Reject' }).click()
+    await expect(editor).not.toContainText('(refined)')
+
+    // The writing assistant helps at once; its voice setup is offered later, never as a gate.
     await page.getByRole('button', { name: 'Assistant', exact: true }).click()
-    await expect(page.getByTestId('assistant-setup')).toBeVisible()
-    await page.getByTestId('assistant-setup').getByRole('button', { name: 'Skip for now' }).click()
+    await expect(page.getByTestId('assistant-setup')).toHaveCount(0)
     const assistant = page.getByTestId('assistant-panel')
     await assistant.getByRole('button', { name: /stronger hooks/ }).click()
     await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(1, { timeout: 60_000 })
@@ -272,6 +286,19 @@ test(
     await assistant.getByRole('button', { name: 'Add as a new post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expectSaved(page)
+    // After three answers with no style guide, the assistant offers its voice setup.
+    await expect(assistant.getByRole('button', { name: 'Set up its voice' })).toHaveCount(0)
+    for (const [index, question] of ['Make it shorter.', 'Add a question at the end.'].entries()) {
+      await assistant.getByLabel('Ask the assistant').fill(question)
+      await assistant.getByRole('button', { name: 'Send', exact: true }).click()
+      await expect(assistant.getByTestId('assistant-assistant')).toHaveCount(index + 2, {
+        timeout: 60_000,
+      })
+    }
+    await assistant.getByRole('button', { name: 'Set up its voice' }).click()
+    await expect(page.getByTestId('assistant-setup')).toBeVisible()
+    await page.getByRole('button', { name: 'Skip for now', exact: true }).click()
+    await expect(page.getByTestId('assistant-panel')).toBeVisible()
 
     // The review names every account and the follow-ups; Auto-DM is off, with why.
     await page.getByTestId('publish-button').click()
@@ -343,11 +370,11 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
     await page.setViewportSize({ height: 844, width: 390 })
-    await app.open('/write')
+    await app.open('/publish')
     await expect(page.getByTestId('write-rail')).toBeVisible()
     await snap(page, 'write-phone-library')
     await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/write\/[a-z0-9]+/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
     const editor = draftEditor(page)
     await expect(editor).toBeVisible({ timeout: 60_000 })
     await editor.click()
@@ -381,23 +408,23 @@ test(
     await expect(publish.getByTestId('review-destination').first()).toContainText('@shots_')
     await snap(page, 'write-phone-review')
     await page.keyboard.press('Escape')
-    const previousId = page.url().match(/\/write\/([a-z0-9]+)/)![1]
+    const previousId = page.url().match(/\/publish\/([a-z0-9]+)/)![1]
     const previous = (await apiRequest(page, `/api/v1/content-drafts/${previousId}`)).body as {
       socialSetId: string
     }
     await page.getByTestId('mobile-new-draft').click()
     await page.waitForURL(
-      (url) => /\/write\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(previousId)
+      (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(previousId)
     )
     await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
     await expect(draftEditor(page)).not.toContainText('Written on a phone.')
-    const nextId = page.url().match(/\/write\/([a-z0-9]+)/)![1]
+    const nextId = page.url().match(/\/publish\/([a-z0-9]+)/)![1]
     const next = (await apiRequest(page, `/api/v1/content-drafts/${nextId}`)).body as {
       socialSetId: string
     }
     expect(next.socialSetId).toBe(previous.socialSetId)
     expect(await draftPosts(nextId)).toHaveLength(0)
-    await app.open(`/write/${previousId}`)
+    await app.open(`/publish/${previousId}`)
     await expect(draftEditor(page)).toContainText('Written on a phone.')
   }
 )
@@ -432,7 +459,7 @@ test(
     await expectSaved(page)
 
     // A tag of this set, put on the draft from its row, then used as a filter.
-    await app.open('/write')
+    await app.open('/publish')
     await page.getByRole('button', { name: 'Draft filters' }).click()
     await choose('Manage tags…')
     await page.getByLabel('Tag name').fill('Launch')
@@ -458,13 +485,13 @@ test(
     await page.getByLabel('Post URL').fill('https://x.com/someone/status/1234567890')
     await page.getByRole('button', { name: 'Start writing' }).click()
     await page.waitForURL(
-      (url) => !url.pathname.endsWith(first) && /\/write\/[a-z0-9]+/.test(url.pathname)
+      (url) => !url.pathname.endsWith(first) && /\/publish\/[a-z0-9]+/.test(url.pathname)
     )
     await expect(page.getByTestId('draft-target')).toContainText('Replying to')
     await expect(page.getByTestId('draft-target')).toContainText('x.com/someone/status/1234567890')
 
     // Duplicate: a new draft with the text, no schedule or link.
-    await app.open('/write')
+    await app.open('/publish')
     await rowMenu('Pricing')
     await choose('Duplicate')
     await expect(rows().filter({ hasText: 'Pricing' })).toHaveCount(2)
@@ -476,7 +503,7 @@ test(
     await page.getByRole('button', { name: /^Publishing brand: / }).click()
     await expect(page.getByRole('menuitem', { name: 'New publishing brand…' })).toHaveAttribute(
       'href',
-      /\/workspace\/social-sets$/
+      /\/settings\/publishing-brands$/
     )
     await page.keyboard.press('Escape')
     const created = await apiRequest(page, '/api/v1/social-sets', {
@@ -503,7 +530,7 @@ test(
       // eslint-disable-next-line no-restricted-syntax -- see above.
       await page.waitForLoadState('networkidle')
     }
-    await app.open(`/write?set=${secondSet}`)
+    await app.open(`/publish?set=${secondSet}`)
     await expect(page.getByText('No drafts in this publishing brand.')).toBeVisible()
     await switchSet(0)
     await rowMenu('Pricing')
@@ -512,7 +539,7 @@ test(
     await page.getByRole('button', { name: 'Copy without tags' }).click()
     await expect(page.getByText(/Copied/).first()).toBeVisible()
     // The copy opens in its set.
-    await page.waitForURL(/\/write\/[a-z0-9]+\?set=/)
+    await page.waitForURL(/\/publish\/[a-z0-9]+\?set=/)
     await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
     await switchSet(1)
     await expect(rows().filter({ hasText: 'Pricing' })).toHaveCount(1)
@@ -564,7 +591,7 @@ test(
       .getByRole('button', { name: 'Save as planned' })
       .click()
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-    await app.open(`/write/plan?week=${tomorrow}`)
+    await app.open(`/publish/calendar?week=${tomorrow}`)
     const plannedCard = page
       .getByTestId('calendar-planned')
       .filter({ hasText: 'Planned, not scheduled', visible: true })
@@ -572,7 +599,7 @@ test(
     await plannedCard.click()
     await expect(page.getByRole('link', { name: 'Open in editor', exact: true })).toHaveAttribute(
       'href',
-      `/write/${planned}`
+      `/publish/${planned}`
     )
     await page.keyboard.press('Escape')
     await snap(page, 'write-plan')
@@ -587,10 +614,13 @@ test(
     const draftId = await newDraft(page)
     const editor = draftEditor(page)
     await expect(editor).toBeFocused()
-    await expect(editor.locator('[placeholder="What would you like to share?"]')).toBeVisible()
-    await expect(
-      page.getByRole('button', { name: 'Add another post', exact: true })
-    ).toBeInViewport()
+    // An X draft asks as X does, with the slash menu's hint (a CSS variable drawn as the placeholder).
+    await expect(editor).toHaveCSS(
+      '--post-placeholder',
+      '"What’s happening?   Type / for commands"'
+    )
+    await expect(editor.locator('[placeholder]')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add post', exact: true })).toBeInViewport()
     await editor.fill('QA persistence check two')
     await expect(page.getByTestId('post-length-1')).toHaveText('24 / 280')
     await expectSaved(page)
@@ -640,7 +670,7 @@ test(
         return (result.body as { plainText: string }).plainText
       })
       .toContain('Second post')
-    await app.open(`/write/${draftId}`)
+    await app.open(`/publish/${draftId}`)
     await expect(editor).toContainText('Second post')
     await page.getByTestId('schedule-button').click()
     const schedule = page.getByTestId('schedule-dialog')
@@ -655,18 +685,37 @@ test(
     await page.getByRole('menuitem', { name: 'Archive draft' }).click()
     await expect(page.getByRole('button', { name: 'Restore draft', exact: true })).toBeVisible()
     await expect(page.getByTestId('publish-button')).toHaveCount(0)
-    await app.open('/write?tab=archived')
+    await app.open('/publish?tab=archived')
     const archived = page.getByTestId('draft-row').filter({ hasText: 'Persistence regression' })
     await expect(archived).toContainText('Previously planned')
     await archived.getByRole('button', { name: 'Actions for Persistence regression' }).click()
     await page.getByRole('menuitem', { name: 'Restore draft', exact: true }).click()
     await expect(archived).toHaveCount(0)
 
-    await app.open('/write?kind=article')
+    await app.open('/publish?kind=article')
     await expect(page.getByRole('button', { name: 'Remove Article filter' })).toBeVisible()
     await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
     await expect(page.getByRole('button', { name: 'Remove Article filter' })).toHaveCount(0)
-    await app.open('/write/plan')
+    await test.step('library filters are in the URL and survive a reload', async () => {
+      await app.open('/publish?tab=all')
+      await expect(page.getByRole('tab', { name: 'All', exact: true })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+      await page.getByRole('button', { name: 'Dates', exact: true }).click()
+      await page.getByRole('button', { name: 'Today', exact: true }).click()
+      await expect(page).toHaveURL(/[?&]from=\d{4}-\d{2}-\d{2}/)
+      await app.reload()
+      await expect(page.getByRole('button', { name: 'Dates', exact: true })).toContainText('Today')
+      // Nothing in this workspace is on a day before it existed.
+      await app.open('/publish?tab=all&from=2020-01-01&to=2020-01-02')
+      await expect(page.getByText('No drafts match these filters.')).toBeVisible()
+      await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
+      await expect(page).not.toHaveURL(/[?&]from=/)
+      await page.getByRole('tab', { name: 'Queue', exact: true }).click()
+      await expect(page.getByText('Showing the next 60 days.')).toBeVisible()
+    })
+    await app.open('/publish/calendar')
     await page
       .getByRole('button', { name: /^Create draft / })
       .first()

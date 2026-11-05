@@ -96,6 +96,18 @@ export function hasPermission(role: string, permission: Permission): boolean {
   return rolePermissions[normalizeOrganizationRole(role)].includes(permission)
 }
 
+/**
+ * What a member may do here: their role's permission, unless their permission
+ * group denies it. Groups only subtract. Use this wherever a member's access is
+ * known, so a page offers what the server will accept.
+ */
+export function accessAllows(
+  access: { deniedPermissions: readonly string[]; role: string },
+  permission: Permission
+): boolean {
+  return hasPermission(access.role, permission) && !access.deniedPermissions.includes(permission)
+}
+
 export function normalizeOrganizationRole(role: string): OrganizationRole {
   if (role === 'member') {
     return 'viewer'

@@ -5,7 +5,7 @@ import { backendSDK } from '@/lib/backend/sdk'
 import { workspaceRequestScopeSchema } from '@/lib/auth/request-scope'
 import { refineTexts } from '@/lib/write/refine'
 import { allowAiAction } from './launch'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import {
   archiveBrandKit,
   createBrandKit,
@@ -30,7 +30,7 @@ export const brandKitRouter = router({
   // Every member reads brand kits to apply them; managing them needs brand:manage.
   list: organizationProcedure('artifact:read').query(async ({ ctx }) => {
     const brandKits = await listBrandKits(ctx.access)
-    return { brandKits, canManage: hasPermission(ctx.access.role, 'brand:manage') }
+    return { brandKits, canManage: accessAllows(ctx.access, 'brand:manage') }
   }),
   create: organizationProcedure('brand:manage')
     .input(brandKitCreateSchema)

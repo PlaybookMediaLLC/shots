@@ -131,7 +131,7 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
       actions={
         <>
           <ButtonLink href={historyHref} variant="outline">
-            Run history
+            Back to runs
           </ButtonLink>
           {canManage && canCancel ? (
             <Button disabled={busy} onClick={() => recover('cancel')} variant="outline">

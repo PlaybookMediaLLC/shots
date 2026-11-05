@@ -476,6 +476,30 @@ func TestListConnectionsNamesAccountsFromSocialAPI(t *testing.T) {
 	}
 }
 
+func TestListConnectionsSignsPrivateBucketAvatars(t *testing.T) {
+	t.Setenv("SOCIAL_PRIVATE_MEDIA", "true")
+	t.Setenv("STORAGE_PROVIDER", "cloudflare")
+	t.Setenv("CLOUDFLARE_ACCOUNT_ID", "account")
+	t.Setenv("CLOUDFLARE_ACCESS_KEY", "test-access")
+	t.Setenv("CLOUDFLARE_SECRET_ACCESS_KEY", "test-secret")
+	t.Setenv("CLOUDFLARE_BUCKETNAME", "social-media")
+	t.Setenv("CLOUDFLARE_BUCKET_URL", "https://account.r2.cloudflarestorage.com/social-media")
+	name, avatar := "Shots", "https://account.r2.cloudflarestorage.com/social-media/avatar.jpg"
+	store := &fakeStore{connections: []*ent.ChannelConnection{{ID: "c1", ExternalAccountID: "social-x", Platform: "x", Status: "ACTIVE", DisplayName: &name, AvatarURL: &avatar}}}
+	handler := New(store, &fakeScheduler{}, &fakeVerifier{}, "secret")
+	request := httptest.NewRequest(http.MethodGet, "/v1/channel-connections", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org-1")
+	request.Header.Set("X-User-ID", "user-1")
+	request.Header.Set("X-Session-ID", "session-1")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	// A browser can load only a signed link to the private bucket.
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `/social-media/avatar.jpg?X-Amz-Algorithm=`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestVideoAndPageOAuthAuthorizationHosts(t *testing.T) {
 	for provider, host := range map[string]string{"linkedin-page": "www.linkedin.com", "tiktok": "www.tiktok.com", "youtube": "accounts.google.com"} {
 		t.Run(provider, func(t *testing.T) {

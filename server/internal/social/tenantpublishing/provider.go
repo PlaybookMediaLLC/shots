@@ -83,7 +83,8 @@ func (r EntIntegrationLookup) FindIntegration(ctx context.Context, orgID, destin
 		integration.ProviderIdentifier(platform), integration.DeletedAtIsNil(),
 	).Only(ctx)
 	if socialent.IsNotFound(err) {
-		return nil, socialapi.NewError(http.StatusNotFound, false, "social destination was not found")
+		// The account was removed on the social side: reconnecting it is the fix.
+		return nil, socialapi.NewCodedError(http.StatusNotFound, publishing.FailureAccountReconnect, "social destination was not found")
 	}
 	return item, err
 }
@@ -112,11 +113,11 @@ func (p *Publisher) analyticsAccount(ctx context.Context, organizationID, destin
 func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinationID, platform, secretReference string,
 	providerSettings map[string]any, publication bool) (*socialent.Integration, poster, json.RawMessage, error) {
 	if p.bindings == nil || p.integrations == nil || p.signer == nil || p.resolve == nil {
-		return nil, nil, nil, socialapi.NewError(http.StatusServiceUnavailable, false, "direct publisher is not configured")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusServiceUnavailable, publishing.FailurePublisherUnavailable, "direct publisher is not configured")
 	}
 	binding, err := p.bindings.Binding(ctx, organizationID)
 	if err != nil {
-		return nil, nil, nil, socialapi.NewError(http.StatusConflict, false, "workspace has no social connection binding")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, publishing.FailurePublisherUnavailable, "workspace has no social connection binding")
 	}
 	if binding == nil || binding.SecretReference != secretReference {
 		return nil, nil, nil, socialapi.NewError(http.StatusForbidden, false, "social credential does not belong to workspace")
@@ -127,10 +128,10 @@ func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinat
 	}
 	if account == nil || account.ID != destinationID || account.OrganizationID != binding.GoOrganizationID || account.ProviderIdentifier != platform || account.DeletedAt != nil || account.InBetweenSteps || account.Disabled || account.RefreshNeeded || account.Token == "" ||
 		account.TokenExpiration != nil && !account.TokenExpiration.After(p.currentTime()) {
-		return nil, nil, nil, socialapi.NewError(http.StatusConflict, false, "social credentials have expired or been disabled")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials have expired or been disabled")
 	}
 	if integrations.RequireVerifiedIdentity(account) != nil {
-		return nil, nil, nil, socialapi.NewError(http.StatusConflict, false, "reconnect this account to verify its identity, publishing permissions and limits")
+		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "reconnect this account to verify its identity, publishing permissions and limits")
 	}
 	provider := p.resolve(platform)
 	if provider == nil || (publication && !directPlatformAllowed(platform)) {
@@ -166,7 +167,7 @@ func publicationOutcome(err error) error {
 		return socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
 	}
 	if temporalx.FailureType(err) == temporalx.TypeRefreshToken || temporalx.FailureType(err) == temporalx.TypeDisconnect {
-		return socialapi.NewError(http.StatusConflict, false, "social credentials must be reconnected")
+		return socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
 	}
 	// The provider may have accepted the post before the call failed. A
 	// reconciliation step must inspect the remote account before retrying.
@@ -192,12 +193,12 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		youtubeOptions, tiktokOptions = input.Options.YouTube, input.Options.TikTok
 	}
 	if err := postoptions.ValidateVideoOptions(input.Platform, youtubeOptions, tiktokOptions, true); err != nil {
-		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailurePostOptions, err.Error())
 	}
 	assets := input.Media()
 	if input.Platform == "tiktok" || input.Platform == "youtube" {
 		if len(assets) != 1 || assets[0].MediaType != "video/mp4" || len(input.Replies) > 0 || input.ReplyTo != "" || input.Poll != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, "choose one MP4 video")
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailureMediaUnsupported, "choose one MP4 video")
 		}
 	}
 	if input.Platform == "tiktok" {
@@ -209,14 +210,21 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 		creator, err := reader.CreatorInfo(ctx, account.Token)
 		if err != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, false, "TikTok creator information unavailable")
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadGateway, publishing.FailureProviderPermissions, "TikTok creator information unavailable")
 		}
 		duration := 0
 		if assets[0].DurationMs != nil {
 			duration = *assets[0].DurationMs
 		}
 		if err := creator.Check(input.Options.TikTok, duration); err != nil {
-			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadRequest, false, err.Error())
+			code := publishing.FailurePostOptions
+			switch {
+			case errors.Is(err, postoptions.ErrVideoTooLong):
+				code = publishing.FailureVideoTooLong
+			case errors.Is(err, postoptions.ErrCreatorPermissions):
+				code = publishing.FailureProviderPermissions
+			}
+			return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, code, err.Error())
 		}
 	}
 	if input.Document != nil {
@@ -316,7 +324,7 @@ func (p *Publisher) publicationAccount(ctx context.Context, input socialapi.Publ
 		return nil, nil, err
 	}
 	if current.InternalID != expected.InternalID || current.OrganizationID != expected.OrganizationID {
-		return nil, nil, socialapi.NewError(http.StatusConflict, false, "social destination identity changed before publication")
+		return nil, nil, socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social destination identity changed before publication")
 	}
 	return current, provider, nil
 }

@@ -2,6 +2,7 @@ package temporalpublishing
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -267,5 +268,24 @@ func TestReceiptSurvivesStorageOutageWithoutResubmitting(t *testing.T) {
 	store.recordErr = nil
 	if err := activities.MarkUnknown(context.Background(), input); err != nil || !store.unknown || store.progress.Publication.RemoteID != "video" {
 		t.Fatalf("receipt recovery failed: %#v %v", store, err)
+	}
+}
+
+func TestFailureCodeNamesTheCause(t *testing.T) {
+	ctx := context.Background()
+	for _, test := range []struct {
+		err  error
+		want string
+	}{
+		{errMissedWindow, publishing.FailureMissedWindow},
+		{socialapi.NewCodedError(409, "ACCOUNT_RECONNECT", "reconnect"), "ACCOUNT_RECONNECT"},
+		{socialapi.NewError(400, false, "rejected"), "400"},
+		{socialapi.NewError(0, false, "offline"), "NETWORK"},
+		{socialapi.NewError(502, true, "unknown"), "UNKNOWN_DELIVERY"},
+		{errors.New("no provider status"), "PUBLISHER_ERROR"},
+	} {
+		if got := failureCodeFor(ctx, PreparedPublication{}, test.err); got != test.want {
+			t.Errorf("failureCodeFor(%v) = %q, want %q", test.err, got, test.want)
+		}
 	}
 }

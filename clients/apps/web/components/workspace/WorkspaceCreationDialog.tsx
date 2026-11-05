@@ -19,7 +19,8 @@ import {
 import { useTRPCClient } from '@/lib/trpc/react'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { workspaceNameSchema } from '@/lib/workspace/input-schemas'
-import { TimeZonePicker, browserTimeZone } from '@/components/settings/TimeZonePicker'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { browserTimeZone } from '@/lib/time-zones'
 import {
   isTerminalCreationError,
   newWorkspaceCreationAttempt,
@@ -170,13 +171,13 @@ export function WorkspaceCreationDialog({
         </DialogHeader>
         {created ? (
           <div className="grid gap-3">
-            <Button disabled={busy} onClick={() => void openWorkspace('/workspace/channels')}>
+            <Button disabled={busy} onClick={() => void openWorkspace('/settings/channels')}>
               Connect social accounts
             </Button>
             <Button
               disabled={busy}
               variant="outline"
-              onClick={() => void openWorkspace('/workspace/members')}
+              onClick={() => void openWorkspace('/settings/members')}
             >
               Invite members
             </Button>
@@ -192,7 +193,7 @@ export function WorkspaceCreationDialog({
             <Button
               disabled={busy}
               variant="ghost"
-              onClick={() => void openWorkspace('/workspace/billing')}
+              onClick={() => void openWorkspace('/settings/billing')}
             >
               Choose a plan
             </Button>
@@ -207,7 +208,7 @@ export function WorkspaceCreationDialog({
           >
             <a
               className="w-fit text-sm underline underline-offset-4"
-              href="/workspace/roles"
+              href="/settings/roles"
               target="_blank"
               rel="noreferrer"
             >

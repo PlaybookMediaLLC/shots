@@ -377,7 +377,7 @@ func (s *Server) completeSocialOAuth(w http.ResponseWriter, r *http.Request) {
 			writeOAuthStoreError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, connectionResponse(connection))
+		writeJSON(w, http.StatusOK, connectionResponse(r.Context(), connection))
 		return
 	}
 	binding, err := s.store.Binding(r.Context(), actor.Organization)
@@ -403,7 +403,7 @@ func (s *Server) completeSocialOAuth(w http.ResponseWriter, r *http.Request) {
 		writeOAuthStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, connectionResponse(connection))
+	writeJSON(w, http.StatusOK, connectionResponse(r.Context(), connection))
 }
 
 func writeOAuthStoreError(w http.ResponseWriter, err error) {

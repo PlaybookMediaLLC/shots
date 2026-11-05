@@ -11,7 +11,7 @@ import { Spinner } from "./spinner";
 import { withTooltip } from "./tooltip";
 
 export const buttonVariants = cva(
-  "focus-ring inline-flex w-fit cursor-pointer select-none items-center justify-center gap-2 rounded-none text-sm ring-offset-background transition-bg-ease disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex w-fit cursor-pointer select-none items-center justify-center gap-2 rounded-md text-sm ring-offset-background transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     defaultVariants: {
       size: "default",
@@ -33,27 +33,27 @@ export const buttonVariants = cva(
         true: "h-auto w-full cursor-pointer justify-start",
       },
       size: {
-        blockAction: "size-[26px] gap-1 px-1.5 text-xs",
-        default: "h-[28px] gap-1.5 px-2",
-        icon: "size-[28px] w-[33px] [&_svg]:size-5",
-        iconSm: "size-[28px]",
+        blockAction: "size-7 gap-1 px-1.5 text-xs",
+        default: "h-8 gap-1.5 px-2.5",
+        icon: "size-8",
+        iconSm: "size-8",
         lg: "h-11 px-4 text-lg",
         md: "h-8 px-3",
         menuAction: "size-6",
         navAction: "size-5",
         none: "",
-        xs: "h-[26px] px-1.5 py-1 text-xs",
+        xs: "h-7 px-1.5 py-1 text-xs",
       },
       truncate: {
         true: "truncate whitespace-nowrap",
       },
       variant: {
         blockAction:
-          "rounded-none hover:bg-primary/[.06] [&_svg]:text-muted-foreground",
+          "rounded-md hover:bg-primary/[.06] [&_svg]:text-muted-foreground",
         blockActionSecondary:
-          "rounded-none bg-primary/[.06] [&_svg]:text-muted-foreground",
+          "rounded-md bg-primary/[.06] [&_svg]:text-muted-foreground",
         brand:
-          "bg-brand font-medium text-white hover:bg-brand/80 active:bg-brand-active",
+          "bg-primary font-medium text-white hover:bg-primary/80 active:bg-brand-active",
         default:
           "bg-primary font-medium text-primary-foreground hover:bg-primary/90 [&_svg]:text-primary-foreground",
         destructive:
@@ -63,9 +63,9 @@ export const buttonVariants = cva(
         ghost3: "text-muted-foreground/80 hover:bg-accent",
         ghostActive: "bg-accent hover:bg-accent hover:text-accent-foreground",
         menuAction: "text-muted-foreground/80 hover:bg-primary/[.06]",
-        nav: "rounded-none text-muted-foreground transition hover:bg-primary/[.04]",
+        nav: "rounded-md text-muted-foreground transition hover:bg-primary/[.04]",
         navAction:
-          "rounded-none text-muted-foreground/80 opacity-0 transition hover:bg-primary/[.06] group-hover:opacity-100",
+          "rounded-md text-muted-foreground/80 opacity-0 transition hover:bg-primary/[.06] group-hover:opacity-100",
         none: "",
         outline:
           "border border-input bg-background hover:bg-accent hover:text-accent-foreground",

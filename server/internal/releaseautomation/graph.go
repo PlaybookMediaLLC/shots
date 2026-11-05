@@ -75,7 +75,7 @@ func Validate(graph Graph) []Issue {
 		return issues
 	}
 	nodes, outgoing, incoming := map[string]Node{}, map[string][]Edge{}, map[string][]string{}
-	trigger, generations, classifiers, renders, canvases := "", 0, 0, 0, 0
+	trigger, generations, classifiers, renders, canvases, codeVisuals := "", 0, 0, 0, 0, 0
 	for _, n := range graph.Nodes {
 		if _, ok := nodes[n.ID]; ok || !nodeID.MatchString(n.ID) {
 			add(n.ID, "node_id", "Node IDs must be unique letters, numbers, underscores, or hyphens.")
@@ -113,6 +113,14 @@ func Validate(graph Graph) []Issue {
 			if n.Action != nil && n.Action.Type == "create_canvas" {
 				if canvases++; canvases > 1 {
 					add(n.ID, "canvas_limit", "A workflow can create a canvas once per run.")
+				}
+			}
+			if n.Action != nil && n.Action.Type == "render_code_visual" {
+				if codeVisuals++; codeVisuals > 1 {
+					add(n.ID, "code_visual_limit", "A workflow can render a code visual once per run.")
+				}
+				if graph.Family != Merged {
+					add(n.ID, "code_visual_trigger", "Code visuals render from a merged pull request; use the pull request trigger.")
 				}
 			}
 		case "classify":
@@ -237,7 +245,7 @@ func outputOf(action string) string {
 	switch action {
 	case "create_release":
 		return "releaseId"
-	case "create_campaign", "generate_copy", "render_creatives":
+	case "create_campaign", "generate_copy", "render_creatives", "render_code_visual":
 		return "campaignId"
 	case "submit_review":
 		return "reviewIds"
@@ -268,6 +276,9 @@ func validateAction(action *Action, version int) string {
 	}
 	if len(action.RecipeIDs) > 0 && action.Type != "create_canvas" {
 		return "Canvas templates belong to create canvas."
+	}
+	if action.ReadSourceCode && action.Type != "render_code_visual" {
+		return "Only render code visual reads source code."
 	}
 	switch action.Type {
 	case "create_release":
@@ -340,6 +351,19 @@ func validateAction(action *Action, version int) string {
 		}
 		if len(action.SurfaceID) > 64 || action.BrandKitID != "" || len(action.DestinationIDs) > 0 || action.Audience != "" || action.CallToAction != "" {
 			return "Create canvas uses the release and a product surface."
+		}
+	case "render_code_visual":
+		if version < 2 {
+			return "Rendering a code visual requires workflow language version 2."
+		}
+		if action.Input == nil || action.Input.Output != "campaignId" {
+			return "Render code visual requires a campaign output."
+		}
+		if !action.ReadSourceCode {
+			return "Allow this action to read the pull request's code; it renders the change as a code visual."
+		}
+		if action.SurfaceID != "" || action.BrandKitID != "" || len(action.DestinationIDs) > 0 || action.Audience != "" || action.CallToAction != "" {
+			return "Render code visual uses the campaign and the merged pull request."
 		}
 	case "submit_review":
 		if action.Input == nil || action.Input.Output != "campaignId" {
@@ -478,6 +502,9 @@ func DryRunAssuming(graph Graph, event Event, relevant bool) Preview {
 			}
 			if n.Action.Type == "create_canvas" {
 				step.Outcome = fmt.Sprintf("Predicted canvas laid out from the release with %d templates; preview creates nothing.", len(n.Action.RecipeIDs))
+			}
+			if n.Action.Type == "render_code_visual" {
+				step.Outcome = "Predicted code visual from the merged pull request's diff; preview reads no code and renders nothing."
 			}
 		case "end":
 			step.Outcome = n.Outcome

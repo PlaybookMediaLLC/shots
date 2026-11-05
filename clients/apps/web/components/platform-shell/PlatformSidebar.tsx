@@ -15,20 +15,25 @@ import {
   PublishIcon,
   SettingsIcon,
   SidebarIcon,
+  StoreIcon,
 } from './icons'
 import {
+  AREA_LINKS,
+  type AreaLink,
   areaLocked,
+  campaignLinks,
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
-import { AREA_LINKS, type AreaLink, AreaSubNav } from '@/components/platform-hub/AreaNavigation'
+import { AreaSubNav, useActiveAreaLink } from '@/components/platform-hub/AreaNavigation'
 import { SearchButton, ShellActions, ShellSearch } from './ShellActions'
 import Image from 'next/image'
 import { useTranslations } from 'next-intl'
 import { usePathname } from 'next/navigation'
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { Suspense, useCallback, useState, useSyncExternalStore } from 'react'
 import { NotificationCenter } from '@/components/notifications/NotificationCenter'
 import { AccountMenu } from '@/components/auth/AccountMenu'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
@@ -46,6 +51,7 @@ import { NavRow, type NavIcon } from './NavRow'
 import { ProductTourMenu } from './ProductTour'
 import { SidebarLink } from './SidebarLink'
 import { SettingsNav } from '@/components/settings/SettingsNav'
+import { RememberVisits } from './PageVisits'
 import { ThemeToggle } from './ThemeToggle'
 
 type NavItem = {
@@ -91,6 +97,10 @@ function NavLink({
   const t = useTranslations('platformNavigation')
   const pathname = usePathname()
   const active = platformArea(pathname) === platformArea(href)
+  const listed = active && subs && !collapsed && !locked
+  // Store screenshots is pinned under Create; when it is the page, Create is its section.
+  const pinned = key === 'create' && !locked && !listed
+  const storeActive = useActiveAreaLink([STORE_SCREENSHOTS]) === STORE_SCREENSHOTS.href
   return (
     <>
       <NavRow
@@ -109,18 +119,53 @@ function NavLink({
         label={t(key)}
         name={locked ? `${t(key)} (Pro)` : undefined}
         onNavigate={onNavigate}
+        section={Boolean(listed) || (pinned && storeActive)}
         tourId={`nav-${key}`}
       />
-      {active && subs && !collapsed && !locked ? (
+      {listed ? (
         <AreaSubNav items={subs} label={t(key)} onNavigate={onNavigate} />
+      ) : pinned ? (
+        <StoreScreenshotsLink
+          active={storeActive}
+          collapsed={collapsed}
+          label={t(key)}
+          onNavigate={onNavigate}
+        />
       ) : null}
     </>
+  )
+}
+
+/** Store screenshots stays pinned under Create, one click from every page and in the icon rail. */
+function StoreScreenshotsLink({
+  active,
+  collapsed,
+  label,
+  onNavigate,
+}: {
+  active: boolean
+  collapsed: boolean
+  label: string
+  onNavigate?: () => void
+}) {
+  return collapsed ? (
+    <NavRow
+      active={active}
+      collapsed
+      href={STORE_SCREENSHOTS.href}
+      icon={StoreIcon}
+      label={STORE_SCREENSHOTS.label}
+      onNavigate={onNavigate}
+    />
+  ) : (
+    <AreaSubNav items={[STORE_SCREENSHOTS]} label={label} onNavigate={onNavigate} />
   )
 }
 
 function Navigation({
   campaignsEnabled,
   collapsed,
+  deniedPermissions,
   draftsEnabled,
   draftsPlan,
   onNavigate,
@@ -129,6 +174,7 @@ function Navigation({
 }: {
   campaignsEnabled: boolean
   collapsed: boolean
+  deniedPermissions: readonly string[]
   draftsEnabled: boolean
   draftsPlan: boolean
   onNavigate?: () => void
@@ -149,6 +195,7 @@ function Navigation({
         draftsPlan={draftsPlan}
         onNavigate={onNavigate}
         paidPlan={paidPlan}
+        deniedPermissions={deniedPermissions}
         role={role}
       />
       {NAV_GROUPS.map((group, index) => (
@@ -169,9 +216,11 @@ function Navigation({
                 subs={
                   item.key === 'publish'
                     ? draftsEnabled
-                      ? publishLinks('', undefined, campaignsEnabled)
+                      ? publishLinks()
                       : undefined
-                    : AREA_LINKS[item.key]
+                    : item.key === 'campaigns'
+                      ? campaignLinks(draftsEnabled)
+                      : AREA_LINKS[item.key]
                 }
               />
             ))}
@@ -281,12 +330,15 @@ function SidebarFooter({
         )}
       >
         {collapsed || settings ? null : (
-          <SidebarLink
+          // The docs open beside the app, so reading them never leaves your work.
+          <a
             className="me-auto flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
             href="/docs"
+            rel="noopener"
+            target="_blank"
           >
             Documentation <OutwardIcon aria-hidden="true" size={14} />
-          </SidebarLink>
+          </a>
         )}
         {/* The settings sidebar lists its own sections, not the places the tours show. */}
         {settings ? null : <ProductTourMenu />}
@@ -320,28 +372,37 @@ function SidebarFooter({
   )
 }
 
-function Brand({ collapsed }: { collapsed: boolean }) {
+function Brand({ brand, collapsed }: { brand: SidebarBrand; collapsed: boolean }) {
   return (
     <SidebarLink
       className="flex min-w-0 items-center gap-2.5 rounded-md"
       href="/home"
-      aria-label="Shots Home"
+      aria-label={`${brand.name} Home`}
     >
-      <Image
-        alt=""
-        className="size-6 rounded-md"
-        height={24}
-        src={publicImageUrl('/logo-mark.png')}
-        width={24}
-      />
+      {brand.logoUrl ? (
+        // An organization's own host, which next/image is not configured for.
+        <img alt="" className="size-6 rounded-md object-contain" src={brand.logoUrl} />
+      ) : (
+        <Image
+          alt=""
+          className="size-6 rounded-md"
+          height={24}
+          src={publicImageUrl('/logo-mark.png')}
+          width={24}
+        />
+      )}
       {collapsed ? null : (
-        <span className="truncate text-[15px] font-medium text-foreground">Shots</span>
+        <span className="truncate text-[15px] font-medium text-foreground">{brand.name}</span>
       )}
     </SidebarLink>
   )
 }
 
+type SidebarBrand = { logoUrl?: string; name: string }
+
 export interface PlatformSidebarProps {
+  /** The organization's white-label name and logo, or Shots'. */
+  brand?: SidebarBrand
   campaignsEnabled: boolean
   /** Show Drafts; content drafts are behind PLATFORM_CONTENT_DRAFTS. */
   draftsEnabled?: boolean
@@ -354,6 +415,8 @@ export interface PlatformSidebarProps {
   draftsPlan?: boolean
   /** False without a paid plan, which marks the paid areas before they are opened. */
   paidPlan?: boolean
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions?: readonly string[]
   /** The member's workspace role; New offers what it may create. */
   role?: string
   variant: 'editor' | 'page'
@@ -415,7 +478,9 @@ function useNavigationExpanded(
  * Mobile: a full drawer of the same links.
  */
 export function PlatformSidebar({
+  brand = { name: 'Shots' },
   campaignsEnabled,
+  deniedPermissions = [],
   draftsEnabled = false,
   draftsPlan = true,
   initialNavigation = 'expanded',
@@ -433,6 +498,9 @@ export function PlatformSidebar({
 
   return (
     <>
+      <Suspense fallback={null}>
+        <RememberVisits />
+      </Suspense>
       <ShellSearch
         campaignsEnabled={campaignsEnabled}
         // Posts are searched only where the plan can read them.
@@ -458,7 +526,7 @@ export function PlatformSidebar({
             collapsed ? 'flex-col gap-2' : 'h-8 justify-between gap-2 ps-2'
           )}
         >
-          <Brand collapsed={collapsed} />
+          <Brand brand={brand} collapsed={collapsed} />
           <div className={cn('flex items-center gap-0.5', collapsed && 'flex-col')}>
             <NotificationCenter initialIdentity={notificationIdentity} />
             <SearchButton />
@@ -472,6 +540,7 @@ export function PlatformSidebar({
             draftsEnabled={draftsEnabled}
             draftsPlan={draftsPlan}
             paidPlan={paidPlan}
+            deniedPermissions={deniedPermissions}
             role={role}
           />
         </div>
@@ -490,7 +559,7 @@ export function PlatformSidebar({
           surface.base
         )}
       >
-        <Brand collapsed={false} />
+        <Brand brand={brand} collapsed={false} />
         <div className="ms-auto flex items-center gap-1">
           <ThemeToggle />
           <NotificationCenter initialIdentity={notificationIdentity} />
@@ -513,7 +582,7 @@ export function PlatformSidebar({
             >
               <SheetTitle className="sr-only">{t('navigation')}</SheetTitle>
               <div className="flex h-8 shrink-0 items-center justify-between gap-2 ps-2 pe-12">
-                <Brand collapsed={false} />
+                <Brand brand={brand} collapsed={false} />
                 <SearchButton />
               </div>
               <div className="mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 py-1">
@@ -523,6 +592,7 @@ export function PlatformSidebar({
                   draftsEnabled={draftsEnabled}
                   draftsPlan={draftsPlan}
                   paidPlan={paidPlan}
+                  deniedPermissions={deniedPermissions}
                   role={role}
                   onNavigate={() => setMobileOpen(false)}
                 />

@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { analyticsReportSchema, analyticsQuerySchema } from '../lib/api/contracts/plan-analyze'
+import {
+  calendarNoteChangesSchema,
+  calendarNoteInputSchema,
+} from '../lib/api/contracts/calendar-notes'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
+  currentPosts,
   draftPostsState,
+  draftStatus,
+  listedAttention,
   OVERDUE_AFTER_MS,
   POST_STATE_TONE,
+  postFailureFix,
   postFailureReason,
   postState,
   STATUS_GROUPS,
@@ -18,6 +26,7 @@ import {
   planPreferencesSchema,
   selectionState,
   selectedInstant,
+  visibleDayItems,
   visibleItems,
   itemDay,
   movedToDay,
@@ -548,4 +557,150 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Publishing',
     'Scheduled',
   ])
+})
+
+test('every surface reads a draft with the same status words, from its current posts', () => {
+  const now = Date.parse('2026-11-04T12:00:00Z')
+  const later = '2026-11-05T12:00:00Z'
+  const post = (
+    id: string,
+    status: 'FAILED' | 'PUBLISHED' | 'CANCELLED' | 'UNKNOWN_DELIVERY' | 'SCHEDULED',
+    createdAt: string
+  ) => ({
+    channelConnectionId: id,
+    createdAt,
+    scheduledFor: later,
+    status,
+  })
+  // The demo draft: TikTok failed, then its retry failed; the retry is its current state.
+  const demo = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'FAILED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(currentPosts(demo).length, 1)
+  const header = draftStatus(
+    { plannedFor: null, status: 'scheduled' },
+    draftPostsState(currentPosts(demo), now)
+  )
+  assert.deepEqual(header, { label: 'Failed', tone: 'red' })
+  // The list reads its counts in the same words.
+  const listed = listedAttention({
+    attentionPosts: 1,
+    checkPosts: 0,
+    publishedPosts: 0,
+    queuedPosts: 0,
+  })
+  assert.equal(listed?.state, 'Failed')
+  // A successful retry replaces the failure it followed; a cancelled one does not.
+  const retried = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'PUBLISHED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.deepEqual(draftPostsState(currentPosts(retried), now), {
+    count: 1,
+    state: 'Published',
+    total: 1,
+  })
+  const cancelled = [
+    post('tiktok', 'FAILED', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'CANCELLED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(cancelled), now)?.state, 'Failed')
+  // An unconfirmed post may be live: a newer post never hides it.
+  const unconfirmed = [
+    post('tiktok', 'UNKNOWN_DELIVERY', '2026-11-04T04:25:00Z'),
+    post('tiktok', 'SCHEDULED', '2026-11-04T04:40:00Z'),
+  ]
+  assert.equal(draftPostsState(currentPosts(unconfirmed), now)?.state, 'Needs check')
+  assert.equal(
+    listedAttention({ attentionPosts: 2, checkPosts: 1, publishedPosts: 1, queuedPosts: 0 })?.state,
+    'Needs check'
+  )
+  assert.equal(
+    listedAttention({ attentionPosts: 0, checkPosts: 0, publishedPosts: 1, queuedPosts: 0 }),
+    null
+  )
+  assert.deepEqual(draftStatus({ plannedFor: null, status: 'archived' }, null), {
+    label: 'Archived',
+    tone: 'gray',
+  })
+  // An archived draft whose post may be live says so, as the drafts list does.
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Needs check', total: 2 }
+    )?.label,
+    'Needs check · 1 of 2'
+  )
+  assert.equal(
+    draftStatus(
+      { plannedFor: null, status: 'archived' },
+      { count: 1, state: 'Published', total: 1 }
+    )?.label,
+    'Archived'
+  )
+  assert.equal(draftStatus({ plannedFor: null, status: 'scheduled' }, null), null)
+})
+
+test('every failure names a cause and an action besides retrying when one exists', () => {
+  for (const code of [
+    'UNKNOWN',
+    'PUBLISHER_ERROR',
+    'PUBLISHER_UNAVAILABLE',
+    'ACCOUNT_RECONNECT',
+    'POST_OPTIONS',
+    'VIDEO_TOO_LONG',
+    'MEDIA_UNSUPPORTED',
+    'PROVIDER_PERMISSIONS',
+  ])
+    assert.doesNotMatch(postFailureReason(code) ?? '', /\(/, code)
+  assert.equal(postFailureFix('ACCOUNT_RECONNECT'), 'reconnect')
+  assert.equal(postFailureFix('403'), 'reconnect')
+  assert.equal(postFailureFix('VIDEO_TOO_LONG'), 'edit')
+  assert.equal(postFailureFix('400'), 'edit')
+  assert.equal(postFailureFix('429'), null)
+  assert.equal(postFailureFix(null), null)
+})
+
+test('a month day caps its posts but never hides one that needs attention', () => {
+  const day = (...statuses: string[]) =>
+    statuses.map((status, i) => ({ ...items[0], id: `item-${i}`, status }))
+  const ids = (found: PlanItem[]) => found.map((item) => item.id)
+
+  const quiet = visibleDayItems(day('Scheduled', 'Planned'))
+  assert.deepEqual([quiet.visible.length, quiet.hidden], [2, 0])
+
+  const over = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Published'))
+  assert.deepEqual(ids(over.visible), ['item-0', 'item-1'])
+  assert.equal(over.hidden, 2)
+
+  // A failure late in the day is shown in its own place, and takes a slot from a quiet post.
+  const late = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Failed'))
+  assert.deepEqual(ids(late.visible), ['item-0', 'item-3'])
+  assert.equal(late.hidden, 2)
+
+  // More attention than the cap still shows every one.
+  const failing = visibleDayItems(day('Failed', 'Needs check', 'Scheduled', 'Overdue'))
+  assert.deepEqual(ids(failing.visible), ['item-0', 'item-1', 'item-3'])
+  assert.equal(failing.hidden, 1)
+})
+
+test('saved calendar preferences from before Show all still load', () => {
+  assert.equal(planPreferencesSchema.parse({ view: 'month' }).showAll, false)
+})
+
+test('a calendar note is a trimmed title, a known color and a real date', () => {
+  const input = { day: '2026-11-04', title: '  Launch  ', color: 'purple' }
+  assert.equal(calendarNoteInputSchema.parse(input).title, 'Launch')
+  for (const bad of [
+    { ...input, title: '   ' },
+    { ...input, title: 'x'.repeat(121) },
+    { ...input, color: 'pink' },
+    { ...input, day: '2026-02-30' },
+    { ...input, day: '2026-11-04T00:00:00Z' },
+    { ...input, organizationId: 'foreign' },
+  ])
+    assert.equal(calendarNoteInputSchema.safeParse(bad).success, false, JSON.stringify(bad))
+  // A note's day never changes after it is created.
+  assert.equal(calendarNoteChangesSchema.safeParse(input).success, false)
 })

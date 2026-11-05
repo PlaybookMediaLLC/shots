@@ -4,7 +4,7 @@ import { useWriteRouter } from '@/components/write/write-context'
 
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
-import { PLATFORM_DESTINATIONS } from '@/lib/platform/navigation'
+import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { createWritingDraft } from './pending-draft'
 import {
   CommandDialog,
@@ -15,8 +15,11 @@ import {
   CommandList,
   CommandShortcut,
 } from '@shots/platejs-editor/ui'
+import { toast } from 'sonner'
+import { CHANNEL_META } from '@/components/drafts/channel-meta'
+import { writeApi } from '@/lib/write/client'
 import { useKeys } from './shortcuts'
-import { draftHref, rememberSet, useWrite } from './write-context'
+import { type DraftCommand, draftHref, type EditorCommandEntry, rememberSet, useWrite } from './write-context'
 
 /**
  * Search and commands (⌘K): the set's drafts by text, its tags, switching
@@ -25,17 +28,28 @@ import { draftHref, rememberSet, useWrite } from './write-context'
  */
 export default function CommandPalette({
   campaignsEnabled,
+  draftCommands,
   onClose,
   onShortcuts,
 }: {
   campaignsEnabled: boolean
+  /** The open draft's actions, read when the palette opened. */
+  draftCommands: DraftCommand[]
   onClose: () => void
   onShortcuts: () => void
 }) {
   const t = useTranslations('platformNavigation')
   const keys = useKeys()
   const router = useWriteRouter()
-  const { beforeLeaveRef, openPreviewRef, activeId, canEdit, data, setQuery } = useWrite()
+  const { beforeLeaveRef, openPreviewRef, editorCommandsRef, activeId, canEdit, data, setQuery } =
+    useWrite()
+  // Read once as the palette opens: the editor's commands for the version being edited.
+  const [editorCommands, setEditorCommands] = React.useState<EditorCommandEntry[]>([])
+  React.useEffect(() => setEditorCommands(editorCommandsRef.current?.() ?? []), [editorCommandsRef])
+  // One new-draft command per platform the brand posts to, already set to it.
+  const platforms = (data.activeSet?.accounts ?? []).filter(
+    (account, index, all) => all.findIndex((item) => item.channel === account.channel) === index
+  )
   const [results, setResults] = React.useState<{ id: string; title: string; plainText: string }[]>(
     []
   )
@@ -98,7 +112,7 @@ export default function CommandPalette({
                   go(() =>
                     router.push(
                       item.key === 'publish' && data.activeSet
-                        ? `/write?set=${data.activeSet.id}`
+                        ? `/publish?set=${data.activeSet.id}`
                         : item.href
                     )
                   )
@@ -108,6 +122,12 @@ export default function CommandPalette({
               </CommandItem>
             )
           )}
+          <CommandItem
+            value={`destination ${STORE_SCREENSHOTS.label}`}
+            onSelect={() => go(() => router.push(STORE_SCREENSHOTS.href))}
+          >
+            {STORE_SCREENSHOTS.label}
+          </CommandItem>
         </CommandGroup>
         {results.length > 0 ? (
           <CommandGroup heading="Drafts">
@@ -121,6 +141,84 @@ export default function CommandPalette({
                 <span className="ml-2 truncate text-xs text-muted-foreground">
                   {draft.plainText.slice(0, 60)}
                 </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+        {activeId && draftCommands.length > 0 ? (
+          <CommandGroup heading="This draft">
+            {draftCommands.map((command) => (
+              <CommandItem
+                key={command.label}
+                onSelect={() => go(command.run)}
+                value={`draft action ${command.label}`}
+              >
+                {command.label}
+                {command.shortcut ? <CommandShortcut>{command.shortcut}</CommandShortcut> : null}
+              </CommandItem>
+            ))}
+            {canEdit && activeId ? (
+              <CommandItem
+                onSelect={() =>
+                  go(
+                    () =>
+                      // Save the latest edits first, so the copy has them.
+                      void Promise.resolve(beforeLeaveRef.current?.())
+                        .then(() => writeApi.duplicate(activeId))
+                        .then((copy) => router.push(draftHref(copy.draft.id, data.activeSet?.id)))
+                        .catch((error: unknown) =>
+                          toast.error(
+                            error instanceof Error ? error.message : 'The draft was not duplicated.'
+                          )
+                        )
+                  )
+                }
+                value="draft action Duplicate draft"
+              >
+                Duplicate draft
+              </CommandItem>
+            ) : null}
+          </CommandGroup>
+        ) : null}
+        {canEdit && platforms.length > 0 ? (
+          <CommandGroup heading="Create">
+            {platforms.map((account) => (
+              <CommandItem
+                key={account.channel}
+                onSelect={() =>
+                  go(
+                    () =>
+                      void createWritingDraft(
+                        {
+                          channelConnectionIds: [account.id],
+                          primaryPlatform: account.channel,
+                          socialSetId: data.activeSet?.id,
+                        },
+                        (id) => router.push(draftHref(id, data.activeSet?.id)),
+                        beforeLeaveRef.current ?? undefined
+                      )
+                  )
+                }
+                value={`create ${CHANNEL_META[account.channel].label} draft`}
+              >
+                Create {CHANNEL_META[account.channel].label} draft
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+        {editorCommands.length ? (
+          <CommandGroup heading="In the editor">
+            {editorCommands.map((command) => (
+              <CommandItem
+                key={command.id}
+                value={`Editor ${command.label}`}
+                // After the palette closes and focus is back in the editor.
+                onSelect={() => go(() => requestAnimationFrame(command.run))}
+              >
+                {command.label}
+                {command.shortcut ? (
+                  <CommandShortcut>{keys.label(command.shortcut)}</CommandShortcut>
+                ) : null}
               </CommandItem>
             ))}
           </CommandGroup>
@@ -154,16 +252,16 @@ export default function CommandPalette({
           ) : null}
           <CommandItem
             onSelect={() =>
-              go(() => router.push(`/write${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
+              go(() => router.push(`/publish${data.activeSet ? `?set=${data.activeSet.id}` : ''}`))
             }
           >
-            Go to Write
+            Go to Drafts
             <CommandShortcut>{keys.label({ key: '1', mod: true, shift: true })}</CommandShortcut>
           </CommandItem>
           <CommandItem
             onSelect={() =>
               go(() =>
-                router.push(`/write/plan${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
+                router.push(`/publish/calendar${data.activeSet ? `?set=${data.activeSet.id}` : ''}`)
               )
             }
           >

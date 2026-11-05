@@ -132,7 +132,7 @@ export function AutomatePanel({ url }: { url: string }) {
         <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <KeyRound className="size-3.5" />
           Create an API key with the <code className="font-mono">artifact:read</code> scope in{' '}
-          <a href="/workspace/developers" className="text-foreground underline underline-offset-4">
+          <a href="/settings/developers" className="text-foreground underline underline-offset-4">
             Settings → Developers
           </a>
           , and store it as <code className="font-mono">SCREENSHOT_STUDIO_API_KEY</code>.

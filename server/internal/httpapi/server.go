@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
 
 type Store interface {
@@ -112,6 +113,13 @@ type ConfigurationStore interface {
 	DeleteAuditDrain(context.Context, product.Actor, string, product.AuditRequest) error
 	GetAuditRetention(context.Context, product.Actor) (*product.AuditRetention, error)
 	UpdateAuditRetention(context.Context, product.Actor, product.AuditRetention, product.AuditRequest) (*product.AuditRetention, error)
+	ListPermissionGroups(context.Context, product.Actor) ([]product.PermissionGroupRecord, error)
+	CreatePermissionGroup(context.Context, product.Actor, product.PermissionGroupInput, product.AuditRequest) (*product.PermissionGroupRecord, error)
+	UpdatePermissionGroup(context.Context, product.Actor, string, product.PermissionGroupInput, product.AuditRequest) (*product.PermissionGroupRecord, error)
+	DeletePermissionGroup(context.Context, product.Actor, string, product.AuditRequest) error
+	SetPermissionGroupMembers(context.Context, product.Actor, string, []string, product.AuditRequest) (*product.PermissionGroupRecord, error)
+	GetWhitelabel(context.Context, product.Actor) (*whitelabel.Settings, error)
+	UpdateWhitelabel(context.Context, product.Actor, whitelabel.Settings, product.AuditRequest) (*whitelabel.Settings, error)
 	GetWebhookSource(context.Context, string) (*product.WebhookSource, error)
 	IngestSourceRelease(context.Context, product.Actor, product.IngestSourceReleaseInput) (*product.SourceReleaseIngest, error)
 	CollectSourceChange(context.Context, product.Actor, product.CollectSourceChangeInput) (*product.SourceChangeCollect, error)
@@ -298,6 +306,7 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerLaunch(mux)
 		s.registerConversations(mux)
 		s.registerPlatformControls(mux)
+		s.registerPermissionGroups(mux)
 		s.registerGitHub(mux)
 		s.registerReleaseAutomation(mux)
 		s.registerFrontendDeployments(mux)
@@ -520,7 +529,7 @@ func (s *Server) createConnection(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, connectionResponse(connection))
+	writeJSON(w, http.StatusCreated, connectionResponse(r.Context(), connection))
 }
 
 func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
@@ -531,9 +540,16 @@ func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	connections = s.fillProfiles(r.Context(), organizationID, connections)
+	var states map[string]product.ChannelAccountState
+	if s.configuration != nil {
+		if states, err = s.configuration.ChannelAccountStates(r.Context(), organizationID, connections); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+	}
 	items := make([]any, 0, len(connections))
 	for _, connection := range connections {
-		items = append(items, connectionResponse(connection))
+		items = append(items, connectionWithState(r.Context(), connection, states))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
@@ -711,14 +727,26 @@ func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) 
 	}, true
 }
 
-func connectionResponse(connection *ent.ChannelConnection) map[string]any {
+func connectionResponse(ctx context.Context, connection *ent.ChannelConnection) map[string]any {
 	return map[string]any{
 		"id": connection.ID, "externalAccountId": connection.ExternalAccountID,
 		"platform": connection.Platform, "provider": connection.Provider,
 		"providerSettings": connection.ProviderSettings, "status": connection.Status,
 		"createdAt": connection.CreatedAt, "updatedAt": connection.UpdatedAt,
-		"displayName": connection.DisplayName, "handle": connection.Handle, "avatarUrl": connection.AvatarURL,
+		"displayName": connection.DisplayName, "handle": connection.Handle, "avatarUrl": product.BrowserAvatar(ctx, connection.AvatarURL),
+		"socialSetId": connection.SocialSetID,
 	}
+}
+
+// connectionWithState adds an account's health and queued-post count, when
+// the product configuration could read them.
+func connectionWithState(ctx context.Context, connection *ent.ChannelConnection, states map[string]product.ChannelAccountState) map[string]any {
+	response := connectionResponse(ctx, connection)
+	if state, ok := states[connection.ID]; ok {
+		response["health"] = state.Health
+		response["queuedPosts"] = state.QueuedPosts
+	}
+	return response
 }
 
 func decodeJSON(r *http.Request, target any) error {

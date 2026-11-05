@@ -64,7 +64,7 @@ test('custom Mastodon authorization keeps the selected origin and commits one pr
     await page.route('https://social.example/oauth/authorize**', (route) =>
       route.fulfill({ contentType: 'text/html', body: '<h1>Fixture Mastodon authorization</h1>' })
     )
-    await app.open('/workspace/social-sets')
+    await app.open('/settings/publishing-brands')
     await page
       .getByRole('button', { name: 'Add publishing brand to your personal workspace' })
       .click()

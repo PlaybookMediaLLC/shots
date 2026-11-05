@@ -35,7 +35,7 @@ const agentQuickstart = `## Agent Quickstart
 
 Shots runs an MCP server for AI agents at ${MCP_URL}, served by the same backend as the REST API, with the same workspace permissions, plan checks, and quotas.
 
-1. In a signed-in workspace, open Settings → AI agents (/workspace/ai-agents) and create an agent key with only the scopes the agent needs.
+1. In a signed-in workspace, open Settings → AI agents (/settings/ai-agents) and create an agent key with only the scopes the agent needs.
 2. Add the server to your agent with the key as a bearer token. For Claude Code: \`claude mcp add --transport http shots ${MCP_URL} --header "Authorization: Bearer $SHOTS_API_KEY"\`.
 3. Claude.ai, Claude Desktop, and ChatGPT connect through OAuth instead and ask a workspace owner or admin to approve.
 4. Prefer HTTP? Every MCP tool mirrors an operation in ${BASE_URL}/openapi.json; send the same key in \`X-API-Key\`.
@@ -96,7 +96,7 @@ ${primaryToolLines}
 - Product overview: ${BASE_URL}/landing
 - Pricing: ${BASE_URL}/pricing
 - Design partners (launch intelligence early access): ${BASE_URL}/design-partners
-- App Store Screenshot Maker: ${BASE_URL}/store-screenshots
+- Store screenshots (App Store and Google Play, signed in): ${BASE_URL}/create/store
 - Code to Image: ${BASE_URL}/code
 - Mockup Generator: ${BASE_URL}/mockup-generator
 - Image Tools Hub: ${BASE_URL}/tools
@@ -135,7 +135,7 @@ ${primaryToolLines}
 - Sitemap: ${BASE_URL}/sitemap.xml
 - robots.txt: ${BASE_URL}/robots.txt
 
-The editor utility endpoints under paths such as \`/api/screenshot\` require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`, and per-IP limits apply on top. Create a workspace API key in Settings → Developer API (/workspace/developers). Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session. Every error is JSON with a stable \`code\`, a \`message\`, and a \`hint\`. Any page also serves Markdown when the request sends \`Accept: text/markdown\`.
+The editor utility endpoints under paths such as \`/api/screenshot\` require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`, and per-IP limits apply on top. Create a workspace API key in Settings → Developer API (/settings/developers). Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session. Every error is JSON with a stable \`code\`, a \`message\`, and a \`hint\`. Any page also serves Markdown when the request sends \`Accept: text/markdown\`.
 
 ${agentQuickstart}
 
@@ -384,7 +384,7 @@ Locale detection: URL path > cookie > Accept-Language header > default (English)
 
 ### Authentication
 
-The editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`; a request with neither returns 401 with code \`unauthorized\`. A workspace without an active paid plan gets 403 with code \`workspace_feature_not_entitled\`; there is no free plan. Create a workspace API key in Settings → Developer API (/workspace/developers). Per-IP limits apply on top: \`POST /api/screenshot\` allows 20 requests per minute per IP and answers 429 with \`Retry-After\` and \`X-RateLimit-*\` headers. Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session, plus the declared permission, scope, feature, and quota checks.
+The editor utility endpoints require a signed-in session or a workspace API key with the artifact:read scope in \`X-API-Key\`; a request with neither returns 401 with code \`unauthorized\`. A workspace without an active paid plan gets 403 with code \`workspace_feature_not_entitled\`; there is no free plan. Create a workspace API key in Settings → Developer API (/settings/developers). Per-IP limits apply on top: \`POST /api/screenshot\` allows 20 requests per minute per IP and answers 429 with \`Retry-After\` and \`X-RateLimit-*\` headers. Workspace-scoped \`/api/v1\` operations require an organization key in \`X-API-Key\` or an authorized signed-in session, plus the declared permission, scope, feature, and quota checks.
 
 ### Endpoints
 

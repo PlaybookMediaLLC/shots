@@ -16,7 +16,7 @@ test(
 
     page.once('dialog', (dialog) => dialog.accept())
     await page.getByRole('link', { name: 'Account', exact: true }).click()
-    await expect(page).toHaveURL(/\/workspace\/account/)
+    await expect(page).toHaveURL(/\/settings\/account/)
     await openWorkspaceSetting(page, 'General')
     await expect(description).toHaveValue('Keep this draft')
     page.once('dialog', (dialog) => dialog.accept())
@@ -44,7 +44,11 @@ test('brand colors retain the last valid preview and block publication until cor
   await page.getByLabel('Visual brand kit name').fill('Validation test')
   await page.getByLabel('Accent', { exact: true }).fill('#123456')
   await page.getByLabel('Accent', { exact: true }).fill('not-a-color')
-  await expect(page.getByLabel('Accent color picker')).toHaveValue('#123456')
+  // The swatch keeps showing the last valid color.
+  await expect(page.getByLabel('Accent color picker').locator('span').first()).toHaveCSS(
+    'background-color',
+    'rgb(18, 52, 86)'
+  )
   await expect(page.getByText('Enter a six-digit hex color, like #6d5dfc.')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Publish visual brand kit' })).toBeDisabled()
   await page.getByLabel('Accent', { exact: true }).fill('#654321')
@@ -80,7 +84,7 @@ test('an expired freshness window offers sign-in recovery back to Account', asyn
   ).toBeVisible()
   await page.getByRole('link', { name: 'Verify identity', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Verify your identity' })).toBeVisible()
-  await expect(page).toHaveURL(/callbackURL=%2Fworkspace%2Faccount/)
+  await expect(page).toHaveURL(/callbackURL=%2Fsettings%2Faccount/)
 })
 
 test('SSO prerequisites explain the next steps before credentials are requested', async ({

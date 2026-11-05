@@ -71,7 +71,7 @@ test(
     await published.getByRole('button', { name: 'Done' }).click()
 
     // Limit it to the workspace: visitors are turned away, members still see it.
-    await app.open('/workspace/shared-links')
+    await app.open('/settings/shared-links')
     const row = page
       .getByText('Launch preview')
       .locator('xpath=ancestor::div[contains(@class,"justify-between")][1]')
@@ -86,7 +86,7 @@ test(
     await expect(page.getByRole('img', { name: 'A blue dashboard screenshot' })).toBeVisible()
 
     // Revoke it: the link is gone for everyone.
-    await app.open('/workspace/shared-links')
+    await app.open('/settings/shared-links')
     await page.getByRole('button', { name: 'Revoke Launch preview' }).click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke link' }).click()
     await expect(page.getByText('Revoked', { exact: true })).toBeVisible()
@@ -105,11 +105,13 @@ test('integrations say exactly what a server needs before they can connect', asy
   app,
   page,
 }) => {
-  await app.open('/workspace/integrations')
+  await app.open('/settings/integrations')
   for (const provider of ['Slack', 'Notion', 'Figma']) {
     await expect(page.getByRole('heading', { name: provider })).toBeVisible()
   }
-  const slackSetup = page.locator('details').filter({ hasText: 'backend Slack configuration' })
+  const slackSetup = page
+    .locator('[data-slot="disclosure"]')
+    .filter({ hasText: 'backend Slack configuration' })
   await slackSetup.getByText('Administrator setup details', { exact: true }).click()
   await expect(slackSetup.getByText('backend Slack configuration', { exact: true })).toBeVisible()
   const connect = await page.request.get('/api/integrations/slack/connect', { maxRedirects: 0 })

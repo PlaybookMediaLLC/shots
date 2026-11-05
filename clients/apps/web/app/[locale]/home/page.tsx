@@ -5,7 +5,6 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
 import { Stage } from '@/components/platform-landing/primitives'
 import { ArrowForwardIcon as ArrowRight } from '@/components/platform-shell/icons'
-import { OutwardIcon as ArrowUpRight } from '@/components/platform-shell/icons'
 import { ImageIcon as ImagePlus } from '@/components/platform-shell/icons'
 import { EditIcon as PenLine } from '@/components/platform-shell/icons'
 import { CampaignsIcon as Megaphone } from '@/components/platform-shell/icons'
@@ -16,10 +15,14 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { NeedsAttention } from '@/components/platform-hub/NeedsAttention'
 import { RecentWork } from '@/components/platform-hub/RecentWork'
 import { TemplateHighlights } from '@/components/platform-hub/TemplateBrowser'
-import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
+import { requirePaidPageAccess, sessionTenant } from '@/lib/auth/page-access'
+import type { OrganizationAccess } from '@/lib/auth/access'
+import { Suspense } from 'react'
+import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { roleLabels } from '@/lib/auth/role-descriptions'
 import { StartPostAction } from '@/components/platform-hub/StartPostAction'
+import { QueueNudge } from '@/components/platform-hub/QueueNudge'
+import { listContentDraftPostsBetween } from '@/lib/tenant/content-drafts'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
 
 export const metadata = { title: 'Home' }
@@ -41,10 +44,11 @@ export default async function HomePage({
     redirect(platformHref(locale === 'en' ? '/' : `/${locale}`, `/?${search}`))
   }
   // A contract that grants drafts without a paid plan gets Home too; paid starters lead to the plan page.
-  const access = await requirePaidPageAccess(await headers(), locale, '/home', 'content:drafts')
+  const requestHeaders = await headers()
+  const access = await requirePaidPageAccess(requestHeaders, locale, '/home', 'content:drafts')
   const paid = access.hasPaidPlan
   const gated = (href: string) => (paid ? href : `/upgrade?from=${encodeURIComponent(href)}`)
-  const can = (permission: Permission) => hasPermission(access.role, permission)
+  const can = (permission: Permission) => accessAllows(access, permission)
   const starters = [
     {
       title: 'Create a visual',
@@ -59,7 +63,7 @@ export default async function HomePage({
           {
             title: 'Write a post',
             description: 'Draft and schedule your posts.',
-            href: '/write',
+            href: '/publish',
             icon: PenLine,
             // Makes the draft at once, as New → Post does.
             startsPost: true,
@@ -109,13 +113,13 @@ export default async function HomePage({
         description="What will you make today?"
         actions={
           paid ? (
-            <ButtonLink href="/library?view=templates" variant="outline" className="gap-2">
+            <ButtonLink href="/create?view=templates" variant="outline" className="gap-2">
               <Shapes size={16} aria-hidden="true" /> Explore templates{' '}
-              <ArrowUpRight size={15} aria-hidden="true" />
+              <ArrowRight size={15} aria-hidden="true" />
             </ButtonLink>
           ) : (
             <ButtonLink href="/upgrade" variant="outline" className="gap-2">
-              See plans <ArrowUpRight size={15} aria-hidden="true" />
+              See plans <ArrowRight size={15} aria-hidden="true" />
             </ButtonLink>
           )
         }
@@ -147,7 +151,7 @@ export default async function HomePage({
                       {description}
                     </span>
                   </span>
-                  <ArrowUpRight size={14} aria-hidden="true" className="home-action-arrow" />
+                  <ArrowRight size={14} aria-hidden="true" className="home-action-arrow" />
                 </>
               )
               return (
@@ -165,6 +169,11 @@ export default async function HomePage({
           </ul>
         </section>
 
+        {paid && contentDraftsEnabled() && can('artifact:edit') && access.organization ? (
+          <Suspense fallback={null}>
+            <UpcomingQueue tenant={sessionTenant(access, access.organization.id, requestHeaders)} />
+          </Suspense>
+        ) : null}
         <div className="home-work platform-home">
           <RecentWork
             organizationId={access.organization!.id}
@@ -186,10 +195,10 @@ export default async function HomePage({
                 </p>
               </div>
               <SidebarLink
-                href="/library?view=templates"
+                href="/create?view=templates"
                 className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
               >
-                All templates <ArrowUpRight size={14} aria-hidden="true" />
+                All templates <ArrowRight size={14} aria-hidden="true" />
               </SidebarLink>
             </div>
             <TemplateHighlights />
@@ -203,19 +212,42 @@ export default async function HomePage({
             </span>
             <span>
               <span className="flex items-center gap-2 text-ui-lg font-medium">
-                Brand resources
+                Brand assets
                 {paid ? null : <span className="platform-pro-badge">Pro</span>}
               </span>
               <span className="mt-1 block text-xs text-muted-foreground">
-                Manage your brand kit, voice, and products.
+                Your logos, colours and fonts, ready for every visual.
               </span>
             </span>
           </span>
           <span className="flex items-center gap-2 text-xs font-medium">
-            Manage brand <ArrowRight size={15} aria-hidden="true" />
+            Open in Library <ArrowRight size={15} aria-hidden="true" />
           </span>
         </SidebarLink>
       </Page>
     </PlatformShell>
   )
+}
+
+/**
+ * Drafts queued for the next seven days, streamed after the page: Home nudges
+ * below three. A failed read is logged and shows nothing.
+ */
+async function UpcomingQueue({ tenant }: { tenant: OrganizationAccess }) {
+  const now = new Date()
+  const posts = await listContentDraftPostsBetween(
+    tenant,
+    now,
+    new Date(now.getTime() + 7 * 86_400_000)
+  ).catch((error: unknown) => {
+    console.error('Home could not read the queue for its nudge', error)
+    return null
+  })
+  if (!posts) return null
+  const queued = new Set(
+    posts
+      .filter((post) => post.status === 'SCHEDULED' || post.status === 'PROCESSING')
+      .map((post) => post.draftId)
+  ).size
+  return queued < 3 ? <QueueNudge queued={queued} /> : null
 }

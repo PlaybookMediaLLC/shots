@@ -6,6 +6,11 @@ import {
   getGitHubRecoveryContract,
   inspectGitHubRecoveryContract,
 } from './github-production'
+import {
+  createCodeProjectContract,
+  getCodeProjectContract,
+  renderCodeProjectContract,
+} from '@/lib/api/contracts/code-projects'
 import { updateSocialSetQueueContract } from '@/lib/api/contracts/social-set-queue'
 import { listSocialSetsContract, getSocialSetContract } from '@/lib/api/contracts/social-sets'
 import { lookupMentionsContract } from '@/lib/api/contracts/social-mentions'
@@ -28,6 +33,12 @@ import {
   refreshAnalyticsContract,
   updateAnalyticsSettingsContract,
 } from './plan-analyze'
+import {
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
+} from './calendar-notes'
 import {
   decideCampaignApprovalContract,
   listApprovalsContract,
@@ -57,7 +68,10 @@ import {
 } from '@/lib/api/contracts/content-drafts'
 import { getLinkPreviewContract } from '@/lib/api/contracts/link-preview'
 import { createSocialConnectionAttemptContract } from '@/lib/api/contracts/social-connections'
-import { getSocialConnectionAvailabilityContract } from '@/lib/api/contracts/social-availability'
+import {
+  getSocialConnectionAvailabilityContract,
+  getSocialConnectionCapacityContract,
+} from '@/lib/api/contracts/social-availability'
 import {
   beginBlueskyConnectionContract,
   completeBlueskyConnectionContract,
@@ -123,12 +137,17 @@ export const documentedContracts = [
   draftGiphySearchContract,
   draftGiphyAttachContract,
   mutateCalendarContract,
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
   getAnalyticsContract,
   refreshAnalyticsContract,
   updateAnalyticsSettingsContract,
   previewMastodonInstanceContract,
   createSocialConnectionAttemptContract,
   getSocialConnectionAvailabilityContract,
+  getSocialConnectionCapacityContract,
   beginBlueskyConnectionContract,
   completeBlueskyConnectionContract,
   listReleasesContract,
@@ -141,6 +160,9 @@ export const documentedContracts = [
   createAssetDownloadUrlContract,
   deleteAssetContract,
   setAssetAltTextContract,
+  createCodeProjectContract,
+  getCodeProjectContract,
+  renderCodeProjectContract,
   listCampaignsContract,
   createCampaignContract,
   getCampaignContract,

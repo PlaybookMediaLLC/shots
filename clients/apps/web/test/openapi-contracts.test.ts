@@ -12,12 +12,15 @@ import * as billing from '@/lib/api/contracts/billing'
 import * as blueskyConnections from '@/lib/api/contracts/bluesky-connections'
 import * as campaigns from '@/lib/api/contracts/campaigns'
 import * as canvases from '@/lib/api/contracts/canvases'
+import * as codeProjects from '@/lib/api/contracts/code-projects'
 import * as contentDrafts from '@/lib/api/contracts/content-drafts'
 import * as draftMedia from '@/lib/api/contracts/draft-media'
 import * as draftCollaboration from '@/lib/api/contracts/draft-collaboration'
 import * as contentDraftPlatform from '@/lib/api/contracts/content-draft-platform'
 import * as writeAi from '@/lib/api/contracts/write-ai'
 import * as draftBatch from '@/lib/api/contracts/draft-batch'
+import * as permissionGroups from '@/lib/api/contracts/permission-groups'
+import * as whitelabel from '@/lib/api/contracts/whitelabel'
 import * as contentBatches from '@/lib/api/contracts/content-batches'
 import * as socialAnalytics from '@/lib/api/contracts/social-analytics'
 import * as draftComments from '@/lib/api/contracts/draft-comments'
@@ -48,6 +51,7 @@ import * as unsubscribe from '@/lib/api/contracts/unsubscribe'
 import * as webhooks from '@/lib/api/contracts/webhooks'
 import * as write from '@/lib/api/contracts/write'
 import * as planAnalyze from '@/lib/api/contracts/plan-analyze'
+import * as calendarNotes from '@/lib/api/contracts/calendar-notes'
 import { openApiSpec } from '@/lib/api/openapi'
 import { getMinimumPlan } from '@/lib/billing/plans'
 
@@ -59,10 +63,13 @@ const contracts = new Map<string, RouteContract>(
     approvals,
     assets,
     audit,
+    whitelabel,
+    permissionGroups,
     billing,
     blueskyConnections,
     campaigns,
     canvases,
+    codeProjects,
     contentDraftPlatform,
     draftMedia,
     draftCollaboration,
@@ -99,6 +106,7 @@ const contracts = new Map<string, RouteContract>(
     webhooks,
     write,
     planAnalyze,
+    calendarNotes,
   ]
     .flatMap((module) => Object.entries(module))
     .filter(([, value]) => routeContractSchema.safeParse(value).success)

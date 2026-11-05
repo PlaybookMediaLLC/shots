@@ -107,7 +107,7 @@ export function DeveloperTools() {
               </Link>
             </li>
             <li>
-              <Link className="underline" href="/workspace/ai-agents">
+              <Link className="underline" href="/settings/ai-agents">
                 MCP and agents
               </Link>
             </li>

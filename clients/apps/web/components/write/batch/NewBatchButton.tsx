@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Combobox } from '@/components/ui/combobox'
 import type { ContentBatch } from '@/lib/api/contracts/content-batches'
 import { call } from '@/lib/content-drafts/client'
 
@@ -32,7 +32,7 @@ export function NewBatchButton({
           method: 'POST',
           body: { title, socialSetId: setId },
         })
-          .then((batch) => window.location.assign(`/write/batches/${batch.id}`))
+          .then((batch) => window.location.assign(`/publish/batches/${batch.id}`))
           .catch((error: unknown) => {
             toast.error(error instanceof Error ? error.message : 'The batch could not be started.')
             setBusy(false)
@@ -45,17 +45,14 @@ export function NewBatchButton({
       </Label>
       <Label className="grid gap-1 font-normal">
         Publishing brand
-        <NativeSelect
+        <Combobox
           aria-label="Publishing brand"
+          className="w-full"
+          onValueChange={setSetId}
+          options={sets.map((set) => ({ label: set.name, value: set.id }))}
+          searchPlaceholder="Search publishing brands"
           value={setId}
-          onChange={(event) => setSetId(event.target.value)}
-        >
-          {sets.map((set) => (
-            <NativeSelectOption key={set.id} value={set.id}>
-              {set.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        />
       </Label>
       <Button type="submit" disabled={busy || !title.trim() || !setId}>
         Start a batch

@@ -7,7 +7,7 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page, Section } from '@/components/platform-ui'
 import { requireActiveOrganizationPermission } from '@/lib/auth/access'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { getRelease } from '@/lib/tenant/releases'
 
 export const metadata: Metadata = { title: 'Release' }
@@ -21,7 +21,7 @@ export default async function ReleasePage({
   const [{ locale, releaseId }, requestHeaders] = await Promise.all([params, headers()])
   if (!z.uuid().safeParse(releaseId).success) notFound()
   const access = await requirePaidPageAccess(requestHeaders, locale, `/releases/${releaseId}`)
-  if (!access.organization || !hasPermission(access.role, 'artifact:read')) notFound()
+  if (!access.organization || !accessAllows(access, 'artifact:read')) notFound()
   const tenant = await requireActiveOrganizationPermission(requestHeaders, 'artifact:read')
   const release = await getRelease(tenant, releaseId)
   if (!release) notFound()
@@ -87,7 +87,7 @@ export default async function ReleasePage({
         {release.screenshotAssetIds?.length ? (
           <p className="text-sm">
             {release.screenshotAssetIds.length} screenshot asset(s) retained.{' '}
-            <Link className="underline" href="/assets">
+            <Link className="underline" href="/library?view=assets">
               Open workspace assets
             </Link>
           </p>

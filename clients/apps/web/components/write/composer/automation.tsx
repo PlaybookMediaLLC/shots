@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { TimePicker } from '@/components/ui/time-picker'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -367,11 +368,10 @@ function RetweetDialog({
                         type="number"
                         value={rule.days}
                       />
-                      <Input
+                      <TimePicker
                         aria-label="Time of day"
-                        className="h-8 w-28"
-                        onChange={(event) => set(index, { at: event.target.value })}
-                        type="time"
+                        className="w-32"
+                        onChange={(at) => set(index, { at })}
                         value={rule.at}
                       />
                     </>

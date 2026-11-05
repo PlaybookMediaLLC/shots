@@ -5,7 +5,7 @@ import { PlanView } from '@/components/launch/plan/PlanView'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { EmptyState } from '@/components/platform-ui'
 import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
-import { hasPermission } from '@/lib/auth/permissions'
+import { accessAllows } from '@/lib/auth/permissions'
 import { latestLaunchRuns } from '@/lib/launch/runs'
 import { getCampaignPlans, getPlanById, getReleaseSpecs, getSpecById } from '@/lib/launch/store'
 import { getCampaign } from '@/lib/tenant/campaigns'
@@ -61,8 +61,8 @@ export default async function PlanPage({ params, searchParams }: PlanPageProps) 
       activeRunId={run?.status === 'RUNNING' ? run.id : null}
       aiConfigured={isCampaignStudioConfigured()}
       campaignId={campaign.id}
-      canApprove={campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:approve')}
-      canEdit={campaign.status !== 'ARCHIVED' && hasPermission(access.role, 'release:create')}
+      canApprove={campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:approve')}
+      canEdit={campaign.status !== 'ARCHIVED' && accessAllows(access, 'release:create')}
       hasApproved={Boolean(plans.approved)}
       productionRun={
         runs.produce?.status === 'RUNNING'

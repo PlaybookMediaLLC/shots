@@ -5,8 +5,15 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { call } from '@/lib/content-drafts/client'
 import { WRITING_PROMPTS } from '@/lib/write/prompt-library'
@@ -56,7 +63,6 @@ export function AssistantPanel({
   const [message, setMessage] = React.useState('')
   const [busy, setBusy] = React.useState(false)
   const [setup, setSetup] = React.useState(false)
-  const [skipped, setSkipped] = React.useState(false)
   const configured = set?.writingAssistant.status === 'configured'
   const send = async (text: string) => {
     const content = text.trim()
@@ -79,17 +85,9 @@ export function AssistantPanel({
       setBusy(false)
     }
   }
-  if (setup || (!configured && !skipped && turns.length === 0 && set)) {
-    return (
-      <AssistantSetup
-        onDone={() => {
-          setSetup(false)
-          setSkipped(true)
-        }}
-        set={set}
-      />
-    )
-  }
+  // Help comes first; the brand's voice is offered after a few answers, never as a gate.
+  if (setup) return <AssistantSetup onDone={() => setSetup(false)} set={set} />
+  const nudge = !configured && Boolean(set) && turns.filter((turn) => turn.role === 'assistant').length >= 3
   return (
     <div className="flex h-full flex-col gap-3 p-4 text-sm" data-testid="assistant-panel">
       <p className="text-xs text-muted-foreground">
@@ -106,36 +104,52 @@ export function AssistantPanel({
         </Button>
       </p>
       <p className="text-xs text-muted-foreground">
-        Workspace defaults → Social-set overrides → Your instructions for this draft. Prohibited
+        Workspace defaults → Publishing brand overrides → Your instructions for this draft. Prohibited
         terms always apply.
       </p>
       <Label className="grid gap-1 text-xs">
         Prompt library
-        <NativeSelect
-          aria-label="Prompt library"
-          value=""
-          onChange={(event) => setMessage(event.target.value)}
-        >
-          <NativeSelectOption value="">Choose an instruction…</NativeSelectOption>
-          {STARTERS.map((starter) => (
-            <NativeSelectOption key={starter} value={starter}>
-              {starter}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <Select value="" onValueChange={(value) => setMessage(value)}>
+          <SelectTrigger aria-label="Prompt library">
+            <SelectValue placeholder="Choose an instruction…" />
+          </SelectTrigger>
+          <SelectContent>
+            {STARTERS.map((starter) => (
+              <SelectItem key={starter} value={starter}>
+                {starter}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </Label>
-      <details className="rounded-lg border border-border p-3">
-        <summary className="cursor-pointer">Writing prompts and examples</summary>
-        <p className="my-2 text-xs text-muted-foreground">Examples show a structure. Use your own facts and experience.</p>
-        <ul className="grid gap-3">
-          {WRITING_PROMPTS.map((prompt) => (
-            <li key={prompt.id}>
-              <Button type="button" variant="outline" size="sm" onClick={() => setMessage(prompt.instruction)}>{prompt.title}</Button>
-              <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{prompt.example}</p>
-            </li>
-          ))}
-        </ul>
-      </details>
+      <Disclosure className="rounded-lg border border-border p-3">
+        <DisclosureTrigger>Writing prompts and examples</DisclosureTrigger>
+        <DisclosureContent>
+          <p className="my-2 text-xs text-muted-foreground">Examples show a structure. Use your own facts and experience.</p>
+          <ul className="grid gap-3">
+            {WRITING_PROMPTS.map((prompt) => (
+              <li key={prompt.id}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setMessage(prompt.instruction)}>{prompt.title}</Button>
+                <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{prompt.example}</p>
+              </li>
+            ))}
+          </ul>
+        </DisclosureContent>
+      </Disclosure>
+      {nudge ? (
+        <p className="rounded-lg border border-border p-3 text-xs text-muted-foreground" role="status">
+          Add a style guide and writing samples so answers sound like {set?.name ?? 'this brand'}.{' '}
+          <Button
+            className="text-sky-700 dark:text-sky-300"
+            onClick={() => setSetup(true)}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            Set up its voice
+          </Button>
+        </p>
+      ) : null}
       {turns.length === 0 ? (
         <VoiceMemo draftId={draftId} channel={channel} onUse={setMessage} />
       ) : null}
@@ -220,7 +234,7 @@ export function AssistantPanel({
           rows={3}
           value={message}
         />
-        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span className="flex items-center justify-between text-label text-muted-foreground">
           Uses your workspace’s AI credits.
           <Button disabled={busy || !message.trim()} size="sm" type="submit">
             Send

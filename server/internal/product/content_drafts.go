@@ -108,11 +108,15 @@ type ContentDraftRecord struct {
 	SourceDraftID    *string                   `json:"sourceDraftId"`
 	TagIDs           []string                  `json:"tagIds"`
 	Target           *draftdoc.Target          `json:"target"`
-	// Lists only: posts waiting to go out, the next one's time, and posts
-	// that failed or whose outcome is unknown, which need attention.
-	AttentionPosts int        `json:"attentionPosts"`
-	NextPostAt     *time.Time `json:"nextPostAt"`
-	QueuedPosts    int        `json:"queuedPosts"`
+	// Lists only: posts waiting to go out, the next scheduled one's time, and
+	// posts that failed or whose outcome is unknown, which need attention.
+	AttentionPosts int `json:"attentionPosts"`
+	// CheckPosts are the attention posts whose outcome is unknown.
+	CheckPosts int        `json:"checkPosts"`
+	NextPostAt *time.Time `json:"nextPostAt"`
+	// PublishingPosts are the queued posts that are publishing now.
+	PublishingPosts int `json:"publishingPosts"`
+	QueuedPosts     int `json:"queuedPosts"`
 }
 
 // ContentDraftPage is one page of a workspace's drafts in the asked order.
@@ -137,6 +141,9 @@ type ContentDraftListQuery struct {
 	Status      string
 	TagID       string
 	View        string
+	// ConnectionID, From and To filter by destination and time: see draftPostsMatch.
+	ConnectionID string
+	From, To     *time.Time
 }
 
 // ContentDraftInput is a new draft. Every field is optional.
@@ -747,6 +754,45 @@ func draftPostExists(statuses ...string) predicate.ContentDraft {
 	}
 }
 
+// draftPostsMatch matches a draft when one live post meets every criterion:
+// a draft with an X post last week and a LinkedIn post today does not match
+// "X, today". A draft with no live post matches on what it intends instead,
+// its destinations and planned time. Time is [From, To) on scheduledFor, as the
+// calendar reads it.
+func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentDraft {
+	return func(s *sql.Selector) {
+		live := func(criteria bool) *sql.Predicate {
+			posts := sql.Table(scheduledpost.Table)
+			where := []*sql.Predicate{
+				sql.ColumnsEQ(posts.C(scheduledpost.FieldContentDraftID), s.C(contentdraft.FieldID)),
+				sql.EQ(posts.C(scheduledpost.FieldOrganizationID), org),
+				sql.In(posts.C(scheduledpost.FieldStatus), "PUBLISHED", "SCHEDULED", "PROCESSING", "FAILED", "UNKNOWN_DELIVERY"),
+			}
+			if criteria && query.ConnectionID != "" {
+				where = append(where, sql.EQ(posts.C(scheduledpost.FieldChannelConnectionID), query.ConnectionID))
+			}
+			if criteria && query.From != nil {
+				where = append(where, sql.GTE(posts.C(scheduledpost.FieldScheduledFor), *query.From))
+			}
+			if criteria && query.To != nil {
+				where = append(where, sql.LT(posts.C(scheduledpost.FieldScheduledFor), *query.To))
+			}
+			return sql.Exists(sql.Select(posts.C(scheduledpost.FieldID)).From(posts).Where(sql.And(where...)))
+		}
+		intent := []*sql.Predicate{sql.Not(live(false))}
+		if query.ConnectionID != "" {
+			intent = append(intent, sqljson.ValueContains(s.C(contentdraft.FieldChannelConnectionIds), query.ConnectionID))
+		}
+		if query.From != nil {
+			intent = append(intent, sql.GTE(s.C(contentdraft.FieldPlannedFor), *query.From))
+		}
+		if query.To != nil {
+			intent = append(intent, sql.LT(s.C(contentdraft.FieldPlannedFor), *query.To))
+		}
+		s.Where(sql.Or(live(true), sql.And(intent...)))
+	}
+}
+
 // draftListFilters turns a list query into predicates.
 func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query ContentDraftListQuery) ([]predicate.ContentDraft, error) {
 	filters := []predicate.ContentDraft{contentdraft.OrganizationID(actor.OrganizationID)}
@@ -781,6 +827,15 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 		filters = append(filters, contentdraft.StatusEQ(contentdraft.StatusArchived))
 	default:
 		return nil, invalid("A view is drafts, posted, or archived.")
+	}
+	if query.ConnectionID != "" && !contentDraftRefPattern.MatchString(query.ConnectionID) {
+		return nil, invalid("Filter by a valid account.")
+	}
+	if query.From != nil && query.To != nil && !query.To.After(*query.From) {
+		return nil, invalid("Choose an end date after the start date.")
+	}
+	if query.ConnectionID != "" || query.From != nil || query.To != nil {
+		filters = append(filters, draftPostsMatch(actor.OrganizationID, query))
 	}
 	if query.Kind != "" {
 		if _, ok := draftKindChannels[query.Kind]; !ok {
@@ -887,17 +942,19 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		ids = append(ids, row.ID)
 	}
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftIDIn(ids...),
-		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(scheduledpost.StatusPUBLISHED,
-			scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED,
-			scheduledpost.StatusUNKNOWN_DELIVERY)).All(ctx)
+		scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(liveOrFailedStatuses...)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	type summary struct {
-		attention, published, queued int
-		next                         *time.Time
+		attention, check, published, publishing, queued int
+		next                                            *time.Time
 	}
 	byDraft := map[string]*summary{}
+	// A failure needs attention only while it is its destination's newest
+	// post: a retry is a new post, so the failure it replaced is history. An
+	// unconfirmed post always counts: it may be live until someone checks.
+	replaced := replacedFailures(posts)
 	for _, post := range posts {
 		item := byDraft[*post.ContentDraftID]
 		if item == nil {
@@ -907,20 +964,29 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		switch post.Status {
 		case scheduledpost.StatusPUBLISHED:
 			item.published++
-		case scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING:
+		case scheduledpost.StatusPROCESSING:
+			item.queued++
+			item.publishing++
+		case scheduledpost.StatusSCHEDULED:
 			item.queued++
 			if item.next == nil || post.ScheduledFor.Before(*item.next) {
 				at := post.ScheduledFor
 				item.next = &at
 			}
-		default:
+		case scheduledpost.StatusUNKNOWN_DELIVERY:
 			item.attention++
+			item.check++
+		default:
+			if !replaced[post.ID] {
+				item.attention++
+			}
 		}
 	}
 	return func(row *ent.ContentDraft) ContentDraftRecord {
 		record := contentDraftRecord(row)
 		if item := byDraft[row.ID]; item != nil {
-			record.AttentionPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.published, item.queued, item.next
+			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
+			record.PublishingPosts = item.publishing
 		}
 		return record
 	}, nil
@@ -1287,4 +1353,34 @@ func (c *Configuration) DeleteContentDraftAtVersion(ctx context.Context, actor A
 	}
 	c.collabAccessChanged(ctx, actor.OrganizationID)
 	return nil
+}
+
+// liveOrFailedStatuses are the post statuses a draft's state reads: a
+// cancelled post (or one never queued) is not one of its outcomes.
+var liveOrFailedStatuses = []scheduledpost.Status{scheduledpost.StatusPUBLISHED, scheduledpost.StatusSCHEDULED,
+	scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED, scheduledpost.StatusUNKNOWN_DELIVERY}
+
+// replacedFailures names the failed posts that a newer post to the same
+// destination replaced: a retry or a new schedule. They are history, not
+// failures that need attention. posts must include each destination's newer
+// posts, in any order; the web's currentPosts reads the same rule.
+func replacedFailures(posts []*ent.ScheduledPost) map[string]bool {
+	newest := map[[2]string]time.Time{}
+	for _, post := range posts {
+		if post.ContentDraftID == nil {
+			continue
+		}
+		key := [2]string{*post.ContentDraftID, post.ChannelConnectionID}
+		if post.CreatedAt.After(newest[key]) {
+			newest[key] = post.CreatedAt
+		}
+	}
+	replaced := map[string]bool{}
+	for _, post := range posts {
+		if post.Status == scheduledpost.StatusFAILED && post.ContentDraftID != nil &&
+			newest[[2]string{*post.ContentDraftID, post.ChannelConnectionID}].After(post.CreatedAt) {
+			replaced[post.ID] = true
+		}
+	}
+	return replaced
 }

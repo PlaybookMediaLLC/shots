@@ -1,19 +1,28 @@
+import { CREATE_LINKS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
+import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page } from '@/components/platform-ui'
-import { AreaNavigation, CREATE_LINKS } from '@/components/platform-hub/AreaNavigation'
+import { AreaNavigation } from '@/components/platform-hub/AreaNavigation'
+import { RecentWork } from '@/components/platform-hub/RecentWork'
 import { ResourceCards } from '@/components/platform-hub/ResourceCards'
 import { TemplateBrowser } from '@/components/platform-hub/TemplateBrowser'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
 
-export const metadata = { title: 'Create' }
-export default async function CreatePage({
-  params,
-  searchParams,
-}: {
+type CreatePageProps = {
   params: Promise<{ locale: string }>
   searchParams: Promise<{ view?: string }>
-}) {
+}
+
+/** The tab title names the Create page shown, as the sidebar does. */
+export async function generateMetadata({ searchParams }: CreatePageProps): Promise<Metadata> {
+  const { view } = await searchParams
+  const href = view ? `/create?view=${view}` : '/create'
+  const page = CREATE_LINKS.find((link) => link.href === href)?.label ?? 'New'
+  return { title: `${page} · Create` }
+}
+
+export default async function CreatePage({ params, searchParams }: CreatePageProps) {
   const [{ locale }, { view }] = await Promise.all([params, searchParams])
   const access = await requirePaidPageAccess(await headers(), locale, '/create')
   return (
@@ -25,16 +34,20 @@ export default async function CreatePage({
         <AreaNavigation label="Create" items={CREATE_LINKS} />
         {view === 'templates' ? (
           <TemplateBrowser />
+        ) : view === 'recent' ? (
+          // Recent screenshots and canvases, from the same list as Home's.
+          <RecentWork draftsEnabled={false} organizationId={access.organization!.id} />
         ) : (
           <ResourceCards
             items={
               view === 'tools'
                 ? [
                     {
-                      title: 'Code image',
-                      description: 'Compose a code snippet as a shareable image.',
-                      href: '/code',
-                      scope: 'Code editor',
+                      title: 'Code Studio',
+                      description:
+                        'Turn a snippet, diff or pull request into an image, carousel or video, then post it.',
+                      href: '/create/code',
+                      scope: 'Code Studio · Save to workspace',
                     },
                     {
                       title: 'Tweet image',
@@ -71,9 +84,9 @@ export default async function CreatePage({
                       add: true,
                     },
                     {
-                      title: 'Build store screenshots',
+                      title: STORE_SCREENSHOTS.label,
                       description: 'Prepare store listings across devices, sizes and languages.',
-                      href: '/?editor=app-store',
+                      href: STORE_SCREENSHOTS.href,
                       scope: 'App Store studio · On this browser',
                       pages: [
                         { kind: 'phone', ratio: '9:16' },

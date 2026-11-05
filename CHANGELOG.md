@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.44.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.43.0...v2.44.0) (2026-11-04)
+
+
+### Features
+
+* **web:** add a product tour framework with workspace and Publish tours ([#430](https://github.com/PlaybookMediaLLC/shots/issues/430)) ([1a5f4ca](https://github.com/PlaybookMediaLLC/shots/commit/1a5f4ca11784cc4ebc1f54448c7d30052cee6b63))
+
+
+### Bug Fixes
+
+* **web:** send an expired sign-in at the connection start to sign in again ([#427](https://github.com/PlaybookMediaLLC/shots/issues/427)) ([47ebb9d](https://github.com/PlaybookMediaLLC/shots/commit/47ebb9d8e498d81347b071e7d445cebf236887fe))
+
 ## [2.43.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.42.1...v2.43.0) (2026-11-04)
 
 

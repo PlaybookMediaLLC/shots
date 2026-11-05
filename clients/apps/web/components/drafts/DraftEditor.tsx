@@ -1,22 +1,9 @@
 'use client'
 
 import * as React from 'react'
-import dynamic from 'next/dynamic'
-const LibraryAssetPicker = dynamic(
-  () =>
-    import('@/components/platform-hub/LibraryAssetPicker').then(
-      (module) => module.LibraryAssetPicker
-    ),
-  { ssr: false }
-)
 import { toast } from 'sonner'
 import './draft-prose.css'
-import {
-  BaseEditorKit,
-  createEditorKit,
-  insertBlock,
-  insertInlineElement,
-} from '@shots/platejs-editor/components'
+import { BaseEditorKit, createEditorKit } from '@shots/platejs-editor/components'
 import { PlaceholderPlugin, type FileSize } from '@shots/platejs-editor/@platejs/media/react'
 import {
   EditorServicesProvider,
@@ -29,6 +16,7 @@ import {
   type PlateEditor,
   useEditorRef,
   useEditorMounted,
+  useEditorSelector,
   usePlateEditor,
   usePluginOption,
 } from '@shots/platejs-editor/platejs/react'
@@ -47,37 +35,26 @@ import {
   discussionPlugin,
   type TDiscussion,
 } from '@shots/platejs-editor/plugins'
-import {
-  Editor,
-  EditorContainer,
-  EditorStatic,
-  MarkToolbarButton,
-  Toolbar,
-  ToolbarButton,
-  ToolbarGroup,
-} from '@shots/platejs-editor/ui'
-import { DotsThreeIcon as MoreHorizontalIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { Editor, EditorContainer, EditorStatic, Toolbar, ToolbarButton } from '@shots/platejs-editor/ui'
+import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
+import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
+import { useKeys } from '@/components/write/shortcuts'
 import type { DraftDiscussions } from '@/lib/content-drafts/discussions'
 import { draftPlainText } from '@/lib/content-drafts/serialize'
 import { divLinesAsParagraphs } from '@/lib/content-drafts/paste'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
+import { OverLimitPlugin } from './over-limit'
 import {
   insertPostBreak,
-  insertPostAfter,
   leaveHeader,
-  postRanges,
+  PostBar,
   PostBreakPlugin,
+  PostHover,
+  postRanges,
   PostHeaderContext,
   type PostTools,
   PostToolsContext,
-  splitPostAtCaret,
   ThreadLine,
   threadAsRules,
 } from './thread'
@@ -121,7 +98,7 @@ function HashtagChips({ hashtags }: { hashtags: string[] }) {
   const editor = useEditorRef()
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5 pb-6', POST_COLUMN)}>
-      <span className="text-[11px] text-muted-foreground">Your hashtags</span>
+      <span className="text-label text-muted-foreground">Your hashtags</span>
       {hashtags.map((tag) => (
         <Button
           variant="custom"
@@ -157,10 +134,12 @@ export type DraftEditorProps = {
   hashtags: string[]
   /** Each post's header, by its 1-based number in the thread: who it is from. */
   postHeader: (number: number) => React.ReactNode
-  /** Per-post settings tools for the platform being edited. */
-  postSettings?: PostTools['settings']
-  /** Extra buttons for the bottom toolbar: numbering, finishers, platform tools. */
-  toolbarExtras?: React.ReactNode
+  /** What each post's bar shows for the platform being edited (count, Ask AI, settings). */
+  postTools?: Omit<PostTools, 'addImage'>
+  /** The empty post's prompt for the platform being edited, such as "What's happening?". */
+  placeholder?: string
+  /** The host's buttons after Add post and Image, given the editor's import and export. */
+  toolbarExtras?: (document: DocumentActions) => React.ReactNode
   /** Plugins the host adds, such as social mentions. */
   extraPlugins?: unknown[]
   /** Collaboration is off for a platform's own version: it saves with the draft. */
@@ -313,8 +292,8 @@ function DiscussionsWatcher({ onChange }: { onChange: (discussions: DraftDiscuss
   return null
 }
 
-/** Who else is in the draft right now, from the session's awareness. */
-function Presence() {
+/** Who else is in the draft right now, from the session's awareness; not you in another tab. */
+function Presence({ userId }: { userId: string }) {
   const editor = useEditorRef()
   const awareness = editor.getOptions(YjsPlugin).awareness
   const [people, setPeople] = React.useState<{ color: string; key: string; name: string }[]>([])
@@ -325,7 +304,7 @@ function Presence() {
       for (const state of awareness.getStates().values()) {
         const data = (state as { data?: { color?: string; name?: string; userId?: string } }).data
         const key = data?.userId ?? data?.name
-        if (data?.name && key && !byPerson.has(key))
+        if (data?.name && key && key !== userId && !byPerson.has(key))
           byPerson.set(key, { color: data.color ?? 'gray', key, name: data.name })
       }
       setPeople([...byPerson.values()])
@@ -333,7 +312,7 @@ function Presence() {
     update()
     awareness.on('change', update)
     return () => awareness.off('change', update)
-  }, [awareness])
+  }, [awareness, userId])
   return (
     // Who else is here sits above the post, at the column's right edge.
     <div className="flex flex-wrap justify-end gap-1.5 px-6 py-2" data-testid="presence">
@@ -372,6 +351,7 @@ function FileButton({
   inputRef,
   label,
   onFile,
+  tooltip,
 }: {
   accept: string
   children: React.ReactNode
@@ -379,12 +359,13 @@ function FileButton({
   inputRef?: React.RefObject<HTMLInputElement | null>
   label: string
   onFile: (file: File) => void
+  tooltip: string
 }) {
   const own = React.useRef<HTMLInputElement>(null)
   const input = inputRef ?? own
   return (
     <>
-      <ToolbarButton aria-label={label} onClick={() => input.current?.click()} tooltip={label}>
+      <ToolbarButton aria-label={label} onClick={() => input.current?.click()} tooltip={tooltip}>
         {children}
       </ToolbarButton>
       <Input
@@ -413,11 +394,13 @@ function InsertButton({
   editor,
   insert,
   label,
+  tooltip,
 }: {
   children: React.ReactNode
   editor: PlateEditor
   insert: () => void
   label: string
+  tooltip: string
 }) {
   return (
     <ToolbarButton
@@ -427,64 +410,23 @@ function InsertButton({
         editor.tf.focus()
       }}
       onMouseDown={(event) => event.preventDefault()}
-      tooltip={label}
+      tooltip={tooltip}
     >
       {children}
     </ToolbarButton>
   )
 }
 
-/** Import and export, out of the writing toolbar's way behind one button. */
-function DocumentMenu({
-  exports,
-  files,
-}: {
+/** The editor's document import and export, for the host's More menu. */
+export type DocumentActions = {
   exports: { label: string; run: () => void | Promise<void> }[]
-  files: { accept: string; label: string; onFile: (file: File) => void }[]
-}) {
-  const inputs = React.useRef<Record<string, HTMLInputElement | null>>({})
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <ToolbarButton aria-label="Import and export" tooltip="Import and export">
-            <MoreHorizontalIcon aria-hidden className="size-4" />
-          </ToolbarButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" side="top">
-          {files.map((file) => (
-            <DropdownMenuItem key={file.label} onSelect={() => inputs.current[file.label]?.click()}>
-              {file.label}
-            </DropdownMenuItem>
-          ))}
-          {exports.map((item) => (
-            <DropdownMenuItem key={item.label} onSelect={() => void item.run()}>
-              {item.label}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {files.map((file) => (
-        <Input
-          accept={file.accept}
-          aria-label={file.label}
-          className="hidden"
-          key={file.label}
-          onChange={(event) => {
-            const picked = event.target.files?.[0]
-            event.target.value = ''
-            if (picked) file.onFile(picked)
-          }}
-          ref={(element) => {
-            inputs.current[file.label] = element
-          }}
-          type="file"
-        />
-      ))}
-    </>
-  )
+  imports: { accept: string; label: string; onFile: (file: File) => void }[]
 }
 
+/**
+ * The editor's one-row toolbar: Add post and Image, then the host's tools.
+ * Formatting lives in the selection toolbar; everything else in the host's More.
+ */
 function DraftToolbar({
   editor,
   imageInput,
@@ -496,8 +438,9 @@ function DraftToolbar({
   imageInput: React.RefObject<HTMLInputElement | null>
   services: EditorServices
   title: string
-  extras?: React.ReactNode
+  extras?: DraftEditorProps['toolbarExtras']
 }) {
+  const keys = useKeys()
   const importDocument = async (file: File) => {
     try {
       // DOCX support (mammoth, the Word writer) loads on first use.
@@ -516,7 +459,6 @@ function DraftToolbar({
     const nodes = editor.getApi({ key: KEYS.markdown }).markdown.deserialize(await file.text())
     editor.tf.insertNodes(nodes, { at: [editor.children.length] })
   }
-  const [libraryOpen, setLibraryOpen] = React.useState(false)
   const exportDocument = async () => {
     const { exportToDocx } = await import('@shots/platejs-editor/@platejs/docx-io')
     const blob = await exportToDocx(threadAsRules(editor.children), {
@@ -532,124 +474,50 @@ function DraftToolbar({
       .markdown.serialize({ value: threadAsRules(editor.children) })
     download(new Blob([markdown], { type: 'text/markdown' }), `${fileSlug(title)}.md`)
   }
+  const document: DocumentActions = {
+    exports: [
+      { label: 'Export DOCX', run: exportDocument },
+      { label: 'Export Markdown', run: exportMarkdown },
+    ],
+    imports: [
+      {
+        accept: '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        label: 'Import DOCX',
+        onFile: importDocument,
+      },
+      { accept: '.md,text/markdown', label: 'Import Markdown', onFile: importMarkdown },
+    ],
+  }
 
   return (
     <Toolbar
-      aria-label="Draft formatting"
-      className="flex max-w-full flex-wrap items-center justify-start gap-0.5 rounded-md border border-border bg-card/95 p-px backdrop-blur [&_button]:!h-7 [&_button]:!px-2 [&_button]:!text-[13px] [&_button]:!font-medium"
+      aria-label="Draft tools"
+      className="flex items-center gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-popover backdrop-blur"
     >
-      <ToolbarGroup>
-        <MarkToolbarButton aria-label="Bold" nodeType={KEYS.bold} tooltip="Bold">
-          <span className="font-bold">B</span>
-        </MarkToolbarButton>
-        <MarkToolbarButton aria-label="Italic" nodeType={KEYS.italic} tooltip="Italic">
-          <span className="italic">I</span>
-        </MarkToolbarButton>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <InsertButton editor={editor} insert={() => insertPostBreak(editor)} label="Add post">
-          + Post
-        </InsertButton>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <FileButton
-          accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
-          inputRef={imageInput}
-          label="Insert media"
-          onFile={(file) => {
-            // The media plugin takes a FileList, as from a drop or a picker.
-            if (!editor.selection) editor.tf.select(editor.api.end([]))
-            const files = new DataTransfer()
-            files.items.add(file)
-            editor.getTransforms(PlaceholderPlugin).insert.media(files.files)
-          }}
-        >
-          Media
-        </FileButton>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <ToolbarButton
-          aria-label="Attach from Library"
-          tooltip="Attach from Library"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => setLibraryOpen(true)}
-        >
-          Library
-        </ToolbarButton>
-      </ToolbarGroup>
-      {libraryOpen ? (
-        <LibraryAssetPicker
-          onClose={() => {
-            setLibraryOpen(false)
-            editor.tf.focus()
-          }}
-          onInsert={(node) => {
-            if (!editor.selection) editor.tf.select(editor.api.end([]))
-            editor.tf.insertNodes(node)
-            editor.tf.focus()
-          }}
-        />
-      ) : null}
-      {/* The longest group wraps inside itself, so no tool is cut off at the edge. */}
-      {extras ? (
-        <ToolbarGroup className="min-w-0 shrink [&>div]:flex-wrap">{extras}</ToolbarGroup>
-      ) : null}
-      <ToolbarGroup>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <ToolbarButton aria-label="Insert" tooltip="Insert">
-              Insert ▾
-            </ToolbarButton>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            onCloseAutoFocus={(event) => {
-              event.preventDefault()
-              editor.tf.focus()
-            }}
-          >
-            {[
-              { label: 'Table', insert: () => insertBlock(editor, KEYS.table) },
-              { label: 'Math', insert: () => insertBlock(editor, KEYS.equation) },
-              {
-                label: 'Footnote',
-                insert: () => insertInlineElement(editor, KEYS.footnoteReference),
-              },
-              { label: 'Split post at caret', insert: () => splitPostAtCaret(editor) },
-            ].map((item) => (
-              <DropdownMenuItem
-                key={item.label}
-                onSelect={() => {
-                  item.insert()
-                  editor.tf.focus()
-                }}
-              >
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-            <p className="max-w-64 px-2 py-1 text-xs text-muted-foreground">
-              Tables and math publish as images. Footnotes publish as text.
-            </p>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </ToolbarGroup>
-      <ToolbarGroup>
-        <DocumentMenu
-          files={[
-            {
-              accept:
-                '.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              label: 'Import DOCX',
-              onFile: importDocument,
-            },
-            { accept: '.md,text/markdown', label: 'Import Markdown', onFile: importMarkdown },
-          ]}
-          exports={[
-            { label: 'Export DOCX', run: exportDocument },
-            { label: 'Export Markdown', run: exportMarkdown },
-          ]}
-        />
-      </ToolbarGroup>
+      <InsertButton
+        editor={editor}
+        insert={() => insertPostBreak(editor)}
+        label="Add post"
+        tooltip={`Add post (${keys.label({ key: 'enter', mod: true })})`}
+      >
+        <PlusIcon aria-hidden />
+      </InsertButton>
+      <FileButton
+        accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+        inputRef={imageInput}
+        label="Insert media"
+        tooltip={`Image or video (${keys.label({ key: 'i', mod: true, shift: true })})`}
+        onFile={(file) => {
+          // The media plugin takes a FileList, as from a drop or a picker.
+          if (!editor.selection) editor.tf.select(editor.api.end([]))
+          const files = new DataTransfer()
+          files.items.add(file)
+          editor.getTransforms(PlaceholderPlugin).insert.media(files.files)
+        }}
+      >
+        <ImageIcon aria-hidden />
+      </FileButton>
+      {extras?.(document)}
     </Toolbar>
   )
 }
@@ -667,7 +535,7 @@ function SavedDraft({
     <section aria-label="Saved draft">
       <EditorStatic
         editor={editor}
-        className={cn(POST_COLUMN, 'draft-prose min-h-0 pt-1 pb-4 text-[15px] leading-relaxed')}
+        className={cn(POST_COLUMN, 'draft-prose min-h-0 pt-1 pb-4 text-body')}
         dir={textDirection}
       />
     </section>
@@ -704,7 +572,8 @@ function DraftEditorSession({
   handles,
   hashtags,
   postHeader,
-  postSettings,
+  postTools: hostPostTools,
+  placeholder = 'Write your post…',
   toolbarExtras,
   extraPlugins,
   documentName,
@@ -748,10 +617,14 @@ function DraftEditorSession({
     return createEditorKit({
       recipe: 'collaborative',
       // Only an explicitly supplied host lookup may replace literal social handles.
-      excludePluginKeys: ['mention', 'mention_input', 'autoformatShortcuts'].filter(
+      // `dnd` is Plate's document gutter (drag handle and "+" beside every block):
+      // posts move from their bar and header, and file drops keep working without it.
+      excludePluginKeys: ['dnd', 'mention', 'mention_input', 'autoformatShortcuts'].filter(
         (key) => !hosted.some((plugin) => plugin.key === key)
       ),
-      additionalPlugins: live ? [PostBreakPlugin, ...hosted, live] : [PostBreakPlugin, ...hosted],
+      additionalPlugins: live
+        ? [PostBreakPlugin, OverLimitPlugin, ...hosted, live]
+        : [PostBreakPlugin, OverLimitPlugin, ...hosted],
       // Comments and suggestions are authored by the signed-in member, not
       // the upstream demo users.
       overridePlugins: [
@@ -798,7 +671,8 @@ function DraftEditorSession({
         })),
         BlockSelectionKit[0].configure({ options: { disableSelectAll: true } }),
         BlockPlaceholderKit[0].configure({
-          options: { placeholders: { [KEYS.p]: 'What would you like to share?' } },
+          // The text shown comes from --post-placeholder, so it follows the platform.
+          options: { placeholders: { [KEYS.p]: 'Write your post' } },
         }),
         // Comments sit in a column beside the post once the text reaches its
         // full measure (POST_COLUMN's 42rem); a narrower editor opens them as a
@@ -981,12 +855,14 @@ function DraftEditorSession({
   React.useEffect(() => {
     const viewport = window.visualViewport
     if (!viewport) return
-    const resize = () =>
-      setKeyboardInset(
-        window.matchMedia('(max-width: 639px)').matches
-          ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-          : 0
-      )
+    const resize = () => {
+      const inset = window.matchMedia('(max-width: 639px)').matches
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0
+      setKeyboardInset(inset)
+      // Sheets that open from the bottom (the slash menu on touch) sit above the keyboard too.
+      document.documentElement.style.setProperty('--keyboard-inset', `${inset}px`)
+    }
     resize()
     viewport.addEventListener('resize', resize)
     viewport.addEventListener('scroll', resize)
@@ -1000,8 +876,8 @@ function DraftEditorSession({
     () =>
       readOnly || waitingForConnection
         ? {}
-        : { addImage: () => imageInput.current?.click(), settings: postSettings },
-    [postSettings, readOnly, waitingForConnection]
+        : { ...hostPostTools, addImage: () => imageInput.current?.click() },
+    [hostPostTools, readOnly, waitingForConnection]
   )
   return (
     <EditorServicesProvider services={services}>
@@ -1014,10 +890,11 @@ function DraftEditorSession({
             }}
             readOnly={readOnly || waitingForConnection}
           >
-            {collaboration ? <Presence /> : null}
+            {collaboration ? <Presence userId={user.id} /> : null}
             <DiscussionsWatcher onChange={onDiscussionsChange} />
             {!collaboration || live ? (
               <CommentColumn>
+                <PostHover>
                 <ThreadLine />
                 <Editor
                   autoFocus={false}
@@ -1040,12 +917,19 @@ function DraftEditorSession({
                   aria-label="Draft body"
                   className={cn(
                     POST_COLUMN,
-                    'draft-prose min-h-0 pt-1 pb-4 text-[15px] leading-relaxed [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[attr(placeholder)]'
+                    'draft-prose min-h-0 pt-1 pb-0 text-body [&_[placeholder]]:before:pointer-events-none [&_[placeholder]]:before:absolute [&_[placeholder]]:before:text-muted-foreground [&_[placeholder]]:before:content-[var(--post-placeholder)]'
                   )}
                   dir={textDirection}
-                  placeholder="What would you like to share?"
+                  placeholder={placeholder}
+                  style={
+                    {
+                      '--post-placeholder': JSON.stringify(`${placeholder}   Type / for commands`),
+                    } as React.CSSProperties
+                  }
                   variant="default"
                 />
+                <LastPostBar />
+                </PostHover>
                 <ReadyEditor draftId={draftId} focus={!readOnly && initiallyEmpty} />
               </CommentColumn>
             ) : (
@@ -1069,18 +953,6 @@ function DraftEditorSession({
                 </div>
                 <SavedDraft value={firstValue.current} textDirection={textDirection} />
               </>
-            )}
-            {readOnly || waitingForConnection ? null : (
-              <div className={cn('pb-6', POST_COLUMN)}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => insertPostAfter(editor, postRanges(editor.children).length)}
-                >
-                  Add another post
-                </Button>
-              </div>
             )}
             {readOnly || waitingForConnection || hashtags.length === 0 ? null : (
               <HashtagChips hashtags={hashtags} />
@@ -1114,6 +986,12 @@ function DraftEditorSession({
       </PostHeaderContext.Provider>
     </EditorServicesProvider>
   )
+}
+
+/** The last post's bar, under the editable text (earlier posts' bars sit above the next header). */
+function LastPostBar() {
+  const count = useEditorSelector((editor) => postRanges(editor.children).length, [])
+  return <PostBar className={cn(POST_COLUMN, 'mb-6')} number={count} />
 }
 
 /** Focus once after Plate has mounted, never while a keystroke is being applied. */

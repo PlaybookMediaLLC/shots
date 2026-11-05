@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -48,8 +50,21 @@ func NewPrivateMediaSigner() (*PrivateMediaSigner, error) {
 	return &PrivateMediaSigner{
 		base:   base,
 		bucket: os.Getenv("CLOUDFLARE_BUCKETNAME"),
-		client: s3.NewPresignClient(newR2Client(os.Getenv("CLOUDFLARE_ACCOUNT_ID"), os.Getenv("CLOUDFLARE_ACCESS_KEY"), os.Getenv("CLOUDFLARE_SECRET_ACCESS_KEY"), region)),
+		client: s3.NewPresignClient(newR2Client(os.Getenv("CLOUDFLARE_ACCOUNT_ID"), os.Getenv("CLOUDFLARE_ACCESS_KEY"), os.Getenv("CLOUDFLARE_SECRET_ACCESS_KEY"), region),
+			func(o *s3.PresignOptions) {
+				// The S3 client's own signer settings, as newDefaultV4Signer sets them.
+				o.Presigner = hourSigner{v4.NewSigner(func(so *v4.SignerOptions) { so.DisableURIPathEscaping = true })}
+			}),
 	}, nil
+}
+
+// hourSigner signs as of the start of the hour. A file then keeps one link
+// for the whole hour, so a browser can cache it instead of loading it again on
+// each page. The link stays valid for at least 23 hours.
+type hourSigner struct{ *v4.Signer }
+
+func (s hourSigner) PresignHTTP(ctx context.Context, credentials aws.Credentials, r *http.Request, payloadHash, service, region string, signingTime time.Time, optFns ...func(*v4.SignerOptions)) (string, http.Header, error) {
+	return s.Signer.PresignHTTP(ctx, credentials, r, payloadHash, service, region, signingTime.UTC().Truncate(time.Hour), optFns...)
 }
 
 const privateMediaExpiry = 24 * time.Hour

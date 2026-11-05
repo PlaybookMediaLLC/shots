@@ -1,5 +1,6 @@
 import type { z } from 'zod'
 import type { draftFinisherSchema, draftTagSchema } from '@/lib/api/contracts/draft-tags'
+import type { CalendarPlacement, CalendarResultWire } from '@/lib/api/contracts/plan-analyze'
 import type { engagementSchema, socialSetSchema } from '@/lib/api/contracts/social-sets'
 import type {
   draftActivitySchema,
@@ -86,6 +87,15 @@ export const writeApi = {
     id: string,
     input: { baseCalendarVersion: number; plannedFor: string | null; timeZone?: string }
   ) => call<DraftWire>(`${draft(id)}/plan`, { body: input, method: 'POST' }),
+  /**
+   * Unschedule a draft as the Calendar does: one step cancels every queued
+   * post, and the draft keeps their time as its plan.
+   */
+  unschedule: (placement: CalendarPlacement) =>
+    call<CalendarResultWire>('/api/v1/calendar/mutations', {
+      body: { action: 'unschedule', items: [placement], key: crypto.randomUUID() },
+      method: 'POST',
+    }),
   duplicate: (id: string, requestKey?: string) =>
     call<DraftCopyWire>(
       `${draft(id)}/duplicate${requestKey ? `?requestKey=${encodeURIComponent(requestKey)}` : ''}`,

@@ -364,6 +364,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List calendar notes
+         * @description Date-only notes visible to everyone in the workspace, at most 100 days at a time.
+         */
+        get: operations["listCalendarNotes"];
+        put?: never;
+        /**
+         * Add a calendar note
+         * @description Adds a note to a date. A note is not a post and never publishes.
+         */
+        post: operations["createCalendarNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a calendar note
+         * @description Deletes a note from this workspace.
+         */
+        delete: operations["deleteCalendarNote"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a calendar note
+         * @description Changes a note's title and color. Its date stays.
+         */
+        patch: operations["updateCalendarNote"];
+        trace?: never;
+    };
     "/api/v1/analytics/{id}": {
         parameters: {
             query?: never;
@@ -476,6 +524,26 @@ export interface paths {
          * @description Reads the current adapter configuration and product rollout gates for the active workspace. Only signed-in owners/admins may inspect it; API keys cannot connect accounts. No app IDs, secrets or credentials are returned. Available means a connection can be attempted, not that provider approval, account grants or publishing capabilities have been verified. Subscription capacity, target ownership and occupied slots are rechecked when an attempt starts and commits. The response is not cached.
          */
         get: operations["getSocialConnectionAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/social-connection-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read social account capacity
+         * @description Counts active accounts across the workspace. A workspace whose plan does not stand may hold none. Capacity is rechecked when an account connects.
+         */
+        get: operations["getSocialConnectionCapacity"];
         put?: never;
         post?: never;
         delete?: never;
@@ -702,6 +770,66 @@ export interface paths {
          */
         put: operations["setAssetAltText"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/code-projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a code project
+         * @description Creates a Code Studio project from code, as a CLI or editor extension does with a selection. The project opens in Code Studio for styling, exporting and posting; render it with the render operation.
+         */
+        post: operations["createCodeProject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/code-projects/{projectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a code project
+         * @description Reads a Code Studio project's document: its slides, files and style.
+         */
+        get: operations["getCodeProject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/code-projects/{projectId}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Render a code project slide
+         * @description Renders one slide as a PNG on the server, exactly as Code Studio exports it, and stores it as a workspace asset. Download it with the asset download URL operation. Renders count against the workspace render limit.
+         */
+        post: operations["renderCodeProject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1602,6 +1730,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -1783,6 +1915,32 @@ export interface components {
                 timeZone: string;
             }[];
         };
+        CalendarNoteList: {
+            items: {
+                id: string;
+                /** Format: date */
+                day: string;
+                title: string;
+                /** @enum {string} */
+                color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+        };
+        CalendarNote: {
+            id: string;
+            /** Format: date */
+            day: string;
+            title: string;
+            /** @enum {string} */
+            color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         AnalyticsReport: {
             accountId: string;
             name: string;
@@ -1942,6 +2100,10 @@ export interface components {
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
+        };
+        SocialConnectionCapacity: {
+            held: number;
+            limit: number | null;
         };
         BlueskyConnectionBeginRequest: {
             /** @enum {string} */
@@ -2155,6 +2317,190 @@ export interface components {
         AssetAltText: {
             altText: string | null;
             id: string;
+        };
+        CodeProject: {
+            createdAt: unknown;
+            document: {
+                /** @constant */
+                version: 1;
+                /** @constant */
+                kind: "code";
+                style: {
+                    /** @default midnight */
+                    theme: string;
+                    /** @default null */
+                    brandTheme: {
+                        kitId: string;
+                        name: string;
+                        from: string;
+                        to: string;
+                        accent: string;
+                        light: {
+                            foreground: string;
+                            constant?: string;
+                            string?: string;
+                            comment?: string;
+                            keyword?: string;
+                            parameter?: string;
+                            function?: string;
+                            stringExpression?: string;
+                            punctuation?: string;
+                            link?: string;
+                            number?: string;
+                            property?: string;
+                        };
+                        dark: {
+                            foreground: string;
+                            constant?: string;
+                            string?: string;
+                            comment?: string;
+                            keyword?: string;
+                            parameter?: string;
+                            function?: string;
+                            stringExpression?: string;
+                            punctuation?: string;
+                            link?: string;
+                            number?: string;
+                            property?: string;
+                        };
+                    } | null;
+                    /** @default true */
+                    dark: boolean;
+                    /** @default true */
+                    showBackground: boolean;
+                    /**
+                     * @default {
+                     *       "kind": "theme",
+                     *       "id": ""
+                     *     }
+                     */
+                    background: {
+                        /** @enum {string} */
+                        kind: "theme" | "gradient" | "image" | "pattern";
+                        id: string;
+                    };
+                    /** @default 64 */
+                    padding: number;
+                    /** @default jetbrainsMono */
+                    font: string;
+                    /** @default true */
+                    lineNumbers: boolean;
+                    /**
+                     * @default mac
+                     * @enum {string}
+                     */
+                    frame: "mac" | "terminal" | "card" | "none";
+                    /** @default  */
+                    title: string;
+                    /** @default 700 */
+                    width: number;
+                    /**
+                     * @default auto
+                     * @enum {string}
+                     */
+                    aspect: "auto" | "16:9" | "1.91:1" | "1:1" | "4:5" | "9:16";
+                    /**
+                     * @default {
+                     *       "show": false,
+                     *       "name": "",
+                     *       "handle": ""
+                     *     }
+                     */
+                    footer: {
+                        /** @default false */
+                        show: boolean;
+                        /** @default  */
+                        name: string;
+                        /** @default  */
+                        handle: string;
+                        logo?: string;
+                    };
+                };
+                slides: {
+                    id: string;
+                    /**
+                     * @default single
+                     * @enum {string}
+                     */
+                    layout: "single" | "split";
+                    panes: {
+                        id: string;
+                        activeFile: string;
+                        files: {
+                            id: string;
+                            /** @default  */
+                            name: string;
+                            /**
+                             * @default text
+                             * @enum {string}
+                             */
+                            lang: "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "rust" | "java" | "kotlin" | "swift" | "c" | "cpp" | "csharp" | "php" | "ruby" | "dart" | "elixir" | "scala" | "lua" | "r" | "zig" | "sql" | "graphql" | "prisma" | "json" | "yaml" | "toml" | "hcl" | "html" | "xml" | "css" | "scss" | "vue" | "svelte" | "markdown" | "bash" | "shellsession" | "dockerfile" | "diff" | "text";
+                            code: string;
+                            base?: string;
+                            /** @enum {string} */
+                            diff?: "unified" | "split";
+                            marks?: {
+                                /** @default [] */
+                                highlight: [
+                                    number,
+                                    number
+                                ][];
+                                /** @default [] */
+                                focus: [
+                                    number,
+                                    number
+                                ][];
+                                /** @default [] */
+                                blur: [
+                                    number,
+                                    number
+                                ][];
+                            };
+                            annotations?: {
+                                id: string;
+                                /** @enum {string} */
+                                kind: "marker" | "callout";
+                                line: number;
+                                /** @default  */
+                                text: string;
+                            }[];
+                            tape?: string;
+                        }[];
+                    }[];
+                    /** @default  */
+                    caption: string;
+                    /** @default 2500 */
+                    duration: number;
+                    /**
+                     * @default morph
+                     * @enum {string}
+                     */
+                    transition: "morph" | "type" | "highlight" | "cut";
+                    /** @default 800 */
+                    transitionDuration: number;
+                }[];
+                source?: {
+                    /** @enum {string} */
+                    kind: "github-file" | "github-pull" | "github-commit" | "gist" | "file";
+                    url?: string;
+                    repo?: string;
+                    ref?: string;
+                    path?: string;
+                };
+            };
+            id: string;
+            name: string;
+            revision: number;
+            updatedAt: unknown;
+            /** Format: uri */
+            url: string;
+        };
+        RenderedCode: {
+            assetId: string;
+            height: number;
+            /** @constant */
+            mediaType: "image/png";
+            width: number;
         };
         CampaignListResponse: {
             data: {
@@ -2483,6 +2829,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -2675,6 +3025,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -2999,6 +3353,10 @@ export interface components {
                 title: string;
             } | null;
             attentionPosts: number;
+            /** @default 0 */
+            checkPosts: number;
+            /** @default 0 */
+            publishingPosts: number;
             /** @enum {string} */
             kind: "standard" | "reply" | "quote" | "repurpose" | "article";
             nextPostAt: string | null;
@@ -3382,6 +3740,10 @@ export interface components {
                     title: string;
                 } | null;
                 attentionPosts: number;
+                /** @default 0 */
+                checkPosts: number;
+                /** @default 0 */
+                publishingPosts: number;
                 /** @enum {string} */
                 kind: "standard" | "reply" | "quote" | "repurpose" | "article";
                 nextPostAt: string | null;
@@ -3740,7 +4102,7 @@ export interface components {
             /** @enum {string} */
             currentPlan: "free" | "pro" | "business" | "enterprise";
             /** @enum {string} */
-            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
+            feature: "asset:create" | "asset:read" | "asset:update" | "asset:delete" | "release:create" | "source-app:create" | "workspace:use" | "workspace:paid" | "content:scheduling-advanced" | "enterprise:audit-drain" | "enterprise:sso" | "enterprise:scim" | "enterprise:white-label" | "enterprise:permission-groups" | "campaign:workflow" | "content:drafts" | "onboarding:agent";
             /** @enum {string} */
             requiredPlan: "free" | "pro" | "business" | "enterprise";
         };
@@ -5820,6 +6182,239 @@ export interface operations {
             };
         };
     };
+    listCalendarNotes: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notes in the range. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNoteList"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    /** @enum {string} */
+                    color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                    /** Format: date */
+                    day: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The note. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNote"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateCalendarNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title: string;
+                    /** @enum {string} */
+                    color: "blue" | "green" | "red" | "yellow" | "purple" | "orange";
+                };
+            };
+        };
+        responses: {
+            /** @description The note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarNote"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     getAccountAnalytics: {
         parameters: {
             query: {
@@ -6229,6 +6824,53 @@ export interface operations {
                 };
             };
             /** @description The workspace binding or adapter availability could not be verified. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSocialConnectionCapacity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current count and limit. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialConnectionCapacity"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -7170,6 +7812,213 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    aspect?: "auto" | "16:9" | "1.91:1" | "1:1" | "4:5" | "9:16";
+                    dark?: boolean;
+                    files: {
+                        code: string;
+                        /** @enum {string} */
+                        lang?: "typescript" | "tsx" | "javascript" | "jsx" | "python" | "go" | "rust" | "java" | "kotlin" | "swift" | "c" | "cpp" | "csharp" | "php" | "ruby" | "dart" | "elixir" | "scala" | "lua" | "r" | "zig" | "sql" | "graphql" | "prisma" | "json" | "yaml" | "toml" | "hcl" | "html" | "xml" | "css" | "scss" | "vue" | "svelte" | "markdown" | "bash" | "shellsession" | "dockerfile" | "diff" | "text";
+                        name?: string;
+                    }[];
+                    name?: string;
+                    theme?: string;
+                    title?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The new code project. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProject"];
+                };
+            };
+            /** @description The code or settings are not valid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The code project. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProject"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No code project with that id exists in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    renderCodeProject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @default 2 */
+                    scale?: 1 | 2 | 3;
+                    /** @default 0 */
+                    slide?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description The stored image. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderedCode"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No code project with that id exists in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The workspace is rendering too fast. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceQuotaError"];
                 };
             };
             /** @description A required dependency is unavailable. */
@@ -8327,7 +9176,9 @@ export interface operations {
     listContentDrafts: {
         parameters: {
             query?: {
+                connectionId?: string;
                 cursor?: string;
+                from?: string;
                 kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
                 limit?: number;
                 search?: string;
@@ -8335,6 +9186,7 @@ export interface operations {
                 sort?: "updated_desc" | "updated_asc" | "created_desc" | "created_asc";
                 status?: "draft" | "scheduled" | "archived";
                 tagId?: string;
+                to?: string;
                 view?: "drafts" | "posted" | "archived";
             };
             header?: never;

@@ -27,14 +27,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { roleLabels } from '@/lib/auth/role-descriptions'
-import { hasPermission, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
+import { accessAllows, normalizeOrganizationRole, type Permission } from '@/lib/auth/permissions'
 import { Input } from '@/components/ui/input'
 import {
   matchesDestination,
   PLATFORM_DESTINATIONS,
   platformArea,
+  STORE_SCREENSHOTS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
+import { recentPages } from './PageVisits'
+import { type PalettePage, palettePages, searchPages, visitedPages } from './palette-pages'
 import { SidebarLink } from './SidebarLink'
 
 // `permission` is what the destination checks before it creates anything.
@@ -42,8 +45,9 @@ import { SidebarLink } from './SidebarLink'
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
   { href: '/?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
   { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
-  { href: '/?editor=app-store', label: 'Store screenshots', paid: true },
-  { href: '/write', label: 'Post', paid: false, permission: 'artifact:edit' },
+  { href: '/create/code', label: 'Code image', paid: true },
+  { ...STORE_SCREENSHOTS, paid: true },
+  { href: '/publish', label: 'Post', paid: false, permission: 'artifact:edit' },
   { href: '/campaigns/new', label: 'Campaign', paid: true, permission: 'release:create' },
   { href: '/workflows/new', label: 'Workflow', paid: true, permission: 'workspace:update' },
 ]
@@ -76,6 +80,7 @@ export function ShellActions({
   onNavigate,
   paidPlan = true,
   role,
+  deniedPermissions,
 }: {
   collapsed: boolean
   campaignsEnabled: boolean
@@ -87,6 +92,8 @@ export function ShellActions({
   paidPlan?: boolean
   /** Items the role may not create are shown unavailable, with who can grant access. */
   role: string
+  /** What the member's permission group subtracts from `role`. */
+  deniedPermissions: readonly string[]
 }) {
   const t = useTranslations('platformNavigation')
   const newPost = useNewPost(onNavigate)
@@ -95,7 +102,7 @@ export function ShellActions({
       (campaignsEnabled || item.label !== 'Campaign') && (draftsEnabled || item.label !== 'Post')
   )
   const allowed = (item: (typeof NEW_ITEMS)[number]) =>
-    !item.permission || hasPermission(role, item.permission)
+    !item.permission || accessAllows({ deniedPermissions, role }, item.permission)
   const locked = (item: (typeof NEW_ITEMS)[number]) =>
     item.label === 'Post' ? !draftsPlan : item.paid && !paidPlan
   const unavailable = items.filter((item) => !allowed(item))
@@ -189,6 +196,8 @@ export function ShellSearch({
   const client = useTRPCClient()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  // The pages this tab visited before the one it is on, read when Search opens.
+  const [visits, setVisits] = useState<string[]>([])
   const launcher = useRef<HTMLElement | null>(null)
   useEffect(() => {
     const show = () => {
@@ -201,6 +210,7 @@ export function ShellSearch({
       }
       launcher.current = document.activeElement as HTMLElement | null
       setQuery('')
+      setVisits(recentPages().slice(1))
       setOpen(true)
     }
     const key = (event: KeyboardEvent) => {
@@ -211,6 +221,9 @@ export function ShellSearch({
         event.key.toLowerCase() !== 'k'
       )
         return
+      // Selected text in a post editor: ⌘K edits its link there (Plate's shortcut).
+      const target = event.target instanceof Element ? event.target : null
+      if (target?.closest('[data-slate-editor]') && !window.getSelection()?.isCollapsed) return
       event.preventDefault()
       event.stopImmediatePropagation()
       show()
@@ -227,6 +240,12 @@ export function ShellSearch({
       (campaignsEnabled || item.key !== 'campaigns') &&
       matchesDestination(item.key, t(item.key), query)
   ).map((item) => withPublishAccess(item, draftsEnabled))
+  const pages = palettePages({ campaignsEnabled, draftsEnabled, sectionLabel: (key) => t(key) })
+  const visited = query.trim() ? [] : visitedPages(pages, visits).slice(0, 5)
+  // A page that opens the same address as a place found above it is listed once.
+  const pageMatches = searchPages(pages, query).filter(
+    (page) => !items.some((item) => item.href === page.href)
+  )
   const searchesWork = draftsEnabled || paidPlan
   // Work is found by its name or words too, a moment after typing stops.
   const [term, setTerm] = useState('')
@@ -296,7 +315,13 @@ export function ShellSearch({
                 </Button>
               ))
             : null}
-          {!query.trim() && workItems.length ? (
+          {visited.length ? (
+            <p className="px-3 pt-3 text-xs text-muted-foreground">Recently visited</p>
+          ) : null}
+          {visited.map((page) => (
+            <PageResult key={page.href} onSelect={() => setOpen(false)} page={page} />
+          ))}
+          {!query.trim() && (workItems.length || visited.length) ? (
             <p className="px-3 pt-3 text-xs text-muted-foreground">Places</p>
           ) : null}
           {items.map((item) => (
@@ -306,6 +331,9 @@ export function ShellSearch({
                 <span className="shrink-0 text-xs text-muted-foreground">Destination</span>
               </SidebarLink>
             </Button>
+          ))}
+          {pageMatches.map((page) => (
+            <PageResult key={page.href} onSelect={() => setOpen(false)} page={page} />
           ))}
           {query.trim()
             ? workItems.map((item) => (
@@ -327,7 +355,7 @@ export function ShellSearch({
               </Button>
             </p>
           ) : null}
-          {query.trim() && !items.length && !workItems.length && !failed ? (
+          {query.trim() && !items.length && !pageMatches.length && !workItems.length && !failed ? (
             <p role="status" className="p-3 text-sm text-muted-foreground">
               {searchesWork && (!searching || found.isFetching)
                 ? 'Searching…'
@@ -339,5 +367,19 @@ export function ShellSearch({
         </nav>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** A page Search found, named with its section, as "Deliveries · Campaigns". */
+function PageResult({ onSelect, page }: { onSelect: () => void; page: PalettePage }) {
+  return (
+    <Button asChild className="min-h-11 justify-between rounded-lg font-normal" variant="ghost">
+      <SidebarLink href={page.href} onClick={onSelect}>
+        <span className="min-w-0 truncate">
+          {page.section ? `${page.label} · ${page.section}` : page.label}
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">Page</span>
+      </SidebarLink>
+    </Button>
   )
 }

@@ -21,6 +21,10 @@ COPY clients/apps/web/package.json ./apps/web/
 COPY clients/packages/platejs-editor/package.json ./packages/platejs-editor/
 COPY clients/packages/screenshot-studio-backend-sdk/package.json ./packages/screenshot-studio-backend-sdk/
 COPY clients/packages/shots-api-client/package.json ./packages/shots-api-client/
+COPY clients/packages/access-control/package.json ./packages/access-control/
+COPY clients/packages/audit-logs/package.json ./packages/audit-logs/
+COPY clients/packages/sso/package.json ./packages/sso/
+COPY clients/packages/whitelabeling/package.json ./packages/whitelabeling/
 RUN --mount=type=cache,target=/root/.npm npm ci --prefer-offline --no-audit
 
 FROM dependencies AS builder

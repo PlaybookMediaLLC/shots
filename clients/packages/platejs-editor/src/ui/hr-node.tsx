@@ -18,7 +18,7 @@ export function HrElement(props: PlateElementProps) {
       <div contentEditable={false}>
         <hr
           className={cn(
-            "h-0.5 cursor-pointer rounded-none border-none bg-muted bg-clip-content",
+            "h-0.5 cursor-pointer rounded-md border-none bg-muted bg-clip-content",
             selected && focused && "ring-2 ring-ring ring-offset-2"
           )}
         />

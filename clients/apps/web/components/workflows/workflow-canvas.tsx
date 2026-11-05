@@ -80,6 +80,10 @@ export function nodeDetail(node: AutomationNode, sourceName?: string) {
       return `${node.action.templateIds?.length ?? 0} templates from the latest capture`
     case 'create_canvas':
       return `${node.action.recipeIds?.length ?? 0} canvas templates from the release`
+    case 'render_code_visual':
+      return node.action.readSourceCode
+        ? 'Code visual from the merged pull request'
+        : 'Needs consent to read the pull request’s code'
     case 'submit_review':
       return 'A person approves before publishing'
     case 'create_release':

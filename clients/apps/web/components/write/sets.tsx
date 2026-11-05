@@ -1,5 +1,7 @@
 'use client'
 
+import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
+import { WarningIcon } from '@phosphor-icons/react/dist/ssr/Warning'
 import { useWriteRouter } from '@/components/write/write-context'
 
 import Link from 'next/link'
@@ -79,12 +81,10 @@ export function SocialSetSwitcher() {
               className="text-xs text-amber-700 dark:text-amber-300"
               title="An account needs attention"
             >
-              ⚠
+              <WarningIcon aria-label="An account needs attention" className="size-3.5" />
             </span>
           ) : null}
-          <span aria-hidden className="text-muted-foreground">
-            ▾
-          </span>
+          <CaretDownIcon aria-hidden className="size-3.5 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-80">
@@ -103,8 +103,8 @@ export function SocialSetSwitcher() {
                 activeId !== 'analyze' &&
                 set.id !== data.activeSet?.id
               )
-                router.push(`/write?set=${encodeURIComponent(set.id)}`)
-              else setQuery({ q: undefined, set: set.id, tag: undefined })
+                router.push(`/publish?set=${encodeURIComponent(set.id)}`)
+              else setQuery({ account: undefined, q: undefined, set: set.id, tag: undefined })
             }}
           >
             <SetDot color={set.color} />
@@ -135,7 +135,7 @@ export function SocialSetSwitcher() {
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem asChild>
-              <Link href="/workspace/social-sets">New publishing brand…</Link>
+              <Link href="/settings/publishing-brands">New publishing brand…</Link>
             </DropdownMenuItem>
           </>
         ) : null}

@@ -1,6 +1,7 @@
 package postoptions
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -74,13 +75,24 @@ type TikTokCreator struct {
 	StitchDisabled     bool     `json:"stitchDisabled"`
 }
 
+// Check's refusals that need their own fix: a video outside the account's
+// allowance, and creator permissions that are missing. A chosen privacy the
+// account no longer offers is fixed in the post's options, like any other.
+var (
+	ErrVideoTooLong       = errors.New("video exceeds the TikTok account duration allowance or has no verified duration")
+	ErrCreatorPermissions = errors.New("TikTok publishing permissions are unavailable; refresh the account before scheduling")
+)
+
 // Check refuses unavailable account controls and media outside the creator's allowance.
 func (c *TikTokCreator) Check(o *TikTokOptions, durationMs int) error {
-	if c == nil || o == nil || c.MaxDurationSeconds <= 0 || !slices.Contains(c.PrivacyLevels, o.Privacy) {
-		return fmt.Errorf("TikTok publishing permissions are unavailable; refresh the account before scheduling")
+	if c == nil || o == nil || c.MaxDurationSeconds <= 0 {
+		return ErrCreatorPermissions
+	}
+	if !slices.Contains(c.PrivacyLevels, o.Privacy) {
+		return fmt.Errorf("the TikTok account no longer offers the chosen privacy")
 	}
 	if durationMs <= 0 || durationMs > c.MaxDurationSeconds*1000 {
-		return fmt.Errorf("video exceeds the TikTok account duration allowance or has no verified duration")
+		return ErrVideoTooLong
 	}
 	if o.AllowComments && c.CommentDisabled || o.AllowDuet && c.DuetDisabled || o.AllowStitch && c.StitchDisabled {
 		return fmt.Errorf("TikTok account settings do not permit the selected interactions")

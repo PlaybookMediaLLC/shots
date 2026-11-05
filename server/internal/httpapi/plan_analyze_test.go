@@ -18,6 +18,8 @@ type planAnalyzeFake struct {
 	command product.CalendarCommand
 	query   product.AnalyticsQuery
 	denied  bool
+
+	noteRange string
 }
 
 func (f *planAnalyzeFake) MutateCalendar(_ context.Context, actor product.Actor, command product.CalendarCommand) (*product.CalendarResult, error) {
@@ -34,6 +36,53 @@ func (f *planAnalyzeFake) GetAnalytics(_ context.Context, actor product.Actor, i
 func (f *planAnalyzeFake) GetPublicAnalytics(_ context.Context, token string, q product.AnalyticsQuery) (*product.AnalyticsReport, error) {
 	f.query = q
 	return &product.AnalyticsReport{}, nil
+}
+func (f *planAnalyzeFake) ListCalendarNotes(_ context.Context, actor product.Actor, from, to string) ([]product.CalendarNote, error) {
+	f.actor, f.noteRange = actor, from+".."+to
+	return []product.CalendarNote{}, nil
+}
+func (f *planAnalyzeFake) CreateCalendarNote(_ context.Context, actor product.Actor, input product.CalendarNoteInput) (*product.CalendarNote, error) {
+	f.actor = actor
+	return &product.CalendarNote{ID: "note", Day: input.Day, Title: input.Title, Color: input.Color}, nil
+}
+func (f *planAnalyzeFake) UpdateCalendarNote(_ context.Context, actor product.Actor, id string, changes product.CalendarNoteChanges) (*product.CalendarNote, error) {
+	f.actor = actor
+	return &product.CalendarNote{ID: id, Title: changes.Title, Color: changes.Color}, nil
+}
+func (f *planAnalyzeFake) DeleteCalendarNote(_ context.Context, actor product.Actor, _ string) error {
+	f.actor = actor
+	if f.denied {
+		return publishing.ErrForbidden
+	}
+	return nil
+}
+func TestCalendarNotesHTTP(t *testing.T) {
+	config := &planAnalyzeFake{}
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", config)
+	const note = "/v1/calendar/notes/c123456789012345678901234"
+	for _, c := range []struct {
+		method, path, body string
+		status             int
+	}{
+		{http.MethodGet, "/v1/calendar/notes?from=2026-11-01&to=2026-11-30", "", 200},
+		{http.MethodPost, "/v1/calendar/notes", `{"day":"2026-11-04","title":"Launch","color":"blue"}`, 201},
+		{http.MethodPost, "/v1/calendar/notes", `{"organizationId":"foreign"}`, 400},
+		{http.MethodPatch, note, `{"title":"Launch","color":"red"}`, 200},
+		{http.MethodPatch, note, `{"day":"2026-11-05"}`, 400},
+		{http.MethodDelete, note, "", 200},
+		{http.MethodDelete, "/v1/calendar/notes/not%20an%20id", "", 400},
+	} {
+		if response := configurationRequest(handler, c.method, c.path, c.body); response.Code != c.status {
+			t.Errorf("%s %s = %d, want %d: %s", c.method, c.path, response.Code, c.status, response.Body)
+		}
+	}
+	if config.actor.OrganizationID != "org-1" || config.noteRange != "2026-11-01..2026-11-30" {
+		t.Fatalf("actor=%+v range=%q", config.actor, config.noteRange)
+	}
+	config.denied = true
+	if response := configurationRequest(handler, http.MethodDelete, note, ""); response.Code != 403 {
+		t.Fatal(response.Code)
+	}
 }
 func TestPlanAnalyzeHTTPAuthorityContracts(t *testing.T) {
 	config, scheduler := &planAnalyzeFake{}, &fakeScheduler{}

@@ -83,21 +83,49 @@ func LockWorkspace(ctx context.Context, tx *ent.Tx, org string) (bool, error) {
 // RequireCapacity is a preflight unless client belongs to a transaction that
 // holds LockWorkspace; resource creation must check again in that transaction.
 func RequireCapacity(ctx context.Context, client *ent.Client, org, name string, held int) error {
-	row, err := client.WorkspaceEntitlement.Get(ctx, org)
-	if err != nil && !ent.IsNotFound(err) {
+	limit, plan, active, err := capacityLimit(ctx, client, org, name)
+	if err != nil {
 		return err
 	}
-	plan, _, active := Resolve(row, time.Now().UTC())
+	if !active || held >= limit {
+		return &LimitError{Limit: limit, Name: name, Plan: plan, Inactive: !active}
+	}
+	return nil
+}
+
+// capacityLimit is the limit of the workspace's plan, and whether it stands.
+func capacityLimit(ctx context.Context, client *ent.Client, org, name string) (limit int, plan string, active bool, err error) {
+	row, err := client.WorkspaceEntitlement.Get(ctx, org)
+	if err != nil && !ent.IsNotFound(err) {
+		return 0, "", false, err
+	}
+	plan, _, active = Resolve(row, time.Now().UTC())
 	if row != nil {
 		if enabled, ok := row.FeatureOverrides["workspace:use"].(bool); ok && !enabled {
 			active = false
 		}
 	}
-	limit := limits[plan][name]
-	if !active || held >= limit {
-		return &LimitError{Limit: limit, Name: name, Plan: plan, Inactive: !active}
+	return limits[plan][name], plan, active, nil
+}
+
+// ChannelUsage is the workspace's active accounts and how many it may hold:
+// none when its plan does not stand, nil when its plan has no limit.
+func ChannelUsage(ctx context.Context, client *ent.Client, org string) (held int, limit *int, err error) {
+	held, err = client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).Count(ctx)
+	if err != nil {
+		return 0, nil, err
 	}
-	return nil
+	allowed, _, active, err := capacityLimit(ctx, client, org, Channels)
+	if err != nil {
+		return 0, nil, err
+	}
+	if !active {
+		allowed = 0
+	}
+	if allowed == math.MaxInt32 {
+		return held, nil, nil
+	}
+	return held, &allowed, nil
 }
 
 // RequireChannel allows an active account to renew without an additional slot.

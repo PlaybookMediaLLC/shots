@@ -64,6 +64,7 @@ type Configuration struct {
 	quota                              QuotaCounter
 	meter                              MonthlyMeter
 	github                             GitHubApp
+	codeReader                         CodeReader
 	automation                         AutomationDispatcher
 	// automationModel writes paid workflow copy and judges relevance; nil
 	// disables both. automationRenderer renders campaign creatives.

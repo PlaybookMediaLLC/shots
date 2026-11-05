@@ -8,6 +8,7 @@ import {
   grantWorkspacePlan,
   signUpViaApi,
   test,
+  openDisclosureFor,
 } from './framework'
 import { notificationSettingsSchema } from '../../lib/notifications/schema'
 import { socialSetSchema } from '../../lib/api/contracts/social-sets'
@@ -51,7 +52,7 @@ test(
       }),
     })
     expect(legacy.status).toBe(200)
-    await app.open('/workspace/notifications')
+    await app.open('/settings/notifications')
     const firstRow = (event: string, channel: string) =>
       page.getByLabel(`Same brand (${first.id}): ${event}: your ${channel} preference`, {
         exact: true,
@@ -77,7 +78,7 @@ test(
     await expect(secondRow('Post published', 'in-app')).toBeChecked()
 
     const commentGroup = page.getByLabel('All comments: your email preferences', { exact: true })
-    await commentGroup.locator('xpath=ancestor::details').locator('summary').click()
+    await openDisclosureFor(commentGroup)
     await commentGroup.click()
     await expect(commentGroup).not.toBeChecked()
     await expect(
@@ -115,7 +116,7 @@ test(
     await expect(secondRow('Post published', 'in-app')).toBeChecked()
 
     const sibling = await context.newPage()
-    await sibling.goto('/workspace/notifications')
+    await sibling.goto('/settings/notifications')
     await expect(
       sibling.getByLabel(`Same brand (${first.id}): Post published: your email preference`, {
         exact: true,

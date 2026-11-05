@@ -14,6 +14,15 @@ type connectionAvailabilityReader interface {
 	ConnectionAvailability(context.Context, string, string) (*socialidentity.ConnectionAvailability, error)
 }
 
+func (s *Server) socialConnectionCapacity(w http.ResponseWriter, r *http.Request) {
+	capacity, err := s.configuration.GetChannelCapacity(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, capacity)
+}
+
 func (s *Server) socialConnectionAvailability(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" {
 		writeError(w, http.StatusBadRequest, "this request does not accept a workspace or provider override")

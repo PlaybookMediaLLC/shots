@@ -199,7 +199,7 @@ export function FontColorToolbarButton(
 export function ColorIcon({ group, value }: { group: string; value: string }) {
   return (
     <div
-      className="flex size-5 items-center justify-center rounded-none border text-sm"
+      className="flex size-5 items-center justify-center rounded-md border text-sm"
       style={{
         background: group === "background" ? value : undefined,
         color: group === "color" ? value : undefined,

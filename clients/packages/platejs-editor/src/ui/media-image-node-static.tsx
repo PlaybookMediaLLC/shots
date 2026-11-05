@@ -38,7 +38,7 @@ export function ImageElementStatic(
             {/* biome-ignore lint/performance/noImgElement: static renderer stays framework-agnostic and cannot depend on Next/Image. */}
             <img
               alt=""
-              className="w-full max-w-full cursor-default rounded-none object-cover px-0"
+              className="w-full max-w-full cursor-default rounded-md object-cover px-0"
               height={fallbackHeight}
               src={url}
               width={fallbackWidth}

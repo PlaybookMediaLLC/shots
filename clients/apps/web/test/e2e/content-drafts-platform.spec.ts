@@ -12,6 +12,7 @@ import {
   previewOf,
   settleSelection,
   test,
+  postMenu,
 } from './framework'
 import { format } from 'date-fns'
 
@@ -127,7 +128,7 @@ test(
     await scheduleDialog.getByRole('button', { name: 'Confirm schedule' }).click()
     await expect(page.getByTestId('draft-post')).toHaveCount(1, { timeout: 30_000 })
 
-    await app.open(`/write/plan?week=${local.slice(0, 10)}`)
+    await app.open(`/publish/calendar?week=${local.slice(0, 10)}`)
     const card = page
       .getByTestId('calendar-post')
       .filter({ hasText: 'Moved on the calendar', visible: true })
@@ -153,14 +154,10 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
 
-    await app.open('/write')
-    await page
-      .getByTestId('write-rail')
-      .getByRole('link', { name: 'Settings', exact: true })
-      .click()
+    await app.open('/settings/publishing-brands')
+    // Settings save as they change.
     await page.getByLabel('Require approval').check()
-    await page.getByRole('button', { name: 'Save settings' }).click()
-    await expect(page.getByText('Saved.')).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible()
 
     const draftId = await openNewDraft(page)
     await write(page, 'Needs a second pair of eyes')
@@ -274,13 +271,13 @@ test(
 
     // Per-post tools: the second post moves up, then is deleted.
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Move post 2 up' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Move post up' }).click()
     // Still two posts, now in the other order.
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     // Each post's header (account, length) sits inside the editor, before its text.
     await expect(draftEditor(page)).toHaveText(/Second post[\s\S]*#shipit First post$/)
     await page.getByTestId('post-header').nth(1).hover()
-    await page.getByRole('button', { name: 'Delete post 2' }).click()
+    await (await postMenu(page, 2)).getByRole('menuitem', { name: 'Delete post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)
     await expect(draftEditor(page)).not.toContainText('First post')
     await expectSaved(page)
@@ -293,10 +290,10 @@ test(
     await expect(backups.getByTestId('backup-time')).toBeVisible({ timeout: 60_000 })
     await backups.getByRole('button', { name: 'Create new draft from this version' }).click()
     await page.waitForURL(
-      (url) => !url.pathname.endsWith(draftId) && /\/write\/[a-z0-9]+/.test(url.pathname)
+      (url) => !url.pathname.endsWith(draftId) && /\/publish\/[a-z0-9]+/.test(url.pathname)
     )
     await expect(draftEditor(page)).toContainText('#shipit', { timeout: 60_000 })
-    await app.open(`/write/${draftId}`)
+    await app.open(`/publish/${draftId}`)
     await expect(draftEditor(page)).toContainText('Second post', { timeout: 60_000 })
 
     // Channel text: LinkedIn says something longer, in its own version.
@@ -318,7 +315,7 @@ test(
 
     // AI: the scripted model answers, Accept puts the answer in, and Undo takes it back.
     await page.getByTestId('platform-tab-x').click()
-    await page.getByRole('button', { name: 'Rewrite', exact: true }).click()
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     await page
       .getByTestId('refine-menu')
       .getByRole('button', { name: 'Rewrite as a thread start' })

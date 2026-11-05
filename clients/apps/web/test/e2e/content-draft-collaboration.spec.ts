@@ -39,7 +39,7 @@ test('a saved draft stays readable until a failed live connection is retried', a
   const saved = z
     .object({ body: z.array(z.unknown()), plainText: z.string() })
     .parse((await apiRequest(page, path)).body)
-  await app.open('/write')
+  await app.open('/publish')
   // A returning reader can have no browser copy; the saved server document must still win.
   await page.evaluate(async (name) => {
     await new Promise<void>((resolve, reject) => {
@@ -63,12 +63,12 @@ test('a saved draft stays readable until a failed live connection is retried', a
     if (new URL(request.url()).pathname === path && request.method() === 'PATCH')
       writes.push(request.method())
   })
-  await app.open(`/write/${draftId}`)
+  await app.open(`/publish/${draftId}`)
   const preview = page.getByRole('region', { name: 'Saved draft' })
   await expect(preview).toContainText(saved.plainText)
   await expect(page.getByText('Connecting… Showing the last saved version.')).toBeVisible()
   await expect(page.locator('[contenteditable="true"][aria-label="Draft body"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Add another post', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add post', exact: true })).toHaveCount(0)
   await preview.click()
   await page.keyboard.insertText('Must not edit while connecting.')
   await expect(preview).not.toContainText('Must not edit while connecting.')
@@ -124,7 +124,7 @@ test('a viewer promoted to creator can edit after client navigation', async ({
     await draftEditor(page).click()
     await page.keyboard.insertText('Visible to the viewer.')
     await expectSaved(page)
-    await member.goto(`/write/${draftId}`)
+    await member.goto(`/publish/${draftId}`)
     await expect(member.getByTestId('draft-editor')).toContainText('Visible to the viewer.')
     await expect(draftEditor(member)).toHaveCount(0)
     expect(
@@ -137,7 +137,7 @@ test('a viewer promoted to creator can edit after client navigation', async ({
       ).status
     ).toBe(200)
     const navigationStart = await member.evaluate(() => performance.timeOrigin)
-    await member.locator(`a[href^="/write/${draftId}?"]`).click()
+    await member.locator(`a[href^="/publish/${draftId}?"]`).click()
     await expect(draftEditor(member)).toBeVisible()
     expect(await member.evaluate(() => performance.timeOrigin)).toBe(navigationStart)
     await endOfText(member, 'Visible to the viewer.')
@@ -233,7 +233,7 @@ test(
       await draftEditor(page).click()
       await page.keyboard.type('Written by the owner.')
 
-      await memberPage.goto(`/write/${draftId}`)
+      await memberPage.goto(`/publish/${draftId}`)
       await expect(draftEditor(memberPage)).toContainText('Written by the owner.', {
         timeout: 60_000,
       })
@@ -402,7 +402,7 @@ test(
       await draftEditor(page).click()
       await page.keyboard.type('Visible to the team.')
       await expectSaved(page)
-      await member.goto(`/write/${draftId}`)
+      await member.goto(`/publish/${draftId}`)
       await expect(draftEditor(member)).toContainText('Visible to the team.')
       await expect(page.getByTestId('presence')).toContainText(memberIdentity.name)
 
@@ -450,7 +450,7 @@ test(
       await expect.poll(storedText, { timeout: 20_000 }).toContain('Allowed owner update.')
       expect(await storedText()).not.toContain('Forbidden live edit.')
       const navigationStart = await member.evaluate(() => performance.timeOrigin)
-      await member.locator(`a[href^="/write/${draftId}?"]`).click()
+      await member.locator(`a[href^="/publish/${draftId}?"]`).click()
       await expect(member.getByTestId('draft-editor')).toContainText('Allowed owner update.')
       await expect(draftEditor(member)).toHaveCount(0)
       expect(await member.evaluate(() => performance.timeOrigin)).toBe(navigationStart)
@@ -460,7 +460,7 @@ test(
       await expect(member.getByTestId('draft-editor')).toContainText(
         'Still live after the access change.'
       )
-      await member.goto(`/write/${draftId}`)
+      await member.goto(`/publish/${draftId}`)
       const reader = member.getByTestId('draft-editor')
       await expect(reader).toBeVisible()
       await expect(reader).toContainText('Allowed owner update.')
@@ -533,7 +533,7 @@ test(
     })
     expect(created.status, JSON.stringify(created.body)).toBe(201)
     const { id } = z.object({ id: z.string() }).parse(created.body)
-    await page.goto(`/write/${id}`)
+    await page.goto(`/publish/${id}`)
     await expect(page.getByRole('region', { name: 'Saved draft' })).toContainText(
       'Stored before anyone opened it'
     )
@@ -542,5 +542,65 @@ test(
       timeout: 60_000,
     })
     await expect(page.getByRole('region', { name: 'Saved draft' })).toHaveCount(0)
+  }
+)
+
+test(
+  'a menu one editor opens stays its own: another editor neither shows it nor closes it',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace()
+    const draftId = await openNewDraft(page)
+    await page.keyboard.type('Shared draft.')
+    await expectSaved(page)
+    const other = await page.context().newPage()
+    try {
+      await other.goto(`/write/${draftId}`)
+      await expect(draftEditor(other)).toContainText('Shared draft.')
+      await page.bringToFront()
+      await page.keyboard.type(' /')
+      await expect(page.getByRole('listbox')).toBeVisible()
+      // The "/" reaches the other editor, but its menu and focus stay where they opened.
+      await expect(draftEditor(other)).toContainText('Shared draft. /')
+      await other.bringToFront()
+      await expect(other.getByRole('listbox')).toHaveCount(0)
+      expect(await other.evaluate(() => document.activeElement?.tagName)).not.toBe('INPUT')
+      await other.keyboard.press('Escape')
+      await page.bringToFront()
+      await expect(page.getByRole('listbox')).toBeVisible()
+      await page.keyboard.type('heading')
+      await expect(
+        page.getByRole('option').filter({ hasText: 'Large section heading.' })
+      ).toBeVisible()
+    } finally {
+      await other.close()
+    }
+  }
+)
+
+test(
+  'a menu left open in a closed editor is removed for everyone else',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace()
+    const draftId = await openNewDraft(page)
+    await page.keyboard.type('Shared draft.')
+    await expectSaved(page)
+    const other = await page.context().newPage()
+    await other.goto(`/write/${draftId}`)
+    await endOfText(other, 'Shared draft.')
+    await other.keyboard.type(' /')
+    await expect(other.getByRole('listbox')).toBeVisible()
+    // The menu is an inline node; the post's "14 / 280" counter is in the editor too.
+    const menu = draftEditor(page).locator('[data-slate-inline]')
+    await expect(menu).toHaveCount(1)
+    // eslint-disable-next-line no-restricted-syntax -- A menu whose owner is still here must outlast the 45 s orphan grace and its 5 s check.
+    await page.waitForTimeout(56_000)
+    await expect(menu).toHaveCount(1)
+    await expect(other.getByRole('listbox')).toBeVisible()
+    // The tab closes with its menu still open; no "/" is left in the draft.
+    await other.close()
+    await expect(menu).toHaveCount(0, { timeout: 90_000 })
+    await expect(draftEditor(page)).toContainText('Shared draft.')
   }
 )

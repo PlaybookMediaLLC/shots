@@ -6,7 +6,8 @@ import { cache } from 'react'
 import type { ListedWorkspace, Workspace } from 'screenshot-studio-backend-sdk'
 import { backendSDK } from '@/lib/backend/sdk'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
-import { getRequestId } from './access'
+import { getRequestId, type OrganizationAccess } from './access'
+import { normalizeOrganizationRole } from './permissions'
 import { auth } from './server'
 
 type SignedInSession = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>
@@ -32,7 +33,7 @@ function backendPageDeletion(active: ListedWorkspace) {
 }
 
 async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSession) {
-  const { active, count, workspace, features } = await backendSDK({
+  const { active, count, deniedPermissions, workspace, features, whitelabel } = await backendSDK({
     organizationId: '',
     principal: {
       display: session.user.email,
@@ -50,6 +51,8 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
       (process.env.PLATFORM_CAMPAIGN_WORKFLOW === 'enabled' ||
         features['campaign:workflow'] === true),
     creativeSetsEnabled: Boolean(workspace) && features['creative-sets:create'] === true,
+    // An older backend mid-deploy sends none, and has no groups to apply.
+    deniedPermissions: deniedPermissions ?? [],
     hasOrganization: count > 0,
     // The onboarding agent (docs/rfcs/032). The backend decides it, including
     // the PLATFORM_ONBOARDING_AGENT rollback; without it onboarding is manual.
@@ -60,6 +63,8 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
     organization: backendPageOrganization(active, workspace),
     role: active?.role ?? 'viewer',
     session,
+    // Set only while the plan grants it, so a lapsed plan shows Shots again.
+    whitelabel,
   }
 }
 
@@ -135,8 +140,28 @@ export async function requirePaidPageAccess(
     redirect(getLocalizedPath(locale, `/sign-in?callbackURL=${encodeURIComponent(returnTo)}`))
   }
   if (!access.hasOrganization) redirect(getLocalizedPath(locale, '/onboarding'))
-  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/workspace'))
+  if (!access.isWorkspaceOperational) redirect(getLocalizedPath(locale, '/settings'))
   if (!(feature === 'content:drafts' ? access.hasBasicScheduling : access.hasPaidPlan))
     redirect(upgradePath(locale, returnTo))
   return access
+}
+
+/** A page's reads as the signed-in session, scoped to its active workspace. */
+export function sessionTenant(
+  access: Awaited<ReturnType<typeof requirePaidPageAccess>>,
+  organizationId: string,
+  requestHeaders: Headers
+): OrganizationAccess {
+  return {
+    deniedPermissions: access.deniedPermissions,
+    organizationId,
+    principal: {
+      display: access.session.user.email,
+      kind: 'session',
+      sessionId: access.session.session.id,
+      userId: access.session.user.id,
+    },
+    requestId: getRequestId(requestHeaders),
+    role: normalizeOrganizationRole(access.role),
+  }
 }

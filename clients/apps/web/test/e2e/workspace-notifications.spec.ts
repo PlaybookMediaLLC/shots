@@ -11,6 +11,7 @@ import {
   requestJson,
   signUpViaApi,
   test,
+  openDisclosureFor,
 } from './framework'
 import { notificationPageSchema, notificationSettingsSchema } from '../../lib/notifications/schema'
 
@@ -73,7 +74,7 @@ test(
         .parse(await browserJson(page, '/api/auth/get-session'))
       await requestJson(page, '/api/auth/send-verification-email', {
         email: identity.email,
-        callbackURL: '/workspace/notifications',
+        callbackURL: '/settings/notifications',
       })
       await expect
         .poll(async () =>
@@ -130,7 +131,7 @@ test(
         ).status
       ).toBe(200)
 
-      await app.open('/workspace/notifications')
+      await app.open('/settings/notifications')
       await page.getByRole('button', { name: 'Delivery & Slack', exact: true }).click()
       await page.getByRole('button', { name: 'Connect Slack', exact: true }).click()
       await expect(page.getByRole('heading', { name: 'Local Slack fixture' })).toBeVisible()
@@ -141,7 +142,7 @@ test(
       expect((await sink()).channelPages).toContain('page-two')
       await page.getByRole('button', { name: /^Workspace rules/ }).click()
       const workspaceEmail = page.getByLabel('Source connected: workspace email', { exact: true })
-      await workspaceEmail.locator('xpath=ancestor::details').locator('summary').click()
+      await openDisclosureFor(workspaceEmail)
       await workspaceEmail.check()
       await page.getByLabel('Source connected: workspace slack', { exact: true }).check()
       await page.getByRole('button', { name: 'Save workspace policy' }).click()
@@ -224,7 +225,7 @@ test(
       expect(JSON.stringify(delivered.slack)).not.toContain('Activity source')
 
       const peer = await page.context().newPage()
-      await peer.goto('/workspace/notifications')
+      await peer.goto('/settings/notifications')
       await expect(
         peer.getByRole('button', { name: /^Notifications, \d+ unread$/ }).first()
       ).toBeVisible()
@@ -334,15 +335,15 @@ test(
         .first()
         .click()
       await row.getByRole('button', { name: 'Open activity' }).click()
-      await expect(page).toHaveURL(/\/workspace\/integrations$/)
-      await app.open('/workspace/notifications')
+      await expect(page).toHaveURL(/\/settings\/integrations$/)
+      await app.open('/settings/notifications')
       await peer.close()
 
       await page.getByRole('button', { name: 'My notifications', exact: true }).click()
       const personalEmail = page.getByLabel('Source connected: your email preference', {
         exact: true,
       })
-      await personalEmail.locator('xpath=ancestor::details').locator('summary').click()
+      await openDisclosureFor(personalEmail)
       await personalEmail.uncheck()
       await page.getByRole('button', { name: 'Save my preferences' }).click()
       await expect(page.getByText('Your preferences are saved.')).toBeVisible()

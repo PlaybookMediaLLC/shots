@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -298,6 +299,10 @@ func TestPlanAnalyzeDatabase(t *testing.T) {
 		}
 		if n, e := repo.client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID), scheduledpost.StatusEQ(scheduledpost.StatusSCHEDULED)).Count(ctx); e != nil || n != 0 {
 			t.Fatalf("live jobs=%d %v", n, e)
+		}
+		// Teammates told the post was scheduled are told it was cancelled.
+		if n, e := repo.client.AuditLog.Query().Where(auditlog.Action("post.cancelled"), auditlog.EntityID(result.Posts[0].ID)).Count(ctx); e != nil || n != 1 {
+			t.Fatalf("cancel records=%d %v", n, e)
 		}
 	})
 
@@ -897,5 +902,103 @@ func TestAnalyticsRetryClassification(t *testing.T) {
 		if availability != item.availability || retry.Sub(now) != item.delay || halt != item.halt {
 			t.Fatalf("status=%d got=%s %v %v", item.status, availability, retry, halt)
 		}
+	}
+}
+
+// A note's day is a date: it must read back the same in any process zone.
+func TestCalendarNotes(t *testing.T) {
+	tokyo, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := time.Local
+	time.Local = tokyo
+	t.Cleanup(func() { time.Local = local })
+
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo, w.owner
+	subscribe(t, ctx, repo, w.org, "pro")
+	w.addMember(t, "reader", "viewer")
+	reader := w.actor("reader")
+
+	note, err := repo.CreateCalendarNote(ctx, owner, CalendarNoteInput{Day: "2026-11-01", Title: "  Launch day  ", Color: "purple"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if note.Day != "2026-11-01" || note.Title != "Launch day" {
+		t.Fatalf("created %+v", note)
+	}
+	listed, err := repo.ListCalendarNotes(ctx, reader, "2026-11-01", "2026-11-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(listed) != 1 || listed[0].Day != "2026-11-01" {
+		t.Fatalf("a viewer reads the note on its day, got %+v", listed)
+	}
+	outside, err := repo.ListCalendarNotes(ctx, owner, "2026-10-31", "2026-10-31")
+	if err != nil || len(outside) != 0 {
+		t.Fatalf("outside the range: %+v, %v", outside, err)
+	}
+
+	for name, input := range map[string]CalendarNoteInput{
+		"blank":     {Day: "2026-11-01", Title: "   ", Color: "blue"},
+		"long":      {Day: "2026-11-01", Title: strings.Repeat("é", 121), Color: "blue"},
+		"color":     {Day: "2026-11-01", Title: "Launch", Color: "pink"},
+		"not a day": {Day: "2026-02-30", Title: "Launch", Color: "blue"},
+	} {
+		if _, err := repo.CreateCalendarNote(ctx, owner, input); !errors.Is(err, ErrInvalidInput) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if _, err := repo.ListCalendarNotes(ctx, owner, "2026-01-01", "2026-12-31"); !errors.Is(err, ErrInvalidInput) {
+		t.Errorf("a range over 100 days: %v", err)
+	}
+
+	if _, err := repo.CreateCalendarNote(ctx, reader, CalendarNoteInput{Day: "2026-11-01", Title: "No", Color: "blue"}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Errorf("a viewer creating: %v", err)
+	}
+	if _, err := repo.UpdateCalendarNote(ctx, reader, note.ID, CalendarNoteChanges{Title: "No", Color: "blue"}); !errors.Is(err, publishing.ErrForbidden) {
+		t.Errorf("a viewer editing: %v", err)
+	}
+	if err := repo.DeleteCalendarNote(ctx, reader, note.ID); !errors.Is(err, publishing.ErrForbidden) {
+		t.Errorf("a viewer deleting: %v", err)
+	}
+
+	other := newTestWorkspace(t)
+	subscribe(t, other.ctx, other.repo, other.org, "pro")
+	foreign, err := other.repo.ListCalendarNotes(other.ctx, other.owner, "2026-11-01", "2026-11-01")
+	if err != nil || len(foreign) != 0 {
+		t.Fatalf("another workspace reads: %+v, %v", foreign, err)
+	}
+	if _, err := other.repo.UpdateCalendarNote(other.ctx, other.owner, note.ID, CalendarNoteChanges{Title: "Mine", Color: "red"}); !errors.Is(err, publishing.ErrNotFound) {
+		t.Errorf("another workspace editing: %v", err)
+	}
+	if err := other.repo.DeleteCalendarNote(other.ctx, other.owner, note.ID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Errorf("another workspace deleting: %v", err)
+	}
+
+	updated, err := repo.UpdateCalendarNote(ctx, owner, note.ID, CalendarNoteChanges{Title: "Launch moved", Color: "red"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.Day != "2026-11-01" || updated.Title != "Launch moved" || updated.Color != "red" {
+		t.Fatalf("updated %+v", updated)
+	}
+	if err := repo.DeleteCalendarNote(ctx, owner, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.DeleteCalendarNote(ctx, owner, note.ID); !errors.Is(err, publishing.ErrNotFound) {
+		t.Errorf("deleting twice: %v", err)
+	}
+
+	var audits, withTitle int
+	if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action LIKE 'product.calendar_note_%'`, w.org).Scan(&audits); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.SQL.QueryRowContext(ctx, `SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND metadata::text LIKE '%Launch%'`, w.org).Scan(&withTitle); err != nil {
+		t.Fatal(err)
+	}
+	if audits != 3 || withTitle != 0 {
+		t.Fatalf("audits=%d carrying the title=%d", audits, withTitle)
 	}
 }

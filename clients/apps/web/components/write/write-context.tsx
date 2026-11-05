@@ -3,12 +3,21 @@
 import * as React from 'react'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import type { WriteData } from '@/app/[locale]/write/write-data'
-import { libraryDraft, libraryQuery } from '@/lib/write/library'
+import type { WriteData } from '@/app/[locale]/publish/write-data'
+import { libraryDraft, libraryQuery, libraryRange } from '@/lib/write/library'
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
 import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
+import type { Shortcut } from './shortcuts'
+
+/** An editor command as the palette lists it. */
+export type EditorCommandEntry = {
+  id: string
+  label: string
+  shortcut?: Pick<Shortcut, 'alt' | 'key' | 'mod' | 'shift'>
+  run: () => void
+}
 
 /**
  * Write's shared client state (RFC 025): the library the page loaded, and
@@ -21,6 +30,14 @@ export type WriteLibrary = WriteData
 
 /** A brand as the browser holds it. */
 export type WriteSet = WriteData['sets'][number]
+
+/** One action of the open draft, as the command palette lists it. */
+export type DraftCommand = {
+  label: string
+  run: () => void
+  /** The shortcut that runs it, as the composer shows it. */
+  shortcut?: string
+}
 
 /** A draft row in the library. */
 export type LibraryDraft = WriteData['library'][number]
@@ -44,8 +61,12 @@ type WriteContextValue = {
   beforeLeaveRef: React.MutableRefObject<(() => Promise<void>) | null>
   /** Opens the mounted composer's preview without navigation or an editor remount. */
   openPreviewRef: React.MutableRefObject<(() => void) | null>
+  /** The open draft's actions, as its composer offers them, for the command palette. */
+  draftCommandsRef: React.MutableRefObject<DraftCommand[]>
   /** Archives or restores the open draft through its composer, which keeps its version. */
   archiveRef: React.MutableRefObject<((status: 'draft' | 'archived') => Promise<void>) | null>
+  /** The open editor's commands (composer/commands.tsx), for the command palette. */
+  editorCommandsRef: React.MutableRefObject<(() => EditorCommandEntry[]) | null>
   saved: Record<string, DraftLine>
   /** The list for the chosen tab or search is still loading. */
   libraryPending: boolean
@@ -56,7 +77,7 @@ type DraftLine = { excerpt?: string; pinned?: boolean; title?: string; updatedAt
 
 const WriteContext = React.createContext<WriteContextValue | null>(null)
 
-const TABS = ['drafts', 'queue', 'posted', 'archived'] as const
+const TABS = ['all', 'drafts', 'queue', 'posted', 'archived'] as const
 
 /** The Write context; every Write component sits inside a provider. */
 export function useWrite(): WriteContextValue {
@@ -88,7 +109,9 @@ export function WriteProvider({
   const params = useSearchParams()
   const beforeLeaveRef = React.useRef<(() => Promise<void>) | null>(null)
   const openPreviewRef = React.useRef<(() => void) | null>(null)
+  const draftCommandsRef = React.useRef<DraftCommand[]>([])
   const archiveRef = React.useRef<((status: 'draft' | 'archived') => Promise<void>) | null>(null)
+  const editorCommandsRef = React.useRef<(() => EditorCommandEntry[]) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
@@ -147,7 +170,8 @@ export function WriteProvider({
     [pathname, query, router]
   )
   const showSaved = React.useCallback<WriteContextValue['showSaved']>(
-    ({ id, ...draft }) => setSaved((current) => ({ ...current, [id]: { ...current[id], ...draft } })),
+    ({ id, ...draft }) =>
+      setSaved((current) => ({ ...current, [id]: { ...current[id], ...draft } })),
     []
   )
   // A pin shows at once, until the server's list arrives; from then on, it is the server's.
@@ -171,8 +195,19 @@ export function WriteProvider({
   const tab = TABS.find((item) => item === params.get('tab')) ?? 'drafts'
   const view = tab === 'queue' ? 'drafts' : tab
   const loaded = view === (data.query.tab === 'queue' ? 'drafts' : data.query.tab)
-  const [results, setResults] = React.useState<{ key: string; items: LibraryDraft[] } | null>(null)
-  const searchQuery = new URLSearchParams({ limit: '100', search, view })
+  const [results, setResults] = React.useState<{
+    key: string
+    items: LibraryDraft[]
+    hasMore: boolean
+  } | null>(null)
+  const searchQuery = new URLSearchParams({ limit: '100', search })
+  // All leaves the view out, which leaves out only archived drafts.
+  if (view !== 'all') searchQuery.set('view', view)
+  if (data.query.account) searchQuery.set('connectionId', data.query.account)
+  for (const [key, at] of Object.entries(
+    libraryRange(data.query, data.activeSet?.timeZone ?? 'UTC')
+  ))
+    searchQuery.set(key, at)
   if (data.activeSet) searchQuery.set('socialSetId', data.activeSet.id)
   if (data.query.kind) searchQuery.set('kind', data.query.kind)
   if (data.query.sort) searchQuery.set('sort', data.query.sort)
@@ -187,9 +222,17 @@ export function WriteProvider({
     void fetch(`/api/v1/content-drafts?${searchKey}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error('Search failed. Try again.')
-        const page = (await response.json()) as { pinned: DraftWire[]; items: DraftWire[] }
+        const page = (await response.json()) as {
+          pinned: DraftWire[]
+          items: DraftWire[]
+          nextCursor: string | null
+        }
         if (!controller.signal.aborted)
-          setResults({ key: searchKey, items: [...page.pinned, ...page.items].map(libraryDraft) })
+          setResults({
+            key: searchKey,
+            items: [...page.pinned, ...page.items].map(libraryDraft),
+            hasMore: page.nextCursor !== null,
+          })
       })
       .catch(() => {
         if (controller.signal.aborted) return
@@ -199,16 +242,18 @@ export function WriteProvider({
             : 'This list could not load. Try again.'
         )
         // A tab with nothing loaded stops showing its loading rows.
-        if (!loaded) setResults({ key: searchKey, items: [] })
+        if (!loaded) setResults({ key: searchKey, items: [], hasMore: false })
       })
     return () => controller.abort()
     // A refreshed page (after an archive, restore or pin) reloads the fetched list too.
   }, [data, fetched, loaded, searchKey])
   const remote = fetched && results?.key === searchKey ? results.items : null
+  const remoteHasMore = fetched && results?.key === searchKey ? results.hasMore : null
   const libraryPending = !loaded && !remote
   const visibleData = React.useMemo(
     () => ({
       ...data,
+      hasMore: remoteHasMore ?? data.hasMore,
       query: { ...data.query, q: search || undefined, tab },
       library: (remote ?? (loaded ? data.library : [])).filter((draft) => {
         if (removed.includes(draft.id)) return false
@@ -218,13 +263,15 @@ export function WriteProvider({
           .includes(search.toLocaleLowerCase())
       }),
     }),
-    [data, loaded, removed, remote, saved, search, tab]
+    [data, loaded, remoteHasMore, removed, remote, saved, search, tab]
   )
   const value = React.useMemo(
     () => ({
       beforeLeaveRef,
+      draftCommandsRef,
       openPreviewRef,
       archiveRef,
+      editorCommandsRef,
       hideDraft,
       activeId,
       canEdit,
@@ -259,7 +306,7 @@ export function draftHref(id: string, setId?: string | null, panel?: string): st
   const query = new URLSearchParams()
   if (setId) query.set('set', setId)
   if (panel) query.set('panel', panel)
-  return `/write/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
+  return `/publish/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
 }
 
 /** "now", "5m", "3h", "2d", then a date: how long ago something happened. */

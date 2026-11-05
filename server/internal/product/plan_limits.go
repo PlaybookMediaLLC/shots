@@ -45,3 +45,19 @@ func (c *Configuration) RequireSeat(ctx context.Context, org string, invitations
 func (c *Configuration) RequireChannel(ctx context.Context, org, externalAccountID string) error {
 	return workspaceplan.RequireChannel(ctx, c.client, org, externalAccountID)
 }
+
+// ChannelCapacity is how many accounts a workspace holds and may hold.
+type ChannelCapacity struct {
+	Held int `json:"held"`
+	// Limit is nil when the plan has none.
+	Limit *int `json:"limit"`
+}
+
+// GetChannelCapacity reads the workspace's account capacity; its route authorizes the actor.
+func (c *Configuration) GetChannelCapacity(ctx context.Context, actor Actor) (*ChannelCapacity, error) {
+	held, limit, err := workspaceplan.ChannelUsage(ctx, c.client, actor.OrganizationID)
+	if err != nil {
+		return nil, err
+	}
+	return &ChannelCapacity{Held: held, Limit: limit}, nil
+}

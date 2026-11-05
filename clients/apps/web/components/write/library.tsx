@@ -1,5 +1,7 @@
 'use client'
 
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
+import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { BulkScheduleDialog } from './bulk-schedule'
 
 import { useWriteRouter } from '@/components/write/write-context'
@@ -23,6 +25,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { DateRangePicker } from '@/components/ui/date-range-picker'
+import { datePreset } from '@/lib/write/library'
+import { zonedDayKey } from '@/lib/settings/zoned-time'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -50,25 +55,50 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
+import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
 import { writeApi } from '@/lib/write/client'
+import { queueDays } from '@/lib/write/calendar'
+import { wallTime } from '@/lib/write/zoned-time'
+import { socialSetHref } from '@/components/workspace/settings-sections'
 import type { DraftKind } from '@/lib/write/document'
 import type { ContentDraftSort } from '@/lib/write/wire'
 import { cn } from '@/lib/utils'
 import { SetDot, SocialSetSwitcher } from './sets'
 import { TagChip, TagManager } from './tags'
-import { draftHref, type LibraryDraft, since, useWrite } from './write-context'
+import {
+  draftHref,
+  type LibraryDraft,
+  since,
+  useWrite,
+  type WriteLibrary,
+} from './write-context'
 import { useKeys } from './shortcuts'
 import { createWritingDraft } from './pending-draft'
 
 /** The library tabs, in order. */
 const TABS = [
+  { label: 'All', tab: 'all' },
   { label: 'Drafts', tab: 'drafts' },
   { label: 'Queue', tab: 'queue' },
   { label: 'Posted', tab: 'posted' },
   { label: 'Archived', tab: 'archived' },
 ] as const
+
+/** The date presets, by the label the picker shows. */
+const DATE_PRESETS = { Today: 'today', 'This week': 'week', 'This month': 'month' } as const
+
+/** Everything a filter can set, for the buttons that clear them all. */
+const NO_FILTERS = {
+  account: undefined,
+  from: undefined,
+  kind: undefined,
+  q: undefined,
+  tag: undefined,
+  to: undefined,
+}
 
 /** The orders the library sorts by. */
 const SORTS: { label: string; sort: ContentDraftSort }[] = [
@@ -103,6 +133,14 @@ export function WriteRail() {
   const [lastClicked, setLastClicked] = React.useState<string | null>(null)
   const [managingTags, setManagingTags] = React.useState(false)
   const tab = data.query.tab
+  const filtered = Boolean(
+    data.query.q ||
+    data.query.tag ||
+    data.query.kind ||
+    data.query.account ||
+    data.query.from ||
+    data.query.to
+  )
   const select = (id: string, range: boolean) => {
     setSelected((current) => {
       if (range && lastClicked) {
@@ -129,7 +167,7 @@ export function WriteRail() {
               {/* A durable batch of separate posts, reopened after a reload (RFC 042). */}
               <Link
                 data-tour-id="write-bulk"
-                href={`/write/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
+                href={`/publish/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
               >
                 Bulk schedule
               </Link>
@@ -142,12 +180,17 @@ export function WriteRail() {
         <div className="min-w-0 flex-1">
           <SocialSetSwitcher />
         </div>
-        <Link
-          className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
-          href={data.activeSet ? `/write/settings?set=${data.activeSet.id}` : '/write/settings'}
-        >
-          Settings
-        </Link>
+        {data.activeSet ? (
+          <Button
+            className="rounded-md px-2 py-1 text-ui text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => openBrandSettings('scheduling')}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            Settings
+          </Button>
+        ) : null}
       </div>
       {/* Underlined tabs: the current one is medium weight over a 2px line. */}
       <div
@@ -187,8 +230,14 @@ export function WriteRail() {
         </div>
       </div>
       {tab === 'queue' ? null : <LibraryFilters onManageTags={() => setManagingTags(true)} />}
+      <PostFilters />
       {/* The search box shows its own text: a chip for it pushed the list down on every keystroke. */}
-      {tab !== 'queue' && (data.query.kind || data.query.tag) ? (
+      {tab !== 'queue' &&
+      (data.query.kind ||
+        data.query.tag ||
+        data.query.account ||
+        data.query.from ||
+        data.query.to) ? (
         <div aria-label="Active filters" className="flex flex-wrap gap-1 px-3 pt-2">
           {(
             [
@@ -210,14 +259,11 @@ export function WriteRail() {
                 variant="outline"
                 onClick={() => setQuery({ [filter.key]: undefined })}
               >
-                {filter.label} ×
+                {filter.label}
+                <XIcon aria-hidden className="size-3.5" />
               </Button>
             ))}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setQuery({ q: undefined, tag: undefined, kind: undefined })}
-          >
+          <Button size="sm" variant="ghost" onClick={() => setQuery(NO_FILTERS)}>
             Clear filters
           </Button>
         </div>
@@ -239,20 +285,21 @@ export function WriteRail() {
           </div>
         ) : data.library.length === 0 ? (
           <div className="px-4 py-6 text-xs text-muted-foreground">
-            {data.query.q || data.query.tag || data.query.kind
+            {filtered
               ? 'No drafts match these filters.'
               : {
+                  all: 'Nothing in this publishing brand yet. Start a draft above.',
                   archived: 'Nothing archived.',
                   drafts: 'No drafts in this publishing brand. Start one above.',
                   posted: 'Nothing posted from this publishing brand yet.',
                   queue: '',
                 }[tab]}
-            {data.query.q || data.query.tag || data.query.kind ? (
+            {filtered ? (
               <Button
                 className="mt-2 block"
                 size="sm"
                 variant="outline"
-                onClick={() => setQuery({ q: undefined, tag: undefined, kind: undefined })}
+                onClick={() => setQuery(NO_FILTERS)}
               >
                 Clear filters
               </Button>
@@ -271,6 +318,11 @@ export function WriteRail() {
                 selecting={selected.length > 0}
               />
             ))}
+            {filtered && data.hasMore ? (
+              <li className="px-4 py-3 text-xs text-muted-foreground" role="status">
+                Showing the first 100. Narrow your filters to see the rest.
+              </li>
+            ) : null}
           </ul>
         )}
       </nav>
@@ -278,6 +330,69 @@ export function WriteRail() {
         <TagManager onClose={() => setManagingTags(false)} setId={data.activeSet.id} />
       ) : null}
     </aside>
+  )
+}
+
+/**
+ * Account and date, on every tab. A brand holds one active account per platform,
+ * so the account is the platform too.
+ */
+function PostFilters() {
+  const { data, setQuery } = useWrite()
+  const { account, from, to } = data.query
+  const accounts = data.activeSet?.accounts ?? []
+  const active = accounts.find((item) => item.id === account)
+  const today = zonedDayKey(new Date(), data.activeSet?.timeZone ?? 'UTC')
+  const triggerClass =
+    'h-7 min-w-0 rounded-md border border-border px-2 text-xs text-muted-foreground hover:text-foreground aria-pressed:border-sky-400/50 aria-pressed:text-sky-700 dark:aria-pressed:text-sky-200'
+  return (
+    <div className="flex items-center gap-1.5 px-3 pt-2">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label={`Account: ${active?.platform ?? 'All accounts'}`}
+            aria-pressed={Boolean(account)}
+            className={triggerClass}
+            size={null}
+            type="button"
+            variant="custom"
+          >
+            <span className="truncate">{active?.displayName ?? 'All accounts'}</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64">
+          <DropdownMenuRadioGroup
+            onValueChange={(value) => setQuery({ account: value || undefined })}
+            value={account ?? ''}
+          >
+            <DropdownMenuRadioItem value="">All accounts</DropdownMenuRadioItem>
+            {accounts.map((item) => (
+              <DropdownMenuRadioItem key={item.id} value={item.id}>
+                {item.displayName} · {item.platform}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DateRangePicker
+        aria-label="Dates"
+        className="h-7 min-w-0 flex-1 text-xs"
+        onChange={(range) => setQuery(range)}
+        onPreset={(label) =>
+          setQuery(
+            datePreset(DATE_PRESETS[label as keyof typeof DATE_PRESETS], today, data.weekStart)
+          )
+        }
+        preset={
+          Object.entries(DATE_PRESETS).find(([, preset]) => {
+            const days = datePreset(preset, today, data.weekStart)
+            return days.from === from && days.to === to
+          })?.[0]
+        }
+        presets={Object.keys(DATE_PRESETS)}
+        value={{ from: from ?? '', to: to ?? '' }}
+      />
+    </div>
   )
 }
 
@@ -382,7 +497,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
           type="button"
           variant="custom"
         >
-          ✕
+          <XIcon aria-hidden className="size-3.5" />
         </Button>
       ) : null}
     </div>
@@ -468,7 +583,6 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel>New post</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => void create('standard')}>
             Post or thread
           </DropdownMenuItem>
@@ -676,7 +790,8 @@ function DraftRow({
             {draft.kind !== 'standard' ? (
               <span className="mr-1 text-muted-foreground">{KIND_LABELS[draft.kind]} ·</span>
             ) : null}
-            {shown.title}
+            {/* The first line names the draft; a title shows only when someone gave one. */}
+            {shown.title && shown.title !== 'Untitled draft' ? shown.title : null}
           </span>
           <span className="flex shrink-0 items-center gap-1">
             {channels.map((channel) => (
@@ -706,17 +821,31 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
   // Times read in the set's scheduling zone, as the Plan calendar shows them.
   const timeZone = useWrite().data.activeSet?.timeZone
   const parts: React.ReactNode[] = []
-  if (draft.attentionPosts > 0) {
+  const attention = listedAttention(draft)
+  if (attention) {
     parts.push(
-      <span className="text-red-700 dark:text-red-300" key="attention">
-        {draft.attentionPosts} need{draft.attentionPosts === 1 ? 's' : ''} attention
+      <span
+        className={
+          attention.state === 'Failed'
+            ? 'text-red-700 dark:text-red-300'
+            : 'text-amber-700 dark:text-amber-300'
+        }
+        key="attention"
+      >
+        {stateLabel(attention.state, attention.count, attention.total)}
       </span>
     )
   }
-  if (draft.nextPostAt) {
+  // The editor's words, in its order: a post whose time passed before it
+  // started, then one publishing now, then the next one scheduled.
+  const overdue = draft.nextPostAt && postState('SCHEDULED', draft.nextPostAt) === 'Overdue'
+  if (draft.nextPostAt && (overdue || draft.publishingPosts === 0)) {
     parts.push(
-      <span className="text-sky-700 dark:text-sky-300" key="next">
-        Scheduled{' '}
+      <span
+        className={overdue ? 'text-amber-700 dark:text-amber-300' : 'text-sky-700 dark:text-sky-300'}
+        key="next"
+      >
+        {overdue ? 'Overdue' : 'Scheduled'}{' '}
         <LocalTime
           options={{
             day: 'numeric',
@@ -728,6 +857,12 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
           }}
           value={draft.nextPostAt}
         />
+      </span>
+    )
+  } else if (draft.publishingPosts > 0) {
+    parts.push(
+      <span className="text-sky-700 dark:text-sky-300" key="next">
+        Publishing
       </span>
     )
   } else if (draft.plannedFor) {
@@ -799,7 +934,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
             type="button"
             variant="custom"
           >
-            ⋯
+            <DotsThreeIcon aria-hidden className="size-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
@@ -1007,7 +1142,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
                         await beforeLeaveRef.current?.()
                         await draftsApi.remove(draft.id)
                         hideDraft(draft.id)
-                        if (activeId === draft.id) router.replace('/write')
+                        if (activeId === draft.id) router.replace('/publish')
                         else router.refresh()
                       },
                       'Draft deleted.',
@@ -1130,7 +1265,8 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
     else toast.success(`${label}: ${selected.length} drafts.`)
     setProgress(null)
     onDone()
-    if (removedActive) router.replace(data.activeSet ? `/write?set=${data.activeSet.id}` : '/write')
+    if (removedActive)
+      router.replace(data.activeSet ? `/publish?set=${data.activeSet.id}` : '/publish')
     else router.refresh()
   }
   const version = (id: string) => data.library.find((draft) => draft.id === id)
@@ -1195,7 +1331,7 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
         type="button"
         variant="ghost"
       >
-        ✕
+        <XIcon aria-hidden className="size-4" />
       </Button>
       <AlertDialog onOpenChange={setConfirm} open={confirm}>
         <AlertDialogContent>
@@ -1223,60 +1359,229 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
   )
 }
 
-/** The queue: scheduled posts and planned drafts, soonest first. Planned ones never publish by themselves. */
+/**
+ * The queue: the next seven days in the brand's zone, each with its queued
+ * posts, planned drafts and free weekly slots, then anything later. An empty
+ * slot is a prompt to write: "+ New" opens a draft set to that time. Planned
+ * drafts never publish by themselves.
+ */
 function QueueList() {
-  const { data } = useWrite()
-  if (data.queue.length === 0) {
-    return (
-      <p className="px-4 py-6 text-xs text-muted-foreground">
-        Nothing queued or planned for this publishing brand. Schedule a draft, add it to the queue,
-        or plan it.
-      </p>
+  const router = useWriteRouter()
+  const { beforeLeaveRef, canEdit, data, setQuery } = useWrite()
+  const set = data.activeSet
+  const zone = set?.timeZone ?? 'UTC'
+  const hydrated = useHydrated()
+  // A filter hides posts that fill slots, so a filtered queue lists its posts and no free slots.
+  const filtered = Boolean(data.query.account || data.query.from || data.query.to)
+  // Slots depend on the clock, so they are read after hydration, as LocalTime does.
+  const days = React.useMemo(
+    () => (hydrated ? queueDays(filtered ? [] : (set?.postingSlots ?? []), zone, data.queue) : []),
+    [data.queue, filtered, hydrated, set?.postingSlots, zone]
+  )
+  const shown = new Set(days.flatMap((day) => day.items.map((item) => item.id)))
+  // Overdue and unconfirmed posts from before today lead: they need a look first.
+  const first = days[0]?.day
+  const earlier = first
+    ? data.queue.filter((item) => !shown.has(item.id) && wallTime(new Date(item.at), zone) < first)
+    : []
+  const later = data.queue.filter((item) => !shown.has(item.id) && !earlier.includes(item))
+  const free = days.reduce((total, day) => total + day.free.length, 0)
+  const total = days.reduce((sum, day) => sum + day.slots, 0)
+  const newAt = (day: string, time: string) =>
+    void createWritingDraft(
+      { socialSetId: set?.id },
+      (id) => {
+        const href = draftHref(id, set?.id)
+        router.push(`${href}${href.includes('?') ? '&' : '?'}day=${day}&time=${time}`)
+      },
+      beforeLeaveRef.current ?? undefined
+    ).catch((error: unknown) =>
+      toast.error(error instanceof Error ? error.message : 'The draft could not be created.')
     )
-  }
+  const horizon = (
+    <p className="px-4 pt-3 text-xs text-muted-foreground">
+      Showing the next 60 days.{' '}
+      <Link
+        className="underline"
+        href={`/publish/calendar${set ? `?set=${encodeURIComponent(set.id)}` : ''}`}
+      >
+        See the calendar
+      </Link>{' '}
+      for later posts.
+    </p>
+  )
+  // The server and the first client render agree: the plain list, soonest first.
+  if (!hydrated)
+    return (
+      <ul data-testid="queue">
+        <li>{horizon}</li>
+        {data.queue.map((item) => (
+          <QueueItem item={item} key={item.id} />
+        ))}
+      </ul>
+    )
   return (
-    <ul>
-      {data.queue.map((item) => (
-        <li key={item.id}>
+    <div data-testid="queue">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-1 text-[11px] text-muted-foreground">
+        <span data-testid="queue-goal">
+          {filtered
+            ? 'Filtered, so free slots are hidden'
+            : total > 0
+              ? `${total - free} of ${total} slots filled this week`
+              : 'No weekly slots yet'}
+          {' · '}
+          {zone.replaceAll('_', ' ')}
+        </span>
+        {set ? (
           <Link
-            className={cn(
-              'm-2 block rounded-lg border px-3 py-2.5 hover:bg-foreground/[0.02]',
-              item.kind === 'planned' ? 'border-dashed border-violet-400/40' : 'border-border'
-            )}
-            data-testid={item.kind === 'planned' ? 'queue-planned' : 'queue-item'}
-            href={draftHref(item.draftId, data.activeSet?.id)}
+            className="underline underline-offset-2 hover:text-foreground"
+            href={socialSetHref(set.id, 'scheduling')}
           >
-            <p
-              className={cn(
-                'flex items-center gap-1.5 text-[11px]',
-                item.kind === 'planned'
-                  ? 'text-violet-700 dark:text-violet-300'
-                  : 'text-sky-700 dark:text-sky-300'
-              )}
-            >
-              <LocalTime
-                options={{
-                  day: 'numeric',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  month: 'short',
-                  timeZone: data.activeSet?.timeZone,
-                  timeZoneName: 'short',
-                  weekday: 'short',
-                }}
-                value={item.at}
-              />
-              · {item.kind === 'planned' ? 'planned, not scheduled' : item.platform}
-              {item.state && item.state !== 'Scheduled' ? (
-                <span className="text-amber-700 dark:text-amber-300">· {item.state}</span>
-              ) : null}
-            </p>
-            <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-foreground">
-              {item.caption}
-            </p>
+            Edit schedule
           </Link>
-        </li>
-      ))}
-    </ul>
+        ) : null}
+      </div>
+      {horizon}
+      {earlier.length > 0 ? (
+        <section aria-label="Needs a look">
+          <h3 className="px-4 pt-3 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+            Needs a look
+          </h3>
+          <ul>
+            {earlier.map((item) => (
+              <QueueItem item={item} key={item.id} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {days.map(({ day, free: open, items }) =>
+        items.length === 0 && open.length === 0 ? null : (
+          <section aria-label={day} key={day}>
+            <h3 className="px-4 pt-3 text-[11px] font-medium text-muted-foreground">
+              <LocalTime
+                options={{ day: 'numeric', month: 'short', timeZone: 'UTC', weekday: 'short' }}
+                value={`${day}T12:00:00Z`}
+              />
+            </h3>
+            <ul>
+              {[
+                ...items.map((item) => ({
+                  clock: wallTime(new Date(item.at), zone).slice(11, 16),
+                  item,
+                })),
+                ...open.map((clock) => ({ clock, item: null })),
+              ]
+                .sort((a, b) => a.clock.localeCompare(b.clock))
+                .map((row) =>
+                  row.item ? (
+                    <QueueItem item={row.item} key={row.item.id} />
+                  ) : (
+                    <li
+                      className="m-2 flex items-center justify-between gap-2 rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
+                      data-testid="queue-free-slot"
+                      key={`${day}-${row.clock}`}
+                    >
+                      <span>{clockLabel(row.clock)} · free</span>
+                      {canEdit ? (
+                        <Button
+                          className="h-6 px-2 text-[11px]"
+                          onClick={() => newAt(day, row.clock)}
+                          size={null}
+                          variant="ghost"
+                        >
+                          + New
+                        </Button>
+                      ) : null}
+                    </li>
+                  )
+                )}
+            </ul>
+          </section>
+        )
+      )}
+      {later.length > 0 ? (
+        <section aria-label="Later">
+          <h3 className="px-4 pt-3 text-[11px] font-medium text-muted-foreground">Later</h3>
+          <ul>
+            {later.map((item) => (
+              <QueueItem item={item} key={item.id} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {data.queue.length === 0 && free === 0 ? (
+        <div className="px-4 py-6 text-xs text-muted-foreground">
+          {filtered
+            ? 'Nothing in the queue matches these filters.'
+            : 'Nothing queued or planned for this publishing brand. Add weekly slots in Edit schedule, or schedule a draft.'}
+          {filtered ? (
+            <Button
+              className="mt-2 block"
+              size="sm"
+              variant="outline"
+              onClick={() => setQuery(NO_FILTERS)}
+            >
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** A wall-clock "HH:MM" as a person reads it, without a date or zone. */
+function clockLabel(time: string): string {
+  const [hour, minute] = time.split(':').map(Number)
+  return new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  })
+}
+
+/** One queued post or planned draft in the queue. */
+function QueueItem({ item }: { item: WriteLibrary['queue'][number] }) {
+  const { data } = useWrite()
+  return (
+    <li>
+      <Link
+        className={cn(
+          'm-2 block rounded-lg border px-3 py-2.5 hover:bg-foreground/[0.02]',
+          item.kind === 'planned' ? 'border-dashed border-violet-400/40' : 'border-border'
+        )}
+        data-testid={item.kind === 'planned' ? 'queue-planned' : 'queue-item'}
+        href={draftHref(item.draftId, data.activeSet?.id)}
+      >
+        <p
+          className={cn(
+            'flex items-center gap-1.5 text-[11px]',
+            item.kind === 'planned'
+              ? 'text-violet-700 dark:text-violet-300'
+              : 'text-sky-700 dark:text-sky-300'
+          )}
+        >
+          <LocalTime
+            options={{
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              month: 'short',
+              timeZone: data.activeSet?.timeZone,
+              timeZoneName: 'short',
+              weekday: 'short',
+            }}
+            value={item.at}
+          />
+          · {item.kind === 'planned' ? 'planned, not scheduled' : item.platform}
+          {item.state && item.state !== 'Scheduled' ? (
+            <span className="text-amber-700 dark:text-amber-300">· {item.state}</span>
+          ) : null}
+        </p>
+        <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-foreground">
+          {item.caption}
+        </p>
+      </Link>
+    </li>
   )
 }

@@ -94,7 +94,7 @@ func (c *Configuration) InviteMember(ctx context.Context, actor Actor, email, ro
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := workspaceAdministrator(ctx, tx, actor); err != nil {
+	if err := workspaceAdministrator(ctx, tx, actor, "member:invite"); err != nil {
 		return nil, err
 	}
 	locked := NewConfiguration(tx.Client())
@@ -160,7 +160,7 @@ func (c *Configuration) ResendInvitation(ctx context.Context, actor Actor, invit
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := workspaceAdministrator(ctx, tx, actor); err != nil {
+	if err := workspaceAdministrator(ctx, tx, actor, "member:invite"); err != nil {
 		return nil, err
 	}
 	if err := NewConfiguration(tx.Client()).invitationRateLimit(ctx, actor, "product.member_invitation_resent", invitationID, 3); err != nil {
@@ -201,7 +201,7 @@ func (c *Configuration) CancelInvitation(ctx context.Context, actor Actor, invit
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := workspaceAdministrator(ctx, tx, actor); err != nil {
+	if err := workspaceAdministrator(ctx, tx, actor, "invitation:revoke"); err != nil {
 		return nil, err
 	}
 	count, err := tx.Invitation.Update().Where(invitation.ID(invitationID), invitation.OrganizationID(actor.OrganizationID),

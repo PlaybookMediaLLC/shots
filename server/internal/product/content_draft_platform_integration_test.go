@@ -182,6 +182,40 @@ func TestContentDraftPlatform(t *testing.T) {
 		}
 	})
 
+	t.Run("the calendar leaves out a failure that a retry replaced", func(t *testing.T) {
+		draft := newDraft("Failed then retried")
+		result, err := schedule(draft, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		failed := result.Posts[0].ID
+		if err := db.Client.ScheduledPost.UpdateOneID(failed).SetStatus(scheduledpost.StatusFAILED).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		shown := func() bool {
+			calendar, err := repo.ListContentDraftPostsBetween(ctx, owner, at.Add(-time.Hour), at.Add(time.Hour), "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, post := range calendar {
+				if post.ID == failed {
+					return true
+				}
+			}
+			return false
+		}
+		if !shown() {
+			t.Fatal("a failure with no retry must show on the calendar")
+		}
+		// The retry goes out now, outside this range; the failure is history.
+		if _, err := repo.RetryContentDraftPost(ctx, owner, failed); err != nil {
+			t.Fatal(err)
+		}
+		if shown() {
+			t.Fatal("a failure that a retry replaced still shows on the calendar")
+		}
+	})
+
 	t.Run("concurrent calendar moves replace a queued post once", func(t *testing.T) {
 		draft := newDraft("Concurrent move")
 		result, err := schedule(draft, at)

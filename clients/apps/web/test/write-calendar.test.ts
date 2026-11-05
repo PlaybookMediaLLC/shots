@@ -5,6 +5,7 @@ import {
   calendarRange,
   shiftCalendar,
   calendarMoveTime,
+  queueDays,
   upcomingSlots,
 } from '@/lib/write/calendar'
 
@@ -105,4 +106,59 @@ test('the next weekly slots are read in the brand zone, in order, with taken one
     ]
   )
   assert.equal(slots.length, 8)
+})
+
+test('the next slots step by calendar day across a daylight-saving change', () => {
+  const daily = [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({ time: '09:00', weekday }))
+  const days = (now: string) =>
+    upcomingSlots(daily, 'America/New_York', [], new Date(now))
+      .slice(0, 3)
+      .map((slot) => slot.at.toISOString())
+  // 23:30 the evening before clocks go forward: Sunday 14 March is not skipped.
+  assert.deepEqual(days('2027-03-14T04:30:00Z'), [
+    '2027-03-14T13:00:00.000Z',
+    '2027-03-15T13:00:00.000Z',
+    '2027-03-16T13:00:00.000Z',
+  ])
+  // 00:30 the day before clocks go back: Sunday 1 November is listed once.
+  assert.deepEqual(days('2026-10-31T04:30:00Z'), [
+    '2026-10-31T13:00:00.000Z',
+    '2026-11-01T14:00:00.000Z',
+    '2026-11-02T14:00:00.000Z',
+  ])
+})
+
+test('the queue shows seven days with each free weekly slot and the items that hold one', () => {
+  // Wednesday 4 November 2026, 08:00 in New York; weekday slots at 09:00.
+  const now = new Date('2026-11-04T13:00:00Z')
+  const slots = [1, 2, 3, 4, 5].map((weekday) => ({ time: '09:00', weekday }))
+  const queued = [{ at: '2026-11-05T14:02:00Z', id: 'thursday' }]
+  const days = queueDays(slots, 'America/New_York', queued, now)
+  assert.equal(days.length, 7)
+  assert.deepEqual(
+    days.map((day) => day.day),
+    [
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+      '2026-11-08',
+      '2026-11-09',
+      '2026-11-10',
+    ]
+  )
+  assert.deepEqual(days[0].free, ['09:00'])
+  // A natural-time post two minutes past the slot still holds it.
+  assert.deepEqual(days[1].free, [])
+  assert.deepEqual(days[1].items, queued)
+  assert.equal(days[1].slots, 1)
+  assert.deepEqual(days[3].free, [])
+  assert.equal(days[3].slots, 0)
+  const filled = days.reduce((sum, day) => sum + day.slots - day.free.length, 0)
+  assert.equal(filled, 1)
+  // A slot already past today is neither free nor counted.
+  assert.equal(
+    queueDays(slots, 'America/New_York', [], new Date('2026-11-04T15:00:00Z'))[0].slots,
+    0
+  )
 })

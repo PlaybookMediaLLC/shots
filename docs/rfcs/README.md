@@ -31,6 +31,10 @@ for earlier designs, not instructions to rebuild superseded architecture.
 
 **Scoped authorization (2026-10-24):** The [Plan and Analyze implementation](../scheduling/typefully/plan-and-analyze/implementation.md) is an explicit exception to the social scheduling/analytics deferral. Its [acceptance matrix](../scheduling/typefully/plan-and-analyze/implementation-matrix.md) records the implemented scope and provider verification dependencies. Other deferred expansions remain deferred.
 
+**Scoped authorization (2026-11-04):** [Code Studio](../code-studio.md) turns code into images, carousels and videos and hands them to Publish. The owner authorized it as a product line beside release readiness; it reuses creative sets, the editor's export pipeline, share links and Publish rather than adding an engine. Its [source-code policy](../code-studio.md#source-code-policy) amends RFC 016's non-goal for explicit member imports only.
+
+**Scoped authorization (2026-11-04):** The [post management implementation](../scheduling/post-bridge/post-management/implementation.md) is a second explicit exception to the same deferral, limited to a month day cap and date notes, library filters and the account allowance. It adds no channels, no client connect links and no second post model. No paid-customer evidence is recorded for it, so its outcome metric decides whether it stays.
+
 ## Build order and exit gates
 
 Each milestone produces usable customer value. Begin assisted pilots now;

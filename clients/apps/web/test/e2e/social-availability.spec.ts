@@ -48,7 +48,7 @@ test('provider readiness fails closed, recovers, and rechecks before authorizati
     await createWorkspace(identity, page)
     await enableTwoFactor(page, identity.password)
     organizationId = await bindTestGoOrganization(page)
-    await app.open('/workspace/social-sets?availability=preserve')
+    await app.open('/settings/publishing-brands?availability=preserve')
     const originalURL = page.url()
     const launch = page.getByRole('button', {
       name: 'Add publishing brand to your personal workspace',

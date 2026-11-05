@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useTRPCClient } from '@/lib/trpc/react'
@@ -131,13 +131,13 @@ export function ImportProject({
         </DialogDescription>
         <Label className="grid gap-2 text-sm">
           Import a design JSON file
-          <Input
-            type="file"
-            accept=".json,application/json"
+          <FileDropZone
+            accept={{ 'application/json': ['.json'] }}
             disabled={busy}
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              event.target.value = ''
+            hint="A design JSON file exported from Shots."
+            label="Design JSON file"
+            onFiles={(files) => {
+              const file = files[0]
               if (file) void copyFile(file)
             }}
           />

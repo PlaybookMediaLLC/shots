@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { ApprovalSetting } from '@/components/drafts/ApprovalSetting'
 import { AccountSettings } from '@/components/settings/AccountSettings'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { DeveloperTools } from '@/components/settings/DeveloperTools'
@@ -21,12 +22,14 @@ import { WorkspaceIntegrations } from './WorkspaceIntegrations'
 import { WorkspaceNotifications } from './WorkspaceNotifications'
 import { WorkspaceMembersSettings } from './WorkspaceMembersSettings'
 import { WorkspaceIdealCustomerProfile } from './WorkspaceIdealCustomerProfile'
+import { WorkspacePermissionGroupsSettings } from './WorkspacePermissionGroupsSettings'
 import { WorkspaceProductProfile } from './WorkspaceProductProfile'
 import { WorkspaceProductSurfaces } from './WorkspaceProductSurfaces'
 import { WorkspaceRolesSettings } from './WorkspaceRolesSettings'
 import { WorkspaceSecuritySettings } from './WorkspaceSecuritySettings'
 import { WorkspaceSharedLinks } from './WorkspaceSharedLinks'
-import { hasPermission, type Permission } from '@/lib/auth/permissions'
+import { WorkspaceWhitelabelSettings } from './WorkspaceWhitelabelSettings'
+import { accessAllows, type Permission } from '@/lib/auth/permissions'
 import type { WorkspaceSettingsProps } from './WorkspaceSettings'
 import type { SettingId } from './settings-sections'
 
@@ -77,7 +80,7 @@ const SETTINGS_CONTENT = {
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
-  'social-sets': ({ can, socialSet }) =>
+  'social-sets': ({ can, draftsEnabled, socialSet }) =>
     socialSet ? (
       <SocialSetSettings
         id={socialSet.id}
@@ -90,7 +93,10 @@ const SETTINGS_CONTENT = {
         }}
       />
     ) : (
-      <SocialSetList canManage={can('workspace:update')} />
+      <>
+        <SocialSetList canManage={can('workspace:update')} />
+        {draftsEnabled ? <ApprovalSetting canManage={can('publish:manage')} /> : null}
+      </>
     ),
   channels: ({ can }) => <ChannelConnections canManage={can('connection:manage')} />,
   integrations: ({ can }) => (
@@ -106,6 +112,18 @@ const SETTINGS_CONTENT = {
     <WorkspaceIdentitySettings
       canManage={can('workspace:update')}
       isOwner={role === 'owner'}
+      organizationId={organization.id}
+    />
+  ),
+  'permission-groups': ({ can, organization }) => (
+    <WorkspacePermissionGroupsSettings
+      canManage={can('member:update_role')}
+      organizationId={organization.id}
+    />
+  ),
+  whitelabel: ({ can, organization }) => (
+    <WorkspaceWhitelabelSettings
+      canManage={can('brand:manage')}
       organizationId={organization.id}
     />
   ),
@@ -130,6 +148,6 @@ const SETTINGS_CONTENT = {
 export function WorkspaceSettingContent({ section, ...props }: WorkspaceSettingsProps) {
   return SETTINGS_CONTENT[section]({
     ...props,
-    can: (permission) => hasPermission(props.role, permission),
+    can: (permission) => accessAllows(props, permission),
   })
 }

@@ -84,6 +84,7 @@ export function PropertiesPanel({
   draft,
   plainText,
   publications,
+  status,
   title,
   onTitle,
 }: {
@@ -93,6 +94,8 @@ export function PropertiesPanel({
   draft: DraftWire
   plainText: string
   publications: { channel: Publication['serialized']['channel']; publication: Publication }[]
+  /** The status the header shows, derived from the draft's posts. */
+  status: string
   title: string
   onTitle: (title: string) => void
 }) {
@@ -160,7 +163,7 @@ export function PropertiesPanel({
           onChange={(event) => onTitle(event.target.value)}
           value={title}
         />
-        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span className="flex items-center justify-between text-label text-muted-foreground">
           Only you and your team see it; it is never posted.
           {aiEnabled && canEdit ? (
             <Button
@@ -280,10 +283,10 @@ export function PropertiesPanel({
         })}
         <dt className="text-muted-foreground">Draft id</dt>
         <dd className="flex items-center gap-1">
-          <code className="truncate text-[11px] text-foreground">{draft.id}</code>
+          <code className="truncate text-label text-foreground">{draft.id}</code>
           <Button
             aria-label="Copy the draft id"
-            className="text-[11px] text-sky-700 dark:text-sky-300"
+            className="text-label text-sky-700 dark:text-sky-300"
             onClick={() => {
               void navigator.clipboard.writeText(draft.id)
               toast.success('Draft id copied.')
@@ -304,15 +307,7 @@ export function PropertiesPanel({
           <LocalTime value={draft.updatedAt} />
         </dd>
         <dt className="text-muted-foreground">Status</dt>
-        <dd>
-          {draft.status === 'archived'
-            ? 'Archived'
-            : draft.plannedFor
-              ? 'Planned, not scheduled'
-              : draft.status === 'scheduled'
-                ? 'Scheduled'
-                : 'Draft'}
-        </dd>
+        <dd data-testid="properties-status">{status}</dd>
       </dl>
       <section>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -326,7 +321,7 @@ export function PropertiesPanel({
                 {ACTIONS[item.action] ?? item.action.replace(/^product\./, '').replaceAll('_', ' ')}
                 {detail(item) ? <span className="text-muted-foreground"> · {detail(item)}</span> : null}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-label text-muted-foreground">
                 {item.actorName ?? (item.actorType === 'SERVICE' ? 'Publishing' : 'Someone')} ·{' '}
                 <LocalTime value={item.at} />
               </p>

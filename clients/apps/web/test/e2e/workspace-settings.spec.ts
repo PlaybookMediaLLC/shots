@@ -17,8 +17,8 @@ test(
 
     await openWorkspaceSetting(page, 'Account')
     await page.getByLabel('Name').fill('Updated E2E User')
-    await page.getByRole('button', { name: 'Save profile' }).click()
-    await expect(page.getByText('Profile updated.')).toBeVisible()
+    await page.getByLabel('Name').press('Enter')
+    await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
 
     await openWorkspaceSetting(page, 'Brand voice & visual kits')
     await page.getByLabel('Visual brand kit name').fill('Launch system')

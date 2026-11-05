@@ -107,6 +107,7 @@ import type {
   Engagement,
   ExperimentState,
   PublicProfile,
+  SocialAccountHealth,
   SocialSet,
   SocialSetInput,
   SocialSetList,
@@ -254,6 +255,14 @@ export type ChannelConnection = {
   avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
+  /** The publishing brand it belongs to; null when it is in none. */
+  socialSetId?: string | null
+  /** Its verified state, when the product configuration could read it. */
+  health?: SocialAccountHealth
+  /** Drafts and scheduled posts that removing it would cancel. */
+  queuedPosts?: number
+  /** When the row last changed, such as a refresh of its profile. */
+  updatedAt?: string
 }
 
 export type BrandKit = {
@@ -619,7 +628,11 @@ export type BackendCurrentUser = {
   name: string | null
 }
 
-export type BackendActiveAccess = { organizationId: string; role: string }
+export type BackendActiveAccess = {
+  deniedPermissions?: string[]
+  organizationId: string
+  role: string
+}
 
 export type BackendSupportGrant = { grantId: string; organizationId: string }
 
@@ -938,8 +951,12 @@ export type BackendContentDraft = {
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */
   attentionPosts: number
+  /** The attention posts whose outcome is unknown (lists only). */
+  checkPosts: number
+  /** The queued posts that are publishing now (lists only). */
+  publishingPosts: number
   kind: BackendDraftKind
-  /** When the next queued post goes out (lists only). */
+  /** When the next scheduled post goes out (lists only). */
   nextPostAt: string | null
   pinnedAt: string | null
   planTimeZone: string | null
@@ -1368,7 +1385,11 @@ export type BackendBatchValidation = {
 }
 
 export type BackendContentDraftListQuery = {
+  /** A draft with a live post to this account, or, with none, meant for it. */
+  connectionId?: string
   cursor?: string
+  /** From this instant, with `to` exclusive, on a live post's or a plan's time. */
+  from?: string
   kind?: BackendDraftKind
   limit?: number
   search?: string
@@ -1376,6 +1397,7 @@ export type BackendContentDraftListQuery = {
   sort?: 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc'
   status?: BackendContentDraftStatus
   tagId?: string
+  to?: string
   view?: 'drafts' | 'posted' | 'archived'
 }
 
@@ -1418,8 +1440,23 @@ export type BackendProjectListQuery = {
   sort?: 'updated' | 'name'
 }
 
-/** What a creativeSet row holds: a Story Set, or a canvas workspace of artboards. Fixed at creation. */
-export type BackendCreativeSetKind = 'story-set' | 'canvas'
+/** What a creativeSet row holds: a Story Set, a canvas workspace of artboards, a store screenshot project or a Code Studio project. Fixed at creation. */
+export type BackendCreativeSetKind = 'story-set' | 'canvas' | 'store' | 'code'
+
+/** One file of a code import: whole code, or a unified patch of a change. */
+export type BackendCodeImportFile = { name: string; code?: string; patch?: string; status?: string }
+
+/** What a GitHub link holds, for Code Studio (docs/code-studio.md). */
+export type BackendCodeImport = {
+  kind: 'github-file' | 'github-pull' | 'github-commit' | 'gist'
+  url: string
+  repo?: string
+  ref?: string
+  path?: string
+  title?: string
+  startLine?: number
+  files: BackendCodeImportFile[]
+}
 
 /** A cloud creativeSet: an editor composition with revision-checked writes. */
 export type BackendCreativeSet = {
@@ -1429,7 +1466,7 @@ export type BackendCreativeSet = {
   document: Record<string, unknown>
   documentVersion: number
   id: string
-  /** A canvas document names itself (`kind: 'canvas'`); every other document is a Story Set. */
+  /** A canvas, store or code document names itself (`kind: 'canvas'`, `'store'` or `'code'`); every other document is a Story Set. */
   kind: BackendCreativeSetKind
   name: string
   organizationId: string
@@ -1501,6 +1538,8 @@ export type BackendPublicShareLink = {
   posterMediaType: string | null
   title: string
   width: number | null
+  /** A frozen Code Studio document, for a live code embed. */
+  code?: Record<string, unknown> | null
 }
 
 /** A provider an integration connects. */
@@ -1636,6 +1675,31 @@ export type BackendAuditDrainInput = {
 }
 
 export type BackendAuditRetention = { legalHold: boolean; retentionDays: number }
+
+/** A permission group: permissions subtracted from its members' roles. */
+export type BackendPermissionGroup = {
+  createdAt: string
+  deniedPermissions: string[]
+  id: string
+  isDefault: boolean
+  memberIds: string[]
+  name: string
+  updatedAt: string
+}
+
+export type BackendPermissionGroupInput = Pick<
+  BackendPermissionGroup,
+  'deniedPermissions' | 'isDefault' | 'name'
+>
+
+/** An organization's app branding. An empty field keeps the Shots default. */
+export type BackendWhitelabelSettings = {
+  accentColor?: string
+  brandName?: string
+  faviconUrl?: string
+  logoUrl?: string
+  primaryColor?: string
+}
 
 /** Caller fingerprint recorded with an audit-control change. */
 export type BackendAuditRequest = { ipHash?: string | null; userAgentSummary?: string | null }
@@ -2237,6 +2301,21 @@ export class ScreenshotStudioBackendSDK {
 
   async listConnections() {
     return this.request<{ items: ChannelConnection[] }>('v1/channel-connections')
+  }
+
+  /** Removes an account from the workspace, in a publishing brand or in none; its queued posts are cancelled. */
+  async removeConnection(id: string) {
+    return this.request<SocialSetRemoval>(`v1/channel-connections/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
+  /** Reads an account's name, handle and picture from its platform again, with its current health. */
+  async refreshConnection(id: string) {
+    return this.request<ChannelConnection>(
+      `v1/channel-connections/${encodeURIComponent(id)}/refresh`,
+      { method: 'POST' }
+    )
   }
 
   async createConnection(input: {
@@ -3068,6 +3147,29 @@ export class ScreenshotStudioBackendSDK {
   async mutateCalendar(input: unknown) {
     return this.request<unknown>('v1/calendar/mutations', { body: input, method: 'POST' })
   }
+  /** How many accounts the workspace holds and may hold; a null limit means none. */
+  async socialConnectionCapacity() {
+    return this.request<{ held: number; limit: number | null }>('v1/social-connection-capacity')
+  }
+  /** A workspace's date-only notes on the days from..to, inclusive. */
+  async listCalendarNotes(from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    return this.request<unknown>(`v1/calendar/notes?${params}`)
+  }
+  async createCalendarNote(input: unknown) {
+    return this.request<unknown>('v1/calendar/notes', { body: input, method: 'POST' })
+  }
+  async updateCalendarNote(id: string, input: unknown) {
+    return this.request<unknown>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PATCH',
+    })
+  }
+  async deleteCalendarNote(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
   async getAnalytics(id: string, query: Record<string, string | number | undefined>) {
     const params = new URLSearchParams(
       Object.entries(query)
@@ -3745,6 +3847,13 @@ export class ScreenshotStudioBackendSDK {
     })
   }
 
+  /** Permanently remove a workspace's store screenshot project and its versions; browser copies stay. */
+  async deleteStoreProject(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/store-projects/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
+  }
+
   async archiveCreativeSet(id: string, archived = true) {
     return this.request<{ archived: boolean }>(
       `v1/creative-sets/${encodeURIComponent(id)}/archive?archived=${archived}`,
@@ -3802,6 +3911,11 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** Read the code a GitHub file, pull request, commit or gist link points to; nothing is stored. */
+  async importCode(url: string) {
+    return this.request<BackendCodeImport>('v1/code-imports', { body: { url }, method: 'POST' })
+  }
+
   async listShareLinks() {
     return this.request<{ shareLinks: BackendShareLink[] }>('v1/share-links')
   }
@@ -3819,6 +3933,8 @@ export class ScreenshotStudioBackendSDK {
     posterAssetId?: string | null
     projectId?: string | null
     title: string
+    /** A Code Studio document to embed as text; frozen when the link is made. */
+    code?: Record<string, unknown>
   }) {
     return this.request<BackendShareLink>('v1/share-links', { body: input, method: 'POST' })
   }
@@ -4270,6 +4386,56 @@ export class ScreenshotStudioBackendSDK {
 
   async updateAuditRetention(input: BackendAuditRetention, audit?: BackendAuditRequest) {
     return this.request<BackendAuditRetention>('v1/audit-retention', {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'PUT',
+    })
+  }
+
+  async listPermissionGroups() {
+    return this.request<{ groups: BackendPermissionGroup[] }>('v1/permission-groups')
+  }
+
+  async createPermissionGroup(input: BackendPermissionGroupInput, audit?: BackendAuditRequest) {
+    return this.request<BackendPermissionGroup>('v1/permission-groups', {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'POST',
+    })
+  }
+
+  async updatePermissionGroup(
+    id: string,
+    input: BackendPermissionGroupInput,
+    audit?: BackendAuditRequest
+  ) {
+    return this.request<BackendPermissionGroup>(`v1/permission-groups/${encodeURIComponent(id)}`, {
+      body: input,
+      headers: auditRequestHeaders(audit),
+      method: 'PUT',
+    })
+  }
+
+  async deletePermissionGroup(id: string, audit?: BackendAuditRequest) {
+    return this.request<{ deleted: boolean }>(`v1/permission-groups/${encodeURIComponent(id)}`, {
+      headers: auditRequestHeaders(audit),
+      method: 'DELETE',
+    })
+  }
+
+  async setPermissionGroupMembers(id: string, memberIds: string[], audit?: BackendAuditRequest) {
+    return this.request<BackendPermissionGroup>(
+      `v1/permission-groups/${encodeURIComponent(id)}/members`,
+      { body: { memberIds }, headers: auditRequestHeaders(audit), method: 'PUT' }
+    )
+  }
+
+  async getWhitelabel() {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel')
+  }
+
+  async updateWhitelabel(input: BackendWhitelabelSettings, audit?: BackendAuditRequest) {
+    return this.request<BackendWhitelabelSettings>('v1/whitelabel', {
       body: input,
       headers: auditRequestHeaders(audit),
       method: 'PUT',
@@ -4891,8 +5057,10 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{
       active: ListedWorkspace | null
       count: number
+      deniedPermissions?: string[]
       workspace: Workspace | null
       features: Record<string, boolean>
+      whitelabel: BackendWhitelabelSettings | null
     }>('v1/page-access')
   }
 

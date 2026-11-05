@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarnote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
@@ -68,6 +69,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organizationenterprisesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
@@ -345,6 +347,18 @@ func init() {
 	calendarmutationDescCreatedAt := calendarmutationFields[5].Descriptor()
 	// calendarmutation.DefaultCreatedAt holds the default value on creation for the created_at field.
 	calendarmutation.DefaultCreatedAt = calendarmutationDescCreatedAt.Default.(func() time.Time)
+	calendarnoteFields := schema.CalendarNote{}.Fields()
+	_ = calendarnoteFields
+	// calendarnoteDescCreatedAt is the schema descriptor for created_at field.
+	calendarnoteDescCreatedAt := calendarnoteFields[6].Descriptor()
+	// calendarnote.DefaultCreatedAt holds the default value on creation for the created_at field.
+	calendarnote.DefaultCreatedAt = calendarnoteDescCreatedAt.Default.(func() time.Time)
+	// calendarnoteDescUpdatedAt is the schema descriptor for updated_at field.
+	calendarnoteDescUpdatedAt := calendarnoteFields[7].Descriptor()
+	// calendarnote.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	calendarnote.DefaultUpdatedAt = calendarnoteDescUpdatedAt.Default.(func() time.Time)
+	// calendarnote.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	calendarnote.UpdateDefaultUpdatedAt = calendarnoteDescUpdatedAt.UpdateDefault.(func() time.Time)
 	campaignFields := schema.Campaign{}.Fields()
 	_ = campaignFields
 	// campaignDescCreatedAt is the schema descriptor for created_at field.
@@ -1054,7 +1068,7 @@ func init() {
 	// organizationenterprisesettings.DefaultScimEnabled holds the default value on creation for the scim_enabled field.
 	organizationenterprisesettings.DefaultScimEnabled = organizationenterprisesettingsDescScimEnabled.Default.(bool)
 	// organizationenterprisesettingsDescUpdatedAt is the schema descriptor for updated_at field.
-	organizationenterprisesettingsDescUpdatedAt := organizationenterprisesettingsFields[3].Descriptor()
+	organizationenterprisesettingsDescUpdatedAt := organizationenterprisesettingsFields[4].Descriptor()
 	// organizationenterprisesettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	organizationenterprisesettings.DefaultUpdatedAt = organizationenterprisesettingsDescUpdatedAt.Default.(func() time.Time)
 	// organizationenterprisesettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1105,6 +1119,22 @@ func init() {
 	pageknowledge.DefaultUpdatedAt = pageknowledgeDescUpdatedAt.Default.(func() time.Time)
 	// pageknowledge.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	pageknowledge.UpdateDefaultUpdatedAt = pageknowledgeDescUpdatedAt.UpdateDefault.(func() time.Time)
+	permissiongroupFields := schema.PermissionGroup{}.Fields()
+	_ = permissiongroupFields
+	// permissiongroupDescIsDefault is the schema descriptor for is_default field.
+	permissiongroupDescIsDefault := permissiongroupFields[4].Descriptor()
+	// permissiongroup.DefaultIsDefault holds the default value on creation for the is_default field.
+	permissiongroup.DefaultIsDefault = permissiongroupDescIsDefault.Default.(bool)
+	// permissiongroupDescCreatedAt is the schema descriptor for created_at field.
+	permissiongroupDescCreatedAt := permissiongroupFields[5].Descriptor()
+	// permissiongroup.DefaultCreatedAt holds the default value on creation for the created_at field.
+	permissiongroup.DefaultCreatedAt = permissiongroupDescCreatedAt.Default.(func() time.Time)
+	// permissiongroupDescUpdatedAt is the schema descriptor for updated_at field.
+	permissiongroupDescUpdatedAt := permissiongroupFields[6].Descriptor()
+	// permissiongroup.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	permissiongroup.DefaultUpdatedAt = permissiongroupDescUpdatedAt.Default.(func() time.Time)
+	// permissiongroup.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	permissiongroup.UpdateDefaultUpdatedAt = permissiongroupDescUpdatedAt.UpdateDefault.(func() time.Time)
 	platformautodmcampaignFields := schema.PlatformAutoDMCampaign{}.Fields()
 	_ = platformautodmcampaignFields
 	// platformautodmcampaignDescDisabled is the schema descriptor for disabled field.
@@ -1686,11 +1716,11 @@ func init() {
 	sharelinkFields := schema.ShareLink{}.Fields()
 	_ = sharelinkFields
 	// sharelinkDescCreatedAt is the schema descriptor for created_at field.
-	sharelinkDescCreatedAt := sharelinkFields[13].Descriptor()
+	sharelinkDescCreatedAt := sharelinkFields[14].Descriptor()
 	// sharelink.DefaultCreatedAt holds the default value on creation for the created_at field.
 	sharelink.DefaultCreatedAt = sharelinkDescCreatedAt.Default.(func() time.Time)
 	// sharelinkDescUpdatedAt is the schema descriptor for updated_at field.
-	sharelinkDescUpdatedAt := sharelinkFields[14].Descriptor()
+	sharelinkDescUpdatedAt := sharelinkFields[15].Descriptor()
 	// sharelink.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	sharelink.DefaultUpdatedAt = sharelinkDescUpdatedAt.Default.(func() time.Time)
 	// sharelink.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1898,31 +1928,31 @@ func init() {
 	// userpreference.DefaultAccentColor holds the default value on creation for the accent_color field.
 	userpreference.DefaultAccentColor = userpreferenceDescAccentColor.Default.(string)
 	// userpreferenceDescShowScrollbars is the schema descriptor for show_scrollbars field.
-	userpreferenceDescShowScrollbars := userpreferenceFields[7].Descriptor()
+	userpreferenceDescShowScrollbars := userpreferenceFields[8].Descriptor()
 	// userpreference.DefaultShowScrollbars holds the default value on creation for the show_scrollbars field.
 	userpreference.DefaultShowScrollbars = userpreferenceDescShowScrollbars.Default.(bool)
 	// userpreferenceDescDeveloperMode is the schema descriptor for developer_mode field.
-	userpreferenceDescDeveloperMode := userpreferenceFields[8].Descriptor()
+	userpreferenceDescDeveloperMode := userpreferenceFields[9].Descriptor()
 	// userpreference.DefaultDeveloperMode holds the default value on creation for the developer_mode field.
 	userpreference.DefaultDeveloperMode = userpreferenceDescDeveloperMode.Default.(bool)
 	// userpreferenceDescEmailNotifications is the schema descriptor for email_notifications field.
-	userpreferenceDescEmailNotifications := userpreferenceFields[9].Descriptor()
+	userpreferenceDescEmailNotifications := userpreferenceFields[10].Descriptor()
 	// userpreference.DefaultEmailNotifications holds the default value on creation for the email_notifications field.
 	userpreference.DefaultEmailNotifications = userpreferenceDescEmailNotifications.Default.(bool)
 	// userpreferenceDescDismissedTips is the schema descriptor for dismissed_tips field.
-	userpreferenceDescDismissedTips := userpreferenceFields[10].Descriptor()
+	userpreferenceDescDismissedTips := userpreferenceFields[11].Descriptor()
 	// userpreference.DefaultDismissedTips holds the default value on creation for the dismissed_tips field.
 	userpreference.DefaultDismissedTips = userpreferenceDescDismissedTips.Default.([]string)
 	// userpreferenceDescExperiments is the schema descriptor for experiments field.
-	userpreferenceDescExperiments := userpreferenceFields[11].Descriptor()
+	userpreferenceDescExperiments := userpreferenceFields[12].Descriptor()
 	// userpreference.DefaultExperiments holds the default value on creation for the experiments field.
 	userpreference.DefaultExperiments = userpreferenceDescExperiments.Default.(map[string]bool)
 	// userpreferenceDescVersion is the schema descriptor for version field.
-	userpreferenceDescVersion := userpreferenceFields[12].Descriptor()
+	userpreferenceDescVersion := userpreferenceFields[13].Descriptor()
 	// userpreference.DefaultVersion holds the default value on creation for the version field.
 	userpreference.DefaultVersion = userpreferenceDescVersion.Default.(int)
 	// userpreferenceDescUpdatedAt is the schema descriptor for updated_at field.
-	userpreferenceDescUpdatedAt := userpreferenceFields[13].Descriptor()
+	userpreferenceDescUpdatedAt := userpreferenceFields[14].Descriptor()
 	// userpreference.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	userpreference.DefaultUpdatedAt = userpreferenceDescUpdatedAt.Default.(func() time.Time)
 	// userpreference.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
