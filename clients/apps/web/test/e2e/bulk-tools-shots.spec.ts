@@ -14,12 +14,16 @@ const WIDTHS = [
 const screenshots: Record<string, string> = {}
 
 async function shoot(page: Page, name: string) {
+  // A toast stays while the mouse rests on it, and on a phone it covers the theme switch.
+  await page.mouse.move(0, 0)
+  await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 20_000 })
   for (const [width, height] of WIDTHS) {
     await page.setViewportSize({ height, width })
     for (const theme of ['light', 'dark']) {
       // The app's own switch; toggling the class by hand leaves some of its styles behind.
       const switcher = page.getByRole('button', { name: `Switch to ${theme} mode` }).first()
-      if (await switcher.isVisible()) await switcher.click()
+      if (await switcher.isVisible())
+        await switcher.evaluate((button: HTMLElement) => button.click())
       await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
       // The shell scrolls inside itself, so the window grows to show the whole page.
       const extra = await page.evaluate(() =>
@@ -41,11 +45,13 @@ async function shoot(page: Page, name: string) {
   await page.setViewportSize({ height: 900, width: 1440 })
 }
 
+test.describe.configure({ retries: 0 })
+
 test(
   'capture the Bulk Tools screens',
   { tag: ['@dev-server', '@journey', '@smoke'] },
   async ({ app, page, startWorkspace }) => {
-    test.setTimeout(900_000)
+    test.setTimeout(480_000)
     await page.setViewportSize({ height: 900, width: 1440 })
     await startWorkspace({ channels: ['x', 'linkedin', 'instagram'] })
     await app.open('/publish/batches')
