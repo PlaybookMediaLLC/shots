@@ -17,6 +17,8 @@ async function shoot(page: Page, name: string) {
   // A toast stays while the mouse rests on it, and on a phone it covers the theme switch.
   await page.mouse.move(0, 0)
   await expect(page.locator('[data-sonner-toast]')).toHaveCount(0, { timeout: 20_000 })
+  // next dev compiles a route on first use, so images can still be on their way.
+  await page.waitForFunction(() => Array.from(document.images).every((image) => image.complete))
   for (const [width, height] of WIDTHS) {
     await page.setViewportSize({ height, width })
     for (const theme of ['light', 'dark']) {
@@ -102,6 +104,7 @@ test(
     await expect(page.getByTestId('bulk-caption-summary')).toContainText('6 variations')
     await page.getByLabel('Replace captions posts already have').check()
     await page.getByRole('button', { name: 'Apply to posts', exact: true }).click()
+    await expect(items.first()).not.toContainText('Untitled post', { timeout: 60_000 })
     await page.getByLabel('Caption CSV file').setInputFiles({
       buffer: Buffer.from('filename,caption\nBeach,"Sand, sun and salt"\nMissing,No post here\n'),
       mimeType: 'text/csv',

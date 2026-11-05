@@ -1174,7 +1174,9 @@ export function BatchWorkspace({
                 description={
                   start === 'videos'
                     ? 'Each video becomes its own post, or matches a CSV row by its exact name. MP4, MOV and WebM; each destination’s own length and size limits are checked before scheduling.'
-                    : 'Each file becomes its own post, or matches a CSV row by its exact name. A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP, GIF, MP4, MOV and WebM; PDFs go to LinkedIn as documents.'
+                    : start === 'images'
+                      ? 'A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP and GIF.'
+                      : 'Each file becomes its own post, or matches a CSV row by its exact name. A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP, GIF, MP4, MOV and WebM; PDFs go to LinkedIn as documents.'
                 }
               >
                 <div

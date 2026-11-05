@@ -66,11 +66,13 @@ export function stagedChecks(item: BatchItem, accounts: BatchAccount[]) {
         account.id,
         {
           changes: facts && !pdf ? mediaChanges(account.channel, facts) : [],
-          problems: !facts
-            ? ['Finish uploading this item’s files first.']
-            : pdf
-              ? documentProblems(account.channel, facts)
-              : mediaProblems(account.channel, facts),
+          problems: waitingToRender(item)
+            ? ['Render this video first.']
+            : !facts
+              ? ['Finish uploading this item’s files first.']
+              : pdf
+                ? documentProblems(account.channel, facts)
+                : mediaProblems(account.channel, facts),
         },
       ])
   )

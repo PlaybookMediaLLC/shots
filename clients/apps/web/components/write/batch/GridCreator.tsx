@@ -704,7 +704,7 @@ export function GridCreator({
                 data-testid="grid-concept"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <Label className="min-w-0 flex-1 font-normal">
+                  <Label className="min-w-0 basis-full font-normal sm:flex-1 sm:basis-0">
                     <span className="sr-only">Headline for video {conceptIndex + 1}</span>
                     <Input
                       key={item.grid.headline}
@@ -886,11 +886,13 @@ export function GridCreator({
             </Row>
           </Group>
           <div className="flex flex-wrap items-center gap-2">
-            <Button disabled={running || !toRender.length} onClick={() => void render()}>
-              {running
-                ? 'Rendering…'
-                : `Render ${toRender.length} video${toRender.length === 1 ? '' : 's'}`}
-            </Button>
+            {running || toRender.length ? (
+              <Button disabled={running} onClick={() => void render()}>
+                {running
+                  ? 'Rendering…'
+                  : `Render ${toRender.length} video${toRender.length === 1 ? '' : 's'}`}
+              </Button>
+            ) : null}
             {running ? (
               <Button variant="outline" onClick={() => abort.current?.abort()}>
                 Stop

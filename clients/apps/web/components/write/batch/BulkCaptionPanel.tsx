@@ -264,7 +264,7 @@ export function BulkCaptionPanel({
                 ).then(() => setRows(null))
               }
             >
-              Apply {ready.length} captions
+              Apply {ready.length} caption{ready.length === 1 ? '' : 's'}
             </Button>
             <Button variant="ghost" onClick={() => setRows(null)}>
               Cancel

@@ -233,3 +233,15 @@ test('a schedule run reads as an outcome per post, and never hides a failure', (
     }
   )
 })
+
+test('an unrendered grid video says to render it, not that it has no media', () => {
+  const concept = item({
+    grid: {
+      headline: 'Four tools',
+      slots: [{ topic: 'a' }, { topic: 'b' }, { topic: 'c' }, { topic: 'd' }],
+    },
+    media: [],
+  })
+  const checks = stagedChecks(concept, [{ channel: 'instagram', id: 'ig', name: 'Shots' }])
+  assert.deepEqual(checks.get('ig')?.problems, ['Render this video first.'])
+})
