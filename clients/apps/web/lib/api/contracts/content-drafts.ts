@@ -5,10 +5,13 @@ import { defineContract, timestampSchema } from '@/lib/api/contract'
 import { getMinimumPlan } from '@/lib/billing/plans'
 import { scheduledPostStatusSchema } from '@/lib/api/contracts/scheduled-posts'
 import { workspaceDocs } from '@/lib/api/contracts/workspace-docs'
+import {
+  contentDraftIdSchema,
+  contentDraftListQuerySchema,
+  contentDraftStatusSchema,
+} from '@/lib/api/contracts/content-draft-list'
 import { automationSchema, draftKindSchema, draftChannelSchema } from '@/lib/write/document'
 import {
-  contentDraftSortSchema,
-  contentDraftViewSchema,
   draftEngagementSchema,
   draftWriteFieldsSchema,
   draftWriteInputSchema,
@@ -17,16 +20,10 @@ import {
   scheduleTimingSchema,
 } from '@/lib/write/wire'
 
-/** Where a draft is in its life. Scheduling sets `scheduled`. */
-export const contentDraftStatusSchema = z.enum(['draft', 'scheduled', 'archived'])
+export { contentDraftIdSchema, contentDraftListQuerySchema, contentDraftStatusSchema }
 
 /** Statuses a client may set by hand. */
 export const contentDraftEditableStatusSchema = z.enum(['draft', 'archived'])
-
-/** A workspace resource id: a cuid or a UUID. */
-export const contentDraftIdSchema = z
-  .string()
-  .regex(/^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/)
 
 /** Plate JSON: the editor's value, a list of block nodes. */
 export const plateValueSchema = z.array(z.record(z.string(), z.unknown())).max(5_000)
@@ -121,22 +118,6 @@ export const contentDraftUpdateSchema = contentDraftFieldsSchema.extend({
   primaryPlatform: draftChannelSchema.or(z.literal('')).optional(),
   /** An ISO 8601 instant, or an empty string to clear it. */
   plannedFor: z.iso.datetime({ offset: true }).or(z.literal('')).optional(),
-})
-
-/**
- * The list query. Without `status` or `view`, archived drafts are left out.
- * Pinned drafts come first, in `pinned`, on the first page.
- */
-export const contentDraftListQuerySchema = z.object({
-  cursor: z.string().max(500).optional(),
-  kind: draftKindSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-  search: z.string().max(200).optional(),
-  socialSetId: contentDraftIdSchema.optional(),
-  sort: contentDraftSortSchema.optional(),
-  status: contentDraftStatusSchema.optional(),
-  tagId: contentDraftIdSchema.optional(),
-  view: contentDraftViewSchema.optional(),
 })
 
 /** Path parameters naming one draft. */

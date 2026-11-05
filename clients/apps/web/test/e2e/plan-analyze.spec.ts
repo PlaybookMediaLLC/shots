@@ -387,6 +387,48 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       'New York'
     )
   })
+  await test.step('date notes persist on their day in every display zone, and are never posts', async () => {
+    await page.getByRole('button', { name: `Add note ${day}`, exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByRole('button', { name: 'Add note', exact: true })).toBeDisabled()
+    await dialog.getByLabel('Title').fill('   ')
+    await expect(dialog.getByRole('button', { name: 'Add note', exact: true })).toBeDisabled()
+    await dialog.getByLabel('Title').fill('Launch review')
+    await dialog.getByRole('radio', { name: 'purple' }).click()
+    await dialog.getByRole('button', { name: 'Add note', exact: true }).click()
+    const note = page
+      .locator(`[data-calendar-date="${day}"]`)
+      .getByRole('button', { name: 'Note: Launch review', exact: true })
+    await expect(note).toBeVisible()
+    expect(
+      (await db.query('SELECT color FROM calendar_note WHERE "organizationId"=$1', [workspace.id]))
+        .rows
+    ).toEqual([{ color: 'purple' }])
+
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^Tokyo · /,
+      'Tokyo'
+    )
+    await expect(note).toBeVisible()
+    await chooseOption(
+      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
+      /^New York · /,
+      'New York'
+    )
+
+    await app.reload()
+    await note.click()
+    await page.getByRole('dialog').getByLabel('Title').fill('Launch moved')
+    await page.getByRole('button', { name: 'Save note', exact: true }).click()
+    const edited = page
+      .locator(`[data-calendar-date="${day}"]`)
+      .getByRole('button', { name: 'Note: Launch moved', exact: true })
+    await expect(edited).toBeVisible()
+    await edited.click()
+    await page.getByRole('button', { name: 'Delete note', exact: true }).click()
+    await expect(edited).toHaveCount(0)
+  })
   await test.step('P34 P36 a move has a durable inverse and stale replay cannot overwrite it', async () => {
     const target = new Date(Date.parse(plannedFor) + 86400000).toISOString()
     const body = {

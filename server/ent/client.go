@@ -33,6 +33,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarnote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
@@ -181,6 +182,8 @@ type Client struct {
 	BrandProfile *BrandProfileClient
 	// CalendarMutation is the client for interacting with the CalendarMutation builders.
 	CalendarMutation *CalendarMutationClient
+	// CalendarNote is the client for interacting with the CalendarNote builders.
+	CalendarNote *CalendarNoteClient
 	// Campaign is the client for interacting with the Campaign builders.
 	Campaign *CampaignClient
 	// CampaignAsset is the client for interacting with the CampaignAsset builders.
@@ -420,6 +423,7 @@ func (c *Client) init() {
 	c.BrandKit = NewBrandKitClient(c.config)
 	c.BrandProfile = NewBrandProfileClient(c.config)
 	c.CalendarMutation = NewCalendarMutationClient(c.config)
+	c.CalendarNote = NewCalendarNoteClient(c.config)
 	c.Campaign = NewCampaignClient(c.config)
 	c.CampaignAsset = NewCampaignAssetClient(c.config)
 	c.CampaignPlan = NewCampaignPlanClient(c.config)
@@ -635,6 +639,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BrandKit:                        NewBrandKitClient(cfg),
 		BrandProfile:                    NewBrandProfileClient(cfg),
 		CalendarMutation:                NewCalendarMutationClient(cfg),
+		CalendarNote:                    NewCalendarNoteClient(cfg),
 		Campaign:                        NewCampaignClient(cfg),
 		CampaignAsset:                   NewCampaignAssetClient(cfg),
 		CampaignPlan:                    NewCampaignPlanClient(cfg),
@@ -777,6 +782,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BrandKit:                        NewBrandKitClient(cfg),
 		BrandProfile:                    NewBrandProfileClient(cfg),
 		CalendarMutation:                NewCalendarMutationClient(cfg),
+		CalendarNote:                    NewCalendarNoteClient(cfg),
 		Campaign:                        NewCampaignClient(cfg),
 		CampaignAsset:                   NewCampaignAssetClient(cfg),
 		CampaignPlan:                    NewCampaignPlanClient(cfg),
@@ -915,26 +921,26 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AnalyticsPost, c.AnalyticsSnapshot, c.Apikey, c.Approval, c.Asset,
 		c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery, c.AuditLog,
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
-		c.BrandProfile, c.CalendarMutation, c.Campaign, c.CampaignAsset,
-		c.CampaignPlan, c.CampaignPost, c.CampaignRevision, c.ChannelConnection,
-		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
-		c.ContentBatch, c.ContentBatchItem, c.ContentDraft, c.ContentDraftFinisher,
-		c.ContentDraftRevision, c.ContentDraftSettings, c.ContentDraftTag,
-		c.Conversation, c.ConversationMessage, c.CreativeTemplate, c.CreativeVariant,
-		c.CustomerCommunication, c.DeploymentEvent, c.Design, c.EnrichmentRecord,
-		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
-		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
-		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
-		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation, c.LaunchRun,
-		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
-		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
-		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAutoDMCampaign,
-		c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient,
-		c.PlatformCreativeSet, c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
+		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
+		c.ChannelConnection, c.CommunicationAttempt, c.CommunicationRecipient,
+		c.ContentAngle, c.ContentBatch, c.ContentBatchItem, c.ContentDraft,
+		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
+		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
+		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
+		c.EnrichmentRecord, c.FrontendActivation, c.FrontendObservation,
+		c.FrontendSource, c.GitHubDeliveryRecovery, c.GitHubInstallStart,
+		c.GitHubInstallation, c.GitHubObservation, c.GitHubProductionPolicy,
+		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
+		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
+		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
+		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -962,26 +968,26 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AnalyticsPost, c.AnalyticsSnapshot, c.Apikey, c.Approval, c.Asset,
 		c.AudienceSubscriber, c.AuditDrain, c.AuditDrainDelivery, c.AuditLog,
 		c.AuditOutbox, c.AuditRetentionPolicy, c.BillingEntitlementEvent, c.BrandKit,
-		c.BrandProfile, c.CalendarMutation, c.Campaign, c.CampaignAsset,
-		c.CampaignPlan, c.CampaignPost, c.CampaignRevision, c.ChannelConnection,
-		c.CommunicationAttempt, c.CommunicationRecipient, c.ContentAngle,
-		c.ContentBatch, c.ContentBatchItem, c.ContentDraft, c.ContentDraftFinisher,
-		c.ContentDraftRevision, c.ContentDraftSettings, c.ContentDraftTag,
-		c.Conversation, c.ConversationMessage, c.CreativeTemplate, c.CreativeVariant,
-		c.CustomerCommunication, c.DeploymentEvent, c.Design, c.EnrichmentRecord,
-		c.FrontendActivation, c.FrontendObservation, c.FrontendSource,
-		c.GitHubDeliveryRecovery, c.GitHubInstallStart, c.GitHubInstallation,
-		c.GitHubObservation, c.GitHubProductionPolicy, c.GitHubRecoveryScan,
-		c.IdealCustomerProfile, c.IntegrationConnection, c.Invitation, c.LaunchRun,
-		c.LaunchRunStep, c.Member, c.OnboardingRun, c.Organization,
-		c.OrganizationEnterpriseSettings, c.OutboxEvent, c.PageKnowledge,
-		c.PermissionGroup, c.PermissionGroupMember, c.PlatformAutoDMCampaign,
-		c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient,
-		c.PlatformCreativeSet, c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.BrandProfile, c.CalendarMutation, c.CalendarNote, c.Campaign,
+		c.CampaignAsset, c.CampaignPlan, c.CampaignPost, c.CampaignRevision,
+		c.ChannelConnection, c.CommunicationAttempt, c.CommunicationRecipient,
+		c.ContentAngle, c.ContentBatch, c.ContentBatchItem, c.ContentDraft,
+		c.ContentDraftFinisher, c.ContentDraftRevision, c.ContentDraftSettings,
+		c.ContentDraftTag, c.Conversation, c.ConversationMessage, c.CreativeTemplate,
+		c.CreativeVariant, c.CustomerCommunication, c.DeploymentEvent, c.Design,
+		c.EnrichmentRecord, c.FrontendActivation, c.FrontendObservation,
+		c.FrontendSource, c.GitHubDeliveryRecovery, c.GitHubInstallStart,
+		c.GitHubInstallation, c.GitHubObservation, c.GitHubProductionPolicy,
+		c.GitHubRecoveryScan, c.IdealCustomerProfile, c.IntegrationConnection,
+		c.Invitation, c.LaunchRun, c.LaunchRunStep, c.Member, c.OnboardingRun,
+		c.Organization, c.OrganizationEnterpriseSettings, c.OutboxEvent,
+		c.PageKnowledge, c.PermissionGroup, c.PermissionGroupMember,
+		c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery, c.PlatformAutoDMOptOut,
+		c.PlatformAutoDMRecipient, c.PlatformCreativeSet, c.PlatformCreativeSetVersion,
+		c.PlatformDraftImport, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -1040,6 +1046,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BrandProfile.mutate(ctx, m)
 	case *CalendarMutationMutation:
 		return c.CalendarMutation.mutate(ctx, m)
+	case *CalendarNoteMutation:
+		return c.CalendarNote.mutate(ctx, m)
 	case *CampaignMutation:
 		return c.Campaign.mutate(ctx, m)
 	case *CampaignAssetMutation:
@@ -3678,6 +3686,139 @@ func (c *CalendarMutationClient) mutate(ctx context.Context, m *CalendarMutation
 		return (&CalendarMutationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CalendarMutation mutation op: %q", m.Op())
+	}
+}
+
+// CalendarNoteClient is a client for the CalendarNote schema.
+type CalendarNoteClient struct {
+	config
+}
+
+// NewCalendarNoteClient returns a client for the CalendarNote from the given config.
+func NewCalendarNoteClient(c config) *CalendarNoteClient {
+	return &CalendarNoteClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `calendarnote.Hooks(f(g(h())))`.
+func (c *CalendarNoteClient) Use(hooks ...Hook) {
+	c.hooks.CalendarNote = append(c.hooks.CalendarNote, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `calendarnote.Intercept(f(g(h())))`.
+func (c *CalendarNoteClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CalendarNote = append(c.inters.CalendarNote, interceptors...)
+}
+
+// Create returns a builder for creating a CalendarNote entity.
+func (c *CalendarNoteClient) Create() *CalendarNoteCreate {
+	mutation := newCalendarNoteMutation(c.config, OpCreate)
+	return &CalendarNoteCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CalendarNote entities.
+func (c *CalendarNoteClient) CreateBulk(builders ...*CalendarNoteCreate) *CalendarNoteCreateBulk {
+	return &CalendarNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CalendarNoteClient) MapCreateBulk(slice any, setFunc func(*CalendarNoteCreate, int)) *CalendarNoteCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CalendarNoteCreateBulk{err: fmt.Errorf("calling to CalendarNoteClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CalendarNoteCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CalendarNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CalendarNote.
+func (c *CalendarNoteClient) Update() *CalendarNoteUpdate {
+	mutation := newCalendarNoteMutation(c.config, OpUpdate)
+	return &CalendarNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CalendarNoteClient) UpdateOne(_m *CalendarNote) *CalendarNoteUpdateOne {
+	mutation := newCalendarNoteMutation(c.config, OpUpdateOne, withCalendarNote(_m))
+	return &CalendarNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CalendarNoteClient) UpdateOneID(id string) *CalendarNoteUpdateOne {
+	mutation := newCalendarNoteMutation(c.config, OpUpdateOne, withCalendarNoteID(id))
+	return &CalendarNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CalendarNote.
+func (c *CalendarNoteClient) Delete() *CalendarNoteDelete {
+	mutation := newCalendarNoteMutation(c.config, OpDelete)
+	return &CalendarNoteDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CalendarNoteClient) DeleteOne(_m *CalendarNote) *CalendarNoteDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CalendarNoteClient) DeleteOneID(id string) *CalendarNoteDeleteOne {
+	builder := c.Delete().Where(calendarnote.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CalendarNoteDeleteOne{builder}
+}
+
+// Query returns a query builder for CalendarNote.
+func (c *CalendarNoteClient) Query() *CalendarNoteQuery {
+	return &CalendarNoteQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCalendarNote},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CalendarNote entity by its id.
+func (c *CalendarNoteClient) Get(ctx context.Context, id string) (*CalendarNote, error) {
+	return c.Query().Where(calendarnote.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CalendarNoteClient) GetX(ctx context.Context, id string) *CalendarNote {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CalendarNoteClient) Hooks() []Hook {
+	return c.hooks.CalendarNote
+}
+
+// Interceptors returns the client interceptors.
+func (c *CalendarNoteClient) Interceptors() []Interceptor {
+	return c.inters.CalendarNote
+}
+
+func (c *CalendarNoteClient) mutate(ctx context.Context, m *CalendarNoteMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CalendarNoteCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CalendarNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CalendarNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CalendarNoteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CalendarNote mutation op: %q", m.Op())
 	}
 }
 
@@ -17748,14 +17889,15 @@ type (
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
 		AnalyticsSnapshot, Apikey, Approval, Asset, AudienceSubscriber, AuditDrain,
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
-		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation, Campaign,
-		CampaignAsset, CampaignPlan, CampaignPost, CampaignRevision, ChannelConnection,
-		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
-		ContentBatchItem, ContentDraft, ContentDraftFinisher, ContentDraftRevision,
-		ContentDraftSettings, ContentDraftTag, Conversation, ConversationMessage,
-		CreativeTemplate, CreativeVariant, CustomerCommunication, DeploymentEvent,
-		Design, EnrichmentRecord, FrontendActivation, FrontendObservation,
-		FrontendSource, GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
+		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
+		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
+		CampaignRevision, ChannelConnection, CommunicationAttempt,
+		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
+		ContentDraft, ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
+		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
+		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
+		EnrichmentRecord, FrontendActivation, FrontendObservation, FrontendSource,
+		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
 		IdealCustomerProfile, IntegrationConnection, Invitation, LaunchRun,
 		LaunchRunStep, Member, OnboardingRun, Organization,
@@ -17783,14 +17925,15 @@ type (
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
 		AnalyticsSnapshot, Apikey, Approval, Asset, AudienceSubscriber, AuditDrain,
 		AuditDrainDelivery, AuditLog, AuditOutbox, AuditRetentionPolicy,
-		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation, Campaign,
-		CampaignAsset, CampaignPlan, CampaignPost, CampaignRevision, ChannelConnection,
-		CommunicationAttempt, CommunicationRecipient, ContentAngle, ContentBatch,
-		ContentBatchItem, ContentDraft, ContentDraftFinisher, ContentDraftRevision,
-		ContentDraftSettings, ContentDraftTag, Conversation, ConversationMessage,
-		CreativeTemplate, CreativeVariant, CustomerCommunication, DeploymentEvent,
-		Design, EnrichmentRecord, FrontendActivation, FrontendObservation,
-		FrontendSource, GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
+		BillingEntitlementEvent, BrandKit, BrandProfile, CalendarMutation,
+		CalendarNote, Campaign, CampaignAsset, CampaignPlan, CampaignPost,
+		CampaignRevision, ChannelConnection, CommunicationAttempt,
+		CommunicationRecipient, ContentAngle, ContentBatch, ContentBatchItem,
+		ContentDraft, ContentDraftFinisher, ContentDraftRevision, ContentDraftSettings,
+		ContentDraftTag, Conversation, ConversationMessage, CreativeTemplate,
+		CreativeVariant, CustomerCommunication, DeploymentEvent, Design,
+		EnrichmentRecord, FrontendActivation, FrontendObservation, FrontendSource,
+		GitHubDeliveryRecovery, GitHubInstallStart, GitHubInstallation,
 		GitHubObservation, GitHubProductionPolicy, GitHubRecoveryScan,
 		IdealCustomerProfile, IntegrationConnection, Invitation, LaunchRun,
 		LaunchRunStep, Member, OnboardingRun, Organization,

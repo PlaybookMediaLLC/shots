@@ -30,6 +30,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarnote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
@@ -214,6 +215,7 @@ func checkColumn(t, c string) error {
 			brandkit.Table:                        brandkit.ValidColumn,
 			brandprofile.Table:                    brandprofile.ValidColumn,
 			calendarmutation.Table:                calendarmutation.ValidColumn,
+			calendarnote.Table:                    calendarnote.ValidColumn,
 			campaign.Table:                        campaign.ValidColumn,
 			campaignasset.Table:                   campaignasset.ValidColumn,
 			campaignplan.Table:                    campaignplan.ValidColumn,

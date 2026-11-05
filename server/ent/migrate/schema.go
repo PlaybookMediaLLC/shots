@@ -523,6 +523,30 @@ var (
 			},
 		},
 	}
+	// CalendarNoteColumns holds the columns for the "calendar_note" table.
+	CalendarNoteColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "day", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "date"}},
+		{Name: "title", Type: field.TypeString},
+		{Name: "color", Type: field.TypeEnum, Enums: []string{"blue", "green", "red", "yellow", "purple", "orange"}},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// CalendarNoteTable holds the schema information for the "calendar_note" table.
+	CalendarNoteTable = &schema.Table{
+		Name:       "calendar_note",
+		Columns:    CalendarNoteColumns,
+		PrimaryKey: []*schema.Column{CalendarNoteColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "calendarnote_organizationId_day",
+				Unique:  false,
+				Columns: []*schema.Column{CalendarNoteColumns[1], CalendarNoteColumns[2]},
+			},
+		},
+	}
 	// CampaignColumns holds the columns for the "campaign" table.
 	CampaignColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -3773,6 +3797,7 @@ var (
 		BrandKitTable,
 		BrandProfileTable,
 		CalendarMutationTable,
+		CalendarNoteTable,
 		CampaignTable,
 		CampaignAssetTable,
 		CampaignPlanTable,
@@ -3936,6 +3961,9 @@ func init() {
 	}
 	CalendarMutationTable.Annotation = &entsql.Annotation{
 		Table: "calendar_mutation",
+	}
+	CalendarNoteTable.Annotation = &entsql.Annotation{
+		Table: "calendar_note",
 	}
 	CampaignTable.Annotation = &entsql.Annotation{
 		Table: "campaign",

@@ -137,6 +137,9 @@ type ContentDraftListQuery struct {
 	Status      string
 	TagID       string
 	View        string
+	// ConnectionID, From and To filter by destination and time: see draftPostsMatch.
+	ConnectionID string
+	From, To     *time.Time
 }
 
 // ContentDraftInput is a new draft. Every field is optional.
@@ -747,6 +750,45 @@ func draftPostExists(statuses ...string) predicate.ContentDraft {
 	}
 }
 
+// draftPostsMatch matches a draft when one live post meets every criterion:
+// a draft with an X post last week and a LinkedIn post today does not match
+// "X, today". A draft with no live post matches on what it intends instead,
+// its destinations and planned time. Time is [From, To) on scheduledFor, as the
+// calendar reads it.
+func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentDraft {
+	return func(s *sql.Selector) {
+		live := func(criteria bool) *sql.Predicate {
+			posts := sql.Table(scheduledpost.Table)
+			where := []*sql.Predicate{
+				sql.ColumnsEQ(posts.C(scheduledpost.FieldContentDraftID), s.C(contentdraft.FieldID)),
+				sql.EQ(posts.C(scheduledpost.FieldOrganizationID), org),
+				sql.In(posts.C(scheduledpost.FieldStatus), "PUBLISHED", "SCHEDULED", "PROCESSING", "FAILED", "UNKNOWN_DELIVERY"),
+			}
+			if criteria && query.ConnectionID != "" {
+				where = append(where, sql.EQ(posts.C(scheduledpost.FieldChannelConnectionID), query.ConnectionID))
+			}
+			if criteria && query.From != nil {
+				where = append(where, sql.GTE(posts.C(scheduledpost.FieldScheduledFor), *query.From))
+			}
+			if criteria && query.To != nil {
+				where = append(where, sql.LT(posts.C(scheduledpost.FieldScheduledFor), *query.To))
+			}
+			return sql.Exists(sql.Select(posts.C(scheduledpost.FieldID)).From(posts).Where(sql.And(where...)))
+		}
+		intent := []*sql.Predicate{sql.Not(live(false))}
+		if query.ConnectionID != "" {
+			intent = append(intent, sqljson.ValueContains(s.C(contentdraft.FieldChannelConnectionIds), query.ConnectionID))
+		}
+		if query.From != nil {
+			intent = append(intent, sql.GTE(s.C(contentdraft.FieldPlannedFor), *query.From))
+		}
+		if query.To != nil {
+			intent = append(intent, sql.LT(s.C(contentdraft.FieldPlannedFor), *query.To))
+		}
+		s.Where(sql.Or(live(true), sql.And(intent...)))
+	}
+}
+
 // draftListFilters turns a list query into predicates.
 func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query ContentDraftListQuery) ([]predicate.ContentDraft, error) {
 	filters := []predicate.ContentDraft{contentdraft.OrganizationID(actor.OrganizationID)}
@@ -781,6 +823,15 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 		filters = append(filters, contentdraft.StatusEQ(contentdraft.StatusArchived))
 	default:
 		return nil, invalid("A view is drafts, posted, or archived.")
+	}
+	if query.ConnectionID != "" && !contentDraftRefPattern.MatchString(query.ConnectionID) {
+		return nil, invalid("Filter by a valid account.")
+	}
+	if query.From != nil && query.To != nil && !query.To.After(*query.From) {
+		return nil, invalid("Choose an end date after the start date.")
+	}
+	if query.ConnectionID != "" || query.From != nil || query.To != nil {
+		filters = append(filters, draftPostsMatch(actor.OrganizationID, query))
 	}
 	if query.Kind != "" {
 		if _, ok := draftKindChannels[query.Kind]; !ok {

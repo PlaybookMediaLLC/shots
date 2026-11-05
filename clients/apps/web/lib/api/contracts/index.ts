@@ -34,6 +34,12 @@ import {
   updateAnalyticsSettingsContract,
 } from './plan-analyze'
 import {
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
+} from './calendar-notes'
+import {
   decideCampaignApprovalContract,
   listApprovalsContract,
   requestCampaignReviewContract,
@@ -62,7 +68,10 @@ import {
 } from '@/lib/api/contracts/content-drafts'
 import { getLinkPreviewContract } from '@/lib/api/contracts/link-preview'
 import { createSocialConnectionAttemptContract } from '@/lib/api/contracts/social-connections'
-import { getSocialConnectionAvailabilityContract } from '@/lib/api/contracts/social-availability'
+import {
+  getSocialConnectionAvailabilityContract,
+  getSocialConnectionCapacityContract,
+} from '@/lib/api/contracts/social-availability'
 import {
   beginBlueskyConnectionContract,
   completeBlueskyConnectionContract,
@@ -128,12 +137,17 @@ export const documentedContracts = [
   draftGiphySearchContract,
   draftGiphyAttachContract,
   mutateCalendarContract,
+  listCalendarNotesContract,
+  createCalendarNoteContract,
+  updateCalendarNoteContract,
+  deleteCalendarNoteContract,
   getAnalyticsContract,
   refreshAnalyticsContract,
   updateAnalyticsSettingsContract,
   previewMastodonInstanceContract,
   createSocialConnectionAttemptContract,
   getSocialConnectionAvailabilityContract,
+  getSocialConnectionCapacityContract,
   beginBlueskyConnectionContract,
   completeBlueskyConnectionContract,
   listReleasesContract,

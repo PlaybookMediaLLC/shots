@@ -15,10 +15,18 @@ type PlanAnalyzeStore interface {
 	GetPublicAnalytics(context.Context, string, product.AnalyticsQuery) (*product.AnalyticsReport, error)
 	UpdateAnalyticsSettings(context.Context, product.Actor, string, product.AnalyticsSettingsInput) (*product.AnalyticsSettings, error)
 	RefreshAnalytics(context.Context, product.Actor, string) error
+	ListCalendarNotes(context.Context, product.Actor, string, string) ([]product.CalendarNote, error)
+	CreateCalendarNote(context.Context, product.Actor, product.CalendarNoteInput) (*product.CalendarNote, error)
+	UpdateCalendarNote(context.Context, product.Actor, string, product.CalendarNoteChanges) (*product.CalendarNote, error)
+	DeleteCalendarNote(context.Context, product.Actor, string) error
 }
 
 func (s *Server) registerPlanAnalyze(mux *http.ServeMux) {
 	mux.Handle("POST /v1/calendar/mutations", s.authenticateProduct(http.HandlerFunc(s.calendarMutation)))
+	mux.Handle("GET /v1/calendar/notes", s.authenticateProduct(http.HandlerFunc(s.listCalendarNotes)))
+	mux.Handle("POST /v1/calendar/notes", s.authenticateProduct(http.HandlerFunc(s.createCalendarNote)))
+	mux.Handle("PATCH /v1/calendar/notes/{id}", s.authenticateProduct(http.HandlerFunc(s.updateCalendarNote)))
+	mux.Handle("DELETE /v1/calendar/notes/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteCalendarNote)))
 	mux.Handle("GET /v1/analytics/{id}", s.authenticateProduct(http.HandlerFunc(s.getAnalytics)))
 	mux.Handle("POST /v1/analytics/{id}/refresh", s.authenticateProduct(http.HandlerFunc(s.refreshAnalytics)))
 	mux.Handle("PUT /v1/analytics/{id}/settings", s.authenticateProduct(http.HandlerFunc(s.analyticsSettings)))
@@ -44,6 +52,55 @@ func (s *Server) calendarMutation(w http.ResponseWriter, r *http.Request) {
 		_ = s.scheduler.Start(r.Context(), temporalpublishing.ScheduleInput{OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor})
 	}
 	writeJSON(w, 200, result)
+}
+func (s *Server) listCalendarNotes(w http.ResponseWriter, r *http.Request) {
+	notes, err := s.configuration.ListCalendarNotes(r.Context(), workspaceActor(r), r.URL.Query().Get("from"), r.URL.Query().Get("to"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]any{"items": notes})
+}
+func (s *Server) createCalendarNote(w http.ResponseWriter, r *http.Request) {
+	var input product.CalendarNoteInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, 400, "invalid calendar note")
+		return
+	}
+	note, err := s.configuration.CreateCalendarNote(r.Context(), workspaceActor(r), input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, 201, note)
+}
+func (s *Server) updateCalendarNote(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	var changes product.CalendarNoteChanges
+	if err := decodeJSON(r, &changes); err != nil {
+		writeError(w, 400, "invalid calendar note")
+		return
+	}
+	note, err := s.configuration.UpdateCalendarNote(r.Context(), workspaceActor(r), ids[0], changes)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, 200, note)
+}
+func (s *Server) deleteCalendarNote(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	if err := s.configuration.DeleteCalendarNote(r.Context(), workspaceActor(r), ids[0]); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"deleted": true})
 }
 func readAnalyticsQuery(w http.ResponseWriter, r *http.Request) (product.AnalyticsQuery, bool) {
 	params := r.URL.Query()

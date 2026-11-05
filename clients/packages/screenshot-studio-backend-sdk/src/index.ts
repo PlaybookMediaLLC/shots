@@ -1381,7 +1381,11 @@ export type BackendBatchValidation = {
 }
 
 export type BackendContentDraftListQuery = {
+  /** A draft with a live post to this account, or, with none, meant for it. */
+  connectionId?: string
   cursor?: string
+  /** From this instant, with `to` exclusive, on a live post's or a plan's time. */
+  from?: string
   kind?: BackendDraftKind
   limit?: number
   search?: string
@@ -1389,6 +1393,7 @@ export type BackendContentDraftListQuery = {
   sort?: 'updated_desc' | 'updated_asc' | 'created_desc' | 'created_asc'
   status?: BackendContentDraftStatus
   tagId?: string
+  to?: string
   view?: 'drafts' | 'posted' | 'archived'
 }
 
@@ -3137,6 +3142,29 @@ export class ScreenshotStudioBackendSDK {
   /** Plan a draft on the calendar, or clear its plan with null. Nothing publishes from a plan. */
   async mutateCalendar(input: unknown) {
     return this.request<unknown>('v1/calendar/mutations', { body: input, method: 'POST' })
+  }
+  /** How many accounts the workspace holds and may hold; a null limit means none. */
+  async socialConnectionCapacity() {
+    return this.request<{ held: number; limit: number | null }>('v1/social-connection-capacity')
+  }
+  /** A workspace's date-only notes on the days from..to, inclusive. */
+  async listCalendarNotes(from: string, to: string) {
+    const params = new URLSearchParams({ from, to })
+    return this.request<unknown>(`v1/calendar/notes?${params}`)
+  }
+  async createCalendarNote(input: unknown) {
+    return this.request<unknown>('v1/calendar/notes', { body: input, method: 'POST' })
+  }
+  async updateCalendarNote(id: string, input: unknown) {
+    return this.request<unknown>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PATCH',
+    })
+  }
+  async deleteCalendarNote(id: string) {
+    return this.request<{ deleted: boolean }>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    })
   }
   async getAnalytics(id: string, query: Record<string, string | number | undefined>) {
     const params = new URLSearchParams(

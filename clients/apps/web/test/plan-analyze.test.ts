@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { analyticsReportSchema, analyticsQuerySchema } from '../lib/api/contracts/plan-analyze'
+import {
+  calendarNoteChangesSchema,
+  calendarNoteInputSchema,
+} from '../lib/api/contracts/calendar-notes'
 import { draftPlanInputSchema } from '../lib/api/contracts/write'
 import {
   draftPostsState,
@@ -18,6 +22,7 @@ import {
   planPreferencesSchema,
   selectionState,
   selectedInstant,
+  visibleDayItems,
   visibleItems,
   itemDay,
   movedToDay,
@@ -548,4 +553,47 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Publishing',
     'Scheduled',
   ])
+})
+
+test('a month day caps its posts but never hides one that needs attention', () => {
+  const day = (...statuses: string[]) =>
+    statuses.map((status, i) => ({ ...items[0], id: `item-${i}`, status }))
+  const ids = (found: PlanItem[]) => found.map((item) => item.id)
+
+  const quiet = visibleDayItems(day('Scheduled', 'Planned'))
+  assert.deepEqual([quiet.visible.length, quiet.hidden], [2, 0])
+
+  const over = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Published'))
+  assert.deepEqual(ids(over.visible), ['item-0', 'item-1'])
+  assert.equal(over.hidden, 2)
+
+  // A failure late in the day is shown in its own place, and takes a slot from a quiet post.
+  const late = visibleDayItems(day('Scheduled', 'Published', 'Planned', 'Failed'))
+  assert.deepEqual(ids(late.visible), ['item-0', 'item-3'])
+  assert.equal(late.hidden, 2)
+
+  // More attention than the cap still shows every one.
+  const failing = visibleDayItems(day('Failed', 'Needs check', 'Scheduled', 'Overdue'))
+  assert.deepEqual(ids(failing.visible), ['item-0', 'item-1', 'item-3'])
+  assert.equal(failing.hidden, 1)
+})
+
+test('saved calendar preferences from before Show all still load', () => {
+  assert.equal(planPreferencesSchema.parse({ view: 'month' }).showAll, false)
+})
+
+test('a calendar note is a trimmed title, a known color and a real date', () => {
+  const input = { day: '2026-11-04', title: '  Launch  ', color: 'purple' }
+  assert.equal(calendarNoteInputSchema.parse(input).title, 'Launch')
+  for (const bad of [
+    { ...input, title: '   ' },
+    { ...input, title: 'x'.repeat(121) },
+    { ...input, color: 'pink' },
+    { ...input, day: '2026-02-30' },
+    { ...input, day: '2026-11-04T00:00:00Z' },
+    { ...input, organizationId: 'foreign' },
+  ])
+    assert.equal(calendarNoteInputSchema.safeParse(bad).success, false, JSON.stringify(bad))
+  // A note's day never changes after it is created.
+  assert.equal(calendarNoteChangesSchema.safeParse(input).success, false)
 })

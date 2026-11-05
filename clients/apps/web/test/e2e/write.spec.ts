@@ -669,6 +669,25 @@ test(
     await expect(page.getByRole('button', { name: 'Remove Article filter' })).toBeVisible()
     await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
     await expect(page.getByRole('button', { name: 'Remove Article filter' })).toHaveCount(0)
+    await test.step('library filters are in the URL and survive a reload', async () => {
+      await app.open('/publish?tab=all')
+      await expect(page.getByRole('tab', { name: 'All', exact: true })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+      await page.getByRole('button', { name: 'Dates', exact: true }).click()
+      await page.getByRole('button', { name: 'Today', exact: true }).click()
+      await expect(page).toHaveURL(/[?&]from=\d{4}-\d{2}-\d{2}/)
+      await app.reload()
+      await expect(page.getByRole('button', { name: 'Dates', exact: true })).toContainText('Today')
+      // Nothing in this workspace is on a day before it existed.
+      await app.open('/publish?tab=all&from=2020-01-01&to=2020-01-02')
+      await expect(page.getByText('No drafts match these filters.')).toBeVisible()
+      await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
+      await expect(page).not.toHaveURL(/[?&]from=/)
+      await page.getByRole('tab', { name: 'Queue', exact: true }).click()
+      await expect(page.getByText('Showing the next 60 days.')).toBeVisible()
+    })
     await app.open('/publish/calendar')
     await page
       .getByRole('button', { name: /^Create draft / })

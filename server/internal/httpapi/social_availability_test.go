@@ -141,3 +141,26 @@ func TestSocialAvailabilityFailsClosedForSessionAndDependencies(t *testing.T) {
 		}
 	}
 }
+
+type capacityConfiguration struct {
+	fakeConfiguration
+	actor product.Actor
+}
+
+func (c *capacityConfiguration) GetChannelCapacity(_ context.Context, actor product.Actor) (*product.ChannelCapacity, error) {
+	c.actor = actor
+	limit := 15
+	return &product.ChannelCapacity{Held: 3, Limit: &limit}, nil
+}
+
+func TestSocialConnectionCapacity(t *testing.T) {
+	config := &capacityConfiguration{}
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", config)
+	response := configurationRequest(handler, http.MethodGet, "/v1/social-connection-capacity", "")
+	if response.Code != 200 || !strings.Contains(response.Body.String(), `"held":3`) || !strings.Contains(response.Body.String(), `"limit":15`) {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body)
+	}
+	if config.actor.OrganizationID != "org-1" {
+		t.Fatalf("actor=%+v", config.actor)
+	}
+}
