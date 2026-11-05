@@ -58,6 +58,18 @@ test('numbering is counted and applied for the X version only', () => {
   assert.equal(joined.target.replies, undefined)
 })
 
+test('a first comment reaches Instagram and stays off platforms without one', () => {
+  const commented = (channel: 'instagram' | 'threads') => {
+    const versions = withOptions(readVersions(undefined), channel, { firstComment: ' #launch ' })
+    return buildPublication(draft({ platformVersions: versions }), {
+      channel,
+      connectionId: 'cc0000000001',
+    }).target.options?.firstComment
+  }
+  assert.equal(commented('instagram'), '#launch')
+  assert.equal(commented('threads'), undefined)
+})
+
 test('a manual LinkedIn version publishes its own text and options', () => {
   let versions = forkVersion(readVersions(undefined), 'linkedin', body, 3, false)
   versions = {

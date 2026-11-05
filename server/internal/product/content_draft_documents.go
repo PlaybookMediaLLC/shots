@@ -22,7 +22,7 @@ const (
 	contentDraftScratchpadLimit = 20_000
 	contentDraftTagLimit        = 20
 	articleTitleLimit           = 200
-	linkedInFirstCommentLimit   = 1250
+	firstCommentLimit           = 1250
 	linkedInDocumentTitleLimit  = 200
 	xCommunityIDPattern         = `^[0-9]{1,30}$`
 )
@@ -274,11 +274,11 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	}
 	clean.FirstComment = strings.TrimSpace(clean.FirstComment)
 	if clean.FirstComment != "" {
-		if channel != "linkedin" {
-			return nil, invalid("A first comment is a LinkedIn setting here.")
+		if channel != "linkedin" && channel != "instagram" {
+			return nil, invalid("First comments are for LinkedIn and Instagram posts.")
 		}
-		if utf8.RuneCountInString(clean.FirstComment) > linkedInFirstCommentLimit {
-			return nil, invalid(fmt.Sprintf("Keep the first comment under %d characters.", linkedInFirstCommentLimit))
+		if utf8.RuneCountInString(clean.FirstComment) > firstCommentLimit {
+			return nil, invalid(fmt.Sprintf("Keep the first comment under %d characters.", firstCommentLimit))
 		}
 	}
 	if clean.Document != nil {

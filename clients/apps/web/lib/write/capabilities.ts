@@ -171,7 +171,11 @@ function simple(label: string, captionLimit: number, thread: boolean): PlatformC
 /** Every platform's capabilities. */
 export const CAPABILITIES: Record<DraftChannel, PlatformCapabilities> = {
   bluesky: { ...simple('Bluesky', 300, true), kinds: ['standard', 'repurpose', 'quote'] },
-  instagram: { ...simple('Instagram', 2_200, false), mentions: 'handle' },
+  instagram: {
+    ...simple('Instagram', 2_200, false),
+    mentions: 'handle',
+    settings: { ...simple('Instagram', 2_200, false).settings, firstComment: true },
+  },
   linkedin: LINKEDIN,
   mastodon: { ...simple('Mastodon', 500, true), kinds: ['standard', 'repurpose', 'quote'] },
   threads: {

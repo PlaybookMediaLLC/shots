@@ -174,6 +174,7 @@ export function VersionOptionsBar({
     tools.push(
       <FirstComment
         key="comment"
+        label={capabilities.label}
         onChange={(firstComment) => onChange({ ...options, firstComment })}
         readOnly={readOnly}
         value={options.firstComment ?? ''}
@@ -753,12 +754,14 @@ function CommunityDialog({
   )
 }
 
-/** LinkedIn's first comment, posted under the post once it is live. */
+/** A first comment, posted under the post once it is live. */
 function FirstComment({
+  label,
   onChange,
   readOnly,
   value,
 }: {
+  label: string
   onChange: (value: string | undefined) => void
   readOnly: boolean
   value: string
@@ -776,7 +779,7 @@ function FirstComment({
           type="button"
           variant="custom"
         >
-          {value ? 'First comment ✓' : 'Add LinkedIn comment'}
+          {value ? 'First comment ✓' : `Add ${label} comment`}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="grid w-80 gap-2 p-3">

@@ -35,6 +35,21 @@ func TestPollAndOptionFieldsCannotSilentlyDisappear(t *testing.T) {
 	if checkPostOptions("linkedin", &postoptions.PublishOptions{DocumentTitle: "orphan"}, true) == nil {
 		t.Fatal("orphan document title accepted")
 	}
+	comment := postoptions.PublishOptions{FirstComment: "#launch"}
+	for _, channel := range []string{"linkedin", "instagram"} {
+		if err := checkPostOptions(channel, &comment, true); err != nil {
+			t.Fatalf("%s first comment refused: %v", channel, err)
+		}
+	}
+	for _, channel := range []string{"x", "threads", "tiktok", "youtube", "bluesky", "mastodon"} {
+		if checkPostOptions(channel, &comment, true) == nil {
+			t.Fatalf("%s first comment accepted", channel)
+		}
+	}
+	long := postoptions.PublishOptions{FirstComment: strings.Repeat("a", firstCommentLimit+1)}
+	if checkPostOptions("instagram", &long, true) == nil {
+		t.Fatal("overlong Instagram first comment accepted")
+	}
 }
 
 func TestBlueskyNativeQuoteOptions(t *testing.T) {

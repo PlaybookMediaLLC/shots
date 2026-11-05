@@ -352,9 +352,10 @@ export function buildPublication(
   }
   const firstCard = cardFor(first?.caption ?? '', (first?.images ?? 0) + (first?.videos ?? 0))
   if (firstCard) firstOptions.linkPreview = firstCard
+  if (CAPABILITIES[channel].settings.firstComment && options.firstComment?.trim())
+    firstOptions.firstComment = options.firstComment.trim()
   if (channel === 'linkedin') {
     if (options.visibility) firstOptions.visibility = options.visibility
-    if (options.firstComment?.trim()) firstOptions.firstComment = options.firstComment.trim()
     if (options.document) {
       firstOptions.documentAssetId = options.document.assetId
       firstOptions.documentTitle = options.document.title

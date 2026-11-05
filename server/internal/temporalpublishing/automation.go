@@ -102,7 +102,8 @@ type automator interface {
 // refuses them before scheduling, so only a stored, stale rule lands here.
 func automationPlan(job PreparedPublication, publishedAt time.Time) []AutomationStep {
 	var steps []AutomationStep
-	if job.Options != nil && strings.TrimSpace(job.Options.FirstComment) != "" && strings.HasPrefix(job.Platform, "linkedin") {
+	if job.Options != nil && strings.TrimSpace(job.Options.FirstComment) != "" &&
+		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram")) {
 		steps = append(steps, AutomationStep{At: publishedAt, Key: "first-comment", Kind: AutomationFirstComment})
 	}
 	actions := job.AutoActions
