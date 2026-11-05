@@ -74,7 +74,7 @@ The web's authenticated routes start OAuth at
 SDK. The backend binds one-use state to the workspace and session, exchanges
 the code through the social service, verifies the destination, and registers
 one canonical channel connection. The supported callback names are `x`,
-`linkedin`, `instagram`, and `instagram-standalone`. Facebook Login's
+`linkedin`, `instagram`, `instagram-standalone`, and `threads`. Facebook Login's
 Instagram flow includes Page selection.
 
 Register each exact HTTPS callback URL with its provider for live tests.

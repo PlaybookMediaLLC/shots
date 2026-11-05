@@ -64,12 +64,13 @@ func TestPublishingEnvSharesSocialCredentials(t *testing.T) {
 		"TENANT_TEMPORAL_NAMESPACE=tenant-namespace", "TENANT_AUDIT_RETENTION_DATABASE_URL=retention-database",
 		"TENANT_RUN_CRON=true", "TENANT_RUN_MAINTENANCE=true", "TENANT_PUBLISHING_SERVICE_TOKEN=private-token",
 		"PLATFORM_SOCIAL_ENCRYPTION_KEY=sealing-key", "TIKTOK_CLIENT_ID=tiktok-client", "TEMPORAL_API_KEY=social-temporal",
+		"THREADS_APP_SECRET=threads-secret",
 	}
 	result, err := publishingEnv(environ)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"PLATFORM_SOCIAL_ENCRYPTION_KEY=sealing-key", "TIKTOK_CLIENT_ID=tiktok-client"} {
+	for _, expected := range []string{"PLATFORM_SOCIAL_ENCRYPTION_KEY=sealing-key", "TIKTOK_CLIENT_ID=tiktok-client", "THREADS_APP_SECRET=threads-secret"} {
 		if !hasEntry(result, expected) {
 			t.Errorf("missing %s", expected)
 		}
