@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.46.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.45.0...v2.46.0) (2026-11-05)
+
+
+### Features
+
+* **automate:** start workflows from templates and fix the Automate audit ([#450](https://github.com/PlaybookMediaLLC/shots/issues/450)) ([954ab11](https://github.com/PlaybookMediaLLC/shots/commit/954ab115642260c1c9f07d3bc7ef7b42986052db))
+* **social:** honor Meta deauthorize and data deletion callbacks ([#449](https://github.com/PlaybookMediaLLC/shots/issues/449)) ([3549e08](https://github.com/PlaybookMediaLLC/shots/commit/3549e08315d9e0a072f16af6ea4da555c9fe5612))
+* **web:** fix the product audit across publishing, analyze and channels ([#447](https://github.com/PlaybookMediaLLC/shots/issues/447)) ([b2be32e](https://github.com/PlaybookMediaLLC/shots/commit/b2be32ee9ea1e9a4bbcb0353f856bd327ec0a6dc))
+
+
+### Bug Fixes
+
+* **web:** report unreadable links and align browser tests with the audit ([#451](https://github.com/PlaybookMediaLLC/shots/issues/451)) ([307d068](https://github.com/PlaybookMediaLLC/shots/commit/307d0687ad65fe3bd239ccbd39e22a096fecd571))
+
 ## [2.45.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.44.0...v2.45.0) (2026-11-05)
 
 
