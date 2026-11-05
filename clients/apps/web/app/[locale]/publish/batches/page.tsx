@@ -39,7 +39,7 @@ export default async function BatchesPage({
         {canEdit ? (
           <Section
             title="Start a batch"
-            description="Name it and choose the publishing brand whose accounts its posts go to."
+            description="Pick what you are posting, then name it and choose the publishing brand whose accounts its posts go to."
           >
             {sets.length ? (
               <Group>

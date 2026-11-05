@@ -27,7 +27,7 @@ import { settingsErrorMessage } from '@/lib/settings/client'
 import { useSocialSetScope } from './scope'
 import { z } from 'zod'
 import { CanvasIcon as Layers } from '@/components/platform-shell/icons'
-import { type SocialSetRecord, useSocialSets, useStoreSocialSet } from './api'
+import { DEFAULT_BRAND_NAME, type SocialSetRecord, useSocialSets, useStoreSocialSet } from './api'
 import { ConnectionLauncher } from '@/components/social-connections/ConnectionLauncher'
 
 function Platforms({ set }: { set: SocialSetRecord }) {
@@ -75,6 +75,9 @@ function SetRow({ set, canManage }: { set: SocialSetRecord; canManage: boolean }
             {set.visibility === 'PRIVATE' ? 'Private to you' : 'Shared with workspace'}
           </Pill>
           {set.needsAttention ? <Pill tone="yellow">Some accounts need attention</Pill> : null}
+          {canManage && set.name === DEFAULT_BRAND_NAME ? (
+            <Pill tone="yellow">Needs a name</Pill>
+          ) : null}
         </span>
       }
     >

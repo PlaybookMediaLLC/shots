@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { DEFAULT_BRAND_NAME } from '@/components/settings/social-sets/api'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { cn } from '@/lib/utils'
 import { rememberSet, useWrite, type WriteSet } from './write-context'
@@ -131,7 +132,9 @@ export function SocialSetSwitcher() {
             <DropdownMenuSeparator />
             {active ? (
               <DropdownMenuItem asChild>
-                <Link href={socialSetHref(active.id)}>Edit {active.name}…</Link>
+                <Link href={socialSetHref(active.id)}>
+                  {active.name === DEFAULT_BRAND_NAME ? 'Name this brand…' : `Edit ${active.name}…`}
+                </Link>
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem asChild>

@@ -299,6 +299,7 @@ export {
   inPreview,
   openNewBatch,
   openNewDraft,
+  openBlockedSchedule,
   openSchedule,
   postMenu,
   previewOf,

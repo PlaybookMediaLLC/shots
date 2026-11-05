@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { addDays, dayOfWeek, zonedDayKey } from '@/lib/settings/zoned-time'
-import { isTimeZone, resolveLocalTime } from '@/lib/write/zoned-time'
+import { resolveLocalTime } from '@/lib/write/zoned-time'
 import { availableDaySlots } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
 import { statusGroup } from '@/lib/content-drafts/post-status'
@@ -13,7 +13,6 @@ export const planPreferencesSchema = z.object({
   tags: z.boolean().default(true),
   slots: z.boolean().default(true),
   weekStart: z.union([z.literal(0), z.literal(1)]).default(1),
-  zone: z.string().refine(isTimeZone).default('UTC'),
   visible: z.array(z.string()).nullable().default(null),
   statuses: z.array(z.string()).default([]),
   providers: z.array(z.string()).default([]),
@@ -33,6 +32,7 @@ export type PlanItem = {
   at: string
   /** A post's publication instant: its slot (`at`) plus any natural offset. */
   publishAt?: string
+  /** The zone of its brand: where it sits on the calendar and how every time of it reads. */
   zone: string
   deliveryStatus?: string
   /** Why a post did not publish, as its backend records it. */
@@ -124,35 +124,23 @@ export function selectedInstant(
   if (at <= now) throw new Error('Choose a future time.')
   return at
 }
-export function itemDay(item: PlanItem, zone: string): string {
-  return zonedDayKey(new Date(item.at), zone)
+/** The day a card sits on: its brand's day, so its place never contradicts its time. */
+export function itemDay(item: PlanItem): string {
+  return zonedDayKey(new Date(item.at), item.zone)
 }
 
 /**
- * A card dropped on another displayed day keeps its time in its own
- * scheduling zone, moved by the days between the two displayed days: a
- * display zone across a daylight-saving change never shifts its clock.
+ * A card dropped on another day keeps its clock in its brand's zone, so a
+ * daylight-saving change between the two days never shifts it.
  */
-export function movedToDay(
-  at: string,
-  postZone: string,
-  displayZone: string,
-  day: string,
-  now = new Date()
-): Date {
-  const instant = new Date(at)
-  const days = Math.round(
-    (Date.parse(`${day}T12:00:00Z`) -
-      Date.parse(`${zonedDayKey(instant, displayZone)}T12:00:00Z`)) /
-      86_400_000
-  )
-  const wall = wallTime(instant, postZone)
-  return selectedInstant(
-    `${addDays(wall.slice(0, 10), days)}T${wall.slice(11)}`,
-    postZone,
-    'reject',
-    now
-  )
+export function movedToDay(at: string, zone: string, day: string, now = new Date()): Date {
+  return selectedInstant(`${day}T${wallTime(new Date(at), zone).slice(11)}`, zone, 'reject', now)
+}
+
+/** Which occurrence of its wall time an instant is, for a time the clocks repeat. */
+export function occurrence(at: string, zone: string): 'earlier' | 'later' {
+  const resolved = resolveLocalTime(wallTime(new Date(at), zone), zone)
+  return resolved.kind === 'ambiguous' && new Date(at) >= resolved.later ? 'later' : 'earlier'
 }
 
 /** States whose post holds its queue slot, as the backend's free-slot search counts them. */
@@ -166,11 +154,11 @@ export function takenSlots(items: PlanItem[], setId: string): string[] {
 }
 
 /** Reserve a separate lane for every overlapping card, including repeated DST hours. */
-export function weekCardLayout(items: PlanItem[], zone: string, height: number) {
+export function weekCardLayout(items: PlanItem[], height: number) {
   const ends: number[] = []
   const cards = items
     .map((item) => {
-      const [hour, minute] = wallTime(new Date(item.at), zone).slice(11).split(':').map(Number)
+      const [hour, minute] = wallTime(new Date(item.at), item.zone).slice(11).split(':').map(Number)
       return { item, top: hour * 60 + minute }
     })
     .sort(
@@ -186,30 +174,30 @@ export function weekCardLayout(items: PlanItem[], zone: string, height: number) 
   return { cards, lanes: Math.max(1, ends.length) }
 }
 
-/** Slots belong to the account's zone; locate them on the displayed calendar without rewriting them. */
-export function displayDaySlots(
+/** A brand's free slots on one of its days, with the instant each names. */
+export function brandDaySlots(
   day: string,
-  displayZone: string,
-  scheduleZone: string,
+  zone: string,
   slots: { weekday: number; time: string }[],
   taken: string[],
   now = new Date()
 ) {
-  return [-2, -1, 0, 1, 2]
-    .flatMap((offset) => {
-      const localDay = addDays(day, offset)
-      return availableDaySlots(localDay, scheduleZone, slots, taken, now).flatMap((time) => {
-        const resolved = resolveLocalTime(`${localDay}T${time}`, scheduleZone)
-        if (resolved.kind !== 'exact' || zonedDayKey(resolved.at, displayZone) !== day) return []
-        return [
-          {
-            at: resolved.at.toISOString(),
-            localDay,
-            localTime: time,
-            displayTime: wallTime(resolved.at, displayZone).slice(11),
-          },
-        ]
-      })
-    })
-    .sort((a, b) => a.at.localeCompare(b.at))
+  return availableDaySlots(day, zone, slots, taken, now).flatMap((time) => {
+    const resolved = resolveLocalTime(`${day}T${time}`, zone)
+    return resolved.kind === 'exact' ? [{ at: resolved.at.toISOString(), time }] : []
+  })
+}
+
+/** How far natural posting times move a post either side of its slot: the backend's `naturalOffsetLimit`. */
+const NATURAL_OFFSET_MS = 240_000
+
+/**
+ * When a post in a slot can go out with natural posting times on. The backend
+ * picks the exact offset when the post is scheduled, so a free slot has a window.
+ */
+export function naturalWindow(at: Date): { from: Date; to: Date } {
+  return {
+    from: new Date(at.getTime() - NATURAL_OFFSET_MS),
+    to: new Date(at.getTime() + NATURAL_OFFSET_MS),
+  }
 }

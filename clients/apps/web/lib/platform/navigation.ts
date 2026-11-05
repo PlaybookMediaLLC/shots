@@ -155,7 +155,7 @@ export function activeLink<T extends { href: string }>(
 /** One Publish vocabulary for every page in the area; `scope` keeps the publishing brand. */
 export function publishLinks(scope = '') {
   return [
-    { href: `/publish${scope}`, label: 'Drafts' },
+    { href: `/publish${scope}`, label: 'Posts' },
     { href: `/publish/calendar${scope}`, label: 'Calendar' },
     { href: `/publish/batches${scope}`, label: 'Bulk tools' },
     { href: `/publish/analyze${scope}`, label: 'Analyze' },

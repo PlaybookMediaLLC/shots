@@ -27,7 +27,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { Switch } from '@/components/ui/switch'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import { LocalTime } from '@/components/drafts/local-time'
+import { LocalTime, useWhen } from '@/components/drafts/local-time'
 import {
   call,
   DraftRequestError,
@@ -162,6 +162,18 @@ export function scheduleBlockers(
   return problems
 }
 
+/** Where a blocker takes you, as its button says it. */
+export function blockerFixLabel(blocker: ScheduleBlocker): string {
+  const platform = blocker.channel ? CHANNEL_META[blocker.channel].label : ''
+  if (blocker.fix === 'account') return 'Open platforms'
+  if (blocker.fix === 'conflict') return 'Go to the conflict'
+  if (blocker.fix === 'restore') return 'Restore the draft'
+  if (blocker.fix === 'review') return 'Open review'
+  if (blocker.fix === 'save') return 'Retry saving'
+  if (blocker.options) return `Open ${platform} settings`
+  return blocker.channel ? `Go to the ${platform} post` : ''
+}
+
 /** Problems that block every destination, collected for the dialogs. */
 function blocking(context: ScheduleContext): string[] {
   return scheduleBlockers(context).map((problem) => problem.text)
@@ -189,6 +201,7 @@ export function ScheduleDialog({
   onPreview?: () => void
 }) {
   const { data } = useWrite()
+  const formatWhen = useWhen()
   const scope = useSocialSetScope()
   // The draft's set owns the queue: its weekly slots in its zone (RFC 024).
   const setId =
@@ -366,7 +379,7 @@ export function ScheduleDialog({
   const rescheduling = (context.scheduled ?? []).length > 0
   const chosen = queue ? reviewedSlot : instant
   const headline = chosen
-    ? chosen.toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'short', timeZone: zone })
+    ? formatWhen(chosen, zone, { dateStyle: 'full', timeStyle: 'short' })
     : queue
       ? slotLoading
         ? 'Finding the next free slot…'
@@ -489,10 +502,9 @@ export function ScheduleDialog({
                       <Label className="flex items-center gap-2" key={option}>
                         <RadioGroupItem value={option} />
                         {option === 'earlier' ? 'The first' : 'The second'} (
-                        {resolution[option].toLocaleTimeString(undefined, {
+                        {formatWhen(resolution[option], zone, {
                           hour: 'numeric',
                           minute: '2-digit',
-                          timeZone: zone,
                           timeZoneName: 'short',
                         })}
                         )
@@ -539,12 +551,7 @@ export function ScheduleDialog({
             {chosen && localZone && localZone !== zone ? (
               <p className="text-xs text-muted-foreground">
                 Your time:{' '}
-                {chosen.toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                  timeZone: localZone,
-                })}{' '}
-                · {localZone.replaceAll('_', ' ')}
+                {formatWhen(chosen, localZone)} · {localZone.replaceAll('_', ' ')}
               </p>
             ) : null}
           </div>
@@ -948,11 +955,7 @@ function ReplacedPosts({
                 (channel ? CHANNEL_META[channel].label : post.platform)}
               <span className="text-muted-foreground">
                 ·{' '}
-                {new Date(post.scheduledFor).toLocaleString(undefined, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                  timeZone,
-                })}
+                <LocalTime value={post.scheduledFor} zone={timeZone} />
               </span>
               {selected.has(post.channelConnectionId) ? (
                 <span className="text-muted-foreground">

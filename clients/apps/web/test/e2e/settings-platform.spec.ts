@@ -69,18 +69,6 @@ test('personal settings are addressable, saved on the server and survive a reloa
   ).toBeVisible()
   await expect(page.getByText('Slack is unavailable.', { exact: false }).first()).toBeVisible()
 
-  await openWorkspaceSetting(page, 'Account')
-  await chooseOption(
-    page.getByRole('combobox', { exact: true, name: 'Display time zone' }),
-    /^Tokyo · UTC\+09:00/,
-    'Tokyo'
-  )
-  await expect(page.getByRole('status').filter({ hasText: 'Saved' }).first()).toBeVisible()
-  await app.reload()
-  await expect(
-    page.getByRole('combobox', { exact: true, name: 'Display time zone' })
-  ).toContainText('Tokyo · UTC+09:00')
-
   // The registry says what each experiment is, and promoted or unavailable
   // ones cannot be switched.
   await openWorkspaceSetting(page, 'Experimental')
@@ -151,7 +139,7 @@ test(
     await app.open(`/settings/publishing-brands/${setId}/scheduling`)
     await expect(page.getByTestId('weekly-slot-count')).toHaveText('5 of 50 weekly posting slots')
     await chooseOption(
-      page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' }),
+      page.getByRole('combobox', { exact: true, name: 'Time zone' }),
       /^Paris · UTC/,
       'Paris'
     )
@@ -162,9 +150,9 @@ test(
     await expect.poll(() => slotCount(setId)).toBe(10)
     await app.reload()
     await expect(page.getByTestId('weekly-slot-count')).toHaveText('10 of 50 weekly posting slots')
-    await expect(
-      page.getByRole('combobox', { exact: true, name: 'Scheduling time zone' })
-    ).toContainText('Paris · UTC')
+    await expect(page.getByRole('combobox', { exact: true, name: 'Time zone' })).toContainText(
+      'Paris · UTC'
+    )
 
     await app.open('/settings/brand-kit')
     await page

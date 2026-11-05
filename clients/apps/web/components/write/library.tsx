@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
-import { datePreset } from '@/lib/write/library'
+import { datePreset, draftName } from '@/lib/write/library'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -82,6 +82,7 @@ import { createWritingDraft } from './pending-draft'
 const TABS = [
   { label: 'All', tab: 'all' },
   { label: 'Drafts', tab: 'drafts' },
+  { label: 'Failed', tab: 'failed' },
   { label: 'Queue', tab: 'queue' },
   { label: 'Posted', tab: 'posted' },
   { label: 'Archived', tab: 'archived' },
@@ -169,7 +170,7 @@ export function WriteRail() {
                 data-tour-id="write-bulk"
                 href={`/publish/batches${data.activeSet ? `?set=${encodeURIComponent(data.activeSet.id)}` : ''}`}
               >
-                Bulk schedule
+                Bulk tools
               </Link>
             </Button>
           )}
@@ -199,16 +200,20 @@ export function WriteRail() {
         role="tablist"
         aria-label="Library"
       >
-        <div className="flex">
-          {TABS.map((item) => (
+        <div className="flex overflow-x-auto [scrollbar-width:none]">
+          {/* Failed appears while something failed, or while it is the open tab. */}
+          {TABS.filter(
+            (item) => item.tab !== 'failed' || data.failedCount > 0 || tab === 'failed'
+          ).map((item) => (
             <Button
               aria-selected={tab === item.tab}
               className={cn(
-                'flex h-10 items-center px-3 py-2.5 text-ui transition-colors',
+                'flex h-10 shrink-0 items-center px-2.5 py-2.5 text-ui transition-colors',
                 tab === item.tab
                   ? 'font-medium text-foreground shadow-[inset_0_-2px_0_var(--foreground)]'
                   : 'text-muted-foreground hover:text-foreground'
               )}
+              data-testid={`library-tab-${item.tab}`}
               key={item.tab}
               onClick={() => {
                 setSelected([])
@@ -225,22 +230,33 @@ export function WriteRail() {
                   {data.queue.length}
                 </span>
               ) : null}
+              {item.tab === 'failed' && data.failedCount > 0 ? (
+                <span
+                  className="ml-1 text-[11px] leading-[11px] font-semibold text-red-700 dark:text-red-300"
+                  data-testid="failed-count"
+                >
+                  {data.failedCount}
+                </span>
+              ) : null}
             </Button>
           ))}
         </div>
       </div>
-      {tab === 'queue' ? null : <LibraryFilters onManageTags={() => setManagingTags(true)} />}
-      <PostFilters />
+      <LibraryFilters onManageTags={() => setManagingTags(true)} />
       {/* The search box shows its own text: a chip for it pushed the list down on every keystroke. */}
-      {tab !== 'queue' &&
-      (data.query.kind ||
-        data.query.tag ||
-        data.query.account ||
-        data.query.from ||
-        data.query.to) ? (
+      {/* The queue applies only the account and dates, so only those show on it. */}
+      {(tab !== 'queue' && (data.query.kind || data.query.tag)) ||
+      data.query.account ||
+      data.query.from ||
+      data.query.to ? (
         <div aria-label="Active filters" className="flex flex-wrap gap-1 px-3 pt-2">
           {(
             [
+              {
+                key: 'account',
+                label: data.activeSet?.accounts.find((item) => item.id === data.query.account)
+                  ?.displayName,
+              },
               { key: 'kind', label: data.query.kind ? KIND_LABELS[data.query.kind] : undefined },
               {
                 key: 'tag',
@@ -250,7 +266,7 @@ export function WriteRail() {
               },
             ] as const
           )
-            .filter((filter) => filter.label)
+            .filter((filter) => filter.label && (tab !== 'queue' || filter.key === 'account'))
             .map((filter) => (
               <Button
                 key={filter.key}
@@ -291,6 +307,7 @@ export function WriteRail() {
                   all: 'Nothing in this publishing brand yet. Start a draft above.',
                   archived: 'Nothing archived.',
                   drafts: 'No drafts in this publishing brand. Start one above.',
+                  failed: 'Nothing failed. Every post went out or is still on its way.',
                   posted: 'Nothing posted from this publishing brand yet.',
                   queue: '',
                 }[tab]}
@@ -334,71 +351,22 @@ export function WriteRail() {
 }
 
 /**
- * Account and date, on every tab. A brand holds one active account per platform,
- * so the account is the platform too.
+ * Search, and one menu for everything that narrows or orders the list: on every
+ * tab the account and dates (a brand holds one active account per platform, so
+ * the account is the platform too); on the lists also sort, tags and kind.
  */
-function PostFilters() {
-  const { data, setQuery } = useWrite()
-  const { account, from, to } = data.query
-  const accounts = data.activeSet?.accounts ?? []
-  const active = accounts.find((item) => item.id === account)
-  const today = zonedDayKey(new Date(), data.activeSet?.timeZone ?? 'UTC')
-  const triggerClass =
-    'h-7 min-w-0 rounded-md border border-border px-2 text-xs text-muted-foreground hover:text-foreground aria-pressed:border-sky-400/50 aria-pressed:text-sky-700 dark:aria-pressed:text-sky-200'
-  return (
-    <div className="flex items-center gap-1.5 px-3 pt-2">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            aria-label={`Account: ${active?.platform ?? 'All accounts'}`}
-            aria-pressed={Boolean(account)}
-            className={triggerClass}
-            size={null}
-            type="button"
-            variant="custom"
-          >
-            <span className="truncate">{active?.displayName ?? 'All accounts'}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-64">
-          <DropdownMenuRadioGroup
-            onValueChange={(value) => setQuery({ account: value || undefined })}
-            value={account ?? ''}
-          >
-            <DropdownMenuRadioItem value="">All accounts</DropdownMenuRadioItem>
-            {accounts.map((item) => (
-              <DropdownMenuRadioItem key={item.id} value={item.id}>
-                {item.displayName} · {item.platform}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DateRangePicker
-        aria-label="Dates"
-        className="h-7 min-w-0 flex-1 text-xs"
-        onChange={(range) => setQuery(range)}
-        onPreset={(label) =>
-          setQuery(
-            datePreset(DATE_PRESETS[label as keyof typeof DATE_PRESETS], today, data.weekStart)
-          )
-        }
-        preset={
-          Object.entries(DATE_PRESETS).find(([, preset]) => {
-            const days = datePreset(preset, today, data.weekStart)
-            return days.from === from && days.to === to
-          })?.[0]
-        }
-        presets={Object.keys(DATE_PRESETS)}
-        value={{ from: from ?? '', to: to ?? '' }}
-      />
-    </div>
-  )
-}
-
-/** Search, tag filter, kind filter and sort. */
 function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
   const { data, setQuery } = useWrite()
+  const queue = data.query.tab === 'queue'
+  const { account, from, to } = data.query
+  const accounts = data.activeSet?.accounts ?? []
+  const today = zonedDayKey(new Date(), data.activeSet?.timeZone ?? 'UTC')
+  // The custom range stays open while one is set; presets live in the menu.
+  const [customDates, setCustomDates] = React.useState(false)
+  const preset = Object.entries(DATE_PRESETS).find(([, value]) => {
+    const days = datePreset(value, today, data.weekStart)
+    return days.from === from && days.to === to
+  })?.[0]
   const [search, setSearch] = React.useState(data.query.q ?? '')
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   React.useEffect(() => () => void (timer.current && clearTimeout(timer.current)), [])
@@ -408,6 +376,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
   }, [data.query.q])
   const activeTag = data.tags.find((tag) => tag.id === data.query.tag)
   return (
+    <>
     <div className="flex items-center gap-1.5 px-3 pt-2">
       <Input
         aria-label="Search drafts"
@@ -428,7 +397,10 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
             aria-label="Draft filters"
             className={cn(
               'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:text-foreground',
-              (activeTag || data.query.kind || data.query.sort) &&
+              (account ||
+                from ||
+                to ||
+                (!queue && (activeTag || data.query.kind || data.query.sort))) &&
                 'border-sky-400/50 text-sky-700 dark:text-sky-200'
             )}
             size={null}
@@ -438,7 +410,44 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
             Filters
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-64">
+        <DropdownMenuContent align="end" className="max-h-[70dvh] w-64 overflow-y-auto">
+          <DropdownMenuLabel>Account</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            onValueChange={(value) => setQuery({ account: value || undefined })}
+            value={account ?? ''}
+          >
+            <DropdownMenuRadioItem value="">All accounts</DropdownMenuRadioItem>
+            {accounts.map((item) => (
+              <DropdownMenuRadioItem key={item.id} value={item.id}>
+                {item.displayName} · {item.platform}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel>Dates</DropdownMenuLabel>
+          <DropdownMenuRadioGroup
+            onValueChange={(label) => {
+              if (label === 'custom') return setCustomDates(true)
+              setCustomDates(false)
+              setQuery(
+                label
+                  ? datePreset(DATE_PRESETS[label as keyof typeof DATE_PRESETS], today, data.weekStart)
+                  : { from: undefined, to: undefined }
+              )
+            }}
+            value={preset ?? (from || to || customDates ? 'custom' : '')}
+          >
+            <DropdownMenuRadioItem value="">Any time</DropdownMenuRadioItem>
+            {Object.keys(DATE_PRESETS).map((label) => (
+              <DropdownMenuRadioItem key={label} value={label}>
+                {label}
+              </DropdownMenuRadioItem>
+            ))}
+            <DropdownMenuRadioItem value="custom">Pick dates…</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+          {queue ? null : (
+            <>
+          <DropdownMenuSeparator />
           <DropdownMenuLabel>Sort</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             onValueChange={(value) =>
@@ -486,9 +495,11 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
-      {activeTag ? (
+      {activeTag && !queue ? (
         <Button
           aria-label={`Clear the ${activeTag.name} filter`}
           className="text-xs text-muted-foreground hover:text-foreground"
@@ -501,6 +512,17 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
         </Button>
       ) : null}
     </div>
+    {customDates || (!preset && (from || to)) ? (
+      <div className="px-3 pt-2">
+        <DateRangePicker
+          aria-label="Dates"
+          className="h-7 w-full min-w-0 text-xs"
+          onChange={(range) => setQuery(range)}
+          value={{ from: from ?? '', to: to ?? '' }}
+        />
+      </div>
+    ) : null}
+    </>
   )
 }
 
@@ -583,30 +605,44 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuLabel>Every platform</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => void create('standard')}>
             Post or thread
           </DropdownMenuItem>
-          {kinds
-            .filter((item) => item.kind === 'article')
-            .map((item) => (
-              <DropdownMenuItem key={item.kind} onSelect={() => void create('article')}>
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Engagements</DropdownMenuLabel>
-          {kinds
-            .filter((item) => item.kind === 'quote' || item.kind === 'reply')
-            .map((item) => (
-              <DropdownMenuItem key={item.kind} onSelect={() => setAsking(item)}>
-                {item.label}
-              </DropdownMenuItem>
-            ))}
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Reuse</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => setAsking(kinds[kinds.length - 1])}>
             Repurpose published content
           </DropdownMenuItem>
+          {kinds.some((item) => item.kind === 'quote') ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>X, LinkedIn, Bluesky and Mastodon</DropdownMenuLabel>
+              {kinds
+                .filter((item) => item.kind === 'quote')
+                .map((item) => (
+                  <DropdownMenuItem key={item.kind} onSelect={() => setAsking(item)}>
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+            </>
+          ) : null}
+          {channels.has('x') ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>X only</DropdownMenuLabel>
+              {kinds
+                .filter((item) => item.kind === 'article' || item.kind === 'reply')
+                .map((item) => (
+                  <DropdownMenuItem
+                    key={item.kind}
+                    onSelect={() =>
+                      item.kind === 'article' ? void create('article') : setAsking(item)
+                    }
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+            </>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       {asking ? (
@@ -753,7 +789,7 @@ function DraftRow({
       <Link
         aria-current={active ? 'page' : undefined}
         className="block px-4 py-2.5 pr-10"
-        href={draftHref(draft.id, data.activeSet?.id)}
+        href={draftHref(draft.id, data.activeSet?.id, undefined, data.query.tab)}
         draggable={canEdit && draft.status === 'draft' && draft.queuedPosts === 0}
         onDragStart={(event) => {
           event.dataTransfer.setData('application/x-shots-library-draft', draft.id)
@@ -769,7 +805,7 @@ function DraftRow({
         <p className="flex items-start gap-1.5">
           {selecting ? (
             <Checkbox
-              aria-label={`Select ${shown.title}`}
+              aria-label={`Select ${draftName(shown)}`}
               checked={selected}
               className="mt-0.5"
               tabIndex={-1}
@@ -798,7 +834,12 @@ function DraftRow({
               <ChannelIcon channel={channel} key={channel} />
             ))}
           </span>
-          <span className="shrink-0">{hydrated ? since(shown.updatedAt, now) : null}</span>
+          {/* A status line below already dates a post that went out or failed. */}
+          {draft.attentionPosts > 0 || draft.publishedPosts > 0 ? null : (
+            <span className="shrink-0" title="Last edited">
+              {hydrated ? `Edited ${since(shown.updatedAt, now)}` : null}
+            </span>
+          )}
         </p>
         <RowStatus draft={draft} />
         {tags.length > 0 ? (
@@ -815,6 +856,9 @@ function DraftRow({
     </li>
   )
 }
+
+/** A status's date in a list row: "Nov 3". */
+const ROW_DAY: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
 
 /** A row's status line: scheduled, planned, posted, needs attention, in review, shared. */
 function RowStatus({ draft }: { draft: LibraryDraft }) {
@@ -833,6 +877,12 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
         key="attention"
       >
         {stateLabel(attention.state, attention.count, attention.total)}
+        {draft.attentionAt ? (
+          <>
+            {' '}
+            <LocalTime options={ROW_DAY} value={draft.attentionAt} zone={timeZone} />
+          </>
+        ) : null}
       </span>
     )
   }
@@ -846,17 +896,7 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
         key="next"
       >
         {overdue ? 'Overdue' : 'Scheduled'}{' '}
-        <LocalTime
-          options={{
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            month: 'short',
-            timeZone,
-            timeZoneName: 'short',
-          }}
-          value={draft.nextPostAt}
-        />
+        <LocalTime value={draft.nextPostAt} zone={timeZone} />
       </span>
     )
   } else if (draft.publishingPosts > 0) {
@@ -869,21 +909,23 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
     parts.push(
       <span className="text-violet-700 dark:text-violet-300" key="planned">
         {draft.status === 'archived' ? 'Previously planned' : 'Planned'}{' '}
-        <LocalTime
-          options={{
-            day: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-            month: 'short',
-            timeZone,
-            timeZoneName: 'short',
-          }}
-          value={draft.plannedFor}
-        />
+        <LocalTime value={draft.plannedFor} zone={timeZone} />
       </span>
     )
   }
-  if (draft.publishedPosts > 0) parts.push(<span key="live">{draft.publishedPosts} live</span>)
+  if (draft.publishedPosts > 0)
+    parts.push(
+      <span key="live">
+        Published
+        {draft.publishedPosts > 1 ? ` to ${draft.publishedPosts} accounts` : ''}
+        {draft.lastPublishedAt ? (
+          <>
+            {' '}
+            <LocalTime options={ROW_DAY} value={draft.lastPublishedAt} zone={timeZone} />
+          </>
+        ) : null}
+      </span>
+    )
   if (draft.reviewStatus === 'pending')
     parts.push(
       <span className="text-amber-700 dark:text-amber-300" key="review">
@@ -928,7 +970,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
-            aria-label={`Actions for ${draft.title}`}
+            aria-label={`Actions for ${draftName(draft)}`}
             className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground hover:text-foreground"
             size={null}
             type="button"
@@ -1372,7 +1414,7 @@ function QueueList() {
   const zone = set?.timeZone ?? 'UTC'
   const hydrated = useHydrated()
   // A filter hides posts that fill slots, so a filtered queue lists its posts and no free slots.
-  const filtered = Boolean(data.query.account || data.query.from || data.query.to)
+  const filtered = Boolean(data.query.account || data.query.from || data.query.to || data.query.q)
   // Slots depend on the clock, so they are read after hydration, as LocalTime does.
   const days = React.useMemo(
     () => (hydrated ? queueDays(filtered ? [] : (set?.postingSlots ?? []), zone, data.queue) : []),
@@ -1400,14 +1442,14 @@ function QueueList() {
     )
   const horizon = (
     <p className="px-4 pt-3 text-xs text-muted-foreground">
-      Showing the next 60 days.{' '}
+      Free slots for the next 7 days, and posts for the next 60.{' '}
       <Link
         className="underline"
         href={`/publish/calendar${set ? `?set=${encodeURIComponent(set.id)}` : ''}`}
       >
         See the calendar
       </Link>{' '}
-      for later posts.
+      for later ones.
     </p>
   )
   // The server and the first client render agree: the plain list, soonest first.
@@ -1481,7 +1523,9 @@ function QueueList() {
                       data-testid="queue-free-slot"
                       key={`${day}-${row.clock}`}
                     >
-                      <span>{clockLabel(row.clock)} · free</span>
+                      <span>
+                        <ClockLabel time={row.clock} /> · free
+                      </span>
                       {canEdit ? (
                         <Button
                           className="h-6 px-2 text-[11px]"
@@ -1531,13 +1575,15 @@ function QueueList() {
 }
 
 /** A wall-clock "HH:MM" as a person reads it, without a date or zone. */
-function clockLabel(time: string): string {
+function ClockLabel({ time }: { time: string }) {
   const [hour, minute] = time.split(':').map(Number)
-  return new Date(Date.UTC(2000, 0, 1, hour, minute)).toLocaleTimeString(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZone: 'UTC',
-  })
+  return (
+    <LocalTime
+      options={{ hour: 'numeric', minute: '2-digit' }}
+      value={new Date(Date.UTC(2000, 0, 1, hour, minute))}
+      zone="UTC"
+    />
+  )
 }
 
 /** One queued post or planned draft in the queue. */

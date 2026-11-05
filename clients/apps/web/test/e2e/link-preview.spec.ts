@@ -13,6 +13,10 @@ test('batch drill-ins preserve results without fetching again, and compare swaps
 }) => {
   await createWorkspace(identity, page)
   await app.open('/publish/link-checks')
+  await expect(page.getByText('Testing localhost')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Keyboard shortcuts', exact: true }).click()
+  await expect(page.getByRole('dialog')).toContainText('Check again')
+  await page.keyboard.press('Escape')
   let requests = 0
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/v1/link-preview') requests++

@@ -119,6 +119,8 @@ test(
     await expect(editor).toContainText('Replaced by another client')
     // Review stays blocked until the writer keeps, copies or discards the edit.
     await page.getByTestId('schedule-button').click()
+    await expect(page.getByTestId('blockers')).toContainText('conflicts with a newer version')
+    await page.getByRole('button', { name: 'Save as planned instead…' }).click()
     await expect(page.getByTestId('blocking-problems')).toContainText(
       'conflicts with a newer version'
     )

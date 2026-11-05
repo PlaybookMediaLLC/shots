@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useHydrated } from '@/components/drafts/local-time'
+import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { useRouter } from 'next/navigation'
 import type { BackendBestTime } from 'screenshot-studio-backend-sdk'
 import { Button } from '@/components/ui/button'
@@ -72,12 +72,11 @@ export function BestPostingTimes({
         {items.map((item) => (
           <li key={item.at} className="grid content-start gap-2">
             <strong className="text-sm">
-              {new Date(item.at).toLocaleString(undefined, {
-                timeZone,
-                weekday: 'long',
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
+              <LocalTime
+                options={{ weekday: 'long', hour: 'numeric', minute: '2-digit' }}
+                value={item.at}
+                zone={timeZone}
+              />
             </strong>
             {item.score !== undefined ? (
               <>

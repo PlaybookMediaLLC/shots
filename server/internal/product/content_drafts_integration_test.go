@@ -223,6 +223,8 @@ func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
 		"the end is exclusive":                          {ContentDraftListQuery{From: &from, To: &day}, []string{}},
 		"the start is inclusive":                        {ContentDraftListQuery{From: &day, To: &to}, []string{split, today, planned}},
 		"a posted view still applies":                   {ContentDraftListQuery{View: "posted", ConnectionID: x}, []string{split}},
+		"a failed view lists what needs someone":        {ContentDraftListQuery{View: "failed"}, []string{today}},
+		"a drafts view leaves failures out":             {ContentDraftListQuery{View: "drafts"}, []string{cancelled, intended, planned}},
 		"an account from elsewhere matches nothing":     {ContentDraftListQuery{ConnectionID: cuid.New()}, []string{}},
 	} {
 		c.query.SocialSetID = set.ID
@@ -239,6 +241,19 @@ func TestContentDraftListFiltersByAccountAndTime(t *testing.T) {
 		if !slices.Equal(got, c.want) {
 			t.Errorf("%s: got %v, want %v", name, got, c.want)
 		}
+	}
+
+	// A retry replaces the failure before it, so the draft no longer needs anyone.
+	retried := draft("Failed, then retried", x)
+	post(retried, x, day.AddDate(0, 0, -30), scheduledpost.StatusFAILED)
+	time.Sleep(5 * time.Millisecond) // createdAt keeps milliseconds; the retry must be newer.
+	post(retried, x, day.AddDate(0, 0, -30), scheduledpost.StatusSCHEDULED)
+	failed, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{SocialSetID: set.ID, View: "failed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(failed.Items) != 1 || failed.Items[0].ID != today || failed.Items[0].AttentionAt == nil {
+		t.Errorf("failed view: %+v", failed.Items)
 	}
 
 	if _, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{ConnectionID: "not an id"}); !errors.Is(err, ErrInvalidInput) {

@@ -14,6 +14,7 @@ import {
   resyncVersion,
   versionFor,
   withOptions,
+  otherPlatformNamed,
 } from '@/lib/write/versions'
 
 const p = (text: string, marks: object = {}) => ({ children: [{ text, ...marks }], type: 'p' })
@@ -142,4 +143,19 @@ test('adapting for a thread platform keeps posts but gives them new ids', () => 
   assert.equal(breaks.length, 3)
   assert.ok(breaks.every((node) => !['a', 'b', 'c'].includes(String(node.id))))
   assert.equal(breaks[1].replySettings, 'following')
+})
+
+test("copy naming another of the draft's platforms is caught, without flagging common words", () => {
+  const channels = ['tiktok', 'x'] as const
+  assert.equal(otherPlatformNamed('Made with Shots, published to TikTok', 'x', channels), 'TikTok')
+  assert.equal(otherPlatformNamed('Made with Shots, published to TikTok', 'tiktok', channels), null)
+  assert.equal(otherPlatformNamed('Now on X as well', 'tiktok', channels), 'X')
+  assert.equal(otherPlatformNamed('Factor X matters', 'tiktok', channels), null)
+  assert.equal(otherPlatformNamed('How to x-ray a release', 'tiktok', channels), null)
+  // A link to a platform is not copy about it.
+  assert.equal(otherPlatformNamed('Watch https://tiktok.com/@a/video/1', 'x', channels), null)
+  assert.equal(otherPlatformNamed('Watch tiktok.com/@a', 'x', channels), null)
+  assert.equal(otherPlatformNamed('It is on TikTok.', 'x', channels), 'TikTok')
+  // A platform this draft does not post to is ordinary copy.
+  assert.equal(otherPlatformNamed('Follow us on LinkedIn', 'x', channels), null)
 })

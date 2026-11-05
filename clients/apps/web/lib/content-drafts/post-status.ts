@@ -186,6 +186,15 @@ export function postFailureFix(code: string | null | undefined): 'reconnect' | '
   return null
 }
 
+/**
+ * Whether a retry could work. A retry resends the post as it was scheduled, so
+ * a failure the post itself caused comes back until it is edited and scheduled
+ * again.
+ */
+export function retryCanHelp(code: string | null | undefined): boolean {
+  return postFailureFix(code) !== 'edit'
+}
+
 /** Why a destination did not publish, or null when nothing went wrong. */
 export function postFailureReason(code: string | null | undefined): string | null {
   switch (code) {
@@ -223,7 +232,7 @@ export function postFailureReason(code: string | null | undefined): string | nul
       return 'Shots could not reach its publishing service, so nothing was sent. Retry it later, or send the details to support.'
     case 'PUBLISHER_ERROR':
     case 'UNKNOWN':
-      return 'Shots had an error before it handed the post to the platform. Retry it. If it fails again, send the details to support.'
+      return 'Shots stopped before it handed the post to the platform, so nothing was sent. It did not record why.'
     case 'NETWORK':
       return 'The platform could not be reached. Retry it.'
     case '429':

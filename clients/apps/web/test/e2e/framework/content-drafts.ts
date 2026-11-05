@@ -282,6 +282,10 @@ export async function openNewBatch(
   app: { open(path: string): Promise<void>; reload(): Promise<void> }
 ): Promise<string> {
   await app.open('/publish/batches')
+  await page
+    .getByTestId('bulk-tools')
+    .getByRole('radio', { name: /^Mixed files or a CSV/ })
+    .click()
   await page.getByRole('button', { name: 'Start a batch', exact: true }).click()
   await page.waitForURL(/\/publish\/batches\/[^/]+$/)
   await app.reload()
@@ -367,6 +371,16 @@ export async function previewOf(page: Page, platform: string): Promise<Locator> 
     .getByRole('button', { name: PLATFORM_LABELS[platform], exact: true })
     .click()
   return page.getByTestId(`preview-${platform}`)
+}
+
+/** Press Schedule while something blocks it: the checklist comes first, then the dialog, which still explains. */
+export async function openBlockedSchedule(page: Page): Promise<Locator> {
+  await page.getByTestId('schedule-button').click()
+  await expect(page.getByTestId('blockers')).toBeVisible()
+  await page.getByRole('button', { name: 'Save as planned instead…' }).click()
+  const dialog = page.getByTestId('schedule-dialog')
+  await expect(dialog).toBeVisible()
+  return dialog
 }
 
 /** Open the schedule dialog from the top bar; returns it. */

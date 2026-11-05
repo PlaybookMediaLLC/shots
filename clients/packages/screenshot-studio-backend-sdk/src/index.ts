@@ -957,6 +957,8 @@ export type BackendContentDraft = {
   guestComments: { createdAt: string; name: string; text: string }[]
   /** The draft's live posts (lists only). */
   publishedPosts: number
+  attentionAt?: string | null
+  lastPublishedAt?: string | null
   /** Write (RFC 025): an article's title and cover, for an article draft. */
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */
@@ -1441,7 +1443,7 @@ export type BackendContentDraftListQuery = {
   status?: BackendContentDraftStatus
   tagId?: string
   to?: string
-  view?: 'drafts' | 'posted' | 'archived'
+  view?: 'drafts' | 'posted' | 'failed' | 'archived'
 }
 
 /** A cloud project: an editor composition with revision-checked writes. */

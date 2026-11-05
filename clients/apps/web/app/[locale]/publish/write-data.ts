@@ -22,8 +22,8 @@ import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
  * then the last one chosen (a cookie), then the workspace's default set.
  */
 
-/** The library tabs: drafts being written, the queue, what went live, the archive. */
-export const writeTabSchema = z.enum(['all', 'drafts', 'queue', 'posted', 'archived'])
+/** The library tabs: drafts being written, what failed, the queue, what went live, the archive. */
+export const writeTabSchema = z.enum(['all', 'drafts', 'failed', 'queue', 'posted', 'archived'])
 
 /** One of {@link writeTabSchema}. */
 export type WriteTab = z.infer<typeof writeTabSchema>
@@ -113,11 +113,14 @@ export async function loadWrite(
     sets.find((set) => set.visibility === 'WORKSPACE') ??
     sets[0]
   const tab: WriteTab = query.tab ?? 'drafts'
-  const [[page, posts, planned], tags] = await Promise.all([
+  const [[page, posts, planned], tags, failedPage] = await Promise.all([
     early && early.setId === activeSet?.id
       ? early.library
       : readLibrary(query, activeSet?.id, experiments.tags, activeSet?.timeZone),
     activeSet && experiments.tags ? listDraftTags(tenant, activeSet.id) : Promise.resolve([]),
+    // The Failed tab's count. shortcut: reads a page of drafts for a number, and stops at
+    // 100; add a backend count if this shows up in page load times.
+    listContentDrafts(tenant, { limit: 100, socialSetId: activeSet?.id, view: 'failed' }),
   ])
   const library = [...page.pinned, ...page.items].map((draft) =>
     libraryDraft(contentDraftSchema.parse(draft))
@@ -156,6 +159,7 @@ export async function loadWrite(
     activeSet: activeSet ?? null,
     advancedScheduling: advanced.allowed,
     experiments,
+    failedCount: failedPage.pinned.length + failedPage.items.length,
     library,
     hasMore: page.nextCursor !== null,
     query: { ...query, tab },

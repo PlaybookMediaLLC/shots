@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import { LocalTime } from '@/components/drafts/local-time'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { call, type DraftWire } from '@/lib/content-drafts/client'
 import { type DraftActivityWire, writeApi } from '@/lib/write/client'
 import type { Publication } from '@/lib/write/publication'
@@ -66,7 +66,7 @@ function detail(item: DraftActivityWire): string {
     return metadata.enabled ? 'public link on' : 'public link off'
   if (metadata.cleared) return 'plan cleared'
   if (typeof metadata.plannedFor === 'string')
-    return `for ${new Date(metadata.plannedFor).toLocaleString()}`
+    return `for ${new Date(metadata.plannedFor).toLocaleString(undefined, WHEN_STYLE)}`
   if (typeof metadata.reason === 'string' && metadata.reason !== 'schedule') return metadata.reason
   if (typeof metadata.action === 'string') return metadata.action
   return ''

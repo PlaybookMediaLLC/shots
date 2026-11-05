@@ -288,15 +288,16 @@ func (c *Configuration) importAnalyticsPost(ctx context.Context, connection *ent
 }
 func (c *Configuration) importCanonicalAnalyticsPosts(ctx context.Context, connection *ent.ChannelConnection) error {
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(connection.OrganizationID), scheduledpost.ChannelConnectionID(connection.ID), scheduledpost.RemotePostIDNEQ(""), scheduledpost.StatusIn(scheduledpost.StatusPUBLISHED, scheduledpost.StatusFAILED), func(s *sql.Selector) {
-		// Manual reconciliation may confirm a remote ID without a dated receipt.
-		// Exclude those rows before the limit so they cannot starve importable posts.
+		// A post needs a date: its publisher's receipt, or the moment a person
+		// confirmed it live. Rows with neither are excluded before the limit so
+		// they cannot starve importable posts.
 		r := sql.Table(publicationattempt.Table)
-		s.Where(sql.Exists(sql.Select(r.C(publicationattempt.FieldID)).From(r).Where(sql.And(
+		s.Where(sql.Or(sql.NotNull(s.C(scheduledpost.FieldPublishedAt)), sql.Exists(sql.Select(r.C(publicationattempt.FieldID)).From(r).Where(sql.And(
 			sql.ColumnsEQ(r.C(publicationattempt.FieldScheduledPostID), s.C(scheduledpost.FieldID)),
 			sql.ColumnsEQ(r.C(publicationattempt.FieldOrganizationID), s.C(scheduledpost.FieldOrganizationID)),
 			sql.ColumnsEQ(r.C(publicationattempt.FieldProviderPostID), s.C(scheduledpost.FieldRemotePostID)),
 			sql.NotNull(r.C(publicationattempt.FieldCompletedAt)),
-		))))
+		)))))
 		a := sql.Table(analyticspost.Table)
 		s.Where(sql.NotExists(sql.Select(a.C(analyticspost.FieldID)).From(a).Where(sql.And(
 			sql.ColumnsEQ(a.C(analyticspost.FieldConnectionID), s.C(scheduledpost.FieldChannelConnectionID)),
@@ -311,13 +312,17 @@ func (c *Configuration) importCanonicalAnalyticsPosts(ctx context.Context, conne
 		if post.RemotePostID == nil || *post.RemotePostID == "" {
 			continue
 		}
-		// Receipt completion is the confirmed timestamp available from the publisher;
-		// never use the planned/scheduled date as proof of publication.
+		// Receipt completion is the confirmed timestamp available from the publisher,
+		// then the moment a person confirmed it live; never use the planned/scheduled
+		// date as proof of publication.
 		var at *time.Time
 		for _, a := range post.Edges.Attempts {
 			if a.ProviderPostID != nil && *a.ProviderPostID == *post.RemotePostID && a.CompletedAt != nil && (at == nil || a.CompletedAt.Before(*at)) {
 				at = a.CompletedAt
 			}
+		}
+		if at == nil {
+			at = post.PublishedAt
 		}
 		if at == nil {
 			continue

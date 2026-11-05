@@ -83,7 +83,8 @@ export function VersionOptionsBar({
   const button =
     'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:border-input hover:text-foreground'
   const tools: React.ReactNode[] = []
-  if (channel === 'tiktok' || channel === 'youtube')
+  // Privacy, consent and YouTube's required fields sit above the post, in the composer.
+  if (channel === 'tiktok')
     tools.push(
       <VideoOptions
         key="video"
@@ -92,6 +93,7 @@ export function VersionOptionsBar({
         onChange={onChange}
         disabled={readOnly}
         creator={tiktokCreator}
+        part="rest"
       />
     )
   if (capabilities.thread) {

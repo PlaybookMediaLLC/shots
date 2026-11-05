@@ -146,7 +146,7 @@ export const PRODUCT_TOURS = [
         anchor: 'write-bulk',
         route: '/publish',
         title: 'Schedule many posts at once',
-        description: 'Bulk schedule plans a batch of separate posts in one pass.',
+        description: 'Bulk tools plan a batch of separate posts in one pass.',
       },
     ],
   },

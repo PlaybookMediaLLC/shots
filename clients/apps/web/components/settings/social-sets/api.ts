@@ -131,6 +131,9 @@ export const CONNECT_PROVIDERS = [
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },
 ] as const
 
+/** The name the backend gives a brand it creates with its first account (publishing/oauth_creation.go). */
+export const DEFAULT_BRAND_NAME = 'New brand'
+
 /** What to tell someone about an account that is not connected. */
 export const HEALTH_GUIDANCE: Record<SocialSetRecord['accounts'][number]['health'], string> = {
   connected: 'Connected and ready to publish.',

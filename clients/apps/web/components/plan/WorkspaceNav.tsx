@@ -6,7 +6,7 @@ import { publishLinks } from '@/lib/platform/navigation'
 import { cn } from '@/lib/utils'
 
 const ACTIVE = {
-  drafts: 'Drafts',
+  drafts: 'Posts',
   plan: 'Calendar',
   analyze: 'Analyze',
   links: 'Link checks',

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { LocalTime } from '@/components/drafts/local-time'
+import { LocalTime, WHEN_STYLE } from '@/components/drafts/local-time'
 import { Group, Row } from '@/components/platform-ui'
 import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
@@ -13,14 +13,15 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TimePicker } from '@/components/ui/time-picker'
 import { POSTING_SLOT_LIMIT } from '@/lib/api/contracts/social-sets'
+import { naturalWindow } from '@/lib/plan/calendar'
 import { formatTimeOfDay } from '@/lib/time-of-day'
 import { upcomingSlots } from '@/lib/write/calendar'
-import { offsetLabel } from '@/lib/write/zoned-time'
 import { type SocialSetRecord, useSaveSocialSet } from './api'
 
 type Slot = SocialSetRecord['postingSlots'][number]
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const
+const CLOCK: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' }
 
 /** The weekly count: every enabled day and time, not just the rows. */
 export function weeklySlotCount(slots: Slot[]): number {
@@ -99,10 +100,10 @@ export function SchedulingPage({
     <div className="grid gap-6">
       <Group>
         <Row
-          description="The time zone this publishing brand's queue, slots and calendar use. It is separate from your display time zone. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
+          description="Every time for this publishing brand reads in this zone: its queue, slots and calendar. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
           label={
             <span className="flex items-center gap-2">
-              Scheduling time zone <SaveStatus state={zoneState} />
+              Time zone <SaveStatus state={zoneState} />
             </span>
           }
           layout="stacked"
@@ -110,7 +111,7 @@ export function SchedulingPage({
           <TimeZonePicker
             disabled={!canManageSet}
             hideLabel
-            label="Scheduling time zone"
+            label="Time zone"
             onChange={(timeZone) => void runZone(() => save({ timeZone }))}
             value={set.timeZone}
           />
@@ -222,11 +223,14 @@ export function SchedulingPage({
                 {next.map(({ at }, index) => (
                   <span key={at.toISOString()}>
                     {index > 0 ? ' · ' : null}
-                    <LocalTime
-                      options={{ weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: set.timeZone }}
-                      value={at}
-                    />{' '}
-                    ({offsetLabel(at, set.timeZone)})
+                    <LocalTime options={{ ...WHEN_STYLE, weekday: 'short' }} value={at} zone={set.timeZone} />
+                    {set.naturalPostingTimes ? (
+                      <>
+                        {' '}
+                        (goes out <LocalTime options={CLOCK} value={naturalWindow(at).from} zone={set.timeZone} />–
+                        <LocalTime options={CLOCK} value={naturalWindow(at).to} zone={set.timeZone} />)
+                      </>
+                    ) : null}
                   </span>
                 ))}
               </p>
@@ -239,6 +243,7 @@ export function SchedulingPage({
         <Row
           description="New drafts start with posts going out up to four minutes either side of the slot, so they read less like a timer. The offset is chosen once and kept, and you can turn it off for one draft when you schedule it."
           label="Natural posting times"
+          layout="inline"
         >
           <div className="flex items-center gap-3">
             <SaveStatus state={naturalState} />

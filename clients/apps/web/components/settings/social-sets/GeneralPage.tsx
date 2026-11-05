@@ -13,6 +13,7 @@ import {
   SETTINGS_SECTIONS,
   socialSetHref,
 } from '@/components/workspace/settings-sections'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -21,6 +22,7 @@ import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { settingsErrorMessage } from '@/lib/settings/client'
 import { useSocialSetScope } from './scope'
 import {
+  DEFAULT_BRAND_NAME,
   HEALTH_GUIDANCE,
   providerFor,
   type SocialSetRecord,
@@ -46,8 +48,19 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
   const trimmed = name.trim()
   const dirty = name !== set.name
   useUnsavedSettings(dirty)
+  // A new brand lands here from its first connection, so this is where it gets asked for a name.
+  const unnamed = canManage && set.name === DEFAULT_BRAND_NAME
   return (
     <>
+      {unnamed ? (
+        <Alert className="border-0 rounded-none">
+          <AlertTitle>Name this publishing brand</AlertTitle>
+          <AlertDescription>
+            “{DEFAULT_BRAND_NAME}” is a placeholder. Use the person or company this brand posts as,
+            so your team can tell it apart.
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <Row
         description="Choose a name that helps your team recognize this publishing brand."
         label="Name"
@@ -64,12 +77,16 @@ function NameAndColor({ canManage, set }: { canManage: boolean; set: SocialSetRe
         >
           <Input
             aria-label="Publishing brand name"
+            autoFocus={unnamed}
             className="w-64"
             disabled={!canManage || nameState === 'saving'}
             maxLength={80}
             // The name saves when you leave the field or press Enter, like the colour below.
             onBlur={(event) => event.currentTarget.form?.requestSubmit()}
             onChange={(event) => setName(event.target.value)}
+            onFocus={(event) => {
+              if (unnamed) event.currentTarget.select()
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Escape') setName(set.name)
             }}
