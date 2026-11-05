@@ -21,10 +21,16 @@ async function shoot(page: Page, name: string) {
     await page.setViewportSize({ height, width })
     for (const theme of ['light', 'dark']) {
       // The app's own switch; toggling the class by hand leaves some of its styles behind.
-      const switcher = page.getByRole('button', { name: `Switch to ${theme} mode` }).first()
-      if (await switcher.isVisible())
-        await switcher.evaluate((button: HTMLElement) => button.click())
-      await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
+      const html = page.locator('html')
+      await expect(async () => {
+        const switcher = page.getByRole('button', { name: `Switch to ${theme} mode` }).first()
+        if (await switcher.isVisible()) {
+          // Disabled until the saved settings load, and a click on it then does nothing.
+          await expect(switcher).toBeEnabled({ timeout: 2_000 })
+          await switcher.evaluate((button: HTMLElement) => button.click())
+        }
+        await expect(html).toHaveClass(new RegExp(`\\b${theme}\\b`), { timeout: 2_000 })
+      }).toPass({ timeout: 30_000 })
       // The shell scrolls inside itself, so the window grows to show the whole page.
       const extra = await page.evaluate(() =>
         Math.max(
