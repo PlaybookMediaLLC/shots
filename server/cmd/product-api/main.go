@@ -15,6 +15,8 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/agentclients"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/authstore"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/collab"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/config"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -83,6 +85,15 @@ func main() {
 		WithAssetDownloads(cfg.ServiceToken, os.Getenv("BETTER_AUTH_URL"))
 	if objects != nil {
 		configuration.WithObjectStore(objects)
+	}
+	// Starting a sign-in needs the browser provider here; jobs run on the worker.
+	captureKeys, err := sessionstate.FromEnvironment()
+	if err != nil {
+		slog.Error("invalid capture session key")
+		os.Exit(1)
+	}
+	if provider := browser.FromEnvironment(); provider != nil && captureKeys != nil {
+		configuration.WithAuthenticatedCapture(browser.Runner{Provider: provider}, captureKeys)
 	}
 	// Live draft posts' engagement is read through the direct social publisher,
 	// which shares this database (RFC 013).

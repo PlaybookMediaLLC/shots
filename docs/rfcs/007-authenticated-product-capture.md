@@ -23,7 +23,10 @@ records a managed-browser candidate, tested defects in existing capture/intake
 paths, and remaining integration gates against its stated source baseline.
 Resolve those defects and prove the same isolation, egress, secret-lifecycle,
 and human-review requirements before adopting that provider. This companion
-does not change this RFC's conditional priority or pilot limits.
+does not change this RFC's conditional priority or pilot limits. The tested defects
+are fixed, and capture is implemented behind configuration on that provider with this
+RFC's limits. The signed-in stage on the real provider and the pilot evidence remain
+open ([implementation status](authenticated-release-capture-review.md#10-implementation-status)).
 
 ## Existing foundation
 

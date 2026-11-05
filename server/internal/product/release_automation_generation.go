@@ -47,6 +47,12 @@ func (c *Configuration) AutomationCapabilities() []string {
 	if c.automationCanvases != nil {
 		capabilities = append(capabilities, automation.CapabilityCanvas)
 	}
+	if c.capture != nil && c.objects != nil {
+		capabilities = append(capabilities, automation.CapabilityCapture)
+	}
+	if c.CaptureAvailable() && c.objects != nil {
+		capabilities = append(capabilities, automation.CapabilityBrowser)
+	}
 	return capabilities
 }
 

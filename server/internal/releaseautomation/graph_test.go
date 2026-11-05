@@ -56,7 +56,7 @@ func TestGraphRejectsUnsafeStructures(t *testing.T) {
 		{"unknown action", "action", func(g *Graph) { g.Nodes[2].Action.Type = "publish" }},
 		{"foreign field", "condition", func(g *Graph) { g.Nodes[1].Condition.Field = "pr.files" }},
 		{"review continuation", "review_terminal", func(g *Graph) { g.Edges[5].To = "release" }},
-		{"unsupported schema", "schema_version", func(g *Graph) { g.SchemaVersion = 3 }},
+		{"unsupported schema", "schema_version", func(g *Graph) { g.SchemaVersion = SchemaVersion + 1 }},
 		{"generation in v1", "action", func(g *Graph) {
 			g.Nodes[4].Action = &Action{Type: "generate_copy", Input: &Reference{NodeID: "campaign", Output: "campaignId"}, CreditLimit: 10}
 		}},
@@ -273,7 +273,7 @@ func TestWorkflowTemplatesFixtureValidates(t *testing.T) {
 	if err := json.Unmarshal(body, &templates); err != nil {
 		t.Fatal(err)
 	}
-	if len(templates) != 10 {
+	if len(templates) != 11 {
 		t.Fatalf("templates=%d", len(templates))
 	}
 	for name, graph := range templates {
@@ -552,5 +552,105 @@ func TestRenderCodeVisualNeedsConsentAndAPullRequest(t *testing.T) {
 				t.Fatal("invalid code visual accepted")
 			}
 		})
+	}
+}
+
+// captureGraph is deployment → release → campaign → capture → render → review.
+func captureGraph() Graph {
+	g := testGraph()
+	g.SchemaVersion, g.Family = 3, Deployed
+	g.Qualification = Condition{Field: "deployment.environment", Operator: "eq", Values: []string{"production"}}
+	g.Nodes[1].Condition = &Condition{Field: "deployment.state", Operator: "eq", Values: []string{"success"}}
+	g.Nodes = append(g.Nodes,
+		Node{ID: "capture", Type: "action", Action: &Action{Type: "capture_product", Input: &Reference{NodeID: "campaign", Output: "campaignId"}, SurfaceID: "surface", VersionPath: "/api/version"}},
+		Node{ID: "art", Type: "action", Action: &Action{Type: "render_creatives", Input: &Reference{NodeID: "capture", Output: "campaignId"}, TemplateIDs: []string{"layout-browser-launch"}}})
+	g.Edges[4].To = "capture"
+	g.Edges = append(g.Edges, Edge{"capture", "art", "next"}, Edge{"art", "review", "next"})
+	g.Nodes[4].Action.Input.NodeID = "art"
+	return g
+}
+
+func TestCaptureProductLanguage(t *testing.T) {
+	if issues := Validate(captureGraph()); len(issues) > 0 {
+		t.Fatalf("issues=%+v", issues)
+	}
+	currentState := captureGraph()
+	capture := FindNode(currentState, "capture").Action
+	capture.VersionPath, capture.CurrentState = "", true
+	if issues := Validate(currentState); len(issues) > 0 {
+		t.Fatalf("explicit current state: %+v", issues)
+	}
+	for name, change := range map[string]func(*Graph, *Action){
+		"older language": func(g *Graph, _ *Action) { g.SchemaVersion = 2 },
+		"merge trigger":  func(g *Graph, _ *Action) { g.Family = Merged },
+		"release unproven": func(g *Graph, a *Action) {
+			g.Family, a.VersionPath, a.CurrentState = Published, "", true
+		},
+		"no surface":         func(_ *Graph, a *Action) { a.SurfaceID = "" },
+		"no proof choice":    func(_ *Graph, a *Action) { a.VersionPath = "" },
+		"both proof choices": func(_ *Graph, a *Action) { a.CurrentState = true },
+		"another host":       func(_ *Graph, a *Action) { a.VersionPath = "https://evil.example/version" },
+		"network path":       func(_ *Graph, a *Action) { a.VersionPath = "//evil.example/version" },
+		"backslash path":     func(_ *Graph, a *Action) { a.VersionPath = `/\evil.example` },
+		"no campaign":        func(_ *Graph, a *Action) { a.Input = nil },
+		"foreign config":     func(_ *Graph, a *Action) { a.Audience = "everyone" },
+		"second capture": func(g *Graph, _ *Action) {
+			g.Nodes = append(g.Nodes, Node{ID: "again", Type: "action", Action: &Action{Type: "capture_product", Input: &Reference{NodeID: "capture", Output: "campaignId"}, SurfaceID: "surface", CurrentState: true}})
+			g.Edges[len(g.Edges)-1] = Edge{"art", "again", "next"}
+			g.Edges = append(g.Edges, Edge{"again", "review", "next"})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			g := captureGraph()
+			for i := range g.Nodes {
+				if g.Nodes[i].ID == "capture" {
+					change(&g, g.Nodes[i].Action)
+				}
+			}
+			if len(Validate(g)) == 0 {
+				t.Fatal("an invalid capture was accepted")
+			}
+		})
+	}
+	// An authenticated recipe names its own page and proof, and needs nothing else.
+	withRecipe := func(change func(*Action)) Graph {
+		g := captureGraph()
+		a := FindNode(g, "capture").Action
+		a.SurfaceID, a.VersionPath, a.RecipeID = "", "", "recipe-1"
+		change(a)
+		return g
+	}
+	if issues := Validate(withRecipe(func(*Action) {})); len(issues) > 0 {
+		t.Fatalf("recipe: %+v", issues)
+	}
+	if issues := Validate(withRecipe(func(a *Action) { a.CurrentState = true })); len(issues) > 0 {
+		t.Fatalf("recipe without proof: %+v", issues)
+	}
+	if len(Validate(withRecipe(func(a *Action) { a.SurfaceID = "surface" }))) == 0 || len(Validate(withRecipe(func(a *Action) { a.VersionPath = "/v" }))) == 0 {
+		t.Fatal("a recipe's page or proof was overridden")
+	}
+	// Other actions cannot carry version proof.
+	g := testGraph()
+	g.SchemaVersion = 3
+	g.Nodes[2].Action.CurrentState = true
+	if len(Validate(g)) == 0 {
+		t.Fatal("version proof on create release was accepted")
+	}
+	g = testGraph()
+	g.SchemaVersion = 3
+	g.Nodes[2].Action.RecipeID = "recipe-1"
+	if len(Validate(g)) == 0 {
+		t.Fatal("a recipe on create release was accepted")
+	}
+	// Preview names the source a render will really use.
+	preview := DryRun(captureGraph(), Event{Family: Deployed, Fields: map[string]Value{"deployment.environment": StringValue("production"), "deployment.state": StringValue("success")}})
+	var rendered string
+	for _, step := range preview.Steps {
+		if step.Action == "render_creatives" {
+			rendered = step.Outcome
+		}
+	}
+	if !strings.Contains(rendered, "this deployment's capture") {
+		t.Fatalf("steps=%+v", preview.Steps)
 	}
 }

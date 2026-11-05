@@ -87,6 +87,7 @@ const DefaultStatus = StatusRECEIVED
 const (
 	StatusRECEIVED Status = "RECEIVED"
 	StatusCAPTURED Status = "CAPTURED"
+	StatusPARTIAL  Status = "PARTIAL"
 	StatusSKIPPED  Status = "SKIPPED"
 	StatusFAILED   Status = "FAILED"
 )
@@ -98,7 +99,7 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusRECEIVED, StatusCAPTURED, StatusSKIPPED, StatusFAILED:
+	case StatusRECEIVED, StatusCAPTURED, StatusPARTIAL, StatusSKIPPED, StatusFAILED:
 		return nil
 	default:
 		return fmt.Errorf("deploymentevent: invalid enum value for status field: %q", s)

@@ -42,7 +42,18 @@ require (
 	google.golang.org/grpc v1.83.2
 )
 
-require google.golang.org/protobuf v1.36.11
+require (
+	github.com/go-rod/rod v0.116.2
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	github.com/ysmood/fetchup v0.2.3 // indirect
+	github.com/ysmood/goob v0.4.0 // indirect
+	github.com/ysmood/got v0.40.0 // indirect
+	github.com/ysmood/gson v0.7.3 // indirect
+	github.com/ysmood/leakless v0.9.0 // indirect
+)
 
 require (
 	ariga.io/atlas v0.32.1-0.20250325101103-175b25e1c1b9 // indirect

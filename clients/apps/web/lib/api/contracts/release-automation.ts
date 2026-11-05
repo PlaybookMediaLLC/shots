@@ -230,6 +230,9 @@ export const automationOutputsSchema = z.object({
   renderedAssetIds: z.array(z.string()).optional(),
   canvasId: z.string().optional(),
   codeProjectId: z.string().optional(),
+  captureId: z.string().optional(),
+  captureAssetId: z.string().optional(),
+  captureProof: z.enum(['version', 'current_state']).optional(),
 })
 
 /** Persisted event/run history remains readable during a Temporal outage. */

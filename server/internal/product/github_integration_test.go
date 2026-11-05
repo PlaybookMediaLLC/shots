@@ -241,14 +241,52 @@ func TestGitHubConnectionsChangesAndReleases(t *testing.T) {
 	if err := connect(ownerA, linkA.ID, "1002", nil); err != nil {
 		t.Fatal(err)
 	}
+	// Lifecycle events record what GitHub reports now, so a late or replayed
+	// signed event never restores access GitHub has since revoked.
+	created := fake.installs[installation]
+	suspended := created
+	suspended.Suspended = true
+	githubReports := func(state githubapp.Installation) { fake.installs[installation] = state }
+	statusIs := func(want string) bool {
+		return count(`SELECT count(*) FROM github_installation WHERE "installationId"=$1 AND status=$2`, installation, want) == 1
+	}
+	githubReports(suspended)
 	if _, err := repo.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationSuspended); err != nil || sources("1002") != 0 {
 		t.Fatalf("a suspended installation still delivers: %v", err)
+	}
+	// created -> suspend -> the original created again: still suspended.
+	if err := repo.RecordGitHubInstallation(ctx, created); err != nil || !statusIs("SUSPENDED") || sources("1002") != 0 {
+		t.Fatalf("a replayed created event restored a suspended installation: %v", err)
+	}
+	// GitHub cannot be read: an event that would restore access writes nothing.
+	down := NewConfiguration(db.Client).WithGitHubApp(downGitHub{fake})
+	githubReports(created)
+	if err := down.RecordGitHubInstallation(ctx, created); !errors.Is(err, ErrGitHubUnavailable) || !statusIs("SUSPENDED") {
+		t.Fatalf("an unconfirmed created event was recorded: %v", err)
+	}
+	if _, err := down.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationActive); !errors.Is(err, ErrGitHubUnavailable) || !statusIs("SUSPENDED") {
+		t.Fatalf("an unconfirmed resumption was recorded: %v", err)
 	}
 	if _, err := repo.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationActive); err != nil || sources("1002") != 1 {
 		t.Fatalf("a resumed installation does not deliver: %v", err)
 	}
+	// suspend -> unsuspend -> the original suspend again: GitHub says active.
+	if _, err := repo.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationSuspended); err != nil || !statusIs("ACTIVE") || sources("1002") != 1 {
+		t.Fatalf("a replayed suspend event overrode GitHub's active installation: %v", err)
+	}
+	// A suspension restores nothing, so it applies even when GitHub cannot be read.
+	if _, err := down.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationSuspended); err != nil || !statusIs("SUSPENDED") {
+		t.Fatalf("an unconfirmed suspension was not recorded: %v", err)
+	}
+	if err := repo.RecordGitHubInstallation(ctx, created); err != nil || !statusIs("ACTIVE") || sources("1002") != 1 {
+		t.Fatalf("GitHub's active installation was not restored: %v", err)
+	}
 	if n, err := repo.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationDeleted); err != nil || n != 1 || sources("1002") != 0 {
 		t.Fatalf("a removed installation archived=%d err=%v", n, err)
+	}
+	// A late suspension, which applies when GitHub cannot be read, leaves a removal final.
+	if _, err := down.SetGitHubInstallationStatus(ctx, installation, GitHubInstallationSuspended); err != nil || !statusIs("DELETED") {
+		t.Fatalf("a late suspension changed a removed installation: %v", err)
 	}
 
 	// Merges wait for the next release, which takes them as features.

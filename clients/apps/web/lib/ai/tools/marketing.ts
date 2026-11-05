@@ -120,7 +120,8 @@ export function marketingTools(
   const captureProductSurface = defineTool(run, {
     description:
       'Take a fresh screenshot of a registered product page, by its slug from ' +
-      'listProductSurfaces, and make it the page’s current capture. Returns the assetId.',
+      'listProductSurfaces, and make it the page’s current capture. Returns the assetId. A page ' +
+      'behind a sign-in is captured in the background: it returns pending with no assetId yet.',
     effect: 'external',
     execute: async ({ slug }) => {
       const surfaces = await services.listProductSurfaces(run.access)
@@ -132,6 +133,15 @@ export function marketingTools(
       })
       if (!result) return failure('Unknown slug. Use one from listProductSurfaces.')
       if ('failure' in result) return failure(result.failure.message)
+      if ('job' in result) {
+        return {
+          message:
+            'The capture is running. The screenshot becomes the page’s current capture when it ends.',
+          ok: true as const,
+          pending: true as const,
+          slug,
+        }
+      }
       return { assetId: result.capture.assetId, ok: true as const, slug }
     },
     inputSchema: z.object({ slug: z.string().trim().min(1).max(200) }),

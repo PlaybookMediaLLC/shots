@@ -59,7 +59,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
-import { actionAvailability, savedGraph, WORKFLOW_SCHEMA_VERSION } from '@/lib/workflows/actions'
+import { actionAvailability, graphSchemaVersion, savedGraph } from '@/lib/workflows/actions'
 import { releaseExample } from '@/lib/workflows/examples'
 import { getErrorMessage } from '@/components/workspace/settings-client'
 import { ActionEditor } from './ActionEditor'
@@ -752,6 +752,7 @@ export function WorkflowEditor({
                             node={selectedNode}
                             graph={graph}
                             overview={overview}
+                            sourceAppId={record.sourceAppId}
                             onChange={(action) => changeNode({ ...selectedNode, action })}
                           />
                         ) : null}
@@ -978,7 +979,7 @@ export function WorkflowEditor({
                     </div>
                     <p className="text-xs leading-5 text-muted-foreground">
                       Draft revision {record.revision || 'new'} · language v
-                      {WORKFLOW_SCHEMA_VERSION}
+                      {graphSchemaVersion(graph)}
                       {record.updatedAt
                         ? ` · Saved ${new Date(record.updatedAt).toLocaleString()}`
                         : ''}

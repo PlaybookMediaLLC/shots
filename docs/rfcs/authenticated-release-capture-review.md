@@ -1,6 +1,8 @@
 # Authenticated screenshots after a release: design and security review
 
-Status: Proposed; locally security-reviewed, with open implementation blockers.
+Status: Implemented behind configuration and proven on the real provider against a
+synthetic protected app; a real customer sign-in remains. See
+[section 10](#10-implementation-status).
 Date: 2026-10-24.
 Source baseline: local `main`, `6447f4edc95a2ac6b41e412a2176e305e13db301`.
 
@@ -805,3 +807,138 @@ the section 8 gates. Actual browser handoff theft, concurrent reconnect,
 session-generation fencing, provider guardrails, database races, full-app
 type/lint/Gauntlet checks, and production behavior remain untested in this
 pass. There is no implemented authenticated capture system to certify yet.
+
+## 10. Implementation status
+
+Updated 2026-11-04. Sections 1–9 keep the review as written against its baseline;
+their statements that nothing is implemented describe that commit. This section is
+the current state. Authenticated capture is off unless `PLATFORM_CAPTURE_CDP_URL`,
+`PLATFORM_CAPTURE_CDP_TOKEN`, and `PLATFORM_CAPTURE_STATE_KEY` are set
+([configuration](../../server/README.md)).
+
+### Decisions
+
+- **One capture system.** `capture_recipe` holds immutable recipe versions,
+  `capture_job` holds one business capture, and the legacy `capture` table holds
+  attempts, as `CaptureAttempt`. `platform_app_connection` is new. RFC 007's
+  `platform_capture_*` tables are not created; its limits apply: a 10-minute sign-in
+  window, state kept 24 hours unless `PLATFORM_CAPTURE_STATE_MAX_AGE` changes it, one
+  active capture per workspace, a 90-second run, and 10 steps.
+- **`go-rod`, not `chromedp`.** The spike's first question was authorization headers.
+  `chromedp` exposes no way to set them on the socket. Rod does, but its built-in
+  reader failed on what Browser Run sends and its client panics on any frame that is
+  not JSON. It therefore runs over the existing `coder/websocket` dependency, through a
+  transport that passes only JSON objects, so a provider frame cannot crash a worker.
+- **Recipe versions.** A job pins one version's exact bytes when it is admitted. A
+  workflow names a recipe, and an owner activating a newer tested version moves that
+  workflow onto it; archiving the recipe stops the workflow. Connection origins and the
+  expected account never change: new authority needs a new connection.
+- **Every entry point shares one job service.** The deployment trigger, the workflow
+  action, a test, a person's request, and both agent tools arrive at `admitCaptureJob`.
+  A surface with an active recipe never gets a public screenshot, which would only show
+  its sign-in screen.
+- **Human review stays as it is.** RFC 007 proposes a separate promotion review. This
+  document keeps the existing flow: a capture never approves anything, and campaign
+  review still gates publication. A review of redactions before promotion is not built.
+
+### Fixed defects
+
+| Finding | Change | Regression |
+| --- | --- | --- |
+| S1 | `publicnet.Transport` dials only public addresses, checked on the dialed address, and is shared with webhook delivery. Readiness uses it and checks every redirect hop. Surface selection compares scheme, host and port. `validSurfaceURL` refuses private and credentialed addresses. A private deployment URL stays recorded and is skipped as `deployment_url_refused`. Go `CaptureWith` and web `captureScreenshot` check the page below every caller. | `TestDeploymentReadinessRefusesPrivateDestinations`, `TestSameOriginComparesSchemeHostAndPort`, `TestConfigurationRoutesPreserveProductShape`, `TestFromEnvironmentRefusesPrivateAddresses`, `screenshot-capture.server.ts` |
+| S2 | The download checks the host on every hop and validates image type and decoded dimensions. | `TestCaptureDownloadRefusesAHostChangingRedirect` |
+| R1 | `capture_product` requires version proof or an explicit current-state label and passes its exact capture to rendering. Deployment captures bypass the provider's 24-hour cache, a staleness cause this review did not list. | `TestAutomationCaptureProductProvesTheDeployment`, `TestAutomationCaptureProductLabelsCurrentStateAndRefusesWhatItCannotShow` |
+| R2 | One receipt per deployment, page and proof, enforced by a unique index. A rerun captures only missing pages. An explicit `PARTIAL` state. A locked surface and deployment ordering. | `TestWorkerEnrichesReleasesBackfillsAndCaptures` |
+| R3 | The repository filter is applied at the web parser and again against the locked source. | `webhook-security.test.ts`, `TestAuditControlsAndSourceWebhooks` |
+| S3 | Lifecycle events record the status GitHub reports now and fail closed when a restoring event cannot confirm it. A removal stays final. | `TestGitHubConnectionsChangesAndReleases`, `github_installations_test.go` |
+
+### Acceptance cases
+
+"Database" uses a real Postgres with a scripted browser. "Chrome" uses a synthetic
+protected app in real Chrome, with each provider session a separate process. "Cloudflare"
+is `TestLiveProviderWorkerAndSignedInCapture`: real Browser Run sessions, a real Temporal
+worker, the real outbox dispatcher, and real Postgres, against a synthetic protected app.
+It passed twice in a row, in about 90 seconds each.
+
+| Case | Status | Evidence |
+| --- | --- | --- |
+| Release before deployment | Passed: Cloudflare and database | The job waited through real workflow timers while the app reported the old commit. `TestCaptureReleaseWaitsForItsTagsDeployment`, `TestCaptureReleaseBeforeDeploymentWaitsAndNeverRecordsOldUI` |
+| Fresh-session auth restore | Passed: Cloudflare and Chrome | A new session restored a form sign-in's cookie and local storage, proved the account, and captured the protected page. `TestRealBrowserFreshSessionCapture` |
+| Duplicate release/deployment delivery | Passed: database | `TestCaptureDeploymentJobIsOneCanonicalResult`, `TestCaptureWorkflowActionWaitsForItsExactResult` |
+| Expired session, MFA, or CAPTCHA | Passed: Cloudflare, Chrome and database | An expired session parked the job, and a reconnect resumed the same job. `TestRealBrowserRefusesWhatItCannotClaim`, `TestCaptureExpiredSessionParksTheJobUntilAPersonReconnects`. MFA and CAPTCHA are simulated, not a real identity provider's challenge |
+| Cross-tenant IDs and viewer access | Passed: database and browser flow | `TestCaptureOtherTenantsAreDenied`, `TestCaptureHandoffBelongsToTheUserWhoStartedIt`, `signed-in-capture.spec.ts` |
+| Revoked access or cancelled release | Passed: database | `TestCaptureRevocationStopsQueuedAndInFlightWork`, `TestCaptureCancellationAndEligibilityStopACommit` |
+| Redirect, DNS rebinding, subresource, WebSocket | Passed: Chrome. Subresource, WebSocket, write, and guardrails passed: Cloudflare. **DNS rebinding cannot be observed on Cloudflare** | `TestRealBrowserStaysOnApprovedHosts`, `TestLiveProviderSession`. See below |
+| Worker crash after allocation, upload, or commit | Passed: database, by rewinding state | `TestCaptureCrashesReconcileToOneResult`, `TestCaptureFencingStopsAnExpiredAttemptOverwritingANewerOne` |
+| Concurrent deployments out of order | Passed: database | `TestCaptureOutOfOrderDeploymentsKeepTheNewerImage` |
+| Missing selector, loading page, wrong account | Passed: Chrome and database | `TestRealBrowserRefusesWhatItCannotClaim`, `TestCaptureSafeFailuresAndTestsNeverClaimASuccess` |
+| Authenticated image privacy | Passed: masks in Chrome and on Cloudflare; tenant reads in database | The URL cache is never used by this path. Signed-link expiry and workspace deletion were not retested |
+| Campaign rendering | Passed: database | `TestCaptureWorkflowActionWaitsForItsExactResult` |
+
+### What the real provider showed
+
+Run on 2026-11-04 against Browser Run and `staging.eigenn.io`.
+
+- Bearer-header CDP auth, immutable guardrails, Live View in a person's browser, a
+  session outliving its CDP connection, and repeatable close all work. No sessions stayed
+  open afterward.
+- A host off the allowlist is refused, with the page reading `Host 'api.workos.com'
+  denied due to guardrails policy`. An app's identity provider must be on the login hosts.
+- A WebSocket to an unapproved host failed with no lockdown applied. The documentation
+  does not promise this, so the runner does not rely on it.
+- The full runner works on a public page: isolated context, interception, lockdown,
+  identity and marker checks, a mask, and a screenshot in under four seconds.
+- A closed session disconnects a viewer already attached, which link expiry would not do.
+- **The browser reports `[::1]` for every response**, on a real site too, because it reaches
+  the network through a local proxy. The response-address check therefore has no signal
+  on this provider and treats loopback as no evidence. Rebinding protection there rests on
+  guardrails and the provider's network isolation. Our backend is not on that network.
+- **Browser Run cannot reach a Cloudflare quick tunnel.** `trycloudflare.com` answers it with
+  a 403 while answering everything else, so an app must have its own public host. A
+  `workers.dev` host worked. A login page's identity provider must also be on the login
+  hosts: `api.workos.com` for this app.
+- **Time.** On the synthetic app, restoring and proving a sign-in took about 6 seconds, and
+  a signed-in capture about 5 to 8. At $0.09 per browser hour that is well under a cent per
+  capture, before retries and login time. A real product page will take longer.
+- The product's own page, API, and provider connected end to end up to the sign-in: Connect
+  allocated a real session and issued the link, the link stayed out of the page's storage,
+  URL, and logs, and Revoke closed the session.
+
+### Known limits
+
+- **No real customer sign-in yet.** Step 4 of section 7 ends with one authorized customer
+  demo workspace. Automation played the person on the synthetic app, through the same
+  browser session a person would use. Run it with a person present: `TestLiveSignIn`, then
+  `TestLiveRestoreAndCapture`, with the variables in `live_test.go`. An SSO provider's
+  session, cross-site cookies, and IndexedDB are therefore unproven on the provider.
+- **Object storage in the live run** was in memory. S3 upload is the existing asset path,
+  covered by its own tests.
+- **Local checks.** `make tenant-isolation`'s script passed, and five browser specs passed,
+  against a locally run stack without Docker. `./dev/social-gate` and the rest of `make e2e`
+  were not run locally and rely on CI. Pull requests run only the `@smoke` browser tests;
+  the full suite runs on `develop`.
+- **Portable state is cookies and local storage.** Session storage, IndexedDB,
+  device-bound sessions, and passkeys are not exported. An app relying on them fails
+  validation and stays unconnected.
+- **Client-side controls are not an egress boundary.** The WebSocket, worker, and popup
+  lockdown runs in page JavaScript. Fetch interception sees HTTP only. DNS rebinding is
+  caught on the response, which refuses the result but cannot unsend a request or its
+  cookies. Backend infrastructure egress controls were not inspected or changed.
+- **Between proof and screenshot.** A newer deployment landing in that gap appears under
+  the earlier commit.
+- **Sign-in detection.** The public path cannot see a form an app draws in the browser;
+  authenticated recipes use their identity and marker checks instead.
+- **Orphaned images.** An upload that loses its commit is reused by the retry. One whose
+  attempt was fenced stays stored; its removal by asset retention was not tested.
+- **Deployment ordering** is the order Shots received them.
+- **Capacity.** Limits are per workspace and per worker. There is no account-wide
+  ceiling shared with design rendering beyond the worker's slot count.
+- **Not built.** Typed deployment events from other CI providers, an app-provided session
+  bootstrap, and RFC 007's review of redactions before promotion. The S3 delivery receipt
+  was left out: reconciling with GitHub covers the late-event case.
+
+### Not established
+
+Cost and latency on real workloads, a real customer demo workspace, and RFC 007's start
+condition of repeated private-screen pain with paid pilot demand. This was built on
+explicit instruction, not on that evidence.

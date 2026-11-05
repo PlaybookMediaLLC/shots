@@ -10,6 +10,7 @@ export const automationActionTypeSchema = z.enum([
   'create_release',
   'create_campaign',
   'generate_copy',
+  'capture_product',
   'render_creatives',
   'render_code_visual',
   'create_canvas',
@@ -45,6 +46,15 @@ export const automationActionSchema = z.discriminatedUnion('type', [
     type: z.literal('generate_copy'),
     input: automationReferenceSchema.optional(),
     creditLimit: z.number().int().min(0).max(500).optional(),
+  }),
+  z.object({
+    type: z.literal('capture_product'),
+    input: automationReferenceSchema.optional(),
+    surfaceId: z.string().max(64).optional(),
+    versionPath: z.string().max(256).optional(),
+    currentState: z.boolean().optional(),
+    /** A signed-in capture recipe, which then supplies the page and proof instead. */
+    recipeId: z.string().max(64).optional(),
   }),
   z.object({
     type: z.literal('render_creatives'),

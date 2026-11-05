@@ -1357,5 +1357,142 @@
         "branch": "next"
       }
     ]
+  },
+  "deployment-marketing+capture": {
+    "schemaVersion": 3,
+    "family": "deployment.succeeded",
+    "qualification": {
+      "field": "deployment.environment",
+      "operator": "eq",
+      "values": [
+        "production"
+      ]
+    },
+    "nodes": [
+      {
+        "id": "trigger",
+        "type": "trigger"
+      },
+      {
+        "id": "condition",
+        "type": "condition",
+        "condition": {
+          "field": "deployment.production",
+          "operator": "is_true"
+        }
+      },
+      {
+        "id": "release",
+        "type": "action",
+        "action": {
+          "type": "create_release"
+        }
+      },
+      {
+        "id": "campaign",
+        "type": "action",
+        "action": {
+          "type": "create_campaign",
+          "input": {
+            "nodeId": "release",
+            "output": "releaseId"
+          },
+          "brandKitId": "brand-fixture",
+          "destinationIds": [
+            "destination-fixture"
+          ]
+        }
+      },
+      {
+        "id": "capture",
+        "type": "action",
+        "action": {
+          "type": "capture_product",
+          "input": {
+            "nodeId": "campaign",
+            "output": "campaignId"
+          },
+          "surfaceId": "surface-fixture",
+          "versionPath": "/api/version"
+        }
+      },
+      {
+        "id": "art",
+        "type": "action",
+        "action": {
+          "type": "render_creatives",
+          "input": {
+            "nodeId": "capture",
+            "output": "campaignId"
+          },
+          "templateIds": [
+            "layout-browser-launch"
+          ]
+        }
+      },
+      {
+        "id": "review",
+        "type": "action",
+        "action": {
+          "type": "submit_review",
+          "input": {
+            "nodeId": "art",
+            "output": "campaignId"
+          }
+        }
+      },
+      {
+        "id": "done",
+        "type": "end",
+        "outcome": "completed"
+      },
+      {
+        "id": "skip",
+        "type": "end",
+        "outcome": "skipped"
+      }
+    ],
+    "edges": [
+      {
+        "from": "trigger",
+        "to": "condition",
+        "branch": "next"
+      },
+      {
+        "from": "condition",
+        "to": "release",
+        "branch": "true"
+      },
+      {
+        "from": "condition",
+        "to": "skip",
+        "branch": "false"
+      },
+      {
+        "from": "release",
+        "to": "campaign",
+        "branch": "next"
+      },
+      {
+        "from": "campaign",
+        "to": "capture",
+        "branch": "next"
+      },
+      {
+        "from": "capture",
+        "to": "art",
+        "branch": "next"
+      },
+      {
+        "from": "art",
+        "to": "review",
+        "branch": "next"
+      },
+      {
+        "from": "review",
+        "to": "done",
+        "branch": "next"
+      }
+    ]
   }
 }

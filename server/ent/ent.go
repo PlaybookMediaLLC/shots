@@ -36,6 +36,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/captureattempt"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/communicationrecipient"
@@ -77,6 +80,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/pageknowledge"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroup"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/permissiongroupmember"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmcampaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformautodmoptout"
@@ -221,6 +225,9 @@ func checkColumn(t, c string) error {
 			campaignplan.Table:                    campaignplan.ValidColumn,
 			campaignpost.Table:                    campaignpost.ValidColumn,
 			campaignrevision.Table:                campaignrevision.ValidColumn,
+			captureattempt.Table:                  captureattempt.ValidColumn,
+			capturejob.Table:                      capturejob.ValidColumn,
+			capturerecipe.Table:                   capturerecipe.ValidColumn,
 			channelconnection.Table:               channelconnection.ValidColumn,
 			communicationattempt.Table:            communicationattempt.ValidColumn,
 			communicationrecipient.Table:          communicationrecipient.ValidColumn,
@@ -262,6 +269,7 @@ func checkColumn(t, c string) error {
 			pageknowledge.Table:                   pageknowledge.ValidColumn,
 			permissiongroup.Table:                 permissiongroup.ValidColumn,
 			permissiongroupmember.Table:           permissiongroupmember.ValidColumn,
+			platformappconnection.Table:           platformappconnection.ValidColumn,
 			platformautodmcampaign.Table:          platformautodmcampaign.ValidColumn,
 			platformautodmdelivery.Table:          platformautodmdelivery.ValidColumn,
 			platformautodmoptout.Table:            platformautodmoptout.ValidColumn,
