@@ -43,6 +43,8 @@ OPTIONAL_SOCIAL_SECRETS = (
     "TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET",
     "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET",
     "THREADS_APP_ID", "THREADS_APP_SECRET",
+    # Keeps a provider "Coming soon" while its credentials are deployed for review.
+    "HIDDEN_PROVIDERS",
 )
 # The onboarding agent's model and enrichment (docs/rfcs/032); without them it
 # drafts from page metadata and skips Exa.
