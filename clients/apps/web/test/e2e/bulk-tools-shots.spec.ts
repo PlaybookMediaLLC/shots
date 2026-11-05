@@ -17,14 +17,25 @@ async function shoot(page: Page, name: string) {
   for (const [width, height] of WIDTHS) {
     await page.setViewportSize({ height, width })
     for (const theme of ['light', 'dark']) {
-      await page.evaluate((next) => {
-        const root = document.documentElement
-        root.classList.remove('light', 'dark')
-        root.classList.add(next)
-        root.style.colorScheme = next
-      }, theme)
-      const image = await page.screenshot({ fullPage: true, quality: 62, type: 'jpeg' })
+      // The app's own switch; toggling the class by hand leaves some of its styles behind.
+      const switcher = page.getByRole('button', { name: `Switch to ${theme} mode` }).first()
+      if (await switcher.isVisible()) await switcher.click()
+      await expect(page.locator('html')).toHaveClass(new RegExp(`\\b${theme}\\b`))
+      // The shell scrolls inside itself, so the window grows to show the whole page.
+      const extra = await page.evaluate(() =>
+        Math.max(
+          0,
+          ...Array.from(document.querySelectorAll('*')).map((element) =>
+            ['auto', 'scroll'].includes(getComputedStyle(element).overflowY)
+              ? element.scrollHeight - element.clientHeight
+              : 0
+          )
+        )
+      )
+      await page.setViewportSize({ height: Math.min(height + extra, 4200), width })
+      const image = await page.screenshot({ quality: 62, type: 'jpeg' })
       screenshots[`${name}-${width}-${theme}.jpg`] = image.toString('base64')
+      await page.setViewportSize({ height, width })
     }
   }
   await page.setViewportSize({ height: 900, width: 1440 })

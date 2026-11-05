@@ -1071,12 +1071,28 @@ export function BatchWorkspace({
   const ready = unsaved.filter(
     (item) => item.media.every((entry) => entry.assetId) && !waitingToRender(item)
   )
+  const notRendered = items.filter(waitingToRender).length
   const drafted = items.filter((item) => item.draftId)
   const checked = Object.keys(verdicts).length > 0
   // The next step is the primary action; the others stay available as outline.
   const next = ready.length ? 'save' : !drafted.length ? null : checked ? 'schedule' : 'check'
   // Smaller action buttons on phones, where the bar stays over the posts.
   const compact = useIsMobile() ? 'sm' : 'default'
+  // A batch started for grid videos, or already holding them, opens on them.
+  const gridFirst = start === 'grid' || items.some((item) => item.grid)
+  const gridCreator = showGrid ? (
+    <GridCreator
+      disabled={busy !== null}
+      base={base}
+      items={items}
+      lastRender={batch.render}
+      sharedAccounts={sharedAccounts}
+      onAdd={addConcepts}
+      onApply={applyGrids}
+      onReload={reload}
+      onUpdate={updateItem}
+    />
+  ) : null
 
   return (
     <Page
@@ -1138,6 +1154,8 @@ export function BatchWorkspace({
             </AlertDescription>
           </Alert>
         ) : null}
+
+        {gridFirst ? gridCreator : null}
 
         {items.length < BATCH_ITEM_LIMIT ? (
           <Section
@@ -1429,19 +1447,7 @@ export function BatchWorkspace({
           </Section>
         ) : null}
 
-        {showGrid ? (
-          <GridCreator
-            disabled={busy !== null}
-            base={base}
-            items={items}
-            lastRender={batch.render}
-            sharedAccounts={sharedAccounts}
-            onAdd={addConcepts}
-            onApply={applyGrids}
-            onReload={reload}
-            onUpdate={updateItem}
-          />
-        ) : null}
+        {gridFirst ? null : gridCreator}
 
         {videoChannels.length ? (
           <Section
@@ -1895,8 +1901,12 @@ export function BatchWorkspace({
                       : ''
                   }. Nothing goes out until you choose Schedule.`
                 : `${drafted.length} of ${items.length} saved as drafts${
-                    unsaved.length > ready.length
-                      ? `; ${unsaved.length - ready.length} still uploading or waiting for files`
+                    notRendered
+                      ? `; ${notRendered} video${notRendered === 1 ? '' : 's'} not rendered yet`
+                      : ''
+                  }${
+                    unsaved.length - ready.length - notRendered > 0
+                      ? `; ${unsaved.length - ready.length - notRendered} still uploading or waiting for files`
                       : ''
                   }.`}
             </p>

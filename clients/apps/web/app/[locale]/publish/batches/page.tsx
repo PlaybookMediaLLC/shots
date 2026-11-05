@@ -10,7 +10,7 @@ import { listContentBatches } from '@/lib/tenant/content-batches'
 import { listSocialSets } from '@/lib/tenant/write'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 
-export const metadata = { title: 'Bulk scheduling · Publish' }
+export const metadata = { title: 'Bulk tools · Publish' }
 
 /** Open bulk batches, and a way to start one in a publishing brand. */
 export default async function BatchesPage({
@@ -33,7 +33,7 @@ export default async function BatchesPage({
       organizationName={access.organization.name}
     >
       <Page
-        title="Bulk scheduling"
+        title="Bulk tools"
         description="Prepare up to 100 separate posts at once from videos, folders of images or a CSV. Each becomes its own draft, so review and scheduling work as they do for one draft. A batch saves as you go."
       >
         {canEdit ? (
@@ -83,7 +83,7 @@ export default async function BatchesPage({
             <EmptyState
               icon={LibraryIcon}
               title="No open batches"
-              description="A batch turns up to 50 photos, videos or CSV rows into separate drafts you can review and schedule together."
+              description="A batch turns up to 100 videos, folders of images or CSV rows into separate drafts you can review and schedule together."
             />
           )}
         </Section>
