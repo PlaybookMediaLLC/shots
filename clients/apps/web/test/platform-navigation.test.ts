@@ -218,7 +218,7 @@ test('the in-app plan page follows the theme like the rest of the app', () => {
 test('Campaigns lists Deliveries only where content drafts are rolled out', () => {
   assert.deepEqual(
     publishLinks('?set=a').map((item) => item.label),
-    ['Drafts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
+    ['Posts', 'Calendar', 'Bulk tools', 'Analyze', 'Link checks']
   )
   assert.deepEqual(
     campaignLinks(true).map((item) => item.label),
@@ -348,7 +348,7 @@ test('search finds every page by name, with its section, and the pages visited b
   )
 })
 
-test('every Publish link keeps the publishing brand it was opened from', () => {
+test('every Publish link keeps the profile it was opened from', () => {
   for (const link of publishLinks('?set=brand'))
     assert.ok(link.href.endsWith('?set=brand'), link.href)
 })

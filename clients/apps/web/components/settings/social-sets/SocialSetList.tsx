@@ -27,7 +27,7 @@ import { settingsErrorMessage } from '@/lib/settings/client'
 import { useSocialSetScope } from './scope'
 import { z } from 'zod'
 import { CanvasIcon as Layers } from '@/components/platform-shell/icons'
-import { type SocialSetRecord, useSocialSets, useStoreSocialSet } from './api'
+import { hasDefaultProfileName, type SocialSetRecord, useSocialSets, useStoreSocialSet } from './api'
 import { ConnectionLauncher } from '@/components/social-connections/ConnectionLauncher'
 
 function Platforms({ set }: { set: SocialSetRecord }) {
@@ -60,7 +60,7 @@ function SetRow({ set, canManage }: { set: SocialSetRecord; canManage: boolean }
           <Platforms set={set} />
           <span>· {set.weeklySlotCount} weekly slots</span>
           <span>· {set.timeZone}</span>
-          <DeveloperId id={set.id} label="Publishing brand" />
+          <DeveloperId id={set.id} label="Profile" />
         </span>
       }
       label={
@@ -75,6 +75,9 @@ function SetRow({ set, canManage }: { set: SocialSetRecord; canManage: boolean }
             {set.visibility === 'PRIVATE' ? 'Private to you' : 'Shared with workspace'}
           </Pill>
           {set.needsAttention ? <Pill tone="yellow">Some accounts need attention</Pill> : null}
+          {canManage && hasDefaultProfileName(set.name) ? (
+            <Pill tone="yellow">Needs a name</Pill>
+          ) : null}
         </span>
       }
     >
@@ -113,18 +116,18 @@ function CreateSet({ canManage }: { canManage: boolean }) {
   return (
     <Group>
       <Row
-        description="Start with a connected account, then add the platforms this person or brand posts from."
-        label="New publishing brand"
+        description="Start with a connected account, then add the platforms this person or company posts from."
+        label="New profile"
         layout="stacked"
       >
         <div className="flex flex-wrap gap-2">
           <ConnectionLauncher intent={{ operation: 'CREATE_SET', creationVisibility: 'PRIVATE' }}>
-            <Button aria-label="Add publishing brand to your personal workspace">
-              New private publishing brand
+            <Button aria-label="Add profile to your personal workspace">
+              New private profile
             </Button>
           </ConnectionLauncher>
           <ConnectionLauncher intent={{ operation: 'CREATE_SET', creationVisibility: 'WORKSPACE' }}>
-            <Button variant="outline">New workspace publishing brand</Button>
+            <Button variant="outline">New workspace profile</Button>
           </ConnectionLauncher>
         </div>
       </Row>
@@ -288,10 +291,10 @@ function CopyFromWorkspace({ canManage }: { canManage: boolean }) {
           value=""
         >
           <SelectTrigger
-            aria-label="Copy a publishing brand from another workspace"
+            aria-label="Copy a profile from another workspace"
             className="bg-card"
           >
-            <SelectValue placeholder="Choose a publishing brand…" />
+            <SelectValue placeholder="Choose a profile…" />
           </SelectTrigger>
           <SelectContent>
             {items.map((item) => (
@@ -310,17 +313,17 @@ function CopyFromWorkspace({ canManage }: { canManage: boolean }) {
 }
 
 /**
- * Brands (RFC 024): the people and brands this workspace posts as. Each
+ * Profiles (RFC 024): the people and companies this workspace posts as. Each
  * row is one set by ID; two sets can share a name and stay apart.
  */
 export function SocialSetList({ canManage }: { canManage: boolean }) {
   const list = useSocialSets()
   if (list.isPending)
-    return <p className="text-sm text-muted-foreground">Loading publishing brands…</p>
+    return <p className="text-sm text-muted-foreground">Loading profiles…</p>
   if (isPlanRefusal(list.error)) {
     return (
       <PlanRequired from="/settings/publishing-brands">
-        Publishing brands, and the accounts and schedules they post with, need Pro.
+        Profiles, and the accounts and schedules they post with, need Pro.
       </PlanRequired>
     )
   }
@@ -336,9 +339,9 @@ export function SocialSetList({ canManage }: { canManage: boolean }) {
     <div className="grid gap-6">
       {sets.length === 0 ? (
         <EmptyState
-          description="Create a publishing brand for each person or company you post as."
+          description="Create a profile for each person or company you post as."
           icon={Layers}
-          title="No publishing brands yet"
+          title="No profiles yet"
         />
       ) : (
         <Group>

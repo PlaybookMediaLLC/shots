@@ -404,6 +404,10 @@ func TestWritePublishing(t *testing.T) {
 		if err != nil || retried.Post.ChannelConnectionID != x || retried.Post.Status != "SCHEDULED" {
 			t.Fatalf("retried=%+v err=%v", retried, err)
 		}
+		// The retry keeps the zone, so it reads the same time as the post it replaces.
+		if optionalText(retried.Post.ScheduleTimeZone) == "" || optionalText(retried.Post.ScheduleTimeZone) != optionalText(result.Posts[0].ScheduleTimeZone) {
+			t.Fatalf("the retry lost its time zone: %v", retried.Post.ScheduleTimeZone)
+		}
 		// The retry keeps the brand, so its failure can link to the account.
 		if optionalText(retried.Post.SocialSetID) != optionalText(result.Posts[0].SocialSetID) || retried.Post.SocialSetID == nil {
 			t.Fatalf("the retry lost its social set: %v", retried.Post.SocialSetID)

@@ -20,8 +20,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   const sets = (all.body as { items: { id: string; version: number; name: string }[] }).items
   const first = sets[0]
   // The planned day: three days out, so it is never past, but never a month's last day.
-  // Later steps move it a day or show it in Tokyo time, and the month view opened on
-  // this day must still contain it.
+  // Later steps move it a day, and the month view opened on this day must still contain it.
   const daysAhead = (count: number) =>
     new Date(Date.now() + count * 86400000).toISOString().slice(0, 10)
   const day = daysAhead(3).slice(0, 7) === daysAhead(4).slice(0, 7) ? daysAhead(3) : daysAhead(4)
@@ -62,7 +61,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   await app.open(`/publish/calendar?day=${day}`)
   await test.step('P01 Calendar retains shared Publish navigation', async () => {
     await expect(page.getByRole('link', { name: 'Analyze', exact: true })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Drafts', exact: true }).first()).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Posts', exact: true }).first()).toBeVisible()
   })
   await test.step('P02 same-named provider identities are distinguishable', async () => {
     await expect(
@@ -73,7 +72,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toBeVisible()
   })
   await test.step('P03 P05 P06 all mixed and none selection use stable account IDs', async () => {
-    const all = page.getByRole('checkbox', { name: 'All publishing brands' })
+    const all = page.getByRole('checkbox', { name: 'All profiles' })
     await expect(all).toBeChecked()
     await page.getByRole('checkbox', { name: 'Show Same name linkedin', exact: true }).uncheck()
     await expect(all).toBeChecked({ indeterminate: true })
@@ -92,9 +91,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       'true'
     )
     await page.getByTestId('available-slot').first().click()
-    await expect(
-      page.getByRole('combobox', { exact: true, name: 'Scheduling timezone' })
-    ).toContainText('New York')
+    await expect(page.getByRole('dialog').getByTestId('schedule-zone')).toContainText('New York')
     await expect(page.getByLabel('Time', { exact: true })).toHaveValue('9:15 AM')
     await page.keyboard.press('Escape')
     await chooseOption(page.getByLabel('Calendar view'), 'Week')
@@ -116,16 +113,16 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await page.getByRole('button', { name: 'Posted', exact: true }).click()
     await expect(page.getByRole('link', { name: /Picker source draft/ })).toHaveCount(0)
     await expect(page.getByRole('combobox', { name: 'Calendar view' })).toContainText('Month')
-    await page.getByRole('button', { name: 'Back to publishing brands' }).click()
+    await page.getByRole('button', { name: 'Back to profiles' }).click()
   })
   await test.step('P10 P11 P12 P13 P14 P15 view controls and keyboard keep a usable period', async () => {
     await chooseOption(page.getByRole('combobox', { name: 'Calendar view' }), 'Week')
-    await expect(page.getByRole('button', { name: '00:00', exact: true })).toHaveCount(7)
+    await expect(page.getByRole('button', { name: '12:00 AM', exact: true })).toHaveCount(7)
     // CAL-01: today's badge must not move its hour grid off the other days'.
     await page.getByRole('button', { name: 'Today', exact: true }).click()
     await expect(page.locator('time[aria-current="date"]')).toBeVisible()
     const midnights = await page
-      .getByRole('button', { name: '00:00', exact: true })
+      .getByRole('button', { name: '12:00 AM', exact: true })
       .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top))
     expect(new Set(midnights).size, midnights.join(', ')).toBe(1)
     await page.keyboard.press('m')
@@ -229,7 +226,12 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     const overlapping = created.body as { id: string; calendarVersion: number }
     const planned = await apiRequest(page, `/api/v1/content-drafts/${overlapping.id}/plan`, {
       method: 'POST',
-      body: { plannedFor, timeZone: 'UTC', baseCalendarVersion: overlapping.calendarVersion },
+      // 12:07 on its own Tokyo clock, the first brand's New York time: same day, same hour.
+      body: {
+        plannedFor: new Date(`${day}T12:07:00+09:00`).toISOString(),
+        timeZone: 'Asia/Tokyo',
+        baseCalendarVersion: overlapping.calendarVersion,
+      },
     })
     expect(planned.status, JSON.stringify(planned.body)).toBe(200)
     await app.open(`/publish/calendar?day=${day}`)
@@ -368,26 +370,15 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     await app.reload()
     await expect(card).toBeVisible()
   })
-  await test.step('P22 P23 changing display zones preserves the stored UTC placement', async () => {
-    await chooseOption(
-      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
-      /^Tokyo · /,
-      'Tokyo'
-    )
+  await test.step('P22 P23 a card reads on its brand clock and names the zone, stored UTC unchanged', async () => {
+    await expect(card).toContainText(/12:07\sPM\sE[SD]T/)
     expect(
       (
         await db.query('SELECT "plannedFor" FROM content_draft WHERE id=$1', [draftId])
       ).rows[0].plannedFor.toISOString()
     ).toBe(plannedFor)
-    // Restore the display zone: in Tokyo a post late on a month's last day
-    // shows in the next month, outside the calendar the later steps read.
-    await chooseOption(
-      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
-      /^New York · /,
-      'New York'
-    )
   })
-  await test.step('date notes persist on their day in every display zone, and are never posts', async () => {
+  await test.step('date notes persist on their day, and are never posts', async () => {
     await page.getByRole('button', { name: `Add note ${day}`, exact: true }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByRole('button', { name: 'Add note', exact: true })).toBeDisabled()
@@ -404,18 +395,6 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
       (await db.query('SELECT color FROM calendar_note WHERE "organizationId"=$1', [workspace.id]))
         .rows
     ).toEqual([{ color: 'purple' }])
-
-    await chooseOption(
-      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
-      /^Tokyo · /,
-      'Tokyo'
-    )
-    await expect(note).toBeVisible()
-    await chooseOption(
-      page.getByRole('combobox', { exact: true, name: 'Display timezone' }),
-      /^New York · /,
-      'New York'
-    )
 
     await app.reload()
     await note.click()
@@ -463,7 +442,9 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   })
   await test.step('P35 detail preserves provider context and schedules the planned content through its review', async () => {
     await card.click()
-    await expect(page.getByText('Original scheduling timezone:', { exact: false })).toBeVisible()
+    await expect(
+      page.getByRole('dialog').getByText(/Planned for .*12:07\sPM\sE[SD]T/)
+    ).toBeVisible()
     // Plan never commits a schedule itself: it opens the draft's own review at that time.
     await page.getByRole('button', { name: 'Review and schedule…', exact: true }).click()
     await page.waitForURL(new RegExp(`/publish/${draftId}\\?.*panel=schedule`))
@@ -552,14 +533,14 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     ).toEqual([{ status: 'PUBLISHED', remotePostId: 'history-fixture' }])
   })
   await test.step('P40 mobile queue and keyboard controls are usable', async () => {
-    // Typing in a picker's search field is text, not a calendar shortcut.
-    const zone = page.getByRole('combobox', { exact: true, name: 'Display timezone' })
-    await zone.click()
+    // Typing in a search field is text, not a calendar shortcut.
+    await page.getByRole('button', { name: 'Drafts', exact: true }).first().click()
+    const search = page.getByLabel('Search sidebar drafts')
+    await search.click()
     await page.keyboard.press('w')
+    await expect(search).toHaveValue('w')
     await expect(page.getByLabel('Calendar view')).toContainText('Month')
-    await page.keyboard.press('Escape')
-    // West of New York, so the planned post keeps its day (and month) on screen.
-    await chooseOption(zone, /^Los Angeles · /, 'Los Angeles')
+    await page.getByRole('button', { name: 'Back to profiles' }).click()
     await page.locator('body').click({ position: { x: 1270, y: 10 } })
     await page.keyboard.press('v')
     await expect(page.getByLabel('Calendar view')).toContainText('Week')
@@ -629,6 +610,22 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     'INSERT INTO analytics_snapshot (id,"organizationId","connectionId","subjectId",kind,"observedAt",counters,"payloadHash") VALUES ($1,$2,$3,$3,\'account\',$4,\'{"followers":1200000}\',$5)',
     [randomUUID(), workspace.id, workspace.channels.x, observed, randomUUID()]
   )
+  // Refresh asks the provider first; these steps are about re-reading the stored report.
+  await page.route('**/api/v1/analytics/*/refresh', (route) =>
+    route.fulfill({ json: { refreshed: true } })
+  )
+  await test.step('A00 Analyze opens on the whole brand, broken down per account', async () => {
+    await app.open('/publish/analyze')
+    await expect(page.getByLabel('Analytics account')).toContainText('All accounts')
+    await expect(page.getByRole('row', { name: /^All accounts/ })).toContainText('2')
+    await expect(page.getByRole('row', { name: /^x · / })).toContainText('1.2M')
+    await expect(page.getByRole('row', { name: /^linkedin · / })).toContainText(
+      'Not available on this network'
+    )
+    await page.getByRole('button', { name: /^x · / }).click()
+    await expect(page.getByLabel('Analytics account')).toContainText(' · x · ')
+    await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
+  })
   await app.open(`/publish/analyze?account=${workspace.channels.x}&limit=1`)
   await test.step('A01 A06 A07 all seven areas show account scope and exact accessible totals', async () => {
     await expect(page.getByLabel('Analytics account')).toContainText(' · x · ')
@@ -647,9 +644,13 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
   await test.step('A02 A03 A04 account changes clear old values and show capability-based availability', async () => {
     await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
+    // No cards of dashes, no grid of empty hours, no goal: one notice and the real post count.
     await expect(
-      page.getByRole('heading', { name: 'Followers', exact: true }).first()
+      page.getByRole('heading', { name: 'Stats aren’t available for this account' })
     ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Published Posts', exact: true })).toBeVisible()
+    for (const title of ['Followers', 'Hourly Engagement', 'Posting Streak'])
+      await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCount(0)
     await chooseOption(page.getByLabel('Analytics account'), / · x · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
@@ -690,7 +691,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
       data.metrics.impressions = { ...data.metrics.impressions, points: null }
       await route.fulfill({ response, json: data })
     })
-    await page.getByRole('button', { name: 'Reload', exact: true }).click()
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Retry metric', exact: true })).toBeVisible()
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
     await page
@@ -720,8 +721,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A18 metric help opens its actual definition', async () => {
-    await page.getByRole('link', { name: 'Metric definition', exact: true }).first().click()
-    await expect(page.locator('#definition-followers')).toBeVisible()
+    await page.getByRole('button', { name: 'About Followers', exact: true }).click()
+    await expect(page.getByRole('dialog')).toContainText('Last observed follower count')
+    await page.keyboard.press('Escape')
   })
   await test.step('A40 transient report failure retries without logging out or changing scope', async () => {
     const account = (await page.getByLabel('Analytics account').textContent()) ?? ''
@@ -729,7 +731,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await page.route(path, (route) =>
       route.fulfill({ status: 503, json: { message: 'Fixture analytics outage' } })
     )
-    await page.getByRole('button', { name: 'Reload', exact: true }).click()
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
     await expect(
       page.getByRole('alert').filter({ hasText: 'Fixture analytics outage' })
     ).toBeVisible()

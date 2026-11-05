@@ -499,9 +499,9 @@ test(
     // A second set with the same name as the default stays a separate identity.
     // Sets are made in workspace settings (RFC 024); the switcher links there.
     const setName =
-      (await page.getByRole('button', { name: /^Publishing brand: / }).textContent())?.trim() ?? ''
-    await page.getByRole('button', { name: /^Publishing brand: / }).click()
-    await expect(page.getByRole('menuitem', { name: 'New publishing brand…' })).toHaveAttribute(
+      (await page.getByRole('button', { name: /^Profile: / }).textContent())?.trim() ?? ''
+    await page.getByRole('button', { name: /^Profile: / }).click()
+    await expect(page.getByRole('menuitem', { name: 'New profile…' })).toHaveAttribute(
       'href',
       /\/settings\/publishing-brands$/
     )
@@ -520,7 +520,7 @@ test(
     const switchSet = async (index: number) => {
       // eslint-disable-next-line no-restricted-syntax -- see above.
       await page.waitForLoadState('networkidle')
-      await page.getByRole('button', { name: /^Publishing brand: / }).click()
+      await page.getByRole('button', { name: /^Profile: / }).click()
       const item = page
         .getByRole('menuitem')
         .filter({ hasText: setName.replace(/▾$/, '').trim() })
@@ -531,10 +531,10 @@ test(
       await page.waitForLoadState('networkidle')
     }
     await app.open(`/publish?set=${secondSet}`)
-    await expect(page.getByText('No drafts in this publishing brand.')).toBeVisible()
+    await expect(page.getByText('No drafts in this profile.')).toBeVisible()
     await switchSet(0)
     await rowMenu('Pricing')
-    await page.getByRole('menuitem', { name: 'Copy to publishing brand' }).click()
+    await page.getByRole('menuitem', { name: 'Copy to profile' }).click()
     await page.getByRole('menu').last().getByRole('menuitem').first().click()
     await page.getByRole('button', { name: 'Copy without tags' }).click()
     await expect(page.getByText(/Copied/).first()).toBeVisible()
@@ -702,18 +702,22 @@ test(
         'aria-selected',
         'true'
       )
-      await page.getByRole('button', { name: 'Dates', exact: true }).click()
-      await page.getByRole('button', { name: 'Today', exact: true }).click()
+      await page.getByRole('button', { name: 'Draft filters' }).click()
+      await page.getByRole('menuitemradio', { name: 'Today', exact: true }).click()
       await expect(page).toHaveURL(/[?&]from=\d{4}-\d{2}-\d{2}/)
       await app.reload()
-      await expect(page.getByRole('button', { name: 'Dates', exact: true })).toContainText('Today')
+      await page.getByRole('button', { name: 'Draft filters' }).click()
+      await expect(page.getByRole('menuitemradio', { name: 'Today', exact: true })).toBeChecked()
+      await page.keyboard.press('Escape')
       // Nothing in this workspace is on a day before it existed.
       await app.open('/publish?tab=all&from=2020-01-01&to=2020-01-02')
       await expect(page.getByText('No drafts match these filters.')).toBeVisible()
       await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
       await expect(page).not.toHaveURL(/[?&]from=/)
       await page.getByRole('tab', { name: 'Queue', exact: true }).click()
-      await expect(page.getByText('Showing the next 60 days.')).toBeVisible()
+      await expect(
+        page.getByText('Free slots for the next 7 days, and posts for the next 60.')
+      ).toBeVisible()
     })
     await app.open('/publish/calendar')
     await page

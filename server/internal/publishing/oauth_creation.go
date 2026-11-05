@@ -78,7 +78,7 @@ func createOAuthSocialSet(ctx context.Context, tx *ent.Tx, actor Actor, start *e
 		return nil, err
 	}
 	created, err := tx.SocialSet.Create().SetID(cuid.New()).SetOrganizationID(actor.Organization).
-		SetName("New brand").SetVisibility(socialset.Visibility(start.CreationVisibility)).
+		SetName("New profile").SetVisibility(socialset.Visibility(start.CreationVisibility)).
 		SetOwnerUserID(start.UserID).SetCreatedByUserID(start.UserID).SetTimeZone(zone).
 		SetPostingSlots(schema.DefaultQueueSlots()).SetPublicSlug(hex.EncodeToString(slug[:])).Save(ctx)
 	if err != nil {

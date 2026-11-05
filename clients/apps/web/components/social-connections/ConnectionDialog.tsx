@@ -189,7 +189,7 @@ function ProviderForm({
           ) : null}
           {intent.operation === 'RECONNECT' ? (
             <p className="text-sm text-muted-foreground">
-              Choose the same account already connected to {target?.name ?? 'this brand'}.
+              Choose the same account already connected to {target?.name ?? 'this profile'}.
               Reconnecting preserves its drafts and schedule; it cannot replace the account with
               another identity.
             </p>
@@ -301,14 +301,14 @@ export default function ConnectionDialog({
           {provider
             ? `${intent.operation === 'RECONNECT' ? 'Reconnect' : 'Connect'} ${label} account`
             : creating
-              ? 'Create a publishing brand'
-              : `Add account to “${target?.name ?? 'this brand'}”`}
+              ? 'Create a profile'
+              : `Add account to “${target?.name ?? 'this profile'}”`}
         </DialogTitle>
         <DialogDescription>
           {provider
-            ? 'Your accounts stay in the brand you chose.'
+            ? 'Your accounts stay in the profile you chose.'
             : creating
-              ? 'Choose the first platform for this person or brand. Your set is created when the account connects.'
+              ? 'Choose the first platform for this person or company. Your profile is created when the account connects.'
               : 'One account per platform. Choose another platform to add to this set.'}
         </DialogDescription>
       </DialogHeader>

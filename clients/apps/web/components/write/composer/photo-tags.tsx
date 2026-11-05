@@ -77,7 +77,7 @@ export function PhotoTags({
           />
           <Button disabled={busy || !setId || !query.trim()}>Find person</Button>
         </form>
-        {!setId ? <p>Choose a publishing brand with a connected X account.</p> : null}
+        {!setId ? <p>Choose a profile with a connected X account.</p> : null}
         {results?.length === 0 ? <p role="status">No eligible account found.</p> : null}
         {results?.map((tag) => (
           <Button

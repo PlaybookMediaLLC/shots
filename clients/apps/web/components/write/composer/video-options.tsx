@@ -53,22 +53,38 @@ export function optionsSummary(channel: string, options: VersionOptions): string
   return ''
 }
 
-/** Explicit metadata travels with the reviewed platform version. */
+/**
+ * Explicit metadata travels with the reviewed platform version. `part` splits
+ * it for the composer: what every post must answer sits above the post, and
+ * the rest beside it. Without one, all of it shows together.
+ */
 export function VideoOptions({
   channel,
   options,
   onChange,
   disabled,
   creator,
+  part,
 }: {
   channel: 'youtube' | 'tiktok'
   options: VersionOptions
   onChange: (options: VersionOptions) => void
   disabled: boolean
   creator?: AccountStanding['tiktokCreator']
+  part?: 'required' | 'rest'
 }) {
+  const required = part !== 'rest'
+  const rest = part !== 'required'
   if (channel === 'youtube') {
+    if (!required) return null
     const value = options.youtube ?? { title: '', privacy: '' }
+    const missing = !value.title.trim()
+      ? 'title'
+      : !value.privacy
+        ? 'privacy'
+        : value.madeForKids === undefined
+          ? 'audience'
+          : null
     const change = (next: Partial<NonNullable<VersionOptions['youtube']>>) =>
       onChange({ ...options, youtube: { ...value, ...next } })
     return (
@@ -79,6 +95,7 @@ export function VideoOptions({
         <div className="grid gap-2">
           <Label htmlFor="youtube-title">YouTube title</Label>
           <Input
+            data-option-missing={missing === 'title' || undefined}
             id="youtube-title"
             value={value.title}
             maxLength={100}
@@ -95,7 +112,7 @@ export function VideoOptions({
               change({ privacy: youtubeOptionsSchema.shape.privacy.parse(privacy) })
             }
           >
-            <SelectTrigger aria-label="YouTube privacy">
+            <SelectTrigger aria-label="YouTube privacy" data-option-missing={missing === 'privacy' || undefined}>
               <SelectValue placeholder="Choose privacy" />
             </SelectTrigger>
             <SelectContent>
@@ -113,7 +130,7 @@ export function VideoOptions({
             disabled={disabled}
             onValueChange={(audience) => change({ madeForKids: audience === 'true' })}
           >
-            <SelectTrigger aria-label="YouTube audience">
+            <SelectTrigger aria-label="YouTube audience" data-option-missing={missing === 'audience' || undefined}>
               <SelectValue placeholder="Choose audience" />
             </SelectTrigger>
             <SelectContent>
@@ -122,6 +139,11 @@ export function VideoOptions({
             </SelectContent>
           </Select>
         </div>
+        {value.privacy === 'private' ? (
+          <p className="text-amber-700 dark:text-amber-300" data-testid="private-warning">
+            Only you can watch a private video. Choose Public or Unlisted to share it.
+          </p>
+        ) : null}
       </div>
     )
   }
@@ -155,6 +177,8 @@ export function VideoOptions({
       data-option-rows
       className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
     >
+      {required ? (
+        <>
       <p>
         {creator
           ? `Posting to ${creator.nickname}. Maximum video length: ${creator.maxDurationSeconds} seconds.`
@@ -168,7 +192,14 @@ export function VideoOptions({
             change({ privacy: tiktokOptionsSchema.shape.privacy.parse(privacy), consent: false })
           }
         >
-          <SelectTrigger aria-label="TikTok privacy">
+          <SelectTrigger
+            aria-label="TikTok privacy"
+            data-option-missing={
+              !value.privacy ||
+              (creator && !creator.privacyLevels.includes(value.privacy)) ||
+              undefined
+            }
+          >
             <SelectValue placeholder="Choose privacy" />
           </SelectTrigger>
           <SelectContent>
@@ -184,6 +215,51 @@ export function VideoOptions({
           </SelectContent>
         </Select>
       </div>
+      {value.privacy === 'SELF_ONLY' ? (
+        <p className="text-amber-700 dark:text-amber-300" data-testid="private-warning">
+          Only you will see this post on TikTok. Choose another audience to share it.
+        </p>
+      ) : null}
+      <div className="flex items-center gap-2">
+        <Checkbox
+          data-option-missing={(Boolean(value.privacy) && !value.consent) || undefined}
+          id="tiktok-consent"
+          checked={value.consent}
+          disabled={disabled || !creator}
+          onCheckedChange={(checked) => change({ consent: checked === true })}
+        />
+        <Label htmlFor="tiktok-consent">
+          I consent to send this video to TikTok at the scheduled time.
+        </Label>
+      </div>
+      <p>
+        By posting, you agree to TikTok’s{' '}
+        <a
+          href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Music Usage Confirmation
+        </a>
+        {value.brandedContent && (
+          <>
+            {' '}
+            and{' '}
+            <a
+              href="https://www.tiktok.com/legal/page/global/bc-policy/en"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Branded Content Policy
+            </a>
+          </>
+        )}
+        . Processing may take a few minutes before the video appears.
+      </p>
+        </>
+      ) : null}
+      {rest ? (
+        <>
       <div className="flex items-center gap-2">
         <Checkbox
           id="tiktok-commercial"
@@ -227,41 +303,8 @@ export function VideoOptions({
       {value.privacy === 'SELF_ONLY' && value.commercialContent ? (
         <p>Branded content visibility cannot be private.</p>
       ) : null}
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="tiktok-consent"
-          checked={value.consent}
-          disabled={disabled || !creator}
-          onCheckedChange={(checked) => change({ consent: checked === true })}
-        />
-        <Label htmlFor="tiktok-consent">
-          I consent to send this video to TikTok at the scheduled time.
-        </Label>
-      </div>
-      <p>
-        By posting, you agree to TikTok’s{' '}
-        <a
-          href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Music Usage Confirmation
-        </a>
-        {value.brandedContent && (
-          <>
-            {' '}
-            and{' '}
-            <a
-              href="https://www.tiktok.com/legal/page/global/bc-policy/en"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Branded Content Policy
-            </a>
-          </>
-        )}
-        . Processing may take a few minutes before the video appears.
-      </p>
+        </>
+      ) : null}
     </div>
   )
 }

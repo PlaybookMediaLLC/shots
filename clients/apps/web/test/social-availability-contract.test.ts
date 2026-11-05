@@ -6,6 +6,7 @@ import {
   connectionProviderSchema,
 } from '../../../packages/screenshot-studio-backend-sdk/src/social-availability'
 import { getSocialConnectionAvailabilityContract } from '../lib/api/contracts/social-availability'
+import { providerComingSoon } from '../components/social-connections/availability'
 
 const catalog = () =>
   connectionAvailabilitySchema.parse({
@@ -61,4 +62,20 @@ test('availability SDK uses the original session and validates the downstream re
   assert.deepEqual(await client.socialConnectionAvailability(), catalog())
   response = { version: 1, providers: [] }
   await assert.rejects(client.socialConnectionAvailability())
+})
+
+test('a platform is coming soon only when the catalog was read and refuses it', () => {
+  const ready = (...available: string[]) => ({
+    ...catalog(),
+    providers: catalog().providers.map((item) => ({
+      ...item,
+      status: available.includes(item.provider) ? ('available' as const) : item.status,
+    })),
+  })
+  assert.equal(providerComingSoon(ready('x'), 'threads'), true)
+  assert.equal(providerComingSoon(ready('x', 'threads'), 'threads'), false)
+  // An unread catalog leaves Connect in place; the start route checks again.
+  assert.equal(providerComingSoon(undefined, 'threads'), false)
+  // Mastodon's row connects through either its default or its custom-server flow.
+  assert.equal(providerComingSoon(ready('mastodon-custom'), 'mastodon'), false)
 })

@@ -1856,7 +1856,7 @@ export function BatchWorkspace({
                       </Table>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        This brand has no connected accounts.{' '}
+                        This profile has no connected accounts.{' '}
                         <Link className="underline" href="/settings/publishing-brands">
                           Connect one
                         </Link>{' '}

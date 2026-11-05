@@ -76,6 +76,8 @@ test(
     await expect(page.getByLabel('Characters per post')).toHaveAttribute('max', '280')
     await expect(draftEditor(page)).toContainText(text)
     await page.getByTestId('publish-button').click()
+    await expect(page.getByTestId('blockers')).toContainText('280')
+    await page.getByRole('button', { name: 'See the review anyway' }).click()
     const review = page.getByTestId('publish-review')
     await expect(review.getByRole('button', { name: 'Publish now', exact: true })).toBeDisabled()
     await expect(review).toContainText('280')

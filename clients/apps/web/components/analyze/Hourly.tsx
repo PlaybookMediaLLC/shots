@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { useTwelveHour } from '@/components/ui/format-preferences'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -21,6 +22,8 @@ import {
 } from '@/components/ui/table'
 import type { AnalyticsReport } from '@/lib/api/contracts/plan-analyze'
 import { formatValue } from '@/lib/analyze/report'
+import { formatTimeOfDay } from '@/lib/time-of-day'
+import { InfoTip } from './InfoTip'
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 /** Values are lifetime engagement per published post, grouped by local publication hour. */
@@ -31,10 +34,14 @@ export function Hourly({
   report: AnalyticsReport
   onInspect: (ids: string[], label: string) => void
 }) {
+  const twelveHour = useTwelveHour()
   const [mode, setMode] = React.useState('average')
   const [day, setDay] = React.useState(1)
   const cells = report.hourly
   const samples = cells.reduce((n, cell) => n + cell.samples, 0)
+  // The page's one empty state covers this: no grid of empty hours.
+  if (!samples) return null
+  const hourLabel = (hour: number) => formatTimeOfDay(`${hour}:00`, twelveHour)
   const averages = Array.from({ length: 24 }, (_, hour) => {
     const selected = cells.filter((c) => c.hour === hour && (mode === 'average' || c.day === day))
     const count = selected.reduce((n, c) => n + c.samples, 0),
@@ -53,11 +60,16 @@ export function Hourly({
   )
   return (
     <section aria-label="Hourly Engagement" className="rounded-xl border p-4">
-      <h2 className="font-semibold">Hourly Engagement</h2>
+      <div className="flex items-center gap-1">
+        <h2 className="font-semibold">Hourly Engagement</h2>
+        <InfoTip label="About Hourly Engagement">
+          Lifetime engagements per post, by the time the post was published. This isn’t when the
+          engagement happened, and a few posts aren’t enough to pick a best time.
+        </InfoTip>
+      </div>
       <p className="my-2 text-xs text-muted-foreground">
-        Average observed lifetime engagements per post, by publication time in{' '}
-        {report.query.timeZone}. This does not measure when engagement occurred. {samples} posts
-        with observations; small samples do not establish a best posting time.
+        Average engagements per post, by publication time in {report.query.timeZone}. Based on{' '}
+        {samples} posts.
       </p>
       <div className="my-3 flex gap-2">
         <Label>
@@ -91,11 +103,6 @@ export function Hourly({
           </Label>
         ) : null}
       </div>
-      {!samples ? (
-        <p role="status">
-          Insufficient engagement history. Collect post observations to explore publishing times.
-        </p>
-      ) : null}
       {mode === 'heatmap' ? (
         <div className="overflow-x-auto">
           <Table className="w-auto text-xs">
@@ -106,7 +113,7 @@ export function Hourly({
               <TableRow>
                 <TableHead>Day</TableHead>
                 {Array.from({ length: 24 }, (_, i) => (
-                  <TableHead key={i}>{i}</TableHead>
+                  <TableHead key={i}>{hourLabel(i).replace(':00', '')}</TableHead>
                 ))}
               </TableRow>
             </TableHeader>
@@ -123,10 +130,13 @@ export function Hourly({
                           size={null}
                           disabled={!c?.samples}
                           onClick={() =>
-                            onInspect(c!.postIds, `${label} ${hour}:00 · ${report.query.timeZone}`)
+                            onInspect(
+                              c!.postIds,
+                              `${label} ${hourLabel(hour)} · ${report.query.timeZone}`
+                            )
                           }
-                          title={`${label} ${hour}:00: ${formatValue(c?.average)} average, ${c?.samples ?? 0} posts`}
-                          aria-label={`${label} ${hour}:00, ${formatValue(c?.average)} average, ${c?.samples ?? 0} posts`}
+                          title={`${label} ${hourLabel(hour)}: ${formatValue(c?.average)} average, ${c?.samples ?? 0} posts`}
+                          aria-label={`${label} ${hourLabel(hour)}, ${formatValue(c?.average)} average, ${c?.samples ?? 0} posts`}
                           className="m-0.5 h-8 w-8 rounded border"
                           style={{
                             backgroundColor:
@@ -156,13 +166,13 @@ export function Hourly({
               onClick={() =>
                 onInspect(
                   c.postIds,
-                  `${mode === 'days' ? DAYS[day] : 'All days'} ${c.hour}:00 · ${report.query.timeZone}`
+                  `${mode === 'days' ? DAYS[day] : 'All days'} ${hourLabel(c.hour)} · ${report.query.timeZone}`
                 )
               }
               className="rounded border p-2 text-xs"
               title={`${c.samples} posts`}
             >
-              <span className="block">{c.hour}:00</span>
+              <span className="block">{hourLabel(c.hour)}</span>
               <strong>{formatValue(c.average, true)}</strong>
               <span className="block text-muted-foreground">n={c.samples}</span>
             </Button>

@@ -2,7 +2,7 @@
  * Settings sections, each its own route under /settings; shared by the
  * settings sidebar, the page and its content map (RFC 024). Sections are
  * grouped by who owns what they change: the person, the workspace, or a
- * publishing identity (a brand).
+ * publishing identity (a profile).
  *
  * To add a section, add it here. TypeScript then asks for its icon in
  * `SettingsNav.tsx` and its content in `WorkspaceSettingDetail.tsx`.
@@ -47,7 +47,7 @@ export const SETTING_GROUPS: { id: SettingGroup; title: string }[] = [
 /** Every section, in the order the navigation lists them within their group. */
 const SECTIONS = [
   {
-    description: 'Your profile, sign-in email, time zone, sessions, and account deletion.',
+    description: 'Your name, sign-in email, sessions, and account deletion.',
     group: 'personal',
     id: 'profile',
     slug: 'account',
@@ -147,14 +147,14 @@ const SECTIONS = [
   },
   {
     description:
-      'The people and brands you post as: their accounts, schedules, defaults, and voice.',
+      'The people and companies you post as: their accounts, schedules, defaults, and voice.',
     group: 'publishing',
     id: 'social-sets',
     slug: 'publishing-brands',
-    title: 'Publishing brands',
+    title: 'Profiles',
   },
   {
-    description: 'Manage the social accounts this workspace posts from, and the publishing brand each belongs to.',
+    description: 'Manage the social accounts this workspace posts from, and the profile each belongs to.',
     group: 'publishing',
     id: 'channels',
     slug: 'channels',
@@ -254,7 +254,7 @@ export function findSettingsSection(slug: string | undefined): SettingSection | 
 
 /**
  * The section a pathname shows, from its first segment under /settings, so a
- * brand's own pages light Publishing brands. Pass the pathname without a locale.
+ * brand's own pages light Profiles. Pass the pathname without a locale.
  */
 export function settingsSectionAt(pathname: string): SettingSection | undefined {
   const [area, slug] = pathname.split('/').filter(Boolean)

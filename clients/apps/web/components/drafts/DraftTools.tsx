@@ -75,7 +75,7 @@ export function ReviewControls({
         ? 'In review'
         : review.reviewStatus === 'changes_requested'
           ? 'Changes requested'
-          : 'Not reviewed'
+          : 'Request review'
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -253,7 +253,7 @@ export function HistorySheet({
             >
               <p className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>
-                  {new Date(item.createdAt).toLocaleString()} · version {item.version}
+                  <LocalTime value={item.createdAt} /> · version {item.version}
                 </span>
                 <Button
                   variant="custom"

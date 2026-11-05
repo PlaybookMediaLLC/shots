@@ -151,7 +151,7 @@ failure fails the job but never stops due posts from starting.
 
 ## Batch scheduling
 
-The batch dialog takes up to 50 drafts from one publishing brand. It
+The batch dialog takes up to 50 drafts from one profile. It
 previews queue or Spread times, validates every draft without writing, shows
 each row's time and destinations, and asks before skipping blocked rows.
 Rows are scheduled one at a time with their previewed slot. A refused row

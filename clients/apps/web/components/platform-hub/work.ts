@@ -93,7 +93,7 @@ export async function loadWork(
           ? item.title
           : item.plainText.trim().slice(0, 80) || 'Untitled draft',
       type: 'Post',
-      scope: 'Publishing brand',
+      scope: 'Profile',
       updatedAt: item.updatedAt,
       excerpt: item.plainText,
     }))

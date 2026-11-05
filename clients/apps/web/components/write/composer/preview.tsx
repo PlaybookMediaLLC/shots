@@ -134,6 +134,8 @@ export function PreviewPanel({
               <ArticlePreview item={item} />
             ) : item.account.channel === 'linkedin' ? (
               <LinkedInPost item={item} target={target} />
+            ) : item.account.channel === 'tiktok' ? (
+              <TikTokPost item={item} />
             ) : (
               <ThreadPreview item={item} target={target} />
             )}
@@ -502,6 +504,40 @@ function ThreadPreview({ item, target }: { item: PreviewItem; target: DraftTarge
         )
       })}
     </div>
+  )
+}
+
+/** A TikTok post: the video fills a vertical frame, with the account and caption over it. */
+function TikTokPost({ item }: { item: PreviewItem }) {
+  const { account, publication } = item
+  const post = publication.serialized.posts[0]
+  const video = post?.media.find((media) => media.kind === 'video')
+  return (
+    <article
+      className="relative mx-auto aspect-[9/16] w-full max-w-[360px] overflow-hidden bg-black text-white"
+      data-platform="tiktok"
+    >
+      {video ? (
+        <video
+          aria-label={video.alt || 'Attached video'}
+          className="absolute inset-0 size-full object-cover"
+          controls
+          preload="metadata"
+          src={assetContentUrl(video.assetId)}
+        />
+      ) : (
+        <p className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-white/70">
+          A TikTok post needs one video.
+        </p>
+      )}
+      {/* Clear of the video's own controls, and it lets clicks through to them. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-10 bg-gradient-to-t from-black/60 to-transparent p-4 pr-14 [&_*]:!text-white">
+        <p className="text-sm font-semibold">
+          @{account.handle ?? account.displayName ?? 'tiktok'}
+        </p>
+        <Truncated channel="tiktok" text={post?.caption ?? ''} />
+      </div>
+    </article>
   )
 }
 

@@ -53,7 +53,7 @@ test('team dialog preserves the page, cancels safely, and validates mobile creat
   const name = dialog.getByRole('textbox', { name: 'Workspace name', exact: true })
   await expect(name).toBeFocused()
   await expect(
-    dialog.getByText('Share publishing brands with colleagues or clients', { exact: false })
+    dialog.getByText('Share profiles with colleagues or clients', { exact: false })
   ).toBeVisible()
   await expect(dialog.getByRole('link', { name: 'Learn about team roles' })).toHaveAttribute(
     'href',

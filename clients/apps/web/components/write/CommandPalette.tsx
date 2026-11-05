@@ -289,7 +289,7 @@ export default function CommandPalette({
             ))}
           </CommandGroup>
         ) : null}
-        <CommandGroup heading="Publishing brands">
+        <CommandGroup heading="Profiles">
           {data.sets.map((set) => (
             <CommandItem
               key={set.id}

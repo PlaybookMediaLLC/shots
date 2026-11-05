@@ -294,3 +294,32 @@ export function primaryChanged(
     version.sourceHash !== primaryHash(primary, channel)
   )
 }
+
+/** How copy names each platform. "X" alone is too common a word, so it needs "on" or "to". */
+const PLATFORM_NAMES: Record<DraftChannel, { label: string; pattern: RegExp }> = {
+  bluesky: { label: 'Bluesky', pattern: /\bbluesky\b/i },
+  instagram: { label: 'Instagram', pattern: /\binstagram\b/i },
+  linkedin: { label: 'LinkedIn', pattern: /\blinkedin\b/i },
+  mastodon: { label: 'Mastodon', pattern: /\bmastodon\b/i },
+  threads: { label: 'Threads', pattern: /\bThreads\b/ },
+  tiktok: { label: 'TikTok', pattern: /\btiktok\b/i },
+  x: { label: 'X', pattern: /\b[Tt]witter\b|\b(?:[Oo]n|[Tt]o) X\b/ },
+  youtube: { label: 'YouTube', pattern: /\byoutube\b/i },
+}
+
+/**
+ * Another of the draft's platforms that this platform's copy names, which
+ * usually means text written for there: "published to TikTok" going out on X.
+ */
+export function otherPlatformNamed(
+  text: string,
+  channel: DraftChannel,
+  channels: readonly DraftChannel[]
+): string | null {
+  // A link to a platform is not copy about it.
+  const copy = text.replace(/\S+\.[a-z]{2,}\S*/gi, '')
+  const other = channels.find(
+    (candidate) => candidate !== channel && PLATFORM_NAMES[candidate].pattern.test(copy)
+  )
+  return other ? PLATFORM_NAMES[other].label : null
+}

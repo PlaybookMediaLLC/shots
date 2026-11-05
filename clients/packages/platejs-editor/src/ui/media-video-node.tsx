@@ -102,8 +102,7 @@ export const MediaVideoElement = withHOC(
                   <ReactPlayer
                     controls
                     height="100%"
-                    // @ts-expect-error - react-player type mismatch
-                    url={unsafeUrl}
+                    src={unsafeUrl}
                     width="100%"
                   />
                 </div>
