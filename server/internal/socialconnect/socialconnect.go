@@ -42,10 +42,21 @@ type Tenants interface {
 	// StateOrganization is the social organization of the tenant whose OAuth
 	// attempt owns state.
 	StateOrganization(ctx context.Context, state string) (string, error)
+	// WorkspaceOrganization is the social organization bound to a product workspace.
+	WorkspaceOrganization(ctx context.Context, workspace string) (string, error)
 }
 
 // EntTenants reads bindings and OAuth attempts from the product database.
 type EntTenants struct{ Client *productent.Client }
+
+// WorkspaceOrganization implements Tenants.
+func (t EntTenants) WorkspaceOrganization(ctx context.Context, workspace string) (string, error) {
+	binding, err := t.Client.SocialTenantBinding.Get(ctx, workspace)
+	if err != nil {
+		return "", err
+	}
+	return binding.GoOrganizationID, nil
+}
 
 // Organization implements Tenants.
 func (t EntTenants) Organization(ctx context.Context, secretReference string) (string, error) {
@@ -101,6 +112,17 @@ func Open(ctx context.Context, databaseURL string, product *productent.Client) (
 
 var errMismatch = socialapi.NewError(http.StatusConflict, false, "social organization does not match this workspace")
 
+// showsHidden reports whether organization belongs to a workspace exempt from
+// HIDDEN_PROVIDERS. A failed lookup keeps the provider hidden.
+func (c *Connector) showsHidden(ctx context.Context, organization string) bool {
+	for _, workspace := range c.manager.HiddenProviderWorkspaces() {
+		if bound, err := c.tenants.WorkspaceOrganization(ctx, workspace); err == nil && bound == organization {
+			return true
+		}
+	}
+	return false
+}
+
 // organization is the public API's API-key check: the reference's binding
 // must name the expected organization.
 func (c *Connector) organization(ctx context.Context, secretReference, expected string) (string, error) {
@@ -147,7 +169,7 @@ func (c *Connector) authURL(ctx context.Context, organization, name, refresh, in
 			target = migrateTo
 		}
 	}
-	if status, managed := c.manager.ConnectionStatus(target); managed && status != "available" {
+	if status, managed := c.manager.ConnectionStatus(target, c.showsHidden(ctx, organization)); managed && status != "available" {
 		return "", socialapi.NewError(http.StatusServiceUnavailable, false, "this social connection is not available")
 	}
 	provider := c.manager.GetSocialIntegration(target)
@@ -593,7 +615,7 @@ func (c *Connector) ConnectionAvailability(ctx context.Context, organization, re
 	if _, err := c.organization(ctx, reference, organization); err != nil {
 		return nil, err
 	}
-	result := c.manager.ConnectionAvailability()
+	result := c.manager.ConnectionAvailability(c.showsHidden(ctx, organization))
 	if result.Validate() != nil {
 		return nil, socialapi.NewError(http.StatusBadGateway, false, "social connection availability could not be verified")
 	}
