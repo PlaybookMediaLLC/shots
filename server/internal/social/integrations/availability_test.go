@@ -40,7 +40,7 @@ func configuredManager(t *testing.T) *Manager {
 
 func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 	m := configuredManager(t)
-	catalog := m.ConnectionAvailability()
+	catalog := m.ConnectionAvailability(false)
 	if catalog.Validate() != nil {
 		t.Fatal("invalid catalog")
 	}
@@ -69,7 +69,7 @@ func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			t.Setenv(tc.key, "  ")
-			if status, managed := m.ConnectionStatus(tc.provider); !managed || status != "not_configured" {
+			if status, managed := m.ConnectionStatus(tc.provider, false); !managed || status != "not_configured" {
 				t.Fatalf("missing config accepted: %s", status)
 			}
 		})
@@ -77,15 +77,15 @@ func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 	// A dedicated LinkedIn Page app must be complete and is independent of the member app.
 	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "private-configuration-canary")
 	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", " ")
-	if status, _ := m.ConnectionStatus("linkedin-page"); status != "not_configured" {
+	if status, _ := m.ConnectionStatus("linkedin-page", false); status != "not_configured" {
 		t.Fatalf("incomplete page app accepted: %s", status)
 	}
 	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "private-configuration-canary")
 	t.Setenv("LINKEDIN_CLIENT_SECRET", "")
-	if status, _ := m.ConnectionStatus("linkedin-page"); status != "available" {
+	if status, _ := m.ConnectionStatus("linkedin-page", false); status != "available" {
 		t.Fatalf("page app: %s", status)
 	}
-	if status, _ := m.ConnectionStatus("linkedin"); status != "not_configured" {
+	if status, _ := m.ConnectionStatus("linkedin", false); status != "not_configured" {
 		t.Fatalf("member app used page credentials: %s", status)
 	}
 }
@@ -112,19 +112,24 @@ func TestConnectionReadinessGatesAndOrigins(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(tc.key, tc.value)
-			if status, managed := m.ConnectionStatus(tc.provider); !managed || status != tc.want {
+			if status, managed := m.ConnectionStatus(tc.provider, false); !managed || status != tc.want {
 				t.Fatalf("got %s, want %s", status, tc.want)
 			}
 		})
 	}
-	if status, managed := NewManager(nil).ConnectionStatus("x"); !managed || status != "unsupported" {
+	t.Setenv("HIDDEN_PROVIDERS", "x")
+	if status, _ := m.ConnectionStatus("x", true); status != "available" {
+		t.Fatalf("exempt workspace stayed hidden: %s", status)
+	}
+	t.Setenv("HIDDEN_PROVIDERS", "")
+	if status, managed := NewManager(nil).ConnectionStatus("x", false); !managed || status != "unsupported" {
 		t.Fatal("missing registration accepted")
 	}
-	if _, managed := m.ConnectionStatus("unrelated-provider"); managed {
+	if _, managed := m.ConnectionStatus("unrelated-provider", false); managed {
 		t.Fatal("legacy adapter policy changed")
 	}
 	var absent *Manager
-	if absent.ConnectionAvailability().Validate() != nil {
+	if absent.ConnectionAvailability(false).Validate() != nil {
 		t.Fatal("nil manager produced invalid catalog")
 	}
 }

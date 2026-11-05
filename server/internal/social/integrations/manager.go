@@ -29,6 +29,13 @@ func (m *Manager) IsHiddenProvider(identifier string) bool {
 	return slices.Contains(envList("HIDDEN_PROVIDERS"), identifier)
 }
 
+// HiddenProviderWorkspaces reads PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES: the
+// product workspaces that can still connect hidden providers, as a provider's
+// app reviewers must before the provider opens to every customer.
+func (m *Manager) HiddenProviderWorkspaces() []string {
+	return slices.DeleteFunc(envList("PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES"), func(id string) bool { return id == "" })
+}
+
 func migrations() [][2]string {
 	var out [][2]string
 	for _, item := range envList("MIGRATE_PROVIDERS") {

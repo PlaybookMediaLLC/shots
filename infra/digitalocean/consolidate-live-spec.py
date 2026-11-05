@@ -45,6 +45,8 @@ OPTIONAL_SOCIAL_SECRETS = (
     "THREADS_APP_ID", "THREADS_APP_SECRET",
     # Keeps a provider "Coming soon" while its credentials are deployed for review.
     "HIDDEN_PROVIDERS",
+    # The workspaces, such as an app reviewer's, that can still connect them.
+    "PLATFORM_SOCIAL_HIDDEN_PROVIDER_WORKSPACES",
 )
 # The onboarding agent's model and enrichment (docs/rfcs/032); without them it
 # drafts from page metadata and skips Exa.
