@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { linkedInPostIdentity } from '@/lib/write/linkedin-target'
-import { requestPreview } from '@/components/link-preview/client'
+import { LinkPreviewRequestError, requestPreview } from '@/components/link-preview/client'
 import { Button } from '@/components/ui/button'
 import { linkPreviewAgentSchema } from '@/lib/api/contracts/link-preview'
 import { draftsApi } from '@/lib/content-drafts/client'
@@ -137,9 +137,12 @@ export function LinkCards({
               .map((issue) => issue.title)
               .join('; ')
           )
-          // A check that could not run (a busy limiter, a timeout) says nothing about the
-          // link, so it leaves no result and the next pause tries again.
-          .catch(() => null)
+          // A page that can't be read is the answer. A check that could not run (a busy
+          // limiter, a timeout) says nothing about the link, so it leaves no result and
+          // the next pause tries again.
+          .catch((error: unknown) =>
+            error instanceof LinkPreviewRequestError && error.status === 422 ? error.message : null
+          )
           .then((problem) => {
             if (problem !== null && !controller.signal.aborted)
               setChecks((previous) => ({ ...previous, [url]: problem }))

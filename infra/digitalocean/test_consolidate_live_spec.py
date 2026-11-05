@@ -156,6 +156,7 @@ class ConsolidateLiveSpecTest(unittest.TestCase):
         self.assertEqual(next(item for item in spec["jobs"] if item["name"] == "platform-migrate")["envs"][0]["value"], "infisical-MIGRATION_DATABASE_URL")
         self.assertEqual(values["TENANT_AUDIT_RETENTION_DATABASE_URL"], "infisical-AUDIT_RETENTION_DATABASE_URL")
         self.assertEqual(values["THREADS_APP_SECRET"], secrets["SOCIAL_THREADS_APP_SECRET"])
+        self.assertEqual(values["HIDDEN_PROVIDERS"], secrets["HIDDEN_PROVIDERS"])
         for key in cutover.OPTIONAL_SOCIAL_SECRETS:
             entry = next(item for item in backend["envs"] if item["key"] == key)
             self.assertEqual(entry["value"], secrets[cutover.SOCIAL_SECRET_SOURCES.get(key, key)])

@@ -51,6 +51,16 @@ export function parseUrlLines(text: string) {
   }
 }
 
+/** A failed read, keeping the status that says whether the page or the request was at fault. */
+export class LinkPreviewRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number
+  ) {
+    super(message)
+  }
+}
+
 /** Ask the server to read `url` as `agent`. Throws with the API's message on failure. */
 export async function requestPreview(
   url: string,
@@ -60,7 +70,11 @@ export async function requestPreview(
   const query = new URLSearchParams({ agent, url })
   const response = await fetch(`/api/v1/link-preview?${query}`, { signal })
   const body = await response.json().catch(() => null)
-  if (!response.ok) throw new Error(body?.message ?? 'The page could not be read.')
+  if (!response.ok)
+    throw new LinkPreviewRequestError(
+      body?.message ?? 'The page could not be read.',
+      response.status
+    )
   return body as LinkPreview
 }
 

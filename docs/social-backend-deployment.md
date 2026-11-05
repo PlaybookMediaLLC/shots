@@ -104,8 +104,9 @@ held the account. The callback matches Meta's `user_id` to the stored provider I
 so confirm that match with a live test account before relying on it.
 
 The credentials also turn on Connect for every customer. Until Meta approves the
-app, set `HIDDEN_PROVIDERS=threads,instagram-standalone` on the backend: both stay
-"Coming soon" and refuse new connections, while these callbacks keep working.
+app, set `HIDDEN_PROVIDERS=threads,instagram-standalone` in Infisical `prod`: the
+deploy passes it to the backend, both stay "Coming soon" and refuse new connections,
+and these callbacks keep working.
 
 Private product media stays in R2. The canonical asset row holds a stable
 object key; the worker signs it when publishing and again for a retry. Do not
