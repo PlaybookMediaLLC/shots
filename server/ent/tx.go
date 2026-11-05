@@ -48,6 +48,8 @@ type Tx struct {
 	BrandProfile *BrandProfileClient
 	// CalendarMutation is the client for interacting with the CalendarMutation builders.
 	CalendarMutation *CalendarMutationClient
+	// CalendarNote is the client for interacting with the CalendarNote builders.
+	CalendarNote *CalendarNoteClient
 	// Campaign is the client for interacting with the Campaign builders.
 	Campaign *CampaignClient
 	// CampaignAsset is the client for interacting with the CampaignAsset builders.
@@ -409,6 +411,7 @@ func (tx *Tx) init() {
 	tx.BrandKit = NewBrandKitClient(tx.config)
 	tx.BrandProfile = NewBrandProfileClient(tx.config)
 	tx.CalendarMutation = NewCalendarMutationClient(tx.config)
+	tx.CalendarNote = NewCalendarNoteClient(tx.config)
 	tx.Campaign = NewCampaignClient(tx.config)
 	tx.CampaignAsset = NewCampaignAssetClient(tx.config)
 	tx.CampaignPlan = NewCampaignPlanClient(tx.config)

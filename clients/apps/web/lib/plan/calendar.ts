@@ -8,6 +8,7 @@ import { statusGroup } from '@/lib/content-drafts/post-status'
 export const planPreferencesSchema = z.object({
   view: z.enum(['flex', 'month', 'week']).default('flex'),
   density: z.enum(['expanded', 'compact']).default('expanded'),
+  showAll: z.boolean().default(false),
   platforms: z.boolean().default(true),
   tags: z.boolean().default(true),
   slots: z.boolean().default(true),
@@ -91,6 +92,19 @@ export function visibleItems(items: PlanItem[], p: PlanPreferences): PlanItem[] 
       (!p.tagIds.length || p.tagIds.some((id) => item.tagIds.includes(id)))
   )
 }
+
+/** Posts a month day shows before "+N more". */
+const MONTH_DAY_CAP = 2
+/** States a person must act on or watch: a month day never collapses these. */
+const NEEDS_ATTENTION = new Set(['Failed', 'Needs check', 'Overdue'])
+
+/** A month day's cards, in their order: every post that needs attention, then others up to the cap. */
+export function visibleDayItems(items: PlanItem[]): { visible: PlanItem[]; hidden: number } {
+  let room = MONTH_DAY_CAP - items.filter((item) => NEEDS_ATTENTION.has(item.status)).length
+  const visible = items.filter((item) => NEEDS_ATTENTION.has(item.status) || room-- > 0)
+  return { visible, hidden: items.length - visible.length }
+}
+
 export function selectionState(visible: string[] | null, ids: string[]): 'all' | 'none' | 'mixed' {
   const count = ids.filter((id) => visible === null || visible.includes(id)).length
   return count === 0 ? 'none' : count === ids.length ? 'all' : 'mixed'

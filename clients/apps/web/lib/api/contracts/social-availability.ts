@@ -32,3 +32,29 @@ export const getSocialConnectionAvailabilityContract = defineContract({
   status: 200,
   summary: 'Read social connection availability',
 })
+
+/** How many accounts a workspace holds, and may hold; a null limit means none. */
+export const channelCapacitySchema = z.object({
+  held: z.number().int(),
+  limit: z.number().int().nullable(),
+})
+
+/** Read how many social accounts the workspace holds and its plan allows. */
+export const getSocialConnectionCapacityContract = defineContract({
+  access: { permission: 'connection:manage', quota: 'api:write:minute' },
+  docs: memberDocs({
+    description:
+      'Counts active accounts across the workspace. A workspace whose plan does not stand may hold none. Capacity is rechecked when an account connects.',
+    operationId: 'getSocialConnectionCapacity',
+    outputName: 'SocialConnectionCapacity',
+    responses: { '200': 'The current count and limit.' },
+    tag: 'Publishing',
+  }),
+  method: 'GET',
+  name: 'social-connections.capacity',
+  output: channelCapacitySchema,
+  query: z.strictObject({}),
+  path: '/api/v1/social-connection-capacity',
+  status: 200,
+  summary: 'Read social account capacity',
+})

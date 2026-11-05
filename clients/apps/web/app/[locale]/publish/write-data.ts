@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { contentDraftSchema } from '@/lib/api/contracts/content-drafts'
-import { libraryDraft } from '@/lib/write/library'
+import { filterQueue, libraryDraft, libraryRange } from '@/lib/write/library'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import type { OrganizationAccess } from '@/lib/auth/access'
@@ -23,19 +23,22 @@ import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
  */
 
 /** The library tabs: drafts being written, the queue, what went live, the archive. */
-export const writeTabSchema = z.enum(['drafts', 'queue', 'posted', 'archived'])
+export const writeTabSchema = z.enum(['all', 'drafts', 'queue', 'posted', 'archived'])
 
 /** One of {@link writeTabSchema}. */
 export type WriteTab = z.infer<typeof writeTabSchema>
 
 /** The library's URL state. */
 export const writeQuerySchema = z.object({
+  account: z.string().max(40).optional().catch(undefined),
+  from: z.iso.date().optional().catch(undefined),
   kind: draftKindSchema.optional().catch(undefined),
   q: z.string().max(200).optional().catch(undefined),
   set: z.string().max(40).optional().catch(undefined),
   sort: contentDraftSortSchema.optional().catch(undefined),
   tab: writeTabSchema.optional().catch(undefined),
   tag: z.string().max(40).optional().catch(undefined),
+  to: z.iso.date().optional().catch(undefined),
 })
 
 /** One of {@link writeQuerySchema}. */
@@ -62,15 +65,23 @@ export async function loadWrite(
   const horizon = new Date(now.getTime() + 60 * 86_400_000)
   // Overdue and unconfirmed posts stay in the queue after their time passes.
   const since = new Date(now.getTime() - 2 * 86_400_000)
-  const readLibrary = (query: WriteQuery, setId: string | undefined, tags: boolean) =>
+  const readLibrary = (query: WriteQuery, setId: string | undefined, tags: boolean, zone = 'UTC') =>
     Promise.all([
       listContentDrafts(tenant, {
+        ...libraryRange(query, zone),
+        connectionId: query.account,
         kind: query.kind,
         limit: 100,
         socialSetId: setId,
         sort: query.sort,
         tagId: tags ? query.tag : undefined,
-        view: query.tab === 'queue' || !query.tab ? 'drafts' : query.tab,
+        // All leaves the view out, which leaves out only archived drafts.
+        view:
+          query.tab === 'all'
+            ? undefined
+            : query.tab === 'queue' || !query.tab
+              ? 'drafts'
+              : query.tab,
       }),
       listContentDraftPostsBetween(tenant, since, horizon, setId),
       listPlannedContentDrafts(tenant, now, horizon, setId),
@@ -80,14 +91,16 @@ export async function loadWrite(
   // filter, which waits for the experiment flag) is read again below.
   const guessed = queried.then(async (query) => {
     const setId = query.set ?? remembered
-    if (!setId || query.tag) return null
+    // A date filter needs the set's zone, which is not known yet.
+    if (!setId || query.tag || query.from || query.to) return null
     const library = await readLibrary(query, setId, false).catch(() => null)
     return library && { library, setId }
   })
-  const [sets, experimentList, advanced, query, early] = await Promise.all([
+  const [sets, experimentList, advanced, preferences, query, early] = await Promise.all([
     listSocialSets(tenant),
     orNull(backendSDK(tenant).listExperiments()),
     backendSDK(tenant).getFeatureDecision('content:scheduling-advanced'),
+    orNull(backendSDK(tenant).getUserPreferences()),
     queried,
     guessed,
   ])
@@ -103,17 +116,18 @@ export async function loadWrite(
   const [[page, posts, planned], tags] = await Promise.all([
     early && early.setId === activeSet?.id
       ? early.library
-      : readLibrary(query, activeSet?.id, experiments.tags),
+      : readLibrary(query, activeSet?.id, experiments.tags, activeSet?.timeZone),
     activeSet && experiments.tags ? listDraftTags(tenant, activeSet.id) : Promise.resolve([]),
   ])
   const library = [...page.pinned, ...page.items].map((draft) =>
     libraryDraft(contentDraftSchema.parse(draft))
   )
-  const queue = [
+  const allQueued = [
     // Posts that still hold their slot, including one that may already be live.
     ...posts
       .filter((post) => ['SCHEDULED', 'PROCESSING', 'UNKNOWN_DELIVERY'].includes(post.status))
       .map((post) => ({
+        accountIds: [post.channelConnectionId],
         at: post.scheduledFor.toISOString(),
         caption: post.caption,
         draftId: post.draftId,
@@ -123,6 +137,7 @@ export async function loadWrite(
         state: postState(post.status, post.scheduledFor, now.getTime()),
       })),
     ...planned.map((draft) => ({
+      accountIds: draft.channelConnectionIds,
       at: draft.plannedFor?.toISOString() ?? now.toISOString(),
       caption: (draft.plainText || draftPlainText(draft.body)).slice(0, 180),
       draftId: draft.id,
@@ -132,6 +147,11 @@ export async function loadWrite(
       state: null,
     })),
   ].sort((a, b) => a.at.localeCompare(b.at))
+  const queue = filterQueue(
+    allQueued,
+    query.account,
+    libraryRange(query, activeSet?.timeZone ?? 'UTC')
+  )
   return {
     activeSet: activeSet ?? null,
     advancedScheduling: advanced.allowed,
@@ -143,6 +163,7 @@ export async function loadWrite(
     sets,
     tags: (tags ?? []).map((tag) => ({ ...tag, createdAt: tag.createdAt.toISOString() })),
     vocabulary: draftVocabulary(page.items.map((draft) => draft.plainText)),
+    weekStart: preferences?.weekStart === 'sunday' ? 0 : 1,
   }
 }
 

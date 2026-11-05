@@ -60,6 +60,9 @@ type BrandProfile func(*sql.Selector)
 // CalendarMutation is the predicate function for calendarmutation builders.
 type CalendarMutation func(*sql.Selector)
 
+// CalendarNote is the predicate function for calendarnote builders.
+type CalendarNote func(*sql.Selector)
+
 // Campaign is the predicate function for campaign builders.
 type Campaign func(*sql.Selector)
 

@@ -341,3 +341,8 @@ test('search finds every page by name, with its section, and the pages visited b
     ['Brand assets', 'Home', 'Billing']
   )
 })
+
+test('every Publish link keeps the publishing brand it was opened from', () => {
+  for (const link of publishLinks('?set=brand'))
+    assert.ok(link.href.endsWith('?set=brand'), link.href)
+})

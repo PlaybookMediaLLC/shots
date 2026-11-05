@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandkit"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarmutation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/calendarnote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaign"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignasset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignplan"
@@ -347,6 +348,18 @@ func init() {
 	calendarmutationDescCreatedAt := calendarmutationFields[5].Descriptor()
 	// calendarmutation.DefaultCreatedAt holds the default value on creation for the created_at field.
 	calendarmutation.DefaultCreatedAt = calendarmutationDescCreatedAt.Default.(func() time.Time)
+	calendarnoteFields := schema.CalendarNote{}.Fields()
+	_ = calendarnoteFields
+	// calendarnoteDescCreatedAt is the schema descriptor for created_at field.
+	calendarnoteDescCreatedAt := calendarnoteFields[6].Descriptor()
+	// calendarnote.DefaultCreatedAt holds the default value on creation for the created_at field.
+	calendarnote.DefaultCreatedAt = calendarnoteDescCreatedAt.Default.(func() time.Time)
+	// calendarnoteDescUpdatedAt is the schema descriptor for updated_at field.
+	calendarnoteDescUpdatedAt := calendarnoteFields[7].Descriptor()
+	// calendarnote.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	calendarnote.DefaultUpdatedAt = calendarnoteDescUpdatedAt.Default.(func() time.Time)
+	// calendarnote.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	calendarnote.UpdateDefaultUpdatedAt = calendarnoteDescUpdatedAt.UpdateDefault.(func() time.Time)
 	campaignFields := schema.Campaign{}.Fields()
 	_ = campaignFields
 	// campaignDescCreatedAt is the schema descriptor for created_at field.

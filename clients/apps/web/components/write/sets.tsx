@@ -104,7 +104,7 @@ export function SocialSetSwitcher() {
                 set.id !== data.activeSet?.id
               )
                 router.push(`/publish?set=${encodeURIComponent(set.id)}`)
-              else setQuery({ q: undefined, set: set.id, tag: undefined })
+              else setQuery({ account: undefined, q: undefined, set: set.id, tag: undefined })
             }}
           >
             <SetDot color={set.color} />
