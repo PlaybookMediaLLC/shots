@@ -22,6 +22,8 @@ import {
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import { startBlankDraft } from './pending-draft'
+import { carriedChannels } from '@/lib/write/composing-session'
+import { countingChannelFor } from '@/lib/write/paste-split'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
@@ -187,11 +189,13 @@ function FrameLayout({
     try {
       startBlankDraft(
         {
+          channelConnectionIds: carriedChannels(data.activeSet),
           socialSetId: data.activeSet?.id,
           tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
         },
         (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined
+        beforeLeaveRef.current ?? undefined,
+        countingChannelFor(data.activeSet?.accounts)
       )
     } finally {
       setCreating(false)

@@ -5,6 +5,7 @@ import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { BulkScheduleDialog } from './bulk-schedule'
 
 import { useWriteRouter } from '@/components/write/write-context'
+import { useSearchParams } from 'next/navigation'
 
 import * as React from 'react'
 // Hover-intent prefetch: the rail lists up to 100 drafts.
@@ -62,6 +63,7 @@ import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/pos
 import { platformLabel } from '@/lib/content-drafts/serialize'
 import { writeApi } from '@/lib/write/client'
 import { carriedChannels } from '@/lib/write/composing-session'
+import { countingChannelFor } from '@/lib/write/paste-split'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
 import { socialSetHref } from '@/components/workspace/settings-sections'
@@ -149,6 +151,21 @@ export function WriteRail() {
   const [lastClicked, setLastClicked] = React.useState<string | null>(null)
   const [managingTags, setManagingTags] = React.useState(false)
   const tab = data.query.tab
+  // A run of drafts just split out of one paste arrives here named in the URL:
+  // select them and open the series scheduler, so one confirmation times them
+  // all. The parameter is cleared once read, so a reload is not a second step.
+  const params = useSearchParams()
+  const series = params.get('series')
+  const [scheduling, setScheduling] = React.useState(false)
+  React.useEffect(() => {
+    if (!series) return
+    const ids = series.split(',').filter(Boolean)
+    if (ids.length) {
+      setSelected(ids)
+      setScheduling(true)
+    }
+    setQuery({ series: undefined })
+  }, [series, setQuery])
   const filtered = Boolean(
     data.query.q ||
     data.query.tag ||
@@ -301,7 +318,15 @@ export function WriteRail() {
         </div>
       ) : null}
       {canEdit && tab !== 'queue' ? <NewDraftMenu /> : null}
-      {selected.length > 0 ? <BulkBar onDone={() => setSelected([])} selected={selected} /> : null}
+      {selected.length > 0 ? (
+        <BulkBar
+          key={scheduling ? 'series' : 'selection'}
+          onDone={() => setSelected([])}
+          onSchedulerClosed={() => setScheduling(false)}
+          openScheduler={scheduling}
+          selected={selected}
+        />
+      ) : null}
       <nav
         aria-label="Drafts"
         className="mt-2 min-h-0 flex-1 overflow-y-auto border-t border-border"
@@ -584,7 +609,8 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           target,
         },
         (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined
+        beforeLeaveRef.current ?? undefined,
+        countingChannelFor(data.activeSet?.accounts)
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The draft could not be created.')
@@ -1293,10 +1319,21 @@ function CopyDialog({
 }
 
 /** Actions on several selected drafts. */
-function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] }) {
+function BulkBar({
+  onDone,
+  openScheduler = false,
+  onSchedulerClosed,
+  selected,
+}: {
+  onDone: () => void
+  /** A run that just arrived from a split paste opens its scheduler at once. */
+  openScheduler?: boolean
+  onSchedulerClosed?: () => void
+  selected: string[]
+}) {
   const router = useWriteRouter()
   const { activeId, beforeLeaveRef, data, hideDraft, canPublish } = useWrite()
-  const [scheduling, setScheduling] = React.useState(false)
+  const [scheduling, setScheduling] = React.useState(openScheduler && canPublish)
   const [confirm, setConfirm] = React.useState(false)
   const [progress, setProgress] = React.useState<number | null>(null)
   const run = async (label: string, work: (id: string) => Promise<unknown>) => {
@@ -1340,7 +1377,14 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
       aria-label="Selected drafts"
     >
       {scheduling && (
-        <BulkScheduleDialog selected={selected} onClose={() => setScheduling(false)} />
+        <BulkScheduleDialog
+          initialMode={openScheduler ? 'spread' : 'queue'}
+          selected={selected}
+          onClose={() => {
+            setScheduling(false)
+            onSchedulerClosed?.()
+          }}
+        />
       )}
       {canPublish && (
         <Button size="sm" variant="ghost" onClick={() => setScheduling(true)}>
