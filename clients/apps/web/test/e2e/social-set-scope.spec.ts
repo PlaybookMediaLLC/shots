@@ -195,8 +195,9 @@ test(
       await expect(
         page.getByRole('link', { name: 'Settings for Delayed Alpha creation', exact: true })
       ).toHaveCount(0)
+      // This tab's own requests are refused until the person chooses, so read past it.
       const storedBeta = socialSetSchema.parse(
-        await browserJson(page, `/api/v1/social-sets/${beta.set.id}`)
+        await (await context.request.get(`/api/v1/social-sets/${beta.set.id}`)).json()
       )
       expect(storedBeta.name).toBe('Private Beta')
       expect(

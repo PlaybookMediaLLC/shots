@@ -590,12 +590,15 @@ test(
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
+    // Preview takes the draft's place, so write in the draft and come back to see it.
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
     // A click then End can leave the caret where the click landed: set it at the end.
     await caretAtDocumentEnd(page)
     await page.keyboard.type(' Live update.')
-    await expect(panel).toContainText('Live update.')
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('A short second post 🚀')
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    await expect(panel).toContainText('Live update.')
     await panel.getByRole('button', { name: 'Threads', exact: true }).click()
     await expect(panel.locator('article')).toHaveCount(2)
     await expect(panel).toHaveScreenshot('threads-mobile-thread.png', {
