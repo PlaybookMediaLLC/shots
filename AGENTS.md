@@ -18,7 +18,8 @@ The repository separates the backend from its clients, as polar.sh does:
     [clients/apps/web/AGENTS.md](clients/apps/web/AGENTS.md).
   - `apps/collab-server/`: the real-time co-editing server.
   - `packages/`: shared libraries (backend SDK, typed API client, editor).
-  - `integrations/`: native clients (Raycast, Zapier, Shortcuts, Claude Code).
+  - `integrations/`: native clients (Raycast, Zapier, Shortcuts) and the
+    agent plugin for Claude Code, Codex and OpenCode.
 - `dev/`: local development and repository tooling. `dev/studio` (behind
   `make`) runs the Compose stack in `dev/compose*.yaml`; `dev/native-stack`
   runs it as host processes where images cannot be pulled, as in cloud

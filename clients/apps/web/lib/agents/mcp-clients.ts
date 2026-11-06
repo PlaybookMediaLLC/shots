@@ -10,6 +10,22 @@ export const MCP_URL = process.env.PLATFORM_MCP_URL ?? 'https://shots-mcp.playbo
 /** The MCP base without `/mcp`, where the OAuth mounts live. */
 export const MCP_BASE_URL = MCP_URL.replace(/\/mcp\/?$/, '')
 
+/** Where the Shots plugin and skill live. `main` is what production runs; `develop` is unreleased. */
+const PLUGIN_REPOSITORY = 'PlaybookMediaLLC/shots'
+const PLUGIN_PATH = 'clients/integrations/agent-plugin'
+
+/** The Shots plugin's source, for people who want to read it first. */
+export const PLUGIN_URL = `https://github.com/${PLUGIN_REPOSITORY}/tree/main/${PLUGIN_PATH}`
+
+/** Installs the plugin in Claude Code: the MCP server over OAuth, and the posting skill. */
+export const CLAUDE_PLUGIN_INSTALL = `claude plugin marketplace add ${PLUGIN_REPOSITORY}@main && claude plugin install shots@shots`
+
+/** Installs the posting skill where Codex and OpenCode both look for it. */
+export const SKILL_INSTALL = `mkdir -p ~/.agents/skills/shots && curl -fsSL https://raw.githubusercontent.com/${PLUGIN_REPOSITORY}/main/${PLUGIN_PATH}/skills/shots/SKILL.md -o ~/.agents/skills/shots/SKILL.md`
+
+/** Where OpenCode's snippet reads the key from until one is created on the page. */
+const OPENCODE_KEY_FILE = '~/.config/opencode/shots-key'
+
 /** The placeholder a snippet shows until a key is created on the page. */
 export const API_KEY_PLACEHOLDER = '$SHOTS_API_KEY'
 
@@ -53,7 +69,7 @@ export const MCP_CLIENTS: McpClientGuide[] = [
     steps: [
       'Run the command, then /mcp in Claude Code to check that shots is connected.',
       'Without the --header line, Claude Code connects through OAuth: run /mcp, pick shots, and approve it in your browser.',
-      'Or install the Shots plugin, which adds the server (over OAuth) and a launch skill: /plugin install shots --marketplace PlaybookMediaLLC/screenshot-studio.',
+      `Or install the Shots plugin, which adds the server over OAuth and a skill for writing and publishing posts: ${CLAUDE_PLUGIN_INSTALL}`,
     ],
   },
   {
@@ -177,7 +193,7 @@ export const MCP_CLIENTS: McpClientGuide[] = [
     ],
   },
   {
-    auth: 'api-key',
+    auth: 'api-key-or-oauth',
     id: 'codex',
     language: 'toml',
     location: '~/.codex/config.toml',
@@ -187,7 +203,10 @@ export const MCP_CLIENTS: McpClientGuide[] = [
         ? `[mcp_servers.shots]\nurl = "${mcpUrl}"\nbearer_token_env_var = "SHOTS_API_KEY"`
         : `[mcp_servers.shots]\nurl = "${mcpUrl}"\nhttp_headers = { Authorization = "Bearer ${apiKey}" }`,
     steps: [
-      'Export SHOTS_API_KEY in the shell Codex runs in, then run codex mcp list to check shots.',
+      'If the snippet names SHOTS_API_KEY, export it in the shell Codex runs in. Run codex mcp list to check shots.',
+      'To connect through OAuth instead, keep only the url line, run codex mcp login shots, and approve it in your browser.',
+      `Add the skill for writing and publishing posts: ${SKILL_INSTALL}`,
+      `In the ChatGPT desktop app, Codex can install all of this as a plugin: run codex plugin marketplace add ${PLUGIN_REPOSITORY}@main, then install Shots from the Plugins Directory.`,
     ],
   },
   {
@@ -203,7 +222,8 @@ export const MCP_CLIENTS: McpClientGuide[] = [
           mcp: {
             shots: {
               enabled: true,
-              headers: { Authorization: bearer(apiKey, '{env:SHOTS_API_KEY}') },
+              headers: { Authorization: bearer(apiKey, `{file:${OPENCODE_KEY_FILE}}`) },
+              oauth: false,
               type: 'remote',
               url: mcpUrl,
             },
@@ -213,8 +233,10 @@ export const MCP_CLIENTS: McpClientGuide[] = [
         2
       ),
     steps: [
+      `If the snippet names ${OPENCODE_KEY_FILE}, save your key in that file. A file works where an environment variable doesn't: OpenCode's background service can't see what you export in a shell.`,
       'Run opencode mcp list to check that shots is connected.',
-      'Leave out headers and run opencode mcp auth shots to connect through OAuth instead.',
+      'To connect through OAuth instead, leave out headers and oauth, then run opencode mcp auth shots.',
+      `Add the skill for writing and publishing posts: ${SKILL_INSTALL}`,
     ],
   },
 ]
@@ -270,6 +292,11 @@ export const MCP_TOOLS: { name: string; scope: string; summary: string }[] = [
     summary: 'Read an editable draft and its version',
   },
   { name: 'createContentDraft', scope: 'draft:write', summary: 'Create a draft for human review' },
+  {
+    name: 'createPost',
+    scope: 'post:publish',
+    summary: 'Write and publish a post or thread (asks to confirm)',
+  },
   {
     name: 'updateContentDraft',
     scope: 'draft:write',

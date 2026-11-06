@@ -43,19 +43,55 @@ export default function AgentsDocsPage() {
           Connect AI agents to Shots
         </h1>
         <p className="mb-6 text-lg leading-relaxed text-muted-foreground">
-          The Shots MCP server gives an AI agent the same workspace operations as the{' '}
+          The Shots MCP server lets an AI agent write, schedule, and publish posts to your connected
+          accounts, with the same scopes, plan checks, and quotas as the{' '}
           <Link className={linkClassName} href="/api-reference">
             REST API
           </Link>
-          : read releases and campaigns, draft campaigns, upload assets, capture screenshots, and
-          submit drafts for review. A key with post:schedule also schedules posts a person approved.
-          Only a person approves, in Shots; no agent can.
+          . It can also read releases and campaigns, draft campaigns, upload assets, capture
+          screenshots, and submit drafts for review. Posting needs the post:publish scope, which is
+          off until you tick it. Only a person approves, in Shots; no agent can.
         </p>
         <pre className={codeBlockClassName}>
           <code>{MCP_URL}</code>
         </pre>
 
         <div className="mt-12 space-y-12">
+          <section id="publishing">
+            <h2 className={heading} style={{ fontFamily: INTER }}>
+              Publish from your agent
+            </h2>
+            <p className="mb-4 leading-relaxed text-muted-foreground">
+              Ask your agent to write a post and say which accounts and when. It finds the accounts
+              with listSocialSets, uploads any media, and calls createPost, which schedules or
+              publishes in one step. Check what it will post before you say yes: with post:publish
+              there is no review in Shots, unless the workspace requires approval, in which case the
+              post waits there and nothing goes out. A retry never posts twice.
+            </p>
+            <ul className="mb-4 list-disc space-y-2 pl-5 leading-relaxed text-muted-foreground">
+              <li>
+                <strong className="font-medium text-foreground">Only tick post:publish if you trust what drives the agent.</strong>{' '}
+                Text an agent reads from a web page or a file could try to talk it into posting. Add
+                post:schedule as well if you want it to be able to cancel scheduled posts.
+              </li>
+              <li>
+                <strong className="font-medium text-foreground">Accounts must be in a shared social set.</strong>{' '}
+                Agents can&apos;t see private sets or connect accounts, so connect them in Shots and
+                share the set first.
+              </li>
+              <li>
+                <strong className="font-medium text-foreground">Media needs a client that can upload files.</strong>{' '}
+                Claude Code, Codex, and OpenCode can. Claude.ai and ChatGPT may only manage text, so
+                attach media in Shots for those.
+              </li>
+              <li>
+                <strong className="font-medium text-foreground">A post can take up to a minute to start.</strong>{' '}
+                The agent can read each account&apos;s result and live link with
+                listContentDraftPosts.
+              </li>
+            </ul>
+          </section>
+
           <section id="authentication">
             <h2 className={heading} style={{ fontFamily: INTER }}>
               Authentication
@@ -64,7 +100,8 @@ export default function AgentsDocsPage() {
               Every call acts for one workspace. Agents that take a header send a workspace API key
               as <code>Authorization: Bearer ss_…</code>; create one in Settings → AI agents with
               only the scopes the agent needs. Claude.ai, Claude Desktop, and ChatGPT connect
-              through OAuth instead: you sign in to Shots, choose the scopes, and approve. The token
+              through OAuth, and Claude Code, Codex, and OpenCode can too: you sign in to Shots,
+              choose the scopes, and approve. The token
               they receive is a workspace API key with exactly those scopes, listed and revocable in
               Settings.
             </p>

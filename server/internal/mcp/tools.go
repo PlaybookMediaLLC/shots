@@ -95,6 +95,7 @@ var toolTable = []struct {
 	{"listContentDrafts", readOnly, 0, listContentDrafts, ""},
 	{"getContentDraft", readOnly, 0, getContentDraft, ""},
 	{"createContentDraft", write, 0, createContentDraft, ""},
+	{"createPost", publishes, 0, createPost, ""},
 	{"updateContentDraft", write, 0, updateContentDraft, ""},
 	{"deleteContentDraft", destructive, 0, deleteContentDraft, ""},
 	{"listContentDraftPosts", readOnly, 0, listContentDraftPosts, ""},

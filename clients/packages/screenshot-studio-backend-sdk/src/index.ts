@@ -3019,6 +3019,17 @@ export class ScreenshotStudioBackendSDK {
     }>(`v1/content-drafts/${encodeURIComponent(id)}/schedule`, { body: input, method: 'POST' })
   }
 
+  /** Writes a post and schedules or publishes it; a repeat with the same key replays it. */
+  async createPost(input: Record<string, unknown> & { idempotencyKey: string }) {
+    return this.request<{
+      created: boolean
+      draft: BackendContentDraft
+      posts: BackendContentDraftPost[]
+      reviewPath?: string
+      status: 'awaiting_approval' | 'publishing' | 'scheduled'
+    }>('v1/posts', { body: input, method: 'POST' })
+  }
+
   /** A short-lived presence token; set documents keep their revision-checked persistence. */
   async createCreativeSetCollabToken(id: string) {
     return this.request<{

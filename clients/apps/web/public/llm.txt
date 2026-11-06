@@ -66,8 +66,8 @@ Editor utility endpoints such as `/api/screenshot` require a signed-in session
 or a workspace API key with the artifact:read scope in `X-API-Key`, and per-IP limits apply on
 top. Create a workspace API key in Settings → Developer API (/settings/developers). Workspace-scoped `/api/v1` operations require an organization key in
 `X-API-Key` or an authorized signed-in session. Every page also serves Markdown
-to clients that send `Accept: text/markdown`. No official CLI tool and no MCP
-server are published yet.
+to clients that send `Accept: text/markdown`. The MCP server at /docs/agents lets
+agents write and publish posts. No official CLI tool is published yet.
 
 ## Languages
 Available in 8 languages: English, Spanish (/es), French (/fr), German (/de), Japanese (/ja), Portuguese (/pt), Korean (/ko), Chinese (/zh).

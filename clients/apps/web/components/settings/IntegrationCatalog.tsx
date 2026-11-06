@@ -1,5 +1,6 @@
 'use client'
 
+import { CLAUDE_PLUGIN_INSTALL, PLUGIN_URL } from '@/lib/agents/mcp-clients'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { z } from 'zod'
@@ -117,8 +118,8 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
         'OAuth consent by a workspace owner or admin; it mints a scoped workspace key.',
       name: 'Claude',
       purpose:
-        'Draft launches, read releases and campaigns from Claude.ai, Claude Desktop and Claude Code.',
-      scopes: 'artifact:read and release:create by default; you choose more.',
+        'Write, schedule and publish posts, and read releases and campaigns, from Claude.ai, Claude Desktop and Claude Code.',
+      scopes: 'Reading, drafting and uploads by default. Posting needs post:publish, which you tick.',
       setup: 'Add the Shots MCP server as a connector in Claude, then approve it here.',
       status: agentStatus('claude'),
     },
@@ -136,7 +137,7 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
       authorization: 'OAuth, or a workspace API key in the X-API-Key header.',
       name: 'MCP',
       purpose:
-        'Any agent that speaks the Model Context Protocol: Cursor, VS Code, Windsurf, Gemini CLI, Codex and more.',
+        'Any agent that speaks the Model Context Protocol: Codex, OpenCode, Cursor, VS Code, Windsurf, Gemini CLI and more.',
       scopes: 'Each tool needs one API key scope; the key decides what the agent can do.',
       setup: 'Copy the MCP server URL into your client.',
       status: agentClients.length > 0 ? 'connected' : 'available',
@@ -144,15 +145,15 @@ export function IntegrationCatalog({ canManage }: { canManage: boolean }) {
     {
       action: {
         external: true,
-        href: 'https://github.com/PlaybookMediaLLC/screenshot-studio/tree/main/integrations/claude-code/shots',
+        href: PLUGIN_URL,
         label: 'View the plugin',
       },
       authorization: 'The MCP connection above; the skill adds no access of its own.',
       name: 'Agent Skills',
-      purpose: 'A Claude Code plugin with the Shots MCP server and a launch workflow skill.',
+      purpose:
+        'A plugin for Claude Code and Codex, and a skill for OpenCode, that write, schedule and publish posts over the Shots MCP server.',
       scopes: 'Those of the MCP connection.',
-      setup:
-        'In Claude Code: /plugin marketplace add PlaybookMediaLLC/screenshot-studio, then /plugin install shots@shots.',
+      setup: `In Claude Code: ${CLAUDE_PLUGIN_INSTALL}. Codex and OpenCode: Settings → AI agents.`,
       status: 'available',
     },
     {

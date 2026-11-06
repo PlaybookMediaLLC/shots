@@ -318,10 +318,10 @@ func (s *Server) serveMCP(w http.ResponseWriter, r *http.Request, mount string) 
 }
 
 // instructions tell an agent what Shots is and where its authority ends.
-const instructions = `Shots turns a software release into a reviewed launch: a cited brief, campaign posts, and visuals.
-Create releases and draft campaigns, upload assets, capture screenshots, and submit drafts for review.
-Only a person approves, in the Shots app; no tool can. With the post:schedule scope you may schedule posts a person approved, and cancel scheduled posts.
-getCampaign reports each post's review and delivery status; listScheduledPosts shows the schedule.`
+const instructions = `Shots writes, schedules, and publishes social posts to a workspace's connected accounts, and turns a software release into a reviewed launch.
+To post: listSocialSets gives the accounts (accounts[].id); for media, createAssetUploadUrl, PUT the bytes to the returned URL, then completeAssetUpload; createPost then writes and schedules or publishes it in one call. It needs the post:publish scope. Confirm the text, the accounts, and the time with the user first, because it goes out to public accounts. Reuse the same idempotencyKey when retrying, and never post again after an unclear result: read listContentDraftPosts instead. A post can take up to a minute to start.
+createContentDraft saves a draft for a person to review instead. Private social sets are not visible here; if no account is listed, ask the user to connect one in a shared set in Shots.
+Only a person approves, in the Shots app; no tool can. With post:schedule you may schedule campaign posts a person approved, and cancel scheduled posts. listScheduledPosts shows the schedule.`
 
 // build makes the MCP server for one request, with the tools the key's
 // scopes allow.

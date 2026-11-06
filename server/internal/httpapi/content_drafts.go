@@ -21,6 +21,7 @@ type ContentDraftStore interface {
 	DeleteContentDraft(context.Context, product.Actor, string) error
 	DeleteContentDraftAtVersion(context.Context, product.Actor, string, int, int) error
 	ScheduleContentDraft(context.Context, product.Actor, string, product.ScheduleContentDraftInput) (*product.ScheduleContentDraftResult, error)
+	CreatePost(context.Context, product.Actor, product.CreatePostInput) (*product.CreatePostResult, error)
 	ListContentDraftPosts(context.Context, product.Actor, string) ([]product.ContentDraftPost, error)
 	IssueContentDraftCollabToken(context.Context, product.Actor, string) (*product.CollabToken, error)
 	WriteStore
@@ -37,6 +38,7 @@ func (s *Server) registerContentDrafts(mux *http.ServeMux) {
 	mux.Handle("PATCH /v1/content-drafts/{id}", s.authenticateProduct(http.HandlerFunc(s.updateContentDraft)))
 	mux.Handle("DELETE /v1/content-drafts/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteContentDraft)))
 	mux.Handle("POST /v1/content-drafts/{id}/schedule", s.authenticateProduct(http.HandlerFunc(s.scheduleContentDraft)))
+	mux.Handle("POST /v1/posts", s.authenticateProduct(http.HandlerFunc(s.createPost)))
 	mux.Handle("GET /v1/content-drafts/{id}/posts", s.authenticateProduct(http.HandlerFunc(s.listContentDraftPosts)))
 	mux.Handle("POST /v1/content-drafts/{id}/collab-token", s.authenticateProduct(http.HandlerFunc(s.issueCollabToken)))
 	s.registerCollab(mux)
@@ -223,6 +225,34 @@ func (s *Server) scheduleContentDraft(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable,
 			"The schedule is saved, but the publisher could not be reached. It starts within a minute; refresh to see it.")
 		return
+	}
+	status := http.StatusOK
+	if result.Created {
+		status = http.StatusCreated
+	}
+	writeJSON(w, status, result)
+}
+
+// createPost writes and schedules a post in one call. A saved post whose
+// workflow can't be woken still succeeds: the once-a-minute dispatcher starts
+// it, and the caller already holds the post's ID.
+func (s *Server) createPost(w http.ResponseWriter, r *http.Request) {
+	var input product.CreatePostInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid post")
+		return
+	}
+	result, err := s.configuration.CreatePost(r.Context(), workspaceActor(r), input)
+	if err != nil {
+		writeContentDraftError(w, err)
+		return
+	}
+	for _, post := range result.Scheduled {
+		if err := s.scheduler.Start(r.Context(), temporalpublishing.ScheduleInput{
+			OrganizationID: post.OrganizationID, PostID: post.ID, ScheduledFor: post.ScheduledFor,
+		}); err != nil {
+			slog.WarnContext(r.Context(), "scheduled post workflow was not woken", "post", post.ID, "error", err)
+		}
 	}
 	status := http.StatusOK
 	if result.Created {

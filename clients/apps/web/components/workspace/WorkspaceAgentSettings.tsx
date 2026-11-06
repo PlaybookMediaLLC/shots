@@ -9,7 +9,12 @@ import { Input } from '@/components/ui/input'
 import { KeyExpiry } from '@/components/settings/KeyExpiry'
 import { Label } from '@/components/ui/label'
 import { API_KEY_PLACEHOLDER, MCP_CLIENTS, type McpClientGuide } from '@/lib/agents/mcp-clients'
-import { apiKeyScopeDescriptions, apiKeyScopes, type ApiKeyScope } from '@/lib/auth/api-key-scopes'
+import {
+  apiKeyScopeDescriptions,
+  apiKeyScopes,
+  defaultAgentScopes,
+  type ApiKeyScope,
+} from '@/lib/auth/api-key-scopes'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { getErrorMessage } from './settings-client'
 
@@ -21,9 +26,6 @@ type AgentKey = {
   name: string | null
   start: string | null
 }
-
-/** Scopes an agent key starts with: read the workspace and draft for review. */
-const DEFAULT_AGENT_SCOPES: ApiKeyScope[] = ['artifact:read', 'release:create']
 
 const fieldLabel = 'text-xs font-medium text-foreground/65'
 
@@ -110,7 +112,8 @@ export function WorkspaceAgentSettings({
             <p className="text-xs text-muted-foreground">
               Agents can read releases, campaigns, the review queue, and the schedule, create
               drafts, upload assets, capture screenshots, and submit drafts for review. With
-              post:schedule they also schedule what a person approved. Only a person approves.{' '}
+              post:publish they also post to your shared accounts, with no review unless the
+              workspace requires approval. Only a person approves.{' '}
               <a className="underline underline-offset-4" href="/docs/agents">
                 Setup guides
               </a>
@@ -121,7 +124,7 @@ export function WorkspaceAgentSettings({
 
       {canManage ? (
         <Section
-          description="Claude.ai, Claude Desktop, and ChatGPT connect through OAuth and ask you to approve them. Other clients take a key: create one here and it fills in the configuration below."
+          description="Claude.ai, Claude Desktop, and ChatGPT connect through OAuth and ask you to approve them. Other clients can use OAuth too, or a key: create one here and it fills in the configuration below."
           title="Agent key"
         >
           {newKey ? (
@@ -269,7 +272,7 @@ function AgentKeyForm({
           <div className="flex items-start gap-2" key={scope}>
             <Checkbox
               className="mt-0.5"
-              defaultChecked={DEFAULT_AGENT_SCOPES.includes(scope)}
+              defaultChecked={defaultAgentScopes.includes(scope)}
               id={`agent-scope-${scope}`}
               name="scopes"
               value={scope}

@@ -28,7 +28,7 @@ const mcpToolLines = MCP_TOOLS.map(
 
 const mcpClientSections = MCP_CLIENTS.map(
   (client) =>
-    `#### ${client.name}\n\n${client.location}\n\n\`\`\`${client.language}\n${client.snippet(MCP_URL, API_KEY_PLACEHOLDER)}\n\`\`\``,
+    `#### ${client.name}\n\n${client.location}\n\n\`\`\`${client.language}\n${client.snippet(MCP_URL, API_KEY_PLACEHOLDER)}\n\`\`\`\n\n${client.steps.map((step) => `- ${step}`).join("\n")}`,
 ).join("\n\n");
 
 const agentQuickstart = `## Agent Quickstart
@@ -36,11 +36,11 @@ const agentQuickstart = `## Agent Quickstart
 Shots runs an MCP server for AI agents at ${MCP_URL}, served by the same backend as the REST API, with the same workspace permissions, plan checks, and quotas.
 
 1. In a signed-in workspace, open Settings → AI agents (/settings/ai-agents) and create an agent key with only the scopes the agent needs.
-2. Add the server to your agent with the key as a bearer token. For Claude Code: \`claude mcp add --transport http shots ${MCP_URL} --header "Authorization: Bearer $SHOTS_API_KEY"\`.
+2. Add the server to your agent with the key as a bearer token, using the configuration for your client at ${BASE_URL}/docs/agents.
 3. Claude.ai, Claude Desktop, and ChatGPT connect through OAuth instead and ask a workspace owner or admin to approve.
 4. Prefer HTTP? Every MCP tool mirrors an operation in ${BASE_URL}/openapi.json; send the same key in \`X-API-Key\`.
 
-Setup for Claude Code, Claude.ai, ChatGPT, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, and OpenCode: ${BASE_URL}/docs/agents. Agents can read releases, campaigns, the review queue, and the schedule, create drafts, upload assets, capture screenshots, and submit drafts for review. With the post:schedule scope they schedule posts a person approved; only a person approves.`;
+Setup for Claude Code, Claude.ai, ChatGPT, Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, and OpenCode: ${BASE_URL}/docs/agents. Agents can write, schedule, and publish posts to connected accounts, read releases, campaigns, the review queue, and the schedule, create drafts, upload assets, capture screenshots, and submit drafts for review. Posting needs the post:publish scope, which is off until someone ticks it. With post:schedule they schedule campaign posts a person approved. Only a person approves.`;
 
 const comparisonRows = comparisons
   .map(
@@ -433,7 +433,7 @@ ${MCP_URL} is the Shots MCP server (Streamable HTTP). Send a workspace API key a
 |------|-------|------|
 ${mcpToolLines}
 
-No tool approves; a person does that in Shots. The scheduling tools need the post:schedule scope and take only posts and visuals a person approved.
+No tool approves; a person does that in Shots. createPost writes and publishes new posts with the post:publish scope, which is off until someone ticks it, and a workspace that requires approval keeps that rule. The campaign scheduling tools need post:schedule and take only posts and visuals a person approved.
 
 ### MCP client configuration
 

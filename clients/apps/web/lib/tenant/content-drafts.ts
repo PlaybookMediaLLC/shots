@@ -13,7 +13,9 @@ import type {
 import type { OrganizationAccess, TenantContext } from '@/lib/auth/access'
 import { backendSDK, orNull, serviceBackend, withDates } from '@/lib/backend/sdk'
 import { channelForPlatform, type DraftChannel } from '@/lib/content-drafts/serialize'
+import type { z } from 'zod'
 import { revisionReasonSchema } from '@/lib/api/contracts/content-draft-platform'
+import type { createPostSchema } from '@/lib/api/contracts/posts'
 import { listBackendConnections } from '@/lib/tenant/publishing-backend'
 import { buildPublication } from '@/lib/write/publication'
 import { readVersions } from '@/lib/write/versions'
@@ -263,6 +265,21 @@ export async function scheduleContentDraft(
     created: result.created,
     draft: readDraft(result.draft),
     posts: result.posts.map(readPost),
+  }
+}
+
+/** Write a post and put it on its accounts: the one way a key or agent posts. */
+export async function createPost(
+  context: TenantContext,
+  input: z.infer<typeof createPostSchema> & { idempotencyKey: string }
+) {
+  const result = await backendSDK(context).createPost(input)
+  return {
+    created: result.created,
+    draft: readDraft(result.draft),
+    posts: result.posts.map(readPost),
+    reviewPath: result.reviewPath,
+    status: result.status,
   }
 }
 
