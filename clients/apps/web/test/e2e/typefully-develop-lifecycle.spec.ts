@@ -58,7 +58,7 @@ test(
     await settleSelection(page)
     await page.keyboard.type('Board draft for review')
     await expectSaved(page)
-    await page.getByRole('button', { name: 'Preview', exact: true }).first().click()
+    await page.getByRole('button', { name: 'Draft details', exact: true }).first().click()
     const resize = page.getByRole('separator', { name: /Resize/ })
     await resize.focus()
     const width = Number(await resize.getAttribute('aria-valuenow'))

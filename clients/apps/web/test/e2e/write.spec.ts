@@ -131,6 +131,9 @@ test(
     await expect(page.getByTestId('preview-linkedin')).toContainText('Read more on our blog.')
     await expect(page.getByTestId('preview-linkedin')).not.toContainText('Today!')
     await snap(page, 'write-preview-linkedin')
+    // The preview and the editor show one platform, whichever of them changed it.
+    await page.getByTestId('platform-tab-x').click()
+    await expect(page.getByTestId('preview-x')).toBeVisible()
 
     // Properties: an internal title and scratchpad that are never posted, and counts.
     await page.getByRole('button', { name: 'Draft details', exact: true }).click()
@@ -391,10 +394,10 @@ test(
 
     // Panels open as a sheet over the draft.
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
-    await expect(page.getByRole('dialog').getByTestId('preview-panel')).toBeVisible()
+    await expect(page.getByTestId('preview-panel')).toBeVisible()
     await expect(page.getByTestId('preview-x')).toContainText('Written on a phone.')
     await snap(page, 'write-phone-preview')
-    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
 
     // Schedule stays in the header on a phone; Publish now is one menu away and still reviewed.
     await expect(page.getByTestId('schedule-button')).toBeVisible()

@@ -40,6 +40,8 @@ import { followUpLines } from '@/lib/write/automation'
 import { upcomingSlots } from '@/lib/write/calendar'
 import { writeApi } from '@/lib/write/client'
 import type { AutoDm, Automation, Community, DraftChannel } from '@/lib/write/document'
+import type { DraftKind } from '@/lib/write/document'
+import { platformRefusal } from '@/lib/write/platform-rules'
 import {
   committedMessage,
   offsetLabel,
@@ -62,6 +64,7 @@ function dayIn(at: Date, zone: string): string {
 
 /** What scheduling needs from the composer. */
 export type ScheduleContext = {
+  kind: DraftKind
   /** Every destination with its publication, to check before anything is queued. */
   items: PreviewItem[]
   approved: boolean
@@ -904,6 +907,9 @@ function Destinations({ context }: { context: ScheduleContext }) {
             <Switch
               aria-label={`Publish to ${CHANNEL_META[account.channel].label}`}
               checked={on.has(account.id)}
+              disabled={
+                platformRefusal(account.channel, context.kind, on.has(account.id), on.size) !== null
+              }
               onCheckedChange={(checked) => context.onToggle(account.id, checked === true)}
             />
           </Label>

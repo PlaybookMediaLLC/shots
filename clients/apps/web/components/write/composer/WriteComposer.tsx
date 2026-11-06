@@ -80,6 +80,7 @@ import {
 import { currentPosts, draftPostsState, draftStatus } from '@/lib/content-drafts/post-status'
 import { renderBlockImages } from '@/lib/content-drafts/render-blocks'
 import {
+  serializeDraft,
   type BlockImages,
   channelForPlatform,
   draftPlainText,
@@ -122,7 +123,10 @@ import { ArticleTools } from './article-tools'
 import { MemberComments } from './member-comments'
 import {
   CompareDialog,
-  ManagePlatformsDialog,
+  ActivePlatform,
+  allChannels,
+  ConnectMenu,
+  ResyncDialog,
   ManualVersionNotice,
   OptionsChip,
   PlatformTabs,
@@ -148,6 +152,8 @@ import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
 import { MediaStrip } from './media-strip'
+import { attachmentsIn } from '@/lib/write/media-operations'
+import { mediaSwitches } from '@/lib/write/platform-rules'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
@@ -188,7 +194,6 @@ type Dialog =
   | 'schedule'
   | 'queue'
   | 'publish'
-  | 'manage'
   | 'share'
   | 'backups'
   | 'compare'
@@ -381,9 +386,7 @@ export function WriteComposer({
         ? 'backups'
         : params.get('panel') === 'schedule'
           ? 'schedule'
-          : params.has('connected')
-            ? 'manage'
-            : null
+          : null
   )
   const [focus, setFocus] = React.useState(false)
   // Where two blockers are fixed: the edit conflict and the review.
@@ -436,11 +439,13 @@ export function WriteComposer({
     poll: PostPoll
   } | null>(null)
   const [editorInstance, setEditorInstance] = React.useState<PlateEditor | null>(null)
+  const [resync, setResync] = React.useState<DraftChannel | null>(null)
   const primary = document.primaryPlatform
   const accounts = set?.accounts ?? []
   const enabled = document.channelConnectionIds
   const channels = tabChannels(accounts, enabled, primary)
-  const active = channels.includes(tab) ? tab : primary
+  // A switched-off platform keeps its tab, so it can be read and switched back on.
+  const active = allChannels(accounts, primary).includes(tab) ? tab : primary
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = {
     article: document.article,
@@ -471,9 +476,23 @@ export function WriteComposer({
     main.addEventListener('scroll', remember, { passive: true })
     return () => main.removeEventListener('scroll', remember)
   }, [])
+  // Preview takes the draft's place, so coming back returns to where it was left, caret included.
+  const scrollBeforePreview = React.useRef<number | null>(null)
   React.useLayoutEffect(() => {
     const main = bodyArea.current?.closest('main')
-    if (main && main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
+    if (!main) return
+    if (panel === 'preview') {
+      // Hiding the editor drops its focus without a blur event, and Slate won't refocus an
+      // editor it believes is focused, so it has to be told before coming back.
+      if (scrollBeforePreview.current === null) editor.current?.tf.blur()
+      scrollBeforePreview.current ??= draftScroll.current
+      return
+    }
+    if (scrollBeforePreview.current !== null) {
+      main.scrollTop = draftScroll.current = scrollBeforePreview.current
+      scrollBeforePreview.current = null
+      editor.current?.tf.focus()
+    } else if (main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
   }, [panel])
   const [pasteNotice, setPasteNotice] = React.useState(false)
 
@@ -565,7 +584,10 @@ export function WriteComposer({
     setPosts((await draftsApi.posts(initial.id)).posts)
     router.refresh()
   }
-  const toggle = (accountId: string, on: boolean) => {
+  // Platforms switched off for lacking media, and those the person chose to keep on regardless.
+  const switchedOff = React.useRef(new Set<string>())
+  const keptOn = React.useRef(new Set<string>())
+  const applySwitch = (accountId: string, on: boolean) => {
     const account = accounts.find((item) => item.id === accountId)
     if (!account) return
     update((current) =>
@@ -576,6 +598,51 @@ export function WriteComposer({
       })
     )
   }
+  const toggle = (accountId: string, on: boolean) => {
+    switchedOff.current.delete(accountId)
+    if (on) keptOn.current.add(accountId)
+    else keptOn.current.delete(accountId)
+    applySwitch(accountId, on)
+  }
+  const mediaAccounts = accounts.map((account) => {
+    const version = versionFor(document.versions, account.channel)
+    const body =
+      account.channel !== primary && version.mode === 'manual'
+        ? ((version.body ?? []) as Value)
+        : document.value
+    return {
+      channel: account.channel,
+      hasMedia: body.some((node) => attachmentsIn(node).length > 0),
+      hasText: Boolean(serializeDraft(body, account.channel).caption.trim()),
+      id: account.id,
+    }
+  })
+  const mediaState = JSON.stringify([mediaAccounts, enabled])
+  const openedAs = React.useRef(mediaState)
+  React.useEffect(() => {
+    // Opening a draft changes nothing, and editing can't change what is already scheduled.
+    if (mediaState === openedAs.current || !canEdit || posts.length > 0) return
+    openedAs.current = ''
+    const { off, on } = mediaSwitches(mediaAccounts, enabled, switchedOff.current, keptOn.current)
+    for (const id of on) {
+      switchedOff.current.delete(id)
+      applySwitch(id, true)
+    }
+    if (off.length === 0) return
+    for (const id of off) {
+      switchedOff.current.add(id)
+      applySwitch(id, false)
+    }
+    const names = off.map((id) => {
+      const channel = accounts.find((item) => item.id === id)?.channel
+      return channel ? CHANNEL_META[channel].label : 'A platform'
+    })
+    toast(`${names.join(' and ')} switched off: this post has no media yet.`, {
+      action: { label: 'Undo', onClick: () => off.forEach((id) => toggle(id, true)) },
+    })
+    // Only a change in the post or its destinations can change the answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaState])
   const setOptions = (channel: DraftChannel, options: VersionOptions) =>
     update((current) => ({ versions: withOptions(current.versions, channel, options) }))
   // A destination that is live is done: scheduling again would post it twice.
@@ -585,6 +652,7 @@ export function WriteComposer({
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
   const context: ScheduleContext = {
+    kind: server.kind,
     approved,
     canPublish: canPublish && server.status !== 'archived',
     conflict: conflict !== null,
@@ -874,7 +942,10 @@ export function WriteComposer({
   const jumpTo = (blocker: ScheduleBlocker) => {
     if (blocker.channel && channels.includes(blocker.channel)) setTab(blocker.channel)
     if (blocker.fix === 'save') context.retrySave()
-    else if (blocker.fix === 'account') setDialog('manage')
+    else if (blocker.fix === 'account')
+      focusRoot.current
+        ?.querySelector<HTMLElement>('[data-testid="platform-tabs"] [role="switch"]')
+        ?.focus()
     else if (blocker.fix === 'restore') {
       if (canEdit) void archive('draft')
     } else if (blocker.fix === 'conflict') conflictBanner.current?.querySelector('button')?.focus()
@@ -914,7 +985,6 @@ export function WriteComposer({
         : []),
       { label: 'Post options', run: () => setPanel('options') },
       { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
-      ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
       { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}${alt}S` },
       { label: 'View automatic backups', run: () => setDialog('backups') },
       ...(canEdit
@@ -1157,6 +1227,60 @@ export function WriteComposer({
       : null
   // Shown options take a paste's split; otherwise its tools show above the text.
   const optionsShown = panel === 'options' && !focus && !settingsOpen(params)
+  const previewPanel = (
+      <PreviewPanel
+        initialChannel={active}
+        onDescribe={canEdit ? (media) => setDescription(media) : undefined}
+        onSelect={(next) => {
+          // The platform shown is the tab being edited, whichever side changes it.
+          if (next.channel) setTab(next.channel)
+          setPreviewSelection({ ...next, channel: null })
+        }}
+        selection={previewSelection}
+        items={
+          items.length
+            ? items
+            : [
+                {
+                  account: {
+                    id: 'preview',
+                    channel: active,
+                    platform: active,
+                    displayName: set?.name ?? user.name,
+                    avatarUrl: null,
+                    handle: null,
+                    premium: false,
+                    socialSetId: set?.id ?? null,
+                    health: 'connected',
+                    createdAt: initial.createdAt,
+                  },
+                  publication: activePublication,
+                },
+              ]
+        }
+        target={document.target}
+      />
+  )
+  const connectAccount =
+    canManageSets && set
+      ? async (provider: string) => {
+          try {
+            await flush()
+            window.location.assign(
+              `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
+            )
+          } catch (error) {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : 'Save the draft before connecting an account.'
+            )
+          }
+        }
+      : undefined
+  // Preview takes the draft's place; every other panel sits beside it.
+  const sidePanel = panel === 'preview' ? null : panel
+  const previewing = panel === 'preview' && !focus
   const panelContent =
     panel === 'options' ? (
       <div data-testid="post-options">
@@ -1197,35 +1321,6 @@ export function WriteComposer({
         }))}
         status={status?.label ?? 'Draft'}
         title={document.title}
-      />
-    ) : panel === 'preview' ? (
-      <PreviewPanel
-        initialChannel={active}
-        onDescribe={canEdit ? (media) => setDescription(media) : undefined}
-        onSelect={setPreviewSelection}
-        selection={previewSelection}
-        items={
-          items.length
-            ? items
-            : [
-                {
-                  account: {
-                    id: 'preview',
-                    channel: active,
-                    platform: active,
-                    displayName: set?.name ?? user.name,
-                    avatarUrl: null,
-                    handle: null,
-                    premium: false,
-                    socialSetId: set?.id ?? null,
-                    health: 'connected',
-                    createdAt: initial.createdAt,
-                  },
-                  publication: activePublication,
-                },
-              ]
-        }
-        target={document.target}
       />
     ) : panel === 'comments' && !canEdit ? (
       <MemberComments draft={server} currentUserId={user.id} onDraft={setServer} />
@@ -1287,7 +1382,7 @@ export function WriteComposer({
               <span
                 className={cn(
                   'hidden items-center gap-1.5 text-xs text-muted-foreground',
-                  !panel && 'xl:flex'
+                  !sidePanel && 'xl:flex'
                 )}
                 data-testid="composer-identity"
                 title={`Writing as ${set.name}`}
@@ -1407,13 +1502,13 @@ export function WriteComposer({
               <Button
                 ref={shareButton}
                 aria-label="Share"
-                className={cn('hidden', !focus && 'lg:inline-flex', panel && 'size-8 px-0')}
+                className={cn('hidden', !focus && 'lg:inline-flex', sidePanel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
                 title={`Share (${mod}${alt}S)`}
                 variant="ghost"
               >
-                {panel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
+                {sidePanel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
               </Button>
               {canPublish && server.status !== 'archived' && locked ? (
                 <Button
@@ -1670,10 +1765,8 @@ export function WriteComposer({
                     ? 'An owner or admin can connect an account. You can write your draft now.'
                     : 'An owner or admin can connect an account to publish this draft.'}
               </span>
-              {canManageSets ? (
-                <Button size="sm" variant="outline" onClick={() => setDialog('manage')}>
-                  Connect account
-                </Button>
+              {connectAccount ? (
+                <ConnectMenu accounts={accounts} onConnect={connectAccount} />
               ) : null}
             </div>
           ) : null}
@@ -1683,9 +1776,11 @@ export function WriteComposer({
           <PlatformTabs
             accounts={accounts}
             active={active}
+            canEdit={canEdit}
             enabled={enabled}
-            onManage={canEdit ? () => setDialog('manage') : undefined}
+            kind={server.kind}
             onSelect={setTab}
+            onToggle={toggle}
             over={over}
             blocked={blockers.flatMap((blocker) => (blocker.channel ? [blocker.channel] : []))}
             options={
@@ -1700,6 +1795,27 @@ export function WriteComposer({
                 />
               ) : null
             }
+            primary={primary}
+            value={document.value as PlateBody}
+            versions={document.versions}
+          />
+          <ActivePlatform
+            accounts={accounts}
+            active={active}
+            canEdit={canEdit}
+            defaultsHref={set ? socialSetHref(set.id, 'new-draft') : undefined}
+            draftVersion={version.current}
+            enabled={enabled}
+            kind={server.kind}
+            onChange={(change) =>
+              update({
+                ...(change.primaryPlatform ? { primaryPlatform: change.primaryPlatform } : {}),
+                ...(change.versions ? { versions: change.versions } : {}),
+              })
+            }
+            onConnect={connectAccount}
+            onResync={setResync}
+            onToggle={toggle}
             primary={primary}
             value={document.value as PlateBody}
             versions={document.versions}
@@ -1772,8 +1888,13 @@ export function WriteComposer({
           ) : null}
             </>
           )}
+          {/* The width of the phone and feed previews it draws; wider would only stretch them. */}
+          {previewing ? (
+            <div className="mx-auto w-full max-w-[419px] flex-1">{previewPanel}</div>
+          ) : null}
+          {/* Hidden, not removed: unmounting would drop the live room, undo history and caret. */}
           <div
-            className="relative flex-1"
+            className={cn('relative flex-1', previewing && 'hidden')}
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
@@ -1834,7 +1955,7 @@ export function WriteComposer({
                 <ManualVersionNotice
                   channel={active}
                   onCompare={() => setDialog('compare')}
-                  onResync={canEdit ? () => setDialog('manage') : undefined}
+                  onResync={canEdit ? () => setResync(active) : undefined}
                   primary={primary}
                   value={document.value as PlateBody}
                   versions={document.versions}
@@ -2060,9 +2181,9 @@ export function WriteComposer({
             <div className="h-32" />
           </div>
         </div>
-        {panel && !focus && !narrow && !settingsOpen(params) ? (
+        {sidePanel && !focus && !narrow && !settingsOpen(params) ? (
           <aside
-            aria-label={PANEL_TITLES[panel]}
+            aria-label={PANEL_TITLES[sidePanel]}
             // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
             className="sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 max-w-[48vw] self-start overflow-y-auto border-l border-border animate-in fade-in duration-150"
             ref={fitToScroller}
@@ -2071,7 +2192,7 @@ export function WriteComposer({
           >
             <div
               role="separator"
-              aria-label="Resize preview sidebar"
+              aria-label="Resize sidebar"
               aria-orientation="vertical"
               aria-valuemin={256}
               aria-valuemax={640}
@@ -2106,18 +2227,18 @@ export function WriteComposer({
                 }
               }}
             />
-            <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[panel]} />
+            <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[sidePanel]} />
             {panelContent}
           </aside>
         ) : null}
-        {panel && !focus && narrow && !settingsOpen(params) ? (
+        {sidePanel && !focus && narrow && !settingsOpen(params) ? (
           <>
             <Sheet onOpenChange={(open) => !open && setPanel(null)} open>
               <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md" side="right">
                 <SheetHeader>
-                  <SheetTitle>{PANEL_TITLES[panel]}</SheetTitle>
+                  <SheetTitle>{PANEL_TITLES[sidePanel]}</SheetTitle>
                   <SheetDescription className="sr-only">
-                    {PANEL_TITLES[panel]} for this draft
+                    {PANEL_TITLES[sidePanel]} for this draft
                   </SheetDescription>
                 </SheetHeader>
                 {panelContent}
@@ -2186,51 +2307,13 @@ export function WriteComposer({
             }}
           />
         ) : null}
-        {dialog === 'manage' ? (
-          <ManagePlatformsDialog
-            accounts={accounts}
-            onConnect={
-              canManageSets && set
-                ? async (provider) => {
-                    try {
-                      await flush()
-                      window.location.assign(
-                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
-                      )
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : 'Save the draft before connecting an account.'
-                      )
-                    }
-                  }
-                : undefined
-            }
-            draftVersion={version.current}
-            enabled={enabled}
-            kind={server.kind}
-            onChange={(change) =>
-              update({
-                ...(change.channelConnectionIds
-                  ? { channelConnectionIds: change.channelConnectionIds }
-                  : {}),
-                ...(change.primaryPlatform ? { primaryPlatform: change.primaryPlatform } : {}),
-                ...(change.versions ? { versions: change.versions } : {}),
-              })
-            }
-            onClose={() => setDialog(null)}
-            onPreview={(channel) => {
-              setDialog(null)
-              setTab(channel)
-              setPanel('preview')
-            }}
-            defaultsHref={set ? socialSetHref(set.id, 'new-draft') : undefined}
-            primary={primary}
-            value={document.value as PlateBody}
-            versions={document.versions}
-          />
-        ) : null}
+        <ResyncDialog
+          channel={resync}
+          onClose={() => setResync(null)}
+          onResynced={(versions) => update({ versions })}
+          primary={primary}
+          versions={document.versions}
+        />
         {dialog === 'share' ? (
           <ShareDialog
             onInsertLink={
