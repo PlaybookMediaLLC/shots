@@ -89,8 +89,7 @@ export function MediaTools({
           <DialogHeader>
             <DialogTitle>Manage media</DialogTitle>
             <DialogDescription>
-              Drag attachments to reorder them or move them to a post. Arrow and move controls work
-              with the keyboard. Undo is available in the editor.
+              Drag to reorder or move between posts.
             </DialogDescription>
           </DialogHeader>
           {ranges.map(([start, end], post) => {
