@@ -482,6 +482,9 @@ export function WriteComposer({
     const main = bodyArea.current?.closest('main')
     if (!main) return
     if (panel === 'preview') {
+      // Hiding the editor drops its focus without a blur event, and Slate won't refocus an
+      // editor it believes is focused, so it has to be told before coming back.
+      if (scrollBeforePreview.current === null) editor.current?.tf.blur()
       scrollBeforePreview.current ??= draftScroll.current
       return
     }
@@ -1885,7 +1888,10 @@ export function WriteComposer({
           ) : null}
             </>
           )}
-          {previewing ? <div className="flex-1">{previewPanel}</div> : null}
+          {/* The width of the phone and feed previews it draws; wider would only stretch them. */}
+          {previewing ? (
+            <div className="mx-auto w-full max-w-[419px] flex-1">{previewPanel}</div>
+          ) : null}
           {/* Hidden, not removed: unmounting would drop the live room, undo history and caret. */}
           <div
             className={cn('relative flex-1', previewing && 'hidden')}
@@ -2186,7 +2192,7 @@ export function WriteComposer({
           >
             <div
               role="separator"
-              aria-label="Resize preview sidebar"
+              aria-label="Resize sidebar"
               aria-orientation="vertical"
               aria-valuemin={256}
               aria-valuemax={640}
