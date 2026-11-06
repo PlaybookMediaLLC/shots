@@ -169,7 +169,7 @@ test(
     await expect(blocked).toBeHidden()
 
     await page.getByRole('button', { name: 'Review', exact: true }).click()
-    await page.getByRole('button', { name: 'Ask for review' }).click()
+    await page.getByRole('button', { name: 'Ask for review', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Review', exact: true })).toContainText(
       'In review'
     )
@@ -177,7 +177,7 @@ test(
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Review', exact: true }).click()
     await page.getByLabel('Review note').fill('Ship it')
-    await page.getByRole('button', { name: 'Approve' }).click()
+    await page.getByRole('button', { name: 'Approve', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Review', exact: true })).toContainText(
       'Approved'
     )

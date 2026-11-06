@@ -136,7 +136,6 @@ export function WriteFrame({
         <DraftSettingsDrawer
           advancedScheduling={data.advancedScheduling}
           canManage={canManageSets}
-          canWrite={canEdit}
           socialSetId={data.activeSet.id}
         />
       ) : null}
