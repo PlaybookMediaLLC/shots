@@ -1770,17 +1770,6 @@ export function WriteComposer({
               </Button>
             </div>
           ) : null}
-          {server.kind === 'article' ? null : (
-            <MediaStrip
-              canEdit={canEditText}
-              channel={active}
-              editor={ownEditor ? editorInstance : null}
-              onBrowse={() => setTool('library')}
-              onEditMain={() => setTab(primary)}
-              onManage={() => setTool('media')}
-              value={active !== primary && ownEditor ? ((versionOfTab.body ?? []) as Value) : document.value}
-            />
-          )}
             </>
           )}
           <div
@@ -1937,6 +1926,17 @@ export function WriteComposer({
             )}
             {focus ? null : (
               <>
+          {server.kind === 'article' ? null : (
+            <MediaStrip
+              canEdit={canEditText}
+              channel={active}
+              editor={ownEditor ? editorInstance : null}
+              onBrowse={() => setTool('library')}
+              onEditMain={() => setTab(primary)}
+              onManage={() => setTool('media')}
+              value={active !== primary && ownEditor ? ((versionOfTab.body ?? []) as Value) : document.value}
+            />
+          )}
           {canEditText && server.kind !== 'article' ? (
             <LinkCards
               text={activePublication.serialized.posts.map((post) => post.caption).join('\n')}
