@@ -6,11 +6,13 @@ import * as React from 'react'
 import { toast } from 'sonner'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
+import { POST_COLUMN } from '@/components/drafts/layout'
 import { postRanges } from '@/components/drafts/thread'
 import { Button } from '@/components/ui/button'
 import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handoff'
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
+import { cn } from '@/lib/utils'
 import type { DraftChannel } from '@/lib/write/document'
 import { attachmentsIn, insertAttachments, removeAttachment } from '@/lib/write/media-operations'
 import { DESTINATION_MEDIA, mediaProblems } from '@/lib/write/media-rules'
@@ -35,7 +37,7 @@ function acceptsHint(channel: DraftChannel): string {
 }
 
 /**
- * The post's media in one place: what is attached, with a way to remove it,
+ * The post's media in one place, below its words so the caret comes first: what is attached, with a way to remove it,
  * and everything needed to add more. Without an `editor` (a tab that follows
  * the main platform) it only shows what that platform publishes.
  */
@@ -68,7 +70,7 @@ export function MediaStrip({
   return (
     <section
       aria-label="Media"
-      className="mx-4 mb-3 grid gap-2"
+      className={cn('mb-3 grid gap-2', POST_COLUMN)}
       data-local-dropzone=""
       data-testid="media-strip"
     >
