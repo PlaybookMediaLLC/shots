@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/sheet'
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
-import { createWritingDraft } from './pending-draft'
+import { startBlankDraft } from './pending-draft'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
@@ -185,7 +185,7 @@ function FrameLayout({
     if (!canEdit || creating) return
     setCreating(true)
     try {
-      await createWritingDraft(
+      startBlankDraft(
         {
           socialSetId: data.activeSet?.id,
           tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,

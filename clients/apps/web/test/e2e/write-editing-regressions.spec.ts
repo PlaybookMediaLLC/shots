@@ -15,6 +15,20 @@ test(
         await new Promise((resolve) => setTimeout(resolve, 500))
       await route.continue()
     })
+    // Starting a post saves nothing, and leaving it leaves no row behind.
+    let creations = 0
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === '/api/v1/content-drafts'
+      )
+        creations++
+    })
+    await page.getByTestId('new-draft').first().click()
+    await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'New draft' })).toHaveCount(0)
+    expect(creations).toBe(0)
     await page.getByTestId('new-draft').first().click()
     const early = page.getByRole('textbox', { name: 'New draft text' })
     await expect(early).toBeFocused()

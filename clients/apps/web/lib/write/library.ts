@@ -31,12 +31,25 @@ export function libraryQuery(location: () => string) {
   }
 }
 
-/** What a draft is called everywhere: its title, else its text's first line. */
-export function draftName(draft: { excerpt?: string | null; title: string }): string {
+const MEDIA_NAMES = { image: 'Image draft', media: 'Draft with media', video: 'Video draft' }
+
+/** What a draft is called everywhere: its title, else its text's first line, else its media. */
+export function draftName(draft: {
+  excerpt?: string | null
+  media?: keyof typeof MEDIA_NAMES | null
+  title: string
+}): string {
   const title = draft.title.trim()
   if (title && title !== 'Untitled draft') return title
   const line = draft.excerpt?.split('\n').find((text) => text.trim())
-  return line?.trim().slice(0, 80) || 'Untitled draft'
+  return line?.trim().slice(0, 80) || (draft.media && MEDIA_NAMES[draft.media]) || 'Untitled draft'
+}
+
+/** A draft's media, as far as naming it goes: a video says more than an image. */
+function draftMedia(body: unknown): 'image' | 'video' | null {
+  const nodes = JSON.stringify(body)
+  if (nodes.includes('"type":"video"')) return 'video'
+  return nodes.includes('"type":"img"') ? 'image' : null
 }
 
 /** The saved fields a draft contributes to the Write library. */
@@ -49,6 +62,7 @@ export function libraryDraft(draft: DraftWire) {
     checkPosts: draft.checkPosts,
     excerpt: text.slice(0, 180),
     id: draft.id,
+    media: draftMedia(draft.body),
     lastPublishedAt: draft.lastPublishedAt,
     searchText: `${text} ${draft.scratchpad}`,
     kind: draft.kind,

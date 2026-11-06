@@ -3,10 +3,12 @@
 import { z } from 'zod'
 import { draftHref } from '@/components/write/write-context'
 import { listedStatus } from '@/lib/content-drafts/post-status'
+import { draftName } from '@/lib/write/library'
 import type { DesignDocument } from '@/lib/design/document'
 import type { useTRPCClient } from '@/lib/trpc/react'
 
 const draftItem = z.object({
+  assetIds: z.array(z.string()).default([]),
   id: z.string(),
   title: z.string(),
   plainText: z.string().catch(''),
@@ -18,7 +20,11 @@ const draftItem = z.object({
   publishedPosts: z.number().default(0),
   queuedPosts: z.number().default(0),
 })
-const draftPage = z.object({ items: z.array(draftItem), pinned: z.array(draftItem) })
+/** One page of the content draft list, as search reads it. */
+export const draftPage = z.object({ items: z.array(draftItem), pinned: z.array(draftItem) })
+
+/** A draft found by searching. */
+export type DraftSearchItem = z.infer<typeof draftItem>
 
 /** A piece of the workspace's work, as Home and search list it. */
 export type WorkItem = {
@@ -96,10 +102,11 @@ export async function loadWork(
       id: item.id,
       href: draftHref(item.id, item.socialSetId),
       // An untitled draft is named by its opening words, so drafts can be told apart.
-      title:
-        item.title && item.title !== 'Untitled draft'
-          ? item.title
-          : item.plainText.trim().slice(0, 80) || 'Untitled draft',
+      title: draftName({
+        excerpt: item.plainText,
+        media: item.assetIds.length ? 'media' : null,
+        title: item.title,
+      }),
       type: 'Post',
       scope: 'Profile',
       updatedAt: item.updatedAt,
