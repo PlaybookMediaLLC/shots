@@ -525,16 +525,21 @@ test(
     await expect(
       page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true })
     ).toBeChecked()
-    await page.getByRole('button', { name: 'More draft actions' }).click()
-    await page.getByRole('menuitem', { name: 'Manage media…' }).click()
-    const media = page.getByTestId('draft-media-tools')
-    await media
-      .getByRole('button', { name: 'Drag media 1', exact: true })
-      .dragTo(media.getByText('Post 1, media 2', { exact: true }))
-    await expect(media.getByAltText('Media 1')).toHaveAttribute('src', new RegExp(assets[1]))
-    await chooseOption(media.getByLabel('Media destination post'), 'Post 2')
-    await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
-    await expect(media).toContainText('Post 2, media 2')
+    await editorMore(page, 'Manage media')
+    const media = page.getByTestId('media-manager')
+    const firstPost = media
+      .getByRole('region', { name: 'Post 1 media' })
+      .getByTestId('draft-media-item')
+    await firstPost
+      .nth(1)
+      .getByRole('img', { name: 'Drag attachment', exact: true })
+      .dragTo(firstPost.nth(0))
+    await expect(firstPost.nth(0).locator('img')).toHaveAttribute('src', new RegExp(assets[1]))
+    await chooseOption(firstPost.nth(0).getByLabel('Destination post'), 'Post 2')
+    await firstPost.nth(0).getByRole('button', { name: 'Move', exact: true }).click()
+    await expect(
+      media.getByRole('region', { name: 'Post 2 media' }).getByTestId('draft-media-item')
+    ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await editorMore(page, 'Alt text')
     await page.getByRole('button', { name: 'Suggest with AI', exact: true }).first().click()

@@ -7,9 +7,13 @@ import { uploadByteLimit } from '../lib/write/media-limits'
 import type { TElement } from '@shots/platejs-editor/platejs'
 import { createPlateEditor } from '@shots/platejs-editor/platejs/react'
 import {
+  attachmentsIn,
   copyAttachment,
+  ensureAttachmentIds,
+  insertAttachments,
   moveAttachment,
   moveAttachmentRelative,
+  removeAttachment,
 } from '../lib/write/media-operations'
 
 const image = (id: string) => ({
@@ -48,6 +52,54 @@ test('TF-007 TF-092: move and copy retain identity, description, transform and p
   const publication = serializeDraft(saved, 'x')
   assert.deepEqual(publication.posts[1].assetIds, ['a'])
   assert.equal(publication.posts[1].media[0].sourceAssetId, 'original-a')
+})
+
+test('removing an attachment leaves the rest, and undo brings it back', () => {
+  const editor = createPlateEditor({ value: [p('First'), image('a'), image('b')] })
+  removeAttachment(editor, { id: 'a', assetId: 'a' })
+  assert.deepEqual(
+    editor.children.flatMap((node) => attachmentsIn(node)).map((node) => node.assetId),
+    ['b']
+  )
+  editor.tf.undo()
+  assert.deepEqual(
+    editor.children.flatMap((node) => attachmentsIn(node)).map((node) => node.assetId),
+    ['a', 'b']
+  )
+})
+
+test('seeded media with no node id is removed by its asset', () => {
+  const seeded = { type: 'video', assetId: 'v', children: [{ text: '' }] }
+  const editor = createPlateEditor({ value: [p('First'), seeded] })
+  removeAttachment(editor, { assetId: 'v' })
+  assert.deepEqual(
+    editor.children.flatMap((node) => attachmentsIn(node)),
+    []
+  )
+})
+
+test('seeded media gets the id that moving it depends on', () => {
+  const seeded = (assetId: string) => ({ type: 'img', assetId, children: [{ text: '' }] })
+  const editor = createPlateEditor({ value: [p('First'), seeded('a'), seeded('b')] })
+  ensureAttachmentIds(editor)
+  const [a, b] = editor.children.flatMap((node) => attachmentsIn(node))
+  assert.ok(a.id && b.id && a.id !== b.id)
+  moveAttachmentRelative(editor, String(b.id), String(a.id))
+  assert.deepEqual(
+    editor.children.flatMap((node) => attachmentsIn(node)).map((node) => node.assetId),
+    ['b', 'a']
+  )
+})
+
+test('attaching keeps the caret in the caption and the picked order', () => {
+  const editor = createPlateEditor({ value: [p('')] })
+  editor.tf.select({ anchor: { path: [0, 0], offset: 0 }, focus: { path: [0, 0], offset: 0 } })
+  insertAttachments(editor, [image('a'), image('b')])
+  assert.deepEqual(editor.selection?.anchor.path, [0, 0])
+  assert.deepEqual(
+    editor.children.flatMap((node) => attachmentsIn(node)).map((node) => node.assetId),
+    ['a', 'b']
+  )
 })
 
 test('TF-076: unsupported combinations and excessive attachments fail without dropping media', () => {

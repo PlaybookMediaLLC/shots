@@ -37,6 +37,8 @@ export const MediaVideoElement = withHOC(
       urlParsers: [parseTwitterUrl, parseVideoUrl],
     });
     const width = useResizableValue("width");
+    // Library, handoff and repurposed media reference a stored asset and never carry `isUpload`.
+    const isStored = isUpload || typeof props.element.assetId === "string";
 
     const isEditorMounted = useEditorMounted();
 
@@ -70,7 +72,7 @@ export const MediaVideoElement = withHOC(
                 options={{ direction: "right" }}
               />
 
-              {!isUpload && isYoutube && embed?.id && (
+              {!isStored && isYoutube && embed?.id && (
                 <div ref={handleRef}>
                   <LiteYouTubeEmbed
                     id={embed.id}
@@ -97,7 +99,7 @@ export const MediaVideoElement = withHOC(
               )}
 
               {/* TODO: Lazy load */}
-              {isUpload && isEditorMounted && (
+              {isStored && isEditorMounted && (
                 // A fixed box, so a loaded video never grows and pushes the page down.
                 <div
                   className="aspect-video overflow-hidden rounded-md bg-black"
