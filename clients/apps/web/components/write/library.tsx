@@ -1603,8 +1603,14 @@ function QueueList() {
     [selectable]
   )
   // Read over the whole queue, so a run spread across two days is one run on
-  // both of them rather than two groups, or a group and a stray post.
+  // both of them rather than two groups, or a group and a stray post. For the
+  // same reason the collapsed runs are held here, not per day.
   const runs = React.useMemo(() => queueRuns(data.queue), [data.queue])
+  const [collapsed, setCollapsed] = React.useState<string[]>([])
+  const onCollapse = (name: string, shut: boolean) =>
+    setCollapsed((current) =>
+      shut ? [...new Set([...current, name])] : current.filter((item) => item !== name)
+    )
   const toggleRow = (id: string, on: boolean) =>
     setPicked((current) => (on ? [...new Set([...current, id])] : current.filter((item) => item !== id)))
   // Dropping one queued post on another exchanges their times, which is what
@@ -1739,7 +1745,9 @@ function QueueList() {
             Needs a look
           </h3>
           <QueueRows
+            collapsed={collapsed}
             items={earlier}
+            onCollapse={onCollapse}
             onPick={setPicked}
             rowProps={rowProps}
             runs={runs}
@@ -1757,8 +1765,11 @@ function QueueList() {
               />
             </h3>
             <QueueRows
+              collapsed={collapsed}
+              day={day}
               free={open}
               items={items}
+              onCollapse={onCollapse}
               onNew={canEdit ? (clock) => newAt(day, clock) : undefined}
               onPick={setPicked}
               rowProps={rowProps}
@@ -1771,7 +1782,15 @@ function QueueList() {
       {later.length > 0 ? (
         <section aria-label="Later">
           <h3 className="px-4 pt-3 text-[11px] font-medium text-muted-foreground">Later</h3>
-          <QueueRows items={later} onPick={setPicked} rowProps={rowProps} runs={runs} zone={zone} />
+          <QueueRows
+            collapsed={collapsed}
+            items={later}
+            onCollapse={onCollapse}
+            onPick={setPicked}
+            rowProps={rowProps}
+            runs={runs}
+            zone={zone}
+          />
         </section>
       ) : null}
       {data.queue.length === 0 && free === 0 ? (
@@ -1827,17 +1846,25 @@ type QueueRowProps = {
  * is what moving or cancelling "those seven posts" needs.
  */
 function QueueRows({
+  collapsed,
+  day,
   free = [],
   items,
+  onCollapse,
   onNew,
   onPick,
   rowProps,
   runs,
   zone,
 }: {
-  /** Free weekly slots on this day, as "HH:MM" in the brand's zone. */
+  /** Runs collapsed to a line, held by the queue so a run reads the same on every day. */
+  collapsed: string[]
+  /** The day this stretch covers, when it is one day with free slots. */
+  day?: string
+  /** Free weekly slots on `day`, as "HH:MM" in the brand's zone. */
   free?: string[]
   items: WriteLibrary['queue'][number][]
+  onCollapse: (name: string, shut: boolean) => void
   onNew?: (clock: string) => void
   onPick: React.Dispatch<React.SetStateAction<string[]>>
   rowProps: (item: WriteLibrary['queue'][number]) => QueueRowProps
@@ -1845,18 +1872,18 @@ function QueueRows({
   runs: Map<string, QueueRow[]>
   zone: string
 }) {
-  const [collapsed, setCollapsed] = React.useState<string[]>([])
   const byId = new Map(items.map((item) => [item.id, item]))
   // Runs and free slots share one timeline, so an empty slot still reads as a
-  // gap in the day rather than a list appended under it.
+  // gap in the day rather than a list appended under it. Sorted by the whole
+  // wall time, because "Needs a look" and "Later" span days.
   const entries = [
     ...queueGroups(items, runs).map((group) => ({
-      clock: wallTime(new Date(group.rows[0].at), zone).slice(11, 16),
       group,
       slot: null,
+      when: wallTime(new Date(group.rows[0].at), zone).slice(0, 16),
     })),
-    ...free.map((clock) => ({ clock, group: null, slot: clock })),
-  ].sort((a, b) => a.clock.localeCompare(b.clock))
+    ...free.map((clock) => ({ group: null, slot: clock, when: `${day ?? ''}T${clock}` })),
+  ].sort((a, b) => a.when.localeCompare(b.when))
   return (
     <ul>
       {entries.map(({ group, slot }) => {
@@ -1886,6 +1913,7 @@ function QueueRows({
         if (!group.name)
           return rows.map((item) => <QueueItem item={item} key={item.id} {...rowProps(item)} />)
         const shut = collapsed.includes(group.name)
+        const name = group.name
         // The whole run, which can reach beyond this day: its header counts and
         // spans all of it, and "Select the run" picks all of it.
         const whole = runs.get(group.name) ?? rows
@@ -1902,13 +1930,7 @@ function QueueRows({
               <Button
                 aria-expanded={!shut}
                 className="h-6 min-w-0 flex-1 justify-start gap-1 px-1 text-[11px] font-medium"
-                onClick={() =>
-                  setCollapsed((current) =>
-                    shut
-                      ? current.filter((name) => name !== group.name)
-                      : [...current, group.name as string]
-                  )
-                }
+                onClick={() => onCollapse(name, !shut)}
                 size={null}
                 variant="ghost"
               >
@@ -1974,8 +1996,12 @@ function QueueItem({
   const [over, setOver] = React.useState(false)
   const account = data.activeSet?.accounts.find((entry) => item.accountIds.includes(entry.id))
   const channel = channelForPlatform(item.platform ?? '')
-  const length = channel ? platformCaptionLength(channel, item.caption) : item.caption.length
-  const limit = channel ? CAPABILITIES[channel].captionLimit : null
+  // A queued post carries the text it will publish, so its length is the real
+  // one. A planned draft carries only an opening, so counting it would be a
+  // number about nothing: expanding one shows what there is and says so.
+  const counted = item.kind === 'scheduled' && channel
+  const length = counted ? platformCaptionLength(channel, item.caption) : 0
+  const limit = counted ? CAPABILITIES[channel].captionLimit : null
   return (
     <li
       className={cn(
@@ -2078,10 +2104,16 @@ function QueueItem({
         </Button>
       </div>
       {open ? (
-        <p className="px-2 pb-2 text-[11px] text-muted-foreground tabular-nums">
-          {length}
-          {limit ? ` / ${limit}` : ''} characters
-          {limit && length > limit ? ' · over the limit' : ''}
+        <p className="px-2 pb-2 text-[11px] text-muted-foreground">
+          {counted ? (
+            <span className="tabular-nums">
+              {length}
+              {limit ? ` / ${limit}` : ''} characters
+              {limit && length > limit ? ' · over the limit' : ''}
+            </span>
+          ) : (
+            'The draft’s opening. Open it to read and count the whole post.'
+          )}
         </p>
       ) : null}
     </li>

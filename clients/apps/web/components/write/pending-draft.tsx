@@ -101,8 +101,18 @@ function prepareCreation(
   let request = { requestKey: crypto.randomUUID(), ...input }
   // One key per piece, kept across attempts: a run that failed halfway is
   // finished by pressing again, and the pieces already created come back by
-  // their key instead of being made a second time.
-  const pieceKeys: string[] = []
+  // their key instead of being made a second time. The key belongs to the
+  // piece's place and its words, so editing a piece before trying again asks
+  // for a new draft rather than replaying the one with the old words.
+  const pieceKeys = new Map<string, string>()
+  const keyForPiece = (index: number, piece: string) => {
+    const at = `${index}\u0000${piece}`
+    const existing = pieceKeys.get(at)
+    if (existing) return existing
+    const fresh = crypto.randomUUID()
+    pieceKeys.set(at, fresh)
+    return fresh
+  }
   // Several posts from one paste: each piece becomes its own draft, sharing a
   // series title, and the library opens its series scheduler on all of them.
   resolvePaste = async (choice, seriesName) => {
@@ -119,8 +129,6 @@ function prepareCreation(
       return retry?.()
     }
     update({ ...(pending ?? { text: '' }), error: undefined, waiting: false })
-    while (pieceKeys.length < pieces.length) pieceKeys.push(crypto.randomUUID())
-    const keys = pieceKeys
     try {
       await beforeLeave?.()
       const created: string[] = []
@@ -128,7 +136,7 @@ function prepareCreation(
         const draft = await draftsApi.create({
           ...request,
           body: importedBody([piece]),
-          requestKey: keys[index],
+          requestKey: keyForPiece(index, piece),
           title: seriesTitle(seriesName, index, pieces.length),
         })
         created.push(draft.id)
@@ -304,8 +312,18 @@ export function PendingDraftInput() {
           onChange={(event) => {
             if (!pending) return
             // A paste the writer has not answered for yet holds everything: the
-            // choice decides what is created, so typing must not create one draft.
-            if (pending.pieces) return update({ ...pending, text: event.target.value })
+            // choice decides what is created, so typing must not create one
+            // draft. Editing it re-reads the pieces, so what the panel lists is
+            // always what would be created; an edit that leaves one piece ends
+            // the choice and the box goes back to making a single post.
+            if (pending.pieces) {
+              const pieces = pastePieces(event.target.value)
+              return update({
+                ...pending,
+                pieces: pieces.length > 1 ? pieces : undefined,
+                text: event.target.value,
+              })
+            }
             const makeIt = pending.waiting && event.target.value.trim()
             update({ ...pending, text: event.target.value, waiting: makeIt ? false : pending.waiting })
             if (makeIt) void retry?.()

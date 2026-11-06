@@ -35,9 +35,13 @@ export function PasteSplit({
   pieces: readonly string[]
 }) {
   const [name, setName] = React.useState(() => suggestedSeriesName(pieces[0] ?? ''))
-  const measured = measurePieces(pieces, channel)
-  const over = measured.filter((piece) => piece.over).length
   const tooMany = pieces.length > PASTE_PIECE_LIMIT
+  // A paste far past the limit cannot become a run anyway, so only enough of
+  // it is measured and listed to show what it is: a page of a thousand rows
+  // would answer nothing and cost everything.
+  const shown = tooMany ? pieces.slice(0, PASTE_PIECE_LIMIT) : pieces
+  const measured = measurePieces(shown, channel)
+  const over = measured.filter((piece) => piece.over).length
   const label = CHANNEL_META[channel].label
   return (
     <section aria-label="Split this paste" className="grid gap-3" data-testid="paste-split">
@@ -73,8 +77,9 @@ export function PasteSplit({
       ) : null}
       {tooMany ? (
         <p className="text-xs text-red-700 dark:text-red-300" role="alert">
-          A run is at most {PASTE_PIECE_LIMIT} posts. Paste fewer pieces, or keep this as one post
-          and split it in the editor.
+          A run is at most {PASTE_PIECE_LIMIT} posts, and this paste makes {pieces.length}. The
+          first {PASTE_PIECE_LIMIT} are shown. Paste fewer pieces, or keep this as one post and
+          split it in the editor.
         </p>
       ) : (
         <Label className="grid gap-1 text-xs text-muted-foreground">
