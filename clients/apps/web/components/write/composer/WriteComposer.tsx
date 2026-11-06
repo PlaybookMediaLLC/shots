@@ -2046,6 +2046,7 @@ export function WriteComposer({
                     : undefined
                 }
                 primary={primary}
+                publishing={publishing}
                 value={document.value as PlateBody}
               />
             )}

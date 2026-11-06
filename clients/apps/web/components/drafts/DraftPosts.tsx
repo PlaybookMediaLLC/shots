@@ -9,6 +9,13 @@ import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { writeApi } from '@/lib/write/client'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { DotsThreeIcon } from '@phosphor-icons/react/dist/ssr/DotsThree'
 import { SidebarLink as Link } from '@/components/platform-shell/SidebarLink'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import {
@@ -87,6 +94,8 @@ export function DraftPosts({
   posts: DraftPostWire[]
 }) {
   const [busy, setBusy] = React.useState<string | null>(null)
+  // The queued post whose Publish now confirmation is open, reached only through its menu.
+  const [publishing, setPublishing] = React.useState<string | null>(null)
   const run = async (id: string, action: () => Promise<{ post: DraftPostWire }>, done: string) => {
     setBusy(id)
     try {
@@ -186,20 +195,39 @@ export function DraftPosts({
                       </AlertDialogContent>
                     </AlertDialog>
                   ) : null}
+                  {/* Publish now is irreversible, so it never sits beside Cancel as a peer button. */}
                   {canSchedule && post.status === 'SCHEDULED' ? (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button disabled={busy !== null} size="sm" variant="outline">
-                          Publish now
-                        </Button>
-                      </AlertDialogTrigger>
+                    <AlertDialog
+                      onOpenChange={(open) => setPublishing(open ? post.id : null)}
+                      open={publishing === post.id}
+                    >
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            aria-label={`More actions for the ${label} post`}
+                            className="size-8"
+                            disabled={busy !== null}
+                            size={null}
+                            variant="ghost"
+                          >
+                            <DotsThreeIcon aria-hidden className="size-4" weight="bold" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setPublishing(post.id)}>
+                            Publish now…
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Publish this queued post now?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This publishes the content saved when you scheduled this destination and
-                            replaces its timer. Later draft edits are not included. Approval and
-                            account access will be checked again.
+                            It is queued for{' '}
+                            <LocalTime value={post.scheduledFor} zone={shownZone(post)} />.
+                            Publishing now sends the content saved when you scheduled this
+                            destination and replaces that timer. Later draft edits are not
+                            included. Approval and account access will be checked again.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <p className="max-h-40 overflow-auto whitespace-pre-wrap text-sm">

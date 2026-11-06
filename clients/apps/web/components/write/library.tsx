@@ -1447,6 +1447,9 @@ function QueueList() {
   const later = data.queue.filter((item) => !shown.has(item.id) && !earlier.includes(item))
   const free = days.reduce((total, day) => total + day.free.length, 0)
   const total = days.reduce((sum, day) => sum + day.slots, 0)
+  // Two different counts, so the header never reads as "nothing is scheduled".
+  const scheduledCount = data.queue.filter((item) => item.kind === 'scheduled').length
+  const plannedCount = data.queue.length - scheduledCount
   const newAt = (day: string, time: string) =>
     void createWritingDraft(
       { socialSetId: set?.id },
@@ -1483,12 +1486,18 @@ function QueueList() {
   return (
     <div data-testid="queue">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-1 text-[11px] text-muted-foreground">
+        {/* What is queued leads: recurring slots are a separate, smaller fact. */}
         <span data-testid="queue-goal">
+          {`${scheduledCount} ${scheduledCount === 1 ? 'post' : 'posts'} scheduled`}
+          {plannedCount > 0
+            ? ` · ${plannedCount} planned`
+            : ''}
+          {' · '}
           {filtered
-            ? 'Filtered, so free slots are hidden'
+            ? 'filtered, so free slots are hidden'
             : total > 0
-              ? `${total - free} of ${total} slots filled in the next 7 days`
-              : 'No weekly slots yet'}
+              ? `${total - free} of ${total} recurring slots used in the next 7 days`
+              : 'no recurring slots yet'}
           {' · '}
           {zone.replaceAll('_', ' ')}
         </span>
