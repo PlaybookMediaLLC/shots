@@ -215,7 +215,7 @@ async function commitSchedule(
 }
 
 /**
- * Choosing a time beside the post, without a separate step. Anything that
+ * Choosing a time right below the post, without a separate step. Anything that
  * needs more than a time (a reschedule replacing posts, a clock change, the
  * queue) goes to the full dialog through `onMore`.
  */
@@ -267,7 +267,7 @@ export function ScheduleDock({
   return (
     <section
       aria-label="Schedule this post"
-      className="mx-4 mb-3 flex flex-wrap items-end gap-2"
+      className="mb-3 flex flex-wrap items-end gap-2"
       data-testid="schedule-dock"
     >
       <Label className="grid gap-1 text-xs text-muted-foreground">

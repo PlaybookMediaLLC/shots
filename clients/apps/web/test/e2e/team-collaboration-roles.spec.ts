@@ -87,7 +87,7 @@ test(
       await expectSaved(writer)
       await writer.getByRole('button', { name: 'Review', exact: true }).click()
       await expect(writer.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0)
-      await writer.getByRole('button', { name: 'Ask for review' }).click()
+      await writer.getByRole('button', { name: 'Ask for review', exact: true }).click()
       await expect(writer.getByRole('button', { name: 'Review', exact: true })).toContainText(
         'In review'
       )
@@ -103,7 +103,9 @@ test(
       ).toHaveCount(0)
       await expect(approver.getByRole('textbox', { name: 'Draft title' })).toBeDisabled()
       await approver.getByRole('button', { name: 'Review', exact: true }).click()
-      await expect(approver.getByRole('button', { name: 'Ask for review' })).toHaveCount(0)
+      await expect(
+        approver.getByRole('button', { name: 'Ask for review', exact: true })
+      ).toHaveCount(0)
       await approver.getByRole('button', { name: 'Approve', exact: true }).click()
       await expect(approver.getByRole('button', { name: 'Review', exact: true })).toContainText(
         'Approved'
