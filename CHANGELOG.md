@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.47.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.0...v2.47.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **agents:** restore the Publishing preset and unambiguous scope labels ([#475](https://github.com/PlaybookMediaLLC/shots/issues/475)) ([79d8515](https://github.com/PlaybookMediaLLC/shots/commit/79d85157d41c275d210e53eb0a45e97aecc09142))
+* **publish:** hold post:schedule keys to approved copy and shared accounts ([#482](https://github.com/PlaybookMediaLLC/shots/issues/482)) ([7cac940](https://github.com/PlaybookMediaLLC/shots/commit/7cac940ab82f0b6ed15ad61cd5ee96e550d794c1))
+* **seo:** replace old editor copy and fill out page metadata ([#480](https://github.com/PlaybookMediaLLC/shots/issues/480)) ([7e0fc7d](https://github.com/PlaybookMediaLLC/shots/commit/7e0fc7da2a2777d1b0d0ac50ae86aa6b97a26628))
+* **web:** stop Preview crashing on following tabs, and keep the project and typing safe ([#477](https://github.com/PlaybookMediaLLC/shots/issues/477)) ([3286f86](https://github.com/PlaybookMediaLLC/shots/commit/3286f866d134ca2c45befb483f8139108f8c8eef))
+
 ## [2.47.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.46.0...v2.47.0) (2026-11-06)
 
 
