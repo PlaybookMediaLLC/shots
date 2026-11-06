@@ -222,11 +222,16 @@ async function commitSchedule(
 export function ScheduleDock({
   blocked,
   context,
+  initialDay,
+  initialTime,
   onMore,
 }: {
   /** Something in the fix list stops this draft from scheduling. */
   blocked: boolean
   context: ScheduleContext
+  /** The queue slot this draft was started from, if any. */
+  initialDay?: string
+  initialTime?: string
   onMore: () => void
 }) {
   const { data } = useWrite()
@@ -239,8 +244,14 @@ export function ScheduleDock({
     (cachedSet ?? data.sets.find((item) => item.id === setId))?.timeZone ??
     context.setTimeZone ??
     'UTC'
-  const [day, setDay] = React.useState(() => dayIn(new Date(Date.now() + 86_400_000), zone))
-  const [time, setTime] = React.useState('09:00')
+  const [day, setDay] = React.useState(() =>
+    initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay)
+      ? initialDay
+      : dayIn(new Date(Date.now() + 86_400_000), zone)
+  )
+  const [time, setTime] = React.useState(
+    initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00'
+  )
   const [busy, setBusy] = React.useState(false)
   const resolution = resolveLocalTime(`${day}T${time}`, zone)
   const instant = resolution.kind === 'exact' ? resolution.at : null

@@ -2204,6 +2204,8 @@ export function WriteComposer({
                 <ScheduleDock
                   blocked={blockers.length > 0}
                   context={context}
+                  initialDay={params.get('day') ?? undefined}
+                  initialTime={params.get('time') ?? undefined}
                   onMore={() => setDialog('schedule')}
                 />
               )}
