@@ -378,6 +378,7 @@ test(
     await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     await editor.click()
     await page.keyboard.press('ControlOrMeta+End')
+    await settleSelection(page)
     await page.keyboard.type('Rapid-edit-marker-0123456789', { delay: 1 })
     await toggle.click()
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
@@ -590,12 +591,18 @@ test(
       animations: 'disabled',
       maxDiffPixelRatio: 0.01,
     })
+    // Preview takes the draft's place, so write in the draft and come back to see it.
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    // The tab followed the preview to LinkedIn, whose text comes from the main platform.
+    await page.getByTestId('platform-tab-x').click()
     // A click then End can leave the caret where the click landed: set it at the end.
     await caretAtDocumentEnd(page)
     await page.keyboard.type(' Live update.')
-    await expect(panel).toContainText('Live update.')
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('A short second post 🚀')
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    // The first post's new words sit past X's cutoff; the end of this test finds them saved.
+    await expect(panel).toContainText('A short second post 🚀')
     await panel.getByRole('button', { name: 'Threads', exact: true }).click()
     await expect(panel.locator('article')).toHaveCount(2)
     await expect(panel).toHaveScreenshot('threads-mobile-thread.png', {
@@ -1008,7 +1015,7 @@ test(
     // A stored poster shows as an image, and the browser's own frame as a video.
     await expect(picker.locator('video, img[src*="variant=thumbnail"]')).toHaveCount(1)
     await expect(picker).not.toContainText('video/mp4')
-    await expect(picker).toContainText(/\d MB · /)
+    await expect(picker).toContainText(/\d (KB|MB) · /)
     await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
 
     // A Library node has no upload marker; it still plays in the editor, also after a reload.

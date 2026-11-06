@@ -1,4 +1,4 @@
-import { browserRequest, expect, test, type Page } from './framework'
+import { browserRequest, draftEditor, expect, openNewDraft, test, type Page } from './framework'
 import { userPreferencesSchema } from '../../lib/api/contracts/settings-platform'
 
 // The first-visit tour is the subject here, so it may start by itself.
@@ -83,6 +83,31 @@ test('the tour does not start over an open menu, so Escape still closes the menu
   await expect(page.getByTestId('product-tour-step')).toHaveCount(0)
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
+})
+
+test('the tour does not start while the person is typing, so it takes none of their words', async ({
+  page,
+}) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/v1/me/preferences', async (route) => {
+    await held
+    await route.continue()
+  })
+  await openNewDraft(page)
+  const editor = draftEditor(page)
+  await editor.click()
+  await page.keyboard.type('Typing as the page settles')
+  const preferences = page.waitForResponse('**/api/v1/me/preferences')
+  release()
+  await preferences
+  // eslint-disable-next-line no-restricted-syntax -- Proves something does not happen: past the tour's own delay.
+  await page.waitForTimeout(1_500)
+  await expect(page.getByTestId('product-tour-step')).toHaveCount(0)
+  await page.keyboard.type(' and carrying on')
+  await expect(editor).toContainText('Typing as the page settles and carrying on')
 })
 
 test('the workspace tour leads into the Publish tour on its page', async ({ app, page }) => {

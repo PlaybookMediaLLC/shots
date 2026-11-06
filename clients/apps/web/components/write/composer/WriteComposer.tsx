@@ -1932,7 +1932,9 @@ export function WriteComposer({
                 onChange={(next) => update({ value: next })}
                 onDiscussionsChange={onDiscussionsChange}
                 onEditor={(next) => {
+                  // A tab without its own editor must not reach the one that has left the page.
                   editor.current = next
+                  if (!next) return
                   editorChannel.current = active
                   setEditorInstance(next)
                 }}
@@ -1976,7 +1978,9 @@ export function WriteComposer({
                   }
                   onDiscussionsChange={() => undefined}
                   onEditor={(next) => {
+                    // A tab without its own editor must not reach the one that has left the page.
                     editor.current = next
+                    if (!next) return
                     editorChannel.current = active
                     setEditorInstance(next)
                   }}

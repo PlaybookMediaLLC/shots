@@ -127,7 +127,8 @@ export type DraftEditorProps = {
   collaboration: DraftCollaboration | null
   draftId?: string
   /** The editor, once made: the host restores revisions through it. */
-  onEditor?: (editor: PlateEditor) => void
+  /** The live editor, then null once it has left the page. */
+  onEditor?: (editor: PlateEditor | null) => void
   /** @handles the workspace already writes, offered in the @ picker. */
   handles: string[]
   /** Hashtags the workspace already writes, offered as chips. */
@@ -727,12 +728,13 @@ function DraftEditorSession({
   const [connectionFailed, setConnectionFailed] = React.useState(false)
   const waitingForConnection = Boolean(collaboration) && !live
   const disposal = React.useRef<ReturnType<typeof setTimeout> | null>(null)
-  const reportEditor = React.useEffectEvent(() => onEditor?.(editor))
+  const reportEditor = React.useEffectEvent((current: PlateEditor | null) => onEditor?.(current))
   React.useEffect(() => {
     // External tools read editor.children immediately. Report the collaborative
     // editor only after its initial snapshot is ready, never the empty shell.
     if (collaboration && !live) return
-    reportEditor()
+    reportEditor(editor)
+    return () => reportEditor(null)
   }, [collaboration, editor, live])
   const firstValue = React.useRef(initialValue)
   const [initiallyEmpty] = React.useState(() => draftPlainText(initialValue).length === 0)

@@ -1,6 +1,6 @@
 /* eslint-disable no-empty-pattern -- `{}` is how a Playwright fixture declares no dependencies. */
 import { randomInt } from 'node:crypto'
-import { test as base, expect, type Page } from '@playwright/test'
+import { test as base, expect, type BrowserContext, type Page } from '@playwright/test'
 import { createDraftWorkspace } from './content-drafts'
 import { createIdentity, type E2EIdentity, waitForHydration } from './flow'
 import { getActiveOrganizationId } from './auth'
@@ -96,6 +96,21 @@ async function buildWorkspace(
 /** Long user journeys may take longer than the default per-test budget. */
 const JOURNEY_TIMEOUT = 300_000
 
+/** Stop the first-visit tours in a context a spec opens for a second person. */
+export async function quietProductToursIn(context: BrowserContext): Promise<void> {
+  const tips = PRODUCT_TOURS.filter((tour) => 'autoStart' in tour && tour.autoStart).map(tourTipId)
+  await context.addInitScript(
+    ([key, seen]) => {
+      try {
+        window.sessionStorage.setItem(key, JSON.stringify(seen))
+      } catch {
+        // A page without storage still runs the spec; the tour can then open.
+      }
+    },
+    [PRODUCT_TOUR_RESOLVED_KEY, tips] as const
+  )
+}
+
 export const test = base.extend<
   {
     app: App
@@ -127,21 +142,7 @@ export const test = base.extend<
   productTour: [false, { option: true }],
   quietProductTours: [
     async ({ context, productTour }, provide) => {
-      if (!productTour) {
-        const tips = PRODUCT_TOURS.filter((tour) => 'autoStart' in tour && tour.autoStart).map(
-          tourTipId
-        )
-        await context.addInitScript(
-          ([key, seen]) => {
-            try {
-              window.sessionStorage.setItem(key, JSON.stringify(seen))
-            } catch {
-              // A page without storage still runs the spec; the tour can then open.
-            }
-          },
-          [PRODUCT_TOUR_RESOLVED_KEY, tips] as const
-        )
-      }
+      if (!productTour) await quietProductToursIn(context)
       await provide()
     },
     { auto: true },

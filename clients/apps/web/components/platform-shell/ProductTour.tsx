@@ -244,7 +244,8 @@ export function ProductTourProvider({
 
   // An unseen tour starts by itself once, where its first element shows: not
   // on a phone, whose navigation is closed, and not over anything the person has
-  // open. Its card would take the next Escape and leave a menu open behind it.
+  // open. Its card would take the next Escape and leave a menu open behind it,
+  // and it would take their typing, with each space pressing its Next button.
   useEffect(() => {
     if (!autoStart || session || status !== 'ready' || !preferences) return
     // A tip leaves the tab's list once saved, so "Reset help tips" brings the tour back here too.
@@ -258,7 +259,10 @@ export function ProductTourProvider({
     const timer = window.setTimeout(() => {
       if (
         findAnchor(first.anchor) &&
-        !document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
+        !document.querySelector(
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'
+        ) &&
+        !document.activeElement?.closest('input, textarea, select, [contenteditable="true"]')
       ) {
         setSession({ tourId: unseen.id, stepIndex: 0 })
       }
