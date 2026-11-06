@@ -304,7 +304,7 @@ jobs:
           REF: ${{ github.ref }}
         run: |
           full='[{"shard":"1/3","shard_index":1,"args":"--shard=1/3"},{"shard":"2/3","shard_index":2,"args":"--shard=2/3"},{"shard":"3/3","shard_index":3,"args":"--shard=3/3"}]'
-          smoke='[{"shard":"smoke","shard_index":1,"args":"--grep=@smoke"}]'
+          smoke='[{"shard":"smoke","shard_index":1,"args":"test/e2e/ai-agents.spec.ts test/e2e/settings-usability.spec.ts"}]'
           if [[ "$EVENT" == push ]]; then
             # A push to main follows a release pull request, which ran the full suite.
             [[ "$REF" == refs/heads/develop ]] && run=true || run=false
