@@ -147,6 +147,7 @@ import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
+import { MediaStrip } from './media-strip'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
@@ -1062,6 +1063,8 @@ export function WriteComposer({
   }
   // A post that is live everywhere does not change with this text, so it is not editable.
   const canEditText = canEdit && !locked
+  // A tab that follows the main platform has no editor of its own: its media lives on that tab.
+  const ownEditor = active === primary || versionOfTab.mode === 'manual'
   const liveOn = [
     ...new Set(
       posts.filter((post) => post.status === 'PUBLISHED').map((post) => platformLabel(post.platform))
@@ -1567,11 +1570,6 @@ export function WriteComposer({
                       Copy poll to channel…
                     </DropdownMenuItem>
                   ) : null}
-                  {canEdit && editorInstance ? (
-                    <DropdownMenuItem onSelect={() => setDialog('media')}>
-                      Manage media…
-                    </DropdownMenuItem>
-                  ) : null}
                   {canEdit && CAPABILITIES[active].thread ? (
                     <DropdownMenuItem onSelect={() => setDialog('paste')}>
                       Paste as thread…
@@ -1822,6 +1820,7 @@ export function WriteComposer({
                     aiEnabled={aiEnabled}
                     channel={active}
                     document={documentActions}
+                    draftId={initial.id}
                     onDescriptionSaved={onDescriptionSaved}
                     onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
                     onTool={setTool}
@@ -1865,6 +1864,7 @@ export function WriteComposer({
                       aiEnabled={aiEnabled}
                       channel={active}
                       document={documentActions}
+                      draftId={initial.id}
                       onDescriptionSaved={onDescriptionSaved}
                       onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
                       onTool={setTool}
@@ -1926,6 +1926,17 @@ export function WriteComposer({
             )}
             {focus ? null : (
               <>
+          {server.kind === 'article' ? null : (
+            <MediaStrip
+              canEdit={canEditText}
+              channel={active}
+              editor={ownEditor ? editorInstance : null}
+              onBrowse={() => setTool('library')}
+              onEditMain={() => setTab(primary)}
+              onManage={() => setTool('media')}
+              value={active !== primary && ownEditor ? ((versionOfTab.body ?? []) as Value) : document.value}
+            />
+          )}
           {canEditText && server.kind !== 'article' ? (
             <LinkCards
               text={activePublication.serialized.posts.map((post) => post.caption).join('\n')}
@@ -2273,12 +2284,10 @@ export function WriteComposer({
             }}
           />
         ) : null}
-        {dialog === 'media' && editorInstance && services.uploadFile ? (
+        {dialog === 'media' && editorInstance ? (
           <MediaImportDialog
             editor={editorInstance}
-            uploadFile={services.uploadFile}
-            draftId={initial.id}
-            returnedAsset={params.get('attach') ?? undefined}
+            returnedAsset={params.get('attach') ?? ''}
             onClose={() => {
               setDialog(null)
               const url = new URL(window.location.href)

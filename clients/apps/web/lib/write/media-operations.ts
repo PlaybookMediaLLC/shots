@@ -12,6 +12,50 @@ export function attachmentEntry(editor: PlateEditor, id: string) {
   ][0]
 }
 
+/** A block's attachments in document order, including media inside imported containers. */
+export function attachmentsIn(node: TElement): TElement[] {
+  if ((node.type === 'img' || node.type === 'video') && typeof node.assetId === 'string')
+    return [node]
+  return node.children.flatMap((child) => ('type' in child ? attachmentsIn(child as TElement) : []))
+}
+
+/**
+ * Insert at the caret's post and leave the caret where it was, so typing carries on
+ * and an empty post keeps its placeholder. An array keeps its order.
+ */
+export function insertAttachments(editor: PlateEditor, nodes: TElement[]) {
+  if (!editor.selection) editor.tf.select(editor.api.end([]))
+  editor.tf.insertNodes(nodes, { select: false })
+}
+
+/**
+ * Remove one attachment. Saved and seeded nodes can lack an id, so those match
+ * by asset: copies of one asset without ids are interchangeable.
+ */
+export function removeAttachment(editor: PlateEditor, node: Record<string, unknown>) {
+  const [entry] = editor.api.nodes<TElement>({
+    at: [],
+    match: (candidate) =>
+      (candidate.type === 'img' || candidate.type === 'video') &&
+      (node.id ? candidate.id === node.id : candidate.assetId === node.assetId),
+  })
+  if (entry) editor.tf.removeNodes({ at: entry[1] })
+}
+
+/**
+ * Give every attachment the identity moves and copies rely on. Media seeded
+ * through the API or saved before node ids has none.
+ */
+export function ensureAttachmentIds(editor: PlateEditor) {
+  const missing = [
+    ...editor.api.nodes<TElement>({
+      at: [],
+      match: (node) => (node.type === 'img' || node.type === 'video') && !node.id,
+    }),
+  ]
+  for (const [, path] of missing) editor.tf.setNodes({ id: crypto.randomUUID() }, { at: path })
+}
+
 /** Move before a current position, retaining identity, nested media, history and comments. */
 export function moveAttachment(editor: PlateEditor, id: string, before: number | number[]) {
   const entry = attachmentEntry(editor, id)

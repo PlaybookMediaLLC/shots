@@ -31,6 +31,7 @@ import { useKeys, useShortcuts } from '../shortcuts'
 import { useWrite } from '../write-context'
 import { type Command, ComposerCommandsContext, type ComposerTool, commandsFor, rememberCommand } from './commands'
 import { DescribeImages } from './describe-images'
+import { insertAttachments } from '@/lib/write/media-operations'
 import { ComposerEmojiPicker } from './emoji-picker'
 import { MediaTools } from './media-tools'
 import { RefineMenu, useRefine } from './refine'
@@ -68,6 +69,7 @@ export function ComposerToolbar({
   aiEnabled,
   channel,
   document: actions,
+  draftId,
   onDescriptionSaved,
   onSnippetsChange,
   onTool,
@@ -78,6 +80,7 @@ export function ComposerToolbar({
   /** The version being edited. */
   channel: DraftChannel
   document: DocumentActions
+  draftId: string
   onDescriptionSaved: (assetId: string, alt: string) => void
   /** Called after the snippets dialog closes, to read them again. */
   onSnippetsChange: () => void
@@ -272,6 +275,7 @@ export function ComposerToolbar({
       ))}
       <MediaTools
         channel={channel}
+        draftId={draftId}
         onClose={close}
         onDescriptionSaved={onDescriptionSaved}
         setId={setId}
@@ -294,12 +298,9 @@ export function ComposerToolbar({
       ) : null}
       {tool === 'library' ? (
         <LibraryAssetPicker
+          channel={channel}
           onClose={close}
-          onInsert={(node) => {
-            if (!editor.selection) editor.tf.select(editor.api.end([]))
-            editor.tf.insertNodes(node)
-            editor.tf.focus()
-          }}
+          onInsert={(nodes) => insertAttachments(editor as PlateEditor, nodes)}
         />
       ) : null}
       {tool === 'snippets' && setId ? (

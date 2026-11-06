@@ -970,3 +970,59 @@ test(
     expect(await scheduledAssets(id, 'x')).toEqual([video.assetId])
   }
 )
+
+test(
+  'a video stays visible after attaching it from Library, and the media strip removes it',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'], verifiedStandardVideo: true })
+    const id = await openNewDraft(page)
+    const strip = page.getByTestId('media-strip')
+    await draftEditor(page).click()
+    await page.keyboard.type('A video from the Library.')
+    await page
+      .locator('input[type=file][aria-label="Insert media"]')
+      .setInputFiles(
+        '../../../server/internal/social/integrations/social/x/testdata/ten-minute-1080p.mp4'
+      )
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
+    await expectSaved(page)
+    const uploaded = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
+      assetIds: string[]
+    }
+
+    // Removing it takes it from the post and the Library keeps it.
+    await strip.getByRole('button', { name: 'Remove Video 1', exact: true }).click()
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(0)
+    await expect(draftEditor(page).locator('video')).toHaveCount(0)
+    await expectSaved(page)
+    expect(
+      ((await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as { assetIds: string[] })
+        .assetIds
+    ).toEqual([])
+
+    // The picker shows a frame and details, never the MIME type.
+    await strip.getByRole('button', { name: 'Browse library', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: 'Attach from Library' })
+    await expect(picker.locator('video')).toHaveCount(1)
+    await expect(picker).not.toContainText('video/mp4')
+    await expect(picker).toContainText(/\d MB · /)
+    await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // A Library node has no upload marker; it still plays in the editor, also after a reload.
+    await strip
+      .getByRole('button', { name: /^Attach / })
+      .first()
+      .click()
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
+    await expect(draftEditor(page).locator('video')).toHaveCount(1)
+    await expectSaved(page)
+    const attached = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
+      assetIds: string[]
+    }
+    expect(attached.assetIds).toEqual(uploaded.assetIds)
+    await app.reload()
+    await expect(draftEditor(page).locator('video')).toHaveCount(1)
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
+  }
+)
