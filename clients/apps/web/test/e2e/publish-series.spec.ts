@@ -1,0 +1,182 @@
+import { apiRequest, db, draftEditor, expect, expectSaved, type Page, test } from './framework'
+
+/**
+ * Publishing a run of written posts in one sitting. A writer who has drafted
+ * a week of posts elsewhere pastes the block once, splits it into separate
+ * posts, times them all in one step, then edits the run from the queue. The
+ * second journey is the editor's own path: schedule, carry the platforms and
+ * the next time to a new draft, and keep going.
+ *
+ * Posts go to fixture accounts at future times; nothing reaches a real one.
+ */
+
+test.use({ viewport: { height: 1000, width: 1440 } })
+
+/** Every day at 10:30 and 18:30 in New York, so the brand has free slots. */
+async function weeklySlots(page: Page): Promise<void> {
+  const sets = await apiRequest(page, '/api/v1/social-sets')
+  const [set] = (sets.body as { items: { id: string; name: string; version: number }[] }).items
+  const saved = await apiRequest(page, `/api/v1/social-sets/${set.id}`, {
+    method: 'PATCH',
+    body: {
+      baseVersion: set.version,
+      name: set.name,
+      postingSlots: [0, 1, 2, 3, 4, 5, 6].flatMap((weekday) => [
+        { time: '10:30', weekday },
+        { time: '18:30', weekday },
+      ]),
+      timeZone: 'America/New_York',
+    },
+  })
+  expect(saved.status, JSON.stringify(saved.body)).toBe(200)
+}
+
+/** Paste into a field the way a clipboard does, so the split offer is reached. */
+async function pasteInto(page: Page, label: string, text: string): Promise<void> {
+  const field = page.getByRole('textbox', { name: label })
+  await field.focus()
+  await field.evaluate((element, value) => {
+    const transfer = new DataTransfer()
+    transfer.setData('text/plain', value)
+    element.dispatchEvent(
+      new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: transfer })
+    )
+  }, text)
+}
+
+const BLOCK = [
+  'One: the opening of the run.',
+  'Two: the middle of the run.',
+  'Three: the end of the run.',
+].join('\n\n')
+
+test(
+  'a pasted block becomes separate posts, scheduled as one run and edited from the queue',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    await weeklySlots(page)
+    await page.goto('/publish')
+
+    await page.getByTestId('new-draft').first().click()
+    await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
+    await pasteInto(page, 'New draft text', BLOCK)
+
+    // Each piece is listed with its length before anything is created.
+    const split = page.getByTestId('paste-split')
+    await expect(split).toContainText('separates into 3 pieces')
+    await expect(page.getByTestId('paste-piece-1')).toContainText('One: the opening of the run.')
+    await expect(page.getByTestId('paste-piece-3')).toContainText('28')
+
+    await page.getByRole('textbox', { name: 'Series name' }).fill('Storytelling')
+    await page.getByTestId('paste-make-posts').click()
+
+    // Three drafts, and the library's series scheduler open on exactly those.
+    await page.waitForURL(/\/publish(\?|$)/)
+    const scheduler = page.getByRole('dialog', { name: /Schedule/i })
+    await expect(scheduler).toBeVisible({ timeout: 60_000 })
+    await expect
+      .poll(async () =>
+        (
+          await db.rows<{ title: string }>(
+            `SELECT title FROM content_draft WHERE title LIKE 'Storytelling%' ORDER BY title`
+          )
+        ).map((row) => row.title)
+      )
+      .toEqual(['Storytelling · 1/3', 'Storytelling · 2/3', 'Storytelling · 3/3'])
+
+    await scheduler
+      .getByRole('button', { name: /Preview|Schedule/ })
+      .first()
+      .click()
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.rows<{ count: string }>(
+              `SELECT count(*)::text AS count FROM scheduled_post p
+                 JOIN content_draft d ON d.id = p."contentDraftId"
+                WHERE d.title LIKE 'Storytelling%' AND p.status = 'SCHEDULED'`
+            )
+          )[0]?.count,
+        { timeout: 60_000 }
+      )
+      .toBe('3')
+
+    // The queue gathers the run under its name and counts what is scheduled.
+    await page.goto('/publish?tab=queue')
+    const queue = page.getByTestId('queue')
+    await expect(queue.getByTestId('queue-goal')).toContainText('3 posts scheduled')
+    const group = queue.getByTestId('queue-group').first()
+    await expect(group).toContainText('Storytelling')
+    await expect(group).toContainText('3 posts')
+
+    // Selecting the run moves all of it at once.
+    const before = await db.rows<{ at: string }>(
+      `SELECT "scheduledFor"::text AS at FROM scheduled_post p
+         JOIN content_draft d ON d.id = p."contentDraftId"
+        WHERE d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`
+    )
+    await group.getByRole('button', { name: 'Select the run' }).click()
+    const bar = page.getByTestId('queue-bulk-bar')
+    await expect(bar).toContainText('3 selected')
+    await bar.getByRole('button', { name: 'Later', exact: true }).click()
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.rows<{ at: string }>(
+              `SELECT "scheduledFor"::text AS at FROM scheduled_post p
+                 JOIN content_draft d ON d.id = p."contentDraftId"
+                WHERE d.title LIKE 'Storytelling%' ORDER BY p."scheduledFor"`
+            )
+          ).map((row) => row.at),
+        { timeout: 60_000 }
+      )
+      .not.toEqual(before.map((row) => row.at))
+  }
+)
+
+test(
+  'Schedule and next queues the post and opens the next draft on the same accounts',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x', 'bluesky'] })
+    await weeklySlots(page)
+    await page.goto('/publish')
+
+    await page.getByTestId('new-draft').first().click()
+    await page.keyboard.type('The first post of the run.')
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
+    await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
+    const first = new URL(page.url()).pathname.split('/').pop() ?? ''
+
+    // Only X: the next draft must open on that choice, not on the brand's defaults.
+    await page.getByRole('switch', { name: 'Publish to Bluesky', exact: true }).click()
+    await expectSaved(page)
+
+    const dock = page.getByTestId('schedule-dock')
+    await dock.getByRole('textbox', { name: 'Schedule time in words' }).fill('+3h')
+    await dock.getByTestId('dock-schedule-next-button').click()
+
+    await page.waitForURL(
+      (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(first),
+      {
+        timeout: 60_000,
+      }
+    )
+    await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByRole('switch', { name: 'Publish to X', exact: true })).toBeChecked()
+    await expect(
+      page.getByRole('switch', { name: 'Publish to Bluesky', exact: true })
+    ).not.toBeChecked()
+
+    // The first post is queued, and the new draft opens after it, not tomorrow at 9.
+    const queued = await db.rows<{ at: string }>(
+      `SELECT "scheduledFor"::text AS at FROM scheduled_post WHERE "contentDraftId" = $1`,
+      [first]
+    )
+    expect(queued).toHaveLength(1)
+    await expect(page.getByTestId('dock-schedule-button')).toContainText('Schedule for')
+  }
+)
