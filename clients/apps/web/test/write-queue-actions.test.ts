@@ -87,7 +87,10 @@ test('the same text from different drafts is a repeat; one draft on two accounts
     ],
     { minutesApart: 30 }
   )
-  assert.deepEqual(repeat.map((item) => item.text), ['The same text is queued 2 times.'])
+  assert.deepEqual(
+    repeat.map((item) => item.text),
+    ['The same text is queued 2 times.']
+  )
 
   const fanOut = queueWarnings(
     [

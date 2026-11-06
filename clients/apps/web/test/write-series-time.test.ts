@@ -27,10 +27,7 @@ test('a learned gap is used instead of an hour', () => {
 
 test('posts in the past or beyond a day do not set the next time', () => {
   const far = new Date(now.getTime() + SERIES_WINDOW_MS + 60_000).toISOString()
-  assert.equal(
-    nextSeriesTime({ gapMinutes: 60, now, queued: [iso(-120), far], slots: [] }),
-    null
-  )
+  assert.equal(nextSeriesTime({ gapMinutes: 60, now, queued: [iso(-120), far], slots: [] }), null)
 })
 
 test('with nothing queued nearby, the next free recurring slot wins', () => {
@@ -53,7 +50,12 @@ test('nothing queued and no free slot leaves the caller its own default', () => 
 
 test('an unreadable queued time is ignored rather than throwing', () => {
   assert.equal(
-    nextSeriesTime({ gapMinutes: 60, now, queued: ['not a time', iso(10)], slots: [] })?.toISOString(),
+    nextSeriesTime({
+      gapMinutes: 60,
+      now,
+      queued: ['not a time', iso(10)],
+      slots: [],
+    })?.toISOString(),
     iso(70)
   )
 })

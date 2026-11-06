@@ -74,6 +74,12 @@ export const SHORTCUT_REFERENCE: {
         label: 'Schedule at the next free slot (opens the review)',
         mod: true,
       },
+      // ⌘Enter already makes a new post in a thread, so scheduling from the
+      // keyboard lives in the field where the time is typed.
+      {
+        key: 'enter',
+        label: 'In the dock’s “Or type it” field: schedule (with ⇧: schedule and open the next draft)',
+      },
       { alt: true, key: 'arrowup', label: 'Move the post up' },
       { alt: true, key: 'arrowdown', label: 'Move the post down' },
       { key: 'f', label: 'Focus mode', mod: true, shift: true },

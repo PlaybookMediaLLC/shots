@@ -50,7 +50,10 @@ test('a run is held together by the title its drafts share', () => {
 })
 
 test('a series is named from the run\u2019s first words, never mid-word', () => {
-  assert.equal(suggestedSeriesName('Storytelling is how we sell.\nSecond line.'), 'Storytelling is how we sell.')
+  assert.equal(
+    suggestedSeriesName('Storytelling is how we sell.\nSecond line.'),
+    'Storytelling is how we sell.'
+  )
   assert.equal(
     suggestedSeriesName(
       'A much longer opening line that runs past the suggestion limit comfortably'

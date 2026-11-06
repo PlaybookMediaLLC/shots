@@ -936,21 +936,6 @@ function DraftRow({
           )}
         </p>
         <RowStatus draft={draft} />
-        {/* Where it went live, on the tab that is about what went out. */}
-        {data.query.tab === 'posted' && draft.publishedPosts > 0 ? (
-          <span
-            className="mt-1 inline-flex text-[11px] text-sky-700 underline dark:text-sky-300"
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              setShowingLinks((current) => !current)
-            }}
-            role="button"
-            tabIndex={-1}
-          >
-            {showingLinks ? 'Hide the links' : 'Where it went live'}
-          </span>
-        ) : null}
         {tags.length > 0 ? (
           <p className="mt-1.5 flex flex-wrap gap-1">
             {tags.map((tag) => (
@@ -959,6 +944,19 @@ function DraftRow({
           </p>
         ) : null}
       </Link>
+      {/* Where it went live, on the tab that is about what went out. Outside the
+          row's link: a control inside an anchor is not reachable by keyboard. */}
+      {data.query.tab === 'posted' && draft.publishedPosts > 0 ? (
+        <Button
+          aria-expanded={showingLinks}
+          className="mx-4 mb-2 h-6 px-0 text-[11px] text-sky-700 underline dark:text-sky-300"
+          onClick={() => setShowingLinks((current) => !current)}
+          size={null}
+          variant="ghost"
+        >
+          {showingLinks ? 'Hide the links' : 'Where it went live'}
+        </Button>
+      ) : null}
       {showingLinks ? <DraftPostLinks draftId={draft.id} /> : null}
       <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
         <DraftRowMenu draft={shown} onSelect={() => onSelect(draft.id, false)} />
@@ -1396,7 +1394,7 @@ function BulkBar({
   selected: string[]
 }) {
   const router = useWriteRouter()
-  const { activeId, beforeLeaveRef, data, hideDraft, canPublish } = useWrite()
+  const { activeId, beforeLeaveRef, canEdit, data, hideDraft, canPublish } = useWrite()
   const [scheduling, setScheduling] = React.useState(openScheduler && canPublish)
   const [confirm, setConfirm] = React.useState(false)
   const [progress, setProgress] = React.useState<number | null>(null)
@@ -1460,6 +1458,53 @@ function BulkBar({
           ? `${selected.length} selected`
           : `${progress} of ${selected.length} completed…`}
       </span>
+      {/* Platforms belong to the draft, so a run's destinations change here
+          rather than on the commitments the queue already holds. */}
+      {canEdit && (data.activeSet?.accounts.length ?? 0) > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={progress !== null} size="sm" type="button" variant="ghost">
+              Platforms
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {(data.activeSet?.accounts ?? []).map((account) => (
+              <React.Fragment key={account.id}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void run(`Added ${CHANNEL_META[account.channel].label}`, async (id) => {
+                      const fresh = await draftsApi.get(id)
+                      return draftsApi.save(id, {
+                        baseVersion: fresh.version,
+                        channelConnectionIds: [
+                          ...new Set([...fresh.channelConnectionIds, account.id]),
+                        ],
+                      })
+                    })
+                  }
+                >
+                  Add {CHANNEL_META[account.channel].label}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void run(`Removed ${CHANNEL_META[account.channel].label}`, async (id) => {
+                      const fresh = await draftsApi.get(id)
+                      return draftsApi.save(id, {
+                        baseVersion: fresh.version,
+                        channelConnectionIds: fresh.channelConnectionIds.filter(
+                          (entry) => entry !== account.id
+                        ),
+                      })
+                    })
+                  }
+                >
+                  Remove {CHANNEL_META[account.channel].label}
+                </DropdownMenuItem>
+              </React.Fragment>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
       <Button
         disabled={progress !== null}
         onClick={() => void run('Pinned', (id) => writeApi.properties(id, { pinned: true }))}
