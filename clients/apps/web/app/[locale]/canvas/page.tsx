@@ -4,6 +4,8 @@ import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { CanvasLibrary } from '@/components/canvas-workspace/CanvasLibrary'
 
+export const metadata = { title: 'Canvas' }
+
 export default async function CanvasPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
   const access = await requirePaidPageAccess(await headers(), locale, '/canvas')

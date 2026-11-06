@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   apiKeyRefusal,
+  apiKeyScopeDescriptions,
   apiKeyScopes,
   defaultAgentScopes,
   preselectedAgentScopes,
@@ -39,4 +40,15 @@ test('a key over its rate limit is told to wait, not that it lacks permission', 
   assert.equal(apiKeyRefusal({ code: 'RATE_LIMITED' }).status, 429)
   assert.equal(apiKeyRefusal({ code: 'KEY_DISABLED' }).status, 403)
   assert.equal(apiKeyRefusal(null).status, 403)
+})
+
+// Consent and settings label each checkbox with its scope and description, so
+// naming another scope in a description makes the two labels ambiguous.
+test('a scope description names no other scope', () => {
+  for (const scope of apiKeyScopes) {
+    for (const other of apiKeyScopes) {
+      if (other !== scope)
+        assert.ok(!apiKeyScopeDescriptions[scope].includes(other), `${scope}: ${other}`)
+    }
+  }
 })

@@ -273,7 +273,7 @@ export const PLATFORM_PAGES: Record<PlatformPagePath, PlatformPage> = {
       'The Shots design partner program gives teams that ship every week early access to launch intelligence and a direct line to the builders, in exchange for real releases and honest feedback.',
   },
   [P['/principles']]: {
-    title: 'Principles: how Shots is built',
+    title: 'Principles: how we build',
     description:
       'The rules behind Shots: manual tools before the AI, fixed steps before automation, the workspace over chat, enforced approval, and cite or ask.',
     label: 'Principles',

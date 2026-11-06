@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TweetImageEditorLoader } from '@/components/tweet-image/TweetImageEditorLoader';
 import { SectionTitle, ToolFaq } from '@/components/tools/ToolLayout';
 import { CARD_CLASS, INTER } from '@/components/tools/ui';
+import { PRO_PLAN_OFFER } from '@/lib/seo/json-ld';
 import { OG_DEFAULTS } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
@@ -67,7 +68,7 @@ const faqs = [
       'Yes. Turn the Background switch off before exporting and the PNG keeps only the card, with rounded corners and a transparent backdrop.',
   },
   {
-    question: 'Is it free?',
+    question: 'Is it in my plan?',
     answer:
       'Yes. Every card style, background, and export size is included in every Shots plan, with no watermark.',
   },
@@ -82,12 +83,8 @@ const jsonLd = {
       applicationCategory: 'DesignApplication',
       operatingSystem: 'Web Browser',
       description:
-        'Free tool that turns a post on X into a clean, shareable image with light or dark cards and gradient backgrounds.',
-      offers: {
-        '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
-      },
+        'Tool that turns a post on X into a clean, shareable image with light or dark cards and gradient backgrounds.',
+      offers: PRO_PLAN_OFFER,
       featureList: [
         'Load any public post from an x.com or twitter.com link',
         'Light and dark card styles',
@@ -128,8 +125,8 @@ export default function TweetImagePage() {
             </h1>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg">
               Paste a link to any public post on X and get a clean image of it,
-              ready for slides, docs, newsletters, or another thread. Free with
-              a Shots account, no watermark.
+              ready for slides, docs, newsletters, or another thread. Included
+              in every plan, with no watermark.
             </p>
           </header>
 

@@ -32,7 +32,7 @@ const AUDIENCES = [
 ];
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: { absolute: TITLE },
   description: DESCRIPTION,
   keywords: [
     "screenshot editor for developers",
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     ...OG_DEFAULTS,
-    title: `${TITLE} - Shots`,
+    title: TITLE,
     description: DESCRIPTION,
     url: "/for",
   },

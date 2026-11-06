@@ -4,6 +4,8 @@ import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { CanvasEditor } from '@/components/canvas-workspace/CanvasEditor'
 
+export const metadata = { title: 'Canvas' }
+
 export default async function CanvasWorkspacePage({
   params,
 }: {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Navigation } from "@/components/landing/Navigation";
 import { Footer } from "@/components/landing/Footer";
 import { PRO_PLAN_OFFER } from "@/lib/seo/json-ld";
+import { OG_DEFAULTS } from "@/lib/seo/metadata";
 import { GithubLogoIcon as Github01Icon } from "@phosphor-icons/react/dist/ssr/GithubLogo"
 import { CodeIcon as SourceCodeIcon } from "@phosphor-icons/react/dist/ssr/Code"
 import { TerminalIcon as ComputerTerminal01Icon } from "@phosphor-icons/react/dist/ssr/Terminal"
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
     "open source project screenshots",
   ],
   openGraph: {
+    ...OG_DEFAULTS,
     title: "Screenshot Editor for Developers",
     description:
       "Beautify code screenshots, terminal output, and project UIs. Browser-based tool for developers.",

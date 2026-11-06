@@ -339,7 +339,7 @@ function ApiKeyForm({
             type="button"
             variant="outline"
           >
-            Approved publishing
+            Publishing
           </Button>
           <Button
             onClick={() =>

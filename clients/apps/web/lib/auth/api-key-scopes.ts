@@ -36,10 +36,10 @@ export const apiKeyScopeDescriptions: Record<ApiKeyScope, string> = {
   'draft:comment':
     'Add, reply, edit your own comments, and resolve discussions on workspace drafts. Never approves or publishes.',
   'draft:write':
-    'Create, update, and delete content drafts. Posting to your accounts takes post:publish.',
+    'Create, update, and delete content drafts. Posting to your accounts takes its own scope.',
   'onboarding:run': 'Read a product site into its profile and follow the run.',
   'post:publish':
-    'Write and publish new posts to the accounts of your shared social sets, right away or at a time, with no review by a person unless the workspace requires approval. Add post:schedule to let it cancel them.',
+    'Write and publish new posts to the accounts of your shared social sets, right away or at a time, with no review by a person unless the workspace requires approval. Cancelling them takes the scheduling scope too.',
   'post:schedule':
     'Schedule campaign posts and visuals a person approved, and cancel scheduled posts. It never approves anything.',
   'release:create': 'Create releases and draft campaigns, and submit drafts for review.',

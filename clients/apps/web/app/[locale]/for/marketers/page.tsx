@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Navigation } from "@/components/landing/Navigation";
 import { Footer } from "@/components/landing/Footer";
 import { PRO_PLAN_OFFER } from "@/lib/seo/json-ld";
+import { OG_DEFAULTS } from "@/lib/seo/metadata";
 import { MegaphoneIcon as Megaphone01Icon } from "@phosphor-icons/react/dist/ssr/Megaphone"
 import { ShareIcon as Share01Icon } from "@phosphor-icons/react/dist/ssr/Share"
 import { ChartLineUpIcon as ChartIncreaseIcon } from "@phosphor-icons/react/dist/ssr/ChartLineUp"
@@ -32,6 +33,7 @@ export const metadata: Metadata = {
     "comparison screenshot maker",
   ],
   openGraph: {
+    ...OG_DEFAULTS,
     title: "Screenshot Editor for Marketers",
     description:
       "Create product screenshots for campaigns, landing pages, and social media. Included in every Shots plan.",

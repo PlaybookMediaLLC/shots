@@ -5,6 +5,8 @@ import { ONBOARDING_STEPS, OnboardingShell } from '@/components/auth/OnboardingS
 import { SignOutButton } from '@/components/auth/SignOutButton'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
 
+export const metadata = { title: 'Create your workspace' }
+
 type OnboardingPageProps = {
   params: Promise<{ locale: string }>
 }

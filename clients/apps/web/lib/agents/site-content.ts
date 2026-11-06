@@ -23,9 +23,9 @@ export interface AgentPage {
 export const AGENT_PAGES: AgentPage[] = [
   {
     path: '/',
-    title: 'Shots - Screenshot Editor & Mockup Maker',
+    title: 'Shots: Turn every release into a launch',
     summary:
-      'The signed-in Shots editor. Drop in a screenshot and add gradient backgrounds, browser mockups, shadows, 3D perspective, and animation, then export a PNG, JPEG, WebP, MP4, WebM, or GIF. Editing runs client side, so imported images are not uploaded merely to edit them; export compression sends the finished image to the server, which returns it without storing it. The editor is included in every paid plan, some capabilities require a higher plan, and editor exports have no watermark.',
+      'The signed-in Shots app. Shots turns a software release into a cited launch brief, on-brand visuals, and posts that a person approves. This address opens the screenshot editor: drop in a screenshot and add gradient backgrounds, browser mockups, shadows, 3D perspective, and animation, then export a PNG, JPEG, WebP, MP4, WebM, or GIF. Editing runs client side, so imported images are not uploaded merely to edit them; export compression sends the finished image to the server, which returns it without storing it. The editor is included in every paid plan, some capabilities require a higher plan, and editor exports have no watermark.',
     points: [
       `${atLeast(PRODUCT_FACTS.backgrounds)} gradient, mesh, and solid backgrounds`,
       'Safari, Chrome, and Arc browser mockups in light and dark',

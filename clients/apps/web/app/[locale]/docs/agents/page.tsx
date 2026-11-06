@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     title: 'Connect AI agents to Shots',
     url: '/docs/agents',
   },
-  title: 'Connect AI agents to Shots',
+  title: { absolute: 'Connect AI agents to Shots' },
 }
 
 const heading = 'mb-3 text-xl font-semibold tracking-[-0.02em] text-foreground'
