@@ -175,6 +175,7 @@ test(
     await expect(draftEditor(page).locator('figure')).toHaveCount(1)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(page.getByTestId('preview-panel').locator('img')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const png = await sharp({
       create: { width: 120, height: 60, channels: 4, background: '#25a8df' },
     })
@@ -184,6 +185,7 @@ test(
       .locator('input[type=file][aria-label="Insert media"]')
       .setInputFiles({ name: 'mixed.png', mimeType: 'image/png', buffer: png })
     await expect(draftEditor(page).locator('figure')).toHaveCount(2)
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(page.getByTestId('preview-panel').getByRole('alert')).toContainText(
       'X posts a video or GIF on its own. Move the other attachments to a separate post.'
     )
@@ -351,13 +353,13 @@ test(
     await page.getByRole('dialog').getByRole('combobox').fill('Preview')
     await page.getByRole('option', { name: /Preview current draft/ }).click()
     await expect(page.getByTestId('preview-panel')).toBeVisible()
+    await toggle.click()
     await expect(editor).toBeFocused()
     await page.keyboard.type('three ')
     await expect(editor).toContainText('Alpha one two three omega.')
-    await toggle.click()
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.insertText('\n' + 'Independent scrolling and saved content.\n'.repeat(45))
-    // The header is sticky; toggling must not remount or scroll the editor.
+    // Coming back from Preview returns to where the draft was scrolled, without a remount.
     const main = page.getByTestId('write-frame').locator('main')
     await main.evaluate((node) => {
       node.scrollTop = 250
@@ -365,7 +367,6 @@ test(
     const before = await main.evaluate((node) => node.scrollTop)
     expect(before).toBeGreaterThan(0)
     await toggle.click()
-    await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     const panel = page.getByTestId('preview-panel')
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     const previewScroll = panel.getByTestId('preview-scroll')
@@ -373,13 +374,12 @@ test(
       node.scrollTop = 100
     })
     expect(await previewScroll.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
-    expect(await main.evaluate((node) => node.scrollTop)).toBe(before)
     await toggle.click()
-    expect(await main.evaluate((node) => node.scrollTop)).toBe(before)
+    await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     await editor.click()
     await page.keyboard.press('ControlOrMeta+End')
-    await toggle.click()
     await page.keyboard.type('Rapid-edit-marker-0123456789', { delay: 1 })
+    await toggle.click()
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     await expect(panel).toContainText('Rapid-edit-marker-0123456789')
     await expectSaved(page)
