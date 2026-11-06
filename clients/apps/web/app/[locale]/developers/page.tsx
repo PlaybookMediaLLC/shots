@@ -11,7 +11,7 @@ import {
 } from "@/lib/seo/docs-shared";
 
 export const metadata: Metadata = {
-  title: "Shots Developer Portal",
+  title: { absolute: "Shots Developer Portal" },
   description:
     "Developer portal for Shots: API docs, OpenAPI 3.1 spec, authentication, rate limits, quickstart requests, and the open-source repository.",
   keywords: [

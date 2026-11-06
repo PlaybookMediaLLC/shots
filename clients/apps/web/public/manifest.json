@@ -1,7 +1,7 @@
 {
   "name": "Shots",
   "short_name": "Shots",
-  "description": "Free browser-based image editor for creating professional graphics. Transform screenshots with backgrounds, animations, 3D effects, and video export.",
+  "description": "Shots turns every release into a cited launch brief, on-brand visuals, and posts you approve. Every plan includes a screenshot editor.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1a1a1a",

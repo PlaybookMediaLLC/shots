@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/table'
 
 export const metadata: Metadata = {
-  title: "Shots API Documentation",
+  title: { absolute: "Shots API Documentation" },
   description:
     "Shots API documentation: editor utilities, workspace tenant endpoints, authentication, rate limits, errors, and the OpenAPI 3.1 specification.",
   keywords: [

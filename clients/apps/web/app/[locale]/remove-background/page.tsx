@@ -5,12 +5,13 @@ import { Footer } from '@/components/landing/Footer';
 import { RemoveBackgroundLoader } from '@/components/remove-background/RemoveBackgroundLoader';
 import { SectionTitle, ToolFaq, ToolHero } from '@/components/tools/ToolLayout';
 import { CARD_CLASS } from '@/components/tools/ui';
+import { PRO_PLAN_OFFER } from '@/lib/seo/json-ld';
 import { OG_DEFAULTS, SITE_URL } from '@/lib/seo/metadata';
 import { TOOLS_HUB_PATH } from '@/lib/seo/tools';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Remove Background from Image: Free',
+  title: 'Remove Background from Image: No Upload',
   description:
     'Remove an image background in your browser and download a transparent PNG. Runs on your device with WebGPU. Included in every plan. No watermark.',
   keywords: [
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     ...OG_DEFAULTS,
-    title: 'Remove Background from Image: Free',
+    title: 'Remove Background from Image: No Upload',
     description:
       'Remove an image background on your device and download a transparent PNG. Included in every plan. No watermark.',
     url: '/remove-background',
@@ -62,7 +63,7 @@ const faqs = [
   {
     question: 'How does it compare to remove.bg?',
     answer:
-      'remove.bg processes images on its servers and caps free downloads at 0.25 megapixel previews, with full-resolution downloads costing credits. This runs on your device and returns full resolution for free. remove.bg\'s server-side models can still resolve fine hair detail better on difficult photos.',
+      'remove.bg processes images on its servers and caps free downloads at 0.25 megapixel previews, with full-resolution downloads costing credits. This runs on your device and returns full resolution with no credits. remove.bg\'s server-side models can still resolve fine hair detail better on difficult photos.',
   },
   {
     question: 'What kinds of images work best?',
@@ -70,7 +71,7 @@ const faqs = [
       'Photos with a clear main subject: people, pets, products, cars, and objects. Busy scenes with several overlapping subjects, or subjects that blend into the background, are harder for any background remover.',
   },
   {
-    question: 'Is it free, and is there a watermark?',
+    question: 'Does it cost extra, and is there a watermark?',
     answer:
       'It is included in every Shots plan, with no daily limit and no watermark. The output keeps the full resolution of your original image.',
   },
@@ -131,16 +132,11 @@ const jsonLd = {
       applicationSubCategory: 'Background Remover',
       operatingSystem: 'Any (Web Browser)',
       description:
-        'Free background remover that runs on your device and exports a transparent PNG without uploading the image.',
-      isAccessibleForFree: true,
+        'Background remover that runs on your device and exports a transparent PNG without uploading the image.',
       publisher: {
         '@id': `${SITE_URL}/#organization`,
       },
-      offers: {
-        '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
-      },
+      offers: PRO_PLAN_OFFER,
       featureList: [
         'On-device AI background removal with BiRefNet-lite',
         'WebGPU acceleration with WebAssembly fallback',

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRightIcon as ArrowRight01Icon } from "@phosphor-icons/react/dist/ssr/ArrowRight";
 import { Navigation } from "@/components/landing/Navigation";
 import { Footer } from "@/components/landing/Footer";
+import { PRO_PLAN_OFFER } from "@/lib/seo/json-ld";
 import { OG_DEFAULTS } from "@/lib/seo/metadata";
 import {
   DEVICE_LAYOUTS,
@@ -99,9 +100,9 @@ const howToSteps = [
 
 const faqs = [
   {
-    question: "Is this mockup generator really free?",
+    question: "Is this mockup generator in my plan?",
     answer:
-      "Yes. Every device, frame, background, and export size is included in every Shots plan, on every plan, with no watermark.",
+      "Yes. Every device, frame, background, and export size is included in every Shots plan, with no watermark.",
   },
   {
     question: "Which devices can I put my screenshot in?",
@@ -167,11 +168,7 @@ export default function MockupGeneratorPage() {
         url: "https://shots.playbookmedia.io/mockup-generator",
         description:
           "Online mockup generator that places screenshots in iPhone, MacBook, Apple Watch, and browser frames. Included in every plan. No watermark.",
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "USD",
-        },
+        offers: PRO_PLAN_OFFER,
         featureList: [
           `${MOCKUP_DEFINITIONS.length} iPhone, MacBook, and Apple Watch mockups`,
           "Safari and Chrome browser frames in light and dark",
@@ -231,8 +228,8 @@ export default function MockupGeneratorPage() {
               screenshot into an iPhone 17 Pro, MacBook Pro, Apple Watch, or a
               Safari or Chrome frame, arrange up to {MAX_DEVICE_MOCKUPS} devices
               in one scene, and export a PNG at up to 5x. It runs in your
-              browser, with no watermark. Sign up free to use the editor and
-              tools.
+              browser, with no watermark. The editor and tools are included in
+              every plan.
             </p>
             <div className="flex flex-col items-center">
               <Link href="/editor" className={ctaClassName}>

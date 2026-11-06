@@ -13,7 +13,7 @@ const DESCRIPTION =
   "Side-by-side comparisons of Shots against Pika Style, Shots.so, CleanShot X, Snagit, Xnapper, Screely, Carbon, Ray.so, and remove.bg.";
 
 export const metadata: Metadata = {
-  title: TITLE,
+  title: { absolute: TITLE },
   description: DESCRIPTION,
   keywords: [
     "screenshot editor comparison",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     ...OG_DEFAULTS,
-    title: `${TITLE} - Shots`,
+    title: TITLE,
     description: DESCRIPTION,
     url: "/compare",
   },
