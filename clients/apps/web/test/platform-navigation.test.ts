@@ -14,6 +14,7 @@ import {
   safeReturnPath,
   PLATFORM_DESTINATIONS,
   CREATE_LINKS,
+  CREATE_TOOLS,
   LIBRARY_LINKS,
   STORE_SCREENSHOTS,
 } from '@/lib/platform/navigation'
@@ -173,8 +174,8 @@ test('workspace and editor routes follow appearance in every locale', () => {
 
 test('the plan page names the paid capability a free workspace asked for', () => {
   assert.equal(paidCapability('/create'), 'Create')
-  assert.equal(paidCapability('/create/code'), 'Code Studio')
-  assert.equal(paidCapability('/create/code/cabc'), 'Code Studio')
+  assert.equal(paidCapability('/create/code'), 'Code image')
+  assert.equal(paidCapability('/create/code/cabc'), 'Code image')
   assert.equal(paidCapability('/library?view=assets'), 'Library')
   assert.equal(paidCapability('/assets'), 'Library')
   assert.equal(paidCapability('/activity'), 'Activity')
@@ -335,6 +336,16 @@ test('Store screenshots has one name and route on every Create and Library surfa
       (page) => page.href === STORE_SCREENSHOTS.href && page.section === 'create'
     )
   )
+})
+
+test('every tool has one name and a place in Library', () => {
+  assert.deepEqual(
+    CREATE_TOOLS.map((tool) => tool.label),
+    ['Screenshot', 'Canvas', 'Story Set', 'Store screenshots', 'Code image']
+  )
+  for (const tool of CREATE_TOOLS) assert.ok(LIBRARY_LINKS.includes(tool.library), tool.label)
+  // Library's first category keeps the area's own address.
+  assert.equal(LIBRARY_LINKS[0]!.href, '/library')
 })
 
 test('search finds every page by name, with its section, and the pages visited before', () => {

@@ -76,13 +76,45 @@ export function matchesDestination(key: PlatformArea, label: string, query: stri
 /** One page of an area, as a link. */
 export type AreaLink = { href: string; label: string }
 
+/**
+ * What people make here, with one name each. The New menu, the Create page and
+ * Library's categories read this, so a tool can't go by two names or go missing
+ * from one of them.
+ */
+export const CREATE_TOOLS = [
+  {
+    create: '/editor?start=new',
+    label: 'Screenshot',
+    library: { href: '/library', label: 'Screenshots' },
+  },
+  {
+    create: '/canvas/new',
+    label: 'Canvas',
+    library: { href: '/library?type=canvas', label: 'Canvas' },
+  },
+  {
+    create: '/creative-sets',
+    label: 'Story Set',
+    library: { href: '/library?type=story', label: 'Story Sets' },
+  },
+  {
+    create: STORE_SCREENSHOTS.href,
+    label: STORE_SCREENSHOTS.label,
+    library: { href: '/library?type=store', label: STORE_SCREENSHOTS.label },
+  },
+  {
+    create: '/create/code',
+    label: 'Code image',
+    library: { href: '/library?type=code', label: 'Code images' },
+  },
+] as const
+
+/** One tool's entry in `CREATE_TOOLS`. */
+export type CreateTool = (typeof CREATE_TOOLS)[number]
+
 /** One row of Library categories: each kind of project, then reusable resources. */
 export const LIBRARY_LINKS = [
-  { href: '/library', label: 'Screenshots' },
-  { href: '/library?type=canvas', label: 'Canvas' },
-  { href: '/library?type=story', label: 'Story Sets' },
-  { href: '/library?type=store', label: STORE_SCREENSHOTS.label },
-  { href: '/library?type=code', label: 'Code' },
+  ...CREATE_TOOLS.map((tool) => tool.library),
   { href: '/library?view=assets', label: 'Assets' },
   { href: '/library?view=brand', label: 'Brand assets' },
 ]
@@ -255,8 +287,8 @@ export function paidCapability(from: string | null | undefined): string | null {
     ['/creative-sets', 'Story Sets'],
     [STORE_SCREENSHOTS.href, STORE_SCREENSHOTS.label],
     ['/store-screenshots', 'Store screenshots'],
-    ['/create/code', 'Code Studio'],
-    ['/code', 'Code Studio'],
+    ['/create/code', 'Code image'],
+    ['/code', 'Code image'],
     ['/tweet', 'Post images'],
     ['/projects', 'Library'],
     ['/assets', 'Library'],
