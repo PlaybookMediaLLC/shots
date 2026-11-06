@@ -135,7 +135,7 @@ export type DraftEditorProps = {
   /** Each post's header, by its 1-based number in the thread: who it is from. */
   postHeader: (number: number) => React.ReactNode
   /** What each post's bar shows for the platform being edited (count, Ask AI, settings). */
-  postTools?: Omit<PostTools, 'addImage'>
+  postTools?: PostTools
   /** The empty post's prompt for the platform being edited, such as "What's happening?". */
   placeholder?: string
   /** The host's buttons after Add post and Image, given the editor's import and export. */
@@ -874,9 +874,7 @@ function DraftEditorSession({
   const imageInput = React.useRef<HTMLInputElement>(null)
   const postTools = React.useMemo<PostTools>(
     () =>
-      readOnly || waitingForConnection
-        ? {}
-        : { ...hostPostTools, addImage: () => imageInput.current?.click() },
+      readOnly || waitingForConnection ? {} : (hostPostTools ?? {}),
     [hostPostTools, readOnly, waitingForConnection]
   )
   return (
@@ -968,7 +966,7 @@ function DraftEditorSession({
                 style={{
                   bottom: `calc(${Math.max(20, keyboardInset)}px + env(safe-area-inset-bottom))`,
                 }}
-                className="pointer-events-none sticky z-10 flex justify-start px-2 [contain:inline-size] sm:ps-4"
+                className={cn('pointer-events-none sticky z-10 mt-2 flex justify-start [contain:inline-size]', POST_COLUMN)}
                 data-draft-toolbar
               >
                 <div className="pointer-events-auto min-w-0 max-w-full">

@@ -77,6 +77,9 @@ func checkDraftMedia(channel string, rows []*ent.Asset) error {
 	label := draftChannelLabels[channel]
 	if len(rows) == 0 {
 		if rules.RequiresMedia {
+			if len(rules.Images) == 0 {
+				return conflict(label + " needs one video. Add one to the post.")
+			}
 			return conflict(label + " needs at least one image or video. Add one to the post.")
 		}
 		return nil

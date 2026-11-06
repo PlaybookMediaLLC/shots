@@ -24,8 +24,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
-import { CAPABILITIES, type AccountStanding } from '@/lib/write/capabilities'
-import { VideoOptions } from './video-options'
+import { CAPABILITIES } from '@/lib/write/capabilities'
 import { type DraftFinisherWire, writeApi } from '@/lib/write/client'
 import {
   type DraftChannel,
@@ -57,7 +56,6 @@ const STYLE_EXAMPLES: Record<Numbering['style'], string> = {
  */
 export function VersionOptionsBar({
   captionLimit,
-  tiktokCreator,
   channel,
   onApplyFinisher,
   onChange,
@@ -68,7 +66,6 @@ export function VersionOptionsBar({
   uploadFile,
 }: {
   channel: DraftChannel
-  tiktokCreator?: AccountStanding['tiktokCreator']
   captionLimit?: number
   onApplyFinisher?: (text: string, quoteFirstPost: boolean) => void
   onChange: (options: VersionOptions) => void
@@ -83,19 +80,6 @@ export function VersionOptionsBar({
   const button =
     'h-8 rounded-md border border-border px-3 text-ui text-muted-foreground hover:border-input hover:text-foreground'
   const tools: React.ReactNode[] = []
-  // Privacy, consent and YouTube's required fields sit above the post, in the composer.
-  if (channel === 'tiktok')
-    tools.push(
-      <VideoOptions
-        key="video"
-        channel={channel}
-        options={options}
-        onChange={onChange}
-        disabled={readOnly}
-        creator={tiktokCreator}
-        part="rest"
-      />
-    )
   if (capabilities.thread) {
     tools.push(
       <Button
@@ -192,7 +176,12 @@ export function VersionOptionsBar({
       />
     )
   }
-  if (tools.length === 0) return null
+  if (tools.length === 0)
+    return (
+      <p className="p-4 text-xs text-muted-foreground">
+        {capabilities.label}’s settings are above the post.
+      </p>
+    )
   return (
     <div
       className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3 has-[[data-option-rows]]:p-0"

@@ -1,4 +1,5 @@
 import type { accountObservationBuckets } from '@/lib/write/analytics'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 
 type Bucket = ReturnType<typeof accountObservationBuckets>[number]
 
@@ -20,7 +21,7 @@ export function AccountMetricCharts({ buckets }: { buckets: Bucket[] }) {
         const x = (point: Bucket) =>
           last === first ? 260 : 55 + ((Date.parse(point.period) - first) / (last - first)) * 405
         const y = (point: Bucket) => 155 - ((point.value - min) / (max - min)) * 130
-        const label = `${points[0].platform} · ${points[0].metric} · ${points[0].connection}`
+        const label = `${platformLabel(points[0].platform)} · ${points[0].metric} · ${points[0].connection}`
         return (
           <figure className="min-w-0 rounded border p-3" key={key}>
             <figcaption className="break-words text-sm">{label}</figcaption>

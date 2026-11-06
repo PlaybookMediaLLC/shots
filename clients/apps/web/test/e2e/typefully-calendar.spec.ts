@@ -56,6 +56,8 @@ test(
       })
     )
     const later = new Date(secondAt.getTime() + 86_400_000)
+    // A scroll during the drag would move the card out from under the pointer.
+    await day(later).scrollIntoViewIfNeeded()
     await card('Calendar first').dragTo(day(later))
     await expect(page.getByText('Move unavailable')).toBeVisible()
     await expect(day(secondAt)).toContainText('Calendar first')

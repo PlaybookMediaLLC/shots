@@ -25,7 +25,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import { serializeDraft } from '@/lib/content-drafts/serialize'
+import { platformCaptionLength, serializeDraft } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import type {
   DraftChannel,
@@ -34,7 +34,8 @@ import type {
   PlatformVersions,
   VersionOptions,
 } from '@/lib/write/document'
-import { forkVersion, primaryChanged, resyncVersion, versionFor } from '@/lib/write/versions'
+import { bodyPosts, forkVersion, mainAfterToggle, primaryChanged, resyncVersion, versionFor } from '@/lib/write/versions'
+import { POST_COLUMN } from '@/components/drafts/layout'
 import { cn } from '@/lib/utils'
 import { healthLabel } from '../sets'
 import { optionsSummary } from './video-options'
@@ -57,6 +58,7 @@ export type ComposerAccount = WriteSet['accounts'][number]
 export function PlatformTabs({
   accounts,
   active,
+  blocked = [],
   enabled,
   onManage,
   onSelect,
@@ -68,6 +70,8 @@ export function PlatformTabs({
 }: {
   accounts: ComposerAccount[]
   active: DraftChannel
+  /** Platforms with something to fix before they can publish. */
+  blocked?: DraftChannel[]
   enabled: string[]
   onManage?: () => void
   onSelect: (channel: DraftChannel) => void
@@ -127,6 +131,13 @@ export function PlatformTabs({
                   aria-label="Over its character limit"
                   className="size-1.5 rounded-full bg-red-500"
                   data-testid={`platform-over-${channel}`}
+                  role="img"
+                />
+              ) : blocked.includes(channel) ? (
+                <span
+                  aria-label="Needs a fix before it can publish"
+                  className="size-1.5 rounded-full bg-red-500"
+                  data-testid={`platform-blocked-${channel}`}
                   role="img"
                 />
               ) : null}
@@ -200,6 +211,34 @@ export function OptionsChip({
   )
 }
 
+/**
+ * A draft after turning one account on or off: one account per platform, and
+ * the main platform handed on if this one was it.
+ */
+export function toggledPlatforms(
+  accounts: ComposerAccount[],
+  account: ComposerAccount,
+  on: boolean,
+  draft: { enabled: string[]; primary: DraftChannel; versions: PlatformVersions }
+): { channelConnectionIds: string[]; primaryPlatform: DraftChannel } {
+  const channelConnectionIds = on
+    ? [
+        ...draft.enabled.filter(
+          (id) => accounts.find((item) => item.id === id)?.channel !== account.channel
+        ),
+        account.id,
+      ]
+    : draft.enabled.filter((id) => id !== account.id)
+  return {
+    channelConnectionIds,
+    primaryPlatform: mainAfterToggle(
+      draft.primary,
+      accounts.filter((item) => channelConnectionIds.includes(item.id)).map((item) => item.channel),
+      draft.versions
+    ),
+  }
+}
+
 /** The tabs a draft shows: its primary, then each enabled platform, once. */
 export function tabChannels(
   accounts: ComposerAccount[],
@@ -255,17 +294,8 @@ export function ManagePlatformsDialog({
   const [resync, setResync] = React.useState<DraftChannel | null>(null)
   const availability = useConnectionAvailability()
   const orphaned = resync ? resyncVersion(versions, resync).orphaned : []
-  const toggle = (account: ComposerAccount, on: boolean) => {
-    const next = on
-      ? [
-          ...enabled.filter(
-            (id) => accounts.find((item) => item.id === id)?.channel !== account.channel
-          ),
-          account.id,
-        ]
-      : enabled.filter((id) => id !== account.id)
-    onChange({ channelConnectionIds: next })
-  }
+  const toggle = (account: ComposerAccount, on: boolean) =>
+    onChange(toggledPlatforms(accounts, account, on, { enabled, primary, versions }))
   const exclusive = kind === 'article' || kind === 'reply'
   return (
     <>
@@ -300,6 +330,7 @@ export function ManagePlatformsDialog({
                             CHANNEL_META[account.channel].label}
                         </span>
                         <span className="block text-label text-muted-foreground">
+                          {CHANNEL_META[account.channel].label} ·{' '}
                           {account.handle ? `@${account.handle} · ` : ''}
                           {healthLabel(account.health)}
                           {account.channel === 'x'
@@ -343,7 +374,14 @@ export function ManagePlatformsDialog({
                         Reconnect in workspace settings
                       </a>
                     ) : null}
-                    {on && account.channel !== primary ? (
+                    {/* Every row has this line, so a toggle never resizes the dialog under the pointer. */}
+                    {!on || account.channel === primary ? (
+                      <p className="mt-2 flex min-h-[1.625rem] items-center text-xs text-muted-foreground">
+                        {on
+                          ? 'The main version: platforms that follow it use this text.'
+                          : 'Off: this draft does not publish here.'}
+                      </p>
+                    ) : (
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                         <span className="text-muted-foreground">Text:</span>
                         <Button
@@ -400,7 +438,7 @@ export function ManagePlatformsDialog({
                           </Button>
                         ) : null}
                       </div>
-                    ) : null}
+                    )}
                   </li>
                 )
               })}
@@ -471,19 +509,29 @@ export function ManagePlatformsDialog({
  */
 export function SyncedVersion({
   channel,
+  header,
+  limit,
   onFork,
+  onSplit,
   primary,
   value,
 }: {
   channel: DraftChannel
+  /** The account's avatar and name, as the editor draws them over each post. */
+  header: React.ReactNode
+  limit: number
   onFork?: () => void
+  /** Give this platform its own text, split into posts that fit. */
+  onSplit?: () => void
   primary: DraftChannel
   value: PlateBody
 }) {
   const posts = serializeDraft(value, channel).posts
+  const hasPoll = bodyPosts(value).some((post) => post.settings.poll)
   return (
-    <div className="mx-auto max-w-2xl px-6 py-6" data-testid={`synced-version-${channel}`}>
-      <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground">
+    <div className="py-6" data-testid={`synced-version-${channel}`}>
+      <div className={cn('mb-4', POST_COLUMN)}>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground">
         <span className="flex-1">
           {CHANNEL_META[channel].label} follows {CHANNEL_META[primary].label}: what you write there
           appears here
@@ -495,20 +543,51 @@ export function SyncedVersion({
           </Button>
         ) : null}
       </div>
-      {(channel === 'bluesky' || channel === 'instagram') && (
-        <p className="mb-3 text-xs text-muted-foreground">{CHANNEL_META[channel].label}: polls unavailable</p>
-      )}
-      {posts.length === 0 ? <p className="text-sm text-muted-foreground">Nothing written yet.</p> : null}
-      {posts.map((post, index) => (
-        <article
-          className="mb-3 whitespace-pre-wrap rounded-lg border border-border p-3 text-body leading-relaxed text-foreground"
-          key={index}
-        >
-          {post.caption}
-        </article>
-      ))}
+      {hasPoll && !CAPABILITIES[channel].poll ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {CHANNEL_META[channel].label} does not take polls, so the poll is not posted here.
+        </p>
+      ) : null}
+      </div>
+      {posts.length === 0 ? (
+        <div className={cn('mb-3', POST_COLUMN)}>
+          {header}
+          <p className="mt-1 text-sm text-muted-foreground">Nothing written yet.</p>
+        </div>
+      ) : null}
+      {posts.map((post, index) => {
+        const over = post.length > limit ? overflowAt(channel, post.caption, limit) : post.caption.length
+        return (
+          <article className={cn('mb-5', POST_COLUMN)} key={index}>
+            {header}
+            <p className="mt-1 whitespace-pre-wrap break-words text-body leading-relaxed text-foreground">
+              {post.caption.slice(0, over)}
+              {over < post.caption.length ? (
+                <mark className="rounded-sm bg-destructive/15 text-inherit" data-testid="over-limit-text">
+                  {post.caption.slice(over)}
+                </mark>
+              ) : null}
+            </p>
+            {post.length > limit && onSplit ? (
+              <Button className="mt-1" onClick={onSplit} size="sm" type="button" variant="outline">
+                Split into thread
+              </Button>
+            ) : null}
+          </article>
+        )
+      })}
     </div>
   )
+}
+
+/** Where a caption passes a platform's limit, counted as the platform counts it. */
+function overflowAt(channel: DraftChannel, caption: string, limit: number): number {
+  let at = caption.length
+  while (at > 0 && platformCaptionLength(channel, caption.slice(0, at)) > limit) {
+    const code = caption.charCodeAt(at - 1)
+    at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
+  }
+  return at
 }
 
 /** A manual version's notice: edited on its own, and whether the primary changed since. */

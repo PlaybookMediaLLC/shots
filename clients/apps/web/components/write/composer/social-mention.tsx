@@ -125,9 +125,17 @@ function SocialMentionInput(props: PlateElementProps) {
   )
 }
 
+/** Only platforms with account search open the @ lookup; elsewhere @ stays plain text. */
+export function setMentionLookup(editor: PlateEditor, channel: DraftChannel): void {
+  const lookup = channel === 'x' || channel === 'linkedin'
+  editor.setOption(MentionPlugin, 'triggerQuery', () => lookup)
+}
+
 /** Provider-backed @ input; the upstream workspace/demo suggestions stay disabled. */
 export const SocialMentionInputPlugins = [
-  MentionPlugin.configure({ options: { triggerPreviousCharPattern: /^$|^[\s"']$/ } }),
+  MentionPlugin.configure({
+    options: { triggerPreviousCharPattern: /^$|^[\s"']$/, triggerQuery: () => true },
+  }),
   MentionInputPlugin.withComponent(SocialMentionInput),
 ]
 

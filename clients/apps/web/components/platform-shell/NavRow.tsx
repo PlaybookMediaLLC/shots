@@ -44,7 +44,7 @@ export function NavRow({
       data-platform-nav
       data-tour-id={tourId}
       aria-current={active ? (section ? 'true' : 'page') : undefined}
-      aria-label={collapsed || name !== label ? name : undefined}
+      aria-label={name}
       className={cn(
         'flex h-8 items-center gap-2.5 px-2.5',
         collapsed && 'mx-auto size-9 justify-center px-0'

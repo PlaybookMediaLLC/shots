@@ -73,7 +73,13 @@ type WriteContextValue = {
 }
 
 /** What this browser knows about a draft's row before the server's list does. */
-type DraftLine = { excerpt?: string; pinned?: boolean; title?: string; updatedAt?: string }
+type DraftLine = {
+  channelConnectionIds?: string[]
+  excerpt?: string
+  pinned?: boolean
+  title?: string
+  updatedAt?: string
+}
 
 const WriteContext = React.createContext<WriteContextValue | null>(null)
 

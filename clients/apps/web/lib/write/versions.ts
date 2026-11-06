@@ -295,7 +295,10 @@ export function primaryChanged(
   )
 }
 
-/** How copy names each platform. "X" alone is too common a word, so it needs "on" or "to". */
+/**
+ * How copy names each platform. "X" alone is too common a word, and "the limit
+ * on X" is about X rather than written for it, so it needs a word for posting there.
+ */
 const PLATFORM_NAMES: Record<DraftChannel, { label: string; pattern: RegExp }> = {
   bluesky: { label: 'Bluesky', pattern: /\bbluesky\b/i },
   instagram: { label: 'Instagram', pattern: /\binstagram\b/i },
@@ -303,7 +306,7 @@ const PLATFORM_NAMES: Record<DraftChannel, { label: string; pattern: RegExp }> =
   mastodon: { label: 'Mastodon', pattern: /\bmastodon\b/i },
   threads: { label: 'Threads', pattern: /\bThreads\b/ },
   tiktok: { label: 'TikTok', pattern: /\btiktok\b/i },
-  x: { label: 'X', pattern: /\b[Tt]witter\b|\b(?:[Oo]n|[Tt]o) X\b/ },
+  x: { label: 'X', pattern: /\b[Tt]witter\b|\b(?:[Nn]ow|[Pp]ost(?:ed|ing|s)?|[Pp]ublish(?:ed|ing)?|[Ss]har(?:e|ed|ing)|[Ff]ollow(?: me| us)?|[Ff]ind (?:me|us)|[Jj]oin (?:me|us)) (?:on|to) X\b/ },
   youtube: { label: 'YouTube', pattern: /\byoutube\b/i },
 }
 
@@ -322,4 +325,20 @@ export function otherPlatformNamed(
     (candidate) => candidate !== channel && PLATFORM_NAMES[candidate].pattern.test(copy)
   )
   return other ? PLATFORM_NAMES[other].label : null
+}
+
+/**
+ * The main platform once the platforms in `enabled` are the ones publishing.
+ * A main platform turned off hands over to the first one that follows it, so
+ * nothing copies from a platform that will not post. One with its own text
+ * cannot take over, because the main text would replace it: with only those
+ * left, the main platform stays.
+ */
+export function mainAfterToggle(
+  primary: DraftChannel,
+  enabled: readonly DraftChannel[],
+  versions: PlatformVersions
+): DraftChannel {
+  if (enabled.includes(primary)) return primary
+  return enabled.find((channel) => versionFor(versions, channel).mode !== 'manual') ?? primary
 }

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   AlertDialog,
   AlertDialogContent,
@@ -45,6 +45,20 @@ export function WorkspaceTabGuard({
   const other = workspaces.data?.workspaces.find((workspace) => workspace.id === active)?.name
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // A click landing as this opens is dropped on purpose: it would run in the other
+  // workspace. It should not vanish silently, so the dialog says so.
+  const lastPress = useRef(0)
+  const [clickDropped, setClickDropped] = useState(false)
+  useEffect(() => {
+    const note = () => {
+      lastPress.current = Date.now()
+    }
+    window.addEventListener('pointerdown', note, { capture: true })
+    return () => window.removeEventListener('pointerdown', note, { capture: true })
+  }, [])
+  useEffect(() => {
+    if (stale) setClickDropped(Date.now() - lastPress.current < 2000)
+  }, [stale])
 
   async function stay() {
     setBusy(true)
@@ -70,6 +84,7 @@ export function WorkspaceTabGuard({
           <AlertDialogDescription>
             You switched to {other ?? 'another workspace'} in another tab. Choose where to keep
             working, so nothing from this tab is saved to the wrong workspace.
+            {clickDropped ? ' Your last click was not applied, so make it again after you choose.' : ''}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (

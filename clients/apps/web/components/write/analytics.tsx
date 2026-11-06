@@ -37,6 +37,7 @@ import {
   latestObservations,
   observationBuckets,
 } from '@/lib/write/analytics'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 
 /** Stored observations with explicit unavailable states and accessible chart data. */
 export function SocialAnalytics({
@@ -271,7 +272,7 @@ export function SocialAnalytics({
                         row.subjectId
                       )}
                     </TableCell>
-                    <TableCell>{row.platform}</TableCell>
+                    <TableCell>{platformLabel(row.platform)}</TableCell>
                     <TableCell>
                       {row.status === 'available'
                         ? (row.metrics[metric] ?? 'Unavailable')
@@ -314,7 +315,7 @@ export function SocialAnalytics({
                 <TableBody>
                   {accountBuckets.map((bucket) => (
                     <TableRow key={`${bucket.connection}:${bucket.metric}:${bucket.period}`}>
-                      <TableCell>{bucket.platform}</TableCell>
+                      <TableCell>{platformLabel(bucket.platform)}</TableCell>
                       <TableCell className="max-w-40 break-words">{bucket.connection}</TableCell>
                       <TableCell>{bucket.metric}</TableCell>
                       <TableCell>{day(bucket.period)}</TableCell>
@@ -331,7 +332,7 @@ export function SocialAnalytics({
                 .map((row) => (
                   <AccordionItem key={row.id} value={row.id}>
                     <AccordionTrigger>
-                      {row.platform} · {row.connectionId} ·{' '}
+                      {platformLabel(row.platform)} · {row.connectionId} ·{' '}
                       {row.kind === 'feed'
                         ? 'Recent provider posts (up to 100 originals, 30 days)'
                         : 'Account metrics'}{' '}

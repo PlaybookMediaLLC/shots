@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { POST_BREAK, serializeDraft } from '@/lib/content-drafts/serialize'
-import type { PlateBody } from '@/lib/write/document'
+import type { PlateBody, PlatformVersions } from '@/lib/write/document'
 import {
   adaptBody,
   bodyFor,
@@ -14,6 +14,7 @@ import {
   resyncVersion,
   versionFor,
   withOptions,
+  mainAfterToggle,
   otherPlatformNamed,
 } from '@/lib/write/versions'
 
@@ -151,6 +152,8 @@ test("copy naming another of the draft's platforms is caught, without flagging c
   assert.equal(otherPlatformNamed('Made with Shots, published to TikTok', 'tiktok', channels), null)
   assert.equal(otherPlatformNamed('Now on X as well', 'tiktok', channels), 'X')
   assert.equal(otherPlatformNamed('Factor X matters', 'tiktok', channels), null)
+  assert.equal(otherPlatformNamed('Past the character limit on X', 'tiktok', channels), null)
+  assert.equal(otherPlatformNamed('Follow us on X', 'tiktok', channels), 'X')
   assert.equal(otherPlatformNamed('How to x-ray a release', 'tiktok', channels), null)
   // A link to a platform is not copy about it.
   assert.equal(otherPlatformNamed('Watch https://tiktok.com/@a/video/1', 'x', channels), null)
@@ -158,4 +161,17 @@ test("copy naming another of the draft's platforms is caught, without flagging c
   assert.equal(otherPlatformNamed('It is on TikTok.', 'x', channels), 'TikTok')
   // A platform this draft does not post to is ordinary copy.
   assert.equal(otherPlatformNamed('Follow us on LinkedIn', 'x', channels), null)
+})
+
+test('a main platform turned off hands over to one that follows it', () => {
+  const none: PlatformVersions = { schemaVersion: 1, versions: [] }
+  const manual: PlatformVersions = {
+    schemaVersion: 1,
+    versions: [{ body: [], channel: 'x', mode: 'manual' }],
+  }
+  assert.equal(mainAfterToggle('tiktok', ['tiktok', 'x'], none), 'tiktok')
+  assert.equal(mainAfterToggle('tiktok', ['x', 'threads'], none), 'x')
+  assert.equal(mainAfterToggle('tiktok', ['x', 'threads'], manual), 'threads')
+  assert.equal(mainAfterToggle('tiktok', ['x'], manual), 'tiktok')
+  assert.equal(mainAfterToggle('tiktok', [], none), 'tiktok')
 })

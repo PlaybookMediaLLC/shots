@@ -53,30 +53,29 @@ export function optionsSummary(channel: string, options: VersionOptions): string
   return ''
 }
 
-/**
- * Explicit metadata travels with the reviewed platform version. `part` splits
- * it for the composer: what every post must answer sits above the post, and
- * the rest beside it. Without one, all of it shows together.
- */
+/** A length as people say it: "60 minutes", or "90 seconds" when minutes would be a fraction. */
+function durationLabel(seconds: number): string {
+  const minutes = seconds / 60
+  return Number.isInteger(minutes)
+    ? `${minutes} minute${minutes === 1 ? '' : 's'}`
+    : `${seconds} seconds`
+}
+
+/** Explicit metadata travels with the reviewed platform version, all of it in one place. */
 export function VideoOptions({
   channel,
   options,
   onChange,
   disabled,
   creator,
-  part,
 }: {
   channel: 'youtube' | 'tiktok'
   options: VersionOptions
   onChange: (options: VersionOptions) => void
   disabled: boolean
   creator?: AccountStanding['tiktokCreator']
-  part?: 'required' | 'rest'
 }) {
-  const required = part !== 'rest'
-  const rest = part !== 'required'
   if (channel === 'youtube') {
-    if (!required) return null
     const value = options.youtube ?? { title: '', privacy: '' }
     const missing = !value.title.trim()
       ? 'title'
@@ -177,11 +176,9 @@ export function VideoOptions({
       data-option-rows
       className="grid w-full divide-y divide-[var(--divider,var(--border))] text-ui text-muted-foreground [&>*]:px-4 [&>*]:py-2.5 [&_label]:text-ui-lg [&_label]:font-medium [&_label]:text-foreground"
     >
-      {required ? (
-        <>
       <p>
         {creator
-          ? `Posting to ${creator.nickname}. Maximum video length: ${creator.maxDurationSeconds} seconds.`
+          ? `Posting to ${creator.nickname}. Maximum video length: ${durationLabel(creator.maxDurationSeconds)}.`
           : 'TikTok permissions are unavailable. Refresh the account before scheduling.'}
       </p>
       <div>
@@ -235,6 +232,7 @@ export function VideoOptions({
       <p>
         By posting, you agree to TikTok’s{' '}
         <a
+          className="underline underline-offset-2 hover:text-foreground"
           href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
           target="_blank"
           rel="noreferrer"
@@ -246,6 +244,7 @@ export function VideoOptions({
             {' '}
             and{' '}
             <a
+              className="underline underline-offset-2 hover:text-foreground"
               href="https://www.tiktok.com/legal/page/global/bc-policy/en"
               target="_blank"
               rel="noreferrer"
@@ -256,10 +255,6 @@ export function VideoOptions({
         )}
         . Processing may take a few minutes before the video appears.
       </p>
-        </>
-      ) : null}
-      {rest ? (
-        <>
       <div className="flex items-center gap-2">
         <Checkbox
           id="tiktok-commercial"
@@ -302,8 +297,6 @@ export function VideoOptions({
       )}
       {value.privacy === 'SELF_ONLY' && value.commercialContent ? (
         <p>Branded content visibility cannot be private.</p>
-      ) : null}
-        </>
       ) : null}
     </div>
   )

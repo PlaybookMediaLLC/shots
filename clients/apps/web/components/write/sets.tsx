@@ -20,6 +20,7 @@ import { hasDefaultProfileName } from '@/components/settings/social-sets/api'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { cn } from '@/lib/utils'
 import { rememberSet, useWrite, type WriteSet } from './write-context'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 
 /** An account's health in words, for a hint or a warning. */
 export function healthLabel(health: SocialAccountHealth): string {
@@ -155,7 +156,7 @@ export function SetAccounts({ set }: { set: WriteSet }) {
         <span
           className={cn(account.health !== 'connected' && 'text-amber-700 dark:text-amber-300')}
           key={account.id}
-          title={`${account.displayName ?? account.handle ?? account.platform}${
+          title={`${account.displayName ?? account.handle ?? platformLabel(account.platform)}${
             account.health === 'connected' ? '' : `: ${healthLabel(account.health).toLowerCase()}`
           }`}
         >

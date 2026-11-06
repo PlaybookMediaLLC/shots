@@ -8,7 +8,6 @@ import {
   CopyIcon,
   DeleteIcon,
   DragIcon,
-  ImageIcon,
   MoreIcon as DotsThreeIcon,
 } from '@/components/platform-shell/icons'
 import { SparkleIcon } from '@phosphor-icons/react/dist/ssr/Sparkle'
@@ -144,13 +143,6 @@ export function duplicatePost(editor: PlateEditor, number: number): void {
   const blocks = copied.length ? structuredClone(copied) : [{ children: [{ text: '' }], type: 'p' }]
   editor.tf.insertNodes([postBreak(), ...blocks], { at: [end] })
   editor.tf.select(editor.api.end([end + blocks.length]))
-}
-
-/** Put the caret at the end of post `number`, to insert into it there. */
-export function selectPostEnd(editor: PlateEditor, number: number): void {
-  const [start, end] = postRanges(editor.children)[number - 1]
-  if (end - 1 > start) editor.tf.select(editor.api.end([end - 1]))
-  editor.tf.focus()
 }
 
 /** A post's settings, set on the break that starts it. */
@@ -334,7 +326,6 @@ export const PostBreakPlugin = createPlatePlugin({
 
 /** What a post's tools can do beyond the editor itself; the host fills them in. */
 export type PostTools = {
-  addImage?: () => void
   /** The post's count for the platform being edited; `active` while the post is in use. */
   counter?: (number: number, active: boolean) => React.ReactNode
   /** Extra items for the post's More menu, such as splitting at the limit. */
@@ -436,23 +427,8 @@ export function PostBar({ className, number }: { className?: string; number: num
           active ? 'opacity-100' : 'opacity-0'
         )}
       >
-        {tools.addImage ? (
-          <Button
-            aria-label={`Add media to post ${number}`}
-            className={icon}
-            onClick={() => {
-              selectPostEnd(editor, number)
-              tools.addImage?.()
-            }}
-            size={null}
-            title={`Image or video (${keys.label({ key: 'i', mod: true, shift: true })})`}
-            type="button"
-            variant="custom"
-          >
-            <ImageIcon aria-hidden className="size-4" />
-          </Button>
-        ) : null}
-        {tools.refine ? tools.refine(number, ask) : null}
+        {/* The toolbar's Ask AI covers a single post; a thread asks post by post. */}
+        {tools.refine && count > 1 ? tools.refine(number, ask) : null}
         {tools.settings?.({ number, settings })}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
