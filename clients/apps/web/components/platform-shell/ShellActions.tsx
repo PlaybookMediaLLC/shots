@@ -33,7 +33,7 @@ import {
   matchesDestination,
   PLATFORM_DESTINATIONS,
   platformArea,
-  STORE_SCREENSHOTS,
+  CREATE_TOOLS,
   withPublishAccess,
 } from '@/lib/platform/navigation'
 import { recentPages } from './PageVisits'
@@ -42,11 +42,18 @@ import { SidebarLink } from './SidebarLink'
 
 // `permission` is what the destination checks before it creates anything.
 // Store screenshots stay on this browser, so any role may make them.
+const TOOL_PERMISSIONS: Partial<Record<string, Permission>> = {
+  Canvas: 'artifact:edit',
+  Screenshot: 'artifact:edit',
+  'Story Set': 'artifact:edit',
+}
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
-  { href: '/editor?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
-  { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
-  { href: '/create/code', label: 'Code image', paid: true },
-  { ...STORE_SCREENSHOTS, paid: true },
+  ...CREATE_TOOLS.map((tool) => ({
+    href: tool.create,
+    label: tool.label,
+    paid: true,
+    permission: TOOL_PERMISSIONS[tool.label],
+  })),
   { href: '/publish', label: 'Post', paid: false, permission: 'artifact:edit' },
   { href: '/campaigns/new', label: 'Campaign', paid: true, permission: 'release:create' },
   { href: '/workflows/new', label: 'Workflow', paid: true, permission: 'workspace:update' },

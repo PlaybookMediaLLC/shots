@@ -31,6 +31,9 @@ test(
     await app.open('/campaigns')
     await page.getByRole('link', { name: 'New campaign' }).click()
 
+    // A title and why it matters are enough; everything else is folded away.
+    await page.getByRole('button', { name: 'More details', exact: true }).click()
+    await chooseOption(page.getByLabel('Product', { exact: true }), 'Add a product…')
     await page.getByLabel('Product name').fill('Ledgerly')
     await page.getByLabel('App URL').fill('https://app.ledgerly.example')
     await chooseOption(page.getByLabel('Environment'), 'staging')
@@ -209,3 +212,17 @@ test('campaign context stays inside its workspace and survives surface deletion'
   })
   expect(archived.status).toBe(200)
 })
+
+test(
+  'a title and why it matters are enough for a campaign, with no product',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    await app.open('/campaigns')
+    await expect(page.getByRole('link', { name: 'New campaign' })).toHaveCount(1)
+    await page.getByRole('link', { name: 'New campaign' }).click()
+    await page.getByLabel('Release title').fill('Dark mode')
+    await page.getByLabel('Why it matters').fill('Easier on the eyes at night.')
+    await page.getByRole('button', { name: 'Create campaign' }).click()
+    await expect(page.getByRole('heading', { level: 1, name: 'Dark mode' })).toBeVisible()
+  }
+)

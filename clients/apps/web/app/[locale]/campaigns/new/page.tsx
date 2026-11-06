@@ -31,7 +31,7 @@ export default async function NewCampaignPage({ params }: NewCampaignPageProps) 
   return (
     <PlatformShell campaignsEnabled organizationName={access.organization.name}>
       <Page
-        description="Tell us which product you run and what you just shipped. The campaign draft is saved as soon as you submit."
+        description="Tell us what you just shipped. The campaign draft is saved as soon as you submit."
         title="New campaign"
         width="sm"
       >

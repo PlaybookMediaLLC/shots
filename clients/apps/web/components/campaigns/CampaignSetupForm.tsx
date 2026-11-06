@@ -5,6 +5,7 @@ import { type FormEvent, type ReactNode, useRef, useState } from 'react'
 import { Group, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,8 +28,8 @@ import {
 } from '@/components/ui/select'
 
 /**
- * The short path from "what product, what shipped" to a saved campaign
- * draft. Each step is persisted before the next runs, and a retry reuses
+ * The short path from "what shipped" to a saved campaign draft: a title and
+ * why it matters, with everything else optional and folded away. Each step is persisted before the next runs, and a retry reuses
  * what already exists: a created product is selected, and the release is
  * created with a stable idempotency key, so resubmitting never duplicates.
  */
@@ -87,9 +88,8 @@ export function CampaignSetupForm({
   const startedAt = useRef(Date.now())
   const [idempotencyKey] = useState(() => crypto.randomUUID())
   const [surfaces, setSurfaces] = useState(initialSurfaces)
-  const [surfaceChoice, setSurfaceChoice] = useState(
-    initialSurfaces[0]?.id ?? (canManageProducts ? NEW_PRODUCT : '')
-  )
+  // A campaign needs what shipped, not a product: one can be added here or later.
+  const [surfaceChoice, setSurfaceChoice] = useState(initialSurfaces[0]?.id ?? '')
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [values, setValues] = useState<Record<string, string>>({})
@@ -224,108 +224,6 @@ export function CampaignSetupForm({
       }}
       onSubmit={handleSubmit}
     >
-      <Section description="The app this campaign captures and promotes." title="Product">
-        <Group>
-          <Row>
-            <Field htmlFor="campaign-product" label="Product">
-              <UiSelect
-                onValueChange={(nextValue) =>
-                  setSurfaceChoice(nextValue === '__empty_option__' ? '' : nextValue)
-                }
-                value={String(surfaceChoice) || '__empty_option__'}
-              >
-                <SelectTrigger className={selectClassName} id="campaign-product">
-                  <SelectValue>
-                    {isNewProduct
-                      ? 'Add a product…'
-                      : (surfaces.find((surface) => surface.id === surfaceChoice)?.name ??
-                        'Choose a product')}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {surfaces.map((surface) => (
-                    <SelectItem key={surface.id} value={surface.id}>
-                      {surface.name} ({surface.environment})
-                    </SelectItem>
-                  ))}
-                  {canManageProducts ? (
-                    <SelectItem value={NEW_PRODUCT}>Add a product…</SelectItem>
-                  ) : null}
-                  {!canManageProducts && surfaces.length === 0 ? (
-                    <SelectItem value={'__empty_option__'}>No product connected</SelectItem>
-                  ) : null}
-                </SelectContent>
-              </UiSelect>
-            </Field>
-          </Row>
-          {isNewProduct ? (
-            <Row>
-              <Field htmlFor="campaign-product-name" label="Product name (required)">
-                <Input
-                  className={inputClassName}
-                  id="campaign-product-name"
-                  maxLength={160}
-                  name="productName"
-                  defaultValue={values.productName ?? ''}
-                  required
-                />
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
-                <Field htmlFor="campaign-app-url" label="App URL (required)">
-                  <Input
-                    className={inputClassName}
-                    id="campaign-app-url"
-                    name="appUrl"
-                    defaultValue={values.appUrl ?? ''}
-                    placeholder="https://app.example.com"
-                    required
-                    type="text"
-                    inputMode="url"
-                    onBlur={(event) => {
-                      const value = normalizeProductUrl(event.target.value)
-                      event.target.value = value
-                      const name = event.target.name
-                      setValues((current) => ({ ...current, [name]: value }))
-                    }}
-                  />
-                </Field>
-                <Field htmlFor="campaign-environment" label="Environment">
-                  <UiSelect defaultValue="production" name="environment">
-                    <SelectTrigger className={selectClassName} id="campaign-environment">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {productEnvironments.map((environment) => (
-                        <SelectItem key={environment} value={environment}>
-                          {environment}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </UiSelect>
-                </Field>
-              </div>
-              <Field htmlFor="campaign-marketing-url" label="Marketing site URL (optional)">
-                <Input
-                  className={inputClassName}
-                  id="campaign-marketing-url"
-                  name="marketingUrl"
-                  defaultValue={values.marketingUrl ?? ''}
-                  placeholder="https://example.com"
-                  type="text"
-                  inputMode="url"
-                  onBlur={(event) => {
-                    const value = normalizeProductUrl(event.target.value)
-                    event.target.value = value
-                    const name = event.target.name
-                    setValues((current) => ({ ...current, [name]: value }))
-                  }}
-                />
-              </Field>
-            </Row>
-          ) : null}
-        </Group>
-      </Section>
-
       <Section description="What did you ship? This becomes the campaign brief." title="Release">
         <Group>
           <Row>
@@ -348,28 +246,8 @@ export function CampaignSetupForm({
                 placeholder="One sentence on what this changes for your users"
               />
               <p className="text-xs text-muted-foreground" id="campaign-benefit-hint">
-                Can be left empty when you add a source link; the AI drafts it from your sources.
+                Or add a source link, and the AI drafts it from your sources.
               </p>
-            </Field>
-          </Row>
-          <Row>
-            <Field htmlFor="campaign-description" label="Description (optional)">
-              <Textarea
-                className={textareaClassName}
-                id="campaign-description"
-                maxLength={10_000}
-                name="description"
-                placeholder="What changed, in your own words. Plain text."
-              />
-            </Field>
-            <Field htmlFor="campaign-audience" label="Target audience (optional)">
-              <Input
-                className={inputClassName}
-                id="campaign-audience"
-                maxLength={1_000}
-                name="audience"
-                placeholder="Who should hear about this?"
-              />
             </Field>
             <Field htmlFor="campaign-sources" label="Source links (optional)">
               <Textarea
@@ -382,6 +260,141 @@ export function CampaignSetupForm({
           </Row>
         </Group>
       </Section>
+
+      <Disclosure>
+        <DisclosureTrigger className="py-2 text-sm font-medium text-foreground">
+          More details
+        </DisclosureTrigger>
+        <DisclosureContent className="flex flex-col gap-10 pt-4">
+          <Section
+            description="The app this campaign captures and promotes. You can add it later."
+            title="Product"
+          >
+            <Group>
+              <Row>
+                <Field htmlFor="campaign-product" label="Product">
+                  <UiSelect
+                    onValueChange={(nextValue) =>
+                      setSurfaceChoice(nextValue === '__empty_option__' ? '' : nextValue)
+                    }
+                    value={String(surfaceChoice) || '__empty_option__'}
+                  >
+                    <SelectTrigger className={selectClassName} id="campaign-product">
+                      <SelectValue>
+                        {isNewProduct
+                          ? 'Add a product…'
+                          : (surfaces.find((surface) => surface.id === surfaceChoice)?.name ??
+                            'No product')}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {surfaces.map((surface) => (
+                        <SelectItem key={surface.id} value={surface.id}>
+                          {surface.name} ({surface.environment})
+                        </SelectItem>
+                      ))}
+                      {canManageProducts ? (
+                        <SelectItem value={NEW_PRODUCT}>Add a product…</SelectItem>
+                      ) : null}
+                      <SelectItem value={'__empty_option__'}>No product</SelectItem>
+                    </SelectContent>
+                  </UiSelect>
+                </Field>
+              </Row>
+              {isNewProduct ? (
+                <Row>
+                  <Field htmlFor="campaign-product-name" label="Product name (required)">
+                    <Input
+                      className={inputClassName}
+                      id="campaign-product-name"
+                      maxLength={160}
+                      name="productName"
+                      defaultValue={values.productName ?? ''}
+                      required
+                    />
+                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-[1fr_10rem]">
+                    <Field htmlFor="campaign-app-url" label="App URL (required)">
+                      <Input
+                        className={inputClassName}
+                        id="campaign-app-url"
+                        name="appUrl"
+                        defaultValue={values.appUrl ?? ''}
+                        placeholder="https://app.example.com"
+                        required
+                        type="text"
+                        inputMode="url"
+                        onBlur={(event) => {
+                          const value = normalizeProductUrl(event.target.value)
+                          event.target.value = value
+                          const name = event.target.name
+                          setValues((current) => ({ ...current, [name]: value }))
+                        }}
+                      />
+                    </Field>
+                    <Field htmlFor="campaign-environment" label="Environment">
+                      <UiSelect defaultValue="production" name="environment">
+                        <SelectTrigger className={selectClassName} id="campaign-environment">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {productEnvironments.map((environment) => (
+                            <SelectItem key={environment} value={environment}>
+                              {environment}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </UiSelect>
+                    </Field>
+                  </div>
+                  <Field htmlFor="campaign-marketing-url" label="Marketing site URL (optional)">
+                    <Input
+                      className={inputClassName}
+                      id="campaign-marketing-url"
+                      name="marketingUrl"
+                      defaultValue={values.marketingUrl ?? ''}
+                      placeholder="https://example.com"
+                      type="text"
+                      inputMode="url"
+                      onBlur={(event) => {
+                        const value = normalizeProductUrl(event.target.value)
+                        event.target.value = value
+                        const name = event.target.name
+                        setValues((current) => ({ ...current, [name]: value }))
+                      }}
+                    />
+                  </Field>
+                </Row>
+              ) : null}
+            </Group>
+          </Section>
+
+          <Section title="Brief">
+            <Group>
+              <Row>
+                <Field htmlFor="campaign-description" label="Description (optional)">
+                  <Textarea
+                    className={textareaClassName}
+                    id="campaign-description"
+                    maxLength={10_000}
+                    name="description"
+                    placeholder="What changed, in your own words. Plain text."
+                  />
+                </Field>
+                <Field htmlFor="campaign-audience" label="Target audience (optional)">
+                  <Input
+                    className={inputClassName}
+                    id="campaign-audience"
+                    maxLength={1_000}
+                    name="audience"
+                    placeholder="Who should hear about this?"
+                  />
+                </Field>
+              </Row>
+            </Group>
+          </Section>
+        </DisclosureContent>
+      </Disclosure>
 
       {error ? (
         <Alert
