@@ -27,9 +27,13 @@ boundary.
    response or internal implementation detail.
 5. Wait for a state, not a time. Keep a test under 60 seconds, or tag a
    longer journey `{ tag: '@journey' }`.
-6. The suite runs against a production build. Tag a test `@dev-server` only
-   when it needs the scripted AI model or screenshot-mock downloads, which
-   only `next dev` allows (`test/e2e/README.md`, "Two lanes").
+6. The suite runs one lane, against the production build. A test that needs
+   something the production build turns off — the scripted AI model,
+   screenshot-mock downloads, room under the sign-in limit — gets it from
+   `lib/e2e-hooks.ts`, which the e2e app enables with `PLATFORM_E2E_HOOKS=1`.
+   Add a hook there rather than a second server. `@quarantine` is only for a
+   flow the production build genuinely fails, with the bug written down
+   (`test/e2e/README.md`, "One lane" and "Quarantine").
 7. Run the file with `./dev/studio e2e-file <path> --workers=4 --repeat-each=2`
    to prove that it is parallel-safe, then run `make e2e`. New specs run
    automatically in Compose CI and the Kind parity workflow. Preserve normal

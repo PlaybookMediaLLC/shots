@@ -109,6 +109,8 @@ effects (writes, audit records, emails, provider calls, quota use).
 | Social providers | `server/internal/social/integrations/social/<provider>` |
 | Events and webhooks | `server/internal/webhooks`, `server/internal/notifications` ([outbound webhooks](docs/outbound-webhooks.md), [notification events](docs/workspace-notification-events.md)) |
 | Test helpers and fixtures | `web/test/`, `web/test/e2e/framework/`, Go `*_test.go` beside the code |
+| End-to-end test hooks | `web/lib/e2e-hooks.ts`; one gate for every behavior the suite needs and production must not have |
+| CI pipeline | `.github/workflows/ci.yml` with `dev/e2e-plan.mjs` and `dev/ci-image.cjs` ([the CI pipeline](docs/ci.md)) |
 | Dependencies | `clients/apps/web/package.json`, `clients/package.json`, `server/go.mod`; npm is the only JS package manager |
 
 Check the dependency files for a library that already does the job before you
@@ -190,10 +192,17 @@ add one.
 | Tier | Where | Run |
 | --- | --- | --- |
 | Unit and contract | `web/test/*.test.ts`; other workspaces: `src/**/*.test.ts` | `npm test` in `clients/` |
-| Web server modules | `web/test/*.server.ts` | its `test:*` script in `clients/apps/web/package.json` |
+| Web server modules | `web/test/*.server.ts` | `npm run test:server` in `clients/` |
 | Go | `*_test.go`; `*_integration_test.go` need their `*_TEST_DATABASE_URL` | `make -C server check` |
 | Browser flows | `web/test/e2e/*.spec.ts` | `make e2e`, following the [add-e2e-flow skill](.agents/skills/add-e2e-flow/SKILL.md) |
 | Whole stack | tenant isolation, social publishing | `make tenant-isolation`, `./dev/social-gate` |
+
+The browser suite runs one lane, against the production image. A test that
+needs something the production build turns off asks for it through
+`web/lib/e2e-hooks.ts`; never add a second server to run it against. The
+`@quarantine` tag and the nightly run that measures it are described in
+[the suite's README](clients/apps/web/test/e2e/README.md), and
+[the CI pipeline](docs/ci.md) explains how a change selects its tests.
 
 Add a browser flow for an authenticated journey, a tenant or permission
 boundary, or a downstream integration. Never mock authentication,
@@ -205,6 +214,7 @@ authorization, tenant isolation or database constraints there.
 | --- | --- |
 | `clients/` | `npm run quality:check` in `clients/`; `make check` runs it in Docker and adds the RFC check |
 | `server/` | `make -C server check` |
+| `.github/workflows/` | the full suite — `dev/e2e-plan.mjs` escalates a CI change to it |
 | A zod API contract | `npm run api:generate` in `clients/`, then commit the diff |
 | `docs/rfcs/` | `python3 dev/verify-rfcs.py` |
 | Journeys, tenancy, publishing | `make e2e`, `make tenant-isolation`, `./dev/social-gate` as they apply |

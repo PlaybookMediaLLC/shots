@@ -2,19 +2,27 @@ import 'server-only'
 import { isIP } from 'node:net'
 import { z } from 'zod'
 import type { ScreenshotRequest } from '@/lib/api/schemas'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 import { isBlankImage } from '@/lib/screenshot-blank'
 
 const MICROLINK_API_URL = process.env.SCREENSHOT_API_URL || 'https://api.microlink.io'
 const MAX_SCREENSHOT_BYTES = 10 * 1024 * 1024
 const MAX_SCREENSHOT_REDIRECTS = 3
-const E2E_ALLOWED_DOWNLOAD_HOSTS = new Set(
-  process.env.NODE_ENV === 'production'
-    ? []
-    : (process.env.SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS ?? '')
-        .split(',')
-        .map((host) => host.trim().toLowerCase())
-        .filter(Boolean)
-)
+
+/**
+ * Hosts the screenshot mock serves from, allowed past the private-address
+ * check only while end-to-end hooks are permitted (lib/e2e-hooks.ts).
+ * Read per call so the gate cannot be frozen at module load.
+ */
+function e2eAllowedDownloadHosts(): ReadonlySet<string> {
+  if (!testHooksAllowed()) return new Set()
+  return new Set(
+    (process.env.SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean)
+  )
+}
 
 const microlinkResponseSchema = z.object({
   data: z
@@ -114,7 +122,7 @@ export function assertPublicCaptureUrl(value: string): void {
 
 function assertSafeScreenshotDownloadUrl(url: URL): void {
   const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
-  const allowedE2EHost = E2E_ALLOWED_DOWNLOAD_HOSTS.has(hostname)
+  const allowedE2EHost = e2eAllowedDownloadHosts().has(hostname)
   if (
     !['http:', 'https:'].includes(url.protocol) ||
     (isUnsafeCaptureHost(hostname) && !allowedE2EHost)

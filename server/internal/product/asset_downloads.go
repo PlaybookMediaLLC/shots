@@ -10,13 +10,28 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/url"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
 const assetDownloadPurpose = "shots.asset-download.v1"
-const assetDownloadLifetime = 2 * time.Minute
+const assetDownloadDefaultLifetime = 2 * time.Minute
+
+// How long a signed asset download URL stays valid. The browser suite proves
+// that an expired URL is refused, and did it by sleeping out the default two
+// minutes inside one test; PLATFORM_ASSET_DOWNLOAD_TTL lets the e2e stack ask
+// for seconds instead. The ceiling keeps a misconfiguration from handing out a
+// long-lived, unrevocable URL.
+func assetDownloadLifetime() time.Duration {
+	configured, err := time.ParseDuration(strings.TrimSpace(os.Getenv("PLATFORM_ASSET_DOWNLOAD_TTL")))
+	if err != nil || configured <= 0 || configured > assetDownloadDefaultLifetime {
+		return assetDownloadDefaultLifetime
+	}
+	return configured
+}
 
 type assetDownloadGrant struct {
 	Actor     Actor  `json:"actor"`
@@ -46,7 +61,7 @@ func (c *Configuration) assetDownloadURL(actor Actor, assetID string) (string, e
 		return "", ErrStorageUnavailable
 	}
 	actor.Display, actor.RequestID = "", ""
-	grant := assetDownloadGrant{Actor: actor, AssetID: assetID, ExpiresAt: time.Now().Add(assetDownloadLifetime).Unix()}
+	grant := assetDownloadGrant{Actor: actor, AssetID: assetID, ExpiresAt: time.Now().Add(assetDownloadLifetime()).Unix()}
 	token, err := c.sealAssetDownload(grant)
 	if err != nil {
 		return "", err
@@ -87,7 +102,9 @@ func (c *Configuration) ReadAssetDownload(ctx context.Context, assetID, token, r
 	}
 	var grant assetDownloadGrant
 	now := time.Now().Unix()
-	if json.Unmarshal(body, &grant) != nil || grant.AssetID != assetID || grant.ExpiresAt <= now || grant.ExpiresAt > now+int64(assetDownloadLifetime.Seconds()) {
+	// The upper bound rejects a grant sealed with a longer lifetime than this
+	// process issues, so shortening the TTL cannot be undone by an old token.
+	if json.Unmarshal(body, &grant) != nil || grant.AssetID != assetID || grant.ExpiresAt <= now || grant.ExpiresAt > now+int64(assetDownloadDefaultLifetime.Seconds()) {
 		return nil, "", publishing.ErrUnauthorized
 	}
 	grant.Actor.RequestID = requestID

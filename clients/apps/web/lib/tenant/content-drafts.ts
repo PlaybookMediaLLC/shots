@@ -13,6 +13,7 @@ import type {
 import type { OrganizationAccess, TenantContext } from '@/lib/auth/access'
 import { backendSDK, orNull, serviceBackend, withDates } from '@/lib/backend/sdk'
 import { channelForPlatform, type DraftChannel } from '@/lib/content-drafts/serialize'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 import type { z } from 'zod'
 import { revisionReasonSchema } from '@/lib/api/contracts/content-draft-platform'
 import type { createPostSchema } from '@/lib/api/contracts/posts'
@@ -121,14 +122,13 @@ export async function listContentDraftPosts(context: TenantContext, id: string) 
 /**
  * The channel a connection's draft is built for. dev/social-gate's fake "e2e"
  * destination takes drafts under X's rules, as the backend's
- * PLATFORM_E2E_DRAFT_PLATFORM allows; a production build never does.
+ * PLATFORM_E2E_DRAFT_PLATFORM allows. The gate now runs the production image,
+ * like the browser suite, so the gate goes through lib/e2e-hooks.ts: a
+ * deployed build still never accepts the fake destination.
  */
 function draftChannel(platform: string): DraftChannel | null {
   if (platform !== 'e2e') return channelForPlatform(platform)
-  return process.env.NODE_ENV !== 'production' &&
-    process.env.PLATFORM_E2E_DRAFT_PLATFORM === 'enabled'
-    ? 'x'
-    : null
+  return testHooksAllowed() && process.env.PLATFORM_E2E_DRAFT_PLATFORM === 'enabled' ? 'x' : null
 }
 
 /**

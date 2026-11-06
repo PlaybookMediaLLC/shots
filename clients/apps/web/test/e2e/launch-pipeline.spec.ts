@@ -32,7 +32,7 @@ const RUN_TIMEOUT = 90_000
 
 test(
   'a release becomes a cited spec, a plan, a produced campaign, a revised post, and a schedule',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, identity, page }) => {
     const organizationId = await getActiveOrganizationId(page)
 

@@ -17,7 +17,10 @@ BOOTSTRAP_FILE="$(mktemp "$ROOT_DIR/.local/social-gate.XXXXXX")"
 chmod 600 "$BOOTSTRAP_FILE"
 
 gate_compose() {
-  docker compose --env-file .local/dev.env --file dev/compose.yaml --file dev/compose.social-gate.yaml \
+  # The same production app image the browser suite runs (dev/compose.e2e.yaml),
+  # then this gate's own ports, database and fake destination on top.
+  docker compose --env-file .local/dev.env \
+    --file dev/compose.yaml --file dev/compose.e2e.yaml --file dev/compose.social-gate.yaml \
     --project-name screenshot-studio-social-gate "$@"
 }
 
@@ -49,7 +52,13 @@ trap cleanup EXIT
 # volumes. The product API connects the fake destinations in process, so the
 # bootstrap needs only the running backend. The Go services share one image
 # tag, so it is built once: parallel builds of one tag race to name it.
-gate_compose build publishing-backend app
+#
+# CI builds both images in their own jobs, with a layer cache, and loads them
+# here: this gate used to compile the whole Go tree with the e2e build tag and
+# no cache at all, beside another job compiling almost the same tree with one.
+if [[ "${STUDIO_PREBUILT_IMAGES:-}" != "true" ]]; then
+  gate_compose build publishing-backend app
+fi
 gate_compose up --detach \
   postgres redis rustfs rustfs-init temporal platform-go-migrate fake-social \
   publishing-backend publishing-orchestrator app
@@ -68,4 +77,5 @@ E2E_R2_REGION="$R2_REGION" \
 E2E_R2_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY" \
 E2E_REDIS_URL=redis://127.0.0.1:63809 \
 E2E_SOCIAL_GATE_BOOTSTRAP="$BOOTSTRAP_FILE" \
-  npm --prefix clients/apps/web run test:e2e -- test/e2e/social-gate.spec.ts --retries=0
+  npm --prefix clients/apps/web run test:e2e -- \
+  --project=production test/e2e/social-gate.spec.ts --retries=0

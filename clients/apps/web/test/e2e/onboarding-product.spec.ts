@@ -16,7 +16,7 @@ const RUN_TIMEOUT = 180_000
 
 test(
   'a pasted URL becomes a reviewed product profile and a first campaign of seven posts',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, identity, page }) => {
     await signUp(identity, page)
     await page.getByLabel('Workspace name').fill(identity.workspaceName)

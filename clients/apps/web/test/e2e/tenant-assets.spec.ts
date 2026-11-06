@@ -202,6 +202,11 @@ test(
   }
 )
 
+// The backend issues these for PLATFORM_ASSET_DOWNLOAD_TTL (dev/compose.e2e.yaml
+// sets 5 s; the product default is 2 minutes). Waiting out the default here
+// cost the suite two minutes of a single shard.
+const downloadTtlMs = Number(process.env.E2E_ASSET_DOWNLOAD_TTL_MS ?? 5_000)
+
 test(
   'a signed asset download URL expires at the authorization boundary',
   { tag: '@journey' },
@@ -226,8 +231,10 @@ test(
       (await browserRequest(page, `/api/tenant/assets/${signed.asset.id}/download-url`)).body
     ).downloadUrl
 
-    // eslint-disable-next-line no-restricted-syntax -- The signed URL expires after 120 s on the object store clock.
-    await page.waitForTimeout(122_000)
+    // The URL is live right up to the boundary, then refused after it.
+    expect((await downloadSignedAsset(page, downloadUrl)).status).toBe(200)
+    // eslint-disable-next-line no-restricted-syntax -- An expiry is a wall-clock fact; there is no event to await.
+    await page.waitForTimeout(downloadTtlMs + 2_000)
     expect([400, 401, 403]).toContain((await downloadSignedAsset(page, downloadUrl)).status)
   }
 )

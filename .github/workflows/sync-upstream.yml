@@ -28,16 +28,26 @@ jobs:
     name: Merge Upstream & Open PR
     runs-on: ubuntu-latest
     steps:
-      # persist-credentials stays on (the default): the push step
-      # authenticates with the persisted GITHUB_TOKEN.
+      # NEVER add a step that executes merged code here — no `npm ci`, no
+      # repository script, no build. This job holds a write token while a
+      # third-party repository's code sits in the worktree, so anything that
+      # runs it hands that repository arbitrary code execution against this
+      # one. Run checks on the pull request this job opens instead, where CI
+      # runs with a read-only token.
+      #
+      # The token is not persisted in .git/config for the same reason; the
+      # push below passes it explicitly, for that one command.
       - name: Checkout
         uses: actions/checkout@v7
         with:
           ref: develop
           # Full history: the merge needs the common ancestor.
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Merge upstream/main into the upstream branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -46,7 +56,7 @@ jobs:
           # Reuse the existing branch, or create it from develop on the first run.
           git checkout upstream || git checkout -b upstream
           git merge --no-edit upstream/main
-          git push origin upstream
+          git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" upstream
 
       - name: Open PR against develop
         env:

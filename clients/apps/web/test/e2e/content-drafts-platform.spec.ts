@@ -249,7 +249,7 @@ test(
 
 test(
   'writing tools: history, per-post tools, channel text, AI, hashtags and plain-language times',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
 
