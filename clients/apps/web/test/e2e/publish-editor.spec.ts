@@ -254,7 +254,9 @@ test(
       new Date(year, month - 1, date).toLocaleDateString('en-US', { dateStyle: 'medium' })
     )
     const [hour, minute] = time.split(':').map(Number)
-    await expect(page.getByTestId('schedule-dialog').getByLabel('Time', { exact: true })).toHaveValue(
+    await expect(
+      page.getByTestId('schedule-dialog').getByLabel('Time', { exact: true })
+    ).toHaveValue(
       `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
     )
   }
