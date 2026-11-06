@@ -314,7 +314,7 @@ jobs:
             matrix="$full"
           else
             git diff --name-only HEAD^1 HEAD | grep -qvE '^docs/|\.md$' && run=true || run=false
-            matrix="$smoke"
+            matrix="$full"
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
