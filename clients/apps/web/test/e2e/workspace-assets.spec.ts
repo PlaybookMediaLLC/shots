@@ -118,7 +118,11 @@ test(
     await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
     await page.getByRole('button', { name: 'Confirm delete' }).click()
     await expect(removed).toBeHidden()
-    await page.getByRole('link', { name: 'Open editor', exact: true }).click()
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('button', { name: 'New', exact: true })
+      .click()
+    await page.getByRole('menuitem', { name: 'Screenshot', exact: true }).click()
     // Go back only once the editor has rendered, or Back races the client navigation.
     await expect(page.getByRole('button', { name: 'Templates', exact: true })).toBeVisible()
     await page.goBack()
