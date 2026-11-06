@@ -32,16 +32,22 @@ const LARGE = { format: 'jpeg', maxWidth: 1200, quality: 'high' } as const
  * Complete versions of the design, side by side with the original. Nothing
  * changes until the user applies one; applying is one undo step, and the
  * versions stay here to compare or switch to another.
+ *
+ * The versions are also reported upward, so Publish can make one draft from
+ * each of them: one screenshot, several images, several posts to review.
  */
 export function VariantsPanel({
   disabled,
   hidden,
+  onCandidates,
   onRequestHandled,
   request,
 }: {
   disabled: boolean
   /** Hidden rather than unmounted, so the versions survive switching tabs. */
   hidden: boolean
+  /** The versions on offer now, for the Publish panel. */
+  onCandidates: (candidates: { document: DesignDocument; title: string }[]) => void
   onRequestHandled: () => void
   request: (VariantsRequest & { id: number }) | null
 }) {
@@ -109,6 +115,19 @@ export function VariantsPanel({
       }
     },
     [trpcClient]
+  )
+
+  // Publish posts the version as it is previewed here, so what is reviewed
+  // side by side is exactly what each draft attaches.
+  useEffect(
+    () =>
+      onCandidates(
+        candidates.map((candidate) => ({
+          document: candidate.preview,
+          title: candidate.title,
+        }))
+      ),
+    [candidates, onCandidates]
   )
 
   // The copilot's "give me four versions" arrives here.

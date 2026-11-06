@@ -42,6 +42,7 @@ type SettingsPlatformStore interface {
 	AddWritingSample(context.Context, product.Actor, string, product.WritingSampleInput) (*product.WritingSampleRecord, error)
 	DeleteWritingSample(context.Context, product.Actor, string, string) error
 	DraftWritingContext(context.Context, product.Actor, string, string) (*product.WritingContext, error)
+	SocialSetWritingContext(context.Context, product.Actor, string, string) (*product.WritingContext, error)
 	GetPublicProfile(context.Context, string) (*product.PublicProfile, error)
 }
 
@@ -72,6 +73,7 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	mux.Handle("POST /v1/social-sets/{id}/writing-samples", product(s.addWritingSample))
 	mux.Handle("DELETE /v1/social-sets/{id}/writing-samples/{sampleId}", product(s.deleteWritingSample))
 	mux.Handle("GET /v1/content-drafts/{id}/writing-context", product(s.draftWritingContext))
+	mux.Handle("GET /v1/social-sets/{id}/writing-context", product(s.socialSetWritingContext))
 	// A public profile page: only the web app, with the service credential, reads it.
 	mux.Handle("GET /v1/internal/public-profiles/{slug}", s.authenticateService(http.HandlerFunc(s.getPublicProfile)))
 }
@@ -427,6 +429,15 @@ func (s *Server) draftWritingContext(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writing, err := s.configuration.DraftWritingContext(r.Context(), workspaceActor(r), id, r.URL.Query().Get("channel"))
+	respond(w, http.StatusOK, writing, err)
+}
+
+func (s *Server) socialSetWritingContext(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	writing, err := s.configuration.SocialSetWritingContext(r.Context(), workspaceActor(r), id, r.URL.Query().Get("channel"))
 	respond(w, http.StatusOK, writing, err)
 }
 

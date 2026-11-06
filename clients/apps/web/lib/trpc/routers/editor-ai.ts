@@ -10,16 +10,34 @@ import { generateGridSlotImage, gridSlotRequestSchema } from '@/lib/ai/images/gr
 import { backgroundRequestSchema } from '@/lib/ai/images/background-request'
 import { withAiCredits } from '@/lib/ai/metering'
 import { variantCountSchema } from '@/lib/ai/variants'
-import { backendSDK } from '@/lib/backend/sdk'
+import { backendSDK, orNull } from '@/lib/backend/sdk'
 import { captionChannelSchema } from '@/lib/captions/channels'
 import { designDocumentSchema } from '@/lib/design/document'
 import { getBrandProfile } from '@/lib/tenant/configuration'
+import { draftChannelSchema, writeIdSchema } from '@/lib/write/document'
 import { router } from '../init'
 import { allowAiAction, isAiEnabled } from './launch'
 import { organizationProcedure } from '../procedures'
 
 /** Up to ~2 MB of base64 JPEG: a snapshot, never a full export. */
 const snapshotSchema = z.string().max(2_800_000).nullable()
+
+/**
+ * The publishing identity's writing voice (RFC 024), or null when there is
+ * no set or it cannot be read. A voice that does not load weakens the
+ * captions; it must not stop them from being written.
+ */
+async function setVoice(
+  access: Parameters<typeof backendSDK>[0],
+  socialSetId: string,
+  channel: string
+) {
+  try {
+    return await orNull(backendSDK(access).getSocialSetWritingContext(socialSetId, channel))
+  } catch {
+    return null
+  }
+}
 
 /** The workspace's brand voice; members who cannot read the profile write without it. */
 async function brandVoice(
@@ -131,7 +149,12 @@ export const editorAiRouter = router({
       await allowAiAction(ctx.access)
       return { lines: await withAiCredits(ctx.access, () => suggestGridLines(input)) }
     }),
-  /** Alt text and platform-aware captions for the design, from a snapshot and its text. */
+  /**
+   * Alt text and platform-aware captions for the design, from a snapshot and
+   * its text. With a social set, the captions are written in that identity's
+   * voice (RFC 024) instead of the workspace brand voice alone, so the editor
+   * and the composer's writing assistant sound like the same account.
+   */
   captions: organizationProcedure('artifact:edit')
     .input(
       z.object({
@@ -139,11 +162,20 @@ export const editorAiRouter = router({
         document: designDocumentSchema,
         notes: z.string().trim().max(1000).optional(),
         snapshot: z.string().min(1).max(2_800_000),
+        /** The publishing identity the captions are written for. */
+        socialSetId: writeIdSchema.optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       await allowAiAction(ctx.access)
       const brand = await brandVoice(ctx.access)
+      // The voice is read for the first requested channel the backend knows;
+      // its platform guidance is the only per-channel part of the context.
+      const channel = input.channels.find(
+        (candidate) => draftChannelSchema.safeParse(candidate).success
+      )
+      const voice =
+        input.socialSetId && channel ? await setVoice(ctx.access, input.socialSetId, channel) : null
       return withAiCredits(ctx.access, () =>
         writeCopy({
           brand,
@@ -151,6 +183,7 @@ export const editorAiRouter = router({
           document: input.document,
           notes: input.notes,
           snapshotJpegBase64: input.snapshot,
+          voice,
         })
       )
     }),

@@ -1,6 +1,7 @@
 import 'server-only'
 
 import { generateText, stepCountIs, tool } from 'ai'
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import {
   CAPTION_CHANNELS,
@@ -9,6 +10,7 @@ import {
   copyProblems,
 } from '@/lib/captions/channels'
 import type { DesignDocument } from '@/lib/design/document'
+import { voiceInstructions } from '@/lib/write/voice'
 import { models } from '../models'
 import { CAPTIONS_INSTRUCTIONS } from '../prompts/captions'
 
@@ -34,6 +36,11 @@ const submission = z.object({
  * of the design and its text. Every submission is checked (lengths as each
  * platform counts them, missing platforms, prohibited terms) and sent back
  * until it passes.
+ *
+ * `voice` is the publishing identity's writing context (RFC 024): the same
+ * merged brand and social-set voice Refine and the writing assistant use, so
+ * a caption written here sounds like the account that will post it. Its
+ * prohibited phrases are enforced alongside the brand's.
  */
 export async function writeCopy(input: {
   brand: BrandVoice | null
@@ -41,8 +48,13 @@ export async function writeCopy(input: {
   document: DesignDocument
   notes?: string
   snapshotJpegBase64: string
+  voice?: WritingContext | null
 }): Promise<WrittenCopy> {
   let accepted: WrittenCopy | null = null
+  const prohibited = [
+    ...(input.brand?.prohibitedTerms ?? []),
+    ...(input.voice?.prohibitedPhrases ?? []),
+  ]
   const visibleText = input.document.texts.map((text) => text.text).filter(Boolean)
   const context = [
     `<channels>${input.channels.join(',')}</channels>`,
@@ -76,16 +88,12 @@ export async function writeCopy(input: {
     ],
     model: models.languageModel('drafting'),
     stopWhen: stepCountIs(4),
-    system: CAPTIONS_INSTRUCTIONS,
+    system: CAPTIONS_INSTRUCTIONS + voiceInstructions(input.voice ?? null),
     tools: {
       submitCaptions: tool({
         description: 'Submit the alt text and one caption per requested platform.',
         execute: async (submitted: z.infer<typeof submission>) => {
-          const problems = copyProblems(
-            submitted,
-            input.channels,
-            input.brand?.prohibitedTerms ?? []
-          )
+          const problems = copyProblems(submitted, input.channels, prohibited)
           if (problems.length) return { ok: false, problems }
           accepted = {
             altText: submitted.altText.trim(),

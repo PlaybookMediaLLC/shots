@@ -392,15 +392,9 @@ func mergeWritingContext(brand *ent.BrandProfile, set *ent.SocialSet, samples []
 	return merged
 }
 
-// DraftWritingContext is the context AI help uses for a draft on a channel.
-func (c *Configuration) DraftWritingContext(ctx context.Context, actor Actor, draftID, channel string) (*WritingContext, error) {
-	if err := c.authorizeContentDrafts(ctx, actor, true); err != nil {
-		return nil, err
-	}
-	draft, err := visibleContentDraft(ctx, c.client, actor, draftID)
-	if err != nil {
-		return nil, err
-	}
+// writingContextOf merges the workspace brand with set, reading the set's
+// newest samples. A nil set gives the brand voice alone.
+func (c *Configuration) writingContextOf(ctx context.Context, actor Actor, set *ent.SocialSet, channel string) (*WritingContext, error) {
 	if _, ok := draftChannelLimits[channel]; !ok {
 		return nil, invalid("Name a draft channel.")
 	}
@@ -408,12 +402,8 @@ func (c *Configuration) DraftWritingContext(ctx context.Context, actor Actor, dr
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
-	var set *ent.SocialSet
 	samples := []string{}
-	if draft.SocialSetID != nil {
-		if set, err = c.client.SocialSet.Get(ctx, *draft.SocialSetID); err != nil {
-			return nil, err
-		}
+	if set != nil {
 		rows, err := c.client.SocialSetWritingSample.Query().Where(socialsetwritingsample.SocialSetID(set.ID)).
 			Order(ent.Desc(socialsetwritingsample.FieldCreatedAt)).Limit(writingContextSamples).All(ctx)
 		if err != nil {
@@ -425,6 +415,38 @@ func (c *Configuration) DraftWritingContext(ctx context.Context, actor Actor, dr
 	}
 	merged := mergeWritingContext(brand, set, samples, channel)
 	return &merged, nil
+}
+
+// DraftWritingContext is the context AI help uses for a draft on a channel.
+func (c *Configuration) DraftWritingContext(ctx context.Context, actor Actor, draftID, channel string) (*WritingContext, error) {
+	if err := c.authorizeContentDrafts(ctx, actor, true); err != nil {
+		return nil, err
+	}
+	draft, err := visibleContentDraft(ctx, c.client, actor, draftID)
+	if err != nil {
+		return nil, err
+	}
+	var set *ent.SocialSet
+	if draft.SocialSetID != nil {
+		if set, err = c.client.SocialSet.Get(ctx, *draft.SocialSetID); err != nil {
+			return nil, err
+		}
+	}
+	return c.writingContextOf(ctx, actor, set, channel)
+}
+
+// SocialSetWritingContext is the same voice for a set with no draft yet, so
+// copy written before a draft exists (the editor's captions) sounds like the
+// set rather than generic marketing.
+func (c *Configuration) SocialSetWritingContext(ctx context.Context, actor Actor, setID, channel string) (*WritingContext, error) {
+	if err := c.authorizeContentDrafts(ctx, actor, true); err != nil {
+		return nil, err
+	}
+	set, err := visibleSocialSet(ctx, c.client, actor, setID)
+	if err != nil {
+		return nil, err
+	}
+	return c.writingContextOf(ctx, actor, set, channel)
 }
 
 // PublicAccount is a connected account as a public profile shows it.

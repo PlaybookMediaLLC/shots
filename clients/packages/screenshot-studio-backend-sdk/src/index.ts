@@ -3766,6 +3766,13 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** The same voice for a set with no draft yet, for copy written before one exists. */
+  async getSocialSetWritingContext(id: string, channel: string) {
+    return this.request<WritingContext>(
+      `v1/social-sets/${encodeURIComponent(id)}/writing-context?channel=${encodeURIComponent(channel)}`
+    )
+  }
+
   /** A set's public profile (service credential); not found while it is off. */
   async getPublicProfile(slug: string) {
     return this.request<PublicProfile>(`v1/internal/public-profiles/${encodeURIComponent(slug)}`)
