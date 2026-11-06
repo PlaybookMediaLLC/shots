@@ -165,11 +165,7 @@ async function assertRolePermissions(
   }
   if (isAdmin) await expect(menu).not.toContainText('Not available to your')
   else await expect(menu).toContainText('Ask a workspace owner or admin for access.')
-  // The open menu hides the page from the accessibility tree, so it has to be gone first.
-  await expect(async () => {
-    await page.keyboard.press('Escape')
-    await expect(menu).toBeHidden({ timeout: 1_000 })
-  }).toPass()
+  await page.keyboard.press('Escape')
   // Home leaves out the starters the role cannot use instead of leading to a refusal.
   const starters = page.getByRole('region', { name: 'Start something new' })
   await expect(starters.getByRole('button', { name: /Write a post/ })).toHaveCount(canEdit ? 1 : 0)

@@ -425,7 +425,8 @@ export function RefineMenu({
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent
         align={align}
-        className="grid w-80 gap-2 p-3"
+        // Taller than the space above or below on a laptop: it scrolls rather than leaving the screen.
+        className="grid max-h-[var(--radix-popover-content-available-height)] w-80 gap-2 overflow-y-auto p-3"
         data-testid="refine-menu"
         onCloseAutoFocus={(event) => event.preventDefault()}
         side={side}

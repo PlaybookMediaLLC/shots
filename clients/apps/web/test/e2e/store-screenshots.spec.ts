@@ -233,7 +233,7 @@ test(
     const listed = library.locator(`a[href$="/create/store/${id}"][aria-label^="Open "]`)
     await expect(listed).toHaveCount(1)
     const name = (await listed.getAttribute('aria-label'))!.replace(/^Open /, '')
-    await expect(library.getByText(/In this workspace/)).toBeVisible()
+    await expect(library.getByRole('heading', { name: 'In this workspace' })).toBeVisible()
     await listed.click()
     await expect(second.locator('[data-store-canvas-slide]')).toContainText('Saved twice')
     await expect(

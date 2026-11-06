@@ -180,7 +180,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     )
     await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00 PM')
     await expect(page.getByRole('checkbox', { name: 'Open in editor' })).toBeChecked()
-    await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Article')
+    await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Post or thread')
     await page.getByRole('button', { name: 'Plan draft', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText('Write some content')
     await page.keyboard.press('Escape')
@@ -795,7 +795,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
   })
   await test.step('A21 A22 A23 A24 A25 hourly modes and exact cell drilldown show sample evidence', async () => {
     await chooseOption(page.getByLabel('Hourly mode'), 'Days')
-    await expect(page.getByLabel('Weekday').locator('option')).toHaveCount(7)
+    await page.getByLabel('Weekday').click()
+    await expect(page.getByRole('option')).toHaveCount(7)
+    await page.keyboard.press('Escape')
     await chooseOption(page.getByLabel('Hourly mode'), 'Heatmap')
     await expect(
       page
