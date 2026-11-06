@@ -10,6 +10,7 @@ import {
   requestJson,
   test,
   trpcMutation,
+  trpcQuery,
 } from './framework'
 
 const invitationSchema = z.object({ id: z.string() })
@@ -108,7 +109,7 @@ test(
 )
 
 test(
-  'a tab left in another workspace asks where to work before anything is saved',
+  'a tab left in another workspace says so, and its writes are refused until the person chooses',
   { tag: '@journey' },
   async ({ app, context, identity, page, workspace }) => {
     const otherName = `Other ${identity.workspaceName}`
@@ -123,13 +124,49 @@ test(
     await second.goto('/home')
     await switchWorkspace(second, otherName)
 
-    // This tab still shows its workspace, but its requests would now run in the other one.
-    const guard = page.getByRole('alertdialog', {
-      name: `This tab is in ${identity.workspaceName}`,
+    // This tab still shows its workspace, and says so without stopping the person reading.
+    const banner = page.getByTestId('workspace-banner')
+    await expect(banner).toContainText(`This tab is in ${identity.workspaceName}`)
+    await expect(banner).toContainText(`You switched to ${otherName} in another tab`)
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+
+    // Its requests are refused rather than running in the other workspace.
+    const attempt = await page.evaluate(async () => {
+      const response = await fetch('/api/trpc/project.create', {
+        body: JSON.stringify({
+          json: { document: { image: { src: null }, version: 2 }, name: 'From the stale tab' },
+        }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      })
+      return response.status
     })
-    await expect(guard).toContainText(`You switched to ${otherName} in another tab.`)
-    await guard.getByRole('button', { name: `Keep working in ${identity.workspaceName}` }).click()
-    await expect(guard).toBeHidden()
+    expect(attempt).toBe(403)
+    const inOther = await trpcQuery(second, 'project.list', { limit: 10 })
+    expect(JSON.stringify(inOther.body)).not.toContain('From the stale tab')
+
+    // Following a link can't send headers, so it carries the same check: no connection starts.
+    const started = await page.evaluate(async () => {
+      const link = document.createElement('a')
+      link.href = '/integrations/github/start'
+      link.addEventListener('click', (event) => event.preventDefault())
+      document.body.append(link)
+      link.click()
+      link.remove()
+      const response = await fetch(link.href, { redirect: 'manual' })
+      return { href: link.href, type: response.type }
+    })
+    expect(new URL(started.href).searchParams.get('scopeWorkspace')).toBe(workspace.id)
+    const refused = await second.request.get(
+      new URL(started.href).pathname + new URL(started.href).search,
+      {
+        maxRedirects: 0,
+      }
+    )
+    expect(refused.headers().location).toContain('failed')
+
+    await banner.getByRole('button', { name: `Keep working in ${identity.workspaceName}` }).click()
+    await expect(banner).toBeHidden()
     expect(await getActiveOrganizationId(page)).toBe(workspace.id)
     const created = await trpcMutation(page, 'project.create', {
       name: 'Saved where this tab said',
@@ -139,8 +176,8 @@ test(
 
     // The other tab is now the out-of-date one, and says so too.
     await second.bringToFront()
-    await expect(
-      second.getByRole('alertdialog', { name: `This tab is in ${otherName}` })
-    ).toBeVisible()
+    await expect(second.getByTestId('workspace-banner')).toContainText(
+      `This tab is in ${otherName}`
+    )
   }
 )

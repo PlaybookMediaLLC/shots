@@ -2,16 +2,9 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { usePathname } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { bindBrowserScope } from '@/lib/auth/browser-scope'
 import { announceSessionChange, authClient, useHydratedSession } from '@/lib/auth/client'
 import { platformHref } from '@/lib/platform/navigation'
 import { settingsErrorMessage } from '@/lib/settings/client'
@@ -19,9 +12,10 @@ import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 
 /**
  * A browser's tabs share one active workspace. When another tab switches it,
- * this tab still shows its own workspace while its requests now run in the
- * other one, so a save or a new item would land there. The page waits behind
- * this dialog until the person picks the workspace to work in.
+ * this tab still shows its own workspace while its session now points at the
+ * other one. `bindBrowserScope` makes the server refuse this tab's requests
+ * from then on, so nothing lands in the wrong workspace, and this banner says
+ * why and offers the way back, without stopping what the person is reading.
  */
 export function WorkspaceTabGuard({
   workspaceId,
@@ -33,6 +27,11 @@ export function WorkspaceTabGuard({
 }) {
   const { data: session } = useHydratedSession()
   const active = session?.session.activeOrganizationId
+  const userId = session?.user.id
+  useEffect(
+    () => (userId ? bindBrowserScope({ userId, workspaceId }) : undefined),
+    [userId, workspaceId]
+  )
   const stale = Boolean(active && active !== workspaceId)
   const pathname = usePathname()
   const queryClient = useQueryClient()
@@ -45,20 +44,6 @@ export function WorkspaceTabGuard({
   const other = workspaces.data?.workspaces.find((workspace) => workspace.id === active)?.name
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // A click landing as this opens is dropped on purpose: it would run in the other
-  // workspace. It should not vanish silently, so the dialog says so.
-  const lastPress = useRef(0)
-  const [clickDropped, setClickDropped] = useState(false)
-  useEffect(() => {
-    const note = () => {
-      lastPress.current = Date.now()
-    }
-    window.addEventListener('pointerdown', note, { capture: true })
-    return () => window.removeEventListener('pointerdown', note, { capture: true })
-  }, [])
-  useEffect(() => {
-    if (stale) setClickDropped(Date.now() - lastPress.current < 2000)
-  }, [stale])
 
   async function stay() {
     setBusy(true)
@@ -76,35 +61,33 @@ export function WorkspaceTabGuard({
     }
   }
 
+  if (!stale) return null
   return (
-    <AlertDialog open={stale}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>This tab is in {workspaceName}</AlertDialogTitle>
-          <AlertDialogDescription>
-            You switched to {other ?? 'another workspace'} in another tab. Choose where to keep
-            working, so nothing from this tab is saved to the wrong workspace.
-            {clickDropped ? ' Your last click was not applied, so make it again after you choose.' : ''}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-        <AlertDialogFooter>
-          <Button
-            disabled={busy}
-            onClick={() => window.location.assign(platformHref(pathname, '/home'))}
-            variant="outline"
-          >
-            Open {other ?? 'the other workspace'}
-          </Button>
-          <Button disabled={busy} onClick={() => void stay()}>
-            {busy ? 'Switching…' : `Keep working in ${workspaceName}`}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <div
+      className="fixed inset-x-0 top-2 z-50 mx-auto flex w-fit max-w-[calc(100%-1rem)] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-amber-400/50 bg-card px-3 py-2 text-sm shadow-popover"
+      data-testid="workspace-banner"
+      role="status"
+    >
+      <span>
+        This tab is in {workspaceName}. You switched to {other ?? 'another workspace'} in another
+        tab, so nothing here saves until you choose.
+      </span>
+      {error ? (
+        <span className="text-destructive" role="alert">
+          {error}
+        </span>
+      ) : null}
+      <Button disabled={busy} onClick={() => void stay()} size="sm">
+        {busy ? 'Switching…' : `Keep working in ${workspaceName}`}
+      </Button>
+      <Button
+        disabled={busy}
+        onClick={() => window.location.assign(platformHref(pathname, '/home'))}
+        size="sm"
+        variant="outline"
+      >
+        Open {other ?? 'the other workspace'}
+      </Button>
+    </div>
   )
 }
