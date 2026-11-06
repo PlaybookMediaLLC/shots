@@ -592,6 +592,8 @@ test(
     })
     // Preview takes the draft's place, so write in the draft and come back to see it.
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
+    // The tab followed the preview to LinkedIn, whose text comes from the main platform.
+    await page.getByTestId('platform-tab-x').click()
     // A click then End can leave the caret where the click landed: set it at the end.
     await caretAtDocumentEnd(page)
     await page.keyboard.type(' Live update.')
