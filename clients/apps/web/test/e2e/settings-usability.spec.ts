@@ -61,7 +61,7 @@ test('API keys start read-only and presets grant only their named capabilities',
   await openWorkspaceSetting(page, 'Developer API')
   await expect(page.locator('[id="scope-artifact:read"]')).toBeChecked()
   await expect(page.locator('button[id^="scope-"][data-state="checked"]')).toHaveCount(1)
-  await page.getByRole('button', { name: 'Publishing', exact: true }).click()
+  await page.getByRole('button', { name: 'Approved publishing', exact: true }).click()
   await expect(page.locator('[id="scope-post:schedule"]')).toBeChecked()
   await expect(page.locator('[id="scope-asset:write"]')).not.toBeChecked()
   // Publishing schedules approved content; posting directly is its own choice.

@@ -184,8 +184,8 @@ test(
           includeHidden: true,
         })
       ).toHaveCount(0)
-      await expect(page.getByRole('alertdialog')).toContainText(
-        'You switched to Private Beta workspace in another tab.'
+      await expect(page.getByTestId('workspace-banner')).toContainText(
+        'You switched to Private Beta workspace in another tab'
       )
       await cancelledCreation
       releaseResponse()

@@ -1008,7 +1008,7 @@ test(
     // A stored poster shows as an image, and the browser's own frame as a video.
     await expect(picker.locator('video, img[src*="variant=thumbnail"]')).toHaveCount(1)
     await expect(picker).not.toContainText('video/mp4')
-    await expect(picker).toContainText(/\d MB · /)
+    await expect(picker).toContainText(/\d (KB|MB) · /)
     await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
 
     // A Library node has no upload marker; it still plays in the editor, also after a reload.

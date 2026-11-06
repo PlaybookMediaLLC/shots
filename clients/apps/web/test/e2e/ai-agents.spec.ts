@@ -12,12 +12,12 @@ test('an owner creates an agent key whose snippets carry it, and the key cannot 
   await expect(page.getByRole('heading', { name: 'MCP server' })).toBeVisible()
   await expect(page.getByLabel('Server URL', { exact: true })).toHaveValue(/\/mcp$/)
   // Agent keys start able to read, write drafts, and upload media.
-  await expect(page.getByLabel(/artifact:read/)).toBeChecked()
-  await expect(page.getByLabel(/draft:write/)).toBeChecked()
-  await expect(page.getByLabel(/asset:write/)).toBeChecked()
+  await expect(page.getByLabel(/^artifact:read/)).toBeChecked()
+  await expect(page.getByLabel(/^draft:write/)).toBeChecked()
+  await expect(page.getByLabel(/^asset:write/)).toBeChecked()
   // Scheduling and posting are opt-in per key.
-  await expect(page.getByLabel(/post:schedule/)).not.toBeChecked()
-  await expect(page.getByLabel(/post:publish/)).not.toBeChecked()
+  await expect(page.getByLabel(/^post:schedule/)).not.toBeChecked()
+  await expect(page.getByLabel(/^post:publish/)).not.toBeChecked()
 
   await page.getByRole('button', { name: 'Create agent key' }).click()
   await expect(page.getByText('Copy this key now')).toBeVisible()
@@ -89,7 +89,7 @@ test('agent consent serializes selected scopes and supports clearing an expiry',
       scopes: ['artifact:read', 'asset:write', 'draft:write', 'release:create', 'upload:sign'],
     })
     await page.getByLabel(/release:create/).uncheck()
-    await page.getByLabel(/draft:write/).uncheck()
+    await page.getByLabel(/^draft:write/).uncheck()
     await page.getByLabel(/upload:sign/).uncheck()
     const expiry = page.getByRole('combobox', { name: 'Access expires', exact: true })
     await expiry.press('Space')
