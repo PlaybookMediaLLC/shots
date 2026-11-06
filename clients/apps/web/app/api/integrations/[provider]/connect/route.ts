@@ -1,7 +1,7 @@
 import { backendSDK } from '@/lib/backend/sdk'
 import { connectIntegrationContract } from '@/lib/api/contracts/integrations'
 import { errorResponse, route } from '@/lib/api/route'
-import { organizationAccess } from '@/lib/api/route-auth'
+import { navigationOrganizationAccess } from '@/lib/api/route-auth'
 import { redirectUri, startState } from '@/lib/integrations/oauth'
 import { authorizeUrl, providerClient } from '@/lib/integrations/providers'
 import { PROVIDER_NAMES, providerOfSlug } from '@/lib/integrations/schema'
@@ -9,7 +9,7 @@ import { providerSetup } from '@/lib/integrations/server'
 
 /** `GET /api/integrations/{provider}/connect`: an owner or admin starts connecting a provider account. */
 export const GET = route(connectIntegrationContract, {
-  auth: organizationAccess('workspace:update'),
+  auth: navigationOrganizationAccess('workspace:update'),
   handler: async ({ access, params, query }) => {
     const provider = providerOfSlug(params.provider)
     if (provider === 'SLACK') {

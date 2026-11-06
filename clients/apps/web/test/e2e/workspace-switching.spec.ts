@@ -145,6 +145,26 @@ test(
     const inOther = await trpcQuery(second, 'project.list', { limit: 10 })
     expect(JSON.stringify(inOther.body)).not.toContain('From the stale tab')
 
+    // Following a link can't send headers, so it carries the same check: no connection starts.
+    const started = await page.evaluate(async () => {
+      const link = document.createElement('a')
+      link.href = '/integrations/github/start'
+      link.addEventListener('click', (event) => event.preventDefault())
+      document.body.append(link)
+      link.click()
+      link.remove()
+      const response = await fetch(link.href, { redirect: 'manual' })
+      return { href: link.href, type: response.type }
+    })
+    expect(new URL(started.href).searchParams.get('scopeWorkspace')).toBe(workspace.id)
+    const refused = await second.request.get(
+      new URL(started.href).pathname + new URL(started.href).search,
+      {
+        maxRedirects: 0,
+      }
+    )
+    expect(refused.headers().location).toContain('failed')
+
     await banner.getByRole('button', { name: `Keep working in ${identity.workspaceName}` }).click()
     await expect(banner).toBeHidden()
     expect(await getActiveOrganizationId(page)).toBe(workspace.id)
