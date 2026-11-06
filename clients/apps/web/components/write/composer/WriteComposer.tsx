@@ -1766,33 +1766,9 @@ export function WriteComposer({
               ) : null}
             </div>
           ) : null}
-          {canPublish && server.status !== 'archived' && !locked && blockers.length > 0 ? (
-            <FixList
-              action={blockedAction}
-              blockers={blockers}
-              listRef={fixList}
-              onJump={jumpTo}
-              onProceed={(action) => setDialog(action)}
-              onRemove={
-                canEdit && items.length > 1
-                  ? (channel) => {
-                      const off = items.find((item) => item.account.channel === channel)
-                      if (off) toggle(off.account.id, false)
-                    }
-                  : undefined
-              }
-            />
-          ) : null}
           {/* Focus mode (⌘⇧F) keeps the posts and Schedule; everything else steps away. */}
           {focus ? null : (
             <>
-          {canPublish && server.status !== 'archived' && !locked ? (
-            <ScheduleDock
-              blocked={blockers.length > 0}
-              context={context}
-              onMore={() => setDialog('schedule')}
-            />
-          ) : null}
           <PlatformTabs
             accounts={accounts}
             active={active}
@@ -2198,6 +2174,41 @@ export function WriteComposer({
             />
               </>
             )}
+            {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
+            {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
+            <div
+              className={cn(
+                'sticky bottom-0 z-10 grid gap-2 border-t border-border bg-background pt-3',
+                POST_COLUMN
+              )}
+              data-testid="publish-bar"
+            >
+              {blockers.length > 0 ? (
+                <FixList
+                  action={blockedAction}
+                  blockers={blockers}
+                  listRef={fixList}
+                  onJump={jumpTo}
+                  onProceed={(action) => setDialog(action)}
+                  onRemove={
+                    canEdit && items.length > 1
+                      ? (channel) => {
+                          const off = items.find((item) => item.account.channel === channel)
+                          if (off) toggle(off.account.id, false)
+                        }
+                      : undefined
+                  }
+                />
+              ) : null}
+              {focus ? null : (
+                <ScheduleDock
+                  blocked={blockers.length > 0}
+                  context={context}
+                  onMore={() => setDialog('schedule')}
+                />
+              )}
+            </div>
+            ) : null}
             <div className="h-32" />
           </div>
         </div>
@@ -2560,7 +2571,7 @@ function FixList({
 }) {
   return (
     <div
-      className="mx-4 mb-3 rounded-lg border border-amber-400/40 bg-amber-400/[0.04] p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="max-h-40 overflow-y-auto rounded-lg border border-amber-400/40 bg-amber-400/[0.04] p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
       data-testid="blockers"
       ref={listRef}
       tabIndex={-1}
