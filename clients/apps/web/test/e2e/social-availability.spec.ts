@@ -109,7 +109,10 @@ test('provider readiness fails closed, recovers, and rechecks before authorizati
     expect(provider.calls.every((call) => call.method === 'GET' && call.body === '')).toBe(true)
     const sets = await apiRequest(page, '/api/v1/social-sets')
     expect(sets.status).toBe(200)
-    expect(socialSetListSchema.parse(sets.body).items).toHaveLength(0)
+    // A workspace starts with an empty default profile; nothing was connected to any.
+    expect(
+      socialSetListSchema.parse(sets.body).items.filter((set) => set.accounts.length > 0)
+    ).toHaveLength(0)
     const attempts = await db.query(
       'SELECT count(*)::int AS count FROM social_oauth_start WHERE "organizationId"=$1',
       [organizationId]
