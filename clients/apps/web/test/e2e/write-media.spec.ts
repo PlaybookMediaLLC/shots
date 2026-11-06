@@ -378,6 +378,7 @@ test(
     await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     await editor.click()
     await page.keyboard.press('ControlOrMeta+End')
+    await settleSelection(page)
     await page.keyboard.type('Rapid-edit-marker-0123456789', { delay: 1 })
     await toggle.click()
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
