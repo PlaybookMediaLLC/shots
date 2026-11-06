@@ -708,15 +708,23 @@ func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id 
 // requireDraftApproval refuses to schedule a draft the workspace wants
 // reviewed until it is approved at its current version.
 func (c *Configuration) requireDraftApproval(ctx context.Context, draft *ent.ContentDraft) error {
-	settings, err := c.draftSettings(ctx, draft.OrganizationID)
-	if err != nil || !settings.RequireApproval {
+	waiting, err := c.draftAwaitsApproval(ctx, draft)
+	if err != nil || !waiting {
 		return err
 	}
-	if draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil &&
-		*draft.ApprovedVersion == draft.Version {
-		return nil
-	}
 	return conflict("This workspace approves drafts before they are scheduled. Ask for review, then schedule once it is approved.")
+}
+
+// draftAwaitsApproval reports whether the workspace wants this draft reviewed
+// and its current version isn't approved.
+func (c *Configuration) draftAwaitsApproval(ctx context.Context, draft *ent.ContentDraft) (bool, error) {
+	settings, err := c.draftSettings(ctx, draft.OrganizationID)
+	if err != nil || !settings.RequireApproval {
+		return false, err
+	}
+	approved := draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil &&
+		*draft.ApprovedVersion == draft.Version
+	return !approved, nil
 }
 
 // ShareContentDraft turns the draft's read-and-comment link on (a fresh

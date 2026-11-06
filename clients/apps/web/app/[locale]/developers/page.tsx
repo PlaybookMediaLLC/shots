@@ -60,7 +60,7 @@ const RESOURCES = [
   {
     href: "/docs/agents",
     label: "AI agents (MCP)",
-    detail: "Connect Claude, ChatGPT, Cursor, and other agents to a workspace through the Shots MCP server.",
+    detail: "Write and publish posts from Claude, Codex, OpenCode, ChatGPT, Cursor, and other agents through the Shots MCP server.",
   },
   {
     href: "/docs/automate",
@@ -81,8 +81,18 @@ const RESOURCES = [
 
 const QUICKSTART = [
   {
+    id: "publish",
+    title: "1. Publish a post",
+    body: "With a key that holds post:publish, one call writes a post and schedules or publishes it. Get account IDs from GET /api/v1/social-sets. A retry with the same Idempotency-Key never posts twice.",
+    code: `curl -s -X POST https://shots.playbookmedia.io/api/v1/posts \\
+  -H "X-API-Key: $SHOTS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: launch-post-recurring-invoices" \\
+  -d '{"channelConnectionIds":["cl..."],"posts":[{"text":"Recurring invoices are here."}],"publishNow":true}'`,
+  },
+  {
     id: "capture",
-    title: "1. Capture a live page",
+    title: "2. Capture a live page",
     body: "This utility accepts a URL and returns a base64 PNG. Send a workspace API key in X-API-Key.",
     code: `curl -s -X POST https://shots.playbookmedia.io/api/screenshot \\
   -H "X-API-Key: $SHOTS_API_KEY" \\
@@ -92,7 +102,7 @@ const QUICKSTART = [
   },
   {
     id: "optimize",
-    title: "2. Optimize the export",
+    title: "3. Optimize the export",
     body: "Send the image back through Sharp to recompress it as WebP.",
     code: `curl -s -X POST https://shots.playbookmedia.io/api/export \\
   -H "X-API-Key: $SHOTS_API_KEY" \\
@@ -103,7 +113,7 @@ const QUICKSTART = [
   },
   {
     id: "handle-errors",
-    title: "3. Handle failures",
+    title: "4. Handle failures",
     body: "Every failing request returns the same JSON envelope. Branch on code.",
     code: `{
   "error": "URL is required",
@@ -253,9 +263,13 @@ export default function DevelopersPage() {
               CLI and MCP server
             </h2>
             <p className="leading-relaxed text-muted-foreground">
-              No official CLI tool and no MCP server are published yet. The
-              curl examples above are the supported command-line path. If you
-              want either one,{" "}
+              The{" "}
+              <a href="/docs/agents" className={linkClassName}>
+                Shots MCP server
+              </a>{" "}
+              lets Claude, Codex, OpenCode, and other agents write and publish
+              posts. No official CLI tool is published yet; the curl examples
+              above are the supported command-line path. If you want one,{" "}
               <a href="mailto:team@playbookmedia.io" className={linkClassName}>
                 email us
               </a>

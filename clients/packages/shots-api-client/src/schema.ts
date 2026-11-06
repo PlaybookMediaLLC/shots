@@ -1096,6 +1096,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write and publish a post
+         * @description Writes a post or thread and schedules or publishes it to accounts of one shared social set, with no review by a person. Say when with exactly one of `publishNow`, `scheduledFor`, `localTime`, and `queue`. A workspace that requires approval keeps that rule: the draft is created, nothing is queued, and `status` is `awaiting_approval` with a `reviewPath`. Every check runs first, so a refused post leaves no draft. Each account's post counts against the monthly posts allowance. Requires `Idempotency-Key`: a retry with the same key and content returns the first result with `200` and never posts twice. A published post can't be recalled by retrying, so read the post's status with `GET /api/v1/content-drafts/{id}/posts` rather than posting again. Requires the `post:publish` scope, which no key has unless someone chose it.
+         */
+        post: operations["createPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/content-drafts/{id}/properties": {
         parameters: {
             query?: never;
@@ -3677,6 +3697,58 @@ export interface components {
                 /** @default null */
                 publishedAt: string | null;
             }[];
+        };
+        PostCreateRequest: {
+            /** @enum {string} */
+            disambiguation?: "earlier" | "later";
+            localTime?: string;
+            publishNow?: boolean;
+            timeZone?: string;
+            /** @description The accounts to post to: `accounts[].id` from `GET /api/v1/social-sets`. */
+            channelConnectionIds: string[];
+            /** @description What a platform posts instead of `posts`, and that platform's settings. */
+            platforms?: {
+                [key: string]: {
+                    options?: {
+                        firstComment?: string;
+                        tiktok?: {
+                            /** @enum {string} */
+                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                            allowComments: boolean;
+                            allowDuet: boolean;
+                            allowStitch: boolean;
+                            commercialContent?: boolean;
+                            brandOrganic: boolean;
+                            brandedContent: boolean;
+                            madeWithAi: boolean;
+                            consent: boolean;
+                        };
+                        /** @enum {string} */
+                        visibility?: "PUBLIC" | "CONNECTIONS";
+                        youtube?: {
+                            title: string;
+                            /** @enum {string} */
+                            privacy: "" | "public" | "private" | "unlisted";
+                            madeForKids?: boolean;
+                        };
+                    };
+                    posts?: {
+                        assetIds?: string[];
+                        text: string;
+                    }[];
+                };
+            };
+            posts: {
+                assetIds?: string[];
+                text: string;
+            }[];
+            queue?: boolean;
+            /**
+             * Format: date-time
+             * @description When to publish, as an RFC 3339 timestamp in the future.
+             */
+            scheduledFor?: string;
+            title?: string;
         };
         ContentDraftCopy: {
             draft: {
@@ -9596,6 +9668,628 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createPost: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description An earlier request with this idempotency key made this post, or the draft is waiting for approval. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: boolean;
+                        draft: {
+                            assetIds: string[];
+                            body: {
+                                [key: string]: unknown;
+                            }[];
+                            /** @default 0 */
+                            collabGeneration: number;
+                            channelConnectionIds: string[];
+                            createdAt: string;
+                            createdByUserId: string | null;
+                            channelText: {
+                                [key: string]: string;
+                            };
+                            discussions: {
+                                [key: string]: unknown;
+                            };
+                            id: string;
+                            organizationId: string;
+                            plainText: string;
+                            /** @enum {string} */
+                            status: "draft" | "scheduled" | "archived";
+                            title: string;
+                            updatedAt: string;
+                            updatedByUserId: string | null;
+                            version: number;
+                            /** @default 1 */
+                            calendarVersion: number;
+                            approvedVersion: number | null;
+                            reviewNote: string | null;
+                            /** @enum {string} */
+                            reviewStatus: "none" | "pending" | "approved" | "changes_requested";
+                            reviewedByUserId: string | null;
+                            shareToken: string | null;
+                            guestComments: {
+                                createdAt: string;
+                                name: string;
+                                text: string;
+                            }[];
+                            publishedPosts: number;
+                            /** @default null */
+                            attentionAt: string | null;
+                            /** @default null */
+                            lastPublishedAt: string | null;
+                            /**
+                             * @default {
+                             *       "autoPlug": {
+                             *         "atLikes": 0,
+                             *         "enabled": false
+                             *       },
+                             *       "autoRepost": {
+                             *         "atLikes": 0,
+                             *         "enabled": false
+                             *       }
+                             *     }
+                             */
+                            engagement: {
+                                autoPlug: {
+                                    atLikes: number;
+                                    enabled: boolean;
+                                    text?: string;
+                                };
+                                autoRepost: {
+                                    atLikes: number;
+                                    enabled: boolean;
+                                    text?: string;
+                                };
+                            };
+                            /** @default false */
+                            naturalPostingTime: boolean;
+                            suppressSlackOnPublish?: boolean;
+                            /** @default null */
+                            plannedFor: string | null;
+                            /** @default null */
+                            primaryPlatform: string | null;
+                            /** @default null */
+                            socialSetId: string | null;
+                            article: {
+                                coverAssetId?: string;
+                                title: string;
+                            } | null;
+                            attentionPosts: number;
+                            /** @default 0 */
+                            checkPosts: number;
+                            /** @default 0 */
+                            publishingPosts: number;
+                            /** @enum {string} */
+                            kind: "standard" | "reply" | "quote" | "repurpose" | "article";
+                            nextPostAt: string | null;
+                            pinnedAt: string | null;
+                            planTimeZone: string | null;
+                            platformVersions: {
+                                /** @constant */
+                                schemaVersion: 1;
+                                versions: {
+                                    body?: {
+                                        [key: string]: unknown;
+                                    }[];
+                                    /** @enum {string} */
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    forkedFromVersion?: number;
+                                    /** @enum {string} */
+                                    mode: "synced" | "manual";
+                                    options?: {
+                                        youtube?: {
+                                            title: string;
+                                            /** @enum {string} */
+                                            privacy: "" | "public" | "private" | "unlisted";
+                                            madeForKids?: boolean;
+                                        };
+                                        tiktok?: {
+                                            /** @enum {string} */
+                                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                            allowComments: boolean;
+                                            allowDuet: boolean;
+                                            allowStitch: boolean;
+                                            commercialContent?: boolean;
+                                            brandOrganic: boolean;
+                                            brandedContent: boolean;
+                                            madeWithAi: boolean;
+                                            consent: boolean;
+                                        };
+                                        autoDm?: {
+                                            /** @enum {string} */
+                                            match: "any" | "all";
+                                            reposts: boolean;
+                                            replies: boolean;
+                                            requireFollow: boolean;
+                                            replyText?: string;
+                                            message: string;
+                                        };
+                                        splitOnPaste?: boolean;
+                                        linkPreviews?: {
+                                            /** Format: uri */
+                                            url: string;
+                                            title?: string;
+                                            description?: string;
+                                            /** Format: uri */
+                                            image?: string;
+                                            removed?: boolean;
+                                        }[];
+                                        splitLimit?: number;
+                                        automation?: {
+                                            plugAtLikes?: number;
+                                            /** @enum {string} */
+                                            plugMetric?: "likes" | "reposts";
+                                            plugText?: string;
+                                            quoteAfterHours?: number;
+                                            quoteText?: string;
+                                            repostAtLikes?: number;
+                                            retweets?: ({
+                                                afterMinutes: number;
+                                            } | {
+                                                at: string;
+                                                days: number;
+                                                timeZone: string;
+                                            })[];
+                                            unretweetAfterMinutes?: number;
+                                        };
+                                        community?: {
+                                            id: string;
+                                            name?: string;
+                                            shareWithFollowers?: boolean;
+                                        };
+                                        document?: {
+                                            assetId: string;
+                                            title?: string;
+                                        };
+                                        firstComment?: string;
+                                        numbering?: {
+                                            enabled: boolean;
+                                            /** @enum {string} */
+                                            position: "start" | "end";
+                                            skipFirst?: number;
+                                            skipLast?: number;
+                                            /** @enum {string} */
+                                            style: "hash" | "emoji" | "dot" | "slash" | "leading" | "fraction" | "of";
+                                        };
+                                        /** @enum {string} */
+                                        visibility?: "PUBLIC" | "CONNECTIONS";
+                                    };
+                                    sourceHash?: string;
+                                }[];
+                            };
+                            queuedPosts: number;
+                            scratchpad: string;
+                            sourceDraftId: string | null;
+                            tagIds: string[];
+                            target: {
+                                author?: string;
+                                /** @enum {string} */
+                                kind?: "reply" | "quote" | "repurpose";
+                                platform?: string;
+                                remoteId?: string;
+                                sourceDraftId?: string;
+                                sourcePostId?: string;
+                                text?: string;
+                                url?: string;
+                            } | null;
+                        };
+                        posts: {
+                            caption: string;
+                            channelConnectionId: string;
+                            createdAt: string;
+                            id: string;
+                            platform: string;
+                            scheduledFor: string;
+                            /** @enum {string} */
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            metrics: {
+                                [key: string]: number;
+                            } | null;
+                            metricsAt: string | null;
+                            url: string | null;
+                            replies: number;
+                            threadProgress: {
+                                publication?: {
+                                    remoteId: string;
+                                    /** Format: uri */
+                                    url: string;
+                                    visibility?: string;
+                                };
+                                quotes?: {
+                                    postId: string;
+                                    state: string;
+                                }[];
+                                lastReplyId?: string;
+                                posted: number;
+                                total: number;
+                            };
+                            /** @default [] */
+                            automations: {
+                                attempts: number;
+                                dueAt: string;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                remoteId: string | null;
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
+                                updatedAt: string;
+                            }[];
+                            /** @default null */
+                            naturalOffsetSeconds: number | null;
+                            /** @default null */
+                            scheduleMode: ("queue" | "explicit") | null;
+                            /** @default null */
+                            scheduleTimeZone: string | null;
+                            /** @default null */
+                            slotAt: string | null;
+                            /** @default null */
+                            socialSetId: string | null;
+                            /** @default null */
+                            failureCode: string | null;
+                            /** @default null */
+                            publishedAt: string | null;
+                        }[];
+                        reviewPath?: string;
+                        /** @enum {string} */
+                        status: "awaiting_approval" | "publishing" | "scheduled";
+                    };
+                };
+            };
+            /** @description The post is scheduled or publishing. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        created: boolean;
+                        draft: {
+                            assetIds: string[];
+                            body: {
+                                [key: string]: unknown;
+                            }[];
+                            /** @default 0 */
+                            collabGeneration: number;
+                            channelConnectionIds: string[];
+                            createdAt: string;
+                            createdByUserId: string | null;
+                            channelText: {
+                                [key: string]: string;
+                            };
+                            discussions: {
+                                [key: string]: unknown;
+                            };
+                            id: string;
+                            organizationId: string;
+                            plainText: string;
+                            /** @enum {string} */
+                            status: "draft" | "scheduled" | "archived";
+                            title: string;
+                            updatedAt: string;
+                            updatedByUserId: string | null;
+                            version: number;
+                            /** @default 1 */
+                            calendarVersion: number;
+                            approvedVersion: number | null;
+                            reviewNote: string | null;
+                            /** @enum {string} */
+                            reviewStatus: "none" | "pending" | "approved" | "changes_requested";
+                            reviewedByUserId: string | null;
+                            shareToken: string | null;
+                            guestComments: {
+                                createdAt: string;
+                                name: string;
+                                text: string;
+                            }[];
+                            publishedPosts: number;
+                            /** @default null */
+                            attentionAt: string | null;
+                            /** @default null */
+                            lastPublishedAt: string | null;
+                            /**
+                             * @default {
+                             *       "autoPlug": {
+                             *         "atLikes": 0,
+                             *         "enabled": false
+                             *       },
+                             *       "autoRepost": {
+                             *         "atLikes": 0,
+                             *         "enabled": false
+                             *       }
+                             *     }
+                             */
+                            engagement: {
+                                autoPlug: {
+                                    atLikes: number;
+                                    enabled: boolean;
+                                    text?: string;
+                                };
+                                autoRepost: {
+                                    atLikes: number;
+                                    enabled: boolean;
+                                    text?: string;
+                                };
+                            };
+                            /** @default false */
+                            naturalPostingTime: boolean;
+                            suppressSlackOnPublish?: boolean;
+                            /** @default null */
+                            plannedFor: string | null;
+                            /** @default null */
+                            primaryPlatform: string | null;
+                            /** @default null */
+                            socialSetId: string | null;
+                            article: {
+                                coverAssetId?: string;
+                                title: string;
+                            } | null;
+                            attentionPosts: number;
+                            /** @default 0 */
+                            checkPosts: number;
+                            /** @default 0 */
+                            publishingPosts: number;
+                            /** @enum {string} */
+                            kind: "standard" | "reply" | "quote" | "repurpose" | "article";
+                            nextPostAt: string | null;
+                            pinnedAt: string | null;
+                            planTimeZone: string | null;
+                            platformVersions: {
+                                /** @constant */
+                                schemaVersion: 1;
+                                versions: {
+                                    body?: {
+                                        [key: string]: unknown;
+                                    }[];
+                                    /** @enum {string} */
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    forkedFromVersion?: number;
+                                    /** @enum {string} */
+                                    mode: "synced" | "manual";
+                                    options?: {
+                                        youtube?: {
+                                            title: string;
+                                            /** @enum {string} */
+                                            privacy: "" | "public" | "private" | "unlisted";
+                                            madeForKids?: boolean;
+                                        };
+                                        tiktok?: {
+                                            /** @enum {string} */
+                                            privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
+                                            allowComments: boolean;
+                                            allowDuet: boolean;
+                                            allowStitch: boolean;
+                                            commercialContent?: boolean;
+                                            brandOrganic: boolean;
+                                            brandedContent: boolean;
+                                            madeWithAi: boolean;
+                                            consent: boolean;
+                                        };
+                                        autoDm?: {
+                                            /** @enum {string} */
+                                            match: "any" | "all";
+                                            reposts: boolean;
+                                            replies: boolean;
+                                            requireFollow: boolean;
+                                            replyText?: string;
+                                            message: string;
+                                        };
+                                        splitOnPaste?: boolean;
+                                        linkPreviews?: {
+                                            /** Format: uri */
+                                            url: string;
+                                            title?: string;
+                                            description?: string;
+                                            /** Format: uri */
+                                            image?: string;
+                                            removed?: boolean;
+                                        }[];
+                                        splitLimit?: number;
+                                        automation?: {
+                                            plugAtLikes?: number;
+                                            /** @enum {string} */
+                                            plugMetric?: "likes" | "reposts";
+                                            plugText?: string;
+                                            quoteAfterHours?: number;
+                                            quoteText?: string;
+                                            repostAtLikes?: number;
+                                            retweets?: ({
+                                                afterMinutes: number;
+                                            } | {
+                                                at: string;
+                                                days: number;
+                                                timeZone: string;
+                                            })[];
+                                            unretweetAfterMinutes?: number;
+                                        };
+                                        community?: {
+                                            id: string;
+                                            name?: string;
+                                            shareWithFollowers?: boolean;
+                                        };
+                                        document?: {
+                                            assetId: string;
+                                            title?: string;
+                                        };
+                                        firstComment?: string;
+                                        numbering?: {
+                                            enabled: boolean;
+                                            /** @enum {string} */
+                                            position: "start" | "end";
+                                            skipFirst?: number;
+                                            skipLast?: number;
+                                            /** @enum {string} */
+                                            style: "hash" | "emoji" | "dot" | "slash" | "leading" | "fraction" | "of";
+                                        };
+                                        /** @enum {string} */
+                                        visibility?: "PUBLIC" | "CONNECTIONS";
+                                    };
+                                    sourceHash?: string;
+                                }[];
+                            };
+                            queuedPosts: number;
+                            scratchpad: string;
+                            sourceDraftId: string | null;
+                            tagIds: string[];
+                            target: {
+                                author?: string;
+                                /** @enum {string} */
+                                kind?: "reply" | "quote" | "repurpose";
+                                platform?: string;
+                                remoteId?: string;
+                                sourceDraftId?: string;
+                                sourcePostId?: string;
+                                text?: string;
+                                url?: string;
+                            } | null;
+                        };
+                        posts: {
+                            caption: string;
+                            channelConnectionId: string;
+                            createdAt: string;
+                            id: string;
+                            platform: string;
+                            scheduledFor: string;
+                            /** @enum {string} */
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            metrics: {
+                                [key: string]: number;
+                            } | null;
+                            metricsAt: string | null;
+                            url: string | null;
+                            replies: number;
+                            threadProgress: {
+                                publication?: {
+                                    remoteId: string;
+                                    /** Format: uri */
+                                    url: string;
+                                    visibility?: string;
+                                };
+                                quotes?: {
+                                    postId: string;
+                                    state: string;
+                                }[];
+                                lastReplyId?: string;
+                                posted: number;
+                                total: number;
+                            };
+                            /** @default [] */
+                            automations: {
+                                attempts: number;
+                                dueAt: string;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                remoteId: string | null;
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
+                                updatedAt: string;
+                            }[];
+                            /** @default null */
+                            naturalOffsetSeconds: number | null;
+                            /** @default null */
+                            scheduleMode: ("queue" | "explicit") | null;
+                            /** @default null */
+                            scheduleTimeZone: string | null;
+                            /** @default null */
+                            slotAt: string | null;
+                            /** @default null */
+                            socialSetId: string | null;
+                            /** @default null */
+                            failureCode: string | null;
+                            /** @default null */
+                            publishedAt: string | null;
+                        }[];
+                        reviewPath?: string;
+                        /** @enum {string} */
+                        status: "awaiting_approval" | "publishing" | "scheduled";
+                    };
+                };
+            };
+            /** @description The input is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The API key lacks the required workspace scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An account is not in this workspace, or is in a private social set. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An account or the post can't publish as written, such as text over a platform's limit or an account that needs reconnecting. Nothing was created. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The monthly posts allowance or the workspace write quota is exhausted. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceQuotaError"];
                 };
             };
             /** @description A required dependency is unavailable. */

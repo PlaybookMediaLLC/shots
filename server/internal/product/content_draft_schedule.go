@@ -696,6 +696,12 @@ func (c *Configuration) ScheduleContentDraft(ctx context.Context, actor Actor, d
 	if err := c.authorizeDecision(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
 	}
+	return c.scheduleContentDraft(ctx, actor, draftID, input)
+}
+
+// scheduleContentDraft schedules a draft for an actor the caller has authorized.
+func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, draftID string,
+	input ScheduleContentDraftInput) (*ScheduleContentDraftResult, error) {
 	if err := c.requireWorkspaceFeature(ctx, actor.OrganizationID, contentDraftFeature); err != nil {
 		return nil, err
 	}

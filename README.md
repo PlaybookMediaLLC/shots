@@ -193,6 +193,11 @@ The deployed product publishes machine-readable interfaces for agents and API cl
 - [API documentation](https://shots.playbookmedia.io/docs) and
   [developer portal](https://shots.playbookmedia.io/developers)
 - Markdown representations of supported pages via `Accept: text/markdown`
+- [MCP server and agent setup](https://shots.playbookmedia.io/docs/agents), so Claude,
+  Codex, OpenCode and other agents can write, schedule and publish posts, with a
+  [plugin and skill](clients/integrations/agent-plugin). In Claude Code:
+  `claude plugin marketplace add PlaybookMediaLLC/shots@main`, then
+  `claude plugin install shots@shots`
 
 ## Deployment
 

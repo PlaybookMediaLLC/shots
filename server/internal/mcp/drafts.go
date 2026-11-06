@@ -8,7 +8,9 @@ import (
 )
 
 // Draft tools use the same domain authority as REST. Planning is deliberately
-// separate from publishing; there is no approval or draft scheduling tool.
+// separate from publishing. createPost is the one tool that puts new text on a
+// channel, behind the opt-in post:publish scope; a stored draft is still
+// scheduled by a person, and no tool approves.
 func listContentDrafts(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
 	return s.config.Product.ListContentDrafts(ctx, actor, product.ContentDraftListQuery{
 		Cursor: stringArg(args, "cursor"), Kind: stringArg(args, "kind"), Limit: intArg(args, "limit"),
@@ -25,6 +27,13 @@ func createContentDraft(ctx context.Context, s *Server, actor product.Actor, arg
 		return nil, err
 	}
 	return s.config.Product.CreateContentDraft(ctx, actor, input)
+}
+func createPost(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
+	var input product.CreatePostInput
+	if err := decode(args, &input); err != nil {
+		return nil, err
+	}
+	return s.config.Product.CreatePost(ctx, actor, input)
 }
 func updateContentDraft(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
 	var input product.ContentDraftUpdate

@@ -35,6 +35,26 @@ curl -X POST ${BASE_URL}/api/v1/campaigns \\
 
 4. Submit the drafts for review with \`POST /api/v1/campaigns/{campaignId}/review-requests\`. Approvers decide in the app.
 
+### Publish a post
+
+With a key that holds \`post:publish\`, one call writes a post and schedules or publishes it. No key has that scope unless someone chose it.
+
+1. Find the accounts with \`GET /api/v1/social-sets\`. Each account's \`id\` is what you post to. A key sees shared social sets only.
+2. To attach media, call \`POST /api/v1/assets/upload-url\`, \`PUT\` the bytes to the returned URL with \`If-None-Match: *\`, then call \`POST /api/v1/assets/{assetId}/complete\`.
+3. Publish:
+
+\`\`\`bash
+curl -X POST ${BASE_URL}/api/v1/posts \\
+  -H "X-API-Key: $SHOTS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: launch-post-recurring-invoices" \\
+  -d '{"channelConnectionIds":["cl..."],"posts":[{"text":"Recurring invoices are here."}],"publishNow":true}'
+\`\`\`
+
+Say when with exactly one of \`publishNow\`, \`scheduledFor\`, \`localTime\` with \`timeZone\`, and \`queue\`. Two or more \`posts\` make a thread. \`platforms\` sets one platform's own text and settings, such as a LinkedIn \`firstComment\`. Read each account's outcome with \`GET /api/v1/content-drafts/{id}/posts\`.
+
+A workspace that requires approval keeps that rule: the draft is created, nothing is queued, and \`status\` is \`awaiting_approval\`.
+
 ### Typed TypeScript client
 
 The document is OpenAPI 3.1. Generate types from it and call the API with full request and response typing:
@@ -72,7 +92,7 @@ ${scopeRows}
 
 Approving, rejecting, or requesting changes on posts is a person's decision and takes a session only. Those operations refuse API keys with \`403\`, whatever the key's scopes.
 
-A key with \`post:schedule\` may schedule campaign posts and visuals a person approved, and cancel scheduled posts. Nothing unapproved can be scheduled, by a key or a person. A session that schedules a variant or cancels a post needs a sign-in under 15 minutes old with two-factor enabled.
+A key with \`post:schedule\` may schedule campaign posts and visuals a person approved, and cancel scheduled posts. A key with the separate \`post:publish\` scope may write and publish new posts with \`POST /api/v1/posts\`, with no review unless the workspace requires approval. A stored content draft is scheduled by a person, whatever the key's scopes. A session that schedules a variant or cancels a post needs a sign-in under 15 minutes old with two-factor enabled.
 
 Shell operations (\`/api/v1/me\`, \`/api/v1/bootstrap\`, \`/api/v1/organizations\`) describe the signed-in user and refuse API keys.
 
@@ -86,7 +106,7 @@ There is no free plan: every operation here needs a Pro, Business or Enterprise 
 
 ## Idempotency
 
-Creating a release, campaign, or scheduled post accepts an \`Idempotency-Key\` header of up to 128 characters. A retry with the same key returns the original result with \`200\` instead of creating a duplicate. Status changes (campaign transitions, review requests, approvals, cancellations) apply only from the current status, so a repeated request returns \`409\` and changes nothing.
+Creating a release, campaign, or scheduled post accepts an \`Idempotency-Key\` header of up to 128 characters. \`POST /api/v1/posts\` requires one of 16 to 128. A retry with the same key returns the original result with \`200\` instead of creating a duplicate. Status changes (campaign transitions, review requests, approvals, cancellations) apply only from the current status, so a repeated request returns \`409\` and changes nothing.
 
 ## Errors
 

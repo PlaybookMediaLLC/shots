@@ -28,7 +28,7 @@ const freshSessionAgeMilliseconds = 15 * 60 * 1000
 export class AuthorizationError extends Error {
   constructor(
     message: string,
-    readonly status: 401 | 403
+    readonly status: 401 | 403 | 429
   ) {
     super(message)
     this.name = 'AuthorizationError'

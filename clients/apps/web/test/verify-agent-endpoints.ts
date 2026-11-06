@@ -118,6 +118,8 @@ const CHECKS: Check[] = [
       /"\/api\/v1\/scheduled-posts"/,
       /"\/api\/v1\/campaigns\/\{campaignId\}\/posts\/\{postId\}\/schedule"/,
       /"workspaceApiKey":\s*\[\s*"post:schedule"\s*\]/,
+      /"\/api\/v1\/posts"/,
+      /"workspaceApiKey":\s*\[\s*"post:publish"\s*\]/,
       /## Quickstart/,
     ],
   },
