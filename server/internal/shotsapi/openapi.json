@@ -22472,7 +22472,8 @@
               "capture",
               "derived",
               "export",
-              "input"
+              "input",
+              "poster"
             ]
           },
           "contentType": {

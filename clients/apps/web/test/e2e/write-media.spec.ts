@@ -1004,7 +1004,8 @@ test(
     // The picker shows a frame and details, never the MIME type.
     await strip.getByRole('button', { name: 'Browse library', exact: true }).click()
     const picker = page.getByRole('dialog', { name: 'Attach from Library' })
-    await expect(picker.locator('video')).toHaveCount(1)
+    // A stored poster shows as an image, and the browser's own frame as a video.
+    await expect(picker.locator('video, img[src*="variant=thumbnail"]')).toHaveCount(1)
     await expect(picker).not.toContainText('video/mp4')
     await expect(picker).toContainText(/\d MB · /)
     await picker.getByRole('button', { name: 'Cancel', exact: true }).click()

@@ -151,6 +151,7 @@ export function LibraryAssetPicker({
                     <MediaThumb
                       assetId={item.id}
                       className="aspect-video w-full object-contain"
+                      poster={item.posterAssetId}
                       video={item.mediaType.startsWith('video/')}
                     />
                     {chosen ? (

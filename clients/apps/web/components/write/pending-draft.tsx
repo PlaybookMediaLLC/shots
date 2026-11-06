@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { draftsApi } from '@/lib/content-drafts/client'
+import { draftAssetNode } from '@/lib/platform/asset-handoff'
+import { postBreak } from '@/lib/write/versions'
 import { prepareWorkspaceSwitch } from '@/lib/platform/navigation-guard'
 import { platformHref } from '@/lib/platform/navigation'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
@@ -56,6 +58,20 @@ export async function createWritingDraft(
     }
   }
   await retry()
+}
+
+/** A new post with these assets attached: it references them, as Attach from Library does. */
+export function startPostWithAssets(
+  assets: { id: string; mediaType: string }[],
+  navigate: (id: string) => void
+) {
+  return createWritingDraft(
+    {
+      assetIds: assets.map((asset) => asset.id),
+      body: [postBreak(), { type: 'p', children: [{ text: '' }] }, ...assets.map(draftAssetNode)],
+    },
+    navigate
+  )
 }
 
 /**

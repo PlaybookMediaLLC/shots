@@ -62,6 +62,8 @@ export type EncoderType = 'auto' | 'ffmpeg' | 'webcodecs' | 'mediarecorder';
 export type ExtendedVideoFormat = VideoFormat | 'gif';
 
 export interface VideoExportOptions {
+  /** Receive the file instead of downloading it, as when saving to the workspace. */
+  onFile?: (blob: Blob) => void;
   /** Duration per slide for this export only, in seconds. */
   slideDuration?: number;
   format?: ExtendedVideoFormat;
@@ -76,7 +78,7 @@ export interface VideoExportOptions {
 }
 
 /** Per-export encoder settings, resolved from {@link VideoExportOptions}. */
-type EncodeSettings = { slideDuration?: number; fileName?: string; fps: number; maxWidth?: number };
+type EncodeSettings = { slideDuration?: number; fileName?: string; fps: number; maxWidth?: number; onFile?: (blob: Blob) => void };
 
 /** The encoder's output size: the frame's, or a GIF scaled down to `maxWidth` (even sides). */
 function encodeSize(canvas: HTMLCanvasElement, format: string, maxWidth?: number) {
@@ -158,10 +160,12 @@ function finishExport<F extends string>(
   blob: Blob,
   namePrefix: "video" | "animation",
   format: F,
-  fileName?: string
+  fileName?: string,
+  onFile?: (blob: Blob) => void
 ): { format: F } {
   progress.done();
-  downloadBlob(blob, fileName ?? `shots-${namePrefix}-${Date.now()}.${format}`);
+  if (onFile) onFile(blob);
+  else downloadBlob(blob, fileName ?? `shots-${namePrefix}-${Date.now()}.${format}`);
   return { format };
 }
 
@@ -284,7 +288,7 @@ async function exportSlideshowWithWebCodecs(
     }
 
     const blob = await state.encoder.finalize();
-    return finishExport(progress, blob, "video", format, settings.fileName);
+    return finishExport(progress, blob, "video", format, settings.fileName, settings.onFile);
   } catch (error) {
     state.encoder?.dispose();
     throw error;
@@ -360,7 +364,7 @@ async function exportSlideshowWithFFmpeg(
 
     throwIfAborted(signal);
     const blob = await encoder.encode();
-    return finishExport(progress, blob, "video", format, settings.fileName);
+    return finishExport(progress, blob, "video", format, settings.fileName, settings.onFile);
   } catch (error) {
     // encode() cleans up on its own; this covers bailing out before encode().
     await encoder?.dispose();
@@ -503,7 +507,7 @@ async function exportAnimationWithFFmpeg(
 
     throwIfAborted(signal);
     const blob = await state.encoder.encode();
-    return finishExport(progress, blob, "animation", format, settings.fileName);
+    return finishExport(progress, blob, "animation", format, settings.fileName, settings.onFile);
   } catch (error) {
     // encode() cleans up on its own; this covers bailing out before encode().
     await state.encoder?.dispose();
@@ -565,7 +569,7 @@ async function exportAnimationWithWebCodecs(
     }
 
     const blob = await state.encoder.finalize();
-    return finishExport(progress, blob, "animation", format, settings.fileName);
+    return finishExport(progress, blob, "animation", format, settings.fileName, settings.onFile);
   } catch (error) {
     state.encoder?.dispose();
     throw error;
@@ -639,7 +643,7 @@ async function exportAnimationWithMediaRecorder(
 
     const blobType = actualFormat === "mp4" ? "video/mp4" : "video/webm";
     const blob = new Blob(chunks, { type: blobType });
-    return finishExport(progress, blob, "animation", actualFormat, settings.fileName);
+    return finishExport(progress, blob, "animation", actualFormat, settings.fileName, settings.onFile);
   } finally {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());

@@ -41,7 +41,7 @@ export default async function LibraryPage({ params, searchParams }: LibraryPageP
       <Page title="Library" description="Everything your team has made.">
         <AreaNavigation label="Library" items={LIBRARY_LINKS} />
         {view === 'assets' ? (
-          <WorkspaceAssets canStartPost={canEdit && contentDraftsEnabled()} />
+          <WorkspaceAssets canStartPost={canEdit && contentDraftsEnabled()} canUpload={canEdit} />
         ) : view === 'brand' ? (
           <BrandAssets />
         ) : (

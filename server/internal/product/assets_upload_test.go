@@ -25,3 +25,18 @@ func TestValidAssetUploadAcceptsNativeStoreFonts(t *testing.T) {
 		}
 	}
 }
+
+func TestValidAssetUploadKeepsPostersToTheirVideo(t *testing.T) {
+	poster := AssetUploadInput{Bytes: 1024, Classification: assetClassificationPoster, ContentType: "image/jpeg", FileName: "poster.jpg", ParentAssetID: "video"}
+	if !validAssetUpload(poster) {
+		t.Fatal("a poster of a video should be accepted")
+	}
+	poster.ParentAssetID = ""
+	if validAssetUpload(poster) {
+		t.Fatal("a poster must belong to a video")
+	}
+	poster.ParentAssetID, poster.ContentType, poster.FileName = "video", "video/mp4", "poster.mp4"
+	if validAssetUpload(poster) {
+		t.Fatal("a poster must be an image")
+	}
+}

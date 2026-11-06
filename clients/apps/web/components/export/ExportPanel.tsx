@@ -9,15 +9,16 @@ import { toast } from 'sonner'
 import { useShallow } from 'zustand/react/shallow'
 import { ChoiceField, ToggleField } from '@/components/editor/inspector/fields'
 import { Button } from '@/components/ui/button'
-import { SaveToWorkspaceButton } from '@/components/workspace/SaveToWorkspaceButton'
+import {
+  SaveToWorkspaceButton,
+  UseInPostButton,
+} from '@/components/workspace/SaveToWorkspaceButton'
+import { useCanStartPost } from '@/lib/platform/can-start-post'
 import { useExportProgress } from '@/hooks/useExportProgress'
 import { trackExportComplete, trackExportError, trackExportStart } from '@/lib/analytics'
 import { getAspectRatioPreset } from '@/lib/aspect-ratio-utils'
 import { deliverFiles, exportStill, stillFormatSchema } from '@/lib/export/export-design'
-import {
-  frameRateFor,
-  withCurrentCanvas,
-} from '@/lib/export/export-settings'
+import { frameRateFor, withCurrentCanvas } from '@/lib/export/export-settings'
 import {
   animatedFormatSchema,
   FORMAT_INFO,
@@ -77,7 +78,9 @@ function FormatButton({
   selected: boolean
 }) {
   return (
-    <Button variant="custom" size={null}
+    <Button
+      variant="custom"
+      size={null}
       aria-pressed={selected}
       className={cn(
         'h-8 cursor-pointer rounded-md border text-xs font-medium transition-colors',
@@ -166,6 +169,7 @@ export type ExportPanelProps = {
  */
 export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: ExportPanelProps) {
   const [settings, update] = useExportSettings()
+  const canStartPost = useCanStartPost()
   const editor = useImageStore(
     useShallow((state) => ({
       customDimensions: state.customDimensions,
@@ -243,15 +247,19 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
     }
   }
 
-  const exportVideo = async () => {
+  const videoOptions = () => {
     const animatedFormat = animatedFormatSchema.parse(format)
-    const options = {
+    return {
       fileName: designFileName(name, format),
       format: animatedFormat,
       fps: frameRateFor(animatedFormat, settings.fps),
       maxWidth: format === 'gif' && settings.gifWidth > 0 ? settings.gifWidth : undefined,
       quality: settings.quality,
     }
+  }
+
+  const exportVideo = async () => {
+    const options = videoOptions()
     trackExportStart(format, settings.quality, 1)
     await (hasAnimation ? exportAnimationVideo(options) : exportSlideshowVideo(options))
     return options.fileName
@@ -282,6 +290,18 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
   }
 
   const createWorkspaceExport = async () => {
+    if (animated) {
+      let exported: Blob | undefined
+      const options = {
+        ...videoOptions(),
+        onFile: (blob: Blob) => {
+          exported = blob
+        },
+      }
+      await (hasAnimation ? exportAnimationVideo(options) : exportSlideshowVideo(options))
+      if (!exported) throw new Error('Nothing was exported.')
+      return exported
+    }
     const [file] = await exportStill({
       allSlides: false,
       format: stillFormatSchema.parse(format),
@@ -314,214 +334,229 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
       ? editor.slidesTotalSeconds
       : editor.slideDuration
 
-  if (busy) {
-    return (
-      <div className="space-y-3 p-5" aria-live="polite">
-        <p className="text-ui-lg font-medium text-foreground">Exporting {info.label}…</p>
-        <p className="text-xs text-muted-foreground">
-          {still
-            ? still.total > 1
-              ? `Rendering ${Math.min(still.done + 1, still.total)} of ${still.total}`
-              : 'Rendering your design'
-            : 'Rendering every frame of the timeline'}
-        </p>
+  // The settings stay mounted while busy: a save in progress owns the export under way.
+  const busyView = busy ? (
+    <div className="space-y-3 p-5" aria-live="polite">
+      <p className="text-ui-lg font-medium text-foreground">Exporting {info.label}…</p>
+      <p className="text-xs text-muted-foreground">
+        {still
+          ? still.total > 1
+            ? `Rendering ${Math.min(still.done + 1, still.total)} of ${still.total}`
+            : 'Rendering your design'
+          : 'Rendering every frame of the timeline'}
+      </p>
+      <div
+        aria-label="Export progress"
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={progress}
+        className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
+        role="progressbar"
+      >
         <div
-          aria-label="Export progress"
-          aria-valuemax={100}
-          aria-valuemin={0}
-          aria-valuenow={progress}
-          className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
-          role="progressbar"
-        >
-          <div
-            className="h-full rounded-full bg-foreground transition-[width] duration-200"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <Button className="w-full" onClick={cancel} size="sm" variant="outline">
-          Cancel
-        </Button>
+          className="h-full rounded-full bg-foreground transition-[width] duration-200"
+          style={{ width: `${progress}%` }}
+        />
       </div>
-    )
-  }
+      <Button className="w-full" onClick={cancel} size="sm" variant="outline">
+        Cancel
+      </Button>
+    </div>
+  ) : null
 
   return (
-    <div className="max-h-[min(640px,calc(100vh-96px))] space-y-4 overflow-y-auto p-4">
-      <div className="space-y-2">
-        <span className="text-ui-lg font-medium text-foreground">Format</span>
-        <div aria-label="Format" className="grid grid-cols-4 gap-1" role="group">
-          {outputFormatSchema.options.map((option) => (
-            <FormatButton
-              format={option}
-              key={option}
-              onSelect={(next) => update({ format: next })}
-              selected={option === format}
-            />
-          ))}
+    <>
+      {busyView}
+      <div
+        className={cn(
+          'max-h-[min(640px,calc(100vh-96px))] space-y-4 overflow-y-auto p-4',
+          busy && 'hidden'
+        )}
+      >
+        <div className="space-y-2">
+          <span className="text-ui-lg font-medium text-foreground">Format</span>
+          <div aria-label="Format" className="grid grid-cols-4 gap-1" role="group">
+            {outputFormatSchema.options.map((option) => (
+              <FormatButton
+                format={option}
+                key={option}
+                onSelect={(next) => update({ format: next })}
+                selected={option === format}
+              />
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">{info.description}</p>
+          {info.limitation ? (
+            <p className="rounded-md bg-foreground/[0.04] p-2 text-[11px] leading-snug text-muted-foreground">
+              {info.limitation}
+            </p>
+          ) : null}
         </div>
-        <p className="text-xs text-muted-foreground">{info.description}</p>
-        {info.limitation ? (
-          <p className="rounded-md bg-foreground/[0.04] p-2 text-[11px] leading-snug text-muted-foreground">
-            {info.limitation}
+
+        {formatHasControl(format, 'sizes') ? (
+          <SizePicker
+            extra={[canvasTarget(canvas.width, canvas.height)]}
+            onChange={(next) => update({ targets: next })}
+            value={targets}
+          />
+        ) : null}
+
+        {formatHasControl(format, 'quality') && (format === 'jpeg' || format === 'webp') ? (
+          <QualityPresetSelector
+            format={format}
+            onQualityPresetChange={(quality) => update({ quality })}
+            qualityPreset={settings.quality}
+          />
+        ) : null}
+        {formatHasControl(format, 'quality') && animated ? (
+          <ChoiceField
+            label="Quality"
+            onChange={(quality) => update({ quality })}
+            options={BITRATE_OPTIONS}
+            value={settings.quality}
+          />
+        ) : null}
+        {formatHasControl(format, 'scale') ? (
+          <ScaleSlider onScaleChange={(scale) => update({ scale })} scale={settings.scale} />
+        ) : null}
+        {format === 'pdf' ? (
+          <>
+            <ChoiceField
+              label="Page image"
+              onChange={(pdfCompression) => update({ pdfCompression })}
+              options={COMPRESSION_OPTIONS}
+              value={settings.pdfCompression}
+            />
+            {settings.pdfCompression === 'jpeg' ? (
+              <ChoiceField
+                label="JPEG quality"
+                onChange={(quality) => update({ quality })}
+                options={QUALITY_OPTIONS}
+                value={settings.quality}
+              />
+            ) : null}
+          </>
+        ) : null}
+        {formatHasControl(format, 'transparency') ? (
+          <ToggleField
+            checked={settings.transparent}
+            label="Transparent background"
+            onChange={(transparent) => update({ transparent })}
+          />
+        ) : null}
+        {formatHasControl(format, 'fps') && animated ? (
+          <ChoiceField
+            label="Frame rate"
+            onChange={(fps) => update({ fps: Number(fps) })}
+            options={FRAME_RATES[format].map((fps) => ({
+              label: `${fps} fps`,
+              value: String(fps),
+            }))}
+            value={String(frameRateFor(format, settings.fps))}
+          />
+        ) : null}
+        {formatHasControl(format, 'width') ? (
+          <ChoiceField
+            label="Width"
+            onChange={(width) => update({ gifWidth: Number(width) })}
+            options={GIF_WIDTHS.map((width) => ({
+              label: width === 0 ? 'Canvas' : `${width}px`,
+              value: String(width),
+            }))}
+            value={String(settings.gifWidth)}
+          />
+        ) : null}
+        {formatHasControl(format, 'duration') ? (
+          hasAnimation ? (
+            <SecondsField
+              label="Duration (timeline)"
+              max={600}
+              min={0.5}
+              onCommit={(seconds) =>
+                useImageStore.getState().setTimelineDuration(Math.round(seconds * 1000))
+              }
+              value={durationSeconds}
+            />
+          ) : editor.slideCount > 1 ? (
+            <p className="text-xs text-muted-foreground">
+              {editor.slideCount} slides · {durationSeconds.toFixed(1)}s in total
+            </p>
+          ) : (
+            <SecondsField
+              label="Length"
+              max={60}
+              min={0.5}
+              onCommit={(seconds) =>
+                useImageStore.getState().setSlideshow({ defaultDuration: seconds })
+              }
+              value={durationSeconds}
+            />
+          )
+        ) : null}
+        {animated && !hasAnimation ? (
+          <p className="text-[11px] text-muted-foreground">
+            {editor.slideCount > 1
+              ? 'No motion yet: plays the slides in order.'
+              : 'No motion yet: a still clip. Add an animation in the Motion tab.'}
           </p>
         ) : null}
-      </div>
-
-      {formatHasControl(format, 'sizes') ? (
-        <SizePicker
-          extra={[canvasTarget(canvas.width, canvas.height)]}
-          onChange={(next) => update({ targets: next })}
-          value={targets}
-        />
-      ) : null}
-
-      {formatHasControl(format, 'quality') && (format === 'jpeg' || format === 'webp') ? (
-        <QualityPresetSelector
-          format={format}
-          onQualityPresetChange={(quality) => update({ quality })}
-          qualityPreset={settings.quality}
-        />
-      ) : null}
-      {formatHasControl(format, 'quality') && animated ? (
-        <ChoiceField
-          label="Quality"
-          onChange={(quality) => update({ quality })}
-          options={BITRATE_OPTIONS}
-          value={settings.quality}
-        />
-      ) : null}
-      {formatHasControl(format, 'scale') ? (
-        <ScaleSlider onScaleChange={(scale) => update({ scale })} scale={settings.scale} />
-      ) : null}
-      {format === 'pdf' ? (
-        <>
-          <ChoiceField
-            label="Page image"
-            onChange={(pdfCompression) => update({ pdfCompression })}
-            options={COMPRESSION_OPTIONS}
-            value={settings.pdfCompression}
+        {!animated && editor.slideCount > 1 ? (
+          <ToggleField
+            checked={settings.allSlides}
+            label={`All ${editor.slideCount} slides`}
+            onChange={(allSlides) => update({ allSlides })}
           />
-          {settings.pdfCompression === 'jpeg' ? (
-            <ChoiceField
-              label="JPEG quality"
-              onChange={(quality) => update({ quality })}
-              options={QUALITY_OPTIONS}
-              value={settings.quality}
-            />
-          ) : null}
-        </>
-      ) : null}
-      {formatHasControl(format, 'transparency') ? (
-        <ToggleField
-          checked={settings.transparent}
-          label="Transparent background"
-          onChange={(transparent) => update({ transparent })}
-        />
-      ) : null}
-      {formatHasControl(format, 'fps') && animated ? (
-        <ChoiceField
-          label="Frame rate"
-          onChange={(fps) => update({ fps: Number(fps) })}
-          options={FRAME_RATES[format].map((fps) => ({ label: `${fps} fps`, value: String(fps) }))}
-          value={String(frameRateFor(format, settings.fps))}
-        />
-      ) : null}
-      {formatHasControl(format, 'width') ? (
-        <ChoiceField
-          label="Width"
-          onChange={(width) => update({ gifWidth: Number(width) })}
-          options={GIF_WIDTHS.map((width) => ({
-            label: width === 0 ? 'Canvas' : `${width}px`,
-            value: String(width),
-          }))}
-          value={String(settings.gifWidth)}
-        />
-      ) : null}
-      {formatHasControl(format, 'duration') ? (
-        hasAnimation ? (
-          <SecondsField
-            label="Duration (timeline)"
-            max={600}
-            min={0.5}
-            onCommit={(seconds) =>
-              useImageStore.getState().setTimelineDuration(Math.round(seconds * 1000))
-            }
-            value={durationSeconds}
-          />
-        ) : editor.slideCount > 1 ? (
-          <p className="text-xs text-muted-foreground">
-            {editor.slideCount} slides · {durationSeconds.toFixed(1)}s in total
-          </p>
-        ) : (
-          <SecondsField
-            label="Length"
-            max={60}
-            min={0.5}
-            onCommit={(seconds) =>
-              useImageStore.getState().setSlideshow({ defaultDuration: seconds })
-            }
-            value={durationSeconds}
-          />
-        )
-      ) : null}
-      {animated && !hasAnimation ? (
-        <p className="text-[11px] text-muted-foreground">
-          {editor.slideCount > 1
-            ? 'No motion yet: plays the slides in order.'
-            : 'No motion yet: a still clip. Add an animation in the Motion tab.'}
-        </p>
-      ) : null}
-      {!animated && editor.slideCount > 1 ? (
-        <ToggleField
-          checked={settings.allSlides}
-          label={`All ${editor.slideCount} slides`}
-          onChange={(allSlides) => update({ allSlides })}
-        />
-      ) : null}
+        ) : null}
 
-      {error ? (
-        <div
-          className="rounded-md border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive"
-          role="alert"
+        {error ? (
+          <div
+            className="rounded-md border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive"
+            role="alert"
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <Button
+          className="h-10 w-full rounded-md text-ui-lg font-semibold"
+          disabled={!animated && targets.length === 0}
+          onClick={handleExport}
         >
-          {error}
-        </div>
-      ) : null}
-
-      <Button
-        className="h-10 w-full rounded-md text-ui-lg font-semibold"
-        disabled={!animated && targets.length === 0}
-        onClick={handleExport}
-      >
-        {fileCount > 1 ? (
-          <FileZipIcon className="mr-2" size={16} />
-        ) : (
-          <Download01Icon className="mr-2" size={16} />
-        )}
-        {actionLabel}
-      </Button>
-
-      {info.kind === 'raster' ? (
-        <SaveToWorkspaceButton createExport={createWorkspaceExport} />
-      ) : null}
-
-      {embed}
-
-      {onOpenBatch ? (
-        <Button variant="custom" size={null}
-          className="flex w-full cursor-pointer items-center gap-2.5 rounded-md border border-foreground/[0.08] p-2.5 text-left transition-colors hover:bg-foreground/[0.04]"
-          onClick={onOpenBatch}
-          type="button"
-        >
-          <Layers01Icon className="shrink-0 text-muted-foreground" size={16} />
-          <span className="min-w-0">
-            <span className="block text-xs font-medium text-foreground">Batch export</span>
-            <span className="block text-[11px] text-muted-foreground">
-              Apply this design to many screenshots
-            </span>
-          </span>
+          {fileCount > 1 ? (
+            <FileZipIcon className="mr-2" size={16} />
+          ) : (
+            <Download01Icon className="mr-2" size={16} />
+          )}
+          {actionLabel}
         </Button>
-      ) : null}
-    </div>
+
+        {info.kind === 'raster' || animated ? (
+          <>
+            {canStartPost ? <UseInPostButton createExport={createWorkspaceExport} /> : null}
+            <SaveToWorkspaceButton createExport={createWorkspaceExport} />
+          </>
+        ) : null}
+
+        {embed}
+
+        {onOpenBatch ? (
+          <Button
+            variant="custom"
+            size={null}
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md border border-foreground/[0.08] p-2.5 text-left transition-colors hover:bg-foreground/[0.04]"
+            onClick={onOpenBatch}
+            type="button"
+          >
+            <Layers01Icon className="shrink-0 text-muted-foreground" size={16} />
+            <span className="min-w-0">
+              <span className="block text-xs font-medium text-foreground">Batch export</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Apply this design to many screenshots
+              </span>
+            </span>
+          </Button>
+        ) : null}
+      </div>
+    </>
   )
 }

@@ -2326,7 +2326,7 @@ export interface components {
              * @default input
              * @enum {string}
              */
-            classification: "capture" | "derived" | "export" | "input";
+            classification: "capture" | "derived" | "export" | "input" | "poster";
             contentType: string;
             fileName: string;
             sha256?: string;
