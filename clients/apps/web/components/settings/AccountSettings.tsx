@@ -185,7 +185,7 @@ function Sessions() {
             </p>
             <div className="flex gap-2">
               <Button asChild variant="outline">
-                <Link href="/sign-in?reauthenticate=1&callbackURL=%2Fworkspace%2Faccount">
+                <Link href="/sign-in?reauthenticate=1&callbackURL=%2Fsettings%2Faccount">
                   Verify identity
                 </Link>
               </Button>

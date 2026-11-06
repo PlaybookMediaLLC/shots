@@ -13,6 +13,10 @@ services:
     volumes: !reset []
     environment:
       NODE_ENV: production
+      # Offers GIF search so its flow can be tested; each spec answers the search
+      # itself, so GIPHY is never contacted. test/write-giphy.server.ts covers the gate.
+      PLATFORM_GIPHY_APPROVED_API_AND_STORAGE: 'true'
+      GIPHY_API_KEY: e2e-fixture
       # Test users have no inbox. Production verifies email by default.
       AUTH_REQUIRE_EMAIL_VERIFICATION: 'false'
       HOSTNAME: 0.0.0.0
