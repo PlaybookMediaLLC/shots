@@ -281,6 +281,9 @@ export function ShellSearch({
     ...(paidPlan ? ['screenshots', 'canvases'] : []),
   ])
   const link = 'min-h-11 justify-between rounded-lg font-normal'
+  const newPost = useNewPost(() => setOpen(false))
+  const wanted = query.trim().toLowerCase()
+  const shows = (label: string) => !wanted || label.toLowerCase().includes(wanted)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
@@ -309,6 +312,27 @@ export function ShellSearch({
           onChange={(event) => setQuery(event.target.value)}
         />
         <nav aria-label="Search results" className="grid max-h-[50dvh] gap-1 overflow-y-auto">
+          {draftsEnabled && shows('New post') ? (
+            <Button className={link} onClick={newPost} variant="ghost">
+              New post
+              <span className="shrink-0 text-xs text-muted-foreground">Command</span>
+            </Button>
+          ) : null}
+          {draftsEnabled
+            ? [
+                { href: '/publish/calendar', label: 'Go to calendar' },
+                { href: '/publish', label: 'Go to drafts' },
+              ]
+                .filter((command) => shows(command.label))
+                .map((command) => (
+                  <Button asChild className={link} key={command.href} variant="ghost">
+                    <SidebarLink href={command.href} onClick={() => setOpen(false)}>
+                      {command.label}
+                      <span className="shrink-0 text-xs text-muted-foreground">Command</span>
+                    </SidebarLink>
+                  </Button>
+                ))
+            : null}
           {!query.trim() && workItems.length ? (
             <p className="px-3 pt-1 text-xs text-muted-foreground">Recent work</p>
           ) : null}

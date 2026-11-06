@@ -5,6 +5,7 @@ import {
   expectSaved,
   settleSelection,
   test,
+  startPostByTyping,
 } from './framework'
 
 test(
@@ -15,13 +16,10 @@ test(
     page.on('pageerror', (error) => errors.push(error.message))
     await startWorkspace({ channels: ['x'] })
     await app.open('/publish')
-    await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/publish\/[a-z0-9]+/)
+    await startPostByTyping(page, 'Before after')
     const editor = draftEditor(page)
-    await expect(editor).toBeVisible()
     await editor.click()
     await settleSelection(page)
-    await page.keyboard.type('Before after')
     for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft')
     await settleSelection(page)
     await page.getByRole('button', { name: 'Emoji', exact: true }).click()

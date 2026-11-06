@@ -264,12 +264,28 @@ export async function expectSaved(page: Page): Promise<void> {
 /** How the composer names each platform. */
 const PLATFORM_LABELS: Record<string, string> = { linkedin: 'LinkedIn', x: 'X' }
 
-/** Open a new draft from the Write library; returns its id. */
+/**
+ * Open an empty draft and return its id. A blank post is only saved at its
+ * first word, so this makes the row through the API, for specs that start
+ * from an empty saved draft. `startPostByTyping` is the path a person takes.
+ */
 export async function openNewDraft(page: Page): Promise<string> {
   await page.goto('/publish')
-  await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/publish\/[a-z0-9]+/)
+  const created = await apiRequest(page, '/api/v1/content-drafts', { method: 'POST', body: {} })
+  expect(created.status, JSON.stringify(created.body)).toBe(201)
+  const { id } = created.body as { id: string }
+  await page.goto(`/publish/${id}`)
   await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
+  return id
+}
+
+/** Start a post the way a person does: the box opens, and the first word makes the draft. */
+export async function startPostByTyping(page: Page, text: string): Promise<string> {
+  await page.getByTestId('new-draft').first().click()
+  await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
+  await page.keyboard.type(text)
+  await page.waitForURL(/\/publish\/[a-z0-9]+/)
+  await expect(draftEditor(page)).toContainText(text, { timeout: 60_000 })
   return new URL(page.url()).pathname.split('/').pop() ?? ''
 }
 

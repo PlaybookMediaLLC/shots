@@ -301,6 +301,7 @@ export {
   openNewDraft,
   openBlockedSchedule,
   openSchedule,
+  startPostByTyping,
   postMenu,
   previewOf,
   saveBatchDrafts,

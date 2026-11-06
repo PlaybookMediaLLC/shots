@@ -16,6 +16,7 @@ import {
   test,
   trpcMutation,
   editorMore,
+  openNewDraft,
 } from './framework'
 
 test.use({ actionTimeout: 30_000 })
@@ -71,8 +72,7 @@ test(
     await expect(page.getByLabel('Poll option 1')).toHaveValue('Choice one')
     await page.screenshot({ path: '.context/shots/typefully-poll-copy.png' })
     await page.keyboard.press('Escape')
-    await page.getByTestId('new-draft').first().click()
-    await expect(draftEditor(page)).toBeVisible()
+    await openNewDraft(page)
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.evaluate(() => navigator.clipboard.writeText('https://x.com/example/status/123456'))
     await draftEditor(page).click()

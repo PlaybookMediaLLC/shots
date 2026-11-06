@@ -1006,7 +1006,9 @@ function ReadyEditor({ draftId, focus }: { draftId?: string; focus: boolean }) {
       pending !== null ||
       (focus && !document.activeElement?.matches('input,textarea,[contenteditable="true"]'))
     ) {
-      editor.tf.select(editor.api.end([]))
+      // Buffered words go to the post's text; a seeded post can end on an attachment.
+      const [text] = editor.api.nodes({ at: [], match: (node) => node.type === 'p', reverse: true })
+      editor.tf.select(editor.api.end(text ? text[1] : []))
       if (pending) editor.tf.insertText(pending)
       editor.tf.focus()
     }
