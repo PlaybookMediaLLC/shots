@@ -64,6 +64,11 @@ test('API keys start read-only and presets grant only their named capabilities',
   await page.getByRole('button', { name: 'Publishing', exact: true }).click()
   await expect(page.locator('[id="scope-post:schedule"]')).toBeChecked()
   await expect(page.locator('[id="scope-asset:write"]')).not.toBeChecked()
+  // Publishing schedules approved content; posting directly is its own choice.
+  await expect(page.locator('[id="scope-post:publish"]')).not.toBeChecked()
+  await page.getByRole('button', { name: 'Direct posting', exact: true }).click()
+  await expect(page.locator('[id="scope-post:publish"]')).toBeChecked()
+  await page.getByRole('button', { name: 'Publishing', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Expires in', exact: true })).toHaveText(
     '30 days'
   )
