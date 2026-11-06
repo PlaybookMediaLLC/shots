@@ -600,7 +600,8 @@ test(
     await page.keyboard.press('ControlOrMeta+Enter')
     await page.keyboard.type('A short second post 🚀')
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
-    await expect(panel).toContainText('Live update.')
+    // The first post's new words sit past X's cutoff; the end of this test finds them saved.
+    await expect(panel).toContainText('A short second post 🚀')
     await panel.getByRole('button', { name: 'Threads', exact: true }).click()
     await expect(panel.locator('article')).toHaveCount(2)
     await expect(panel).toHaveScreenshot('threads-mobile-thread.png', {
