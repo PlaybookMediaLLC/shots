@@ -9,6 +9,7 @@ import {
   expectSaved,
   getActiveOrganizationId,
   openNewDraft,
+  quietProductToursIn,
   type Page,
   requestJson,
   settleSelection,
@@ -110,6 +111,7 @@ test('a viewer promoted to creator can edit after client navigation', async ({
   const invitationId = z.object({ id: z.string() }).parse(invited.body).id
   const context = await browser.newContext()
   try {
+    await quietProductToursIn(context)
     const member = await context.newPage()
     await signUpViaApi(memberIdentity, member)
     await acceptInvitation(member, invitationId)
@@ -225,6 +227,7 @@ test(
     const memberContext = await browser.newContext()
     const strangerContext = await browser.newContext()
     try {
+      await quietProductToursIn(memberContext)
       const memberPage = await memberContext.newPage()
       await signUpViaApi(memberIdentity, memberPage)
       await acceptInvitation(memberPage, invitationId)
