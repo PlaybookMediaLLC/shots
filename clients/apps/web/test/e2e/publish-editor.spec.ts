@@ -223,7 +223,7 @@ test(
     const blockers = page.getByTestId('blockers')
     await expect(blockers).toContainText('X: 290 of 280 characters')
     await blockers.getByRole('button', { name: /^X: 290 of 280/ }).click()
-    await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-pressed', 'true')
 
     await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await expect(page.getByTestId('empty-post-2')).toContainText('Empty, not sent')
