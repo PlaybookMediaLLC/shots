@@ -290,11 +290,12 @@ func TestCampaignPublishing(t *testing.T) {
 		}
 	}
 
-	// The same key schedules an approved variant directly, charged once.
+	// The same key schedules an approved variant directly, charged once. It sends
+	// only copy a person approved, so the edits above took that away.
 	key := func(id string) Actor {
 		return Actor{Kind: "api_key", KeyID: id, OrganizationID: org, Display: "Coding agent", RequestID: "agent_" + id}
 	}
-	direct := publishing.CreateScheduledPostInput{Caption: "Ship faster", ChannelConnectionID: connection.ID,
+	direct := publishing.CreateScheduledPostInput{Caption: "Ship even faster", ChannelConnectionID: connection.ID,
 		IdempotencyKey: "agent-" + id, ScheduledFor: at, VariantID: variant}
 	_, err = repo.CreateScheduledPost(ctx, key(reader), direct)
 	expect(err, publishing.ErrForbidden, "key without post:schedule created a scheduled post")
@@ -302,6 +303,13 @@ func TestCampaignPublishing(t *testing.T) {
 	draft.VariantID, draft.ContentDraftID = "", "draft_"+id
 	_, err = repo.CreateScheduledPost(ctx, key(scheduler), draft)
 	expect(err, publishing.ErrForbidden, "key scheduled a content draft")
+	_, err = repo.CreateScheduledPost(ctx, key(scheduler), direct)
+	expect(err, publishing.ErrForbidden, "key sent edited copy no one approved")
+	old := direct
+	old.Caption = "Ship faster"
+	_, err = repo.CreateScheduledPost(ctx, key(scheduler), old)
+	expect(err, publishing.ErrForbidden, "key sent copy whose approval the edit withdrew")
+	exec(`UPDATE campaign_post SET status='APPROVED', "approvedAt"=now(), "approvedByUserId"=$1 WHERE id=$2`, owner.UserID, x)
 	before := meter.used[monthlyMeterKey(QuotaPosts, org, time.Now().UTC())]
 	created, err := repo.CreateScheduledPost(ctx, key(scheduler), direct)
 	if err != nil || !created.Created {

@@ -33,8 +33,11 @@ scheduling or publishing a draft is human-only, this narrows it for one operatio
   Exposing it would need a Go port of that serializer.
 - Everything a schedule checks runs before the draft exists, so a refused post leaves
   nothing behind. `Idempotency-Key` is required, and a retry can't post twice.
-- Private social sets stay session-only: a key can't post to one, or read or cancel the
-  posts in one.
+- Private social sets stay session-only: a key can't post to one, schedule to one, or
+  read or cancel the posts in one.
+- `post:schedule` now means what it says: `createScheduledPost` from a key takes only the
+  copy of an approved campaign post for that visual, because approving a visual doesn't
+  approve words. New text takes `createPost`.
 - The risk this accepts is a prompt-injected agent posting to public accounts. Mitigations:
   the opt-in scope, `openWorldHint` so clients confirm, the skill's instruction to confirm
   with the user, the audit trail, and the monthly posts allowance.
