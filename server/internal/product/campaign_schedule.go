@@ -180,6 +180,9 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	if err != nil {
 		return nil, err
 	}
+	if err := requireSharedAccount(ctx, tx.Client(), actor, connection); err != nil {
+		return nil, err
+	}
 	if !slices.Contains(campaignChannelPlatforms[post.Channel], connection.Platform) {
 		return nil, conflict("This channel cannot publish a " + post.Channel + " post.")
 	}

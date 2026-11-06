@@ -30,6 +30,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture"
 	platformdb "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
@@ -675,6 +676,57 @@ func TestSchedulingToolsTakeOnlyApprovedContent(t *testing.T) {
 	if isError || body["scheduledPost"].(map[string]any)["status"] != "CANCELLED" {
 		t.Fatalf("cancelScheduledPost: %v", body)
 	}
+}
+
+// post:schedule schedules what a person approved, so a key can't send its own
+// text by reusing an approved visual, or reach an account in a private set. A
+// person who schedules still writes the caption.
+func TestScheduleKeyOnlySendsApprovedCopy(t *testing.T) {
+	f := newFixture(t)
+	campaignID, approved, _, variantID, connectionID := f.approvedPost()
+	session := f.session("a-schedule")
+	at := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	direct := func(caption, key string) (map[string]any, bool) {
+		return f.call(session, "createScheduledPost", map[string]any{"caption": caption, "channelConnectionId": connectionID,
+			"variantId": variantID, "scheduledFor": at, "idempotencyKey": key + f.id})
+	}
+	scheduled := func() int {
+		count, err := f.db.Client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(f.orgs["a"])).Count(f.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	body, isError := direct("Unreviewed text from an agent", "own-")
+	refusedWith(t, "createScheduledPost with its own caption", body, isError, "forbidden")
+	if count := scheduled(); count != 0 {
+		t.Fatalf("scheduled %d posts", count)
+	}
+	// Surrounding space doesn't make approved copy new text.
+	if body, isError = direct("  Ship faster  ", "approved-"); isError || body["created"] != true {
+		t.Fatalf("approved copy: %v", body)
+	}
+	// Once approval is withdrawn, the copy is no longer approved.
+	f.exec(`UPDATE campaign_post SET "approvedAt"=NULL WHERE id=$1`, approved)
+	body, isError = direct("Ship faster", "withdrawn-")
+	refusedWith(t, "createScheduledPost after approval was withdrawn", body, isError, "forbidden")
+	f.exec(`UPDATE campaign_post SET "approvedAt"=now() WHERE id=$1`, approved)
+
+	owner := product.Actor{OrganizationID: f.orgs["a"], UserID: "user_" + f.id, SessionID: "session_" + f.id, RequestID: "owner-" + f.id}
+	person, err := f.product.CreateScheduledPost(f.ctx, owner, publishing.CreateScheduledPostInput{Caption: "A person wrote this", ChannelConnectionID: connectionID,
+		IdempotencyKey: "person-" + f.id, ScheduledFor: time.Now().Add(24 * time.Hour), VariantID: variantID})
+	if err != nil || !person.Created {
+		t.Fatalf("person's caption: %+v %v", person, err)
+	}
+
+	setID := cuid.New()
+	f.exec(`INSERT INTO social_set (id,"organizationId",name,visibility,"publicSlug","ownerUserId","createdAt","updatedAt") VALUES ($1,$2,'Mine','PRIVATE',$1,$3,now(),now())`, setID, f.orgs["a"], owner.UserID)
+	f.exec(`UPDATE channel_connection SET "socialSetId"=$1 WHERE id=$2`, setID, connectionID)
+	body, isError = direct("Ship faster", "private-")
+	refusedWith(t, "createScheduledPost to a private set", body, isError, "not_found")
+	body, isError = f.call(session, "scheduleCampaignPost", map[string]any{"campaignId": campaignID, "postId": approved,
+		"channelConnectionId": connectionID, "creativeVariantId": variantID, "scheduledAt": at, "skipLinkCheck": true})
+	refusedWith(t, "scheduleCampaignPost to a private set", body, isError, "not_found")
 }
 
 // createPost needs its own opt-in scope: a key with post:schedule doesn't even
