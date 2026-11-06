@@ -337,11 +337,12 @@ test(
     // Slate syncs native DOM selection on a 100 ms timer.
     await settleSelection(page)
     const toggle = page.getByRole('button', { name: 'Preview', exact: true })
-    await toggle.click()
-    await expect(editor).toBeFocused()
+    // Preview takes the draft's place and shows what was written; closing it returns to the caret.
     await page.keyboard.type('one ')
     await expect(editor).toContainText('Alpha one omega.')
+    await toggle.click()
     await expect(page.getByTestId('preview-panel')).toContainText('Alpha one omega.')
+    await expect(editor).toBeHidden()
     await toggle.click()
     await expect(editor).toBeFocused()
     await page.keyboard.type('two ')

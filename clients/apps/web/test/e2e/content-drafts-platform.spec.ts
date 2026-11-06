@@ -76,9 +76,7 @@ test(
 
     // The account shows as its platform names it, not an integration id.
     const draftId = await openNewDraft(page)
-    await page.getByRole('button', { name: 'Manage platforms' }).click()
-    await expect(page.getByRole('dialog')).toContainText('@shots_x')
-    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('active-platform')).toContainText('@shots_x')
     await write(page, 'Queued for the next slot')
     await chooseChannels(page, ['x'])
     await expectSaved(page)

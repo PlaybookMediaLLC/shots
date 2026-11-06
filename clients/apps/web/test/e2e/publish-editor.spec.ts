@@ -191,15 +191,11 @@ test(
       const box = await control.boundingBox()
       expect(box && column && box.x + box.width <= column.x + column.width).toBeTruthy()
     }
-    // A panel beside the draft is never drawn over by the header's buttons.
+    // Preview takes the draft's place, so the header keeps its full width and one row.
+    const before = await page.getByTestId('publish-button').boundingBox()
     await page.getByRole('button', { name: 'Preview', exact: true }).first().click()
-    const panel = await page
-      .getByRole('complementary', { name: 'Preview', exact: true })
-      .boundingBox()
-    for (const button of ['publish-button', 'schedule-button', 'queue-button']) {
-      const box = await page.getByTestId(button).boundingBox()
-      expect(box && panel && box.x + box.width <= panel.x, button).toBeTruthy()
-    }
+    await expect(page.getByTestId('preview-panel')).toBeVisible()
+    expect(await page.getByTestId('publish-button').boundingBox()).toEqual(before)
   }
 )
 
@@ -272,31 +268,24 @@ test(
     await weeklySlots(page)
     const id = await openNewDraft(page)
     await page.keyboard.type('Plain text, with no media.')
+    // They switch themselves off for lacking media; keeping them on leaves something to fix.
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
     await expectSaved(page)
 
     // Every platform with something to fix says so on its tab, and the list offers to drop it.
     await expect(page.getByTestId('platform-blocked-tiktok')).toBeVisible()
     await expect(page.getByTestId('platform-blocked-instagram')).toBeVisible()
-    for (const [channel, label] of [
-      ['tiktok', 'TikTok'],
-      ['instagram', 'Instagram'],
-    ]) {
+    for (const label of ['TikTok', 'Instagram']) {
       if (!(await page.getByTestId('blockers').isVisible()))
         await page.getByTestId('blockers-button').click()
       await page.getByRole('button', { name: `Remove ${label} from this post` }).click()
-      await expect(page.getByTestId(`platform-tab-${channel}`)).toHaveCount(0)
+      await expect(page.getByRole('switch', { name: `Publish to ${label}` })).not.toBeChecked()
     }
     await expect(page.getByTestId('blockers-button')).toHaveCount(0)
 
-    // Turning the main platform off hands the main version on, and the dialog holds still.
-    await page.getByRole('button', { name: 'Manage platforms' }).click()
-    const dialog = page.getByRole('dialog')
-    const before = await dialog.boundingBox()
-    await dialog.getByRole('switch', { name: 'Publish to X' }).click()
-    await expect(dialog.getByRole('switch', { name: 'Publish to X' })).not.toBeChecked()
-    expect(await dialog.boundingBox()).toEqual(before)
-    await dialog.getByRole('button', { name: 'Done' }).click()
-    await expect(page.getByTestId('platform-tab-x')).toHaveCount(0)
+    // Turning the main platform off hands the main version on; its tab stays to turn back on.
+    await page.getByRole('switch', { name: 'Publish to X' }).click()
+    await expect(page.getByRole('switch', { name: 'Publish to X' })).not.toBeChecked()
     await expect(page.getByTestId('platform-tab-threads')).toContainText('Main')
     await expectSaved(page)
 
@@ -320,5 +309,30 @@ test(
     await expect(page.getByRole('toolbar', { name: 'Draft tools' })).toHaveCount(0)
     await app.open('/home')
     await expect(page.getByRole('region', { name: 'Continue working' })).toContainText('Published')
+  }
+)
+
+test(
+  'a platform that needs media switches itself off with an undo, and each tab has its own switch',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x', 'tiktok'] })
+    await openNewDraft(page)
+    const tiktok = page.getByRole('switch', { name: 'Publish to TikTok', exact: true })
+    // An empty post leaves it alone: the person may be about to attach a video.
+    await expect(tiktok).toBeChecked()
+    await page.keyboard.type('Words but no video.')
+    await expect(tiktok).not.toBeChecked()
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(tiktok).toBeChecked()
+    // Having chosen to keep it, more typing does not switch it off again; the fix list explains it.
+    await page.keyboard.type(' More words.')
+    await expectSaved(page)
+    await expect(tiktok).toBeChecked()
+    await expect(page.getByTestId('platform-blocked-tiktok')).toBeVisible()
+    // Off is a state of the tab, not its removal.
+    await tiktok.click()
+    await expect(tiktok).not.toBeChecked()
+    await expect(page.getByTestId('platform-tab-tiktok')).toBeVisible()
   }
 )
