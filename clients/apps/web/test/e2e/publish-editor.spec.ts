@@ -336,3 +336,28 @@ test(
     await expect(page.getByTestId('platform-tab-tiktok')).toBeVisible()
   }
 )
+
+test(
+  'an empty draft says what it needs, and a post schedules from the time beside it',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    const id = await openNewDraft(page)
+    // Nothing is pretending to be ready: one item, and it goes to the post.
+    const fixes = page.getByTestId('blockers')
+    await expect(fixes).toContainText('Write something to post.')
+    await expect(page.getByTestId('blockers-button')).toContainText('1 to fix')
+    await expect(page.getByTestId('dock-schedule-button')).toBeDisabled()
+    await fixes.getByRole('button', { name: /Write something to post/ }).click()
+    await expect(draftEditor(page)).toBeFocused()
+
+    await page.keyboard.type('Scheduled without a dialog.')
+    await expectSaved(page)
+    await expect(fixes).toHaveCount(0)
+    await page.getByTestId('dock-schedule-button').click()
+    await expect(page.getByText(/Scheduled for|Queued|scheduled/i).first()).toBeVisible()
+    await expect(page.getByTestId('schedule-dialog')).toHaveCount(0)
+    const posts = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
+    expect((posts.body as { posts: unknown[] }).posts).toHaveLength(1)
+  }
+)

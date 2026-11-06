@@ -44,7 +44,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Sheet,
   SheetContent,
@@ -138,6 +137,7 @@ import { PostSettingRequestContext, PostSettingsTools, type PostSettingRequest }
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
 import {
+  ScheduleDock,
   blockerFixLabel,
   PublishReview,
   type ScheduleBlocker,
@@ -775,20 +775,19 @@ export function WriteComposer({
       item.publication.serialized.posts.some((post) => post.length > item.publication.serialized.limit)
     )
     .map((item) => item.account.channel)
-  // Blockers show beside Schedule once there is something to post, not on an empty draft.
-  const blockers =
-    !locked && items.some((item) => item.publication.serialized.posts.length > 0)
-      ? scheduleBlockers({
-          approved,
-          canPublish: canPublish && server.status !== 'archived',
-          conflict: conflict !== null,
-          draft: server,
-          items: pending,
-          requireApproval,
-          saveState,
-        })
-      : []
-  const [blockersOpen, setBlockersOpen] = React.useState(false)
+  // Always in view beside the post, including what an empty draft still needs.
+  const blockers = !locked
+    ? scheduleBlockers({
+        approved,
+        canPublish: canPublish && server.status !== 'archived',
+        conflict: conflict !== null,
+        draft: server,
+        items: pending,
+        requireApproval,
+        saveState,
+      })
+    : []
+  const fixList = React.useRef<HTMLDivElement>(null)
   const [blockedAction, setBlockedAction] = React.useState<PublishAction | null>(null)
   const [postAgain, setPostAgain] = React.useState(false)
   // Every way to schedule or publish comes through here: what is missing is fixed first.
@@ -797,14 +796,12 @@ export function WriteComposer({
     // An archived draft has no checklist in its header: the review says to restore it.
     if (blockers.length === 0 || server.status === 'archived') return setDialog(action)
     setBlockedAction(action)
-    setBlockersOpen(true)
+    fixList.current?.focus()
   }
-  // The checklist closes with its last item, so the next blocker cannot reopen it unasked.
+  // A button's "anyway" offer ends with the last thing to fix.
   const anyBlockers = blockers.length > 0
   React.useEffect(() => {
-    if (anyBlockers) return
-    setBlockersOpen(false)
-    setBlockedAction(null)
+    if (!anyBlockers) setBlockedAction(null)
   }, [anyBlockers])
   React.useEffect(() => {
     openPreviewRef.current = () => setPanel('preview')
@@ -946,6 +943,7 @@ export function WriteComposer({
       focusRoot.current
         ?.querySelector<HTMLElement>('[data-testid="platform-tabs"] [role="switch"]')
         ?.focus()
+    else if (blocker.fix === 'write') editor.current?.tf.focus()
     else if (blocker.fix === 'restore') {
       if (canEdit) void archive('draft')
     } else if (blocker.fix === 'conflict') conflictBanner.current?.querySelector('button')?.focus()
@@ -1523,28 +1521,23 @@ export function WriteComposer({
               {canPublish && server.status !== 'archived' && !locked ? (
                 <>
                   {blockers.length > 0 ? (
-                    <Blockers
-                      action={blockedAction}
-                      blockers={blockers}
-                      onJump={jumpTo}
-                      onOpenChange={(open) => {
-                        setBlockersOpen(open)
-                        if (!open) setBlockedAction(null)
-                      }}
-                      onProceed={(action) => setDialog(action)}
-                      onRemove={
-                        canEdit && items.length > 1
-                          ? (channel) => {
-                              const off = items.find((item) => item.account.channel === channel)
-                              if (off) toggle(off.account.id, false)
-                            }
-                          : undefined
-                      }
-                      open={blockersOpen}
-                    />
+                    <Button
+                      className="text-amber-700 dark:text-amber-300"
+                      data-testid="blockers-button"
+                      onClick={() => fixList.current?.focus()}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+                      {blockers.length} to fix
+                    </Button>
                   ) : null}
                   <Button
-                    className={cn('hidden', !focus && 'sm:inline-flex')}
+                    className={cn(
+                      'hidden',
+                      !focus && 'sm:inline-flex',
+                      blockers.length > 0 && 'opacity-60'
+                    )}
                     data-testid="publish-button"
                     onClick={() => startPublishing('publish')}
                     size="sm"
@@ -1560,7 +1553,7 @@ export function WriteComposer({
                   {/* Schedule picks a time; its arrow takes the next free queue slot. */}
                   <span className="flex items-center" role="group" aria-label="Schedule">
                     <Button
-                      className="rounded-r-none"
+                      className={cn('rounded-r-none', blockers.length > 0 && 'opacity-60')}
                       data-testid="schedule-button"
                       onClick={() => startPublishing('schedule')}
                       size="sm"
@@ -1576,7 +1569,10 @@ export function WriteComposer({
                     </Button>
                     <Button
                       aria-label="Add to the next free slot"
-                      className="rounded-l-none border-l border-background/25 px-2"
+                      className={cn(
+                        'rounded-l-none border-l border-background/25 px-2',
+                        blockers.length > 0 && 'opacity-60'
+                      )}
                       data-testid="queue-button"
                       onClick={() => startPublishing('queue')}
                       size="sm"
@@ -1770,9 +1766,33 @@ export function WriteComposer({
               ) : null}
             </div>
           ) : null}
+          {canPublish && server.status !== 'archived' && !locked && blockers.length > 0 ? (
+            <FixList
+              action={blockedAction}
+              blockers={blockers}
+              listRef={fixList}
+              onJump={jumpTo}
+              onProceed={(action) => setDialog(action)}
+              onRemove={
+                canEdit && items.length > 1
+                  ? (channel) => {
+                      const off = items.find((item) => item.account.channel === channel)
+                      if (off) toggle(off.account.id, false)
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
           {/* Focus mode (⌘⇧F) keeps the posts and Schedule; everything else steps away. */}
           {focus ? null : (
             <>
+          {canPublish && server.status !== 'archived' && !locked ? (
+            <ScheduleDock
+              blocked={blockers.length > 0}
+              context={context}
+              onMore={() => setDialog('schedule')}
+            />
+          ) : null}
           <PlatformTabs
             accounts={accounts}
             active={active}
@@ -2518,105 +2538,83 @@ function PostCount({
 }
 
 /**
- * The checklist of what blocks publishing, beside Schedule: the publishing
- * buttons open it instead of their dialogs, and each item goes where it is fixed.
+ * What stops this draft from publishing, always in view beside the post. Each
+ * item goes straight to where it is fixed.
  */
-function Blockers({
+function FixList({
   action,
   blockers,
+  listRef,
   onJump,
-  onOpenChange,
   onProceed,
   onRemove,
-  open,
 }: {
-  /** The publishing button that opened this, if one did. */
+  /** The publishing button that was pressed, if one was. */
   action: PublishAction | null
   blockers: ScheduleBlocker[]
+  listRef: React.RefObject<HTMLDivElement | null>
   onJump: (blocker: ScheduleBlocker) => void
-  onOpenChange: (open: boolean) => void
   onProceed: (action: PublishAction) => void
   /** Stop publishing to a platform; missing when it is the only one. */
   onRemove?: (channel: DraftChannel) => void
-  open: boolean
 }) {
   return (
-    <Popover onOpenChange={onOpenChange} open={open}>
-      <PopoverTrigger asChild>
-        <Button
-          className="text-amber-700 dark:text-amber-300"
-          data-testid="blockers-button"
-          size="sm"
-          variant="ghost"
-        >
-          <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-          {blockers.length} to fix
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-80 p-2"
-        data-testid="blockers"
-        // A menu or the palette hands focus back as it closes; only a click dismisses this.
-        onFocusOutside={(event) => event.preventDefault()}
-      >
-        <p className="px-2 py-1 text-xs text-muted-foreground">
-          Fix {blockers.length === 1 ? 'this' : 'these'} before you{' '}
-          {action === 'publish' ? 'publish' : 'schedule'}:
-        </p>
-        <ul className="grid gap-0.5">
-          {blockers.map((blocker, index) => (
-            <li key={blocker.text}>
+    <div
+      className="mx-4 mb-3 rounded-lg border border-amber-400/40 bg-amber-400/[0.04] p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-testid="blockers"
+      ref={listRef}
+      tabIndex={-1}
+    >
+      <p className="px-2 py-1 text-xs text-muted-foreground">
+        Fix {blockers.length === 1 ? 'this' : 'these'} before you{' '}
+        {action === 'publish' ? 'publish' : 'schedule'}:
+      </p>
+      <ul className="grid gap-0.5">
+        {blockers.map((blocker, index) => (
+          <li key={blocker.text}>
+            <Button
+              className="h-auto w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
+              onClick={() => onJump(blocker)}
+              size={null}
+              variant="ghost"
+            >
+              <span className="min-w-0">
+                {blocker.text}
+                {blockerFixLabel(blocker) ? (
+                  <span className="mt-0.5 block font-medium text-foreground">
+                    {blockerFixLabel(blocker)}
+                  </span>
+                ) : null}
+              </span>
+              <CaretRightIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+            </Button>
+            {/* Once per platform, under the first thing it needs. */}
+            {onRemove &&
+            blocker.channel &&
+            blockers.findIndex((item) => item.channel === blocker.channel) === index ? (
               <Button
-                className="h-auto w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
-                onClick={() => {
-                  onOpenChange(false)
-                  onJump(blocker)
-                }}
+                className="mx-2 mb-1 h-6 px-1.5 text-xs font-normal text-muted-foreground"
+                onClick={() => onRemove(blocker.channel!)}
                 size={null}
                 variant="ghost"
               >
-                <span className="min-w-0">
-                  {blocker.text}
-                  {blockerFixLabel(blocker) ? (
-                    <span className="mt-0.5 block font-medium text-foreground">
-                      {blockerFixLabel(blocker)}
-                    </span>
-                  ) : null}
-                </span>
-                <CaretRightIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                Remove {CHANNEL_META[blocker.channel].label} from this post
               </Button>
-              {/* Once per platform, under the first thing it needs. */}
-              {onRemove &&
-              blocker.channel &&
-              blockers.findIndex((item) => item.channel === blocker.channel) === index ? (
-                <Button
-                  className="mx-2 mb-1 h-6 px-1.5 text-xs font-normal text-muted-foreground"
-                  onClick={() => onRemove(blocker.channel!)}
-                  size={null}
-                  variant="ghost"
-                >
-                  Remove {CHANNEL_META[blocker.channel].label} from this post
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-        {action ? (
-          <Button
-            className="mt-1 w-full justify-start px-2 text-xs font-normal text-muted-foreground"
-            onClick={() => {
-              onOpenChange(false)
-              onProceed(action)
-            }}
-            size="sm"
-            variant="ghost"
-          >
-            {action === 'schedule' ? 'Save as planned instead…' : 'See the review anyway'}
-          </Button>
-        ) : null}
-      </PopoverContent>
-    </Popover>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {action ? (
+        <Button
+          className="mt-1 w-full justify-start px-2 text-xs font-normal text-muted-foreground"
+          onClick={() => onProceed(action)}
+          size="sm"
+          variant="ghost"
+        >
+          {action === 'schedule' ? 'Save as planned instead…' : 'See the review anyway'}
+        </Button>
+      ) : null}
+    </div>
   )
 }
 

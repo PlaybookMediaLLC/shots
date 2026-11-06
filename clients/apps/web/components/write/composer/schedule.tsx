@@ -41,6 +41,7 @@ import { upcomingSlots } from '@/lib/write/calendar'
 import { writeApi } from '@/lib/write/client'
 import type { AutoDm, Automation, Community, DraftChannel } from '@/lib/write/document'
 import type { DraftKind } from '@/lib/write/document'
+import { mediaProblems } from '@/lib/write/media-rules'
 import { platformRefusal } from '@/lib/write/platform-rules'
 import {
   committedMessage,
@@ -104,7 +105,7 @@ export type ScheduleContext = {
  */
 export type ScheduleBlocker = {
   channel?: DraftChannel
-  fix?: 'account' | 'conflict' | 'restore' | 'review' | 'save'
+  fix?: 'account' | 'conflict' | 'restore' | 'review' | 'save' | 'write'
   options?: boolean
   text: string
 }
@@ -120,6 +121,11 @@ export function scheduleBlockers(
   >
 ): ScheduleBlocker[] {
   const problems: ScheduleBlocker[] = []
+  // Nothing written says so once, and what each platform will need, not one error per platform.
+  const empty =
+    context.items.length > 0 &&
+    context.items.every((item) => item.publication.serialized.posts.length === 0)
+  if (empty) problems.push({ fix: 'write', text: 'Write something to post.' })
   if (context.conflict)
     problems.push({
       fix: 'conflict',
@@ -146,7 +152,10 @@ export function scheduleBlockers(
         text: `${CHANNEL_META[channel].label}: reconnect the account first.`,
       })
     }
-    for (const problem of item.publication.problems)
+    if (empty)
+      for (const text of mediaProblems(channel, []))
+        problems.push({ channel, text: text.replace(' Add one to the post.', '') })
+    else for (const problem of item.publication.problems)
       problems.push({
         channel,
         fix: item.publication.accountProblems.includes(problem) ? 'account' : undefined,
@@ -168,6 +177,137 @@ export function scheduleBlockers(
   return problems
 }
 
+/** Queue the draft and confirm it, with an Undo unless this replaced earlier posts. */
+async function commitSchedule(
+  context: ScheduleContext,
+  timing: { disambiguation?: 'earlier' | 'later'; localTime: string; timeZone: string } | {
+    expectedQueueSlot?: string
+    queue: true
+  },
+  options: { naturalPostingTime: boolean | undefined; newDraft: boolean; zone: string }
+): Promise<void> {
+  await context.flush()
+  const queued = 'queue' in timing
+  const rescheduling = (context.scheduled ?? []).length > 0
+  const result = await draftsApi.schedule(context.draft.id, {
+    blockImages: await context.renderBlocks(),
+    channelConnectionIds: context.items.map((item) => item.account.id),
+    ...timing,
+    naturalPostingTime: options.naturalPostingTime,
+    version: context.versionRef.current,
+    baseCalendarVersion: context.draft.calendarVersion,
+  })
+  context.versionRef.current = result.draft.version
+  context.onDone({ ...result, newDraft: options.newDraft })
+  // Undo cancels what this schedule queued. A reschedule replaced earlier posts,
+  // which Undo cannot bring back, so it offers none.
+  const undo = rescheduling ? undefined : context.undoSchedule
+  const [first] = result.posts
+  const before = context.draft
+  toast.success(
+    result.created
+      ? committedMessage(result.posts, options.zone, queued)
+      : 'Already scheduled: nothing new was queued.',
+    result.created && undo && first
+      ? { action: { label: 'Undo', onClick: () => void undo(before, first.id) } }
+      : undefined
+  )
+}
+
+/**
+ * Choosing a time beside the post, without a separate step. Anything that
+ * needs more than a time (a reschedule replacing posts, a clock change, the
+ * queue) goes to the full dialog through `onMore`.
+ */
+export function ScheduleDock({
+  blocked,
+  context,
+  onMore,
+}: {
+  /** Something in the fix list stops this draft from scheduling. */
+  blocked: boolean
+  context: ScheduleContext
+  onMore: () => void
+}) {
+  const { data } = useWrite()
+  const formatWhen = useWhen()
+  const scope = useSocialSetScope()
+  const setId =
+    context.draft.socialSetId ?? data.sets.find((item) => item.visibility === 'WORKSPACE')?.id
+  const cachedSet = useQueryClient().getQueryData<SocialSetRecord>(socialSetKey(scope, setId ?? ''))
+  const zone =
+    (cachedSet ?? data.sets.find((item) => item.id === setId))?.timeZone ??
+    context.setTimeZone ??
+    'UTC'
+  const [day, setDay] = React.useState(() => dayIn(new Date(Date.now() + 86_400_000), zone))
+  const [time, setTime] = React.useState('09:00')
+  const [busy, setBusy] = React.useState(false)
+  const resolution = resolveLocalTime(`${day}T${time}`, zone)
+  const instant = resolution.kind === 'exact' ? resolution.at : null
+  const rescheduling = (context.scheduled ?? []).length > 0
+  const past = instant !== null && instant.getTime() <= Date.now()
+  const schedule = async () => {
+    setBusy(true)
+    try {
+      await commitSchedule(
+        context,
+        { localTime: `${day}T${time}`, timeZone: zone },
+        {
+          naturalPostingTime: Boolean(context.draft.naturalPostingTime && data.advancedScheduling),
+          newDraft: false,
+          zone,
+        }
+      )
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'The draft could not be scheduled.')
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section
+      aria-label="Schedule this post"
+      className="mx-4 mb-3 flex flex-wrap items-end gap-2"
+      data-testid="schedule-dock"
+    >
+      <Label className="grid gap-1 text-xs text-muted-foreground">
+        Day
+        <DatePicker
+          aria-label="Schedule day"
+          min={dayIn(new Date(), zone)}
+          onChange={setDay}
+          value={day}
+        />
+      </Label>
+      <Label className="grid gap-1 text-xs text-muted-foreground">
+        Time
+        <TimePicker aria-label="Schedule time" onChange={setTime} value={time} />
+      </Label>
+      {rescheduling || !instant ? (
+        <Button onClick={onMore} size="sm" type="button">
+          {rescheduling ? 'Reschedule…' : 'Choose a time…'}
+        </Button>
+      ) : (
+        <Button
+          data-testid="dock-schedule-button"
+          disabled={blocked || busy || past}
+          onClick={() => void schedule()}
+          size="sm"
+          type="button"
+        >
+          {busy
+            ? 'Scheduling…'
+            : `Schedule for ${formatWhen(instant, zone, { dateStyle: 'medium', timeStyle: 'short' })}`}
+        </Button>
+      )}
+      <Button onClick={onMore} size="sm" type="button" variant="ghost">
+        More options
+      </Button>
+      <span className="pb-1.5 text-xs text-muted-foreground">{zone}</span>
+    </section>
+  )
+}
+
 /** Where a blocker takes you, as its button says it. */
 export function blockerFixLabel(blocker: ScheduleBlocker): string {
   const platform = blocker.channel ? CHANNEL_META[blocker.channel].label : ''
@@ -176,6 +316,7 @@ export function blockerFixLabel(blocker: ScheduleBlocker): string {
   if (blocker.fix === 'restore') return 'Restore the draft'
   if (blocker.fix === 'review') return 'Open review'
   if (blocker.fix === 'save') return 'Retry saving'
+  if (blocker.fix === 'write') return 'Go to the post'
   if (blocker.options) return `Open ${platform} settings`
   return blocker.channel ? `Go to the ${platform} post` : ''
 }
@@ -312,31 +453,12 @@ export function ScheduleDialog({
     setAction('schedule')
     setError('')
     try {
-      await context.flush()
-      const result = await draftsApi.schedule(context.draft.id, {
-        blockImages: await context.renderBlocks(),
-        channelConnectionIds: context.items.map((item) => item.account.id),
-        ...(queue
+      await commitSchedule(
+        context,
+        queue
           ? { queue: true, expectedQueueSlot: queueSlot ?? undefined }
-          : { disambiguation: disambiguation ?? undefined, localTime: local, timeZone: zone }),
-        naturalPostingTime: natural,
-        version: context.versionRef.current,
-        baseCalendarVersion: context.draft.calendarVersion,
-      })
-      context.versionRef.current = result.draft.version
-      context.onDone({ ...result, newDraft: continueWriting })
-      // Undo cancels what this schedule queued. A reschedule replaced earlier posts,
-      // which Undo cannot bring back, so it offers none.
-      const undo = rescheduling ? undefined : context.undoSchedule
-      const [first] = result.posts
-      const before = context.draft
-      toast.success(
-        result.created
-          ? committedMessage(result.posts, zone, queue)
-          : 'Already scheduled: nothing new was queued.',
-        result.created && undo && first
-          ? { action: { label: 'Undo', onClick: () => void undo(before, first.id) } }
-          : undefined
+          : { disambiguation: disambiguation ?? undefined, localTime: local, timeZone: zone },
+        { naturalPostingTime: natural, newDraft: continueWriting, zone }
       )
       onClose()
     } catch (error) {
