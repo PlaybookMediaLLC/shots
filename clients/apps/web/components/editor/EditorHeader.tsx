@@ -378,12 +378,13 @@ export function EditorHeader() {
 
           {hasImage && showVideoExport && !isMobile ? (
             <Button variant="custom" size={null}
+              aria-label="Export Video"
               className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/[0.08] px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-foreground/[0.06]"
               onClick={() => setExportSlideshowOpen(true)}
               type="button"
             >
               <Video01Icon size={14} />
-              <span>Export Video</span>
+              <span className="hidden xl:inline">Export Video</span>
             </Button>
           ) : null}
 

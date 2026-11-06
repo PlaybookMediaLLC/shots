@@ -257,7 +257,7 @@ export const MCP_TOOLS: { name: string; scope: string; summary: string }[] = [
   { name: 'requestCampaignReview', scope: 'release:create', summary: 'Submit drafts for review' },
   { name: 'scheduleCampaignPost', scope: 'post:schedule', summary: 'Schedule an approved post' },
   { name: 'listScheduledPosts', scope: 'artifact:read', summary: 'List the publishing schedule' },
-  { name: 'createScheduledPost', scope: 'post:schedule', summary: 'Schedule an approved visual' },
+  { name: 'createScheduledPost', scope: 'post:schedule', summary: 'Schedule an approved post with its visual' },
   {
     name: 'cancelScheduledPost',
     scope: 'post:schedule',

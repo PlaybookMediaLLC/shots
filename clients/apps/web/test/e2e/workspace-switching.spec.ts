@@ -157,13 +157,13 @@ test(
       return { href: link.href, type: response.type }
     })
     expect(new URL(started.href).searchParams.get('scopeWorkspace')).toBe(workspace.id)
+    // GitHub isn't configured here and would stop before the check, so ask the X start instead.
     const refused = await second.request.get(
-      new URL(started.href).pathname + new URL(started.href).search,
-      {
-        maxRedirects: 0,
-      }
+      `/integrations/social/x/start${new URL(started.href).search}`,
+      { maxRedirects: 0 }
     )
-    expect(refused.headers().location).toContain('failed')
+    expect(refused.status()).toBe(403)
+    expect(await refused.text()).toContain('Your account or workspace changed')
 
     await banner.getByRole('button', { name: `Keep working in ${identity.workspaceName}` }).click()
     await expect(banner).toBeHidden()

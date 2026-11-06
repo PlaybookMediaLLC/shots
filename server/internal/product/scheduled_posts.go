@@ -6,6 +6,11 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/creativevariant"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
@@ -43,6 +48,65 @@ func (c *Configuration) authorizeScheduling(ctx context.Context, actor Actor) er
 	return publishing.ErrForbidden
 }
 
+// requireKeySchedule holds a key to what post:schedule promises: it sends what a
+// person approved. Approving a visual doesn't approve words, so the caption must
+// be the copy of an approved campaign post that uses this visual. New text takes
+// CreatePost and post:publish. A person still writes their own caption. A variant
+// or account that doesn't qualify is left for the repository to refuse.
+func (c *Configuration) requireKeySchedule(ctx context.Context, actor Actor, input publishing.CreateScheduledPostInput) error {
+	connection, err := c.client.ChannelConnection.Query().Where(channelconnection.ID(input.ChannelConnectionID),
+		channelconnection.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return err
+	}
+	if connection != nil {
+		if err := requireSharedAccount(ctx, c.client, actor, connection); err != nil {
+			return err
+		}
+	}
+	variant, err := c.client.CreativeVariant.Query().Where(creativevariant.ID(input.VariantID),
+		creativevariant.OrganizationID(actor.OrganizationID), creativevariant.StatusEQ(creativevariant.StatusAPPROVED)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	uses := []predicate.CampaignPost{campaignpost.CreativeVariantID(variant.ID)}
+	if variant.DesignID != nil {
+		designs, err := c.client.Design.Query().Where(design.ID(*variant.DesignID), design.OrganizationID(actor.OrganizationID)).All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, row := range designs {
+			if row.CampaignID != nil {
+				uses = append(uses, campaignpost.CampaignID(*row.CampaignID))
+			}
+		}
+	}
+	posts, err := c.client.CampaignPost.Query().Where(campaignpost.OrganizationID(actor.OrganizationID),
+		campaignpost.ApprovedAtNotNil(), campaignpost.Or(uses...)).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, post := range posts {
+		if strings.TrimSpace(post.Copy) == input.Caption {
+			return nil
+		}
+	}
+	return forbidden("A key with post:schedule sends only text a person approved: use the approved copy of a campaign post for this visual. To post new text, use createPost, which needs post:publish.")
+}
+
+// requireSharedAccount keeps a key out of a private social set's accounts: not
+// found, the same as another workspace's account. People keep their own access.
+func requireSharedAccount(ctx context.Context, client *ent.Client, actor Actor, connection *ent.ChannelConnection) error {
+	if actor.IsSession() || connection.SocialSetID == nil {
+		return nil
+	}
+	_, err := visibleSocialSet(ctx, client, actor, *connection.SocialSetID)
+	return err
+}
+
 // CreateScheduledPost schedules an approved variant, or for a session a
 // content draft, to a channel connection and charges the monthly posts
 // allowance. A replay of the same idempotency
@@ -60,6 +124,11 @@ func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	// (RFC 013). A key schedules approved campaign variants only.
 	if input.ContentDraftID != "" && !actor.IsSession() {
 		return publishing.CreateScheduledPostResult{}, publishing.ErrForbidden
+	}
+	if !actor.IsSession() {
+		if err := c.requireKeySchedule(ctx, actor, input); err != nil {
+			return publishing.CreateScheduledPostResult{}, err
+		}
 	}
 	// The legacy variant scheduler stays paid; free content drafts use the
 	// versioned draft scheduling path with its account/seat and option checks.

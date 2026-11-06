@@ -11031,7 +11031,7 @@
           "minimumPlan": "pro",
           "quota": "api:write:minute"
         },
-        "description": "Schedules an approved creative variant, or a content draft, to an active channel connection. Send exactly one of `variantId` and `contentDraftId`. A variant must be `APPROVED` with an approved review; scheduling never approves. Only a signed-in member schedules a content draft; an API key gets `403`. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.",
+        "description": "Schedules an approved creative variant, or a content draft, to an active channel connection. Send exactly one of `variantId` and `contentDraftId`. A variant must be `APPROVED` with an approved review; scheduling never approves. Only a signed-in member schedules a content draft; an API key gets `403`. A key also sends only text a person approved: `caption` must be the copy of an approved campaign post for this visual, otherwise `403`. To post new text, use `POST /api/v1/posts`. A key cannot schedule to an account in a private social set. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.",
         "operationId": "createScheduledPost",
         "parameters": [
           {

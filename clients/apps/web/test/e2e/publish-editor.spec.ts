@@ -247,16 +247,14 @@ test(
     const day = slotUrl.searchParams.get('day') ?? ''
     const time = slotUrl.searchParams.get('time') ?? ''
     await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
-    await page.getByTestId('schedule-button').click()
-    // The dialog opens on that slot's day and time, not on its own defaults.
+    // The dock below the post opens on that slot's day and time, not on its own defaults.
     const [year, month, date] = day.split('-').map(Number)
-    await expect(page.getByTestId('schedule-dialog').getByLabel('Day', { exact: true })).toHaveText(
+    const dock = page.getByTestId('schedule-dock')
+    await expect(dock.getByLabel('Schedule day', { exact: true })).toHaveText(
       new Date(year, month - 1, date).toLocaleDateString('en-US', { dateStyle: 'medium' })
     )
     const [hour, minute] = time.split(':').map(Number)
-    await expect(
-      page.getByTestId('schedule-dialog').getByLabel('Time', { exact: true })
-    ).toHaveValue(
+    await expect(dock.getByLabel('Schedule time', { exact: true })).toHaveValue(
       `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
     )
   }
