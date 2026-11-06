@@ -84,7 +84,7 @@ test('bad images cannot block autosave, text remains editable, and playback and 
   expect(writes).toBe(0)
   await saved.click()
   await page.getByRole('menuitem', { name: 'All projects' }).click()
-  await expect(page).toHaveURL(/\/projects/)
+  await expect(page).toHaveURL(/\/library/)
   const reopened = page.waitForResponse((response) => response.url().includes('project.get'))
   await page.goBack()
   await reopened

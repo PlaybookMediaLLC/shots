@@ -13,7 +13,8 @@ async function openStudio(identity: E2EIdentity, page: Page) {
 
 async function editHeading(page: Page, text: string) {
   const box = (await page.locator('[data-store-canvas-slide]').boundingBox())!
-  await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.1)
+  // The heading's first line: a short heading doesn't reach further down the slide.
+  await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.075)
   await expect(page.locator('[data-store-inline-editor]')).toBeVisible()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type(text)

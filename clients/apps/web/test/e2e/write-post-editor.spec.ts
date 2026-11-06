@@ -130,6 +130,7 @@ test(
     await startWorkspace({ channels: ['x'] })
     await openNewDraft(page)
     const editor = draftEditor(page)
+    await page.getByTestId('options-chip').click()
     await page.getByText('Split automatically on paste').click()
     await editor.click()
     await settleSelection(page)

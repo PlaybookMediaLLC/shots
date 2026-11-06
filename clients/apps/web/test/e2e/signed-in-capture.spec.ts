@@ -32,7 +32,7 @@ test('an admin registers a signed-in app, and another workspace cannot reach it'
   await expect(page.getByRole('heading', { name: 'Signed-in capture', exact: true })).toBeVisible()
 
   // With no provider, the page says so and offers no form that cannot finish.
-  await expect(page.getByText(/not configured|isn.t set up/i).first()).toBeVisible()
+  await expect(page.getByText(/not configured|not set up/i).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Add connection' })).toHaveCount(0)
 
   // A private address is refused with a reason, and nothing is saved.

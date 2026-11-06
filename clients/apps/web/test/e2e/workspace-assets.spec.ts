@@ -89,7 +89,7 @@ test(
     await expect(page).toHaveURL(/type=image&sort=oldest/)
 
     // A new save while away from the gallery appears on Back, with the view preserved.
-    await page.getByRole('link', { name: 'Open editor', exact: true }).click()
+    await page.getByRole('link', { name: 'Open the editor', exact: true }).click()
     // Leave only once the editor has loaded; a Back during the client navigation
     // returns first, and the navigation then lands on the editor anyway.
     await page.waitForURL((url) => url.pathname === '/')
