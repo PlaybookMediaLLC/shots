@@ -122,21 +122,36 @@ export function captionChannelText(
   return text
 }
 
+/** A platform whose text does not fit there, and whether it is the body it reuses. */
+export type CaptionOverLimit = {
+  channel: DraftChannel
+  length: number
+  limit: number
+  /** True when the platform has no caption of its own and posts the body. */
+  reused: boolean
+}
+
 /**
- * Captions that are over the platform's limit as the platform counts them.
- * The composer refuses to schedule them, so the editor says so before the
- * draft is made rather than after.
+ * Platforms whose text is over their limit, as each one counts it. A
+ * platform with no caption of its own posts the body, so a long caption
+ * written for LinkedIn is measured against Bluesky's 300 characters too:
+ * the composer refuses to schedule either, and the editor says so before
+ * the draft is made rather than after.
  */
 export function captionsOverLimit(
   copy: DesignCopy | null,
-  channels: readonly DraftChannel[]
-): { channel: DraftChannel; length: number; limit: number }[] {
+  channels: readonly DraftChannel[],
+  primary: DraftChannel
+): CaptionOverLimit[] {
+  const body = captionFor(copy, primary)
   return channels.flatMap((channel) => {
-    const caption = captionFor(copy, channel)
-    if (!caption || !isPublishChannel(channel)) return []
+    if (!isPublishChannel(channel)) return []
+    const own = captionFor(copy, channel)
+    const caption = own || body
+    if (!caption) return []
     const length = captionLength(caption, channel)
     const limit = CAPTION_CHANNELS[channel].limit
-    return length > limit ? [{ channel, length, limit }] : []
+    return length > limit ? [{ channel, length, limit, reused: !own }] : []
   })
 }
 

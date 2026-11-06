@@ -9,7 +9,8 @@ import {
 import { DRAFT_ACCOUNT_LIMIT } from '@/lib/api/contracts/content-drafts'
 import { call } from '@/lib/content-drafts/client'
 import type { AppRouter } from '@/lib/trpc/router'
-import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { exportFileName } from './publish-drafts'
 
 /**
  * Editor batch exports as a bulk batch (RFC 042).
@@ -44,7 +45,8 @@ export type StageBatchRequest = {
  *
  * Uploads run before the batch is created, so a failed upload leaves no
  * half-filled batch behind; the items are then staged in one request, which
- * the API applies as a whole.
+ * the API applies as a whole. An upload that did finish is a workspace
+ * asset either way, and stays in the Library.
  */
 export async function stageExportsAsBatch(request: StageBatchRequest): Promise<ContentBatch> {
   if (request.exports.length === 0) throw new Error('Render the screenshots first.')
@@ -55,11 +57,10 @@ export async function stageExportsAsBatch(request: StageBatchRequest): Promise<C
   const items: BatchItemInput[] = []
   for (const [index, entry] of request.exports.entries()) {
     request.onProgress?.(index, request.exports.length)
-    const fileName = safeAssetFileName(entry.name)
     const { assetId } = await saveExportToWorkspace({
       blob: entry.blob,
       classification: 'export',
-      fileName: fileName || `shots-${index + 1}.png`,
+      fileName: exportFileName(entry.name, entry.blob.type),
       trpcClient: request.trpcClient,
     })
     items.push({

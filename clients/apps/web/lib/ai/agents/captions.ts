@@ -39,8 +39,11 @@ const submission = z.object({
  *
  * `voice` is the publishing identity's writing context (RFC 024): the same
  * merged brand and social-set voice Refine and the writing assistant use, so
- * a caption written here sounds like the account that will post it. Its
- * prohibited phrases are enforced alongside the brand's.
+ * a caption written here sounds like the account that will post it. It has
+ * already absorbed the brand's tone and audience and may override them, so
+ * with a voice the brand contributes only what the voice does not carry:
+ * what the product is and how it asks for action. Prohibited terms are the
+ * union of both and are enforced on every submission.
  */
 export async function writeCopy(input: {
   brand: BrandVoice | null
@@ -66,11 +69,11 @@ export async function writeCopy(input: {
     input.notes ? `<notes>${input.notes}</notes>` : '',
     input.brand
       ? `<brand>${JSON.stringify({
-          audience: input.brand.audience,
+          audience: input.voice ? undefined : input.brand.audience,
           callsToAction: input.brand.ctaConventions,
           product: input.brand.productDescription,
-          prohibited: input.brand.prohibitedTerms,
-          tone: input.brand.tone,
+          prohibited,
+          tone: input.voice ? undefined : input.brand.tone,
         })}</brand>`
       : '',
   ]

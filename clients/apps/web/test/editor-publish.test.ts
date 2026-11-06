@@ -76,10 +76,29 @@ test('a caption over its limit is reported the way the platform counts it', () =
   const long: DesignCopy = { captions: { linkedin: 'Short enough', x: link } }
 
   // X counts any link as 23 characters, so this one fits despite its length.
-  assert.deepEqual(captionsOverLimit(long, ['x', 'linkedin']), [])
-  assert.deepEqual(captionsOverLimit({ captions: { x: 'x'.repeat(281) } }, ['x']), [
-    { channel: 'x', length: 281, limit: 280 },
+  assert.deepEqual(captionsOverLimit(long, ['x', 'linkedin'], 'x'), [])
+  assert.deepEqual(captionsOverLimit({ captions: { x: 'x'.repeat(281) } }, ['x'], 'x'), [
+    { channel: 'x', length: 281, limit: 280, reused: false },
   ])
+})
+
+test('a body a platform would reuse is measured against that platform too', () => {
+  // Bluesky has no caption of its own, so it posts the LinkedIn body: 400
+  // characters, past its 300-character limit. LinkedIn itself is fine.
+  const wordy: DesignCopy = { captions: { linkedin: 'a'.repeat(400) } }
+
+  assert.deepEqual(captionsOverLimit(wordy, ['linkedin', 'bluesky'], 'linkedin'), [
+    { channel: 'bluesky', length: 400, limit: 300, reused: true },
+  ])
+  // Its own short caption is what it posts, so there is nothing to report.
+  assert.deepEqual(
+    captionsOverLimit(
+      { captions: { bluesky: 'Short', linkedin: 'a'.repeat(400) } },
+      ['linkedin', 'bluesky'],
+      'linkedin'
+    ),
+    []
+  )
 })
 
 test('a canvas shape a chosen platform refuses is reported before anything renders', () => {

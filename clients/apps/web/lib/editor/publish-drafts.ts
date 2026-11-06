@@ -46,8 +46,12 @@ const TITLE_LIMIT = 200
 /** One design to post: its document and a name for its file and draft. */
 export type PublishDesign = { document: DesignDocument; name: string }
 
-/** A file name for a design's export, falling back to a stamped default. */
-function exportFileName(name: string, contentType: string): string {
+/**
+ * A stored file name for an export: the design's own name, made safe for an
+ * object key and given the extension the bytes actually have. A name with
+ * nothing to keep falls back to a stamped one, as a plain export does.
+ */
+export function exportFileName(name: string, contentType: string): string {
   const extension = contentType.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png'
   const stem = safeAssetFileName(name).replace(/\.[^.]+$/, '')
   return `${stem || `shots-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}`}.${extension}`

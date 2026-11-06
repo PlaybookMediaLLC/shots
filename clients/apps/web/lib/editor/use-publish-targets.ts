@@ -99,26 +99,31 @@ export function usePublishSets(enabled: boolean): {
  * The recommended posting times for a set: the same analysis of past
  * engagement the composer's scheduler offers, so a time chosen in the editor
  * is a time Analytics would have suggested.
+ *
+ * The answer is absolute instants in the near future, so it is read again
+ * each time the surface is shown: an editor left open all afternoon must not
+ * offer a slot that has already passed. Times belong to the set they were
+ * read for, so switching sets never shows another set's slots.
  */
-export function useRecommendedTimes(socialSetId: string | undefined) {
-  const [times, setTimes] = React.useState<RecommendedTime[]>([])
+export function useRecommendedTimes(
+  socialSetId: string | undefined,
+  visible: boolean
+): RecommendedTime[] {
+  const [read, setRead] = React.useState<{ id: string; times: RecommendedTime[] } | null>(null)
   React.useEffect(() => {
-    if (!socialSetId) {
-      setTimes([])
-      return
-    }
+    if (!socialSetId || !visible) return
     let active = true
     void draftsApi.bestTimes(socialSetId).then(
       ({ items }) => {
-        if (active) setTimes(items)
+        if (active) setRead({ id: socialSetId, times: items })
       },
       () => {
-        if (active) setTimes([])
+        if (active) setRead({ id: socialSetId, times: [] })
       }
     )
     return () => {
       active = false
     }
-  }, [socialSetId])
-  return times
+  }, [socialSetId, visible])
+  return read && read.id === socialSetId ? read.times : []
 }

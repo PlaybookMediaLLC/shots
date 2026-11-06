@@ -25,7 +25,7 @@ import {
   primaryFor,
 } from '@/lib/editor/publish'
 import { PUBLISH_MEDIA_TYPE, publishDesigns } from '@/lib/editor/publish-drafts'
-import { canvasSizeOf } from '@/lib/export/adapt'
+import { canvasSizeOf, documentCanvasSize } from '@/lib/export/adapt'
 import { useImageStore } from '@/lib/store'
 import { useTRPCClient } from '@/lib/trpc/react'
 import type { DraftChannel } from '@/lib/write/document'
@@ -53,16 +53,24 @@ export type PublishVariant = { document: DesignDocument; title: string }
 /** No calendar placement: the drafts wait in Publish. */
 const NO_TIME = 'none'
 
-/** A recommended time as the panel labels it, in the set's zone. */
+/**
+ * A recommended time as the panel labels it, in the set's zone. A zone the
+ * browser does not know throws, and a label must never take the editor
+ * down with it, so the reader's own zone is the fallback.
+ */
 function timeLabel(at: string, timeZone: string): string {
-  return new Date(at).toLocaleString(undefined, {
+  const options: Intl.DateTimeFormatOptions = {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     month: 'short',
-    timeZone,
     weekday: 'short',
-  })
+  }
+  try {
+    return new Date(at).toLocaleString(undefined, { ...options, timeZone })
+  } catch {
+    return new Date(at).toLocaleString(undefined, options)
+  }
 }
 
 export function PublishPanel({
@@ -91,7 +99,7 @@ export function PublishPanel({
   const trpcClient = useTRPCClient()
   const copy = useImageStore((state) => state.copy)
   const set = sets.find((candidate) => candidate.id === socialSetId) ?? null
-  const times = useRecommendedTimes(set?.id)
+  const times = useRecommendedTimes(set?.id, !hidden)
   const [selected, setSelected] = React.useState<string[]>([])
   const [everything, setEverything] = React.useState(false)
   const [plannedFor, setPlannedFor] = React.useState(NO_TIME)
@@ -121,38 +129,50 @@ export function PublishPanel({
   const chosen = accounts.filter((account) => selected.includes(account.id))
   const channels: DraftChannel[] = [...new Set(chosen.map((account) => account.channel))]
   const primary = primaryFor(channels, copy)
-  const overLimit = captionsOverLimit(copy, channels)
+  const overLimit = captionsOverLimit(copy, channels, primary)
   const withoutCaption = channels.filter(
     (channel) => channel !== primary && !captionFor(copy, channel)
   )
-  const count = everything && variants.length > 0 ? variants.length : 1
-  // Preflight on the canvas's shape, so an aspect ratio no chosen platform
-  // takes is visible before anything renders. The export is a multiple of
-  // this size, so its proportions are the same; `publishDesigns` checks the
-  // rendered bytes again before it creates anything.
+  const versions = everything && variants.length > 0
+  const count = versions ? variants.length : 1
+  // A slot the panel no longer offers (a newer reading of the recommended
+  // times dropped it) is no choice at all, so the control and the drafts
+  // both fall back to no placement.
+  const when = times.some((time) => time.at === plannedFor) ? plannedFor : NO_TIME
+  // Preflight on the shape of what will be posted, so an aspect ratio no
+  // chosen platform takes is visible before anything renders. A version can
+  // change the canvas, so versions are measured one by one; the export is a
+  // multiple of the canvas, so its proportions are the canvas's.
+  // `publishDesigns` checks the rendered bytes again before it creates
+  // anything.
   const aspectRatio = useImageStore((state) => state.selectedAspectRatio)
   const custom = useImageStore((state) => state.customDimensions)
+  const sizes = versions
+    ? variants.map((variant) => documentCanvasSize(variant.document))
+    : [canvasSizeOf(aspectRatio, custom ?? undefined)]
   const mediaProblems =
     disabled || channels.length === 0
       ? []
-      : designMediaProblems(channels, {
-          mimeType: PUBLISH_MEDIA_TYPE,
-          ...canvasSizeOf(aspectRatio, custom ?? undefined),
-        })
+      : [
+          ...new Set(
+            sizes.flatMap((size) =>
+              designMediaProblems(channels, { mimeType: PUBLISH_MEDIA_TYPE, ...size })
+            )
+          ),
+        ]
 
   // The draft's name in the library: the caption's first line, as bulk
   // posts are named, or the version's own title.
   const title = captionFor(copy, primary).split('\n')[0]?.slice(0, 60).trim() || 'Screenshot post'
 
   async function create() {
-    const designs =
-      everything && variants.length > 0
-        ? variants.map((variant) => ({ document: variant.document, name: variant.title }))
-        : [{ document: exportDesignDocument({ keepLocalSources: true }), name: title }]
+    const designs = versions
+      ? variants.map((variant) => ({ document: variant.document, name: variant.title }))
+      : [{ document: exportDesignDocument({ keepLocalSources: true }), name: title }]
     const run = JSON.stringify([
       designs.map((design) => design.name),
       chosen.map((account) => account.id),
-      plannedFor,
+      when,
     ])
     const already = resume.current.run === run ? resume.current.done : 0
     const remaining = designs.slice(already)
@@ -164,7 +184,7 @@ export function PublishPanel({
       designs: remaining,
       onProgress: (done, total) =>
         setBusy(done >= total ? 'Finishing…' : `Preparing ${done + 1} of ${total}…`),
-      plannedFor: plannedFor === NO_TIME ? undefined : plannedFor,
+      plannedFor: when === NO_TIME ? undefined : when,
       socialSetId: set?.id,
       trpcClient,
     })
@@ -300,8 +320,9 @@ export function PublishPanel({
 
       {overLimit.map((problem) => (
         <p className="text-xs text-destructive" key={problem.channel} role="status">
-          The {channelLabel(problem.channel)} caption is {problem.length} characters; the limit is{' '}
-          {problem.limit}. Shorten it in Captions before publishing.
+          {problem.reused
+            ? `The ${channelLabel(primary)} caption ${channelLabel(problem.channel)} would reuse is ${problem.length} characters there; its limit is ${problem.limit}. Write a ${channelLabel(problem.channel)} caption in Captions.`
+            : `The ${channelLabel(problem.channel)} caption is ${problem.length} characters; the limit is ${problem.limit}. Shorten it in Captions before publishing.`}
         </p>
       ))}
 
@@ -322,7 +343,7 @@ export function PublishPanel({
 
       <Label className="grid gap-1 text-xs font-medium">
         When
-        <Select onValueChange={setPlannedFor} value={plannedFor}>
+        <Select onValueChange={setPlannedFor} value={when}>
           <SelectTrigger aria-label="When to post">
             <SelectValue />
           </SelectTrigger>
