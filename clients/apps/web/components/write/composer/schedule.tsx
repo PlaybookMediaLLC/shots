@@ -261,14 +261,27 @@ export function ScheduleDock({
     (cachedSet ?? data.sets.find((item) => item.id === setId))?.timeZone ??
     context.setTimeZone ??
     'UTC'
-  // A slot the draft was started from wins; otherwise a run of posts continues
-  // from the last one, and a brand with weekly slots offers its next free one.
-  const suggested = React.useMemo(() => {
-    if (initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay))
-      return {
-        day: initialDay,
-        time: initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00',
-      }
+  // A slot the draft was started from wins, and is known on the server too.
+  const fromSlot =
+    initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay)
+      ? {
+          day: initialDay,
+          time:
+            initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00',
+        }
+      : null
+  const [day, setDay] = React.useState(
+    fromSlot?.day ?? dayIn(new Date(Date.now() + 86_400_000), zone)
+  )
+  const [time, setTime] = React.useState(fromSlot?.time ?? '09:00')
+  const [typed, setTyped] = React.useState('')
+  // Otherwise a run of posts continues from the last one, and a brand with
+  // weekly slots offers its next free one. That answer depends on the clock
+  // and on this session's memory, neither of which the server has, so it is
+  // read once after hydration rather than rendered on both sides.
+  const touched = React.useRef(false)
+  React.useEffect(() => {
+    if (fromSlot || touched.current) return
     const memory = readComposing(context.draft.socialSetId)
     const set = data.sets.find((item) => item.id === setId)
     const at = nextSeriesTime({
@@ -286,16 +299,13 @@ export function ScheduleDock({
         .filter((slot) => !slot.busy)
         .map((slot) => slot.at),
     })
-    const wall = at ? wallTime(at, zone) : null
-    return wall
-      ? { day: wall.slice(0, 10), time: wall.slice(11, 16) }
-      : { day: dayIn(new Date(Date.now() + 86_400_000), zone), time: '09:00' }
-    // Read once, when the draft opens: a suggestion must not move under the writer.
+    if (!at) return
+    const wall = wallTime(at, zone)
+    setDay(wall.slice(0, 10))
+    setTime(wall.slice(11, 16))
+    // Once, when the draft opens: a suggestion must not move under the writer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  const [day, setDay] = React.useState(suggested.day)
-  const [time, setTime] = React.useState(suggested.time)
-  const [typed, setTyped] = React.useState('')
   const [busy, setBusy] = React.useState<'schedule' | 'next' | null>(null)
   const resolution = resolveLocalTime(`${day}T${time}`, zone)
   const instant = resolution.kind === 'exact' ? resolution.at : null
@@ -321,6 +331,7 @@ export function ScheduleDock({
   }
   // One typed field for both controls: "today 5pm", "fri 2:30pm", "+1h".
   const readTyped = (value: string) => {
+    touched.current = true
     setTyped(value)
     const wall = readWhen(value, zone)
     if (!wall) return
@@ -339,6 +350,7 @@ export function ScheduleDock({
           aria-label="Schedule day"
           min={dayIn(new Date(), zone)}
           onChange={(value) => {
+            touched.current = true
             setDay(value)
             setTyped('')
           }}
@@ -350,6 +362,7 @@ export function ScheduleDock({
         <TimePicker
           aria-label="Schedule time"
           onChange={(value) => {
+            touched.current = true
             setTime(value)
             setTyped('')
           }}

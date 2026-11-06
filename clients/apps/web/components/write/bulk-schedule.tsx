@@ -62,8 +62,9 @@ export function BulkScheduleDialog({
   const set = data.activeSet
   const [mode, setMode] = useState<'queue' | 'spread'>(initialMode)
   // A run started from the composer continues where the last post left off,
-  // at the gap this session has been using; otherwise tomorrow morning.
-  const memory = readComposing(set?.id)
+  // at the gap this session has been using; otherwise tomorrow morning. The
+  // dialog only ever opens in the browser, so reading the session here is safe.
+  const [memory] = useState(() => readComposing(set?.id))
   const [start, setStart] = useState(() => {
     const zone = set?.timeZone ?? 'UTC'
     const at = nextSeriesTime({

@@ -310,11 +310,11 @@ export function PendingDraftInput() {
           onPaste={(event) => {
             if (!pending?.waiting) return
             const pasted = event.clipboardData.getData('text/plain')
-            const field = event.currentTarget
+            const box = event.currentTarget
             const next =
-              field.value.slice(0, field.selectionStart ?? 0) +
+              box.value.slice(0, box.selectionStart ?? 0) +
               pasted +
-              field.value.slice(field.selectionEnd ?? 0)
+              box.value.slice(box.selectionEnd ?? 0)
             const pieces = pastePieces(next)
             if (pieces.length < 2) return
             event.preventDefault()
