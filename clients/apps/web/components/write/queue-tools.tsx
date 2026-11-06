@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { type DraftPostWire, draftsApi } from '@/lib/content-drafts/client'
 import { currentPosts, retryCanHelp } from '@/lib/content-drafts/post-status'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 import { writeApi } from '@/lib/write/client'
 import {
   evenTimes,
@@ -75,18 +76,34 @@ export function QueueBulkBar({
   const last = rows.length
     ? new Date(Math.max(...rows.map((row) => new Date(row.at).getTime())))
     : null
-  // The end of the range starts where the run already ends, so "spread evenly"
-  // is a one-press change of shape rather than a form to fill in.
-  const [until, setUntil] = React.useState(() => {
-    const wall = wallTime(last ?? new Date(), zone)
-    return { day: wall.slice(0, 10), time: wall.slice(11, 16) }
-  })
+  // The end of the range follows where the run already ends, so "spread
+  // evenly" is a one-press change of shape; once it is set by hand it stays,
+  // and it keeps following the selection as more posts are picked.
+  const [edited, setEdited] = React.useState<{ day: string; time: string } | null>(null)
+  const end = wallTime(last ?? new Date(), zone)
+  const until = edited ?? { day: end.slice(0, 10), time: end.slice(11, 16) }
+  const setUntil = (next: { day: string; time: string }) => setEdited(next)
   const apply = async (times: Map<string, Date>, done: string) => {
+    // A queued post cannot move into the past, and a half-applied move would
+    // leave the run in a shape nobody asked for: check the whole change first.
+    const past = [...times.values()].filter((at) => at.getTime() <= Date.now()).length
+    if (past) {
+      toast.error(
+        past === times.size
+          ? 'That would put every selected post in the past.'
+          : `That would put ${past} of them in the past. Nothing was moved.`
+      )
+      return
+    }
     setBusy(true)
     let failed = 0
-    // One at a time: each move is its own commitment, and a refusal must not
-    // stop the rest of the run from moving.
-    for (const [id, at] of times) {
+    // One at a time, and in the direction of travel, so two posts never pass
+    // through the same time. A refusal must not stop the rest from moving.
+    const ordered = [...times.entries()].sort(([, a], [, b]) => a.getTime() - b.getTime())
+    const movingLater = ordered.some(
+      ([id, at]) => at.getTime() > new Date(rows.find((row) => row.id === id)?.at ?? 0).getTime()
+    )
+    for (const [id, at] of movingLater ? ordered.reverse() : ordered) {
       try {
         await draftsApi.movePost(id, at)
       } catch {
@@ -304,7 +321,7 @@ export function DraftPostLinks({ draftId }: { draftId: string }) {
             rel="noreferrer"
             target="_blank"
           >
-            Open the {post.platform} post
+            Open the {platformLabel(post.platform)} post
           </a>
         </li>
       ))}

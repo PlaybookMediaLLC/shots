@@ -99,10 +99,12 @@ function prepareCreation(
 ) {
   // One key for every try: a retry after a lost response gets the same draft back, not a second one.
   let request = { requestKey: crypto.randomUUID(), ...input }
+  // One key per piece, kept across attempts: a run that failed halfway is
+  // finished by pressing again, and the pieces already created come back by
+  // their key instead of being made a second time.
+  const pieceKeys: string[] = []
   // Several posts from one paste: each piece becomes its own draft, sharing a
   // series title, and the library opens its series scheduler on all of them.
-  // A lost response is replayed by the piece's own key, so a retry never
-  // doubles the run.
   resolvePaste = async (choice, seriesName) => {
     const pieces = pending?.pieces ?? []
     if (choice === 'one') {
@@ -111,11 +113,14 @@ function prepareCreation(
     }
     if (choice === 'thread') {
       request = { ...request, body: importedBody(pieces) }
-      update({ ...(pending ?? { text: '' }), pieces: undefined, waiting: false })
+      // The draft already holds the pasted text as posts; leaving it buffered
+      // too would type the whole block into the editor again.
+      update({ ...(pending ?? { text: '' }), pieces: undefined, text: '', waiting: false })
       return retry?.()
     }
     update({ ...(pending ?? { text: '' }), error: undefined, waiting: false })
-    const keys = pieces.map(() => crypto.randomUUID())
+    while (pieceKeys.length < pieces.length) pieceKeys.push(crypto.randomUUID())
+    const keys = pieceKeys
     try {
       await beforeLeave?.()
       const created: string[] = []
@@ -356,7 +361,9 @@ export function PendingDraftInput() {
             onInsert={(nodes) => attachToWaiting?.(nodes)}
           />
         ) : null}
-        {value.error ? (
+        {/* A pending paste answers for itself: its three buttons are the retry,
+            and the one below would instead make a single draft of the block. */}
+        {value.error && !value.pieces ? (
           <div className="flex gap-2">
             {value.planRequired ? (
               <ButtonLink

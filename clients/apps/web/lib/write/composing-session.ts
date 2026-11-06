@@ -141,12 +141,3 @@ export function takeOffNotice(setId: string | null | undefined, accountIds: stri
     write(setId, { ...memory, noticedOff: [...memory.noticedOff, ...fresh] })
   return fresh
 }
-
-/** Forget this brand's carry-over, so the next draft starts from the brand's defaults. */
-export function clearComposing(setId: string | null | undefined): void {
-  try {
-    store()?.removeItem(key(setId))
-  } catch {
-    // Nothing to do: the memory is already unreachable.
-  }
-}

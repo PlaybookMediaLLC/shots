@@ -21,6 +21,7 @@ import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { assetContentUrl } from '@/lib/editor/services'
 import type { SerializedMedia } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
+import { countingNote } from '@/lib/write/caption-counting'
 import { previewLineLimit, previewScale, xCollapsedText } from '@/lib/write/preview-layout'
 import type { DraftChannel, DraftTarget } from '@/lib/write/document'
 import type { Publication } from '@/lib/write/publication'
@@ -178,7 +179,11 @@ function PreviewLengths({ item }: { item: PreviewItem }) {
   const standard = CAPABILITIES[channel].captionLimit
   if (posts.length === 0) return null
   return (
-    <ul className="grid gap-0.5 text-[11px] tabular-nums" data-testid="preview-lengths">
+    <ul
+      className="grid gap-0.5 text-[11px] tabular-nums"
+      data-testid="preview-lengths"
+      title={countingNote(channel)}
+    >
       {posts.map((post, index) => {
         const over = post.length > limit
         const overStandard = limit > standard && post.length > standard
@@ -199,7 +204,7 @@ function PreviewLengths({ item }: { item: PreviewItem }) {
               {posts.length > 1 ? `#${index + 1} · ` : ''}
               {post.length} / {limit}
             </span>
-            {limit > standard ? <span>({standard} without verification)</span> : null}
+            {limit > standard ? <span>({standard} for a standard account)</span> : null}
             {over ? <span>over the limit</span> : null}
           </li>
         )

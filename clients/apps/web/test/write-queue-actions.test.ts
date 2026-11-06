@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   evenTimes,
   queueGroups,
+  queueRuns,
   queueWarnings,
   shiftedTimes,
   spacedTimes,
@@ -77,6 +78,29 @@ test('posts written as one run are gathered, in time order', () => {
 test('a run of one is not a run', () => {
   const groups = queueGroups([row({ id: 'a', at: at(16), title: 'Storytelling \u00b7 1/7' })])
   assert.deepEqual(groups, [{ name: null, rows: [groups[0].rows[0]] }])
+})
+
+test('a run spread over two days is one run on each of them', () => {
+  const whole = [
+    row({ id: 'a', at: at(16), title: 'Storytelling \u00b7 1/3' }),
+    row({ id: 'b', at: at(17), title: 'Storytelling \u00b7 2/3' }),
+    row({ id: 'c', at: '2026-11-07T16:00:00.000Z', title: 'Storytelling \u00b7 3/3' }),
+  ]
+  const runs = queueRuns(whole)
+  assert.deepEqual(
+    runs.get('Storytelling')?.map((item) => item.id),
+    ['a', 'b', 'c']
+  )
+  // The second day holds one of them; it is still the run, not a stray post.
+  const secondDay = queueGroups([whole[2]], runs)
+  assert.deepEqual(
+    secondDay.map((group) => [group.name, group.rows.map((item) => item.id)]),
+    [['Storytelling', ['c']]]
+  )
+})
+
+test('a title that names no run groups nothing', () => {
+  assert.equal(queueRuns([row({ id: 'a', at: at(16), title: 'Just a draft' })]).size, 0)
 })
 
 test('the same text from different drafts is a repeat; one draft on two accounts is not', () => {

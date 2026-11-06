@@ -70,16 +70,37 @@ export type QueueGroup = {
 }
 
 /**
- * Rows gathered into the runs they were written as. A run is the drafts that
- * share a series name ({@link seriesName}); anything else stays on its own,
- * in time order, so the queue still reads as a timeline.
+ * The runs the whole queue holds, by name: the drafts sharing a series name
+ * ({@link seriesName}), where more than one of them is queued. A "run" of one
+ * is just a post, and naming it would only add a row to read.
+ *
+ * This is read over the entire queue, not over the day being drawn, so a run
+ * spread across two days is still one run on both of them.
  */
-export function queueGroups(rows: readonly QueueRow[]): QueueGroup[] {
+export function queueRuns(rows: readonly QueueRow[]): Map<string, QueueRow[]> {
+  const byName = new Map<string, QueueRow[]>()
+  for (const row of byTime(rows)) {
+    const name = seriesName(row.title)
+    if (name) byName.set(name, [...(byName.get(name) ?? []), row])
+  }
+  for (const [name, run] of byName) if (run.length < 2) byName.delete(name)
+  return byName
+}
+
+/**
+ * One stretch of the queue gathered into its runs, in time order, so the
+ * queue still reads as a timeline. `runs` names what counts as a run, which
+ * the caller takes from the whole queue.
+ */
+export function queueGroups(
+  rows: readonly QueueRow[],
+  runs: Map<string, QueueRow[]> = queueRuns(rows)
+): QueueGroup[] {
   const groups: QueueGroup[] = []
   const byName = new Map<string, QueueGroup>()
   for (const row of byTime(rows)) {
     const name = seriesName(row.title)
-    if (!name) {
+    if (!name || !runs.has(name)) {
       groups.push({ name: null, rows: [row] })
       continue
     }
@@ -92,8 +113,7 @@ export function queueGroups(rows: readonly QueueRow[]): QueueGroup[] {
     byName.set(name, group)
     groups.push(group)
   }
-  // A "run" of one is just a post; naming it would only add a row to read.
-  return groups.map((group) => (group.rows.length > 1 ? group : { name: null, rows: group.rows }))
+  return groups
 }
 
 /** Something worth seeing before a queue goes out, and the rows it is about. */

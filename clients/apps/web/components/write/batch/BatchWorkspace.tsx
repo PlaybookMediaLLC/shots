@@ -702,6 +702,8 @@ export function BatchWorkspace({
       )
       setCSV('')
       setChosen([])
+      // The pasted block has become posts; leaving it would stage them twice.
+      setPasted('')
       startUploads()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The items could not be added.')
@@ -1224,7 +1226,13 @@ export function BatchWorkspace({
                       ? ` · ${pastedOver} over ${CHANNEL_META[countingChannel].label}’s limit`
                       : ''}
                     {' · '}
-                    {pastedPieces.map((piece) => piece.length).join(', ')} characters
+                    {/* The first few lengths say the shape of the run; a hundred of
+                        them would say nothing and fill the page. */}
+                    {pastedPieces
+                      .slice(0, 12)
+                      .map((piece) => piece.length)
+                      .join(', ')}
+                    {pastedPieces.length > 12 ? '…' : ''} characters
                   </p>
                 ) : null}
               </Row>

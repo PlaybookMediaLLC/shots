@@ -195,12 +195,12 @@ export function DraftPosts({
                       </AlertDialogContent>
                     </AlertDialog>
                   ) : null}
-                  {/* Publish now is irreversible, so it never sits beside Cancel as a peer button. */}
+                  {/* Publish now is irreversible, so it never sits beside Cancel as a peer
+                      button. The menu and its confirmation are siblings, as the library's
+                      row menu does it, so closing the menu does not fight the dialog for
+                      focus. */}
                   {canSchedule && post.status === 'SCHEDULED' ? (
-                    <AlertDialog
-                      onOpenChange={(open) => setPublishing(open ? post.id : null)}
-                      open={publishing === post.id}
-                    >
+                    <>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -219,6 +219,10 @@ export function DraftPosts({
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      <AlertDialog
+                        onOpenChange={(open) => !open && setPublishing(null)}
+                        open={publishing === post.id}
+                      >
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Publish this queued post now?</AlertDialogTitle>
@@ -252,7 +256,8 @@ export function DraftPosts({
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
-                    </AlertDialog>
+                      </AlertDialog>
+                    </>
                   ) : null}
                 </div>
               </div>

@@ -73,7 +73,7 @@ test(
 
     // Three drafts, and the library's series scheduler open on exactly those.
     await page.waitForURL(/\/publish(\?|$)/)
-    const scheduler = page.getByRole('dialog', { name: /Schedule/i })
+    const scheduler = page.getByRole('dialog', { name: 'Schedule 3 drafts' })
     await expect(scheduler).toBeVisible({ timeout: 60_000 })
     await expect
       .poll(async () =>
@@ -85,10 +85,11 @@ test(
       )
       .toEqual(['Storytelling · 1/3', 'Storytelling · 2/3', 'Storytelling · 3/3'])
 
-    await scheduler
-      .getByRole('button', { name: /Preview|Schedule/ })
-      .first()
-      .click()
+    // All three on one day, so the run is easy to read back in the queue.
+    await scheduler.getByRole('spinbutton', { name: 'Posts per day' }).fill('3')
+    // Preview every time first, then confirm: one step for the whole run.
+    await scheduler.getByRole('button', { name: 'Preview and validate' }).click()
+    await scheduler.getByRole('button', { name: /^Schedule valid drafts \(3\)$/ }).click()
     await expect
       .poll(
         async () =>

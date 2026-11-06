@@ -66,7 +66,7 @@ import {
   platformLabel,
 } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import { queueGroups, queueWarnings } from '@/lib/write/queue-actions'
+import { type QueueRow, queueGroups, queueRuns, queueWarnings } from '@/lib/write/queue-actions'
 import { DraftPostLinks, QueueBulkBar, QueueWarnings, RetryAllFailed } from './queue-tools'
 import { writeApi } from '@/lib/write/client'
 import { carriedChannels } from '@/lib/write/composing-session'
@@ -384,9 +384,6 @@ export function WriteRail() {
           </div>
         ) : (
           <ul>
-            {/* Scheduling does not finish a draft, so a scheduled one still
-                belongs here — but "Drafts" then stops meaning unfinished work.
-                The list says how many are queued and hides them on request. */}
             {tab === 'failed' && canPublish ? (
               <li className="flex flex-wrap items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
                 <span>
@@ -396,6 +393,9 @@ export function WriteRail() {
                 <RetryAllFailed draftIds={data.library.map((draft) => draft.id)} />
               </li>
             ) : null}
+            {/* Scheduling does not finish a draft, so a scheduled one still
+                belongs here — but "Drafts" then stops meaning unfinished work.
+                The list says how many are queued and hides them on request. */}
             {tab === 'drafts' && queuedInList > 0 ? (
               <li className="flex flex-wrap items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
                 <span>
@@ -1602,6 +1602,9 @@ function QueueList() {
     () => queueWarnings([...selectable.values()], { minutesApart: 30 }),
     [selectable]
   )
+  // Read over the whole queue, so a run spread across two days is one run on
+  // both of them rather than two groups, or a group and a stray post.
+  const runs = React.useMemo(() => queueRuns(data.queue), [data.queue])
   const toggleRow = (id: string, on: boolean) =>
     setPicked((current) => (on ? [...new Set([...current, id])] : current.filter((item) => item !== id)))
   // Dropping one queued post on another exchanges their times, which is what
@@ -1620,7 +1623,17 @@ function QueueList() {
         )
       )
   }
+  // The backend exchanges two commitments on one account, so a row only takes
+  // a drop from a post that shares its account: offering more would be an
+  // invitation to a refusal.
+  const dragged = dragging ? selectable.get(dragging) : undefined
   const rowProps = (item: WriteLibrary['queue'][number]) => ({
+    accepts: Boolean(
+      dragged &&
+        dragged.id !== item.id &&
+        item.kind === 'scheduled' &&
+        item.accountIds.some((id) => dragged.accountIds.includes(id))
+    ),
     dragging: dragging === item.id,
     onDragEnd: () => setDragging(null),
     onDragStart: () => setDragging(item.id),
@@ -1725,7 +1738,13 @@ function QueueList() {
           <h3 className="px-4 pt-3 text-[11px] font-medium text-amber-700 dark:text-amber-300">
             Needs a look
           </h3>
-          <QueueRows items={earlier} onPick={setPicked} rowProps={rowProps} zone={zone} />
+          <QueueRows
+            items={earlier}
+            onPick={setPicked}
+            rowProps={rowProps}
+            runs={runs}
+            zone={zone}
+          />
         </section>
       ) : null}
       {days.map(({ day, free: open, items }) =>
@@ -1743,6 +1762,7 @@ function QueueList() {
               onNew={canEdit ? (clock) => newAt(day, clock) : undefined}
               onPick={setPicked}
               rowProps={rowProps}
+              runs={runs}
               zone={zone}
             />
           </section>
@@ -1751,7 +1771,7 @@ function QueueList() {
       {later.length > 0 ? (
         <section aria-label="Later">
           <h3 className="px-4 pt-3 text-[11px] font-medium text-muted-foreground">Later</h3>
-          <QueueRows items={later} onPick={setPicked} rowProps={rowProps} zone={zone} />
+          <QueueRows items={later} onPick={setPicked} rowProps={rowProps} runs={runs} zone={zone} />
         </section>
       ) : null}
       {data.queue.length === 0 && free === 0 ? (
@@ -1789,6 +1809,8 @@ function ClockLabel({ time }: { time: string }) {
 
 /** The props a queue row needs beyond its item, all supplied by the list. */
 type QueueRowProps = {
+  /** A post is being dragged that this row could exchange times with. */
+  accepts: boolean
   dragging: boolean
   onDragEnd: () => void
   onDragStart: () => void
@@ -1810,6 +1832,7 @@ function QueueRows({
   onNew,
   onPick,
   rowProps,
+  runs,
   zone,
 }: {
   /** Free weekly slots on this day, as "HH:MM" in the brand's zone. */
@@ -1818,6 +1841,8 @@ function QueueRows({
   onNew?: (clock: string) => void
   onPick: React.Dispatch<React.SetStateAction<string[]>>
   rowProps: (item: WriteLibrary['queue'][number]) => QueueRowProps
+  /** The runs the whole queue holds, so one spread over two days stays one run. */
+  runs: Map<string, QueueRow[]>
   zone: string
 }) {
   const [collapsed, setCollapsed] = React.useState<string[]>([])
@@ -1825,7 +1850,7 @@ function QueueRows({
   // Runs and free slots share one timeline, so an empty slot still reads as a
   // gap in the day rather than a list appended under it.
   const entries = [
-    ...queueGroups(items).map((group) => ({
+    ...queueGroups(items, runs).map((group) => ({
       clock: wallTime(new Date(group.rows[0].at), zone).slice(11, 16),
       group,
       slot: null,
@@ -1861,8 +1886,11 @@ function QueueRows({
         if (!group.name)
           return rows.map((item) => <QueueItem item={item} key={item.id} {...rowProps(item)} />)
         const shut = collapsed.includes(group.name)
-        const span = `${wallTime(new Date(rows[0].at), zone).slice(11, 16)}–${wallTime(
-          new Date(rows[rows.length - 1].at),
+        // The whole run, which can reach beyond this day: its header counts and
+        // spans all of it, and "Select the run" picks all of it.
+        const whole = runs.get(group.name) ?? rows
+        const span = `${wallTime(new Date(whole[0].at), zone).slice(11, 16)}–${wallTime(
+          new Date(whole[whole.length - 1].at),
           zone
         ).slice(11, 16)}`
         return (
@@ -1890,7 +1918,8 @@ function QueueRows({
                 />
                 <span className="truncate">{group.name}</span>
                 <span className="text-muted-foreground">
-                  · {rows.length} posts · {span}
+                  · {whole.length} posts · {span}
+                  {whole.length > rows.length ? ` · ${rows.length} here` : ''}
                 </span>
               </Button>
               <Button
@@ -1899,7 +1928,7 @@ function QueueRows({
                   onPick((current) => [
                     ...new Set([
                       ...current,
-                      ...rows.filter((row) => row.kind === 'scheduled').map((row) => row.id),
+                      ...whole.filter((row) => row.kind === 'scheduled').map((row) => row.id),
                     ]),
                   ])
                 }
@@ -1930,6 +1959,7 @@ function QueueRows({
  * another queued post to exchange their times.
  */
 function QueueItem({
+  accepts = false,
   dragging = false,
   item,
   onDragEnd,
@@ -1957,11 +1987,16 @@ function QueueItem({
         dragging && 'opacity-50'
       )}
       draggable={item.kind === 'scheduled' && Boolean(onDrop)}
-      onDragEnd={onDragEnd}
+      onDragEnd={() => {
+        setOver(false)
+        onDragEnd?.()
+      }}
       onDragOver={(event) => {
-        if (!onDrop || item.kind !== 'scheduled') return
+        // Only our own drag, only onto a post it can be exchanged with, and
+        // only once: dragover fires continuously.
+        if (!accepts || !event.dataTransfer.types.includes(QUEUE_DRAG)) return
         event.preventDefault()
-        setOver(true)
+        if (!over) setOver(true)
       }}
       onDragLeave={() => setOver(false)}
       onDragStart={(event) => {
@@ -1971,6 +2006,7 @@ function QueueItem({
       }}
       onDrop={(event) => {
         setOver(false)
+        if (!accepts) return
         const from = event.dataTransfer.getData(QUEUE_DRAG)
         if (from) onDrop?.(from)
       }}
@@ -1978,15 +2014,17 @@ function QueueItem({
       <div className="flex items-start gap-2 px-2 py-2">
         {onToggle ? (
           <Checkbox
-            aria-label={`Select the post scheduled for ${item.at}`}
+            aria-label={`Select “${item.caption.slice(0, 60) || 'this post'}”`}
             checked={selected}
             className="mt-0.5"
             onCheckedChange={(checked) => onToggle(item.id, checked === true)}
           />
         ) : null}
+        {/* The row carries the drag, so its link must not start one of its own. */}
         <Link
           className="min-w-0 flex-1 rounded-md hover:bg-foreground/[0.02]"
           data-testid={item.kind === 'planned' ? 'queue-planned' : 'queue-item'}
+          draggable={false}
           href={draftHref(item.draftId, data.activeSet?.id)}
         >
           <p

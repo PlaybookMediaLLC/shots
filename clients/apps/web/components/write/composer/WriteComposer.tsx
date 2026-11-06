@@ -90,6 +90,7 @@ import { platformEditorServices } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
+import { countingNote } from '@/lib/write/caption-counting'
 import { writeApi } from '@/lib/write/client'
 import { rememberChannels, takeOffNotice } from '@/lib/write/composing-session'
 import {
@@ -541,8 +542,12 @@ export function WriteComposer({
   // Write's tools the toolbar, the More menu and the slash menu open.
   const [tool, setTool] = React.useState<ComposerTool | null>(null)
   const [postSetting, setPostSetting] = React.useState<PostSettingRequest | null>(null)
+  // The brand this draft belongs to: its own, or the library's active one for
+  // a draft the backend has not named a set for yet. Everything keyed by brand
+  // reads it here, so the composer and the library never disagree on the key.
+  const draftSet = server.socialSetId ?? set?.id ?? null
   // The set's thread finishers are the slash menu's snippets.
-  const snippetSet = server.socialSetId ?? set?.id ?? null
+  const snippetSet = draftSet
   const [snippets, setSnippets] = React.useState<Snippet[]>([])
   const [snippetsRead, setSnippetsRead] = React.useState(0)
   React.useEffect(() => {
@@ -589,6 +594,9 @@ export function WriteComposer({
   // Platforms switched off for lacking media, and those the person chose to keep on regardless.
   const switchedOff = React.useRef(new Set<string>())
   const keptOn = React.useRef(new Set<string>())
+  // Whether a switch has been set by hand in this draft: only then does the
+  // next new draft in this brand open on what this one publishes to.
+  const touchedPlatforms = React.useRef(false)
   const applySwitch = (accountId: string, on: boolean) => {
     const account = accounts.find((item) => item.id === accountId)
     if (!account) return
@@ -605,12 +613,16 @@ export function WriteComposer({
     if (on) keptOn.current.add(accountId)
     else keptOn.current.delete(accountId)
     applySwitch(accountId, on)
-    // A switch the writer set by hand is what the next new draft opens on.
-    rememberChannels(
-      server.socialSetId,
-      on ? [...new Set([...enabled, accountId])] : enabled.filter((id) => id !== accountId)
-    )
+    touchedPlatforms.current = true
   }
+  // Once the writer has set a switch by hand, the next new draft in this brand
+  // opens on whatever the draft ends up publishing to — read from the document,
+  // because turning one account on can turn another off on the same platform.
+  const enabledKey = enabled.join(',')
+  React.useEffect(() => {
+    if (touchedPlatforms.current) rememberChannels(draftSet, enabled)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabledKey, draftSet])
   const mediaAccounts = accounts.map((account) => {
     const version = versionFor(document.versions, account.channel)
     const body =
@@ -642,7 +654,7 @@ export function WriteComposer({
     }
     // The switch always happens; the message is once per account per session,
     // so a run of text posts is not told the same thing on every draft.
-    const fresh = takeOffNotice(server.socialSetId, off)
+    const fresh = takeOffNotice(draftSet, off)
     if (fresh.length === 0) return
     const names = fresh.map((id) => {
       const channel = accounts.find((item) => item.id === id)?.channel
@@ -1114,6 +1126,7 @@ export function WriteComposer({
       <>
         <PostCount
           active={inUse}
+          channel={active}
           length={post.length}
           limit={activePublication.serialized.limit}
           number={number}
@@ -2151,7 +2164,7 @@ export function WriteComposer({
                       {item.publication.serialized.limit >
                       CAPABILITIES[item.account.channel].captionLimit ? (
                         <span className="text-muted-foreground">
-                          ({CAPABILITIES[item.account.channel].captionLimit} without verification)
+                          ({CAPABILITIES[item.account.channel].captionLimit} for a standard account)
                         </span>
                       ) : null}
                     </span>
@@ -2552,6 +2565,7 @@ function initials(name: string): string {
  */
 function PostCount({
   active,
+  channel,
   length,
   limit,
   number,
@@ -2559,6 +2573,7 @@ function PostCount({
   thread,
 }: {
   active: boolean
+  channel: DraftChannel
   length: number
   limit: number
   number: number
@@ -2582,7 +2597,7 @@ function PostCount({
         !active && ratio < 0.9 && 'opacity-60'
       )}
       // Counted as the platform counts it, which writers cannot check outside the app.
-      title="Counted as the platform counts it: a line break is one character, a link counts as 23, and an emoji as two."
+      title={countingNote(channel)}
     >
       <span
         aria-hidden
@@ -2600,7 +2615,7 @@ function PostCount({
           className={cn(overStandard ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
           data-testid={`post-standard-length-${number}`}
         >
-          ({standard} without verification)
+          ({standard} for a standard account)
         </span>
       ) : null}
       {thread ? <span className="text-muted-foreground">#{number}</span> : null}

@@ -186,7 +186,13 @@ async function commitSchedule(
     expectedQueueSlot?: string
     queue: true
   },
-  options: { naturalPostingTime: boolean | undefined; newDraft: boolean; zone: string }
+  options: {
+    naturalPostingTime: boolean | undefined
+    newDraft: boolean
+    /** The brand this run belongs to, resolved the same way everywhere its memory is read. */
+    setId: string | null
+    zone: string
+  }
 ): Promise<void> {
   await context.flush()
   const queued = 'queue' in timing
@@ -206,7 +212,7 @@ async function commitSchedule(
     .filter((time) => Number.isFinite(time))
   if (committed.length)
     rememberScheduled(
-      context.draft.socialSetId,
+      options.setId,
       new Date(Math.min(...committed)),
       context.items.map((item) => item.account.id)
     )
@@ -282,7 +288,7 @@ export function ScheduleDock({
   const touched = React.useRef(false)
   React.useEffect(() => {
     if (fromSlot || touched.current) return
-    const memory = readComposing(context.draft.socialSetId)
+    const memory = readComposing(setId ?? null)
     const set = data.sets.find((item) => item.id === setId)
     const at = nextSeriesTime({
       gapMinutes: memory.gapMinutes,
@@ -320,6 +326,7 @@ export function ScheduleDock({
         {
           naturalPostingTime: Boolean(context.draft.naturalPostingTime && data.advancedScheduling),
           newDraft: andNext,
+          setId: setId ?? null,
           zone,
         }
       )
@@ -583,7 +590,7 @@ export function ScheduleDialog({
         queue
           ? { queue: true, expectedQueueSlot: queueSlot ?? undefined }
           : { disambiguation: disambiguation ?? undefined, localTime: local, timeZone: zone },
-        { naturalPostingTime: natural, newDraft: continueWriting, zone }
+        { naturalPostingTime: natural, newDraft: continueWriting, setId: setId ?? null, zone }
       )
       onClose()
     } catch (error) {
