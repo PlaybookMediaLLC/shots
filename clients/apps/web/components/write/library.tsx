@@ -61,6 +61,7 @@ import { draftsApi } from '@/lib/content-drafts/client'
 import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
 import { platformLabel } from '@/lib/content-drafts/serialize'
 import { writeApi } from '@/lib/write/client'
+import { carriedChannels } from '@/lib/write/composing-session'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
 import { socialSetHref } from '@/components/workspace/settings-sections'
@@ -576,6 +577,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
       const start = kind === 'standard' && !target ? startBlankDraft : createWritingDraft
       await start(
         {
+          channelConnectionIds: carriedChannels(data.activeSet),
           kind,
           socialSetId: data.activeSet?.id,
           tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
@@ -1452,7 +1454,7 @@ function QueueList() {
   const plannedCount = data.queue.length - scheduledCount
   const newAt = (day: string, time: string) =>
     void createWritingDraft(
-      { socialSetId: set?.id },
+      { channelConnectionIds: carriedChannels(set), socialSetId: set?.id },
       (id) => {
         const href = draftHref(id, set?.id)
         router.push(`${href}${href.includes('?') ? '&' : '?'}day=${day}&time=${time}`)

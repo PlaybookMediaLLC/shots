@@ -43,6 +43,8 @@ import type { AutoDm, Automation, Community, DraftChannel } from '@/lib/write/do
 import type { DraftKind } from '@/lib/write/document'
 import { mediaProblems } from '@/lib/write/media-rules'
 import { platformRefusal } from '@/lib/write/platform-rules'
+import { readComposing, rememberScheduled } from '@/lib/write/composing-session'
+import { nextSeriesTime } from '@/lib/write/series-time'
 import {
   committedMessage,
   offsetLabel,
@@ -198,6 +200,16 @@ async function commitSchedule(
     baseCalendarVersion: context.draft.calendarVersion,
   })
   context.versionRef.current = result.draft.version
+  // What the next draft in this run opens on: these accounts, a gap after this time.
+  const committed = result.posts
+    .map((post) => new Date(post.scheduledFor).getTime())
+    .filter((time) => Number.isFinite(time))
+  if (committed.length)
+    rememberScheduled(
+      context.draft.socialSetId,
+      new Date(Math.min(...committed)),
+      context.items.map((item) => item.account.id)
+    )
   context.onDone({ ...result, newDraft: options.newDraft })
   // Undo cancels what this schedule queued. A reschedule replaced earlier posts,
   // which Undo cannot bring back, so it offers none.
@@ -218,6 +230,11 @@ async function commitSchedule(
  * Choosing a time right below the post, without a separate step. Anything that
  * needs more than a time (a reschedule replacing posts, a clock change, the
  * queue) goes to the full dialog through `onMore`.
+ *
+ * Writing a run of posts, the dock opens a gap after the one just scheduled
+ * rather than on a fixed hour tomorrow, takes a typed time like "today 5pm"
+ * or "+1h" beside the pickers, and can schedule and open the next draft on
+ * the same accounts in one press.
  */
 export function ScheduleDock({
   blocked,
@@ -244,36 +261,71 @@ export function ScheduleDock({
     (cachedSet ?? data.sets.find((item) => item.id === setId))?.timeZone ??
     context.setTimeZone ??
     'UTC'
-  const [day, setDay] = React.useState(() =>
-    initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay)
-      ? initialDay
-      : dayIn(new Date(Date.now() + 86_400_000), zone)
-  )
-  const [time, setTime] = React.useState(
-    initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00'
-  )
-  const [busy, setBusy] = React.useState(false)
+  // A slot the draft was started from wins; otherwise a run of posts continues
+  // from the last one, and a brand with weekly slots offers its next free one.
+  const suggested = React.useMemo(() => {
+    if (initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay))
+      return {
+        day: initialDay,
+        time: initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00',
+      }
+    const memory = readComposing(context.draft.socialSetId)
+    const set = data.sets.find((item) => item.id === setId)
+    const at = nextSeriesTime({
+      gapMinutes: memory.gapMinutes,
+      now: new Date(),
+      queued: [
+        ...data.queue.map((item) => item.at),
+        ...(memory.lastScheduledAt ? [memory.lastScheduledAt] : []),
+      ],
+      slots: upcomingSlots(
+        set?.postingSlots ?? [],
+        zone,
+        data.queue.map((item) => item.at)
+      )
+        .filter((slot) => !slot.busy)
+        .map((slot) => slot.at),
+    })
+    const wall = at ? wallTime(at, zone) : null
+    return wall
+      ? { day: wall.slice(0, 10), time: wall.slice(11, 16) }
+      : { day: dayIn(new Date(Date.now() + 86_400_000), zone), time: '09:00' }
+    // Read once, when the draft opens: a suggestion must not move under the writer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const [day, setDay] = React.useState(suggested.day)
+  const [time, setTime] = React.useState(suggested.time)
+  const [typed, setTyped] = React.useState('')
+  const [busy, setBusy] = React.useState<'schedule' | 'next' | null>(null)
   const resolution = resolveLocalTime(`${day}T${time}`, zone)
   const instant = resolution.kind === 'exact' ? resolution.at : null
   const rescheduling = (context.scheduled ?? []).length > 0
   const past = instant !== null && instant.getTime() <= Date.now()
-  const schedule = async () => {
-    setBusy(true)
+  const schedule = async (andNext: boolean) => {
+    setBusy(andNext ? 'next' : 'schedule')
     try {
       await commitSchedule(
         context,
         { localTime: `${day}T${time}`, timeZone: zone },
         {
           naturalPostingTime: Boolean(context.draft.naturalPostingTime && data.advancedScheduling),
-          newDraft: false,
+          newDraft: andNext,
           zone,
         }
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The draft could not be scheduled.')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
+  }
+  // One typed field for both controls: "today 5pm", "fri 2:30pm", "+1h".
+  const readTyped = (value: string) => {
+    setTyped(value)
+    const wall = readWhen(value, zone)
+    if (!wall) return
+    setDay(wall.slice(0, 10))
+    setTime(wall.slice(11, 16))
   }
   return (
     <section
@@ -286,35 +338,74 @@ export function ScheduleDock({
         <DatePicker
           aria-label="Schedule day"
           min={dayIn(new Date(), zone)}
-          onChange={setDay}
+          onChange={(value) => {
+            setDay(value)
+            setTyped('')
+          }}
           value={day}
         />
       </Label>
       <Label className="grid gap-1 text-xs text-muted-foreground">
         Time
-        <TimePicker aria-label="Schedule time" onChange={setTime} value={time} />
+        <TimePicker
+          aria-label="Schedule time"
+          onChange={(value) => {
+            setTime(value)
+            setTyped('')
+          }}
+          value={time}
+        />
+      </Label>
+      <Label className="grid gap-1 text-xs text-muted-foreground">
+        Or type it
+        <Input
+          aria-label="Schedule time in words"
+          className="h-9 w-40"
+          data-testid="dock-when"
+          onChange={(event) => readTyped(event.target.value)}
+          placeholder="today 5pm, +1h"
+          value={typed}
+        />
       </Label>
       {rescheduling || !instant ? (
         <Button onClick={onMore} size="sm" type="button">
           {rescheduling ? 'Reschedule…' : 'Choose a time…'}
         </Button>
       ) : (
-        <Button
-          data-testid="dock-schedule-button"
-          disabled={blocked || busy || past}
-          onClick={() => void schedule()}
-          size="sm"
-          type="button"
-        >
-          {busy
-            ? 'Scheduling…'
-            : `Schedule for ${formatWhen(instant, zone, { dateStyle: 'medium', timeStyle: 'short' })}`}
-        </Button>
+        <>
+          <Button
+            data-testid="dock-schedule-button"
+            disabled={blocked || busy !== null || past}
+            onClick={() => void schedule(false)}
+            size="sm"
+            type="button"
+          >
+            {busy === 'schedule'
+              ? 'Scheduling…'
+              : `Schedule for ${formatWhen(instant, zone, { dateStyle: 'medium', timeStyle: 'short' })}`}
+          </Button>
+          {/* The whole point of a run: queue this one and start the next on the same
+              accounts, a gap later, without going back to the library. */}
+          <Button
+            data-testid="dock-schedule-next-button"
+            disabled={blocked || busy !== null || past}
+            onClick={() => void schedule(true)}
+            size="sm"
+            title="Schedule this post, then open a new draft on the same platforms at the next time"
+            type="button"
+            variant="outline"
+          >
+            {busy === 'next' ? 'Scheduling…' : 'Schedule & next'}
+          </Button>
+        </>
       )}
       <Button onClick={onMore} size="sm" type="button" variant="ghost">
         More options
       </Button>
-      <span className="pb-1.5 text-xs text-muted-foreground">{zone}</span>
+      <span className="pb-1.5 text-xs text-muted-foreground">
+        {typed && !readWhen(typed, zone) ? 'Could not read that time · ' : ''}
+        {zone}
+      </span>
     </section>
   )
 }

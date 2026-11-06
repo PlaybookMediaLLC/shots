@@ -91,6 +91,7 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import { writeApi } from '@/lib/write/client'
+import { rememberChannels, takeOffNotice } from '@/lib/write/composing-session'
 import {
   type DraftChannel,
   type PlateBody,
@@ -604,6 +605,11 @@ export function WriteComposer({
     if (on) keptOn.current.add(accountId)
     else keptOn.current.delete(accountId)
     applySwitch(accountId, on)
+    // A switch the writer set by hand is what the next new draft opens on.
+    rememberChannels(
+      server.socialSetId,
+      on ? [...new Set([...enabled, accountId])] : enabled.filter((id) => id !== accountId)
+    )
   }
   const mediaAccounts = accounts.map((account) => {
     const version = versionFor(document.versions, account.channel)
@@ -634,12 +640,16 @@ export function WriteComposer({
       switchedOff.current.add(id)
       applySwitch(id, false)
     }
-    const names = off.map((id) => {
+    // The switch always happens; the message is once per account per session,
+    // so a run of text posts is not told the same thing on every draft.
+    const fresh = takeOffNotice(server.socialSetId, off)
+    if (fresh.length === 0) return
+    const names = fresh.map((id) => {
       const channel = accounts.find((item) => item.id === id)?.channel
       return channel ? CHANNEL_META[channel].label : 'A platform'
     })
     toast(`${names.join(' and ')} switched off: this post has no media yet.`, {
-      action: { label: 'Undo', onClick: () => off.forEach((id) => toggle(id, true)) },
+      action: { label: 'Undo', onClick: () => fresh.forEach((id) => toggle(id, true)) },
     })
     // Only a change in the post or its destinations can change the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -670,7 +680,12 @@ export function WriteComposer({
       void refreshPosts()
       if (newDraft)
         void draftsApi
-          .create({ socialSetId: draft.socialSetId ?? undefined })
+          // The next post in a run starts on the accounts this one went to, not
+          // on the brand's defaults: that is the switch the writer just set.
+          .create({
+            channelConnectionIds: enabled.length ? [...enabled] : undefined,
+            socialSetId: draft.socialSetId ?? undefined,
+          })
           .then((next) => router.push(`/publish/${next.id}`))
           .catch(() =>
             toast.error(
@@ -1893,8 +1908,10 @@ export function WriteComposer({
             <div className="mx-auto w-full max-w-[419px] flex-1">{previewPanel}</div>
           ) : null}
           {/* Hidden, not removed: unmounting would drop the live room, undo history and caret. */}
+          {/* A column, so the publish bar below is pushed to the foot of the
+              page: its day and time stay in one place whatever the post's length. */}
           <div
-            className={cn('relative flex-1', previewing && 'hidden')}
+            className={cn('relative flex flex-1 flex-col', previewing && 'hidden')}
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
@@ -2183,6 +2200,9 @@ export function WriteComposer({
             />
               </>
             )}
+            {/* Takes the slack under a short post, so the bar below it does not
+                float in the middle of the page. */}
+            <div className="h-32 shrink-0 grow" />
             {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
             {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
             <div
@@ -2220,7 +2240,6 @@ export function WriteComposer({
               )}
             </div>
             ) : null}
-            <div className="h-32" />
           </div>
         </div>
         {sidePanel && !focus && !narrow && !settingsOpen(params) ? (

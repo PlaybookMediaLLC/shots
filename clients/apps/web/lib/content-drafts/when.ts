@@ -1,7 +1,8 @@
 /**
  * Plain-language schedule times for the composer: "tomorrow 9am", "in 3
- * hours", "fri 2:30pm", "oct 21 at noon". Times are local to the browser. A
- * day without a time means 9:00; a time alone means its next occurrence.
+ * hours", "+90m", "fri 2:30pm", "oct 21 at noon". Times are local to the
+ * browser. A day without a time means 9:00; a time alone means its next
+ * occurrence.
  */
 
 import { parseTimeOfDay } from '@/lib/time-of-day'
@@ -44,6 +45,13 @@ export function parseWhen(input: string, now: Date = new Date()): Date | null {
     const amount = /^\d+$/.test(relative[1]) ? Number(relative[1]) : 1
     const unit = UNITS[relative[2]]
     return unit ? new Date(now.getTime() + amount * unit) : null
+  }
+
+  // "+1h", "+90m", "+2 days": the same step, typed the way a queue is spaced.
+  const step = /^\+ ?(\d+) ?([a-z]+?)s?$/.exec(text)
+  if (step) {
+    const unit = UNITS[step[2]]
+    return unit ? new Date(now.getTime() + Number(step[1]) * unit) : null
   }
 
   // Split "<day> [at] <time>" at the time, if there is one.
