@@ -96,17 +96,8 @@ const nextConfig: NextConfig = {
           },
         ],
       })),
-      // COOP/COEP for editor routes (FFmpeg WASM)
-      {
-        source: '/editor/:path*',
-        headers: [
-          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
-          { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
-        ],
-      },
-      // /home is the platform Home here, not upstream's editor. Cross-origin
-      // isolation there blocked the non-isolated /render frame, so every project
-      // preview on Home stayed loading.
+      // /home and /editor stay out of cross-origin isolation: it blocks the
+      // non-isolated /render frame that draws their exports and previews.
       // Cross-origin isolation lets the background remover run ONNX WASM
       // multi-threaded. credentialless still allows the Hugging Face model fetch.
       {
