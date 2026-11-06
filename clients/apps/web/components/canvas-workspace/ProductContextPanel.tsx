@@ -281,7 +281,7 @@ function Lineage({ artboard }: { artboard: Artboard }) {
       : origin.kind === 'design' && origin.campaignId
         ? `/campaigns/${origin.campaignId}/assets`
         : origin.kind === 'project'
-          ? `/?project=${origin.id}`
+          ? `/editor?project=${origin.id}`
           : null
   return (
     <div

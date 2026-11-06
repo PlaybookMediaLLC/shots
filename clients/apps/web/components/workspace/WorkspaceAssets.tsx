@@ -436,7 +436,7 @@ export function WorkspaceAssets({
         </ul>
       ) : assets.length === 0 && !query.error ? (
         <EmptyState
-          action={<ButtonLink href="/">Open the editor</ButtonLink>}
+          action={<ButtonLink href="/editor">Open the editor</ButtonLink>}
           description={
             typeFilter === 'video'
               ? 'Export a video in the editor and choose Save to workspace to keep it here for your team.'
@@ -499,7 +499,7 @@ export function WorkspaceAssets({
                     {asset.projectName ? (
                       <a
                         className="block truncate text-xs text-primary underline"
-                        href={`/?project=${asset.projectId}`}
+                        href={`/editor?project=${asset.projectId}`}
                       >
                         From {asset.projectName}
                       </a>
@@ -553,14 +553,14 @@ export function WorkspaceAssets({
                     >
                       {asset.projectId ? (
                         <DropdownMenuItem asChild>
-                          <a href={`/?project=${asset.projectId}`}>Open source project</a>
+                          <a href={`/editor?project=${asset.projectId}`}>Open source project</a>
                         </DropdownMenuItem>
                       ) : null}
                       {isImage ? (
                         <DropdownMenuItem asChild>
                           {/* The editor reads this parameter on load and pulls
                               the asset onto the canvas for another pass. */}
-                          <a href={`/?asset=${asset.id}`}>Use image in new design</a>
+                          <a href={`/editor?asset=${asset.id}`}>Use image in new design</a>
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuItem onSelect={() => void handleOpen(asset.id)}>

@@ -209,6 +209,6 @@ test(
     await app.open('/create?view=templates')
     await page.getByRole('link', { name: 'Use template: Violet Showcase' }).click()
     await expect(page.getByText('Upload your media')).toBeVisible({ timeout: 60_000 })
-    await expect(page).toHaveURL((url) => url.pathname === '/' && !url.search)
+    await expect(page).toHaveURL((url) => url.pathname === '/editor' && !url.search)
   }
 )

@@ -96,7 +96,7 @@ test(
     await page.getByRole('menuitem', { name: 'Screenshot', exact: true }).click()
     // Leave only once the editor has loaded; a Back during the client navigation
     // returns first, and the navigation then lands on the editor anyway.
-    await page.waitForURL((url) => url.pathname === '/')
+    await page.waitForURL((url) => url.pathname === '/editor')
     const added = await saveAsset(page, png)
     await page.goBack()
     await expect(page).toHaveURL(/type=image&sort=oldest/)

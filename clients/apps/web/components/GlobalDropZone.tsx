@@ -22,7 +22,7 @@ export function GlobalDropZone({ children }: GlobalDropZoneProps) {
 
   const locale = locales.find((locale) => pathname === `/${locale}` || pathname.startsWith(`/${locale}/`));
   // The fork serves the signed-in editor at the locale root, not /editor.
-  const editorPath = locale ? `/${locale}` : '/';
+  const editorPath = locale ? `/${locale}/editor` : '/editor';
   const isEditorPage = pathname === editorPath;
 
   // Import validation finishes before the command chooses a target and writes it.

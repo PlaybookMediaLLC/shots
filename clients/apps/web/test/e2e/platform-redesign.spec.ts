@@ -48,7 +48,7 @@ test(
     await expect(page.getByRole('main')).toHaveCount(1)
     await expect(page.getByRole('link', { name: /Navigation proof/ })).toHaveAttribute(
       'href',
-      `/?project=${id}`
+      `/editor?project=${id}`
     )
     const search = sidebar.getByRole('button', { name: 'Search and commands' })
     await search.focus()
@@ -72,7 +72,7 @@ test(
     await expect(page).toHaveURL(new RegExp(`[?]project=${id}&editor=screenshot$`))
     expect((await trpcQuery(page, 'project.get', { projectId: id })).status).toBe(200)
     await app.open(`/fr/home?project=${id}&editor=screenshot`)
-    await expect(page).toHaveURL(new RegExp(`/fr[?]project=${id}&editor=screenshot$`))
+    await expect(page).toHaveURL(new RegExp(`/fr/editor[?]project=${id}&editor=screenshot$`))
   }
 )
 
@@ -258,7 +258,7 @@ test(
     await box.fill('harbor')
     await expect(
       results.getByRole('link', { name: 'Harbor launch hero Screenshot' })
-    ).toHaveAttribute('href', `/?project=${id}`)
+    ).toHaveAttribute('href', `/editor?project=${id}`)
     await box.fill('qzxj nothing')
     await expect(results.getByRole('status')).toContainText(
       'Search finds places in Shots and posts, screenshots, and canvases by name or words.'
@@ -293,7 +293,7 @@ test(
     ).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('link', { name: 'Open Retry proof' })).toHaveAttribute(
       'href',
-      `/?project=${id}`
+      `/editor?project=${id}`
     )
     const failedRequests = requests
     await page.getByRole('button', { name: 'Retry preview' }).click()
