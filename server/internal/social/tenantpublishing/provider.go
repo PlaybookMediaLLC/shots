@@ -291,7 +291,9 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 	}
 	var publication *postoptions.PublicationReceipt
-	if input.Platform == "tiktok" || input.Platform == "youtube" {
+	// Threads and Instagram ids do not make a link, so the provider's own address is kept.
+	if input.Platform == "tiktok" || input.Platform == "youtube" || input.Platform == "threads" ||
+		input.Platform == "instagram" || input.Platform == "instagram-standalone" {
 		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
 	}
 	if input.Platform == "youtube" {

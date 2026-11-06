@@ -112,7 +112,8 @@ export function NotificationCenter({
     return () => channel.close()
   }, [identity.key, identity.userId, identity.workspaceId, queryClient])
   if (!identity.ready) return null
-  const n = count.isError ? 0 : (count.data?.unseenCount ?? 0)
+  // A failed refresh keeps the last count: a badge that vanishes reads as all read.
+  const n = count.data?.unseenCount ?? 0
   const view = chosen ?? (inboxRead && n > 0 ? 'activity' : 'inbox')
   return (
     <>

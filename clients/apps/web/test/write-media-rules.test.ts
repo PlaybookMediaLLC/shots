@@ -54,6 +54,7 @@ const cases: [string, DraftChannel, MediaFacts[], string][] = [
   ['linkedin quicktime', 'linkedin', [mov], 'Export it as MP4'],
   ['linkedin pdf attachment', 'linkedin', [row('application/pdf', 1000)], 'document option'],
   ['instagram empty', 'instagram', [], 'needs at least one'],
+  ['tiktok empty', 'tiktok', [], 'needs one video'],
   ['instagram png is converted', 'instagram', [png], ''],
   ['instagram gif', 'instagram', [gif], 'animation'],
   ['instagram narrow', 'instagram', [row('image/jpeg', 1000, 300, 300)], 'at least 320 pixels'],

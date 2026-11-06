@@ -71,7 +71,7 @@ export function RecentWork({
                   {item.type === 'Post' ? (
                     // A post has no picture, so it sits on the landing page's grain stage.
                     <Stage className="size-full rounded-none" variant={index}>
-                      <Window className="w-[80%]" meta="Draft" title="Post">
+                      <Window className="w-[80%]" meta={item.status ?? "Draft"} title="Post">
                         {item.excerpt ? (
                           <span className="line-clamp-4 block px-4 py-4 text-start text-[14px] leading-relaxed text-white/90">
                             {item.excerpt}

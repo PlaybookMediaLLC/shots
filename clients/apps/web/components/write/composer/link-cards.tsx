@@ -8,7 +8,12 @@ import { linkPreviewAgentSchema } from '@/lib/api/contracts/link-preview'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { auditLinkPreview, issueSeveritySchema } from '@/lib/link-preview/audit'
 import { MAX_GATED_LINKS } from '@/lib/link-preview/gate'
+import { POST_COLUMN } from '@/components/drafts/layout'
+import { cn } from '@/lib/utils'
 import { linkPreviewSchema, type DraftChannel, type LinkPreview } from '@/lib/write/document'
+
+/** Platforms whose posts show no link card, where looking one up would mislead. */
+export const NO_LINK_CARDS: readonly DraftChannel[] = ['instagram', 'tiktok', 'youtube']
 
 /** HTTPS links in the visible platform version, in document order. */
 export function previewLinks(text: string): string[] {
@@ -92,7 +97,10 @@ export function LinkCards({
   const save = React.useEffectEvent(onChange)
   const [checks, setChecks] = React.useState<Record<string, string>>({})
   const checked = React.useEffectEvent((url: string) => url in checks)
+  const noCards = NO_LINK_CARDS.includes(channel)
+  // Each platform keeps its own cards, so opening another tab looks up what it lacks.
   React.useEffect(() => {
+    if (noCards) return
     let cancelled = false
     const timer = window.setTimeout(() => {
       for (const url of key.split('\n').filter(Boolean)) {
@@ -123,9 +131,10 @@ export function LinkCards({
       window.clearTimeout(timer)
       cancelled = true
     }
-  }, [key, retry])
+  }, [channel, key, noCards, retry])
   // A check reads the whole page, so it waits for a longer pause than the card does.
   React.useEffect(() => {
+    if (noCards) return
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       for (const url of key.split('\n').filter(Boolean).slice(0, MAX_GATED_LINKS)) {
@@ -153,10 +162,18 @@ export function LinkCards({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [key])
+  }, [key, noCards])
   if (!links.length) return null
+  if (noCards)
+    return (
+      <p className={cn('my-2 text-xs text-muted-foreground', POST_COLUMN)} data-testid="no-link-cards">
+        {channel === 'youtube'
+          ? 'YouTube shows links in the description as plain links, with no preview card.'
+          : `Links in ${channel === 'tiktok' ? 'TikTok' : 'Instagram'} captions are not clickable.`}
+      </p>
+    )
   return (
-    <section aria-label="Link previews" className="mx-4 my-2 max-w-xl space-y-2">
+    <section aria-label="Link previews" className={cn('my-2 space-y-2', POST_COLUMN)}>
       {links.map((url) => {
         const card = cards.find((item) => item.url === url)
         const quote =

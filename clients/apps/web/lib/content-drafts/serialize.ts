@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { draftChannelSchema, type Numbering } from '@/lib/write/document'
 import { numberCaptions } from '@/lib/write/numbering'
-import { mediaProblems } from '@/lib/write/media-rules'
+import { LABELS, mediaProblems } from '@/lib/write/media-rules'
 import { xLength } from './x-length'
 
 /**
@@ -177,6 +177,12 @@ const CONNECTION_CHANNELS: Record<string, DraftChannel> = {
 /** The draft channel a connection platform publishes to, or null. */
 export function channelForPlatform(platform: string): DraftChannel | null {
   return CONNECTION_CHANNELS[platform] ?? null
+}
+
+/** A connection's platform as people write it: "Instagram", never "instagram-standalone". */
+export function platformLabel(platform: string): string {
+  const channel = channelForPlatform(platform)
+  return channel ? LABELS[channel] : platform
 }
 
 /** Text marks the editor applies; plain-text channels drop them all. */
@@ -668,8 +674,8 @@ export function serializeDraft(
     if (post.length <= limit) return
     errors.push(
       posts.length > 1
-        ? `Post ${index + 1} is ${post.length} of ${limit} characters: shorten it for ${channel}.`
-        : `${post.length} of ${limit} characters: shorten it for ${channel}.`
+        ? `Post ${index + 1} is ${post.length} of ${limit} characters: shorten it for ${LABELS[channel]}.`
+        : `${post.length} of ${limit} characters: shorten it for ${LABELS[channel]}.`
     )
   })
   // Each post's stored media against the channel's rules, as Go checks it;

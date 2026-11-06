@@ -148,7 +148,10 @@ export function scheduleBlockers(
         channel,
         fix: item.publication.accountProblems.includes(problem) ? 'account' : undefined,
         options: item.publication.optionProblems.includes(problem),
-        text: `${CHANNEL_META[channel].label}: ${problem}`,
+        // Some problems already start with the platform's name.
+        text: problem.startsWith(CHANNEL_META[channel].label)
+          ? problem
+          : `${CHANNEL_META[channel].label}: ${problem}`,
       })
   }
   if (context.requireApproval && !context.approved) {

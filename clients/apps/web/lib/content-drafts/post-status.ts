@@ -170,6 +170,21 @@ export function listedAttention(counts: {
   }
 }
 
+/** A listed draft's one word: what needs a person, else how far its posts have gone. */
+export function listedStatus(draft: {
+  attentionPosts: number
+  checkPosts: number
+  publishedPosts: number
+  queuedPosts: number
+  status: string
+}): string {
+  const attention = listedAttention(draft)
+  if (attention) return attention.state
+  if (draft.status === 'archived') return 'Archived'
+  if (draft.queuedPosts > 0) return 'Scheduled'
+  return draft.publishedPosts > 0 ? 'Published' : 'Draft'
+}
+
 /**
  * What a person can do about a failure besides retrying it: reconnect the
  * account, or edit the post or its options. Null when retrying is the fix.
@@ -232,7 +247,7 @@ export function postFailureReason(code: string | null | undefined): string | nul
       return 'Shots could not reach its publishing service, so nothing was sent. Retry it later, or send the details to support.'
     case 'PUBLISHER_ERROR':
     case 'UNKNOWN':
-      return 'Shots stopped before it handed the post to the platform, so nothing was sent. It did not record why.'
+      return 'Shots stopped before it handed the post to the platform, so nothing was sent. Retry it. If it fails again, copy the details below for support.'
     case 'NETWORK':
       return 'The platform could not be reached. Retry it.'
     case '429':

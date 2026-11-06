@@ -54,6 +54,7 @@ func TestDraftMediaFollowsEachDestination(t *testing.T) {
 		{"linkedin unknown length", "linkedin", []*ent.Asset{legacy}, "couldn't read the length"},
 		{"linkedin pdf attachment", "linkedin", []*ent.Asset{mediaRow("application/pdf", 1000, 0, 0, 0)}, "document option"},
 		{"instagram empty", "instagram", nil, "needs at least one"},
+		{"tiktok empty", "tiktok", nil, "needs one video"},
 		{"instagram png is converted", "instagram", []*ent.Asset{png}, ""},
 		{"instagram gif", "instagram", []*ent.Asset{gif}, "animation"},
 		{"instagram narrow", "instagram", []*ent.Asset{mediaRow("image/jpeg", 1000, 300, 300, 0)}, "at least 320 pixels"},

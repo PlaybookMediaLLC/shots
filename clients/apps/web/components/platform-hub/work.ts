@@ -2,6 +2,7 @@
 
 import { z } from 'zod'
 import { draftHref } from '@/components/write/write-context'
+import { listedStatus } from '@/lib/content-drafts/post-status'
 import type { DesignDocument } from '@/lib/design/document'
 import type { useTRPCClient } from '@/lib/trpc/react'
 
@@ -11,6 +12,11 @@ const draftItem = z.object({
   plainText: z.string().catch(''),
   socialSetId: z.string().nullable(),
   updatedAt: z.coerce.date(),
+  status: z.string().default('draft'),
+  attentionPosts: z.number().default(0),
+  checkPosts: z.number().default(0),
+  publishedPosts: z.number().default(0),
+  queuedPosts: z.number().default(0),
 })
 const draftPage = z.object({ items: z.array(draftItem), pinned: z.array(draftItem) })
 
@@ -26,6 +32,8 @@ export type WorkItem = {
   document?: DesignDocument | null
   /** A post's opening text, shown in place of a thumbnail. */
   excerpt?: string
+  /** A post's state, in the words the drafts list uses. */
+  status?: string
 }
 
 /**
@@ -96,6 +104,7 @@ export async function loadWork(
       scope: 'Profile',
       updatedAt: item.updatedAt,
       excerpt: item.plainText,
+      status: listedStatus(item),
     }))
   }
   const results = await Promise.allSettled([

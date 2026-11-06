@@ -262,9 +262,8 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // Each post has its own Ask AI, and Try again asks the same thing again,
-    // not the empty instruction box.
-    await page.getByRole('button', { name: 'Ask AI about post 1' }).click()
+    // Try again asks the same thing again, not the empty instruction box.
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     const menu = page.getByTestId('refine-menu')
     await menu.getByLabel('Refine instruction').fill('Make it friendlier')
     await menu.getByRole('button', { name: 'Go', exact: true }).click()
@@ -711,12 +710,12 @@ test(
       await page.keyboard.press('Escape')
       // Nothing in this workspace is on a day before it existed.
       await app.open('/publish?tab=all&from=2020-01-01&to=2020-01-02')
-      await expect(page.getByText('No drafts match these filters.')).toBeVisible()
+      await expect(page.getByText('Nothing matches these filters.')).toBeVisible()
       await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
       await expect(page).not.toHaveURL(/[?&]from=/)
-      await page.getByRole('tab', { name: 'Queue', exact: true }).click()
+      await page.getByRole('tab', { name: /^Queue/ }).click()
       await expect(
-        page.getByText('Free slots for the next 7 days, and posts for the next 60.')
+        page.getByText('Free slots for the next 7 days, and posts for the next 60 days.')
       ).toBeVisible()
     })
     await app.open('/publish/calendar')

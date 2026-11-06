@@ -8,13 +8,14 @@ import { useHydratedSession } from '@/lib/auth/client'
 /**
  * Cache identity follows both the authenticated person and active workspace.
  * `initial`, from the server's render, stands in until the session loads, so
- * the first reads need not wait for it.
+ * the first reads need not wait for it. It also holds the workspace: when another
+ * tab switches the browser's active one, this page still shows its own.
  */
 export function useNotificationIdentity(initial?: { userId: string; workspaceId: string }) {
   const { data, isPending } = useHydratedSession()
   const fallback = isPending ? initial : undefined
   const userId = data?.user.id ?? fallback?.userId ?? ''
-  const workspaceId = data?.session.activeOrganizationId ?? fallback?.workspaceId ?? ''
+  const workspaceId = initial?.workspaceId ?? data?.session.activeOrganizationId ?? ''
   const queryClient = useQueryClient()
   const key = useMemo(
     () => ['workspace-notifications', userId, workspaceId] as const,

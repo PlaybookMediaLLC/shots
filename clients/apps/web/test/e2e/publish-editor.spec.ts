@@ -240,7 +240,7 @@ test(
 
     await page.goto('/write?tab=queue')
     const queue = page.getByTestId('queue')
-    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled this week')
+    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled in the next 7 days')
     await expect(queue.getByRole('link', { name: 'Edit schedule' })).toBeVisible()
     const slot = queue.getByTestId('queue-free-slot').first()
     await expect(slot).toBeVisible()
@@ -261,5 +261,64 @@ test(
     await expect(page.getByLabel('Time', { exact: true })).toHaveValue(
       `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
     )
+  }
+)
+
+test(
+  'a platform that cannot post is one click away from removal, the main version moves on, and a live post locks',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x', 'threads', 'tiktok', 'instagram'] })
+    await weeklySlots(page)
+    const id = await openNewDraft(page)
+    await page.keyboard.type('Plain text, with no media.')
+    await expectSaved(page)
+
+    // Every platform with something to fix says so on its tab, and the list offers to drop it.
+    await expect(page.getByTestId('platform-blocked-tiktok')).toBeVisible()
+    await expect(page.getByTestId('platform-blocked-instagram')).toBeVisible()
+    for (const [channel, label] of [
+      ['tiktok', 'TikTok'],
+      ['instagram', 'Instagram'],
+    ]) {
+      if (!(await page.getByTestId('blockers').isVisible()))
+        await page.getByTestId('blockers-button').click()
+      await page.getByRole('button', { name: `Remove ${label} from this post` }).click()
+      await expect(page.getByTestId(`platform-tab-${channel}`)).toHaveCount(0)
+    }
+    await expect(page.getByTestId('blockers-button')).toHaveCount(0)
+
+    // Turning the main platform off hands the main version on, and the dialog holds still.
+    await page.getByRole('button', { name: 'Manage platforms' }).click()
+    const dialog = page.getByRole('dialog')
+    const before = await dialog.boundingBox()
+    await dialog.getByRole('switch', { name: 'Publish to X' }).click()
+    await expect(dialog.getByRole('switch', { name: 'Publish to X' })).not.toBeChecked()
+    expect(await dialog.boundingBox()).toEqual(before)
+    await dialog.getByRole('button', { name: 'Done' }).click()
+    await expect(page.getByTestId('platform-tab-x')).toHaveCount(0)
+    await expect(page.getByTestId('platform-tab-threads')).toContainText('Main')
+    await expectSaved(page)
+
+    await page.getByTestId('queue-button').click()
+    const schedule = page.getByTestId('schedule-dialog')
+    await schedule.getByLabel('Open a new draft after scheduling').uncheck()
+    await schedule.getByRole('button', { name: 'Add to queue', exact: true }).click()
+    await expect(schedule).toBeHidden()
+    await expect.poll(async () => (await draftPosts(id)).length).toBe(1)
+    const [post] = await draftPosts(id)
+    await db.row(
+      `UPDATE scheduled_post SET status = 'PUBLISHED', "publishedAt" = now()
+        WHERE id = $1 RETURNING id`,
+      [post.id]
+    )
+
+    // Edits could not reach it, so the text says that and takes none.
+    await app.reload()
+    await expect(page.getByTestId('live-notice')).toContainText('live on Threads')
+    await expect(page.getByTestId('post-again-button')).toBeVisible()
+    await expect(page.getByRole('toolbar', { name: 'Draft tools' })).toHaveCount(0)
+    await app.open('/home')
+    await expect(page.getByRole('region', { name: 'Continue working' })).toContainText('Published')
   }
 )

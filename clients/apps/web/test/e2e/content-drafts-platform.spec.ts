@@ -410,7 +410,7 @@ test('a live post links to itself, shows engagement, and resumes a thread that s
   )
   await app.reload()
   const live = page.getByTestId('draft-post')
-  await expect(live.getByRole('link', { name: 'View post' })).toHaveAttribute(
+  await expect(live.getByRole('link', { name: /^View on / })).toHaveAttribute(
     'href',
     'https://x.com/i/status/tweet-1'
   )
