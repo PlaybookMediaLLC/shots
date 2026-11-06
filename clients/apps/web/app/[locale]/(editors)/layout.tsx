@@ -6,10 +6,10 @@ import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { getPageAccess } from '@/lib/auth/page-access'
 import { accessAllows } from '@/lib/auth/permissions'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
-import { CanStartPostProvider } from '@/lib/platform/can-start-post'
+import { EditorAccessProvider } from '@/lib/platform/can-start-post'
 
 /**
- * The screenshot editor (`/`) and the store studio (`/create/store`) share this
+ * The screenshot editor (`/editor`) and the store studio (`/create/store`) share this
  * layout, so moving between them keeps both documents, selections and undo
  * histories mounted. Each page checks access and redirects whoever may not
  * open it; the editors render only for a workspace that may.
@@ -26,11 +26,14 @@ export default async function EditorsLayout({ children }: { children: ReactNode 
           variant="editor"
         >
           <ErrorBoundary>
-            <CanStartPostProvider
-              value={accessAllows(access, 'artifact:edit') && contentDraftsEnabled()}
+            <EditorAccessProvider
+              value={{
+                canEdit: accessAllows(access, 'artifact:edit'),
+                canStartPost: accessAllows(access, 'artifact:edit') && contentDraftsEnabled(),
+              }}
             >
               <EditorWorkspace />
-            </CanStartPostProvider>
+            </EditorAccessProvider>
           </ErrorBoundary>
         </PlatformShell>
       ) : null}

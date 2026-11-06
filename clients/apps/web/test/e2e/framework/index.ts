@@ -64,7 +64,7 @@ export type App = {
 
 /** Opens the screenshot editor on `page` and waits until it can be used. */
 export async function openEditor(page: Page): Promise<void> {
-  await page.goto('/')
+  await page.goto('/editor')
   await waitForHydration(page)
   await expect(page.getByRole('button', { exact: true, name: 'Export' })).toBeVisible()
 }

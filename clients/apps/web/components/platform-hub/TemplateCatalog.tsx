@@ -95,7 +95,7 @@ export function TemplateStrip({ count = 4 }: { count?: number }) {
 }
 
 /** A new screenshot that opens with this template applied (ProjectLoader). */
-const newScreenshotFrom = (id: string) => `/?start=new&template=${encodeURIComponent(id)}`
+const newScreenshotFrom = (id: string) => `/editor?start=new&template=${encodeURIComponent(id)}`
 
 /** Shared catalog. Screenshot and Canvas templates open applied; the rest open their editor. */
 export default function TemplateCatalog() {
@@ -178,7 +178,7 @@ export default function TemplateCatalog() {
                 key={template.id}
                 name={template.name}
                 description={template.description}
-                href="/?start=new"
+                href="/editor?start=new"
                 action="Open editor"
               >
                 <AnimatedTemplatePreview template={template} active={false} />

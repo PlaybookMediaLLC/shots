@@ -70,7 +70,7 @@ export async function loadWork(
       .then(({ items }): WorkItem[] =>
         items.map((item) => ({
           id: item.id,
-          href: `/?project=${encodeURIComponent(item.id)}`,
+          href: `/editor?project=${encodeURIComponent(item.id)}`,
           title: item.name,
           type: 'Screenshot',
           scope: 'Workspace',

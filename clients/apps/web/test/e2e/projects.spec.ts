@@ -195,7 +195,15 @@ test(
     const kept = await trpcQuery(page, 'project.get', { projectId })
     expect((kept.body as { document: { texts: unknown[] } }).document.texts).toHaveLength(1)
 
-    // A design kept only on this browser is replaced only when the person says so.
+    // A design with content is saved to the workspace on the way out, so nothing is lost.
+    await addText(page)
+    await newScreenshot()
+    await expect(texts(page)).toHaveCount(0)
+    const saved = await trpcQuery(page, 'project.list', { limit: 10 })
+    expect(JSON.stringify(saved.body)).toContain('Untitled screenshot')
+
+    // If it can't be saved, it stays on this browser and is replaced only when the person says so.
+    await page.route('**/api/trpc/**project.create**', (route) => route.abort())
     await addText(page)
     await newScreenshot()
     const ask = page.getByRole('alertdialog', { name: 'Start a new screenshot?' })
@@ -204,11 +212,12 @@ test(
     await newScreenshot()
     await ask.getByRole('button', { name: 'Replace with a new screenshot' }).click()
     await expect(texts(page)).toHaveCount(0)
+    await page.unroute('**/api/trpc/**project.create**')
 
     // Use template opens that template, ready for the person's own screenshot.
     await app.open('/create?view=templates')
     await page.getByRole('link', { name: 'Use template: Violet Showcase' }).click()
     await expect(page.getByText('Upload your media')).toBeVisible({ timeout: 60_000 })
-    await expect(page).toHaveURL((url) => url.pathname === '/' && !url.search)
+    await expect(page).toHaveURL((url) => url.pathname === '/editor' && !url.search)
   }
 )

@@ -2,7 +2,7 @@
 
 import { useLayerDepth, reorderLayer } from '@/lib/editor/use-layer-depth';
 
-import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
+import { useRef, useState, useCallback, useMemo, useEffect, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { shouldIgnoreEditorShortcut } from '@/lib/editor-shortcuts';
 import { fitFontSize, textFillCss } from '@/lib/typography/text-style';
 import { measureLine, useFontsVersion } from '@/lib/typography/measure';
@@ -12,6 +12,7 @@ import { canvasOf, canvasScale, collectSnapLines, endSnapDrag, snapDrag } from '
 import type { SnapLines } from '@/lib/editor/snapping';
 import { useLayerMotion, useTextReveal } from '@/lib/animation/use-motion';
 import { RevealedText } from '../motion/motion-layers';
+import { takeTextEdit } from "@/lib/editor/pending-text-edit";
 
 export function getDraggedTextPosition(
   start: TextOverlay['position'], deltaX: number, deltaY: number, width: number, height: number,
@@ -54,6 +55,23 @@ function DraggableText({
   const depth = useLayerDepth(overlay.id);
   const drag = useRef<{ x: number; y: number; position: TextOverlay["position"]; lines: SnapLines | null } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isEditing, setIsEditing] = useState(() => takeTextEdit(overlay.id));
+  const field = useRef<HTMLDivElement>(null);
+  // The field is uncontrolled while typing; its words are committed as it closes.
+  useEffect(() => {
+    const element = field.current;
+    if (!isEditing || !element) return;
+    element.textContent = overlay.text;
+    element.focus();
+    const selection = window.getSelection();
+    selection?.selectAllChildren(element);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing]);
+  const finishEditing = () => {
+    const text = field.current?.innerText.replace(/\n$/, "") ?? overlay.text;
+    setIsEditing(false);
+    if (text !== overlay.text) onUpdate({ text });
+  };
 
   // Convert percentage position to pixels
   const textX = (overlay.position.x / 100) * canvasW;
@@ -92,7 +110,30 @@ function DraggableText({
     <div
       data-text-overlay-id={overlay.id}
       data-export-clean-outline={isSelected ? 'true' : undefined}
+      ref={field}
+      {...(isEditing
+        ? {
+            'aria-label': 'Edit text',
+            'aria-multiline': true,
+            contentEditable: 'plaintext-only' as const,
+            role: 'textbox',
+            suppressContentEditableWarning: true,
+            onBlur: finishEditing,
+            onKeyDown: (event: ReactKeyboardEvent) => {
+              event.stopPropagation();
+              if (event.key === 'Escape' || (event.key === 'Enter' && (event.metaKey || event.ctrlKey))) {
+                event.preventDefault();
+                field.current?.blur();
+              }
+            },
+          }
+        : {})}
+      onDoubleClick={() => setIsEditing(true)}
       onPointerDown={(event) => {
+        if (isEditing) {
+          event.stopPropagation();
+          return;
+        }
         if (event.button !== 0) return;
         event.preventDefault();
         event.stopPropagation();
@@ -147,8 +188,8 @@ function DraggableText({
         letterSpacing: overlay.letterSpacing ? `${overlay.letterSpacing}em` : undefined,
         lineHeight: overlay.lineHeight ?? 1.2,
         touchAction: 'none',
-        cursor: isDragging ? 'grabbing' : 'grab',
-        userSelect: 'none',
+        cursor: isEditing ? 'text' : isDragging ? 'grabbing' : 'grab',
+        userSelect: isEditing ? 'text' : 'none',
         writingMode: overlay.orientation === 'vertical' ? 'vertical-rl' : 'horizontal-tb',
         outline: isSelected ? '2px solid rgba(59, 130, 246, 0.5)' : 'none',
         outlineOffset: '4px',
@@ -156,7 +197,7 @@ function DraggableText({
         pointerEvents: 'auto',
       }}
     >
-      {reveal ? <RevealedText {...reveal} /> : overlay.text}
+      {isEditing ? null : reveal ? <RevealedText {...reveal} /> : overlay.text}
     </div>
   );
 }

@@ -43,7 +43,7 @@ import { SidebarLink } from './SidebarLink'
 // `permission` is what the destination checks before it creates anything.
 // Store screenshots stay on this browser, so any role may make them.
 const NEW_ITEMS: { href: string; label: string; paid: boolean; permission?: Permission }[] = [
-  { href: '/?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
+  { href: '/editor?start=new', label: 'Screenshot', paid: true, permission: 'artifact:edit' },
   { href: '/canvas/new', label: 'Canvas', paid: true, permission: 'artifact:edit' },
   { href: '/create/code', label: 'Code image', paid: true },
   { ...STORE_SCREENSHOTS, paid: true },

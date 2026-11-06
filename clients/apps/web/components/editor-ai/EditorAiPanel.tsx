@@ -4,6 +4,7 @@ import { SparkleIcon as AiMagicIcon } from '@phosphor-icons/react/dist/ssr/Spark
 import { ArrowUpIcon as ArrowUp02Icon } from '@phosphor-icons/react/dist/ssr/ArrowUp'
 import { XIcon as Cancel01Icon } from '@phosphor-icons/react/dist/ssr/X'
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { applyDesignChanges } from '@/lib/design/apply'
@@ -55,6 +56,9 @@ export function EditorAiPanel() {
   const trpcClient = useTRPCClient()
   const [status, setStatus] = useState<Status | null>(null)
   const [open, setOpen] = useState(false)
+  // The header belongs to upstream's editor, which only leaves a place for this button.
+  const [headerSlot, setHeaderSlot] = useState<Element | null>(null)
+  useEffect(() => setHeaderSlot(document.getElementById('editor-header-slot')), [])
   const [tab, setTab] = useState<Tab>('copilot')
   const [input, setInput] = useState('')
   const [selection, setSelection] = useState<string | null>(null)
@@ -153,17 +157,23 @@ export function EditorAiPanel() {
 
   return (
     <>
-      <Button
-        aria-expanded={open}
-        aria-label="Open the AI copilot"
-        className="fixed top-[72px] right-4 lg:right-[276px] z-30 gap-1.5 rounded-full shadow-lg"
-        onClick={() => (open ? setOpen(false) : openCopilot(false))}
-        size="sm"
-        type="button"
-      >
-        <AiMagicIcon size={16} />
-        AI
-      </Button>
+      {headerSlot
+        ? createPortal(
+            <Button
+              aria-expanded={open}
+              aria-label="Open the AI copilot"
+              className="gap-1.5"
+              onClick={() => (open ? setOpen(false) : openCopilot(false))}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              <AiMagicIcon size={16} />
+              AI
+            </Button>,
+            headerSlot
+          )
+        : null}
 
       {open ? (
         <section
