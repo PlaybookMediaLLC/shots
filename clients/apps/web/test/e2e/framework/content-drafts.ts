@@ -337,18 +337,14 @@ export async function saveBatchDrafts(page: Page): Promise<string[]> {
 }
 
 /**
- * Turn platforms on in the composer's Manage platforms dialog, then close it.
- * A new draft already publishes to every platform of its set, so this
- * confirms them rather than adding any.
+ * Turn platforms on with their tabs' switches. A new draft already publishes
+ * to every platform of its set, so this confirms them rather than adding any.
  */
 export async function chooseChannels(page: Page, platforms: readonly string[]): Promise<void> {
-  await page.getByRole('button', { name: 'Manage platforms' }).click()
-  const dialog = page.getByRole('dialog')
+  const tabs = page.getByTestId('platform-tabs')
   for (const platform of platforms) {
-    await dialog.getByRole('switch', { name: `Publish to ${PLATFORM_LABELS[platform]}` }).check()
+    await tabs.getByRole('switch', { name: `Publish to ${PLATFORM_LABELS[platform]}` }).check()
   }
-  await dialog.getByRole('button', { name: 'Done' }).click()
-  await expect(dialog).toHaveCount(0)
 }
 
 /** Run checks against the previews, with the preview panel open, then close it. */
