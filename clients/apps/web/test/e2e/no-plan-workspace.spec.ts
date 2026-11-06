@@ -125,6 +125,8 @@ test('a plan that lapses while the app is open: New post explains it instead of 
   await page.getByRole('button', { exact: true, name: 'New' }).click()
   await page.getByRole('menuitem', { exact: true, name: 'Post' }).click()
   const draft = page.getByRole('dialog', { name: 'New draft' })
+  // Nothing is asked of the server until there is something to save.
+  await page.keyboard.type('First words')
   await expect(draft.getByText('Writing posts needs Pro.')).toBeVisible()
   await expect(draft.getByText(/capability is not available/)).toHaveCount(0)
   await expect(draft.getByRole('button', { exact: true, name: 'Retry' })).toHaveCount(0)

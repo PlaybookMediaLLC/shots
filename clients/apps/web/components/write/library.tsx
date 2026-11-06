@@ -77,7 +77,7 @@ import {
   type WriteLibrary,
 } from './write-context'
 import { useKeys } from './shortcuts'
-import { createWritingDraft } from './pending-draft'
+import { createWritingDraft, startBlankDraft } from './pending-draft'
 
 /** The library tabs, in order. */
 const TABS = [
@@ -572,7 +572,9 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
   const create = async (kind: DraftKind, target?: { sourceDraftId?: string; url?: string }) => {
     setCreating(true)
     try {
-      await createWritingDraft(
+      // A plain post waits for its first word; the other kinds carry a choice worth keeping.
+      const start = kind === 'standard' && !target ? startBlankDraft : createWritingDraft
+      await start(
         {
           kind,
           socialSetId: data.activeSet?.id,

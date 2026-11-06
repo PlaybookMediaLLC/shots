@@ -18,6 +18,9 @@ import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handof
 import type { DraftChannel } from '@/lib/write/document'
 import { DESTINATION_MEDIA, mediaProblems } from '@/lib/write/media-rules'
 
+/** A draft's attachment cap (`assetIds` in the content draft contract). */
+const MAX_DRAFT_ASSETS = 20
+
 /** Size and day, which tell two copies of one file apart. */
 function assetDetails(asset: { bytes: number; createdAt: Date | string }): string {
   return `${formatBytes(asset.bytes)} · ${new Date(asset.createdAt).toLocaleDateString(undefined, {
@@ -34,7 +37,7 @@ export function LibraryAssetPicker({
   onInsert,
 }: {
   /** The platform being edited, whose rules decide what can be picked and how many. */
-  channel: DraftChannel
+  channel?: DraftChannel
   onClose: () => void
   /** The picked assets, in the order they were picked. */
   onInsert: (nodes: ReturnType<typeof draftAssetNode>[]) => void
@@ -47,7 +50,7 @@ export function LibraryAssetPicker({
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const maxMedia = DESTINATION_MEDIA[channel].maxMedia
+  const maxMedia = channel ? DESTINATION_MEDIA[channel].maxMedia : MAX_DRAFT_ASSETS
   useEffect(() => {
     const timer = setTimeout(() => setDebounced(search.trim()), 200)
     return () => clearTimeout(timer)
@@ -130,9 +133,11 @@ export function LibraryAssetPicker({
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {assets.map((item) => {
               const supported = supportedDraftMedia(item.mediaType)
-              const refused = supported
-                ? mediaProblems(channel, [{ mimeType: item.mediaType }])[0]
-                : 'Export to PNG, JPEG, WebP, GIF, MP4 or WebM first.'
+              const refused = !supported
+                ? 'Export to PNG, JPEG, WebP, GIF, MP4 or WebM first.'
+                : channel
+                  ? mediaProblems(channel, [{ mimeType: item.mediaType }])[0]
+                  : undefined
               const chosen = selected.includes(item.id)
               const name = item.fileName || 'Workspace media'
               return (

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
@@ -12,8 +13,25 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-type PendingDraft = { id?: string; text: string; error?: string; planRequired?: boolean }
+const LibraryAssetPicker = dynamic(
+  () =>
+    import('@/components/platform-hub/LibraryAssetPicker').then(
+      (module) => module.LibraryAssetPicker
+    ),
+  { ssr: false }
+)
+
+type PendingDraft = {
+  id?: string
+  text: string
+  error?: string
+  planRequired?: boolean
+  /** Nothing has been saved: the draft is made by the first word or attachment. */
+  waiting?: boolean
+}
 let pending: PendingDraft | null = null
+/** Attach media to a post still waiting to be made, and make it. */
+let attachToWaiting: ((nodes: ReturnType<typeof draftAssetNode>[]) => void) | null = null
 let retry: (() => Promise<void>) | null = null
 const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => {
@@ -35,8 +53,42 @@ export async function createWritingDraft(
 ) {
   if (pending) return
   update({ text: '' })
+  prepareCreation(input, navigate, beforeLeave)
+  await retry?.()
+}
+
+/**
+ * Open the box for a blank post and save nothing yet: the first word or
+ * attachment makes the draft, so a post started and abandoned leaves no row.
+ * Cancelling returns to the page underneath. Anything seeded or aimed at a
+ * target goes through `createWritingDraft`, which saves at once.
+ */
+export function startBlankDraft(
+  input: Parameters<typeof draftsApi.create>[0],
+  navigate: (id: string) => void,
+  beforeLeave?: () => Promise<void>
+) {
+  if (pending) return
+  update({ text: '', waiting: true })
+  prepareCreation(input, navigate, beforeLeave)
+}
+
+function prepareCreation(
+  input: Parameters<typeof draftsApi.create>[0],
+  navigate: (id: string) => void,
+  beforeLeave?: () => Promise<void>
+) {
   // One key for every try: a retry after a lost response gets the same draft back, not a second one.
-  const request = { requestKey: crypto.randomUUID(), ...input }
+  let request = { requestKey: crypto.randomUUID(), ...input }
+  attachToWaiting = (nodes) => {
+    request = {
+      ...request,
+      assetIds: nodes.map((node) => node.assetId),
+      body: [postBreak(), { type: 'p', children: [{ text: '' }] }, ...nodes],
+    }
+    if (pending) update({ ...pending, waiting: false })
+    void retry?.()
+  }
   retry = async () => {
     if (pending) update({ ...pending, error: undefined })
     try {
@@ -57,7 +109,6 @@ export async function createWritingDraft(
       })
     }
   }
-  await retry()
 }
 
 /** A new post with these assets attached: it references them, as Attach from Library does. */
@@ -75,9 +126,9 @@ export function startPostWithAssets(
 }
 
 /**
- * Start a post from anywhere in the app: the draft is made at once, with the
- * quick-compose box up meanwhile, instead of opening Publish to click New
- * draft again. It lands in the workspace's default brand. Every open editor
+ * Start a post from anywhere in the app: the quick-compose box opens over the
+ * page, and the first word makes the draft, instead of opening Publish to click
+ * New draft again. It lands in the workspace's default brand. Every open editor
  * saves or asks first; a cancelled leave stays put.
  */
 export function useNewPost(onStart?: () => void): () => void {
@@ -87,7 +138,7 @@ export function useNewPost(onStart?: () => void): () => void {
     onStart?.()
     void prepareWorkspaceSwitch().then(
       () =>
-        createWritingDraft({}, (id) =>
+        startBlankDraft({}, (id) =>
           router.push(platformHref(pathname, `/publish/${encodeURIComponent(id)}`))
         ),
       () => {}
@@ -121,6 +172,13 @@ export function PendingDraftInput() {
   const box = React.useRef<HTMLDivElement>(null)
   const field = React.useRef<HTMLTextAreaElement>(null)
   const open = Boolean(value)
+  const [picking, setPicking] = React.useState(false)
+  const cancel = () => {
+    retry = null
+    attachToWaiting = null
+    setPicking(false)
+    update(null)
+  }
   // The box covers the page, so focus stays in it. A menu or dialog that opened
   // it hands focus back to its own trigger as it closes, which would otherwise
   // send the first words typed to a hidden control.
@@ -149,7 +207,7 @@ export function PendingDraftInput() {
       role="dialog"
     >
       <div className="w-full max-w-xl space-y-3">
-        <p role="status">{value.error ?? 'New draft · Connecting in the background'}</p>
+        <p role="status">{value.error ?? (value.waiting ? 'New post' : 'Saving your post…')}</p>
         <Textarea
           ref={field}
           aria-label="New draft text"
@@ -157,9 +215,31 @@ export function PendingDraftInput() {
           placeholder="What would you like to share?"
           value={value.text}
           onChange={(event) => {
-            if (pending) update({ ...pending, text: event.target.value })
+            if (!pending) return
+            const makeIt = pending.waiting && event.target.value.trim()
+            update({ ...pending, text: event.target.value, waiting: makeIt ? false : pending.waiting })
+            if (makeIt) void retry?.()
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && value.waiting && !value.text) cancel()
           }}
         />
+        {value.waiting ? (
+          <div className="flex gap-2">
+            <Button onClick={() => setPicking(true)} variant="outline">
+              Add media
+            </Button>
+            <Button onClick={cancel} variant="ghost">
+              Cancel
+            </Button>
+          </div>
+        ) : null}
+        {picking ? (
+          <LibraryAssetPicker
+            onClose={() => setPicking(false)}
+            onInsert={(nodes) => attachToWaiting?.(nodes)}
+          />
+        ) : null}
         {value.error ? (
           <div className="flex gap-2">
             {value.planRequired ? (
@@ -177,13 +257,7 @@ export function PendingDraftInput() {
             )}
             {value.id ? null : (
               // Nothing was created: a refusal (such as no permission to write) must not trap the page.
-              <Button
-                onClick={() => {
-                  retry = null
-                  update(null)
-                }}
-                variant="outline"
-              >
+              <Button onClick={cancel} variant="outline">
                 Cancel
               </Button>
             )}

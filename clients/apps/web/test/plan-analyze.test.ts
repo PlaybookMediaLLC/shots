@@ -759,6 +759,8 @@ test('a draft is called by its title, else its first line of text', () => {
   )
   assert.equal(draftName({ excerpt: 'First line', title: '  ' }), 'First line')
   assert.equal(draftName({ excerpt: '', title: '' }), 'Untitled draft')
+  assert.equal(draftName({ excerpt: '', media: 'video', title: 'Untitled draft' }), 'Video draft')
+  assert.equal(draftName({ excerpt: 'Words', media: 'video', title: '' }), 'Words')
 })
 
 test('a month day caps its posts but never hides one that needs attention', () => {

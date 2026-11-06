@@ -5,7 +5,10 @@ import { useWriteRouter } from '@/components/write/write-context'
 import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
-import { createWritingDraft } from './pending-draft'
+import { startBlankDraft } from './pending-draft'
+import { type DraftSearchItem, draftPage } from '@/components/platform-hub/work'
+import { listedStatus } from '@/lib/content-drafts/post-status'
+import { draftName } from '@/lib/write/library'
 import {
   CommandDialog,
   CommandEmpty,
@@ -50,9 +53,7 @@ export default function CommandPalette({
   const platforms = (data.activeSet?.accounts ?? []).filter(
     (account, index, all) => all.findIndex((item) => item.channel === account.channel) === index
   )
-  const [results, setResults] = React.useState<{ id: string; title: string; plainText: string }[]>(
-    []
-  )
+  const [results, setResults] = React.useState<DraftSearchItem[]>([])
   const [search, setSearch] = React.useState('')
   const [searchError, setSearchError] = React.useState(false)
   React.useEffect(() => {
@@ -67,10 +68,10 @@ export default function CommandPalette({
           if (!response.ok) throw new Error('Search failed')
           return response.json()
         })
-        .then(
-          (body: { items: typeof results; pinned: typeof results }) =>
-            !controller.signal.aborted && setResults([...body.pinned, ...body.items])
-        )
+        .then((body: unknown) => {
+          const page = draftPage.parse(body)
+          if (!controller.signal.aborted) setResults([...page.pinned, ...page.items])
+        })
         .catch(() => {
           if (!controller.signal.aborted) {
             setResults([])
@@ -130,16 +131,22 @@ export default function CommandPalette({
           </CommandItem>
         </CommandGroup>
         {results.length > 0 ? (
-          <CommandGroup heading="Drafts">
+          <CommandGroup heading="Posts">
             {results.map((draft) => (
               <CommandItem
                 key={draft.id}
                 onSelect={() => go(() => router.push(draftHref(draft.id, data.activeSet?.id)))}
                 value={`draft ${draft.id} ${draft.title} ${draft.plainText}`}
               >
-                <span className="truncate">{draft.title}</span>
-                <span className="ml-2 truncate text-xs text-muted-foreground">
-                  {draft.plainText.slice(0, 60)}
+                <span className="truncate">
+                  {draftName({
+                    excerpt: draft.plainText,
+                    media: draft.assetIds.length ? 'media' : null,
+                    title: draft.title,
+                  })}
+                </span>
+                <span className="ml-auto shrink-0 ps-2 text-xs text-muted-foreground">
+                  {listedStatus(draft)}
                 </span>
               </CommandItem>
             ))}
@@ -188,7 +195,7 @@ export default function CommandPalette({
                 onSelect={() =>
                   go(
                     () =>
-                      void createWritingDraft(
+                      startBlankDraft(
                         {
                           channelConnectionIds: [account.id],
                           primaryPlatform: account.channel,
@@ -235,10 +242,11 @@ export default function CommandPalette({
           ) : null}
           {canEdit ? (
             <CommandItem
+              value="New draft new post"
               onSelect={() =>
                 go(
                   () =>
-                    void createWritingDraft(
+                    startBlankDraft(
                       { socialSetId: data.activeSet?.id },
                       (id) => router.push(draftHref(id, data.activeSet?.id)),
                       beforeLeaveRef.current ?? undefined

@@ -9,6 +9,8 @@ import {
   type Page,
   settleSelection,
   test,
+  openNewDraft,
+  startPostByTyping,
 } from './framework'
 
 /**
@@ -27,11 +29,7 @@ async function snap(page: Page, name: string): Promise<void> {
 
 /** Open a new draft from the library; returns its id. */
 async function newDraft(page: Page): Promise<string> {
-  await page.goto('/publish')
-  await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/publish\/[a-z0-9]+/)
-  await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
-  return new URL(page.url()).pathname.split('/').pop() ?? ''
+  return openNewDraft(page)
 }
 
 /**
@@ -375,13 +373,7 @@ test(
     await app.open('/publish')
     await expect(page.getByTestId('write-rail')).toBeVisible()
     await snap(page, 'write-phone-library')
-    await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/publish\/[a-z0-9]+/)
-    const editor = draftEditor(page)
-    await expect(editor).toBeVisible({ timeout: 60_000 })
-    await editor.click()
-    await settleSelection(page)
-    await page.keyboard.type('Written on a phone.')
+    await startPostByTyping(page, 'Written on a phone.')
     await expectSaved(page)
     await expect(page.getByTestId('save-state')).toBeVisible()
     await snap(page, 'write-phone-composer')
@@ -415,6 +407,7 @@ test(
       socialSetId: string
     }
     await page.getByTestId('mobile-new-draft').click()
+    await page.keyboard.type('Next.')
     await page.waitForURL(
       (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(previousId)
     )
