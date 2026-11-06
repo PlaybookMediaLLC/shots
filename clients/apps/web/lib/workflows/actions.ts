@@ -110,7 +110,7 @@ export const WORKFLOW_ACTIONS = {
     type: 'render_creatives',
     label: 'Render creatives',
     description:
-      'Fills 1–3 design templates with the capture from an earlier step, or your latest product capture, and the release headline, styles them with the campaign brand kit, renders them, and attaches them to the campaign for review.',
+      'Fills 1–3 design templates with the capture from an earlier step, or your latest product capture, and the release headline, styles them with the campaign brand kit, renders them, and attaches them to the campaign for review. Each one opens in the editor from the campaign’s assets, and an edit there becomes a Publish draft with this campaign’s copy.',
     input: 'campaignId',
     output: 'campaignId',
     minSchemaVersion: 2,

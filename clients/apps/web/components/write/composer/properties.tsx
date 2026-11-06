@@ -3,6 +3,7 @@
 import { useWriteRouter } from '@/components/write/write-context'
 
 import * as React from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -298,6 +299,20 @@ export function PropertiesPanel({
             Copy
           </Button>
         </dd>
+        {draft.campaignId ? (
+          <>
+            <dt className="text-muted-foreground">Campaign</dt>
+            <dd>
+              {/* An edited campaign visual keeps the campaign it was published from. */}
+              <Link
+                className="text-sky-700 underline dark:text-sky-300"
+                href={`/campaigns/${encodeURIComponent(draft.campaignId)}`}
+              >
+                Open the campaign
+              </Link>
+            </dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Created</dt>
         <dd>
           <LocalTime value={draft.createdAt} />

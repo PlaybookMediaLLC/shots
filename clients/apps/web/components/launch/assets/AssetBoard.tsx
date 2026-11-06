@@ -31,6 +31,12 @@ export type Critique = {
 export type BoardImage = { height: number | null; url: string | null; width: number | null }
 
 export type BoardVisual = {
+  /**
+   * Whether this visual can be approved for the campaign's own posts.
+   * Defaults to true; an export published through Publish is a record of
+   * what went out, not a candidate the campaign publishes again.
+   */
+  approvable?: boolean
   /** The approved render of a design; null until a render is approved. */
   approvedVariant: { id: string; sourceAssetId: string } | null
   caption: string | null
@@ -233,7 +239,10 @@ function VisualCard({
               Edit in Canvas
             </ButtonLink>
           ) : null}
-          {options.canApprove && visual.renderedAssetId && (changed || !approved) ? (
+          {options.canApprove &&
+          visual.approvable !== false &&
+          visual.renderedAssetId &&
+          (changed || !approved) ? (
             <ApproveVisualButton
               campaignId={options.campaignId}
               designId={visual.designId ?? undefined}

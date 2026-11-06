@@ -18,6 +18,7 @@ import { socialSetHref } from '@/components/workspace/settings-sections'
 import { call } from '@/lib/content-drafts/client'
 import { WRITING_PROMPTS } from '@/lib/write/prompt-library'
 import { assistPosts } from '@/lib/write/refine-actions'
+import { promptBrief, screenshotPrompts } from '@/lib/write/screenshot-post'
 import { VoiceMemo } from './voice-memo'
 import type { DraftChannel } from '@/lib/write/document'
 import { useWrite, type WriteSet } from '../write-context'
@@ -47,23 +48,38 @@ const STARTERS = [
 export function AssistantPanel({
   channel,
   draftId,
+  hasImage,
   onInsert,
+  openWithPrompt,
   posts,
   set,
 }: {
   channel: DraftChannel
   draftId: string
+  /** The draft carries a screenshot, so the image prompts come first. */
+  hasImage?: boolean
   /** Add a reply to the draft as a new post. */
   onInsert?: (text: string) => void
+  /** A saved prompt the draft was opened with, waiting to be sent. */
+  openWithPrompt?: string
   /** The draft's posts as the platform reads them. */
   posts: string[]
   set: WriteSet | null
 }) {
   const [turns, setTurns] = React.useState<Turn[]>([])
-  const [message, setMessage] = React.useState('')
+  // A draft prepared from an edited screenshot arrives with its chosen
+  // prompt and its own text as the notes; the writer still sends it.
+  const [message, setMessage] = React.useState(() => {
+    const chosen = WRITING_PROMPTS.find((prompt) => prompt.id === openWithPrompt)
+    return chosen ? promptBrief(chosen, posts.join('\n\n')) : ''
+  })
   const [busy, setBusy] = React.useState(false)
   const [setup, setSetup] = React.useState(false)
   const configured = set?.writingAssistant.status === 'configured'
+  // Screenshot posts put the prompts about announcing and explaining first.
+  const prompts = hasImage ? screenshotPrompts() : [...WRITING_PROMPTS]
+  const usesPrompt = (prompt: (typeof WRITING_PROMPTS)[number]) =>
+    setMessage(hasImage ? promptBrief(prompt) : prompt.instruction)
   const send = async (text: string) => {
     const content = text.trim()
     if (!content || busy) return
@@ -127,9 +143,9 @@ export function AssistantPanel({
         <DisclosureContent>
           <p className="my-2 text-xs text-muted-foreground">Examples show a structure. Use your own facts and experience.</p>
           <ul className="grid gap-3">
-            {WRITING_PROMPTS.map((prompt) => (
+            {prompts.map((prompt) => (
               <li key={prompt.id}>
-                <Button type="button" variant="outline" size="sm" onClick={() => setMessage(prompt.instruction)}>{prompt.title}</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => usesPrompt(prompt)}>{prompt.title}</Button>
                 <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{prompt.example}</p>
               </li>
             ))}
@@ -150,9 +166,12 @@ export function AssistantPanel({
           </Button>
         </p>
       ) : null}
-      {turns.length === 0 ? (
-        <VoiceMemo draftId={draftId} channel={channel} onUse={setMessage} />
-      ) : null}
+      <VoiceMemo
+        channel={channel}
+        draftId={draftId}
+        {...(onInsert ? { onInsert } : {})}
+        onUse={setMessage}
+      />
       {turns.length === 0 ? (
         <div className="grid gap-1.5">
           {STARTERS.map((starter) => (

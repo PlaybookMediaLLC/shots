@@ -4,9 +4,11 @@ import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useProjectSession } from '@/lib/projects/session'
 import { toast } from 'sonner'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { startPostWithAssets } from '@/components/write/pending-draft'
 import { useHydratedSession } from '@/lib/auth/client'
+import { draftAttachHref, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
   buildExportFileName,
@@ -31,12 +33,21 @@ export interface SaveToWorkspaceButtonProps {
   fileName?: string
 }
 
+// The preparation dialog reaches Publish's profiles, batches and campaign
+// copy; the editor loads none of that until someone asks for a post.
+const PrepareScreenshotPost = dynamic(
+  () =>
+    import('@/components/workspace/PrepareScreenshotPost').then(
+      (module) => module.PrepareScreenshotPost
+    ),
+  { ssr: false }
+)
+
 type SaveState = 'idle' | 'saving' | 'saved'
 
 /** The draft this editor was opened from, when a person came to frame its media. */
 function draftFromUrl(): string | null {
-  const draft = new URLSearchParams(window.location.search).get('fromDraft')
-  return draft && /^[a-z0-9_-]{1,128}$/i.test(draft) ? draft : null
+  return readEditorReturn(window.location.search).draftId ?? null
 }
 
 /**
@@ -50,13 +61,19 @@ function saveFailure(error: unknown): string {
     : 'The export could not be saved. Your work is unchanged.'
 }
 
-/** Export the design and open a post with it attached, with no Library steps in between. */
+/**
+ * Export the design and take it into Publish, with no Library steps in
+ * between. Framing an existing attachment returns to the draft it came from;
+ * anything else opens the preparation dialog, which writes the caption,
+ * thread, follow-ups and destination before the draft or batch item exists.
+ */
 export function UseInPostButton({ createExport, disabled, fileName }: SaveToWorkspaceButtonProps) {
   const router = useRouter()
   const trpcClient = useTRPCClient()
   const [busy, setBusy] = React.useState(false)
+  const [preparing, setPreparing] = React.useState(false)
 
-  async function handleUse(): Promise<void> {
+  async function returnToDraft(draft: string): Promise<void> {
     setBusy(true)
     try {
       const blob = await createExport()
@@ -67,9 +84,9 @@ export function UseInPostButton({ createExport, disabled, fileName }: SaveToWork
         fileName: fileName ?? buildExportFileName(blob.type),
         trpcClient,
       })
-      const draft = draftFromUrl()
-      if (draft && blob.type.startsWith('image/'))
-        router.push(`/publish/${encodeURIComponent(draft)}?attach=${encodeURIComponent(assetId)}`)
+      // Only an image replaces the attachment being framed; a video export
+      // belongs to a post of its own, as it did before.
+      if (blob.type.startsWith('image/')) router.push(draftAttachHref(draft, assetId))
       else
         await startPostWithAssets([{ id: assetId, mediaType: blob.type }], (id) =>
           router.push(`/publish/${encodeURIComponent(id)}`)
@@ -82,9 +99,27 @@ export function UseInPostButton({ createExport, disabled, fileName }: SaveToWork
   }
 
   return (
-    <Button disabled={disabled || busy} onClick={() => void handleUse()} type="button">
-      {busy ? 'Preparing…' : 'Use in post'}
-    </Button>
+    <>
+      <Button
+        disabled={disabled || busy}
+        onClick={() => {
+          const draft = draftFromUrl()
+          if (draft) void returnToDraft(draft)
+          else setPreparing(true)
+        }}
+        type="button"
+      >
+        {busy ? 'Preparing…' : 'Use in post'}
+      </Button>
+      {preparing ? (
+        <PrepareScreenshotPost
+          createExport={createExport}
+          {...(fileName ? { fileName } : {})}
+          onOpenChange={setPreparing}
+          open
+        />
+      ) : null}
+    </>
   )
 }
 
@@ -151,7 +186,7 @@ export function SaveToWorkspaceButton({
       {draftExport && (
         <a
           className="text-sm underline"
-          href={`/publish/${encodeURIComponent(draftExport.draft)}?attach=${encodeURIComponent(draftExport.assetId)}`}
+          href={draftAttachHref(draftExport.draft, draftExport.assetId)}
         >
           Review export in draft
         </a>

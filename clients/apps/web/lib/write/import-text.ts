@@ -2,6 +2,9 @@ import { xLength } from '@/lib/content-drafts/x-length'
 import type { DraftChannel, PlateBody } from './document'
 import { postBreak } from './versions'
 
+/** The posts one thread can hold, wherever a thread is built or appended to. */
+export const THREAD_POST_LIMIT = 25
+
 /** Import only explicit thread delimiters; URL query values are already decoded by Next. */
 export function importedPosts(text: string): string[] {
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
@@ -10,7 +13,8 @@ export function importedPosts(text: string): string[] {
     .split(/\n[ \t]*---[ \t]*\n|\n(?:[ \t]*\n){3,}/)
     .map((post) => post.trim())
     .filter(Boolean)
-  if (posts.length > 25) throw new Error('A thread can contain at most 25 posts.')
+  if (posts.length > THREAD_POST_LIMIT)
+    throw new Error(`A thread can contain at most ${THREAD_POST_LIMIT} posts.`)
   return posts
 }
 
@@ -33,8 +37,10 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   const push = () => {
     if (current.trim()) posts.push(current.trim())
     current = ''
-    if (posts.length > 25)
-      throw new Error('This text needs more than 25 posts. Shorten it or increase the limit.')
+    if (posts.length > THREAD_POST_LIMIT)
+      throw new Error(
+        `This text needs more than ${THREAD_POST_LIMIT} posts. Shorten it or increase the limit.`
+      )
   }
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
     if (length((current + token).trim()) <= limit) {
