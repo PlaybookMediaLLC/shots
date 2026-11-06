@@ -2,8 +2,12 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { isOwnApiRequest } from '../lib/auth/browser-scope'
-import { matchesWorkspaceScope, workspaceScopeHeaders } from '../lib/auth/request-scope'
+import { isOwnApiRequest, isScopedNavigation } from '../lib/auth/browser-scope'
+import {
+  headersWithNavigationScope,
+  matchesWorkspaceScope,
+  workspaceScopeHeaders,
+} from '../lib/auth/request-scope'
 
 test('browser expectations cannot follow a different workspace or signed-in person', () => {
   const displayed = { userId: 'person-a', workspaceId: 'workspace-a' }
@@ -44,4 +48,28 @@ test('every browser write goes through fetch, where the workspace scope is bound
   )
   // Its XMLHttpRequest sends file bytes to signed storage URLs only, never to this app.
   assert.deepEqual(bypasses, ['lib/workspace/save-export.ts'])
+})
+
+test('a link that starts something in the workspace carries the scope a request would', () => {
+  for (const path of [
+    '/integrations/social/x/start',
+    '/fr/integrations/github/start',
+    '/api/integrations/slack/connect',
+  ])
+    assert.equal(isScopedNavigation(path), true, path)
+  for (const path of ['/publish', '/api/v1/assets/1/content', '/guides/integrations/x'])
+    assert.equal(isScopedNavigation(path), false, path)
+
+  const displayed = { userId: 'person-a', workspaceId: 'workspace-a' }
+  const scoped = headersWithNavigationScope(
+    new Request(
+      'https://app.example/integrations/github/start?scopeUser=person-a&scopeWorkspace=workspace-a'
+    )
+  )
+  assert.equal(matchesWorkspaceScope(scoped, displayed), true)
+  // The session moved on: the same link is refused, exactly as a request would be.
+  assert.equal(matchesWorkspaceScope(scoped, { ...displayed, workspaceId: 'workspace-b' }), false)
+  // A link with no scope stays the legacy caller it always was; half a scope is ignored.
+  const none = new Request('https://app.example/integrations/github/start?scopeUser=person-a')
+  assert.equal(headersWithNavigationScope(none).has('x-playbook-user'), false)
 })

@@ -152,6 +152,7 @@ import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
 import { MediaStrip } from './media-strip'
+import { withBrowserScope } from '@/lib/auth/browser-scope'
 import { attachmentsIn } from '@/lib/write/media-operations'
 import { mediaSwitches } from '@/lib/write/platform-rules'
 import { CopyPollDialog } from './copy-poll'
@@ -1265,7 +1266,10 @@ export function WriteComposer({
           try {
             await flush()
             window.location.assign(
-              `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
+              withBrowserScope(
+                `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`,
+                window.location.origin
+              )
             )
           } catch (error) {
             toast.error(

@@ -10,6 +10,7 @@ import {
   type TenantAccessRequirement,
 } from '@/lib/api/access-requirements'
 import { hasMaintenanceAccess } from '@/lib/api/maintenance-auth'
+import { headersWithNavigationScope } from '@/lib/auth/request-scope'
 import { platformHeaders } from '@/lib/api/request-context'
 import type { Authenticate, RawRequest } from '@/lib/api/route'
 import {
@@ -81,6 +82,17 @@ export function organizationAccess(
     : requireOrganizationPermission
   return async ({ raw, request }) =>
     requireRequested(request.headers, getRequestedOrganizationId(await raw()), permission)
+}
+
+/**
+ * {@link organizationAccess} for a route a browser reaches by following a link,
+ * which can't send the workspace scope as headers and carries it in the query.
+ */
+export function navigationOrganizationAccess(
+  permission: Permission
+): Authenticate<OrganizationAccess> {
+  return async ({ request }) =>
+    requireActiveOrganizationPermission(headersWithNavigationScope(request), permission)
 }
 
 /**

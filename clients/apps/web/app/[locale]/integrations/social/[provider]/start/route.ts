@@ -5,6 +5,7 @@ import {
   socialOAuthSignInRedirect,
 } from '@/lib/tenant/social-oauth-callback'
 import { socialOAuthErrorResponse, startSocialOAuth } from '@/lib/tenant/social-oauth-start'
+import { headersWithNavigationScope } from '@/lib/auth/request-scope'
 
 type Context = { params: Promise<{ provider: string }> }
 
@@ -24,7 +25,7 @@ export async function GET(request: Request, context: Context): Promise<Response>
         ? `/settings/publishing-brands/${socialSetId}`
         : ''
     const expectedConnectionId = query.get('reconnect') || undefined
-    const destination = await startSocialOAuth(request.headers, provider, socialSetId, {
+    const destination = await startSocialOAuth(headersWithNavigationScope(request), provider, socialSetId, {
       expectedConnectionId,
       ...(returnTo ? { returnPath: returnTo } : {}),
     })
