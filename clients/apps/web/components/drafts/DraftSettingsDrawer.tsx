@@ -5,10 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useRef } from 'react'
 import { useSocialSet } from '@/components/settings/social-sets/api'
-import { NewDraftPage } from '@/components/settings/social-sets/NewDraftPage'
-import { PublicProfilePage } from '@/components/settings/social-sets/PublicProfilePage'
 import { SchedulingPage } from '@/components/settings/social-sets/SchedulingPage'
-import { WritingAssistantPage } from '@/components/settings/social-sets/WritingAssistantPage'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -18,25 +15,23 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import {
-  SOCIAL_SET_PAGES,
   type SocialSetPage,
   socialSetHref,
 } from '@/components/workspace/settings-sections'
 import { settingsErrorMessage } from '@/lib/settings/client'
-import { cn } from '@/lib/utils'
 
 /**
- * The brand's settings pages the sheet shows: the full page's tabs, except
- * General, where connecting an account leaves the page to sign in.
+ * The sheet holds what a person needs while writing: the time zone and posting
+ * times. Everything else about a brand is in Settings, one link away.
  */
-const PAGES = SOCIAL_SET_PAGES.filter((page) => page.slug !== 'general')
+const SHEET_PAGE = 'scheduling'
 
 /**
  * Whether the address opens the sheet: a page it has. An old page in a saved
  * link (such as `appearance`, now in workspace settings) does not.
  */
 export function settingsOpen(params: { get: (name: string) => string | null }): boolean {
-  return PAGES.some((item) => item.slug === params.get('settings'))
+  return params.get('settings') === SHEET_PAGE
 }
 
 /**
@@ -70,28 +65,26 @@ export function BrandSettingsButton({ id, name }: { id: string; name: string }) 
 }
 
 /**
- * A brand's settings in a sheet over the page (RFC 024): the same pages as
- * Settings › Profiles, named in the address (`?settings=scheduling`),
- * so opening, moving between pages and closing never unmounts the work under
- * it: unsaved text, selection, media, channel text and comments stay as they were.
+ * A brand's scheduling settings in a sheet over the page (RFC 024), named in
+ * the address (`?settings=scheduling`), so opening and closing never unmounts
+ * the work under it: unsaved text, selection, media, channel text and comments
+ * stay as they were.
  */
 export function DraftSettingsDrawer({
   advancedScheduling,
   canManage,
-  canWrite,
   socialSetId,
 }: {
   /** Whether the plan has queue slots, so the schedule page can say so before a save fails. */
   advancedScheduling?: boolean
   /** May change the brand (workspace:update, as on its Settings page). */
   canManage: boolean
-  canWrite: boolean
   /** The page's own brand, when the address names none. */
   socialSetId: string
 }) {
   const router = useRouter()
   const params = useSearchParams()
-  const page = PAGES.find((item) => item.slug === params.get('settings'))?.slug ?? null
+  const open = settingsOpen(params)
   const id = params.get('brand') || socialSetId
   const set = useSocialSet(id)
 
@@ -106,38 +99,12 @@ export function DraftSettingsDrawer({
 
   const name = set.data?.name ?? 'Profile'
   return (
-    <Sheet onOpenChange={(open) => (open ? null : openBrandSettings(null))} open={page !== null}>
+    <Sheet onOpenChange={(open) => (open ? null : openBrandSettings(null))} open={open}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl" side="right">
         <SheetHeader>
           <SheetTitle>{name} settings</SheetTitle>
-          <SheetDescription>
-            The same settings as Settings › Profiles. Changes apply to new drafts and the
-            queue; open drafts keep their text.
-          </SheetDescription>
+          <SheetDescription className="sr-only">Time zone and posting times</SheetDescription>
         </SheetHeader>
-        <nav
-          aria-label="Settings pages"
-          className="flex flex-wrap gap-1 border-b border-border px-4"
-        >
-          {PAGES.map((item) => (
-            <Button
-              aria-current={item.slug === page ? 'page' : undefined}
-              className={cn(
-                '-mb-px border-b-2 px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                item.slug === page
-                  ? 'border-foreground text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              )}
-              key={item.slug}
-              onClick={() => openBrandSettings(item.slug)}
-              size={null}
-              type="button"
-              variant="custom"
-            >
-              {item.title}
-            </Button>
-          ))}
-        </nav>
         <div className="grid gap-4 p-4">
           {set.isPending ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
           {set.isError ? (
@@ -145,24 +112,15 @@ export function DraftSettingsDrawer({
               {settingsErrorMessage(set.error)}
             </p>
           ) : null}
-          {set.data && page === 'scheduling' ? (
+          {set.data ? (
             <SchedulingPage
               advancedScheduling={advancedScheduling}
               canManage={canManage}
               set={set.data}
             />
           ) : null}
-          {set.data && page === 'new-draft' ? (
-            <NewDraftPage canManage={canManage} set={set.data} />
-          ) : null}
-          {set.data && page === 'public-profile' ? (
-            <PublicProfilePage canManage={canManage} set={set.data} />
-          ) : null}
-          {set.data && page === 'writing-assistant' ? (
-            <WritingAssistantPage canWrite={canWrite} set={set.data} />
-          ) : null}
-          <Link className="text-sm underline" href={socialSetHref(id, page ?? 'general')}>
-            Open in Settings
+          <Link className="text-sm underline" href={socialSetHref(id, 'general')}>
+            All settings for {name}
           </Link>
         </div>
       </SheetContent>

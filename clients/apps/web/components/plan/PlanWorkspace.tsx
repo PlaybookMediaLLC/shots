@@ -643,7 +643,6 @@ export function PlanWorkspace({
         <DraftSettingsDrawer
           advancedScheduling={advancedScheduling}
           canManage={canManageSets}
-          canWrite={canEdit}
           socialSetId={focused?.id ?? sets[0].id}
         />
       ) : null}
