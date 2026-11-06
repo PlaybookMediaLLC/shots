@@ -147,6 +147,11 @@ func validAssetUpload(input AssetUploadInput) bool {
 	}
 	switch input.Classification {
 	case "capture", "derived", "export", "input":
+	case assetClassificationPoster:
+		// A poster only ever illustrates the video it belongs to.
+		if input.ParentAssetID == "" || !strings.HasPrefix(input.ContentType, "image/") {
+			return false
+		}
 	default:
 		return false
 	}
@@ -491,7 +496,8 @@ func (c *Configuration) CompleteAssetUpload(ctx context.Context, actor Actor, as
 	if err != nil {
 		return nil, err
 	}
-	if count == 1 {
+	// A poster is part of its video, not news to webhooks and activity feeds.
+	if count == 1 && !isVideoPoster(row.ObjectKey) {
 		if _, err := tx.OutboxEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
 			SetType("asset.uploaded").SetAggregateType("asset").SetAggregateID(row.ID).
 			SetPayload(map[string]any{"assetId": row.ID, "actorUserId": actor.UserID, "ownerUserId": actor.UserID}).SetIdempotencyKey("asset.uploaded:" + row.ID).Save(ctx); err != nil {

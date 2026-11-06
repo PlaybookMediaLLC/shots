@@ -221,6 +221,7 @@ function AddMedia({
             <MediaThumb
               assetId={asset.id}
               className="size-full"
+              poster={asset.posterAssetId}
               video={asset.mediaType.startsWith('video/')}
             />
           </Button>

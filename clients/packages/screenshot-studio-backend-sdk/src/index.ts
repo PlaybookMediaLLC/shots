@@ -654,6 +654,8 @@ export type BackendAsset = {
 
 export type BackendAssetListItem = {
   fileName?: string
+  /** A stored opening frame of a video, shown instead of downloading it. */
+  posterAssetId?: string
   classification?: string
   projectId?: string
   projectName?: string
@@ -681,7 +683,7 @@ export type BackendAssetUploadInput = {
   parentAssetId?: string
   projectId?: string
   bytes: number
-  classification?: 'capture' | 'derived' | 'export' | 'input'
+  classification?: 'capture' | 'derived' | 'export' | 'input' | 'poster'
   contentType: string
   fileName: string
   sha256?: string

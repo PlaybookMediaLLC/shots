@@ -12,11 +12,14 @@ export function MediaThumb({
   alt = '',
   assetId,
   className,
+  poster,
   video,
 }: {
   alt?: string
   assetId: string
   className?: string
+  /** The stored opening frame of a video, which spares downloading the video itself. */
+  poster?: string
   video: boolean
 }) {
   const [failed, setFailed] = React.useState(false)
@@ -27,7 +30,7 @@ export function MediaThumb({
         {video ? 'Video' : 'Image'}
       </span>
     )
-  return video ? (
+  return video && !poster ? (
     <video
       aria-label={alt || undefined}
       className={box}
@@ -46,7 +49,7 @@ export function MediaThumb({
       draggable={false}
       loading="lazy"
       onError={() => setFailed(true)}
-      src={`${assetContentUrl(assetId)}?variant=thumbnail`}
+      src={`${assetContentUrl(poster ?? assetId)}?variant=thumbnail`}
     />
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import Link from 'next/link'
 import { ImageIcon } from '@/components/platform-shell/icons'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -82,6 +82,15 @@ export function ProjectLibrary({ canEdit }: { canEdit: boolean }) {
     { getNextPageParam: (page) => page.nextCursor }
   )
   const projects = useInfiniteQuery(options)
+  // Library opens where the work is: with no projects yet, that is saved files.
+  const noProjects = projects.isSuccess && !query && !projects.data.pages[0]?.items.length
+  const saved = useQuery(
+    trpc.asset.list.queryOptions({ limit: 1 }, { enabled: noProjects, staleTime: 30_000 })
+  )
+  const hasAssets = noProjects && Boolean(saved.data?.assets.length)
+  React.useEffect(() => {
+    if (hasAssets) router.replace('/library?view=assets')
+  }, [hasAssets, router])
   const page = {
     items: projects.data?.pages.flatMap((page) => page.items) ?? [],
     loading: projects.isPending || projects.isFetchingNextPage,

@@ -19,8 +19,22 @@ import (
 	"github.com/lucsky/cuid"
 )
 
+// assetClassificationPoster marks a video's opening frame: a child asset the
+// library shows in place of downloading the video, and never lists by itself.
+const assetClassificationPoster = "poster"
+
+func videoPosterPrefix(organizationID string) string {
+	return "org/" + organizationID + "/" + assetClassificationPoster + "/"
+}
+
+func isVideoPoster(objectKey string) bool {
+	parts := strings.Split(objectKey, "/")
+	return len(parts) >= 3 && parts[2] == assetClassificationPoster
+}
+
 type AssetListItem struct {
 	FileName       string    `json:"fileName"`
+	PosterAssetID  string    `json:"posterAssetId,omitempty"`
 	Classification string    `json:"classification"`
 	ProjectID      string    `json:"projectId,omitempty"`
 	ProjectName    string    `json:"projectName,omitempty"`
@@ -98,7 +112,8 @@ func (c *Configuration) ListAssets(ctx context.Context, actor Actor, options Ass
 	if options.Classification != "" && options.Classification != "input" && options.Classification != "export" && options.Classification != "derived" && options.Classification != "capture" {
 		return nil, ErrInvalidInput
 	}
-	conditions := []predicate.Asset{asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusUPLOADED)}
+	conditions := []predicate.Asset{asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusUPLOADED),
+		asset.Not(asset.ObjectKeyHasPrefix(videoPosterPrefix(actor.OrganizationID)))}
 	if search := strings.TrimSpace(options.Search); search != "" {
 		conditions = append(conditions, asset.ObjectKeyContainsFold(search))
 	}
@@ -149,8 +164,19 @@ func (c *Configuration) ListAssets(ctx context.Context, actor Actor, options Ass
 			}
 		}
 	}
+	posters := map[string]string{}
+	if len(ids) > 0 {
+		children, err := c.client.Asset.Query().Where(asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusUPLOADED),
+			asset.ParentAssetIDIn(ids...), asset.ObjectKeyHasPrefix(videoPosterPrefix(actor.OrganizationID))).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, child := range children {
+			posters[*child.ParentAssetID] = child.ID
+		}
+	}
 	for _, row := range rows {
-		item := AssetListItem{ID: row.ID, Bytes: row.Bytes, CreatedAt: row.CreatedAt, Height: row.Height, MediaType: row.MediaType, Width: row.Width, FileName: path.Base(row.ObjectKey)}
+		item := AssetListItem{PosterAssetID: posters[row.ID], ID: row.ID, Bytes: row.Bytes, CreatedAt: row.CreatedAt, Height: row.Height, MediaType: row.MediaType, Width: row.Width, FileName: path.Base(row.ObjectKey)}
 		parts := strings.Split(row.ObjectKey, "/")
 		if len(parts) >= 3 {
 			item.Classification = parts[2]
@@ -272,6 +298,22 @@ func (c *Configuration) DeleteAsset(ctx context.Context, actor Actor, assetID st
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.asset_deletion_requested", "asset", current.ID); err != nil {
 		return "", err
+	}
+	// A video's poster goes with it, through the same storage cleanup.
+	posters, err := tx.Asset.Query().Where(asset.OrganizationID(actor.OrganizationID), asset.ParentAssetID(current.ID),
+		asset.StatusEQ(asset.StatusUPLOADED), asset.ObjectKeyHasPrefix(videoPosterPrefix(actor.OrganizationID))).All(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, poster := range posters {
+		if err := tx.Asset.UpdateOneID(poster.ID).SetStatus(asset.StatusDELETED).Exec(ctx); err != nil {
+			return "", err
+		}
+		if _, err := tx.OutboxEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
+			SetType("asset.deleted").SetAggregateType("asset").SetAggregateID(poster.ID).
+			SetPayload(map[string]any{"assetId": poster.ID}).SetIdempotencyKey("asset.deleted:" + poster.ID).Save(ctx); err != nil {
+			return "", err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return "", err

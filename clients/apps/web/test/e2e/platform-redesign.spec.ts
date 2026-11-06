@@ -217,10 +217,7 @@ test(
 
     // From the Library, the same asset starts a new post without being uploaded again.
     await app.open('/library?view=assets')
-    await page
-      .getByRole('button', { name: new RegExp(`^Actions for .* ${kept.slice(0, 8)}$`) })
-      .click()
-    await page.getByRole('menuitem', { name: 'Use in a new post' }).click()
+    await page.getByRole('button', { name: 'Use kept-library.png in a post', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
     await page.waitForURL(
       (url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname) && !url.pathname.endsWith(draftId)
@@ -712,5 +709,31 @@ test(
     await page.screenshot({ path: '.context/ux-redesign/home-dark-mobile.png', fullPage: true })
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.screenshot({ path: '.context/ux-redesign/home-dark.png', fullPage: true })
+  }
+)
+
+test(
+  'Library opens on saved files when no project exists, and several start one post',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    const bytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+      'base64'
+    )
+    await app.open('/library?view=assets')
+    const input = page.getByLabel('Upload files')
+    await input.setInputFiles([
+      { buffer: bytes, mimeType: 'image/png', name: 'first.png' },
+      { buffer: bytes, mimeType: 'image/png', name: 'second.png' },
+    ])
+    await expect(page.getByText('2 files uploaded')).toBeVisible()
+    await app.open('/library')
+    await expect(page).toHaveURL(/\/library\?view=assets$/)
+
+    await page.getByRole('checkbox', { name: 'Select first.png', exact: true }).click()
+    await page.getByRole('checkbox', { name: 'Select second.png', exact: true }).click()
+    await page.getByRole('button', { name: 'Use 2 in post', exact: true }).click()
+    await page.waitForURL((url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname))
+    await expect(page.getByTestId('media-strip-item')).toHaveCount(2, { timeout: 60_000 })
   }
 )
