@@ -100,7 +100,7 @@ export function SchedulingPage({
     <div className="grid gap-6">
       <Group>
         <Row
-          description="Every time for this profile reads in this zone: its queue, slots and calendar. Changing it keeps each weekly slot's clock time in the new zone; posts already scheduled keep their time."
+          description="Applies to its queue, slots and calendar. Scheduled posts keep their time."
           label={
             <span className="flex items-center gap-2">
               Time zone <SaveStatus state={zoneState} />
@@ -120,7 +120,7 @@ export function SchedulingPage({
 
       <Group>
         <Row
-          description="Add to queue takes the next free time here. Editing the schedule does not change posts already scheduled."
+          description="Add to queue takes the next free time here. Scheduled posts stay as they are."
           label={
             <span className="flex items-center gap-2">
               Weekly posting times <SaveStatus state={gridState} />
