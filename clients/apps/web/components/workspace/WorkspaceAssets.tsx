@@ -22,9 +22,14 @@ import {
 import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { getErrorMessage } from './settings-client'
-import { createWritingDraft } from '@/components/write/pending-draft'
-import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handoff'
-import { postBreak } from '@/lib/write/versions'
+import { startPostWithAssets } from '@/components/write/pending-draft'
+import { supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import {
+  buildExportFileName,
+  safeAssetFileName,
+  saveExportToWorkspace,
+} from '@/lib/workspace/save-export'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -44,6 +49,7 @@ import {
 
 type AssetSummary = {
   fileName?: string
+  posterAssetId?: string
   bytes: number
   createdAt: string | Date
   height: number | null
@@ -55,6 +61,8 @@ type AssetSummary = {
 type TypeFilter = 'all' | 'image' | 'video'
 
 const PAGE_SIZE = 24
+/** A draft's attachment cap (`assetIds` in the content draft contract). */
+const MAX_POST_ASSETS = 20
 const TYPE_FILTERS: { label: string; value: TypeFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Images', value: 'image' },
@@ -129,6 +137,11 @@ function AssetPreview({
           muted
           preload="none"
           controls
+          poster={
+            asset.posterAssetId
+              ? `/api/v1/assets/${asset.posterAssetId}/content?variant=thumbnail`
+              : undefined
+          }
           src={url}
           onError={() => setFailed(true)}
         />
@@ -143,9 +156,12 @@ function AssetPreview({
 
 export function WorkspaceAssets({
   canStartPost = false,
+  canUpload = false,
 }: {
   /** The member may write drafts here, so an image or video can start a new post. */
   canStartPost?: boolean
+  /** The member may add files to the workspace. */
+  canUpload?: boolean
 } = {}) {
   const router = useRouter()
   const trpcClient = useTRPCClient()
@@ -173,6 +189,9 @@ export function WorkspaceAssets({
   const assets = useMemo(() => query.data?.pages.flatMap((page) => page.assets) ?? [], [query.data])
   const isLoading = query.isPending
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
+  const uploadInput = useRef<HTMLInputElement>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const deleting = useRef(false)
   const metadataRefresh = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -199,6 +218,36 @@ export function WorkspaceAssets({
     window.addEventListener('pageshow', refresh)
     return () => window.removeEventListener('pageshow', refresh)
   }, [queryClient, trpc])
+
+  function startPost(picked: { id: string; mediaType: string }[]): void {
+    void startPostWithAssets(picked, (id) => router.push(`/publish/${encodeURIComponent(id)}`))
+  }
+
+  async function handleUpload(files: File[]): Promise<void> {
+    setUploading(true)
+    try {
+      // One at a time, so a failure says which file and keeps those already saved.
+      for (const file of files) {
+        try {
+          await saveExportToWorkspace({
+            blob: file,
+            classification: 'input',
+            fileName: safeAssetFileName(file.name) || buildExportFileName(file.type),
+            trpcClient,
+          })
+        } catch (requestError) {
+          toast.error(`Could not upload ${file.name}`, {
+            description: getErrorMessage(requestError),
+          })
+          return
+        }
+      }
+      toast.success(files.length === 1 ? 'File uploaded' : `${files.length} files uploaded`)
+    } finally {
+      setUploading(false)
+      await queryClient.invalidateQueries(trpc.asset.list.pathFilter())
+    }
+  }
 
   function updateView(key: 'type' | 'sort' | 'search' | 'classification', value: string): void {
     const params = new URLSearchParams(searchParams.toString())
@@ -318,7 +367,53 @@ export function WorkspaceAssets({
         <p className="text-xs text-muted-foreground">
           Files in this workspace are shared with its members.
         </p>
+        {canUpload ? (
+          <>
+            <Button
+              className="sm:ms-auto"
+              disabled={uploading}
+              onClick={() => uploadInput.current?.click()}
+              size="sm"
+              type="button"
+            >
+              {uploading ? 'Uploading…' : 'Upload'}
+            </Button>
+            <Input
+              accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+              aria-label="Upload files"
+              className="hidden"
+              multiple
+              onChange={(event) => {
+                const files = [...(event.target.files ?? [])]
+                event.target.value = ''
+                if (files.length) void handleUpload(files)
+              }}
+              ref={uploadInput}
+              type="file"
+            />
+          </>
+        ) : null}
       </div>
+      {selected.length > 0 ? (
+        <div
+          className="sticky top-2 z-10 flex items-center gap-3 rounded-lg bg-card p-2 ring-1 ring-border"
+          data-testid="asset-selection"
+        >
+          <span className="text-sm">{selected.length} selected</span>
+          <Button
+            onClick={() => {
+              startPost(selected.flatMap((id) => assets.filter((item) => item.id === id)))
+              setSelected([])
+            }}
+            size="sm"
+          >
+            Use {selected.length} in post
+          </Button>
+          <Button onClick={() => setSelected([])} size="sm" variant="ghost">
+            Clear
+          </Button>
+        </div>
+      ) : null}
       {query.error ? (
         <Alert variant="destructive">
           <AlertDescription>
@@ -341,7 +436,7 @@ export function WorkspaceAssets({
         </ul>
       ) : assets.length === 0 && !query.error ? (
         <EmptyState
-          action={<ButtonLink href="/">Open the editor</ButtonLink>}
+          action={<ButtonLink href="/editor">Open the editor</ButtonLink>}
           description={
             typeFilter === 'video'
               ? 'Export a video in the editor and choose Save to workspace to keep it here for your team.'
@@ -361,11 +456,27 @@ export function WorkspaceAssets({
             const isImage = asset.mediaType.startsWith('image/')
             const isConfirmingDelete = confirmingDeleteId === asset.id
             const isDeleting = deletingId === asset.id
+            const postable = canStartPost && supportedDraftMedia(asset.mediaType)
+            const assetName =
+              asset.fileName || `${describeType(asset.mediaType)} ${asset.id.slice(0, 8)}`
             return (
               <li
-                className="group overflow-hidden rounded-xl bg-foreground/[0.02] ring-1 ring-foreground/[0.08] transition hover:ring-foreground/[0.16]"
+                className="group relative overflow-hidden rounded-xl bg-foreground/[0.02] ring-1 ring-foreground/[0.08] transition hover:ring-foreground/[0.16]"
                 key={asset.id}
               >
+                {postable ? (
+                  <Checkbox
+                    aria-label={`Select ${assetName}`}
+                    checked={selected.includes(asset.id)}
+                    className="absolute top-2 left-2 z-10 size-5 bg-background"
+                    disabled={!selected.includes(asset.id) && selected.length >= MAX_POST_ASSETS}
+                    onCheckedChange={(checked) =>
+                      setSelected((current) =>
+                        checked ? [...current, asset.id] : current.filter((id) => id !== asset.id)
+                      )
+                    }
+                  />
+                ) : null}
                 {asset.mediaType.startsWith('video/') ? (
                   <AssetPreview asset={asset} onMetadataAvailable={refreshMetadata} />
                 ) : (
@@ -388,7 +499,7 @@ export function WorkspaceAssets({
                     {asset.projectName ? (
                       <a
                         className="block truncate text-xs text-primary underline"
-                        href={`/?project=${asset.projectId}`}
+                        href={`/editor?project=${asset.projectId}`}
                       >
                         From {asset.projectName}
                       </a>
@@ -406,6 +517,17 @@ export function WorkspaceAssets({
                       {' · '}
                       {new Date(asset.createdAt).toLocaleDateString()}
                     </p>
+                    {postable ? (
+                      <Button
+                        aria-label={`Use ${assetName} in a post`}
+                        className="mt-2"
+                        onClick={() => startPost([asset])}
+                        size="sm"
+                        variant="outline"
+                      >
+                        Use in post
+                      </Button>
+                    ) : null}
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -431,34 +553,14 @@ export function WorkspaceAssets({
                     >
                       {asset.projectId ? (
                         <DropdownMenuItem asChild>
-                          <a href={`/?project=${asset.projectId}`}>Open source project</a>
+                          <a href={`/editor?project=${asset.projectId}`}>Open source project</a>
                         </DropdownMenuItem>
                       ) : null}
                       {isImage ? (
                         <DropdownMenuItem asChild>
                           {/* The editor reads this parameter on load and pulls
                               the asset onto the canvas for another pass. */}
-                          <a href={`/?asset=${asset.id}`}>Use image in new design</a>
-                        </DropdownMenuItem>
-                      ) : null}
-                      {canStartPost && supportedDraftMedia(asset.mediaType) ? (
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            // The draft references the asset itself, as Attach from Library does.
-                            void createWritingDraft(
-                              {
-                                assetIds: [asset.id],
-                                body: [
-                                  postBreak(),
-                                  { type: 'p', children: [{ text: '' }] },
-                                  draftAssetNode(asset),
-                                ],
-                              },
-                              (id) => router.push(`/publish/${encodeURIComponent(id)}`)
-                            )
-                          }
-                        >
-                          Use in a new post
+                          <a href={`/editor?asset=${asset.id}`}>Use image in new design</a>
                         </DropdownMenuItem>
                       ) : null}
                       <DropdownMenuItem onSelect={() => void handleOpen(asset.id)}>

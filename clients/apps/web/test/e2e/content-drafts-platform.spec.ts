@@ -76,9 +76,7 @@ test(
 
     // The account shows as its platform names it, not an integration id.
     const draftId = await openNewDraft(page)
-    await page.getByRole('button', { name: 'Manage platforms' }).click()
-    await expect(page.getByRole('dialog')).toContainText('@shots_x')
-    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('active-platform')).toContainText('@shots_x')
     await write(page, 'Queued for the next slot')
     await chooseChannels(page, ['x'])
     await expectSaved(page)
@@ -171,7 +169,7 @@ test(
     await expect(blocked).toBeHidden()
 
     await page.getByRole('button', { name: 'Review', exact: true }).click()
-    await page.getByRole('button', { name: 'Ask for review' }).click()
+    await page.getByRole('button', { name: 'Ask for review', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Review', exact: true })).toContainText(
       'In review'
     )
@@ -179,7 +177,7 @@ test(
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Review', exact: true }).click()
     await page.getByLabel('Review note').fill('Ship it')
-    await page.getByRole('button', { name: 'Approve' }).click()
+    await page.getByRole('button', { name: 'Approve', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Review', exact: true })).toContainText(
       'Approved'
     )
@@ -410,7 +408,7 @@ test('a live post links to itself, shows engagement, and resumes a thread that s
   )
   await app.reload()
   const live = page.getByTestId('draft-post')
-  await expect(live.getByRole('link', { name: 'View post' })).toHaveAttribute(
+  await expect(live.getByRole('link', { name: /^View on / })).toHaveAttribute(
     'href',
     'https://x.com/i/status/tweet-1'
   )

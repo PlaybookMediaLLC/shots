@@ -339,7 +339,17 @@ function ApiKeyForm({
             type="button"
             variant="outline"
           >
-            Publishing
+            Approved publishing
+          </Button>
+          <Button
+            onClick={() =>
+              setScopes(['artifact:read', 'asset:write', 'post:publish', 'post:schedule', 'upload:sign'])
+            }
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Direct posting
           </Button>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">

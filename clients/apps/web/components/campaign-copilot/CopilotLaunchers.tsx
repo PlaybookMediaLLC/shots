@@ -13,7 +13,7 @@ import { type FormEvent, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { CampaignCopilot } from './CampaignCopilot'
-import { ButtonLink } from '@/components/platform-shell/ButtonLink'
+import Link from 'next/link'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 
@@ -75,12 +75,13 @@ export function ShipInput({
   }
   if (!hasProfile && products.length === 0)
     return (
-      <div className="rounded-2xl bg-foreground/[0.02] p-4 text-sm">
-        <p>Add a product before drafting a campaign.</p>
-        <ButtonLink href="/campaigns/new" size="sm">
-          Add your product
-        </ButtonLink>
-      </div>
+      <p className="rounded-2xl bg-foreground/[0.02] px-5 py-4 text-sm text-muted-foreground ring-1 ring-foreground/[0.06]">
+        To draft from what you shipped,{' '}
+        <Link className="underline" href="/onboarding/product">
+          add your product
+        </Link>
+        .
+      </p>
     )
   return (
     <>

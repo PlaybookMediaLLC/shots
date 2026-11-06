@@ -63,6 +63,7 @@ import {
   STATS_PENDING,
   statsPending,
 } from '@/lib/analyze/report'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 import { downloadBlob } from '@/lib/export/export-design'
 import { isTimeZone } from '@/lib/write/zoned-time'
 import { ChartBoundary, MetricChart } from './MetricChart'
@@ -290,7 +291,7 @@ export function AnalyzeWorkspace({
                       value: brandValue(set.id),
                     })),
                   ...accounts.map((a) => ({
-                    label: `${a.setName} · ${a.platform} · ${a.handle ?? a.displayName ?? a.id}`,
+                    label: `${a.setName} · ${platformLabel(a.platform)} · ${a.handle ?? a.displayName ?? a.id}`,
                     value: a.id,
                   })),
                 ]}
@@ -302,7 +303,7 @@ export function AnalyzeWorkspace({
           {report?.profileUrl ? (
             <Button asChild className="h-auto p-0" size={null} variant="link">
               <a href={report.profileUrl} target="_blank" rel="noreferrer">
-                View {report.name} on {report.platform}
+                View {report.name} on {platformLabel(report.platform)}
               </a>
             </Button>
           ) : null}
@@ -382,7 +383,7 @@ export function AnalyzeWorkspace({
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {report.name} · {report.platform} · {day(query.from)} – {day(query.to)} (
+              {report.name} · {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)} (
               {query.timeZone}) · {STATES[report.status]}.{' '}
               {report.coverageStart
                 ? `Stats start ${when(report.coverageStart, query.timeZone, DAY_STYLE)}.`
@@ -456,7 +457,7 @@ export function AnalyzeWorkspace({
                         {growth && metric === 'followers' ? ' interval growth' : ''}
                       </h3>
                       <p className="text-sm">
-                        {report.platform} · {day(query.from)} – {day(query.to)} · {query.timeZone} ·{' '}
+                        {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)} · {query.timeZone} ·{' '}
                         {query.grouping}
                       </p>
                       <p className="my-3 text-3xl">

@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { templateStarter } from '@/lib/design/templates'
 import { projectIdSchema } from '@/lib/projects/schema'
 import {
+  autosaveDesignAsProject,
   openProject,
   releaseDraft,
   saveProjectNow,
@@ -24,6 +25,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { useCanSaveProjects } from '@/lib/platform/can-start-post'
+import { useImageStore } from '@/lib/store'
 
 /**
  * Drop `?start=` once handled, so a reload keeps the new work instead of
@@ -36,6 +39,9 @@ function clearStartParam(): void {
   url.searchParams.delete('template')
   window.history.replaceState(null, '', url)
 }
+
+/** Long enough that a burst of edits, or a person about to name it themselves, comes first. */
+const AUTOSAVE_AFTER_MS = 30_000
 
 /**
  * Opens the project named by `?project=<id>` when the editor mounts, or
@@ -146,15 +152,48 @@ export function ProjectLoader() {
     if (start === 'new') void begin(false)
   }, [start, begin])
 
+  // Work belongs to the workspace, not one browser: a design with content becomes a
+  // project shortly after the last edit. The browser's copy covers the moments before.
+  const canSave = useCanSaveProjects()
+  const autosaveBlocked = React.useRef(false)
+  const autosave = React.useCallback(async () => {
+    if (!canSave || autosaveBlocked.current) return
+    try {
+      await autosaveDesignAsProject(trpcClient)
+    } catch {
+      // A plan limit or a lost connection: stop asking, and the browser's copy keeps the work.
+      autosaveBlocked.current = true
+      toast.info('Saved in this browser only', {
+        description: 'Save it as a project to keep it in your workspace.',
+        id: 'project-autosave',
+      })
+    }
+  }, [canSave, trpcClient])
+  React.useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const stop = useImageStore.subscribe(() => {
+      clearTimeout(timer)
+      if (!useProjectSession.getState().projectId)
+        timer = setTimeout(() => void autosave(), AUTOSAVE_AFTER_MS)
+    })
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
+  }, [autosave])
+
   React.useEffect(
     () =>
       registerNavigationGuard(async () => {
-        if (!useProjectSession.getState().projectId) return
+        if (!useProjectSession.getState().projectId) {
+          await autosave()
+          return
+        }
         await saveProjectNow()
         if (useProjectSession.getState().status !== 'saved')
           throw new Error('Save the screenshot project before leaving.')
       }, true),
-    []
+    [autosave]
   )
   React.useEffect(() => () => void saveProjectNow(), [])
 

@@ -6,7 +6,11 @@ import { AuthShell } from '@/components/auth/AuthShell'
 import { AgentAccessExpiry } from '@/components/auth/AgentAccessExpiry'
 import { Button } from '@/components/ui/button'
 import { AuthorizationError, requireActiveOrganizationPermission } from '@/lib/auth/access'
-import { apiKeyScopeDescriptions, apiKeyScopes, type ApiKeyScope } from '@/lib/auth/api-key-scopes'
+import {
+  apiKeyScopeDescriptions,
+  apiKeyScopes,
+  preselectedAgentScopes,
+} from '@/lib/auth/api-key-scopes'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
 import {
   agentAuthorizationQuerySchema,
@@ -24,8 +28,6 @@ type ConsentPageProps = {
   params: Promise<{ locale: string }>
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }
-
-const DEFAULT_SCOPES: ApiKeyScope[] = ['artifact:read', 'release:create']
 
 function single(params: Record<string, string | string[] | undefined>) {
   return Object.fromEntries(
@@ -77,8 +79,7 @@ export default async function AgentConsentPage({ params, searchParams }: Consent
     throw error
   }
 
-  const requested = requestedScopes(query.data.scope)
-  const checked = requested.length ? requested : DEFAULT_SCOPES
+  const checked = preselectedAgentScopes(requestedScopes(query.data.scope))
   const hidden = Object.entries(query.data).filter(([, value]) => value !== undefined)
 
   return (
@@ -114,7 +115,8 @@ export default async function AgentConsentPage({ params, searchParams }: Consent
           ))}
           <p className="text-xs text-neutral-500">
             No agent can approve content; a person does that in Shots. With post:schedule, it can
-            schedule and cancel posts a person already approved.
+            schedule and cancel posts a person already approved. With post:publish, it can post to
+            your shared accounts with no review. Only tick that if you trust what will drive it.
           </p>
         </fieldset>
         <Label className="flex flex-col gap-1.5 text-sm text-neutral-400">

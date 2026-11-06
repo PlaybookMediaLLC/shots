@@ -133,11 +133,11 @@ test('a brand’s settings open over the Calendar, on the same pages as Settings
   await expect(page).toHaveURL(new RegExp(`[?&]settings=scheduling&brand=${brand.id}`))
   const sheet = page.getByRole('dialog', { name: 'Wayfinding brand settings' })
   await expect(sheet).toContainText('weekly posting slots')
-  const tabs = sheet.getByRole('navigation', { name: 'Settings pages' }).getByRole('button')
-  await expect(tabs).toHaveText(['Scheduling', 'New draft', 'Public profile', 'Writing Assistant'])
-  await expect(sheet.getByRole('link', { name: 'Open in Settings' })).toHaveAttribute(
+  // The sheet holds what writing needs; the rest of the brand is one link away.
+  await expect(sheet.getByRole('navigation', { name: 'Settings pages' })).toHaveCount(0)
+  await expect(sheet.getByRole('link', { name: /^All settings for / })).toHaveAttribute(
     'href',
-    `/settings/publishing-brands/${brand.id}/scheduling`
+    new RegExp(`/settings/publishing-brands/${brand.id}(/general)?$`)
   )
   // Closing returns to the Calendar it opened over.
   await page.keyboard.press('Escape')

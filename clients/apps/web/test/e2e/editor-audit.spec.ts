@@ -110,12 +110,16 @@ test('App Store canvas and editing controls remain usable on a phone', async ({ 
 })
 
 /**
- * The canvas shortcut opens Store screenshots at /create/store; Back returns to
+ * The New menu opens Store screenshots at /create/store; Back returns to
  * the screenshot editor. Both share one layout, so each stays mounted with its own session.
  */
 async function switchEditor(page: Page, section: 'Screenshot editor' | 'App Store Screenshots') {
   if (section === 'App Store Screenshots') {
-    await page.getByRole('link', { name: /^Create App Store screenshots/ }).click()
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('button', { name: 'New', exact: true })
+      .click()
+    await page.getByRole('menuitem', { name: 'Store screenshots', exact: true }).click()
     await expect(page).toHaveURL(/\/create\/store(\/|$)/)
   } else {
     await page.goBack()
@@ -416,7 +420,11 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   page,
 }) => {
   await app.openEditor()
-  await page.getByRole('link', { name: /^Create App Store screenshots/ }).press('Enter')
+  await page
+    .getByRole('complementary', { name: 'Primary navigation' })
+    .getByRole('button', { name: 'New', exact: true })
+    .click()
+  await page.getByRole('menuitem', { name: 'Store screenshots', exact: true }).press('Enter')
   await expect(page).toHaveURL(/\/create\/store$/)
   await page.getByRole('button', { name: 'Use the sample set' }).click()
   // Settings is one link; as in Polar, its sections replace the destinations there.
@@ -431,7 +439,7 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   const settingsLinks = page.getByRole('navigation', { name: 'Settings sections', exact: true })
   // Every settings section, including RFC 024's Appearance, Install, Experimental,
   // Social sets. Create workspace lives in the account menu.
-  await expect(settingsLinks.getByRole('link')).toHaveCount(21)
+  await expect(settingsLinks.getByRole('link')).toHaveCount(23)
   await expect(
     settingsLinks.getByRole('link', { name: 'Notifications', exact: true })
   ).toHaveAttribute('href', '/settings/notifications')

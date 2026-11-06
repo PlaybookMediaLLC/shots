@@ -54,11 +54,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { ChannelIcon } from '@/components/drafts/channel-meta'
+import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 import { writeApi } from '@/lib/write/client'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
@@ -76,7 +77,7 @@ import {
   type WriteLibrary,
 } from './write-context'
 import { useKeys } from './shortcuts'
-import { createWritingDraft } from './pending-draft'
+import { createWritingDraft, startBlankDraft } from './pending-draft'
 
 /** The library tabs, in order. */
 const TABS = [
@@ -87,6 +88,19 @@ const TABS = [
   { label: 'Posted', tab: 'posted' },
   { label: 'Archived', tab: 'archived' },
 ] as const
+
+/** What the search box looks through on each tab. */
+const SEARCH_LABELS: Record<(typeof TABS)[number]['tab'], string> = {
+  all: 'Search all posts',
+  archived: 'Search archived drafts',
+  drafts: 'Search drafts',
+  failed: 'Search failed posts',
+  posted: 'Search posted',
+  queue: 'Search the queue',
+}
+
+/** A menu's group heading: quieter than its items, so it does not read as one. */
+const MENU_GROUP = 'pt-2 pb-1 text-[11px] font-normal uppercase tracking-wide text-muted-foreground'
 
 /** The date presets, by the label the picker shows. */
 const DATE_PRESETS = { Today: 'today', 'This week': 'week', 'This month': 'month' } as const
@@ -200,7 +214,8 @@ export function WriteRail() {
         role="tablist"
         aria-label="Library"
       >
-        <div className="flex overflow-x-auto [scrollbar-width:none]">
+        {/* They wrap rather than scroll, so no tab is cut off or moves under the pointer. */}
+        <div className="flex flex-wrap">
           {/* Failed appears while something failed, or while it is the open tab. */}
           {TABS.filter(
             (item) => item.tab !== 'failed' || data.failedCount > 0 || tab === 'failed'
@@ -302,7 +317,7 @@ export function WriteRail() {
         ) : data.library.length === 0 ? (
           <div className="px-4 py-6 text-xs text-muted-foreground">
             {filtered
-              ? 'No drafts match these filters.'
+              ? 'Nothing matches these filters.'
               : {
                   all: 'Nothing in this profile yet. Start a draft above.',
                   archived: 'Nothing archived.',
@@ -379,7 +394,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
     <>
     <div className="flex items-center gap-1.5 px-3 pt-2">
       <Input
-        aria-label="Search drafts"
+        aria-label={SEARCH_LABELS[data.query.tab]}
         className="h-8 min-w-0 flex-1"
         onChange={(event) => {
           const value = event.target.value
@@ -387,7 +402,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
           if (timer.current) clearTimeout(timer.current)
           timer.current = setTimeout(() => setQuery({ q: value.trim() || undefined }), 300)
         }}
-        placeholder="Search drafts"
+        placeholder={SEARCH_LABELS[data.query.tab]}
         type="search"
         value={search}
       />
@@ -419,7 +434,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
             <DropdownMenuRadioItem value="">All accounts</DropdownMenuRadioItem>
             {accounts.map((item) => (
               <DropdownMenuRadioItem key={item.id} value={item.id}>
-                {item.displayName} · {item.platform}
+                {item.displayName} · {platformLabel(item.platform)}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
@@ -557,7 +572,9 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
   const create = async (kind: DraftKind, target?: { sourceDraftId?: string; url?: string }) => {
     setCreating(true)
     try {
-      await createWritingDraft(
+      // A plain post waits for its first word; the other kinds carry a choice worth keeping.
+      const start = kind === 'standard' && !target ? startBlankDraft : createWritingDraft
+      await start(
         {
           kind,
           socialSetId: data.activeSet?.id,
@@ -605,7 +622,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-60">
-          <DropdownMenuLabel>Every platform</DropdownMenuLabel>
+          <DropdownMenuLabel className={MENU_GROUP}>Every platform</DropdownMenuLabel>
           <DropdownMenuItem onSelect={() => void create('standard')}>
             Post or thread
           </DropdownMenuItem>
@@ -615,7 +632,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           {kinds.some((item) => item.kind === 'quote') ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>X, LinkedIn, Bluesky and Mastodon</DropdownMenuLabel>
+              <DropdownMenuLabel className={MENU_GROUP}>X, LinkedIn, Bluesky and Mastodon</DropdownMenuLabel>
               {kinds
                 .filter((item) => item.kind === 'quote')
                 .map((item) => (
@@ -628,7 +645,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           {channels.has('x') ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>X only</DropdownMenuLabel>
+              <DropdownMenuLabel className={MENU_GROUP}>X only</DropdownMenuLabel>
               {kinds
                 .filter((item) => item.kind === 'article' || item.kind === 'reply')
                 .map((item) => (
@@ -766,13 +783,9 @@ function DraftRow({
   const { data, saved, canEdit } = useWrite()
   const hydrated = useHydrated()
   const shown = { ...draft, ...saved[draft.id] }
-  const channels = [
-    ...new Set(
-      (data.activeSet?.accounts ?? [])
-        .filter((connection) => draft.channelConnectionIds.includes(connection.id))
-        .map((connection) => connection.channel)
-    ),
-  ]
+  const destinations = (data.activeSet?.accounts ?? []).filter((connection) =>
+    shown.channelConnectionIds.includes(connection.id)
+  )
   const tags = data.tags.filter((tag) => draft.tagIds.includes(tag.id))
   return (
     <li
@@ -818,7 +831,7 @@ function DraftRow({
             />
           ) : null}
           <span className="line-clamp-2 text-[13px] leading-snug text-foreground">
-            {shown.excerpt || <span className="text-muted-foreground">Empty draft</span>}
+            {shown.excerpt || <span className="text-muted-foreground">{draftName(shown)}</span>}
           </span>
         </p>
         <p className="mt-1 flex items-center gap-2 text-caption text-[var(--fg-tertiary)]">
@@ -830,9 +843,14 @@ function DraftRow({
             {shown.title && shown.title !== 'Untitled draft' ? shown.title : null}
           </span>
           <span className="flex shrink-0 items-center gap-1">
-            {channels.map((channel) => (
-              <ChannelIcon channel={channel} key={channel} />
-            ))}
+            {destinations.map((connection) => {
+              const name = `${CHANNEL_META[connection.channel].label}: ${connection.displayName ?? connection.handle ?? 'account'}`
+              return (
+                <span aria-label={name} key={connection.id} role="img" title={name}>
+                  <ChannelIcon channel={connection.channel} />
+                </span>
+              )
+            })}
           </span>
           {/* A status line below already dates a post that went out or failed. */}
           {draft.attentionPosts > 0 || draft.publishedPosts > 0 ? null : (
@@ -1163,7 +1181,7 @@ export function DraftRowMenu({ draft, onSelect }: { draft: LibraryDraft; onSelec
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirm === 'delete' ? `Delete “${draft.title}”?` : 'Turn on the public link?'}
+              {confirm === 'delete' ? `Delete “${draftName(draft)}”?` : 'Turn on the public link?'}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirm === 'delete'
@@ -1442,7 +1460,7 @@ function QueueList() {
     )
   const horizon = (
     <p className="px-4 pt-3 text-xs text-muted-foreground">
-      Free slots for the next 7 days, and posts for the next 60.{' '}
+      Free slots for the next 7 days, and posts for the next 60 days.{' '}
       <Link
         className="underline"
         href={`/publish/calendar${set ? `?set=${encodeURIComponent(set.id)}` : ''}`}
@@ -1469,7 +1487,7 @@ function QueueList() {
           {filtered
             ? 'Filtered, so free slots are hidden'
             : total > 0
-              ? `${total - free} of ${total} slots filled this week`
+              ? `${total - free} of ${total} slots filled in the next 7 days`
               : 'No weekly slots yet'}
           {' · '}
           {zone.replaceAll('_', ' ')}
@@ -1619,7 +1637,7 @@ function QueueItem({ item }: { item: WriteLibrary['queue'][number] }) {
             }}
             value={item.at}
           />
-          · {item.kind === 'planned' ? 'planned, not scheduled' : item.platform}
+          · {item.kind === 'planned' ? 'planned, not scheduled' : platformLabel(item.platform)}
           {item.state && item.state !== 'Scheduled' ? (
             <span className="text-amber-700 dark:text-amber-300">· {item.state}</span>
           ) : null}

@@ -115,6 +115,9 @@ let unsubscribe: (() => void) | null = null
  * what is on this canvas.
  */
 let unlinkedHere = false
+/** This tab's canvas was deliberately taken out of its project, and stays out until a new start. */
+let unlinkedByClosing = false
+const AUTOSAVED_NAME = 'Untitled screenshot'
 
 // The draft owner record. The editor has one local draft, so one record.
 const OWNER_KEY = 'shots.project-draft'
@@ -362,6 +365,7 @@ export function closeProject(): void {
   writeOwner(null)
   setProjectParam(null)
   unlinkedHere = true
+  unlinkedByClosing = true
 }
 
 /**
@@ -422,6 +426,20 @@ export async function createProjectFromEditor(trpcClient: Client, name: string) 
   edits = 0
   adopt(trpcClient, project, documentKey(document))
   return project
+}
+
+/**
+ * Save a design with real content as a project of its own, so it survives this
+ * browser. A person who closed a project meant to leave its copy unlinked, and
+ * a design already saving or opening is left to that.
+ */
+export async function autosaveDesignAsProject(trpcClient: Client): Promise<void> {
+  await draftRestored()
+  await running
+  const { projectId, status } = useProjectSession.getState()
+  if (projectId || status === 'loading' || unlinkedByClosing) return
+  if (!hasDesignContent(currentProjectDocument())) return
+  await createProjectFromEditor(trpcClient, AUTOSAVED_NAME)
 }
 
 /** Resolve a conflict by loading the saved project; this device's changes are dropped. */
@@ -548,5 +566,6 @@ export async function startNewDesign(
   }
   await applyStoredDocument(trpcClient, design, 'clear', { replace: true })
   unlinkedHere = true
+  unlinkedByClosing = false
   return 'started'
 }

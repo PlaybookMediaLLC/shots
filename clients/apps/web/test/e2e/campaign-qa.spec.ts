@@ -6,6 +6,7 @@ import {
   test,
   trpcMutation,
   trpcQuery,
+  chooseOption,
 } from './framework'
 
 test.use({ timezoneId: 'America/New_York' })
@@ -23,6 +24,8 @@ test(
     })) as { id: string }
     await grantWorkspacePlan(organization.id, 'pro')
     await app.open('/campaigns/new')
+    await page.getByRole('button', { name: 'More details', exact: true }).click()
+    await chooseOption(page.getByLabel('Product', { exact: true }), 'Add a product…')
     await page.getByLabel('Product name').fill('QA Product')
     await page.getByLabel('App URL', { exact: false }).fill('example.com')
     await page.getByLabel('Release title').fill('Recurring invoices')

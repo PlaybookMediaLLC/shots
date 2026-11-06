@@ -677,6 +677,68 @@ func TestSchedulingToolsTakeOnlyApprovedContent(t *testing.T) {
 	}
 }
 
+// createPost needs its own opt-in scope: a key with post:schedule doesn't even
+// see it. With the scope it posts to the workspace's accounts, retries replay,
+// and another workspace's account is not found.
+func TestCreatePostToolTakesItsOwnScope(t *testing.T) {
+	f := newFixture(t)
+	f.key("a-publish", "a", `{"artifact":["read"],"post":["publish"]}`, true)
+	f.key("b-publish", "b", `{"artifact":["read"],"post":["publish"]}`, true)
+	listed := func(label string) bool {
+		list, err := f.session(label).ListTools(f.ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(list.Tools, func(tool *sdk.Tool) bool { return tool.Name == "createPost" })
+	}
+	if listed("a-schedule") || listed("a") {
+		t.Fatal("createPost is listed without post:publish")
+	}
+	if !listed("a-publish") {
+		t.Fatal("createPost is not listed with post:publish")
+	}
+	_, _, _, _, connectionID := f.approvedPost()
+	setID := cuid.New()
+	f.exec(`INSERT INTO social_set (id,"organizationId",name,visibility,"publicSlug","createdAt","updatedAt") VALUES ($1,$2,'Shared','WORKSPACE',$1,now(),now())`, setID, f.orgs["a"])
+	f.exec(`UPDATE channel_connection SET "socialSetId"=$1 WHERE id=$2`, setID, connectionID)
+	// The account has a live credential behind it, so it can publish.
+	remote := "social-" + f.id
+	f.exec(`INSERT INTO "Organization" (id,name,"updatedAt") VALUES ($1,'Fixture',now())`, remote)
+	f.exec(`INSERT INTO social_tenant_binding ("organizationId","goOrganizationId","secretReference") VALUES ($1,$2,$3)`, f.orgs["a"], remote, "SOCIAL_FIXTURE_"+f.id)
+	f.exec(`INSERT INTO "Integration" (id,"internalId","organizationId",name,"providerIdentifier",type,token) VALUES ($1,$1,$2,'Fixture','linkedin','social','fixture-only-credential')`, "li-"+f.id, remote)
+	t.Cleanup(func() {
+		_, _ = f.db.SQL.ExecContext(f.ctx, `DELETE FROM "Integration" WHERE "organizationId"=$1`, remote)
+		_, _ = f.db.SQL.ExecContext(f.ctx, `DELETE FROM social_tenant_binding WHERE "organizationId"=$1`, f.orgs["a"])
+		_, _ = f.db.SQL.ExecContext(f.ctx, `DELETE FROM "Organization" WHERE id=$1`, remote)
+	})
+	args := map[string]any{
+		"channelConnectionIds": []string{connectionID}, "idempotencyKey": "agent-post-" + f.id,
+		"posts": []map[string]any{{"text": "Posted by an agent"}}, "scheduledFor": time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339),
+	}
+	foreign, failed := f.call(f.session("b-publish"), "createPost", args)
+	refusedWith(t, "createPost", foreign, failed, "not_found")
+	session := f.session("a-publish")
+	missing, failed := f.call(session, "createPost", map[string]any{"channelConnectionIds": []string{connectionID}, "posts": []map[string]any{{"text": "No key"}}, "publishNow": true})
+	if !failed {
+		t.Fatalf("no idempotency key: %v", missing)
+	}
+	body, failed := f.call(session, "createPost", args)
+	if failed {
+		t.Fatalf("create: %v", body)
+	}
+	if body["status"] != "scheduled" || body["created"] != true {
+		t.Fatalf("result: %v", body)
+	}
+	replay, failed := f.call(session, "createPost", args)
+	if failed || replay["created"] != false {
+		t.Fatalf("replay: %v", replay)
+	}
+	posts, failed := f.call(session, "listContentDraftPosts", map[string]any{"id": body["draft"].(map[string]any)["id"]})
+	if failed || len(posts["posts"].([]any)) != 1 {
+		t.Fatalf("posts: %v", posts)
+	}
+}
+
 func TestDraftToolsShareRESTAuthority(t *testing.T) {
 	f := newFixture(t)
 	f.key("a-draft", "a", `{"artifact":["read"],"draft":["write"]}`, true)

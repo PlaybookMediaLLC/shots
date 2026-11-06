@@ -20,22 +20,19 @@ import {
 import { postRanges } from '@/components/drafts/thread'
 import {
   attachmentEntry,
+  attachmentsIn,
   copyAttachment,
+  ensureAttachmentIds,
   moveAttachment,
   moveAttachmentRelative,
+  removeAttachment,
 } from '@/lib/write/media-operations'
-import { assetContentUrl } from '@/lib/editor/services'
 import { DescribeImages } from './describe-images'
 import { MediaFrame } from './media-frame'
+import { MediaThumb } from './media-thumb'
 import { LinkImage } from './link-image'
 import { GiphyPicker } from './giphy-picker'
 import { PhotoTags } from './photo-tags'
-
-function attachmentsIn(node: TElement): TElement[] {
-  if ((node.type === 'img' || node.type === 'video') && typeof node.assetId === 'string')
-    return [node]
-  return node.children.flatMap((child) => ('type' in child ? attachmentsIn(child as TElement) : []))
-}
 
 /**
  * Media controls operate on the editor's nodes, with native undo and autosave.
@@ -43,12 +40,14 @@ function attachmentsIn(node: TElement): TElement[] {
  */
 export function MediaTools({
   channel,
+  draftId,
   onClose,
   setId,
   onDescriptionSaved,
   tool,
 }: {
   channel: string
+  draftId: string
   onClose: () => void
   setId: string | null
   onDescriptionSaved: (assetId: string, alt: string) => void
@@ -59,6 +58,10 @@ export function MediaTools({
   const [alt, setAlt] = React.useState<string | null>(null)
   const [frame, setFrame] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string | null>(null)
+  const managing = tool === 'media'
+  React.useEffect(() => {
+    if (managing) ensureAttachmentIds(editor)
+  }, [editor, managing])
   const ranges = postRanges(body)
   // Derive from the subscribed value, not the stable editor ref: React Compiler
   // can otherwise memoize an initially empty iterator even after an upload.
@@ -81,13 +84,12 @@ export function MediaTools({
       {tags ? (
         <PhotoTags editor={editor} id={tags} setId={setId} onClose={() => setTags(null)} />
       ) : null}
-      <Dialog open={tool === 'media'} onOpenChange={(open) => !open && onClose()}>
+      <Dialog open={managing} onOpenChange={(open) => !open && onClose()}>
         <DialogContent className="max-h-[85vh] overflow-y-auto" data-testid="media-manager">
           <DialogHeader>
             <DialogTitle>Manage media</DialogTitle>
             <DialogDescription>
-              Drag attachments to reorder them or move them to a post. Arrow and move controls work
-              with the keyboard. Undo is available in the editor.
+              Drag to reorder or move between posts.
             </DialogDescription>
           </DialogHeader>
           {ranges.map(([start, end], post) => {
@@ -118,8 +120,10 @@ export function MediaTools({
                 {attachments.map(({ node }, position) => (
                   <AttachmentRow
                     key={String(node.id)}
+                    draftId={draftId}
                     node={node}
                     post={post}
+                    onRemove={() => removeAttachment(editor, node)}
                     postCount={ranges.length}
                     onMove={(target, copy) => {
                       const targetEnd = postRanges(editor.children)[target]?.[1]
@@ -171,9 +175,11 @@ export function MediaTools({
 }
 
 function AttachmentRow({
+  draftId,
   node,
   post,
   postCount,
+  onRemove,
   onMove,
   onUp,
   onDown,
@@ -183,9 +189,11 @@ function AttachmentRow({
   onTags,
   onClearTags,
 }: {
+  draftId: string
   node: TElement
   post: number
   postCount: number
+  onRemove: () => void
   onMove: (post: number, copy: boolean) => void
   onUp?: () => void
   onDown?: () => void
@@ -217,6 +225,7 @@ function AttachmentRow({
         onDrop(event.dataTransfer.getData('application/x-shots-attachment'))
       }}
       data-attachment-id={String(node.id)}
+      data-testid="draft-media-item"
     >
       <span
         aria-label="Drag attachment"
@@ -226,16 +235,12 @@ function AttachmentRow({
       >
         ⠿
       </span>
-      {video ? (
-        <span>Video</span>
-      ) : (
-        <img
-          draggable={false}
-          src={assetContentUrl(String(node.assetId))}
-          alt={String(node.alt ?? '')}
-          className="size-16 object-contain"
-        />
-      )}
+      <MediaThumb
+        alt={String(node.alt ?? '')}
+        assetId={String(node.assetId)}
+        className="size-16 object-contain"
+        video={video}
+      />
       {onClearTags ? (
         <Button size="sm" variant="outline" onClick={onClearTags}>
           Remove X photo tags
@@ -253,6 +258,15 @@ function AttachmentRow({
             disabled={node.mimeType === 'image/gif'}
           >
             Frame
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a
+              href={`/editor?asset=${encodeURIComponent(String(node.assetId))}&fromDraft=${encodeURIComponent(draftId)}`}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              Frame in Shots editor
+            </a>
           </Button>
           {onTags ? (
             <Button
@@ -306,6 +320,9 @@ function AttachmentRow({
       </Button>
       <Button size="sm" variant="outline" onClick={() => onMove(destination, true)}>
         Copy
+      </Button>
+      <Button size="sm" variant="ghost" onClick={onRemove}>
+        Remove
       </Button>
     </div>
   )

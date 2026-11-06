@@ -1,5 +1,12 @@
 import { readFileSync } from 'node:fs'
-import { draftEditor, expect, expectSaved, settleSelection, test } from './framework'
+import {
+  draftEditor,
+  expect,
+  expectSaved,
+  settleSelection,
+  test,
+  startPostByTyping,
+} from './framework'
 
 test(
   'article metadata, rich text and embeds persist; prepared DMs remain off',
@@ -100,12 +107,8 @@ test(
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x'] })
     await app.open('/publish')
-    await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/publish\/[a-z0-9]+/)
+    await startPostByTyping(page, 'A video attachment')
     const editor = draftEditor(page)
-    await editor.click()
-    await settleSelection(page)
-    await page.keyboard.type('A video attachment')
     const bytes = [
       ...readFileSync('../../../server/internal/social/integrations/social/x/testdata/sample.mp4'),
     ]

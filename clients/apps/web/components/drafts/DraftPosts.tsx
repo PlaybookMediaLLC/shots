@@ -157,7 +157,7 @@ export function DraftPosts({
                       rel="noreferrer"
                       target="_blank"
                     >
-                      View post
+                      View on {label}
                     </a>
                   ) : null}
                   {canSchedule && (post.status === 'SCHEDULED' || post.status === 'DRAFT') ? (
@@ -300,7 +300,9 @@ export function DraftPosts({
                   </div>
                   {!history && (needed || !retryCanHelp(post.failureCode)) ? (
                     <p className="text-muted-foreground">
-                      {retryCanHelp(post.failureCode)
+                      {needed?.blocksRetry
+                        ? 'Fix this first: retrying now would fail the same way. Then schedule or publish the draft again.'
+                        : retryCanHelp(post.failureCode)
                         ? 'A retry resends the version that was scheduled. To send your changes, schedule or publish the draft again.'
                         : 'Once it is fixed, schedule or publish the draft again: a retry would resend the old version.'}
                     </p>
@@ -366,7 +368,7 @@ export function DraftPosts({
               ) : null}
               {post.replies > 0 && post.status !== 'PUBLISHED' ? (
                 <p className="text-xs text-muted-foreground">
-                  A thread: this post and {post.replies} replies.
+                  A thread: this post and {post.replies} {post.replies === 1 ? 'reply' : 'replies'}.
                 </p>
               ) : null}
               {post.status === 'PUBLISHED' && post.threadProgress.quotes?.map((quote) => (
@@ -380,7 +382,8 @@ export function DraftPosts({
                   className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300"
                   role="status"
                 >
-                  {post.threadProgress.posted} of {post.threadProgress.total} replies went out.
+                  {post.threadProgress.posted} of {post.threadProgress.total}{' '}
+                  {post.threadProgress.total === 1 ? 'reply' : 'replies'} went out.
                   {canSchedule ? (
                     <Button
                       disabled={busy === post.id}
@@ -488,7 +491,8 @@ export function DraftPosts({
               <Pill tone="gray">Not attempted</Pill>
             </div>
             <p className="text-xs text-muted-foreground">
-              Nothing was sent here. Schedule or publish the draft to send it.
+              This platform was not part of the last send, so nothing went out here. A failure on
+              another platform does not skip it. Schedule or publish the draft to send it.
             </p>
           </li>
         ))}

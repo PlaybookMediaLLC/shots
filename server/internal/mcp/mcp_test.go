@@ -80,7 +80,7 @@ func TestToolsMirrorTheirOpenAPIOperations(t *testing.T) {
 	}
 	want := []string{"listReleases", "createRelease", "createAssetUploadUrl", "completeAssetUpload", "createAssetDownloadUrl",
 		"deleteAsset", "captureScreenshot", "listCampaigns", "getCampaign", "createCampaign", "listApprovals", "requestCampaignReview",
-		"scheduleCampaignPost", "listScheduledPosts", "createScheduledPost", "cancelScheduledPost", "listSocialSets", "getSocialSet", "updateSocialSetQueue", "lookupSocialSetMentions", "listCalendarPosts", "bestPostingTimes", "listContentDrafts", "getContentDraft", "createContentDraft", "updateContentDraft", "deleteContentDraft", "listContentDraftPosts", "planContentDraft", "duplicateContentDraft", "updateContentDraftProperties", "listContentDraftActivity", "listDraftComments", "mutateDraftComment"}
+		"scheduleCampaignPost", "listScheduledPosts", "createScheduledPost", "cancelScheduledPost", "listSocialSets", "getSocialSet", "updateSocialSetQueue", "lookupSocialSetMentions", "listCalendarPosts", "bestPostingTimes", "listContentDrafts", "getContentDraft", "createContentDraft", "createPost", "updateContentDraft", "deleteContentDraft", "listContentDraftPosts", "planContentDraft", "duplicateContentDraft", "updateContentDraftProperties", "listContentDraftActivity", "listDraftComments", "mutateDraftComment"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools=%v", names)
 	}
@@ -92,7 +92,10 @@ func TestToolsMirrorTheirOpenAPIOperations(t *testing.T) {
 				t.Errorf("%s scope=%q", tool.spec.Name, tool.operation.Scope)
 			}
 		}
-		if publishes := tool.spec.Name == "scheduleCampaignPost" || tool.spec.Name == "createScheduledPost"; publishes && !*tool.spec.Annotations.OpenWorldHint {
+		if tool.spec.Name == "createPost" && tool.operation.Scope != product.PostPublishScope {
+			t.Errorf("createPost scope=%q", tool.operation.Scope)
+		}
+		if publishes := tool.spec.Name == "scheduleCampaignPost" || tool.spec.Name == "createScheduledPost" || tool.spec.Name == "createPost"; publishes && !*tool.spec.Annotations.OpenWorldHint {
 			t.Errorf("%s must carry openWorldHint", tool.spec.Name)
 		}
 	}

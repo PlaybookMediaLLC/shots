@@ -8,7 +8,6 @@ import { getGuide, guideUpdated, guides } from '@/lib/seo/guides'
 import { TOOLS, TOOLS_HUB_PATH } from '@/lib/seo/tools'
 
 const STATIC_PATHS = [
-  '/',
   '/landing',
   '/store-screenshots',
   '/code',

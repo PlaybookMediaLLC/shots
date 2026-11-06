@@ -18,7 +18,8 @@ The repository separates the backend from its clients, as polar.sh does:
     [clients/apps/web/AGENTS.md](clients/apps/web/AGENTS.md).
   - `apps/collab-server/`: the real-time co-editing server.
   - `packages/`: shared libraries (backend SDK, typed API client, editor).
-  - `integrations/`: native clients (Raycast, Zapier, Shortcuts, Claude Code).
+  - `integrations/`: native clients (Raycast, Zapier, Shortcuts) and the
+    agent plugin for Claude Code, Codex and OpenCode.
 - `dev/`: local development and repository tooling. `dev/studio` (behind
   `make`) runs the Compose stack in `dev/compose*.yaml`; `dev/native-stack`
   runs it as host processes where images cannot be pulled, as in cloud
@@ -262,7 +263,7 @@ Resolve conflicts by class:
    `lib/`, `tests/`, ...) was missed by rename detection. Port the change into
    the same path under `clients/apps/web/` (upstream's `tests/` is
    `clients/apps/web/test/`; upstream's `app/[locale]/page.tsx` is
-   `clients/apps/web/app/[locale]/(editors)/page.tsx`, the route group the
+   `clients/apps/web/app/[locale]/(editors)/editor/page.tsx`, the route group the
    screenshot editor shares with Store screenshots), then `git rm` the root copy.
 4. `bun.lock` is deleted in the fork (npm is the only package manager). When
    upstream changes it, resolve the modify/delete conflict with

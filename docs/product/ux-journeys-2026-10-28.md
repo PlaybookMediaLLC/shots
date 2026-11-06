@@ -51,6 +51,10 @@ Checked and left as they are (observed, no defect): a new user's sign-up → wor
 
 ## How people start, find, continue and reuse work now
 
+> **Changed since this report:** TAB-01's blocking dialog is now a banner. The protection moved to the request: every API call from a tab carries the workspace on its screen, and the server refuses it with a 403 when the session has moved on, so nothing lands in the wrong workspace.
+>
+> **Changed since this report:** a blank post no longer saves as it starts, as START-01 had it. The quick-compose box opens over the page and the first word or attachment makes the draft, so a post started and abandoned leaves no row. Seeded posts, and ones with a target or a queue slot, still save at once.
+
 - **Start.** **New** offers what the role can make. **Screenshot** and **Use template** open a new design instead of the last project; **Post** and Home's **Write a post** open a draft with the cursor ready, and the first words are kept even if the request is retried.
 - **Know where it is saved.** Opening something new never writes over a saved project. Work kept only in this browser is named as such before it can be replaced.
 - **Find and continue.** Home lists what was just saved. Search opens with recent work and finds posts, screenshots and canvases by name; it says when part of the search failed.

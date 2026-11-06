@@ -14,6 +14,31 @@
 
 ## Decision
 
+### Authorized expansion, 2026-11-05
+
+The owner authorized agents and API keys to publish, so people can post from Claude,
+Codex, OpenCode, any MCP client and the REST API. Where the older text below says
+scheduling or publishing a draft is human-only, this narrows it for one operation.
+
+- `createPost` (`POST /api/v1/posts`) writes a post or thread and schedules or publishes
+  it in one call, with no review by a person. It needs the new `post:publish` scope. No
+  key has it by default, the consent page never pre-ticks it even when a client asks,
+  and `post:schedule` does not imply it, because those keys were issued on the promise
+  of scheduling approved content only.
+- A workspace with Require approval keeps that rule: the draft is created, nothing is
+  queued, and the result is `awaiting_approval`. No tool approves.
+- The call takes finished text per platform. The serializer from a composer document to
+  captions lives in TypeScript, and tools don't call Next.js, so **a stored draft is
+  still scheduled by a person** and `scheduleContentDraft` stays out of the tool table.
+  Exposing it would need a Go port of that serializer.
+- Everything a schedule checks runs before the draft exists, so a refused post leaves
+  nothing behind. `Idempotency-Key` is required, and a retry can't post twice.
+- Private social sets stay session-only: a key can't post to one, or read or cancel the
+  posts in one.
+- The risk this accepts is a prompt-injected agent posting to public accounts. Mitigations:
+  the opt-in scope, `openWorldHint` so clients confirm, the skill's instruction to confirm
+  with the user, the audit trail, and the monthly posts allowance.
+
 ### Authorized expansion, 2026-10-24
 
 The Typefully implementation assignment authorizes the existing REST/domain operations

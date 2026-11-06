@@ -203,13 +203,14 @@ export const AGENT_PAGES: AgentPage[] = [
     path: '/docs/agents',
     title: 'Connect AI agents to Shots',
     summary:
-      'Setup for the Shots MCP server, which gives AI agents the workspace operations of the REST API with the same scopes, plan checks, and quotas. Agents that take a header send a workspace API key as a bearer token; Claude.ai, Claude Desktop, and ChatGPT connect through OAuth and a workspace owner or admin approves them. A key with post:schedule schedules approved posts; only a person approves.',
+      'Setup for the Shots MCP server, which lets AI agents write, schedule, and publish posts with the same scopes, plan checks, and quotas as the REST API. Agents that take a header send a workspace API key as a bearer token; Claude.ai, Claude Desktop, and ChatGPT connect through OAuth and a workspace owner or admin approves them. Posting needs the post:publish scope, which is off until someone ticks it. Only a person approves.',
     points: [
       'Claude Code: claude mcp add --transport http shots <server URL> --header "Authorization: Bearer $SHOTS_API_KEY"',
       'Claude.ai and Claude Desktop: a custom connector on the /mcp-oauth-claude URL',
       'ChatGPT: a developer-mode connector on the /mcp-oauth-dynamic URL',
       'Cursor, VS Code, Windsurf, Gemini CLI, Codex CLI, and OpenCode: a config snippet with the server URL and a key',
-      'Twelve tools named after the REST operations they mirror, filtered by the key scopes',
+      'A plugin for Claude Code and Codex, and a skill for Codex and OpenCode, for writing and publishing posts',
+      'Tools named after the REST operations they mirror, filtered by the key scopes',
     ],
   },
   {

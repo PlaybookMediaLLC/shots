@@ -320,7 +320,7 @@ test('a thread posts each post on X and one joined post elsewhere', () => {
   )
   // Each X post has its own limit.
   const long = serializeDraft([p(text('Short')), brk, p(text('y'.repeat(281)))], 'x')
-  assert.deepEqual(long.errors, ['Post 2 is 281 of 280 characters: shorten it for x.'])
+  assert.deepEqual(long.errors, ['Post 2 is 281 of 280 characters: shorten it for X.'])
   assert.equal(long.length, 281)
 })
 

@@ -16,6 +16,7 @@ import {
   test,
   trpcMutation,
   editorMore,
+  openNewDraft,
 } from './framework'
 
 test.use({ actionTimeout: 30_000 })
@@ -71,8 +72,7 @@ test(
     await expect(page.getByLabel('Poll option 1')).toHaveValue('Choice one')
     await page.screenshot({ path: '.context/shots/typefully-poll-copy.png' })
     await page.keyboard.press('Escape')
-    await page.getByTestId('new-draft').first().click()
-    await expect(draftEditor(page)).toBeVisible()
+    await openNewDraft(page)
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.evaluate(() => navigator.clipboard.writeText('https://x.com/example/status/123456'))
     await draftEditor(page).click()
@@ -309,14 +309,14 @@ test(
     )
     await page.getByRole('button', { name: 'Show only', exact: true }).first().click()
     await page.getByText('Filters', { exact: true }).click()
-    await page.getByRole('checkbox', { name: 'linkedin', exact: true }).check()
+    await page.getByRole('checkbox', { name: 'LinkedIn', exact: true }).check()
     await page.getByText('Filters', { exact: true }).click()
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(0)
     await app.reload()
     await page.getByText('Filters', { exact: true }).click()
-    await expect(page.getByRole('checkbox', { name: 'linkedin', exact: true })).toBeChecked()
-    await page.getByRole('checkbox', { name: 'linkedin', exact: true }).uncheck()
-    await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+    await expect(page.getByRole('checkbox', { name: 'LinkedIn', exact: true })).toBeChecked()
+    await page.getByRole('checkbox', { name: 'LinkedIn', exact: true }).uncheck()
+    await page.getByRole('checkbox', { name: 'X', exact: true }).check()
     await page.getByText('Filters', { exact: true }).click()
     await expect(page.getByTestId('calendar-post').filter({ visible: true })).toHaveCount(2)
     const period = page.getByRole('heading', { level: 1 })
@@ -433,8 +433,8 @@ test(
       page.getByText('This time is already in the posting schedule.', { exact: true })
     ).toBeVisible()
     await expect(page.getByTestId('social-analytics')).toContainText('Observed outside Shots')
-    await expect(page.getByRole('img', { name: /x · Followers/ })).toBeVisible()
-    await expect(page.getByRole('img', { name: /x · Followers/ }).locator('circle')).toHaveCount(2)
+    await expect(page.getByRole('img', { name: /X · Followers/ })).toBeVisible()
+    await expect(page.getByRole('img', { name: /X · Followers/ }).locator('circle')).toHaveCount(2)
     await expect(page.getByTestId('social-analytics')).toContainText('12')
     await expect(page.getByTestId('social-analytics')).toContainText('Unavailable')
     await chooseOption(page.getByLabel('Period', { exact: true }), 'Monthly')
@@ -525,16 +525,21 @@ test(
     await expect(
       page.getByRole('switch', { name: 'Skip Slack publish notice', exact: true })
     ).toBeChecked()
-    await page.getByRole('button', { name: 'More draft actions' }).click()
-    await page.getByRole('menuitem', { name: 'Manage media…' }).click()
-    const media = page.getByTestId('draft-media-tools')
-    await media
-      .getByRole('button', { name: 'Drag media 1', exact: true })
-      .dragTo(media.getByText('Post 1, media 2', { exact: true }))
-    await expect(media.getByAltText('Media 1')).toHaveAttribute('src', new RegExp(assets[1]))
-    await chooseOption(media.getByLabel('Media destination post'), 'Post 2')
-    await media.getByRole('button', { name: 'Move to post 2', exact: true }).first().click()
-    await expect(media).toContainText('Post 2, media 2')
+    await editorMore(page, 'Manage media')
+    const media = page.getByTestId('media-manager')
+    const firstPost = media
+      .getByRole('region', { name: 'Post 1 media' })
+      .getByTestId('draft-media-item')
+    await firstPost
+      .nth(1)
+      .getByRole('img', { name: 'Drag attachment', exact: true })
+      .dragTo(firstPost.nth(0))
+    await expect(firstPost.nth(0).locator('img')).toHaveAttribute('src', new RegExp(assets[1]))
+    await chooseOption(firstPost.nth(0).getByLabel('Destination post'), 'Post 2')
+    await firstPost.nth(0).getByRole('button', { name: 'Move', exact: true }).click()
+    await expect(
+      media.getByRole('region', { name: 'Post 2 media' }).getByTestId('draft-media-item')
+    ).toHaveCount(1)
     await page.keyboard.press('Escape')
     await editorMore(page, 'Alt text')
     await page.getByRole('button', { name: 'Suggest with AI', exact: true }).first().click()

@@ -51,7 +51,8 @@ export type MediaFacts = {
   width?: number | null
 }
 
-const LABELS: Record<DraftChannel, string> = {
+/** Each platform's name as people write it. */
+export const LABELS: Record<DraftChannel, string> = {
   bluesky: 'Bluesky',
   instagram: 'Instagram',
   linkedin: 'LinkedIn',
@@ -87,7 +88,11 @@ export function mediaProblems(channel: DraftChannel, media: MediaFacts[]): strin
   const label = LABELS[channel]
   if (media.length === 0)
     return rules.requiresMedia
-      ? [`${label} needs at least one image or video. Add one to the post.`]
+      ? [
+          rules.images.length === 0
+            ? `${label} needs one video. Add one to the post.`
+            : `${label} needs at least one image or video. Add one to the post.`,
+        ]
       : []
   if (media.length > rules.maxMedia)
     return [

@@ -9,6 +9,8 @@ import {
   type Page,
   settleSelection,
   test,
+  openNewDraft,
+  startPostByTyping,
 } from './framework'
 
 /**
@@ -27,11 +29,7 @@ async function snap(page: Page, name: string): Promise<void> {
 
 /** Open a new draft from the library; returns its id. */
 async function newDraft(page: Page): Promise<string> {
-  await page.goto('/publish')
-  await page.getByTestId('new-draft').first().click()
-  await page.waitForURL(/\/publish\/[a-z0-9]+/)
-  await expect(draftEditor(page)).toBeVisible({ timeout: 60_000 })
-  return new URL(page.url()).pathname.split('/').pop() ?? ''
+  return openNewDraft(page)
 }
 
 /**
@@ -131,6 +129,9 @@ test(
     await expect(page.getByTestId('preview-linkedin')).toContainText('Read more on our blog.')
     await expect(page.getByTestId('preview-linkedin')).not.toContainText('Today!')
     await snap(page, 'write-preview-linkedin')
+    // The preview and the editor show one platform, whichever of them changed it.
+    await page.getByTestId('platform-tab-x').click()
+    await expect(page.getByTestId('preview-x')).toBeVisible()
 
     // Properties: an internal title and scratchpad that are never posted, and counts.
     await page.getByRole('button', { name: 'Draft details', exact: true }).click()
@@ -262,9 +263,8 @@ test(
     await expect(editor).toContainText('we shipped the new editor today')
     await expectSaved(page)
 
-    // Each post has its own Ask AI, and Try again asks the same thing again,
-    // not the empty instruction box.
-    await page.getByRole('button', { name: 'Ask AI about post 1' }).click()
+    // Try again asks the same thing again, not the empty instruction box.
+    await page.getByRole('button', { name: 'Ask AI', exact: true }).click()
     const menu = page.getByTestId('refine-menu')
     await menu.getByLabel('Refine instruction').fill('Make it friendlier')
     await menu.getByRole('button', { name: 'Go', exact: true }).click()
@@ -373,13 +373,7 @@ test(
     await app.open('/publish')
     await expect(page.getByTestId('write-rail')).toBeVisible()
     await snap(page, 'write-phone-library')
-    await page.getByTestId('new-draft').first().click()
-    await page.waitForURL(/\/publish\/[a-z0-9]+/)
-    const editor = draftEditor(page)
-    await expect(editor).toBeVisible({ timeout: 60_000 })
-    await editor.click()
-    await settleSelection(page)
-    await page.keyboard.type('Written on a phone.')
+    await startPostByTyping(page, 'Written on a phone.')
     await expectSaved(page)
     await expect(page.getByTestId('save-state')).toBeVisible()
     await snap(page, 'write-phone-composer')
@@ -392,10 +386,10 @@ test(
 
     // Panels open as a sheet over the draft.
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
-    await expect(page.getByRole('dialog').getByTestId('preview-panel')).toBeVisible()
+    await expect(page.getByTestId('preview-panel')).toBeVisible()
     await expect(page.getByTestId('preview-x')).toContainText('Written on a phone.')
     await snap(page, 'write-phone-preview')
-    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
 
     // Schedule stays in the header on a phone; Publish now is one menu away and still reviewed.
     await expect(page.getByTestId('schedule-button')).toBeVisible()
@@ -413,6 +407,7 @@ test(
       socialSetId: string
     }
     await page.getByTestId('mobile-new-draft').click()
+    await page.keyboard.type('Next.')
     await page.waitForURL(
       (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(previousId)
     )
@@ -711,12 +706,12 @@ test(
       await page.keyboard.press('Escape')
       // Nothing in this workspace is on a day before it existed.
       await app.open('/publish?tab=all&from=2020-01-01&to=2020-01-02')
-      await expect(page.getByText('No drafts match these filters.')).toBeVisible()
+      await expect(page.getByText('Nothing matches these filters.')).toBeVisible()
       await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click()
       await expect(page).not.toHaveURL(/[?&]from=/)
-      await page.getByRole('tab', { name: 'Queue', exact: true }).click()
+      await page.getByRole('tab', { name: /^Queue/ }).click()
       await expect(
-        page.getByText('Free slots for the next 7 days, and posts for the next 60.')
+        page.getByText('Free slots for the next 7 days, and posts for the next 60 days.')
       ).toBeVisible()
     })
     await app.open('/publish/calendar')

@@ -62,7 +62,7 @@ import {
   postState,
   STATUS_GROUPS,
 } from '@/lib/content-drafts/post-status'
-import { draftPlainText, channelForPlatform } from '@/lib/content-drafts/serialize'
+import { draftPlainText, channelForPlatform, platformLabel } from '@/lib/content-drafts/serialize'
 import {
   writeApi,
   type SocialSetWire,
@@ -298,8 +298,9 @@ export function PlanWorkspace({
             accountId: p.channelConnectionId,
             platform: p.platform,
             // Placed at its slot; publishAt is the instant after any natural offset.
-            at: p.slotAt ?? p.scheduledFor,
-            publishAt: p.scheduledFor,
+            // A live post reads when it went out, as the Posted list dates it.
+            at: p.publishedAt ?? p.slotAt ?? p.scheduledFor,
+            publishAt: p.publishedAt ?? p.scheduledFor,
             zone:
               sets.find((s) => s.id === p.socialSetId)?.timeZone ??
               p.scheduleTimeZone ??
@@ -500,7 +501,7 @@ export function PlanWorkspace({
       type="button"
       variant="custom"
       data-testid={item.status === 'Planned' ? 'calendar-planned' : 'calendar-post'}
-      aria-label={`${item.status}: ${item.text || item.title}, ${sets.find((s) => s.id === item.setId)?.name ?? 'Account'}, ${item.platform}`}
+      aria-label={`${item.status}: ${item.text || item.title}, ${sets.find((s) => s.id === item.setId)?.name ?? 'Account'}, ${platformLabel(item.platform)}`}
       draggable={
         !busy &&
         !item.campaignId &&
@@ -539,7 +540,7 @@ export function PlanWorkspace({
       ) : null}
       <strong className={weekly ? 'block truncate' : 'line-clamp-2 break-words'}>
         {sets.find((s) => s.id === item.setId)?.name ?? 'Account'}{' '}
-        {prefs.platforms ? `· ${item.platform}` : ''}
+        {prefs.platforms ? `· ${platformLabel(item.platform)}` : ''}
       </strong>
       <span className={prefs.density === 'compact' ? 'line-clamp-1' : 'line-clamp-3'}>
         {item.text || item.title || 'Untitled draft'}
@@ -642,7 +643,6 @@ export function PlanWorkspace({
         <DraftSettingsDrawer
           advancedScheduling={advancedScheduling}
           canManage={canManageSets}
-          canWrite={canEdit}
           socialSetId={focused?.id ?? sets[0].id}
         />
       ) : null}
@@ -732,13 +732,13 @@ export function PlanWorkspace({
                   <Label className="items-start font-normal">
                     <Checkbox
                       checked={activeIds.includes(set.id)}
-                      aria-label={`Show ${set.name} ${set.accounts.map((a) => a.platform).join(', ')}`}
+                      aria-label={`Show ${set.name} ${set.accounts.map((a) => platformLabel(a.platform)).join(', ')}`}
                       onCheckedChange={() => setPref({ visible: toggle(activeIds, set.id) })}
                     />
                     <span>
                       <strong>{set.name}</strong>
                       <small className="block text-muted-foreground">
-                        {set.accounts.map((a) => a.platform).join(' · ') || 'No connected accounts'}
+                        {set.accounts.map((a) => platformLabel(a.platform)).join(' · ') || 'No connected accounts'}
                       </small>
                     </span>
                   </Label>
@@ -837,7 +837,7 @@ export function PlanWorkspace({
                         checked={prefs.providers.includes(p)}
                         onCheckedChange={() => setPref({ providers: toggle(prefs.providers, p) })}
                       />
-                      {p}
+                      {platformLabel(p)}
                     </Label>
                   ))}
                 </fieldset>
@@ -989,8 +989,9 @@ export function PlanWorkspace({
               </Button>
             </div>
           </header>
-          {/* Keep the measured Flex viewport stable while a range loads or fails. */}
-          <div className="h-10 shrink-0 overflow-y-auto px-4 text-sm">
+          {/* It floats over the grid: reserved room left an empty band whenever all was well. */}
+          <div className="relative z-20 h-0 shrink-0">
+            <div className="absolute inset-x-0 top-0 bg-background px-4 text-sm">
             {load === 'error' ? (
               <div role="alert" className="flex items-center gap-2">
                 {failure}{' '}
@@ -1010,6 +1011,7 @@ export function PlanWorkspace({
                 </Button>
               </div>
             ) : null}
+            </div>
           </div>
           <div ref={container} className="min-h-0 flex-1 overflow-auto" data-local-dropzone="">
             <div className="grid gap-3 p-3 md:hidden" aria-label="Mobile queue">
@@ -1090,7 +1092,12 @@ export function PlanWorkspace({
                       aria-current={day === today ? 'date' : undefined}
                       className={`whitespace-nowrap ${day === today ? 'rounded-full bg-sky-600 px-1.5 py-0.5 text-white' : ''}`}
                     >
-                      {readable(day, { weekday: 'short', day: 'numeric' })}
+                      {readable(
+                        day,
+                        day === days[0] || day.endsWith('-01')
+                          ? { month: 'short', day: 'numeric' }
+                          : { weekday: 'short', day: 'numeric' }
+                      )}
                     </time>
                     <span className="flex shrink-0 items-center justify-end @max-[6.5rem]:w-full">
                       {prefs.view === 'week'
@@ -1487,7 +1494,7 @@ function PlanComposer({
             <SelectContent>
               {sets.map((s) => (
                 <SelectItem key={s.id} value={s.id}>
-                  {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
+                  {s.name} · {s.accounts.map((a) => platformLabel(a.platform)).join(', ')}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1816,7 +1823,7 @@ function PlanDetail({
         <SheetHeader>
           <SheetTitle>{item.title || 'Content details'}</SheetTitle>
           <SheetDescription>
-            {set?.name} · {item.platform} · {item.status}
+            {set?.name} · {platformLabel(item.platform)} · {item.status}
           </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4 p-4">
@@ -1900,7 +1907,7 @@ function PlanDetail({
                 })
               }
             >
-              {item.postId && queued.length > 1 ? `Move this ${item.platform} post` : 'Move'}
+              {item.postId && queued.length > 1 ? `Move this ${platformLabel(item.platform)} post` : 'Move'}
             </Button>
             {item.status === 'Planned' ? (
               <>
@@ -1937,9 +1944,9 @@ function PlanDetail({
           </div>
           {item.postId && queued.length > 1 ? (
             <p className="text-xs text-muted-foreground" data-testid="unschedule-scope">
-              Move changes only this {item.platform} post. Unschedule returns the whole draft to a
+              Move changes only this {platformLabel(item.platform)} post. Unschedule returns the whole draft to a
               plan and cancels every queued destination:{' '}
-              {queued.map((post) => post.platform).join(', ')}. To stop one destination only, cancel
+              {queued.map((post) => platformLabel(post.platform)).join(', ')}. To stop one destination only, cancel
               it from the draft’s posts in the editor.
             </p>
           ) : null}
@@ -1984,7 +1991,7 @@ function PlanDetail({
               <SelectContent>
                 {sets.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name} · {s.accounts.map((a) => a.platform).join(', ')}
+                    {s.name} · {s.accounts.map((a) => platformLabel(a.platform)).join(', ')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -2038,7 +2045,7 @@ function PlanDetail({
               receipts.map((post) => (
                 <div key={post.id} className="my-2 grid gap-1 rounded border p-2 text-xs">
                   <p className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-foreground">{post.platform}</span>
+                    <span className="text-foreground">{platformLabel(post.platform)}</span>
                     <Pill tone={POST_STATE_TONE[postState(post.status, post.scheduledFor)]}>
                       {postState(post.status, post.scheduledFor)}
                     </Pill>

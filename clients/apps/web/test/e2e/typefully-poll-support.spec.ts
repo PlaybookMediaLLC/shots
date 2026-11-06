@@ -34,9 +34,10 @@ test(
     for (const channel of ['bluesky', 'instagram']) {
       await page.getByTestId(`platform-tab-${channel}`).click()
       await expect(
-        page.getByText(`${channel === 'bluesky' ? 'Bluesky' : 'Instagram'}: polls unavailable`, {
-          exact: true,
-        })
+        page.getByText(
+          `${channel === 'bluesky' ? 'Bluesky' : 'Instagram'} does not take polls, so the poll is not posted here.`,
+          { exact: true }
+        )
       ).toBeVisible()
       await expect(page.getByRole('button', { name: 'Add a poll', exact: true })).toHaveCount(0)
     }

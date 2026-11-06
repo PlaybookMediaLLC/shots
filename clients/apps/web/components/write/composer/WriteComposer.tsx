@@ -43,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Sheet,
   SheetContent,
@@ -79,9 +79,11 @@ import {
 import { currentPosts, draftPostsState, draftStatus } from '@/lib/content-drafts/post-status'
 import { renderBlockImages } from '@/lib/content-drafts/render-blocks'
 import {
+  serializeDraft,
   type BlockImages,
   channelForPlatform,
   draftPlainText,
+  platformLabel,
   renderableBlockCount,
 } from '@/lib/content-drafts/serialize'
 import { platformEditorServices } from '@/lib/editor/services'
@@ -95,8 +97,8 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
-import { draftName } from '@/lib/write/library'
 import { buildPublication } from '@/lib/write/publication'
+import { splitThread } from '@/lib/write/split-thread'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
   adaptBody,
@@ -120,17 +122,22 @@ import { ArticleTools } from './article-tools'
 import { MemberComments } from './member-comments'
 import {
   CompareDialog,
-  ManagePlatformsDialog,
+  ActivePlatform,
+  allChannels,
+  ConnectMenu,
+  ResyncDialog,
   ManualVersionNotice,
   OptionsChip,
   PlatformTabs,
   SyncedVersion,
   tabChannels,
+  toggledPlatforms,
 } from './platforms'
 import { PostSettingRequestContext, PostSettingsTools, type PostSettingRequest } from './post-tools'
 import { PreviewPanel, type PreviewItem, type PreviewSelection } from './preview'
 import { PropertiesPanel } from './properties'
 import {
+  ScheduleDock,
   blockerFixLabel,
   PublishReview,
   type ScheduleBlocker,
@@ -144,6 +151,10 @@ import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
 import { MediaImportDialog } from './media-import-dialog'
+import { MediaStrip } from './media-strip'
+import { withBrowserScope } from '@/lib/auth/browser-scope'
+import { attachmentsIn } from '@/lib/write/media-operations'
+import { mediaSwitches } from '@/lib/write/platform-rules'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
@@ -156,6 +167,7 @@ import { HashtagPlugins, HashtagsContext } from './hashtags'
 import { QuietShortcutPlugins } from './quiet-shortcuts'
 import { PlainPastePlugin } from './plain-paste'
 import {
+  setMentionLookup,
   SocialMentionPlugin,
   SocialMentionInputPlugins,
   SocialMentionContext,
@@ -183,7 +195,6 @@ type Dialog =
   | 'schedule'
   | 'queue'
   | 'publish'
-  | 'manage'
   | 'share'
   | 'backups'
   | 'compare'
@@ -303,6 +314,7 @@ export function WriteComposer({
     draft: initial,
     onSaved: (saved) =>
       showSaved({
+        channelConnectionIds: saved.channelConnectionIds,
         excerpt: draftPlainText(saved.body).slice(0, 180),
         id: saved.id,
         title: saved.title,
@@ -320,11 +332,6 @@ export function WriteComposer({
       180
     )
   const title = typed && (typed.title.trim() || 'Untitled draft')
-  // Until a title is set, the draft is called by its first line, as the list does.
-  const [openedExcerpt] = React.useState(() =>
-    draftPlainText(Array.isArray(document.value) ? document.value.slice(0, 12) : document.value)
-  )
-  const firstLine = draftName({ excerpt: excerpt ?? openedExcerpt, title: '' })
   React.useEffect(() => {
     if (excerpt === null || title === null) return
     // A transition, so redrawing the list never holds up the next keystroke.
@@ -380,9 +387,7 @@ export function WriteComposer({
         ? 'backups'
         : params.get('panel') === 'schedule'
           ? 'schedule'
-          : params.has('connected')
-            ? 'manage'
-            : null
+          : null
   )
   const [focus, setFocus] = React.useState(false)
   // Where two blockers are fixed: the edit conflict and the review.
@@ -435,11 +440,13 @@ export function WriteComposer({
     poll: PostPoll
   } | null>(null)
   const [editorInstance, setEditorInstance] = React.useState<PlateEditor | null>(null)
+  const [resync, setResync] = React.useState<DraftChannel | null>(null)
   const primary = document.primaryPlatform
   const accounts = set?.accounts ?? []
   const enabled = document.channelConnectionIds
   const channels = tabChannels(accounts, enabled, primary)
-  const active = channels.includes(tab) ? tab : primary
+  // A switched-off platform keeps its tab, so it can be read and switched back on.
+  const active = allChannels(accounts, primary).includes(tab) ? tab : primary
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = {
     article: document.article,
@@ -470,9 +477,23 @@ export function WriteComposer({
     main.addEventListener('scroll', remember, { passive: true })
     return () => main.removeEventListener('scroll', remember)
   }, [])
+  // Preview takes the draft's place, so coming back returns to where it was left, caret included.
+  const scrollBeforePreview = React.useRef<number | null>(null)
   React.useLayoutEffect(() => {
     const main = bodyArea.current?.closest('main')
-    if (main && main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
+    if (!main) return
+    if (panel === 'preview') {
+      // Hiding the editor drops its focus without a blur event, and Slate won't refocus an
+      // editor it believes is focused, so it has to be told before coming back.
+      if (scrollBeforePreview.current === null) editor.current?.tf.blur()
+      scrollBeforePreview.current ??= draftScroll.current
+      return
+    }
+    if (scrollBeforePreview.current !== null) {
+      main.scrollTop = draftScroll.current = scrollBeforePreview.current
+      scrollBeforePreview.current = null
+      editor.current?.tf.focus()
+    } else if (main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
   }, [panel])
   const [pasteNotice, setPasteNotice] = React.useState(false)
 
@@ -511,6 +532,7 @@ export function WriteComposer({
   const activePublication =
     items.find((item) => item.account.channel === active)?.publication ??
     buildPublication(draftFields, { channel: active, connectionId: 'preview' }, pendingBlocks)
+  const publishing = items.some((item) => item.account.channel === active)
   const approved = server.reviewStatus === 'approved' && server.approvedVersion === server.version
   const limitFor = (channel: DraftChannel) =>
     items.find((item) => item.account.channel === channel)?.publication.serialized.limit ??
@@ -563,20 +585,65 @@ export function WriteComposer({
     setPosts((await draftsApi.posts(initial.id)).posts)
     router.refresh()
   }
-  const toggle = (accountId: string, on: boolean) => {
+  // Platforms switched off for lacking media, and those the person chose to keep on regardless.
+  const switchedOff = React.useRef(new Set<string>())
+  const keptOn = React.useRef(new Set<string>())
+  const applySwitch = (accountId: string, on: boolean) => {
     const account = accounts.find((item) => item.id === accountId)
     if (!account) return
-    update((current) => ({
-      channelConnectionIds: on
-        ? [
-            ...current.channelConnectionIds.filter(
-              (id) => accounts.find((item) => item.id === id)?.channel !== account.channel
-            ),
-            accountId,
-          ]
-        : current.channelConnectionIds.filter((id) => id !== accountId),
-    }))
+    update((current) =>
+      toggledPlatforms(accounts, account, on, {
+        enabled: current.channelConnectionIds,
+        primary: current.primaryPlatform,
+        versions: current.versions,
+      })
+    )
   }
+  const toggle = (accountId: string, on: boolean) => {
+    switchedOff.current.delete(accountId)
+    if (on) keptOn.current.add(accountId)
+    else keptOn.current.delete(accountId)
+    applySwitch(accountId, on)
+  }
+  const mediaAccounts = accounts.map((account) => {
+    const version = versionFor(document.versions, account.channel)
+    const body =
+      account.channel !== primary && version.mode === 'manual'
+        ? ((version.body ?? []) as Value)
+        : document.value
+    return {
+      channel: account.channel,
+      hasMedia: body.some((node) => attachmentsIn(node).length > 0),
+      hasText: Boolean(serializeDraft(body, account.channel).caption.trim()),
+      id: account.id,
+    }
+  })
+  const mediaState = JSON.stringify([mediaAccounts, enabled])
+  const openedAs = React.useRef(mediaState)
+  React.useEffect(() => {
+    // Opening a draft changes nothing, and editing can't change what is already scheduled.
+    if (mediaState === openedAs.current || !canEdit || posts.length > 0) return
+    openedAs.current = ''
+    const { off, on } = mediaSwitches(mediaAccounts, enabled, switchedOff.current, keptOn.current)
+    for (const id of on) {
+      switchedOff.current.delete(id)
+      applySwitch(id, true)
+    }
+    if (off.length === 0) return
+    for (const id of off) {
+      switchedOff.current.add(id)
+      applySwitch(id, false)
+    }
+    const names = off.map((id) => {
+      const channel = accounts.find((item) => item.id === id)?.channel
+      return channel ? CHANNEL_META[channel].label : 'A platform'
+    })
+    toast(`${names.join(' and ')} switched off: this post has no media yet.`, {
+      action: { label: 'Undo', onClick: () => off.forEach((id) => toggle(id, true)) },
+    })
+    // Only a change in the post or its destinations can change the answer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mediaState])
   const setOptions = (channel: DraftChannel, options: VersionOptions) =>
     update((current) => ({ versions: withOptions(current.versions, channel, options) }))
   // A destination that is live is done: scheduling again would post it twice.
@@ -586,6 +653,7 @@ export function WriteComposer({
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
   const context: ScheduleContext = {
+    kind: server.kind,
     approved,
     canPublish: canPublish && server.status !== 'archived',
     conflict: conflict !== null,
@@ -708,20 +776,19 @@ export function WriteComposer({
       item.publication.serialized.posts.some((post) => post.length > item.publication.serialized.limit)
     )
     .map((item) => item.account.channel)
-  // Blockers show beside Schedule once there is something to post, not on an empty draft.
-  const blockers =
-    !locked && items.some((item) => item.publication.serialized.posts.length > 0)
-      ? scheduleBlockers({
-          approved,
-          canPublish: canPublish && server.status !== 'archived',
-          conflict: conflict !== null,
-          draft: server,
-          items: pending,
-          requireApproval,
-          saveState,
-        })
-      : []
-  const [blockersOpen, setBlockersOpen] = React.useState(false)
+  // Always in view beside the post, including what an empty draft still needs.
+  const blockers = !locked
+    ? scheduleBlockers({
+        approved,
+        canPublish: canPublish && server.status !== 'archived',
+        conflict: conflict !== null,
+        draft: server,
+        items: pending,
+        requireApproval,
+        saveState,
+      })
+    : []
+  const fixList = React.useRef<HTMLDivElement>(null)
   const [blockedAction, setBlockedAction] = React.useState<PublishAction | null>(null)
   const [postAgain, setPostAgain] = React.useState(false)
   // Every way to schedule or publish comes through here: what is missing is fixed first.
@@ -730,14 +797,12 @@ export function WriteComposer({
     // An archived draft has no checklist in its header: the review says to restore it.
     if (blockers.length === 0 || server.status === 'archived') return setDialog(action)
     setBlockedAction(action)
-    setBlockersOpen(true)
+    fixList.current?.focus()
   }
-  // The checklist closes with its last item, so the next blocker cannot reopen it unasked.
+  // A button's "anyway" offer ends with the last thing to fix.
   const anyBlockers = blockers.length > 0
   React.useEffect(() => {
-    if (anyBlockers) return
-    setBlockersOpen(false)
-    setBlockedAction(null)
+    if (!anyBlockers) setBlockedAction(null)
   }, [anyBlockers])
   React.useEffect(() => {
     openPreviewRef.current = () => setPanel('preview')
@@ -875,7 +940,11 @@ export function WriteComposer({
   const jumpTo = (blocker: ScheduleBlocker) => {
     if (blocker.channel && channels.includes(blocker.channel)) setTab(blocker.channel)
     if (blocker.fix === 'save') context.retrySave()
-    else if (blocker.fix === 'account') setDialog('manage')
+    else if (blocker.fix === 'account')
+      focusRoot.current
+        ?.querySelector<HTMLElement>('[data-testid="platform-tabs"] [role="switch"]')
+        ?.focus()
+    else if (blocker.fix === 'write') editor.current?.tf.focus()
     else if (blocker.fix === 'restore') {
       if (canEdit) void archive('draft')
     } else if (blocker.fix === 'conflict') conflictBanner.current?.querySelector('button')?.focus()
@@ -890,6 +959,11 @@ export function WriteComposer({
         if (!missing) return setPanel('options')
         missing.scrollIntoView({ block: 'center' })
         missing.focus()
+        // Focus from a click draws no ring, so the row flashes to show where to look.
+        ;(missing.closest('[data-option-rows] > *') ?? missing).animate(
+          [{ boxShadow: 'inset 0 0 0 2px #f59e0b' }, { boxShadow: 'inset 0 0 0 2px transparent' }],
+          { duration: 2000, easing: 'ease-in' }
+        )
       }, 50)
     } else if (blocker.channel) editor.current?.tf.focus()
   }
@@ -910,7 +984,6 @@ export function WriteComposer({
         : []),
       { label: 'Post options', run: () => setPanel('options') },
       { label: 'Draft details', run: () => setPanel('properties'), shortcut: `${mod}\\` },
-      ...(canEdit ? [{ label: 'Manage platforms…', run: () => setDialog('manage') }] : []),
       { label: 'Share…', run: () => setDialog('share'), shortcut: `${mod}${alt}S` },
       { label: 'View automatic backups', run: () => setDialog('backups') },
       ...(canEdit
@@ -991,6 +1064,9 @@ export function WriteComposer({
   React.useEffect(() => {
     if (editorInstance) setOverLimit(editorInstance, active, JSON.parse(excessKey) as PostExcess)
   }, [active, editorInstance, excessKey])
+  React.useEffect(() => {
+    if (editorInstance) setMentionLookup(editorInstance, active)
+  }, [active, editorInstance])
   const splitAtLimit = (number: number) => {
     const current = editor.current
     const point = current && overflowStart(current.children, number, excess, active)
@@ -1020,13 +1096,25 @@ export function WriteComposer({
         </span>
       ) : null
     return (
-      <PostCount
-        active={inUse}
-        length={post.length}
-        limit={activePublication.serialized.limit}
-        number={number}
-        thread={Boolean(CAPABILITIES[active].thread)}
-      />
+      <>
+        <PostCount
+          active={inUse}
+          length={post.length}
+          limit={activePublication.serialized.limit}
+          number={number}
+          thread={Boolean(CAPABILITIES[active].thread)}
+        />
+        {excess[number] && CAPABILITIES[active].thread ? (
+          <Button
+            className="h-6 px-1.5 text-xs"
+            onClick={() => splitAtLimit(number)}
+            size={null}
+            variant="ghost"
+          >
+            Split into thread
+          </Button>
+        ) : null}
+      </>
     )
   }
   const onDescriptionSaved = (assetId: string, alt: string) => {
@@ -1042,6 +1130,15 @@ export function WriteComposer({
       versions: withAssetDescription(draft.versions, assetId, alt),
     }))
   }
+  // A post that is live everywhere does not change with this text, so it is not editable.
+  const canEditText = canEdit && !locked
+  // A tab that follows the main platform has no editor of its own: its media lives on that tab.
+  const ownEditor = active === primary || versionOfTab.mode === 'manual'
+  const liveOn = [
+    ...new Set(
+      posts.filter((post) => post.status === 'PUBLISHED').map((post) => platformLabel(post.platform))
+    ),
+  ].join(', ')
   const editorProps = {
     draftId: initial.id,
     extraPlugins: WRITE_PLUGINS,
@@ -1065,7 +1162,7 @@ export function WriteComposer({
             </RefineMenu>
           )
         : undefined,
-      settings: canEdit
+      settings: canEditText
       ? ({
           number,
           settings,
@@ -1100,7 +1197,7 @@ export function WriteComposer({
         )
       : undefined,
     },
-    readOnly: !canEdit,
+    readOnly: !canEditText,
     services,
     // Text runs in the direction the person chose in Appearance (RFC 024).
     textDirection,
@@ -1111,7 +1208,7 @@ export function WriteComposer({
   const status = draftStatus(server, draftPostsState(currentPosts(posts)))
   // Thread splitting for the edited platform; only the instance told about a paste splits it.
   const threadTools =
-    canEdit &&
+    canEditText &&
     server.kind !== 'article' &&
     CAPABILITIES[active].thread &&
     (active === primary || versionOfTab.mode === 'manual')
@@ -1129,53 +1226,15 @@ export function WriteComposer({
       : null
   // Shown options take a paste's split; otherwise its tools show above the text.
   const optionsShown = panel === 'options' && !focus && !settingsOpen(params)
-  const panelContent =
-    panel === 'options' ? (
-      <div data-testid="post-options">
-        <VersionOptionsBar
-          tiktokCreator={accounts.find((account) => account.channel === active)?.tiktokCreator}
-          channel={active}
-          captionLimit={activePublication.serialized.limit}
-          onApplyFinisher={
-            canEdit && (active === primary || versionOfTab.mode === 'manual')
-              ? (text, quoteFirstPost) => {
-                  if (editor.current)
-                    appendPost(editor.current, text, quoteFirstPost ? { quoteFirstPost: true } : {})
-                }
-              : undefined
-          }
-          onChange={(options) => setOptions(active, options)}
-          options={versionOfTab.options ?? {}}
-          postCount={activePublication.serialized.posts.length}
-          readOnly={!canEdit}
-          setId={server.socialSetId ?? set?.id ?? null}
-          uploadFile={
-            services.uploadFile
-              ? async (file) => ({ assetId: (await services.uploadFile!(file)).assetId ?? '' })
-              : undefined
-          }
-        />
-        {threadTools?.(pasteNotice)}
-      </div>
-    ) : panel === 'properties' ? (
-      <PropertiesPanel
-        aiEnabled={aiEnabled}
-        canEdit={canEdit}
-        draft={server}
-        onTitle={(title) => update({ title })}
-        plainText={draftPlainText(document.value)}
-        publications={items.map((item) => ({
-          channel: item.account.channel,
-          publication: item.publication,
-        }))}
-        status={status?.label ?? 'Draft'}
-        title={document.title}
-      />
-    ) : panel === 'preview' ? (
+  const previewPanel = (
       <PreviewPanel
         initialChannel={active}
         onDescribe={canEdit ? (media) => setDescription(media) : undefined}
-        onSelect={setPreviewSelection}
+        onSelect={(next) => {
+          // The platform shown is the tab being edited, whichever side changes it.
+          if (next.channel) setTab(next.channel)
+          setPreviewSelection({ ...next, channel: null })
+        }}
         selection={previewSelection}
         items={
           items.length
@@ -1200,6 +1259,71 @@ export function WriteComposer({
         }
         target={document.target}
       />
+  )
+  const connectAccount =
+    canManageSets && set
+      ? async (provider: string) => {
+          try {
+            await flush()
+            window.location.assign(
+              withBrowserScope(
+                `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`,
+                window.location.origin
+              )
+            )
+          } catch (error) {
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : 'Save the draft before connecting an account.'
+            )
+          }
+        }
+      : undefined
+  // Preview takes the draft's place; every other panel sits beside it.
+  const sidePanel = panel === 'preview' ? null : panel
+  const previewing = panel === 'preview' && !focus
+  const panelContent =
+    panel === 'options' ? (
+      <div data-testid="post-options">
+        <VersionOptionsBar
+          channel={active}
+          captionLimit={activePublication.serialized.limit}
+          onApplyFinisher={
+            canEditText && (active === primary || versionOfTab.mode === 'manual')
+              ? (text, quoteFirstPost) => {
+                  if (editor.current)
+                    appendPost(editor.current, text, quoteFirstPost ? { quoteFirstPost: true } : {})
+                }
+              : undefined
+          }
+          onChange={(options) => setOptions(active, options)}
+          options={versionOfTab.options ?? {}}
+          postCount={activePublication.serialized.posts.length}
+          readOnly={!canEditText}
+          setId={server.socialSetId ?? set?.id ?? null}
+          uploadFile={
+            services.uploadFile
+              ? async (file) => ({ assetId: (await services.uploadFile!(file)).assetId ?? '' })
+              : undefined
+          }
+        />
+        {threadTools?.(pasteNotice)}
+      </div>
+    ) : panel === 'properties' ? (
+      <PropertiesPanel
+        aiEnabled={aiEnabled}
+        canEdit={canEdit}
+        draft={server}
+        onTitle={(title) => update({ title })}
+        plainText={draftPlainText(document.value)}
+        publications={items.map((item) => ({
+          channel: item.account.channel,
+          publication: item.publication,
+        }))}
+        status={status?.label ?? 'Draft'}
+        title={document.title}
+      />
     ) : panel === 'comments' && !canEdit ? (
       <MemberComments draft={server} currentUserId={user.id} onDraft={setServer} />
     ) : panel === 'comments' ? (
@@ -1214,7 +1338,7 @@ export function WriteComposer({
       <AssistantPanel
         channel={active}
         onInsert={
-          canEdit && (active === primary || versionOfTab.mode === 'manual')
+          canEditText && (active === primary || versionOfTab.mode === 'manual')
             ? (text) => {
                 if (editor.current) appendPost(editor.current, text)
               }
@@ -1260,7 +1384,7 @@ export function WriteComposer({
               <span
                 className={cn(
                   'hidden items-center gap-1.5 text-xs text-muted-foreground',
-                  !panel && 'xl:flex'
+                  !sidePanel && 'xl:flex'
                 )}
                 data-testid="composer-identity"
                 title={`Writing as ${set.name}`}
@@ -1281,27 +1405,21 @@ export function WriteComposer({
               disabled={!canEdit}
               maxLength={200}
               onChange={(event) => update({ title: event.target.value })}
-              placeholder={firstLine}
+              placeholder="Add a title"
               value={document.title}
             />
-            {/* The everyday labels share one cell sized to the widest, so the header never shifts. */}
-            <span className="grid shrink-0 text-xs [&>*]:col-start-1 [&>*]:row-start-1">
-              {(['saving', 'saved', 'unsaved'] as const).map((state) => (
-                <span aria-hidden className="invisible" key={state}>
-                  {SAVE_LABELS[state]}
-                </span>
-              ))}
-              <span
-                className={cn(
-                  saveState === 'error' || saveState === 'offline'
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : 'text-muted-foreground'
-                )}
-                data-testid="save-state"
-                role="status"
-              >
-                {SAVE_LABELS[saveState]}
-              </span>
+            {/* Wide enough for the everyday labels, so the header never shifts. */}
+            <span
+              className={cn(
+                'min-w-[8ch] shrink-0 text-xs',
+                saveState === 'error' || saveState === 'offline'
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-muted-foreground'
+              )}
+              data-testid="save-state"
+              role="status"
+            >
+              {SAVE_LABELS[saveState]}
             </span>
             {saveState === 'error' || saveState === 'offline' ? (
               <Button
@@ -1386,13 +1504,13 @@ export function WriteComposer({
               <Button
                 ref={shareButton}
                 aria-label="Share"
-                className={cn('hidden', !focus && 'lg:inline-flex', panel && 'size-8 px-0')}
+                className={cn('hidden', !focus && 'lg:inline-flex', sidePanel && 'size-8 px-0')}
                 onClick={() => setDialog('share')}
                 size="sm"
                 title={`Share (${mod}${alt}S)`}
                 variant="ghost"
               >
-                {panel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
+                {sidePanel ? <Share2 aria-hidden className="size-4" /> : 'Share'}
               </Button>
               {canPublish && server.status !== 'archived' && locked ? (
                 <Button
@@ -1407,26 +1525,29 @@ export function WriteComposer({
               {canPublish && server.status !== 'archived' && !locked ? (
                 <>
                   {blockers.length > 0 ? (
-                    <Blockers
-                      action={blockedAction}
-                      blockers={blockers}
-                      onJump={jumpTo}
-                      onOpenChange={(open) => {
-                        setBlockersOpen(open)
-                        if (!open) setBlockedAction(null)
-                      }}
-                      onProceed={(action) => setDialog(action)}
-                      open={blockersOpen}
-                    />
+                    <Button
+                      className="text-amber-700 dark:text-amber-300"
+                      data-testid="blockers-button"
+                      onClick={() => fixList.current?.focus()}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
+                      {blockers.length} to fix
+                    </Button>
                   ) : null}
                   <Button
-                    className={cn('hidden', !focus && 'sm:inline-flex', blockers.length > 0 && 'opacity-60')}
+                    className={cn(
+                      'hidden',
+                      !focus && 'sm:inline-flex',
+                      blockers.length > 0 && 'opacity-60'
+                    )}
                     data-testid="publish-button"
                     onClick={() => startPublishing('publish')}
                     size="sm"
                     title={
                       blockers.length > 0
-                        ? 'Fix what is listed first'
+                        ? 'Shows what to fix before publishing'
                         : `Review and publish now (${mod}⇧↵)`
                     }
                     variant="outline"
@@ -1440,7 +1561,9 @@ export function WriteComposer({
                       data-testid="schedule-button"
                       onClick={() => startPublishing('schedule')}
                       size="sm"
-                      title={blockers.length > 0 ? 'Fix what is listed first' : 'Choose a time'}
+                      title={
+                        blockers.length > 0 ? 'Shows what to fix before scheduling' : 'Choose a time'
+                      }
                     >
                       {posts.some((post) => post.status === 'SCHEDULED')
                         ? 'Reschedule'
@@ -1459,7 +1582,7 @@ export function WriteComposer({
                       size="sm"
                       title={
                         blockers.length > 0
-                          ? 'Fix what is listed first'
+                          ? 'Shows what to fix before scheduling'
                           : `Add to the next free slot (${mod}${alt}↵)`
                       }
                     >
@@ -1540,11 +1663,6 @@ export function WriteComposer({
                       }}
                     >
                       Copy poll to channel…
-                    </DropdownMenuItem>
-                  ) : null}
-                  {canEdit && editorInstance ? (
-                    <DropdownMenuItem onSelect={() => setDialog('media')}>
-                      Manage media…
                     </DropdownMenuItem>
                   ) : null}
                   {canEdit && CAPABILITIES[active].thread ? (
@@ -1647,10 +1765,8 @@ export function WriteComposer({
                     ? 'An owner or admin can connect an account. You can write your draft now.'
                     : 'An owner or admin can connect an account to publish this draft.'}
               </span>
-              {canManageSets ? (
-                <Button size="sm" variant="outline" onClick={() => setDialog('manage')}>
-                  Connect account
-                </Button>
+              {connectAccount ? (
+                <ConnectMenu accounts={accounts} onConnect={connectAccount} />
               ) : null}
             </div>
           ) : null}
@@ -1660,17 +1776,18 @@ export function WriteComposer({
           <PlatformTabs
             accounts={accounts}
             active={active}
+            canEdit={canEdit}
             enabled={enabled}
-            onManage={canEdit ? () => setDialog('manage') : undefined}
+            kind={server.kind}
             onSelect={setTab}
+            onToggle={toggle}
             over={over}
+            blocked={blockers.flatMap((blocker) => (blocker.channel ? [blocker.channel] : []))}
             options={
-              accounts.length > 0 ? (
+              // TikTok's options all sit in its section below; an off platform has none to set.
+              publishing && active !== 'tiktok' ? (
                 <OptionsChip
-                  blocked={
-                    items.some((item) => item.account.channel === active) &&
-                    activePublication.optionProblems.length > 0
-                  }
+                  blocked={activePublication.optionProblems.length > 0}
                   channel={active}
                   onClick={() => togglePanel('options')}
                   open={panel === 'options'}
@@ -1682,14 +1799,34 @@ export function WriteComposer({
             value={document.value as PlateBody}
             versions={document.versions}
           />
+          <ActivePlatform
+            accounts={accounts}
+            active={active}
+            canEdit={canEdit}
+            defaultsHref={set ? socialSetHref(set.id, 'new-draft') : undefined}
+            draftVersion={version.current}
+            enabled={enabled}
+            kind={server.kind}
+            onChange={(change) =>
+              update({
+                ...(change.primaryPlatform ? { primaryPlatform: change.primaryPlatform } : {}),
+                ...(change.versions ? { versions: change.versions } : {}),
+              })
+            }
+            onConnect={connectAccount}
+            onResync={setResync}
+            onToggle={toggle}
+            primary={primary}
+            value={document.value as PlateBody}
+            versions={document.versions}
+          />
           {/* What this platform must have is on the page, not behind the options chip. */}
-          {(active === 'tiktok' || active === 'youtube') && accounts.length > 0 ? (
+          {(active === 'tiktok' || active === 'youtube') && publishing ? (
             <section
-              aria-label={`${CHANNEL_META[active].label} settings every post needs`}
+              aria-label={`${CHANNEL_META[active].label} settings`}
               className={cn(
                 'mx-4 mb-3 rounded-xl border',
-                items.some((item) => item.account.channel === active) &&
-                  activePublication.optionProblems.length > 0
+                activePublication.optionProblems.length > 0
                   ? 'border-amber-400/50'
                   : 'border-border'
               )}
@@ -1701,7 +1838,6 @@ export function WriteComposer({
                 disabled={!canEdit}
                 onChange={(options) => setOptions(active, options)}
                 options={versionOfTab.options ?? {}}
-                part="required"
               />
             </section>
           ) : null}
@@ -1715,50 +1851,24 @@ export function WriteComposer({
               you mean to say here.
             </p>
           ) : null}
+          {liveOn ? (
+            <p
+              className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
+              data-testid="live-notice"
+              role="status"
+            >
+              {locked
+                ? `This post is live on ${liveOn}. Changes here would not reach it, so its text is locked. To send a changed version, post it again as new.`
+                : `Already live on ${liveOn}. Changes here only reach the platforms not sent yet.`}
+            </p>
+          ) : null}
           <TargetBanner draft={server} />
-          {canEdit && server.kind === 'article' ? (
+          {canEditText && server.kind === 'article' ? (
             <ArticleTools
               article={document.article}
               onChange={(article) => update(() => ({ article }))}
               editor={editor}
               upload={services.uploadFile}
-            />
-          ) : null}
-          {canEdit && server.kind !== 'article' ? (
-            <LinkCards
-              text={activePublication.serialized.posts.map((post) => post.caption).join('\n')}
-              channel={active}
-              cards={versionOfTab.options?.linkPreviews ?? []}
-              onChange={(card) =>
-                update((current) => {
-                  const options = versionFor(current.versions, active).options ?? {}
-                  return {
-                    versions: withOptions(current.versions, active, {
-                      ...options,
-                      linkPreviews: [
-                        ...(options.linkPreviews ?? []).filter((item) => item.url !== card.url),
-                        card,
-                      ].slice(-25),
-                    }),
-                  }
-                })
-              }
-              onQuote={(url) => {
-                void (async () => {
-                  await flush()
-                  const next = await draftsApi.create({
-                    kind: 'quote',
-                    socialSetId: server.socialSetId ?? undefined,
-                    target: { url },
-                    body: bodyFor(document.value as PlateBody, document.versions, active),
-                  })
-                  router.push(`/publish/${next.id}`)
-                })().catch((error) =>
-                  toast.error(
-                    error instanceof Error ? error.message : 'The quote draft could not be created.'
-                  )
-                )
-              }}
             />
           ) : null}
           {/* A paste can become a thread: its tools show here until it is split or dismissed. */}
@@ -1778,8 +1888,13 @@ export function WriteComposer({
           ) : null}
             </>
           )}
+          {/* The width of the phone and feed previews it draws; wider would only stretch them. */}
+          {previewing ? (
+            <div className="mx-auto w-full max-w-[419px] flex-1">{previewPanel}</div>
+          ) : null}
+          {/* Hidden, not removed: unmounting would drop the live room, undo history and caret. */}
           <div
-            className="relative flex-1"
+            className={cn('relative flex-1', previewing && 'hidden')}
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
@@ -1826,6 +1941,7 @@ export function WriteComposer({
                     aiEnabled={aiEnabled}
                     channel={active}
                     document={documentActions}
+                    draftId={initial.id}
                     onDescriptionSaved={onDescriptionSaved}
                     onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
                     onTool={setTool}
@@ -1839,7 +1955,7 @@ export function WriteComposer({
                 <ManualVersionNotice
                   channel={active}
                   onCompare={() => setDialog('compare')}
-                  onResync={canEdit ? () => setDialog('manage') : undefined}
+                  onResync={canEdit ? () => setResync(active) : undefined}
                   primary={primary}
                   value={document.value as PlateBody}
                   versions={document.versions}
@@ -1869,6 +1985,7 @@ export function WriteComposer({
                       aiEnabled={aiEnabled}
                       channel={active}
                       document={documentActions}
+                      draftId={initial.id}
                       onDescriptionSaved={onDescriptionSaved}
                       onSnippetsChange={() => setSnippetsRead((count) => count + 1)}
                       onTool={setTool}
@@ -1881,8 +1998,37 @@ export function WriteComposer({
             ) : (
               <SyncedVersion
                 channel={active}
+                header={postHeader()}
+                limit={activePublication.serialized.limit}
+                onSplit={
+                  canEditText && CAPABILITIES[active].thread
+                    ? () => {
+                        try {
+                          const forked = forkVersion(
+                            document.versions,
+                            active,
+                            document.value as PlateBody,
+                            version.current,
+                            true
+                          )
+                          const own = versionFor(forked, active)
+                          const body = splitThread(
+                            own.body ?? [],
+                            active,
+                            activePublication.serialized.limit,
+                            own.options?.numbering
+                          )
+                          update({ versions: withVersion(forked, { ...own, body }) })
+                        } catch (error) {
+                          toast.error(
+                            error instanceof Error ? error.message : 'The text could not be split.'
+                          )
+                        }
+                      }
+                    : undefined
+                }
                 onFork={
-                  canEdit
+                  canEditText
                     ? () =>
                         update((current) => ({
                           versions: forkVersion(
@@ -1901,6 +2047,54 @@ export function WriteComposer({
             )}
             {focus ? null : (
               <>
+          {server.kind === 'article' ? null : (
+            <MediaStrip
+              canEdit={canEditText}
+              channel={active}
+              editor={ownEditor ? editorInstance : null}
+              onBrowse={() => setTool('library')}
+              onEditMain={() => setTab(primary)}
+              onManage={() => setTool('media')}
+              value={active !== primary && ownEditor ? ((versionOfTab.body ?? []) as Value) : document.value}
+            />
+          )}
+          {canEditText && server.kind !== 'article' ? (
+            <LinkCards
+              text={activePublication.serialized.posts.map((post) => post.caption).join('\n')}
+              channel={active}
+              cards={versionOfTab.options?.linkPreviews ?? []}
+              onChange={(card) =>
+                update((current) => {
+                  const options = versionFor(current.versions, active).options ?? {}
+                  return {
+                    versions: withOptions(current.versions, active, {
+                      ...options,
+                      linkPreviews: [
+                        ...(options.linkPreviews ?? []).filter((item) => item.url !== card.url),
+                        card,
+                      ].slice(-25),
+                    }),
+                  }
+                })
+              }
+              onQuote={(url) => {
+                void (async () => {
+                  await flush()
+                  const next = await draftsApi.create({
+                    kind: 'quote',
+                    socialSetId: server.socialSetId ?? undefined,
+                    target: { url },
+                    body: bodyFor(document.value as PlateBody, document.versions, active),
+                  })
+                  router.push(`/publish/${next.id}`)
+                })().catch((error) =>
+                  toast.error(
+                    error instanceof Error ? error.message : 'The quote draft could not be created.'
+                  )
+                )
+              }}
+            />
+          ) : null}
             <div
               className={cn('mb-6 flex flex-wrap justify-end gap-3', POST_COLUMN)}
               data-testid="platform-counters"
@@ -1939,8 +2133,8 @@ export function WriteComposer({
                 const found = blockers.filter((blocker) => blocker.channel === channel)
                 if (!channel || found.length === 0) return null
                 return {
-                  // A retry resends what was scheduled, so only the account can stop it working.
-                  blocksRetry: found.some((blocker) => blocker.fix === 'account'),
+                  // A retry waits while the platform's account or required options are unfinished.
+                  blocksRetry: found.some((blocker) => blocker.fix === 'account' || blocker.options),
                   label: blockerFixLabel(found[0]),
                   open: () => jumpTo(found[0]),
                   problems: found.map((blocker) =>
@@ -1984,12 +2178,49 @@ export function WriteComposer({
             />
               </>
             )}
+            {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
+            {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
+            <div
+              className={cn(
+                'sticky bottom-0 z-10 grid gap-2 border-t border-border bg-background pt-3',
+                POST_COLUMN
+              )}
+              data-testid="publish-bar"
+            >
+              {blockers.length > 0 ? (
+                <FixList
+                  action={blockedAction}
+                  blockers={blockers}
+                  listRef={fixList}
+                  onJump={jumpTo}
+                  onProceed={(action) => setDialog(action)}
+                  onRemove={
+                    canEdit && items.length > 1
+                      ? (channel) => {
+                          const off = items.find((item) => item.account.channel === channel)
+                          if (off) toggle(off.account.id, false)
+                        }
+                      : undefined
+                  }
+                />
+              ) : null}
+              {focus ? null : (
+                <ScheduleDock
+                  blocked={blockers.length > 0}
+                  context={context}
+                  initialDay={params.get('day') ?? undefined}
+                  initialTime={params.get('time') ?? undefined}
+                  onMore={() => setDialog('schedule')}
+                />
+              )}
+            </div>
+            ) : null}
             <div className="h-32" />
           </div>
         </div>
-        {panel && !focus && !narrow && !settingsOpen(params) ? (
+        {sidePanel && !focus && !narrow && !settingsOpen(params) ? (
           <aside
-            aria-label={PANEL_TITLES[panel]}
+            aria-label={PANEL_TITLES[sidePanel]}
             // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
             className="sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 max-w-[48vw] self-start overflow-y-auto border-l border-border animate-in fade-in duration-150"
             ref={fitToScroller}
@@ -1998,7 +2229,7 @@ export function WriteComposer({
           >
             <div
               role="separator"
-              aria-label="Resize preview sidebar"
+              aria-label="Resize sidebar"
               aria-orientation="vertical"
               aria-valuemin={256}
               aria-valuemax={640}
@@ -2033,18 +2264,18 @@ export function WriteComposer({
                 }
               }}
             />
-            <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[panel]} />
+            <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[sidePanel]} />
             {panelContent}
           </aside>
         ) : null}
-        {panel && !focus && narrow && !settingsOpen(params) ? (
+        {sidePanel && !focus && narrow && !settingsOpen(params) ? (
           <>
             <Sheet onOpenChange={(open) => !open && setPanel(null)} open>
               <SheetContent className="w-full overflow-y-auto p-0 sm:max-w-md" side="right">
                 <SheetHeader>
-                  <SheetTitle>{PANEL_TITLES[panel]}</SheetTitle>
+                  <SheetTitle>{PANEL_TITLES[sidePanel]}</SheetTitle>
                   <SheetDescription className="sr-only">
-                    {PANEL_TITLES[panel]} for this draft
+                    {PANEL_TITLES[sidePanel]} for this draft
                   </SheetDescription>
                 </SheetHeader>
                 {panelContent}
@@ -2113,51 +2344,13 @@ export function WriteComposer({
             }}
           />
         ) : null}
-        {dialog === 'manage' ? (
-          <ManagePlatformsDialog
-            accounts={accounts}
-            onConnect={
-              canManageSets && set
-                ? async (provider) => {
-                    try {
-                      await flush()
-                      window.location.assign(
-                        `${connectHref(provider, set.id)}&${new URLSearchParams({ returnTo: `/publish/${initial.id}` })}`
-                      )
-                    } catch (error) {
-                      toast.error(
-                        error instanceof Error
-                          ? error.message
-                          : 'Save the draft before connecting an account.'
-                      )
-                    }
-                  }
-                : undefined
-            }
-            draftVersion={version.current}
-            enabled={enabled}
-            kind={server.kind}
-            onChange={(change) =>
-              update({
-                ...(change.channelConnectionIds
-                  ? { channelConnectionIds: change.channelConnectionIds }
-                  : {}),
-                ...(change.primaryPlatform ? { primaryPlatform: change.primaryPlatform } : {}),
-                ...(change.versions ? { versions: change.versions } : {}),
-              })
-            }
-            onClose={() => setDialog(null)}
-            onPreview={(channel) => {
-              setDialog(null)
-              setTab(channel)
-              setPanel('preview')
-            }}
-            defaultsHref={set ? socialSetHref(set.id, 'new-draft') : undefined}
-            primary={primary}
-            value={document.value as PlateBody}
-            versions={document.versions}
-          />
-        ) : null}
+        <ResyncDialog
+          channel={resync}
+          onClose={() => setResync(null)}
+          onResynced={(versions) => update({ versions })}
+          primary={primary}
+          versions={document.versions}
+        />
         {dialog === 'share' ? (
           <ShareDialog
             onInsertLink={
@@ -2211,12 +2404,10 @@ export function WriteComposer({
             }}
           />
         ) : null}
-        {dialog === 'media' && editorInstance && services.uploadFile ? (
+        {dialog === 'media' && editorInstance ? (
           <MediaImportDialog
             editor={editorInstance}
-            uploadFile={services.uploadFile}
-            draftId={initial.id}
-            returnedAsset={params.get('attach') ?? undefined}
+            returnedAsset={params.get('attach') ?? ''}
             onClose={() => {
               setDialog(null)
               const url = new URL(window.location.href)
@@ -2364,89 +2555,83 @@ function PostCount({
 }
 
 /**
- * The checklist of what blocks publishing, beside Schedule: the publishing
- * buttons open it instead of their dialogs, and each item goes where it is fixed.
+ * What stops this draft from publishing, always in view beside the post. Each
+ * item goes straight to where it is fixed.
  */
-function Blockers({
+function FixList({
   action,
   blockers,
+  listRef,
   onJump,
-  onOpenChange,
   onProceed,
-  open,
+  onRemove,
 }: {
-  /** The publishing button that opened this, if one did. */
+  /** The publishing button that was pressed, if one was. */
   action: PublishAction | null
   blockers: ScheduleBlocker[]
+  listRef: React.RefObject<HTMLDivElement | null>
   onJump: (blocker: ScheduleBlocker) => void
-  onOpenChange: (open: boolean) => void
   onProceed: (action: PublishAction) => void
-  open: boolean
+  /** Stop publishing to a platform; missing when it is the only one. */
+  onRemove?: (channel: DraftChannel) => void
 }) {
   return (
-    <Popover onOpenChange={onOpenChange} open={open}>
-      <PopoverTrigger asChild>
-        <Button
-          className="text-amber-700 dark:text-amber-300"
-          data-testid="blockers-button"
-          size="sm"
-          variant="ghost"
-        >
-          <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
-          {blockers.length} to fix
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        className="w-80 p-2"
-        data-testid="blockers"
-        // A menu or the palette hands focus back as it closes; only a click dismisses this.
-        onFocusOutside={(event) => event.preventDefault()}
-      >
-        <p className="px-2 py-1 text-xs text-muted-foreground">
-          Fix {blockers.length === 1 ? 'this' : 'these'} before you{' '}
-          {action === 'publish' ? 'publish' : 'schedule'}:
-        </p>
-        <ul className="grid gap-0.5">
-          {blockers.map((blocker) => (
-            <li key={blocker.text}>
+    <div
+      className="max-h-40 overflow-y-auto rounded-lg border border-amber-400/40 bg-amber-400/[0.04] p-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      data-testid="blockers"
+      ref={listRef}
+      tabIndex={-1}
+    >
+      <p className="px-2 py-1 text-xs text-muted-foreground">
+        Fix {blockers.length === 1 ? 'this' : 'these'} before you{' '}
+        {action === 'publish' ? 'publish' : 'schedule'}:
+      </p>
+      <ul className="grid gap-0.5">
+        {blockers.map((blocker, index) => (
+          <li key={blocker.text}>
+            <Button
+              className="h-auto w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
+              onClick={() => onJump(blocker)}
+              size={null}
+              variant="ghost"
+            >
+              <span className="min-w-0">
+                {blocker.text}
+                {blockerFixLabel(blocker) ? (
+                  <span className="mt-0.5 block font-medium text-foreground">
+                    {blockerFixLabel(blocker)}
+                  </span>
+                ) : null}
+              </span>
+              <CaretRightIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+            </Button>
+            {/* Once per platform, under the first thing it needs. */}
+            {onRemove &&
+            blocker.channel &&
+            blockers.findIndex((item) => item.channel === blocker.channel) === index ? (
               <Button
-                className="h-auto w-full items-start justify-between gap-2 px-2 py-1.5 text-left text-xs font-normal whitespace-normal"
-                onClick={() => {
-                  onOpenChange(false)
-                  onJump(blocker)
-                }}
+                className="mx-2 mb-1 h-6 px-1.5 text-xs font-normal text-muted-foreground"
+                onClick={() => onRemove(blocker.channel!)}
                 size={null}
                 variant="ghost"
               >
-                <span className="min-w-0">
-                  {blocker.text}
-                  {blockerFixLabel(blocker) ? (
-                    <span className="mt-0.5 block font-medium text-foreground">
-                      {blockerFixLabel(blocker)}
-                    </span>
-                  ) : null}
-                </span>
-                <CaretRightIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
+                Remove {CHANNEL_META[blocker.channel].label} from this post
               </Button>
-            </li>
-          ))}
-        </ul>
-        {action ? (
-          <Button
-            className="mt-1 w-full justify-start px-2 text-xs font-normal text-muted-foreground"
-            onClick={() => {
-              onOpenChange(false)
-              onProceed(action)
-            }}
-            size="sm"
-            variant="ghost"
-          >
-            {action === 'schedule' ? 'Save as planned instead…' : 'See the review anyway'}
-          </Button>
-        ) : null}
-      </PopoverContent>
-    </Popover>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {action ? (
+        <Button
+          className="mt-1 w-full justify-start px-2 text-xs font-normal text-muted-foreground"
+          onClick={() => onProceed(action)}
+          size="sm"
+          variant="ghost"
+        >
+          {action === 'schedule' ? 'Save as planned instead…' : 'See the review anyway'}
+        </Button>
+      ) : null}
+    </div>
   )
 }
 
@@ -2487,18 +2672,22 @@ function PanelButton({
   shortcut?: string
 }) {
   return (
-    <Button
-      aria-label={label}
-      aria-pressed={active}
-      className={cn('size-8 px-0', active && 'bg-foreground/[0.08] text-foreground', className)}
-      onMouseDown={(event) => event.preventDefault()}
-      onClick={onClick}
-      size="sm"
-      title={shortcut ? `${label} (${shortcut})` : label}
-      variant="ghost"
-    >
-      {icon}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={label}
+          aria-pressed={active}
+          className={cn('size-8 px-0', active && 'bg-foreground/[0.08] text-foreground', className)}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onClick}
+          size="sm"
+          variant="ghost"
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{shortcut ? `${label} (${shortcut})` : label}</TooltipContent>
+    </Tooltip>
   )
 }
 

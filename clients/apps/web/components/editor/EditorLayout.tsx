@@ -20,7 +20,7 @@ import { useImageStore } from '@/lib/store'
 import { trackEditorOpen } from '@/lib/analytics'
 import { cn } from '@/lib/utils'
 import { hasVisibleMockups, shouldRenderSourceImage } from '@/lib/device-mockups/layouts'
-import { StoreScreenshotsShortcut } from '@/components/store-screenshots/StoreScreenshotsFeatureCard'
+import { SidebarSimpleIcon } from '@phosphor-icons/react/dist/ssr/SidebarSimple'
 import { TemplateLibraryDrawer } from '@/components/templates/TemplateLibraryDrawer'
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_SIZE } from '@/lib/constants'
 import { useDeviceUIStore } from '@/lib/store/device-ui'
@@ -123,7 +123,7 @@ function TemplateMediaPrompt() {
 function EditorMain() {
   const isMobile = useIsMobile()
   const [mobileSheetOpen, setMobileSheetOpen] = React.useState(false)
-  const { uploadedImageUrl, imageName, slides, mockups, editorMode, showTimeline, toggleTimeline } =
+  const { uploadedImageUrl, slides, mockups, editorMode, showTimeline, toggleTimeline } =
     useImageStore()
 
   // enable autosave
@@ -133,11 +133,8 @@ function EditorMain() {
   const hasSourceContent =
     (!!uploadedImageUrl || slides.length > 0) && shouldRenderSourceImage(editorMode, mockups)
   const hasContent = hasSourceContent || (editorMode === 'device' && hasVisibleMockups(mockups))
-  const isUsingTemplateDemo =
-    editorMode === 'device'
-      ? hasTemplateDemoMedia(mockups.map((mockup) => mockup.screen))
-      : isTemplateDemoMedia(uploadedImageUrl, imageName)
-
+  const [composeShown, setComposeShown] = React.useState(true)
+  const [inspectorShown, setInspectorShown] = React.useState(true)
   React.useEffect(() => {
     trackEditorOpen()
   }, [])
@@ -156,7 +153,7 @@ function EditorMain() {
       <TemplateLibraryDrawer />
 
       <div className="bg-background border-b border-foreground/10 flex items-center justify-between gap-2 px-3 py-2 z-10 shrink-0 lg:hidden">
-        {!isUsingTemplateDemo ? <StoreScreenshotsShortcut compact className="min-w-0" /> : null}
+        <span />
         <Button
           variant="ghost"
           size="sm"
@@ -170,7 +167,7 @@ function EditorMain() {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="hidden lg:contents">
+          <div className={composeShown ? 'hidden lg:contents' : 'hidden'}>
             <ComposePanel />
           </div>
 
@@ -182,6 +179,27 @@ function EditorMain() {
                 hasContent && !showTimeline && !isMobile && 'pb-14'
               )}
             >
+              {/* The canvas can have the whole width; both panels stay mounted to keep their state. */}
+              <Button
+                aria-label={composeShown ? 'Hide the tools panel' : 'Show the tools panel'}
+                aria-pressed={!composeShown}
+                className="absolute top-2 left-2 z-20 hidden size-8 px-0 lg:inline-flex"
+                onClick={() => setComposeShown((shown) => !shown)}
+                size="sm"
+                variant="ghost"
+              >
+                <SidebarSimpleIcon aria-hidden className="size-4" />
+              </Button>
+              <Button
+                aria-label={inspectorShown ? 'Hide the details panel' : 'Show the details panel'}
+                aria-pressed={!inspectorShown}
+                className="absolute top-2 right-2 z-20 hidden size-8 px-0 lg:inline-flex"
+                onClick={() => setInspectorShown((shown) => !shown)}
+                size="sm"
+                variant="ghost"
+              >
+                <SidebarSimpleIcon aria-hidden className="size-4 -scale-x-100" />
+              </Button>
               <EditorContent>
                 <EditorCanvas />
               </EditorContent>
@@ -210,7 +228,7 @@ function EditorMain() {
             </div>
           </div>
 
-          <div className="hidden lg:contents">
+          <div className={inspectorShown ? 'hidden lg:contents' : 'hidden'}>
             <InspectorPanel />
           </div>
 

@@ -24,6 +24,7 @@ import {
   STATS_PENDING,
   statsPending,
 } from '@/lib/analyze/report'
+import { platformLabel } from '@/lib/content-drafts/serialize'
 import type { SocialSetWire } from '@/lib/write/client'
 import { InfoTip } from './InfoTip'
 
@@ -50,6 +51,7 @@ export function BrandSummary({
   const search = queryString({ ...query, scope: 'all', limit: 1, cursor: '', asOf: undefined })
   const key = `${accounts.map((account) => account.id).join()}?${search}`
   const [loaded, setLoaded] = React.useState<{ key: string; rows: Row[] } | null>(null)
+  const [attempt, setAttempt] = React.useState(0)
   const read = React.useEffectEvent((signal: AbortSignal) =>
     Promise.all(
       accounts.map(async (account): Promise<Row> => {
@@ -68,7 +70,7 @@ export function BrandSummary({
       if (!controller.signal.aborted) setLoaded({ key, rows })
     })
     return () => controller.abort()
-  }, [key, refresh])
+  }, [attempt, key, refresh])
   if (loaded?.key !== key) return <p role="status">Loading analytics…</p>
   const reports = loaded.rows.flatMap((row) => ('report' in row ? [row.report] : []))
   const columns = Object.entries(METRICS).filter(
@@ -129,7 +131,7 @@ export function BrandSummary({
                     size={null}
                     variant="link"
                   >
-                    {row.account.platform} ·{' '}
+                    {platformLabel(row.account.platform)} ·{' '}
                     {row.account.handle ?? row.account.displayName ?? row.account.id}
                   </Button>
                 </TableHead>
@@ -143,9 +145,23 @@ export function BrandSummary({
                     </TableCell>
                   )
                 })}
-                {'error' in row ? (
+                {'error' in row ||
+                row.report.status === 'failed' ||
+                Object.values(row.report.metrics).some((metric) => metric?.status === 'failed') ? (
                   <TableCell className="text-xs">
-                    <span role="alert">{row.error}</span>
+                    <span role="alert">
+                      {'error' in row
+                        ? row.error
+                        : `${platformLabel(row.account.platform)} did not return these numbers.`}
+                    </span>{' '}
+                    <Button
+                      className="h-auto p-0 text-xs"
+                      onClick={() => setAttempt((count) => count + 1)}
+                      size={null}
+                      variant="link"
+                    >
+                      Retry
+                    </Button>
                   </TableCell>
                 ) : (
                   <TableCell className="text-xs text-muted-foreground">

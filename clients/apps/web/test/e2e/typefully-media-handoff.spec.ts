@@ -3,6 +3,7 @@ import {
   addBatchRows,
   apiRequest,
   draftEditor,
+  editorMore,
   expect,
   expectSaved,
   openNewBatch,
@@ -37,8 +38,7 @@ test(
       assetIds: string[]
     }
     await page.goto(url)
-    await page.getByRole('button', { name: 'More draft actions', exact: true }).click()
-    await page.getByRole('menuitem', { name: 'Manage media…', exact: true }).click()
+    await editorMore(page, 'Manage media')
     const opened = page.context().waitForEvent('page')
     await page.getByRole('link', { name: 'Frame in Shots editor', exact: true }).click()
     const editor = await opened
@@ -72,8 +72,7 @@ test(
     await review.click()
     await expect(editor.getByAltText('Framed export', { exact: true })).toBeVisible()
     await editor.getByRole('button', { name: 'Attach framed export', exact: true }).click()
-    await expect(editor.getByTestId('draft-media-item')).toHaveCount(2)
-    await editor.keyboard.press('Escape')
+    await expect(editor.getByTestId('media-strip-item')).toHaveCount(2)
     await expectSaved(editor)
     await editor.reload()
     const after = (await apiRequest(editor, `/api/v1/content-drafts/${id}`)).body as {
@@ -107,8 +106,8 @@ test(
     expect(created.status).toBe(201)
     await page.setViewportSize({ width: 1600, height: 1000 })
     await app.open(`/publish/${(created.body as { id: string }).id}`)
-    await page.getByRole('button', { name: 'Preview', exact: true }).click()
-    const resize = page.getByRole('separator', { name: 'Resize preview sidebar' })
+    await page.getByRole('button', { name: 'Draft details', exact: true }).click()
+    const resize = page.getByRole('separator', { name: 'Resize sidebar' })
     const initialWidth = Number(await resize.getAttribute('aria-valuenow'))
     await resize.focus()
     await page.keyboard.press('ArrowLeft')

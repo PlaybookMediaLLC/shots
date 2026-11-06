@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { PreviewLinkCard } from './preview-link-card'
-import { LinkPreviewCard } from './link-cards'
+import { LinkPreviewCard, NO_LINK_CARDS } from './link-cards'
 import {
   Avatar as AccountAvatar,
   AvatarFallback,
@@ -86,7 +86,7 @@ export function PreviewPanel({
   return (
     <div className="flex flex-col gap-3 p-4" data-testid="preview-panel">
       <p className="rounded-md border border-dashed border-input px-2 py-1 text-center text-[11px] text-muted-foreground">
-        Preview — not published. No engagement is shown because none exists yet.
+        Preview — not published
       </p>
       <div className="flex flex-wrap items-center gap-1.5">
         {items.map((entry) => (
@@ -143,7 +143,7 @@ export function PreviewPanel({
         </ScaledPreview>
       </DescribeMediaContext.Provider>
       <p className="text-[11px] text-muted-foreground">
-        Layout simulation. Feed cutoffs can vary by app and device.
+        Cutoffs vary by app and device.
       </p>
       {item.publication.problems.length > 0 ? (
         <ul className="grid gap-0.5" role="alert">
@@ -460,6 +460,7 @@ function ThreadPreview({ item, target }: { item: PreviewItem; target: DraftTarge
               {post.media.length === 0 &&
               !settings.poll &&
               target?.kind !== 'quote' &&
+              !NO_LINK_CARDS.includes(channel) &&
               !publication.target.options?.linkPreview ? (
                 <PreviewLinkCard text={post.caption} />
               ) : null}

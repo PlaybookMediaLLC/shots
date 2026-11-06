@@ -37,6 +37,8 @@ export const MediaVideoElement = withHOC(
       urlParsers: [parseTwitterUrl, parseVideoUrl],
     });
     const width = useResizableValue("width");
+    // Library, handoff and repurposed media reference a stored asset and never carry `isUpload`.
+    const isStored = isUpload || typeof props.element.assetId === "string";
 
     const isEditorMounted = useEditorMounted();
 
@@ -70,7 +72,7 @@ export const MediaVideoElement = withHOC(
                 options={{ direction: "right" }}
               />
 
-              {!isUpload && isYoutube && embed?.id && (
+              {!isStored && isYoutube && embed?.id && (
                 <div ref={handleRef}>
                   <LiteYouTubeEmbed
                     id={embed.id}
@@ -97,12 +99,18 @@ export const MediaVideoElement = withHOC(
               )}
 
               {/* TODO: Lazy load */}
-              {isUpload && isEditorMounted && (
-                <div ref={handleRef}>
+              {isStored && isEditorMounted && (
+                // A fixed box, so a loaded video never grows and pushes the page down.
+                <div
+                  className="aspect-video overflow-hidden rounded-md bg-black"
+                  ref={handleRef}
+                >
                   <ReactPlayer
                     controls
                     height="100%"
-                    src={unsafeUrl}
+                    preload="metadata"
+                    // Opening just past the start shows a frame: many videos begin on black.
+                    src={`${unsafeUrl}#t=0.1`}
                     width="100%"
                   />
                 </div>

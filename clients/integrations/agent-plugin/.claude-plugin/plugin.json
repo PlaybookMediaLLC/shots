@@ -1,0 +1,10 @@
+{
+  "name": "shots",
+  "version": "0.2.0",
+  "description": "Write, schedule, and publish social posts from Claude Code with Shots, over its MCP server.",
+  "author": { "name": "Playbook Media" },
+  "homepage": "https://shots.playbookmedia.io/docs/agents",
+  "repository": "https://github.com/PlaybookMediaLLC/shots",
+  "license": "Apache-2.0",
+  "keywords": ["shots", "mcp", "social", "publishing", "scheduling"]
+}

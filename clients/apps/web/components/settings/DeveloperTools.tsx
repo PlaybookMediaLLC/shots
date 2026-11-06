@@ -1,5 +1,6 @@
 'use client'
 
+import { PLUGIN_URL } from '@/lib/agents/mcp-clients'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Group, Row, Section } from '@/components/platform-ui'
@@ -114,11 +115,11 @@ export function DeveloperTools() {
             <li>
               <a
                 className="underline"
-                href="https://github.com/PlaybookMediaLLC/screenshot-studio/tree/main/integrations/claude-code/shots"
+                href={PLUGIN_URL}
                 rel="noreferrer"
                 target="_blank"
               >
-                Claude Code plugin
+                Agent plugin for Claude Code and Codex
               </a>
             </li>
             <li>

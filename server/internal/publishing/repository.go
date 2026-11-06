@@ -20,6 +20,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postautomationrun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialtenantbinding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
@@ -243,13 +244,30 @@ func (r *Repository) IsEligible(ctx context.Context, organizationID, variantID, 
 	return r.isEligible(ctx, organizationID, variantID, connectionID)
 }
 
-func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID string, limit int) ([]*ent.ScheduledPost, error) {
-	return r.client.ScheduledPost.Query().
-		Where(scheduledpost.OrganizationID(organizationID)).
-		WithChannelConnection().
+// ListScheduledPosts reads the schedule, newest first. sharedOnly leaves out
+// private social sets, which are for sessions: an API key never reads them.
+func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID string, sharedOnly bool, limit int) ([]*ent.ScheduledPost, error) {
+	query := r.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID))
+	if sharedOnly {
+		if err := keepSharedPosts(ctx, r.client, query, organizationID); err != nil {
+			return nil, err
+		}
+	}
+	return query.WithChannelConnection().
 		Order(ent.Desc(scheduledpost.FieldScheduledFor), ent.Desc(scheduledpost.FieldID)).
 		Limit(limit).
 		All(ctx)
+}
+
+// keepSharedPosts limits query to posts outside the workspace's private sets.
+func keepSharedPosts(ctx context.Context, client *ent.Client, query *ent.ScheduledPostQuery, organizationID string) error {
+	private, err := client.SocialSet.Query().Where(socialset.OrganizationID(organizationID),
+		socialset.VisibilityEQ(socialset.VisibilityPRIVATE)).IDs(ctx)
+	if err != nil || len(private) == 0 {
+		return err
+	}
+	query.Where(scheduledpost.Or(scheduledpost.SocialSetIDIsNil(), scheduledpost.SocialSetIDNotIn(private...)))
+	return nil
 }
 
 func (r *Repository) ListRecoverablePosts(ctx context.Context, since, dueBefore time.Time, limit int) ([]RecoverablePost, error) {
@@ -276,9 +294,13 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 		return nil, err
 	}
 	defer tx.Rollback()
-	post, err := tx.ScheduledPost.Query().Where(
-		scheduledpost.ID(id), scheduledpost.OrganizationID(actor.Organization),
-	).Only(ctx)
+	query := tx.ScheduledPost.Query().Where(scheduledpost.ID(id), scheduledpost.OrganizationID(actor.Organization))
+	if actor.Type != "USER" && actor.Type != "SUPPORT" {
+		if err := keepSharedPosts(ctx, tx.Client(), query, actor.Organization); err != nil {
+			return nil, err
+		}
+	}
+	post, err := query.Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, ErrNotFound
 	}
@@ -310,11 +332,30 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 		}); err != nil {
 			return nil, err
 		}
+		if err := reopenCancelledDraft(ctx, tx, post); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return post.Unwrap(), nil
+}
+
+// reopenCancelledDraft puts a draft back to a draft once every post from it is
+// cancelled. A failed or live post keeps it scheduled: someone must still act.
+func reopenCancelledDraft(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost) error {
+	if post.ContentDraftID == nil {
+		return nil
+	}
+	remaining, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(*post.ContentDraftID),
+		scheduledpost.StatusNEQ(scheduledpost.StatusCANCELLED)).Exist(ctx)
+	if err != nil || remaining {
+		return err
+	}
+	_, err = tx.ContentDraft.Update().Where(contentdraft.ID(*post.ContentDraftID), contentdraft.OrganizationID(post.OrganizationID),
+		contentdraft.StatusEQ(contentdraft.StatusScheduled)).SetStatus(contentdraft.StatusDraft).AddCalendarVersion(1).Save(ctx)
+	return err
 }
 
 func (r *Repository) Claim(ctx context.Context, id, runID string, now time.Time) (bool, error) {

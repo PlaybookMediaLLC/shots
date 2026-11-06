@@ -1,4 +1,4 @@
-import { CREATE_LINKS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
+import { CREATE_TOOLS, CREATE_LINKS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
@@ -22,6 +22,11 @@ export async function generateMetadata({ searchParams }: CreatePageProps): Promi
   return { title: `${page} · Create` }
 }
 
+/** A card's title: the tool's one name, as the New menu and Library say it. */
+function toolLabel(create: string): string {
+  return CREATE_TOOLS.find((tool) => tool.create === create)?.label ?? create
+}
+
 export default async function CreatePage({ params, searchParams }: CreatePageProps) {
   const [{ locale }, { view }] = await Promise.all([params, searchParams])
   const access = await requirePaidPageAccess(await headers(), locale, '/create')
@@ -43,13 +48,6 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
               view === 'tools'
                 ? [
                     {
-                      title: 'Code Studio',
-                      description:
-                        'Turn a snippet, diff or pull request into an image, carousel or video, then post it.',
-                      href: '/create/code',
-                      scope: 'Code Studio · Save to workspace',
-                    },
-                    {
                       title: 'Tweet image',
                       description: 'Style a social post as a visual.',
                       href: '/tweet',
@@ -64,17 +62,17 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                   ]
                 : [
                     {
-                      title: 'Polish a screenshot',
+                      title: toolLabel('/editor?start=new'),
                       description:
                         'Frame a screen, adjust the background and export a finished image.',
-                      href: '/?start=new',
+                      href: '/editor?start=new',
                       scope: 'Screenshot · Save as a workspace project',
                       pages: [{ kind: 'screen', ratio: '16:9' }],
                     },
                     {
-                      title: 'Compose a Canvas',
+                      title: toolLabel('/canvas/new'),
                       description: 'Build a visual story with editable artboards and layers.',
-                      href: '/canvas',
+                      href: '/canvas/new',
                       scope: 'Canvas · Workspace',
                       pages: [
                         { kind: 'hero', ratio: '16:9' },
@@ -84,7 +82,7 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                       add: true,
                     },
                     {
-                      title: STORE_SCREENSHOTS.label,
+                      title: toolLabel(STORE_SCREENSHOTS.href),
                       description: 'Prepare store listings across devices, sizes and languages.',
                       href: STORE_SCREENSHOTS.href,
                       scope: 'App Store studio · On this browser',
@@ -96,7 +94,7 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                       ],
                     },
                     {
-                      title: 'Create a Story Set',
+                      title: toolLabel('/creative-sets'),
                       description: access.creativeSetsEnabled
                         ? 'Keep related stories and output formats together.'
                         : 'Early access for design partners. Saved sets stay available here.',
@@ -109,6 +107,13 @@ export default async function CreatePage({ params, searchParams }: CreatePagePro
                         { kind: 'hero', ratio: '1:1' },
                         { kind: 'hero', ratio: '4:5' },
                       ],
+                    },
+                    {
+                      title: toolLabel('/create/code'),
+                      description:
+                        'Turn a snippet, diff or pull request into an image, carousel or video, then post it.',
+                      href: '/create/code',
+                      scope: 'Code image · Save to workspace',
                     },
                   ]
             }

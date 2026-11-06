@@ -122,8 +122,8 @@ test(
         })
       ).status
     ).toBe(200)
-    // Only the GIPHY boundary is substituted. The gate stays off, no GIPHY
-    // server is contacted, and the fixture animation has real tenant storage.
+    // Only the GIPHY boundary is substituted. No GIPHY server is contacted,
+    // and the fixture animation has real tenant storage.
     await page.route('**/api/v1/content-drafts/giphy*', async (route) => {
       const request = route.request()
       if (request.method() === 'POST') {
@@ -175,6 +175,7 @@ test(
     await expect(draftEditor(page).locator('figure')).toHaveCount(1)
     await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(page.getByTestId('preview-panel').locator('img')).toHaveCount(1)
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
     const png = await sharp({
       create: { width: 120, height: 60, channels: 4, background: '#25a8df' },
     })
@@ -184,6 +185,7 @@ test(
       .locator('input[type=file][aria-label="Insert media"]')
       .setInputFiles({ name: 'mixed.png', mimeType: 'image/png', buffer: png })
     await expect(draftEditor(page).locator('figure')).toHaveCount(2)
+    await page.getByRole('button', { name: 'Preview', exact: true }).click()
     await expect(page.getByTestId('preview-panel').getByRole('alert')).toContainText(
       'X posts a video or GIF on its own. Move the other attachments to a separate post.'
     )
@@ -337,11 +339,12 @@ test(
     // Slate syncs native DOM selection on a 100 ms timer.
     await settleSelection(page)
     const toggle = page.getByRole('button', { name: 'Preview', exact: true })
-    await toggle.click()
-    await expect(editor).toBeFocused()
+    // Preview takes the draft's place and shows what was written; closing it returns to the caret.
     await page.keyboard.type('one ')
     await expect(editor).toContainText('Alpha one omega.')
+    await toggle.click()
     await expect(page.getByTestId('preview-panel')).toContainText('Alpha one omega.')
+    await expect(editor).toBeHidden()
     await toggle.click()
     await expect(editor).toBeFocused()
     await page.keyboard.type('two ')
@@ -350,13 +353,13 @@ test(
     await page.getByRole('dialog').getByRole('combobox').fill('Preview')
     await page.getByRole('option', { name: /Preview current draft/ }).click()
     await expect(page.getByTestId('preview-panel')).toBeVisible()
+    await toggle.click()
     await expect(editor).toBeFocused()
     await page.keyboard.type('three ')
     await expect(editor).toContainText('Alpha one two three omega.')
-    await toggle.click()
     await page.keyboard.press('ControlOrMeta+End')
     await page.keyboard.insertText('\n' + 'Independent scrolling and saved content.\n'.repeat(45))
-    // The header is sticky; toggling must not remount or scroll the editor.
+    // Coming back from Preview returns to where the draft was scrolled, without a remount.
     const main = page.getByTestId('write-frame').locator('main')
     await main.evaluate((node) => {
       node.scrollTop = 250
@@ -364,7 +367,6 @@ test(
     const before = await main.evaluate((node) => node.scrollTop)
     expect(before).toBeGreaterThan(0)
     await toggle.click()
-    await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     const panel = page.getByTestId('preview-panel')
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     const previewScroll = panel.getByTestId('preview-scroll')
@@ -372,13 +374,12 @@ test(
       node.scrollTop = 100
     })
     expect(await previewScroll.evaluate((node) => node.scrollTop)).toBeGreaterThan(0)
-    expect(await main.evaluate((node) => node.scrollTop)).toBe(before)
     await toggle.click()
-    expect(await main.evaluate((node) => node.scrollTop)).toBe(before)
+    await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBe(before)
     await editor.click()
     await page.keyboard.press('ControlOrMeta+End')
-    await toggle.click()
     await page.keyboard.type('Rapid-edit-marker-0123456789', { delay: 1 })
+    await toggle.click()
     await panel.getByRole('button', { name: 'Show more', exact: true }).click()
     await expect(panel).toContainText('Rapid-edit-marker-0123456789')
     await expectSaved(page)
@@ -460,15 +461,22 @@ test(
         .evaluateAll((items) => items.map((item) => item.getAttribute('data-attachment-id')))
     ).toEqual(originalOrder.reverse())
     await manager.getByRole('button', { name: 'Frame', exact: true }).first().click()
-    await page.getByLabel('Frame color').fill('#ff8800')
+    await page.getByLabel('Frame color').click()
+    await page.getByLabel('Hex color').fill('#ff8800')
+    await page.getByLabel('Hex color').press('Enter')
+    await expect(page.getByLabel('Frame color')).toContainText(/ff8800/i)
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Use brand color #6366f1' }).click()
     await page.getByRole('button', { name: 'Preview frame', exact: true }).click()
     await expect(page.getByAltText('Framed image preview')).toBeVisible({ timeout: 60_000 })
     await page.getByRole('button', { name: 'Apply frame', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Frame image' })).toHaveCount(0)
     await manager.getByRole('button', { name: 'Frame', exact: true }).first().click()
-    await expect(page.getByLabel('Frame color')).toHaveValue('#6366f1')
-    await page.getByLabel('Frame color').fill('#ff8800')
+    await expect(page.getByLabel('Frame color')).toContainText(/#6366f1/i)
+    await page.getByLabel('Frame color').click()
+    await page.getByLabel('Hex color').fill('#ff8800')
+    await page.getByLabel('Hex color').press('Enter')
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await page.keyboard.press('Escape')
     await draftEditor(page).click()
@@ -622,6 +630,13 @@ test(
     await openNewDraft(page)
     await draftEditor(page).click()
     await page.keyboard.type('Document and image preview.')
+    // The server refuses until GIPHY approves; the picker says so rather than showing nothing.
+    await page.route('**/api/v1/content-drafts/giphy*', (route) =>
+      route.fulfill({
+        status: 503,
+        json: { message: 'GIPHY search is not enabled. Provider approval is still required.' },
+      })
+    )
     await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('release')
     await page.getByRole('button', { name: 'Search', exact: true }).click()
@@ -954,5 +969,62 @@ test(
     const posts = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
     expect(JSON.stringify(posts.body)).toContain('SCHEDULED')
     expect(await scheduledAssets(id, 'x')).toEqual([video.assetId])
+  }
+)
+
+test(
+  'a video stays visible after attaching it from Library, and the media strip removes it',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'], verifiedStandardVideo: true })
+    const id = await openNewDraft(page)
+    const strip = page.getByTestId('media-strip')
+    await draftEditor(page).click()
+    await page.keyboard.type('A video from the Library.')
+    await page
+      .locator('input[type=file][aria-label="Insert media"]')
+      .setInputFiles(
+        '../../../server/internal/social/integrations/social/x/testdata/ten-minute-1080p.mp4'
+      )
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
+    await expectSaved(page)
+    const uploaded = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
+      assetIds: string[]
+    }
+
+    // Removing it takes it from the post and the Library keeps it.
+    await strip.getByRole('button', { name: 'Remove Video 1', exact: true }).click()
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(0)
+    await expect(draftEditor(page).locator('video')).toHaveCount(0)
+    await expectSaved(page)
+    expect(
+      ((await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as { assetIds: string[] })
+        .assetIds
+    ).toEqual([])
+
+    // The picker shows a frame and details, never the MIME type.
+    await strip.getByRole('button', { name: 'Browse library', exact: true }).click()
+    const picker = page.getByRole('dialog', { name: 'Attach from Library' })
+    // A stored poster shows as an image, and the browser's own frame as a video.
+    await expect(picker.locator('video, img[src*="variant=thumbnail"]')).toHaveCount(1)
+    await expect(picker).not.toContainText('video/mp4')
+    await expect(picker).toContainText(/\d MB · /)
+    await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // A Library node has no upload marker; it still plays in the editor, also after a reload.
+    await strip
+      .getByRole('button', { name: /^Attach / })
+      .first()
+      .click()
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
+    await expect(draftEditor(page).locator('video')).toHaveCount(1)
+    await expectSaved(page)
+    const attached = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
+      assetIds: string[]
+    }
+    expect(attached.assetIds).toEqual(uploaded.assetIds)
+    await app.reload()
+    await expect(draftEditor(page).locator('video')).toHaveCount(1)
+    await expect(strip.getByTestId('media-strip-item')).toHaveCount(1)
   }
 )

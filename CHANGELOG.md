@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.47.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.46.0...v2.47.0) (2026-11-06)
+
+
+### Features
+
+* **agents:** let MCP, API, Claude, Codex and OpenCode publish posts ([#472](https://github.com/PlaybookMediaLLC/shots/issues/472)) ([2c58a3b](https://github.com/PlaybookMediaLLC/shots/commit/2c58a3b23115ac2d9364c98386b50e0768df8308))
+* **publish:** add Instagram first comments and deploy password sign-in setting ([#457](https://github.com/PlaybookMediaLLC/shots/issues/457)) ([0d291ca](https://github.com/PlaybookMediaLLC/shots/commit/0d291caa6bc0ccccd5a35e88ddc98c5fb704a08b))
+* **social:** let listed workspaces connect hidden providers ([#454](https://github.com/PlaybookMediaLLC/shots/issues/454)) ([c4efaba](https://github.com/PlaybookMediaLLC/shots/commit/c4efaba7959303cb097b9c4b30ccafbc6f565717))
+
+
+### Bug Fixes
+
+* **publish:** resolve the Publish flow audit ([#459](https://github.com/PlaybookMediaLLC/shots/issues/459)) ([a48e0ea](https://github.com/PlaybookMediaLLC/shots/commit/a48e0eaf7b53d5364444be7ea44f05717c31d56a))
+
 ## [2.46.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.45.0...v2.46.0) (2026-11-05)
 
 

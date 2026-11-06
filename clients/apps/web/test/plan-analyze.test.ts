@@ -11,6 +11,7 @@ import {
   draftPostsState,
   draftStatus,
   listedAttention,
+  listedStatus,
   OVERDUE_AFTER_MS,
   POST_STATE_TONE,
   postFailureFix,
@@ -19,6 +20,7 @@ import {
   postState,
   STATUS_GROUPS,
 } from '../lib/content-drafts/post-status'
+import { platformLabel } from '../lib/content-drafts/serialize'
 import {
   brandDaySlots,
   calendarDays,
@@ -757,6 +759,8 @@ test('a draft is called by its title, else its first line of text', () => {
   )
   assert.equal(draftName({ excerpt: 'First line', title: '  ' }), 'First line')
   assert.equal(draftName({ excerpt: '', title: '' }), 'Untitled draft')
+  assert.equal(draftName({ excerpt: '', media: 'video', title: 'Untitled draft' }), 'Video draft')
+  assert.equal(draftName({ excerpt: 'Words', media: 'video', title: '' }), 'Words')
 })
 
 test('a month day caps its posts but never hides one that needs attention', () => {
@@ -800,4 +804,25 @@ test('a calendar note is a trimmed title, a known color and a real date', () => 
     assert.equal(calendarNoteInputSchema.safeParse(bad).success, false, JSON.stringify(bad))
   // A note's day never changes after it is created.
   assert.equal(calendarNoteChangesSchema.safeParse(input).success, false)
+})
+
+test('Home names a listed post by how far it has gone, not as a draft', () => {
+  const counts = {
+    attentionPosts: 0,
+    checkPosts: 0,
+    publishedPosts: 0,
+    queuedPosts: 0,
+    status: 'draft',
+  }
+  assert.equal(listedStatus(counts), 'Draft')
+  assert.equal(listedStatus({ ...counts, publishedPosts: 2 }), 'Published')
+  assert.equal(listedStatus({ ...counts, queuedPosts: 1 }), 'Scheduled')
+  assert.equal(listedStatus({ ...counts, publishedPosts: 1, attentionPosts: 1 }), 'Failed')
+  assert.equal(listedStatus({ ...counts, status: 'archived' }), 'Archived')
+})
+
+test('a connection platform reads as people write it', () => {
+  assert.equal(platformLabel('instagram-standalone'), 'Instagram')
+  assert.equal(platformLabel('tiktok'), 'TikTok')
+  assert.equal(platformLabel('twitter'), 'X')
 })

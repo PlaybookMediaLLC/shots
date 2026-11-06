@@ -100,8 +100,31 @@ func TestDeletingAnAssetKeepsMediaThatIsStillNeeded(t *testing.T) {
 			t.Fatalf("%s: %s %v", name, result, err)
 		}
 	}
+	// A poster is listed only on its video, and is deleted with it.
+	poster := "poster-" + w.id
+	w.exec(t, `INSERT INTO asset (id,"organizationId","parentAssetId","objectKey","mediaType",bytes,status,"createdAt","updatedAt") VALUES ($1,$2,$3,$4,'image/jpeg',1,'UPLOADED',now(),now())`,
+		poster, w.org, free, "org/"+w.org+"/poster/"+poster+"/1/poster.jpg")
+	library, err := repo.ListAssets(w.ctx, w.owner, AssetListOptions{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, item := range library.Assets {
+		if item.ID == poster {
+			t.Fatal("a poster was listed as its own asset")
+		}
+		if item.ID == free {
+			found = item.PosterAssetID == poster
+		}
+	}
+	if !found {
+		t.Fatalf("the video does not name its poster: %+v", library.Assets)
+	}
 	if result, err := repo.DeleteAsset(w.ctx, w.owner, free); err != nil || result != AssetDeleted {
 		t.Fatalf("unused asset: %s %v", result, err)
+	}
+	if row := w.db.Client.Asset.GetX(w.ctx, poster); row.Status != asset.StatusDELETED {
+		t.Fatalf("poster status %s after deleting its video", row.Status)
 	}
 	// Once the post is published and the draft no longer shows it, it can go.
 	w.exec(t, `UPDATE scheduled_post SET status='PUBLISHED' WHERE id=$1`, scheduled.Posts[0].ID)

@@ -41,9 +41,7 @@ test('X composer reads verified limits and keeps Basic Articles unavailable', as
   const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
   expect(saved.status).toBe(200)
   expect(draftReceiptSchema.parse(saved.body).plainText).toBe('a'.repeat(281))
-  await page.getByRole('button', { name: 'Manage platforms', exact: true }).click()
-  await expect(page.getByRole('dialog')).toContainText('longer posts verified')
-  await page.getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(page.getByTestId('active-platform')).toContainText('longer posts verified')
   await page.screenshot({
     path: '.context/x-content-basic-long-post.png',
     animations: 'disabled',

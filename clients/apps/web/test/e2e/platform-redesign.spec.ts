@@ -48,7 +48,7 @@ test(
     await expect(page.getByRole('main')).toHaveCount(1)
     await expect(page.getByRole('link', { name: /Navigation proof/ })).toHaveAttribute(
       'href',
-      `/?project=${id}`
+      `/editor?project=${id}`
     )
     const search = sidebar.getByRole('button', { name: 'Search and commands' })
     await search.focus()
@@ -72,7 +72,7 @@ test(
     await expect(page).toHaveURL(new RegExp(`[?]project=${id}&editor=screenshot$`))
     expect((await trpcQuery(page, 'project.get', { projectId: id })).status).toBe(200)
     await app.open(`/fr/home?project=${id}&editor=screenshot`)
-    await expect(page).toHaveURL(new RegExp(`/fr[?]project=${id}&editor=screenshot$`))
+    await expect(page).toHaveURL(new RegExp(`/fr/editor[?]project=${id}&editor=screenshot$`))
   }
 )
 
@@ -197,11 +197,12 @@ test(
     const picker = page.getByRole('dialog', { name: 'Attach from Library' })
     await picker.getByRole('button', { name: 'removed-library.png', exact: true }).click()
     expect((await trpcMutation(page, 'asset.delete', { assetId: removed })).status).toBe(200)
-    await picker.getByRole('button', { name: 'Attach selected' }).click()
+    await picker.getByRole('button', { name: 'Attach 1', exact: true }).click()
     await expect(picker.getByRole('alert')).toBeVisible()
     await expect(picker).toBeVisible()
+    // What was refused is unticked, so only the kept asset is attached.
     await picker.getByRole('button', { name: 'kept-library.png', exact: true }).click()
-    await picker.getByRole('button', { name: 'Attach selected' }).click()
+    await picker.getByRole('button', { name: 'Attach 1', exact: true }).click()
     await expect(picker).toHaveCount(0)
     await expectSaved(page)
     const saved = await browserRequest(page, `/api/v1/content-drafts/${draftId}`)
@@ -216,10 +217,7 @@ test(
 
     // From the Library, the same asset starts a new post without being uploaded again.
     await app.open('/library?view=assets')
-    await page
-      .getByRole('button', { name: new RegExp(`^Actions for .* ${kept.slice(0, 8)}$`) })
-      .click()
-    await page.getByRole('menuitem', { name: 'Use in a new post' }).click()
+    await page.getByRole('button', { name: 'Use kept-library.png in a post', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
     await page.waitForURL(
       (url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname) && !url.pathname.endsWith(draftId)
@@ -260,7 +258,7 @@ test(
     await box.fill('harbor')
     await expect(
       results.getByRole('link', { name: 'Harbor launch hero Screenshot' })
-    ).toHaveAttribute('href', `/?project=${id}`)
+    ).toHaveAttribute('href', `/editor?project=${id}`)
     await box.fill('qzxj nothing')
     await expect(results.getByRole('status')).toContainText(
       'Search finds places in Shots and posts, screenshots, and canvases by name or words.'
@@ -295,7 +293,7 @@ test(
     ).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('link', { name: 'Open Retry proof' })).toHaveAttribute(
       'href',
-      `/?project=${id}`
+      `/editor?project=${id}`
     )
     const failedRequests = requests
     await page.getByRole('button', { name: 'Retry preview' }).click()
@@ -711,5 +709,31 @@ test(
     await page.screenshot({ path: '.context/ux-redesign/home-dark-mobile.png', fullPage: true })
     await page.setViewportSize({ width: 1440, height: 1000 })
     await page.screenshot({ path: '.context/ux-redesign/home-dark.png', fullPage: true })
+  }
+)
+
+test(
+  'Library opens on saved files when no project exists, and several start one post',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    const bytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
+      'base64'
+    )
+    await app.open('/library?view=assets')
+    const input = page.getByLabel('Upload files')
+    await input.setInputFiles([
+      { buffer: bytes, mimeType: 'image/png', name: 'first.png' },
+      { buffer: bytes, mimeType: 'image/png', name: 'second.png' },
+    ])
+    await expect(page.getByText('2 files uploaded')).toBeVisible()
+    await app.open('/library')
+    await expect(page).toHaveURL(/\/library\?view=assets$/)
+
+    await page.getByRole('checkbox', { name: 'Select first.png', exact: true }).click()
+    await page.getByRole('checkbox', { name: 'Select second.png', exact: true }).click()
+    await page.getByRole('button', { name: 'Use 2 in post', exact: true }).click()
+    await page.waitForURL((url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname))
+    await expect(page.getByTestId('media-strip-item')).toHaveCount(2, { timeout: 60_000 })
   }
 )

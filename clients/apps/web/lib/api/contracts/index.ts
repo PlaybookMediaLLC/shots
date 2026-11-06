@@ -66,6 +66,7 @@ import {
   listContentDraftsContract,
   updateContentDraftContract,
 } from '@/lib/api/contracts/content-drafts'
+import { createPostContract } from '@/lib/api/contracts/posts'
 import { getLinkPreviewContract } from '@/lib/api/contracts/link-preview'
 import { createSocialConnectionAttemptContract } from '@/lib/api/contracts/social-connections'
 import {
@@ -180,6 +181,7 @@ export const documentedContracts = [
   updateContentDraftContract,
   deleteContentDraftContract,
   listContentDraftPostsContract,
+  createPostContract,
   updateDraftPropertiesContract,
   planContentDraftContract,
   duplicateContentDraftContract,

@@ -54,7 +54,8 @@ export const assetUploadSchema = z
     bytes: z.number().int().positive().max(MEDIA_LIMITS.videoBytes),
     projectId: z.string().cuid().optional(),
     parentAssetId: assetIdSchema.optional(),
-    classification: z.enum(assetClassifications).default('input'),
+    // Listing never filters on 'poster': a poster only appears on its video.
+    classification: z.enum([...assetClassifications, 'poster']).default('input'),
     contentType: contentTypeSchema,
     fileName: z.string().trim().min(1).max(128),
     sha256: sha256Schema.optional(),

@@ -191,15 +191,11 @@ test(
       const box = await control.boundingBox()
       expect(box && column && box.x + box.width <= column.x + column.width).toBeTruthy()
     }
-    // A panel beside the draft is never drawn over by the header's buttons.
+    // Preview takes the draft's place, so the header keeps its full width and one row.
+    const before = await page.getByTestId('publish-button').boundingBox()
     await page.getByRole('button', { name: 'Preview', exact: true }).first().click()
-    const panel = await page
-      .getByRole('complementary', { name: 'Preview', exact: true })
-      .boundingBox()
-    for (const button of ['publish-button', 'schedule-button', 'queue-button']) {
-      const box = await page.getByTestId(button).boundingBox()
-      expect(box && panel && box.x + box.width <= panel.x, button).toBeTruthy()
-    }
+    await expect(page.getByTestId('preview-panel')).toBeVisible()
+    expect(await page.getByTestId('publish-button').boundingBox()).toEqual(before)
   }
 )
 
@@ -227,7 +223,7 @@ test(
     const blockers = page.getByTestId('blockers')
     await expect(blockers).toContainText('X: 290 of 280 characters')
     await blockers.getByRole('button', { name: /^X: 290 of 280/ }).click()
-    await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-pressed', 'true')
 
     await page.getByRole('button', { name: 'Add post', exact: true }).click()
     await expect(page.getByTestId('empty-post-2')).toContainText('Empty, not sent')
@@ -240,7 +236,7 @@ test(
 
     await page.goto('/write?tab=queue')
     const queue = page.getByTestId('queue')
-    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled this week')
+    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled in the next 7 days')
     await expect(queue.getByRole('link', { name: 'Edit schedule' })).toBeVisible()
     const slot = queue.getByTestId('queue-free-slot').first()
     await expect(slot).toBeVisible()
@@ -254,12 +250,116 @@ test(
     await page.getByTestId('schedule-button').click()
     // The dialog opens on that slot's day and time, not on its own defaults.
     const [year, month, date] = day.split('-').map(Number)
-    await expect(page.getByLabel('Day', { exact: true })).toHaveText(
+    await expect(page.getByTestId('schedule-dialog').getByLabel('Day', { exact: true })).toHaveText(
       new Date(year, month - 1, date).toLocaleDateString('en-US', { dateStyle: 'medium' })
     )
     const [hour, minute] = time.split(':').map(Number)
-    await expect(page.getByLabel('Time', { exact: true })).toHaveValue(
+    await expect(
+      page.getByTestId('schedule-dialog').getByLabel('Time', { exact: true })
+    ).toHaveValue(
       `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
     )
+  }
+)
+
+test(
+  'a platform that cannot post is one click away from removal, the main version moves on, and a live post locks',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x', 'threads', 'tiktok', 'instagram'] })
+    await weeklySlots(page)
+    const id = await openNewDraft(page)
+    await page.keyboard.type('Plain text, with no media.')
+    // They switch themselves off for lacking media; keeping them on leaves something to fix.
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expectSaved(page)
+
+    // Every platform with something to fix says so on its tab, and the list offers to drop it.
+    await expect(page.getByTestId('platform-blocked-tiktok')).toBeVisible()
+    await expect(page.getByTestId('platform-blocked-instagram')).toBeVisible()
+    for (const label of ['TikTok', 'Instagram']) {
+      if (!(await page.getByTestId('blockers').isVisible()))
+        await page.getByTestId('blockers-button').click()
+      await page.getByRole('button', { name: `Remove ${label} from this post` }).click()
+      await expect(page.getByRole('switch', { name: `Publish to ${label}` })).not.toBeChecked()
+    }
+    await expect(page.getByTestId('blockers-button')).toHaveCount(0)
+
+    // Turning the main platform off hands the main version on; its tab stays to turn back on.
+    await page.getByRole('switch', { name: 'Publish to X' }).click()
+    await expect(page.getByRole('switch', { name: 'Publish to X' })).not.toBeChecked()
+    await expect(page.getByTestId('platform-tab-threads')).toContainText('Main')
+    await expectSaved(page)
+
+    await page.getByTestId('queue-button').click()
+    const schedule = page.getByTestId('schedule-dialog')
+    await schedule.getByLabel('Open a new draft after scheduling').uncheck()
+    await schedule.getByRole('button', { name: 'Add to queue', exact: true }).click()
+    await expect(schedule).toBeHidden()
+    await expect.poll(async () => (await draftPosts(id)).length).toBe(1)
+    const [post] = await draftPosts(id)
+    await db.row(
+      `UPDATE scheduled_post SET status = 'PUBLISHED', "publishedAt" = now()
+        WHERE id = $1 RETURNING id`,
+      [post.id]
+    )
+
+    // Edits could not reach it, so the text says that and takes none.
+    await app.reload()
+    await expect(page.getByTestId('live-notice')).toContainText('live on Threads')
+    await expect(page.getByTestId('post-again-button')).toBeVisible()
+    await expect(page.getByRole('toolbar', { name: 'Draft tools' })).toHaveCount(0)
+    await app.open('/home')
+    await expect(page.getByRole('region', { name: 'Continue working' })).toContainText('Published')
+  }
+)
+
+test(
+  'a platform that needs media switches itself off with an undo, and each tab has its own switch',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x', 'tiktok'] })
+    await openNewDraft(page)
+    const tiktok = page.getByRole('switch', { name: 'Publish to TikTok', exact: true })
+    // An empty post leaves it alone: the person may be about to attach a video.
+    await expect(tiktok).toBeChecked()
+    await page.keyboard.type('Words but no video.')
+    await expect(tiktok).not.toBeChecked()
+    await page.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(tiktok).toBeChecked()
+    // Having chosen to keep it, more typing does not switch it off again; the fix list explains it.
+    await page.keyboard.type(' More words.')
+    await expectSaved(page)
+    await expect(tiktok).toBeChecked()
+    await expect(page.getByTestId('platform-blocked-tiktok')).toBeVisible()
+    // Off is a state of the tab, not its removal.
+    await tiktok.click()
+    await expect(tiktok).not.toBeChecked()
+    await expect(page.getByTestId('platform-tab-tiktok')).toBeVisible()
+  }
+)
+
+test(
+  'an empty draft says what it needs, and a post schedules from the time beside it',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    const id = await openNewDraft(page)
+    // Nothing is pretending to be ready: one item, and it goes to the post.
+    const fixes = page.getByTestId('blockers')
+    await expect(fixes).toContainText('Write something to post.')
+    await expect(page.getByTestId('blockers-button')).toContainText('1 to fix')
+    await expect(page.getByTestId('dock-schedule-button')).toBeDisabled()
+    await fixes.getByRole('button', { name: /Write something to post/ }).click()
+    await expect(draftEditor(page)).toBeFocused()
+
+    await page.keyboard.type('Scheduled without a dialog.')
+    await expectSaved(page)
+    await expect(fixes).toHaveCount(0)
+    await page.getByTestId('dock-schedule-button').click()
+    await expect(page.getByText(/Scheduled for|Queued|scheduled/i).first()).toBeVisible()
+    await expect(page.getByTestId('schedule-dialog')).toHaveCount(0)
+    const posts = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
+    expect((posts.body as { posts: unknown[] }).posts).toHaveLength(1)
   }
 )

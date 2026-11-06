@@ -14,8 +14,6 @@ import { cn } from "@/lib/utils";
 import { XIcon as Cancel01Icon } from "@phosphor-icons/react/dist/ssr/X";
 import { hasCanvasContent } from "@/lib/editor/canvas-content";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { StoreScreenshotsShortcut } from "@/components/store-screenshots/StoreScreenshotsFeatureCard";
-import { TEMPLATE_DEMO_IMAGE_NAME } from "@/lib/templates/demo-media";
 import { useBackgroundImageReady } from "@/hooks/useBackgroundImageReady";
 import { Button } from '@/components/ui/button'
 
@@ -30,7 +28,6 @@ export function EditorCanvas() {
     isPreviewing,
     stopPreview,
     uploadedImageUrl,
-    imageName,
     showTimeline,
     backgroundConfig,
   } = useImageStore();
@@ -122,11 +119,6 @@ export function EditorCanvas() {
           onOpenChange={setExportOpen}
         />
 
-        {!isMobile && imageName !== TEMPLATE_DEMO_IMAGE_NAME ? (
-          <div className="flex shrink-0 justify-center py-2 max-lg:hidden">
-            <StoreScreenshotsShortcut />
-          </div>
-        ) : null}
         <div
           data-canvas-viewport
           className={cn(

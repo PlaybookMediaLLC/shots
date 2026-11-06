@@ -89,10 +89,14 @@ test(
     await expect(page).toHaveURL(/type=image&sort=oldest/)
 
     // A new save while away from the gallery appears on Back, with the view preserved.
-    await page.getByRole('link', { name: 'Open editor', exact: true }).click()
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('button', { name: 'New', exact: true })
+      .click()
+    await page.getByRole('menuitem', { name: 'Screenshot', exact: true }).click()
     // Leave only once the editor has loaded; a Back during the client navigation
     // returns first, and the navigation then lands on the editor anyway.
-    await page.waitForURL((url) => url.pathname === '/')
+    await page.waitForURL((url) => url.pathname === '/editor')
     const added = await saveAsset(page, png)
     await page.goBack()
     await expect(page).toHaveURL(/type=image&sort=oldest/)
@@ -114,7 +118,11 @@ test(
     await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
     await page.getByRole('button', { name: 'Confirm delete' }).click()
     await expect(removed).toBeHidden()
-    await page.getByRole('link', { name: 'Open editor', exact: true }).click()
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('button', { name: 'New', exact: true })
+      .click()
+    await page.getByRole('menuitem', { name: 'Screenshot', exact: true }).click()
     // Go back only once the editor has rendered, or Back races the client navigation.
     await expect(page.getByRole('button', { name: 'Templates', exact: true })).toBeVisible()
     await page.goBack()

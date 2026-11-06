@@ -76,13 +76,14 @@ test(
       expect(response.status).toBe(200)
       return socialSetListSchema.parse(response.body).items
     }
+    // A workspace starts with an empty default profile; a connection is one with an account.
+    const connected = async () => (await list()).filter((set) => set.accounts.length > 0)
     try {
       await createWorkspace(identity, page)
       await enableTwoFactor(page, identity.password)
       organizationId = await bindTestGoOrganization(page)
       await app.open('/settings/publishing-brands?picker=preserve')
-      await expect(page.getByText('No profiles yet', { exact: true })).toBeVisible()
-      expect(await list()).toHaveLength(0)
+      expect(await connected()).toHaveLength(0)
       const originalURL = page.url()
       const launch = page.getByRole('button', {
         name: 'Add profile to your personal workspace',
@@ -120,7 +121,7 @@ test(
       await expect(dialog).toHaveCount(0)
       await expect(launch).toBeFocused()
       expect(page.url()).toBe(originalURL)
-      expect(await list()).toHaveLength(0)
+      expect(await connected()).toHaveLength(0)
       // Only readiness was read. In development React mounts the dialog twice, and
       // its first, aborted read can reach the provider too, so calls are compared as a set.
       expect([...new Set(provider.calls.map((call) => `${call.method} ${call.url}`))]).toEqual([
@@ -147,7 +148,7 @@ test(
       })
       await dialog.getByRole('button', { name: 'Connect X account', exact: true }).click()
       await expect(page).toHaveURL(`https://api.x.com/oauth/authenticate?oauth_token=${state}`)
-      expect(await list()).toHaveLength(0)
+      expect(await connected()).toHaveLength(0)
 
       const callback = getE2EUrl(
         `/integrations/social/x?oauth_token=${state}&oauth_verifier=fixture-verifier`
@@ -179,7 +180,7 @@ test(
           page.getByRole('heading', { name: 'Connection completed', exact: true })
         ).toBeVisible()
         await expect(page.getByText(identity.workspaceName, { exact: true })).toBeVisible()
-        expect(await list()).toHaveLength(0)
+        expect(await connected()).toHaveLength(0)
         await page.screenshot({
           path: '.context/social-connection-original-workspace.png',
           animations: 'disabled',
@@ -206,7 +207,7 @@ test(
           await anonymous.close()
         }
         await page.getByRole('link', { name: 'Stay in the current workspace' }).click()
-        expect(await list()).toHaveLength(0)
+        expect(await connected()).toHaveLength(0)
         await page.goto(callback)
         await page
           .getByRole('button', { name: `Open ${identity.workspaceName}`, exact: true })
@@ -215,7 +216,7 @@ test(
         await otherTab.close()
       }
       await expect(page).toHaveURL(/\/settings\/publishing-brands\/[a-z0-9]+\?connected=x$/)
-      const sets = await list()
+      const sets = await connected()
       expect(sets).toHaveLength(1)
       const created = socialSetSchema.parse(sets[0])
       expect(created.visibility).toBe('PRIVATE')
@@ -232,7 +233,7 @@ test(
       await expect(dialog.getByRole('button', { name: 'LinkedIn', exact: true })).toBeEnabled()
       await page.keyboard.press('Escape')
       await page.goto(callback)
-      expect((await list()).map((item) => item.id)).toEqual([created.id])
+      expect((await connected()).map((item) => item.id)).toEqual([created.id])
       expect(
         provider.calls.filter((call) => call.url === '/integrations/social-connect/x')
       ).toHaveLength(1)

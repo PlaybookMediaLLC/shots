@@ -13,6 +13,23 @@ import (
 // (RFC 026). It schedules only what a person already approved.
 const PostScheduleScope = "post:schedule"
 
+// PostPublishScope is the opt-in API-key scope that publishes new posts with
+// no person in between. post:schedule never implies it: keys issued with that
+// scope were promised they could only schedule what a person approved.
+const PostPublishScope = "post:publish"
+
+// authorizePublishing admits a publisher's session, or an API key the backend
+// itself finds was issued with post:publish. It guards CreatePost only.
+func (c *Configuration) authorizePublishing(ctx context.Context, actor Actor) error {
+	switch {
+	case actor.IsSession():
+		return c.authorizeRoles(ctx, actor, "owner", "admin", "publisher")
+	case actor.Kind == "api_key":
+		return c.auth.AuthorizeAPIKeyScope(ctx, actor.OrganizationID, actor.KeyID, PostPublishScope)
+	}
+	return publishing.ErrForbidden
+}
+
 // authorizeScheduling admits a publisher's session, or an API key the backend
 // itself finds was issued with post:schedule. Approving stays with a person:
 // the scheduling paths accept only approved posts and variants.
@@ -70,7 +87,7 @@ func (c *Configuration) ListScheduledPosts(ctx context.Context, actor Actor, lim
 	if err := c.authorizeRoles(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
 	}
-	return c.auth.ListScheduledPosts(ctx, actor.OrganizationID, limit)
+	return c.auth.ListScheduledPosts(ctx, actor.OrganizationID, !actor.IsSession(), limit)
 }
 
 // CancelScheduledPost cancels a post that has not started publishing. Its

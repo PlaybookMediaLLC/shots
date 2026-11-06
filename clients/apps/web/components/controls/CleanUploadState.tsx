@@ -19,6 +19,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control'
 import { getBackgroundCSS } from '@/lib/constants/backgrounds'
 import { useBackgroundImageReady } from '@/hooks/useBackgroundImageReady'
 import { Label } from '@/components/ui/label'
+import { requestTextEdit } from '@/lib/editor/pending-text-edit'
 
 const TRANSITION_DURATION = 400 // ms
 type ColorScheme = 'light' | 'dark'
@@ -273,7 +274,9 @@ export function CleanUploadState() {
         htmlFor="editor-image-upload"
         className={cn(
           'relative z-10 flex flex-col items-center justify-center cursor-pointer',
-          'group/upload px-6 transition-transform duration-100 ease-out active:scale-[0.98]',
+          // A panel of its own: the chosen background can be anything behind this text.
+          'rounded-2xl bg-background/85 p-6 ring-1 ring-foreground/10 backdrop-blur-md',
+          'group/upload transition-transform duration-100 ease-out active:scale-[0.98]',
           active && 'scale-[1.01]'
         )}
       >
@@ -284,7 +287,7 @@ export function CleanUploadState() {
           fill="none"
           className={cn(
             'mb-4 drop-shadow-sm transition-transform duration-100 ease-out group-active/upload:scale-[0.92]',
-            active ? 'text-foreground/90' : 'text-foreground/70'
+            active ? 'text-foreground' : 'text-foreground/85'
           )}
         >
           <line
@@ -308,16 +311,13 @@ export function CleanUploadState() {
         </svg>
 
         <p
-          className="text-sm font-medium text-center text-foreground/80 mb-2"
-          style={{
-            textShadow: '0 1px 4px color-mix(in srgb, var(--shadow-color) 45%, transparent)',
-          }}
+          className="text-sm font-medium text-center text-foreground mb-2"
         >
           {active ? 'Drop the image here...' : 'Drag & drop, click to browse, or paste'}
         </p>
 
         {!active && (
-          <div className="flex items-center gap-1.5 text-xs text-foreground/50 mb-5">
+          <div className="flex items-center gap-1.5 text-xs text-foreground/75 mb-5">
             <kbd className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-foreground/10 border border-foreground/20 text-foreground/70 font-medium">
               <CommandIcon size={10} />V
             </kbd>
@@ -332,20 +332,24 @@ export function CleanUploadState() {
           >
             <div className="flex items-center gap-2.5 w-full max-w-[120px]">
               <div className="flex-1 h-px bg-foreground/20" />
-              <span className="text-[10px] text-foreground/40">or</span>
+              <span className="text-[10px] text-foreground/75">or</span>
               <div className="flex-1 h-px bg-foreground/20" />
             </div>
 
-            <Button variant="outline" onClick={() => addTextOverlay()}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const id = addTextOverlay()
+                useImageStore.getState().setSelectedTextId(id)
+                requestTextEdit(id)
+              }}
+            >
               Start with text
             </Button>
-            <p className="text-xs text-foreground/60">
-              No image needed. Edit in Design → Add Text.
-            </p>
 
             <div className="flex items-center gap-2 w-full">
-              <div className="flex flex-1 min-w-0 items-center gap-0 h-10 rounded-xl bg-background/35 border border-foreground/15 backdrop-blur-md focus-within:border-foreground/30 focus-within:ring-1 focus-within:ring-foreground/20 transition-[border-color,box-shadow]">
-                <Globe02Icon size={14} className="shrink-0 ml-3 text-foreground/45" />
+              <div className="flex flex-1 min-w-0 items-center gap-0 h-10 rounded-xl bg-background/80 border border-foreground/15 backdrop-blur-md focus-within:border-foreground/30 focus-within:ring-1 focus-within:ring-foreground/20 transition-[border-color,box-shadow]">
+                <Globe02Icon size={14} className="shrink-0 ml-3 text-foreground/75" />
                 <Input
                   type="url"
                   placeholder="Enter website URL..."
@@ -353,7 +357,7 @@ export function CleanUploadState() {
                   onChange={(event) => setScreenshotUrl(event.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleCaptureScreenshot()}
                   disabled={isCapturing}
-                  className="h-full flex-1 min-w-0 border-0 bg-transparent px-2 text-xs text-foreground/90 placeholder:text-foreground/35 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
+                  className="h-full flex-1 min-w-0 border-0 bg-transparent px-2 text-xs text-foreground/90 placeholder:text-foreground/70 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 dark:bg-transparent"
                 />
                 <div className="h-4 w-px shrink-0 bg-foreground/15" />
                 <SegmentedControl
@@ -378,7 +382,7 @@ export function CleanUploadState() {
                 variant="outline"
                 size="icon"
                 aria-label="Capture screenshot"
-                className="size-10 shrink-0 rounded-xl border-foreground/15 bg-background/35 text-foreground/80 backdrop-blur-md hover:bg-background/45 hover:text-foreground hover:border-foreground/25"
+                className="size-10 shrink-0 rounded-xl border-foreground/15 bg-background/80 text-foreground/80 backdrop-blur-md hover:bg-background/45 hover:text-foreground hover:border-foreground/25"
               >
                 {isCapturing ? (
                   <Loading03Icon size={16} className="animate-spin" />

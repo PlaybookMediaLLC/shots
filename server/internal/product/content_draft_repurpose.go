@@ -110,25 +110,12 @@ func seedRepurposedDraft(ctx context.Context, tx *ent.Tx, actor Actor, input *Co
 	if documentID != "" && !slices.Contains(ids, documentID) {
 		ids = append(ids, documentID)
 	}
-	kinds := map[string]string{}
-	if len(ids) > 0 {
-		media, err := tx.Asset.Query().Where(asset.IDIn(ids...), asset.OrganizationID(actor.OrganizationID), asset.StatusEQ(asset.StatusUPLOADED)).All(ctx)
-		if err != nil {
-			return err
-		}
-		if len(media) != len(ids) {
-			return conflict("Some published media is no longer available. Start a new draft and attach replacement media.")
-		}
-		for _, item := range media {
-			kind := "img"
-			if strings.HasPrefix(item.MediaType, "video/") {
-				kind = "video"
-			}
-			if item.MediaType == "application/pdf" {
-				kind = "file"
-			}
-			kinds[item.ID] = kind
-		}
+	kinds, err := draftMediaKinds(ctx, tx.Asset, actor.OrganizationID, ids)
+	if err != nil {
+		return err
+	}
+	if len(kinds) != len(ids) {
+		return conflict("Some published media is no longer available. Start a new draft and attach replacement media.")
 	}
 	body := []any{}
 	texts := []string{}
@@ -156,7 +143,7 @@ func seedRepurposedDraft(ctx context.Context, tx *ent.Tx, actor Actor, input *Co
 		body = append(body, map[string]any{"type": "p", "children": []any{map[string]any{"text": p.text}}})
 		texts = append(texts, p.text)
 		for _, id := range p.assets {
-			body = append(body, map[string]any{"type": kinds[id], "assetId": id, "url": "/api/v1/assets/" + id + "/content", "children": []any{map[string]any{"text": ""}}})
+			body = append(body, draftMediaBlock(kinds[id], id))
 		}
 	}
 	if input.PrimaryPlatform == "" {
@@ -183,4 +170,33 @@ func seedRepurposedDraft(ctx context.Context, tx *ent.Tx, actor Actor, input *Co
 		input.Title = source.Title
 	}
 	return nil
+}
+
+// draftMediaKinds is the Plate block type of each uploaded asset among ids. An
+// asset that is missing or still uploading is absent, so callers compare lengths.
+func draftMediaKinds(ctx context.Context, assets *ent.AssetClient, organizationID string, ids []string) (map[string]string, error) {
+	kinds := map[string]string{}
+	if len(ids) == 0 {
+		return kinds, nil
+	}
+	media, err := assets.Query().Where(asset.IDIn(ids...), asset.OrganizationID(organizationID), asset.StatusEQ(asset.StatusUPLOADED)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, item := range media {
+		kind := "img"
+		if strings.HasPrefix(item.MediaType, "video/") {
+			kind = "video"
+		}
+		if item.MediaType == "application/pdf" {
+			kind = "file"
+		}
+		kinds[item.ID] = kind
+	}
+	return kinds, nil
+}
+
+// draftMediaBlock is the body block that attaches an asset to a post.
+func draftMediaBlock(kind, id string) map[string]any {
+	return map[string]any{"type": kind, "assetId": id, "url": "/api/v1/assets/" + id + "/content", "children": []any{map[string]any{"text": ""}}}
 }

@@ -57,6 +57,7 @@ func (f *fakeSigner) SignDelivery(_ context.Context, organizationID, key string)
 
 type fakePoster struct {
 	quoteState string
+	releaseURL string
 	calls      int
 	media      int
 	// replies records each reply as "message>answers", in order.
@@ -95,7 +96,7 @@ func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrati
 	if f.afterPost != nil {
 		f.afterPost()
 	}
-	return []integrations.PostResponse{{PostID: "remote-post-1", Status: status, QuoteState: f.quoteState}}, nil
+	return []integrations.PostResponse{{PostID: "remote-post-1", ReleaseURL: f.releaseURL, Status: status, QuoteState: f.quoteState}}, nil
 }
 
 func (f *fakePoster) Comment(_ context.Context, _, postID, lastCommentID, _ string, posts []integrations.PostDetails, _ *socialent.Integration) ([]integrations.PostResponse, error) {
@@ -150,6 +151,17 @@ func TestDirectPublisherUsesFreshSignedMediaAndRemoteReceipt(t *testing.T) {
 	id, err := p.Publish(context.Background(), input)
 	if err != nil || id != "remote-post-1" || signer.calls != 1 || poster.calls != 1 || poster.path != "https://r2.example/private/image.png?fresh-signature" {
 		t.Fatalf("id=%q err=%v signer=%d provider=%d path=%q", id, err, signer.calls, poster.calls, poster.path)
+	}
+}
+
+func TestThreadsKeepsTheProvidersLinkToTheLivePost(t *testing.T) {
+	p, _, poster, input := directFixture()
+	poster.releaseURL = "https://www.threads.net/@shots/post/1"
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "threads", InternalID: "remote-user", Token: "private-token"}}
+	input.Platform = "threads"
+	receipt, err := p.PublishThread(context.Background(), input)
+	if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
+		t.Fatalf("receipt=%+v err=%v", receipt, err)
 	}
 }
 

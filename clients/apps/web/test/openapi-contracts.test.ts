@@ -14,6 +14,7 @@ import * as campaigns from '@/lib/api/contracts/campaigns'
 import * as canvases from '@/lib/api/contracts/canvases'
 import * as codeProjects from '@/lib/api/contracts/code-projects'
 import * as contentDrafts from '@/lib/api/contracts/content-drafts'
+import * as posts from '@/lib/api/contracts/posts'
 import * as draftMedia from '@/lib/api/contracts/draft-media'
 import * as draftCollaboration from '@/lib/api/contracts/draft-collaboration'
 import * as contentDraftPlatform from '@/lib/api/contracts/content-draft-platform'
@@ -76,6 +77,7 @@ const contracts = new Map<string, RouteContract>(
     draftCollaboration,
     writeAi,
     contentDrafts,
+    posts,
     draftTags,
     draftComments,
     draftBatch,
@@ -255,6 +257,39 @@ test('approving is human-only; agents ask for review and schedule only with post
   assert.ok(!body.safeParse({ decision: 'submit' }).success, 'submit is a review request')
   assert.ok(body.safeParse({ decision: 'approve' }).success)
   assert.ok(!body.safeParse({ decision: 'approve', organizationId: 'org_2' }).success)
+})
+
+test('posting directly takes its own opt-in scope and an idempotency key', () => {
+  const contract = posts.createPostContract
+  assert.equal(contract.access.apiKeyScope, 'post:publish')
+  assert.equal(contract.access.feature, 'content:drafts')
+  assert.equal(contract.access.quota, 'api:write:minute')
+  // A stored draft stays with a person.
+  assert.equal(
+    (contentDrafts.scheduleContentDraftContract as { access?: unknown }).access,
+    undefined
+  )
+  const parts = [{ text: 'Shipped' }]
+  const accounts = ['cl0000000000000000000000']
+  const body = { channelConnectionIds: accounts, posts: parts, publishNow: true }
+  assert.ok(contract.body.safeParse(body).success)
+  assert.ok(!contract.body.safeParse({ ...body, posts: [] }).success)
+  assert.ok(!contract.body.safeParse({ ...body, channelConnectionIds: [] }).success)
+  assert.ok(!contract.body.safeParse({ ...body, organizationId: 'org_2' }).success)
+  assert.ok(
+    contract.body.safeParse({
+      ...body,
+      platforms: { linkedin: { options: { firstComment: 'Link below' } } },
+    }).success
+  )
+  assert.ok(
+    !contract.body.safeParse({ ...body, platforms: { linkedin: { options: { automation: {} } } } })
+      .success,
+    'follow-ups are not part of this call'
+  )
+  assert.ok(!contract.headers?.safeParse({}).success, 'a retry must not be able to post twice')
+  assert.ok(!contract.headers?.safeParse({ 'idempotency-key': 'short' }).success)
+  assert.ok(contract.headers?.safeParse({ 'idempotency-key': 'a'.repeat(16) }).success)
 })
 
 test('new mutation bodies reject unknown fields', () => {
