@@ -64,6 +64,21 @@ test('AI commands follow the platforms and disappear when AI is off', () => {
   assert.ok(!ids(commandsFor(context({ ai: null }))).some((id) => id.startsWith('ai-')))
 })
 
+test('an empty post offers no AI command, because each one acts on written words', () => {
+  const empty = createPlateEditor({
+    plugins: [PostBreakPlugin],
+    value: [postBreak(), p()] as Value,
+  })
+  assert.ok(!ids(commandsFor(context({ editor: empty }))).some((id) => id.startsWith('ai-')))
+})
+
+test('tables and math are left out where the platform refuses images', () => {
+  const tiktok = ids(commandsFor(context({ channel: 'tiktok' })))
+  assert.ok(!tiktok.includes('insert-table'))
+  assert.ok(!tiktok.includes('insert-math'))
+  assert.ok(ids(commandsFor(context())).includes('insert-table'))
+})
+
 test('tables and math say they publish as images; snippets come from finishers', () => {
   const commands = commandsFor(
     context({ snippets: [{ id: 'f1', name: 'Signature', text: 'Thanks for reading' }] })

@@ -39,6 +39,7 @@ import {
 } from '@/components/drafts/thread'
 import { CAPABILITIES, pollRules } from '@/lib/write/capabilities'
 import type { DraftChannel } from '@/lib/write/document'
+import { DESTINATION_MEDIA } from '@/lib/write/media-rules'
 import { COMMAND_SHORTCUTS, type Shortcut } from '../shortcuts'
 import type { RefineApi } from './refine'
 
@@ -118,11 +119,15 @@ const PLAIN_TEXT = 'Converted to plain text'
 
 /** The commands for the version being edited, in menu order. */
 export function commandsFor(context: CommandContext): Command[] {
-  const { ai, channel, channels, editor } = context
+  const { channel, channels, editor } = context
+  // Every AI command works on the words already written; on an empty post it could only refuse.
+  const ai = editor.api.string([]).trim() ? context.ai : null
   const label = CHANNEL_META[channel].label
   const others = channels.filter((other) => other !== channel)
   const posts = postRanges(editor.children).length
   const pollChannels = channels.filter((other) => pollRules(other))
+  // A table or equation publishes as an image, which a video-only platform refuses.
+  const takesImages = DESTINATION_MEDIA[channel].images.length > 0
   const commands: (Command | false)[] = [
     Boolean(ai) && {
       aliases: ['ai', 'ask', 'write', 'prompt'],
@@ -308,7 +313,7 @@ export function commandsFor(context: CommandContext): Command[] {
       label: 'Numbered list',
       run: () => insert(editor, KEYS.ol),
     },
-    {
+    takesImages && {
       aliases: ['table', 'grid'],
       badge: PUBLISHES_AS_IMAGE,
       group: 'Insert',
@@ -317,7 +322,7 @@ export function commandsFor(context: CommandContext): Command[] {
       label: 'Table',
       run: () => insert(editor, KEYS.table),
     },
-    {
+    takesImages && {
       aliases: ['equation', 'formula', 'math', 'latex'],
       badge: PUBLISHES_AS_IMAGE,
       group: 'Insert',

@@ -6,11 +6,11 @@ import {
   apiRequest,
   chooseOption,
   draftEditor,
+  editorMore,
   expect,
   expectSaved,
   openNewBatch,
   openNewDraft,
-  type Page,
   saveBatchDrafts,
   signedAssetSchema,
   test,
@@ -20,11 +20,6 @@ import { importedBody } from '@/lib/write/import-text'
 
 test.use({ actionTimeout: 30_000 })
 const fixture = (name: string) => `test/fixtures/typefully-media/${name}`
-async function openMedia(page: Page) {
-  await page.getByRole('button', { name: 'More draft actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Manage media…', exact: true }).click()
-}
-
 test(
   'phone previews fit the sidebar, weighted long text expands, and link cards dismiss without removing the URL',
   { tag: '@journey' },
@@ -231,16 +226,16 @@ test(
     const id = await openNewDraft(page)
     await draftEditor(page).fill('Media sources')
     await expectSaved(page)
-    await openMedia(page)
-    await page.getByLabel('Page URL for image').fill('https://example.com/article')
-    await page.getByRole('button', { name: 'Find page image', exact: true }).click()
-    await page.getByRole('button', { name: 'Attach 1200 × 630 image', exact: true }).click()
-    await expect(page.getByTestId('draft-media-item')).toHaveCount(1)
+    await editorMore(page, 'Image from link')
+    await page.getByLabel('Page URL', { exact: true }).fill('https://example.com/article')
+    await page.getByRole('button', { name: 'Find image', exact: true }).click()
+    await page.getByRole('button', { name: 'Attach image', exact: true }).click()
+    await expect(page.getByTestId('media-strip-item')).toHaveCount(1)
+    await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('colors')
-    await page.getByRole('button', { name: 'Search GIPHY', exact: true }).click()
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
     await page.getByRole('button', { name: 'Attach Moving colors', exact: true }).click()
-    await expect(page.getByTestId('draft-media-item')).toHaveCount(2)
-    await page.getByRole('button', { name: 'Done', exact: true }).click()
+    await expect(page.getByTestId('media-strip-item')).toHaveCount(2)
     await expectSaved(page)
     await app.reload()
     const draft = (await apiRequest(page, `/api/v1/content-drafts/${id}`)).body as {
