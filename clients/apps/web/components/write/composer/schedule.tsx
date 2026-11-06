@@ -363,7 +363,17 @@ export function ScheduleDock({
           className="h-9 w-40"
           data-testid="dock-when"
           onChange={(event) => readTyped(event.target.value)}
+          // Typed, then confirmed from the keyboard: Enter schedules, Shift+Enter
+          // schedules and opens the next draft. (The composer's own ⌘Enter makes a
+          // new post in a thread, so it cannot also mean "schedule".)
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || blocked || busy !== null || past || !instant) return
+            if (rescheduling) return
+            event.preventDefault()
+            void schedule(event.shiftKey)
+          }}
           placeholder="today 5pm, +1h"
+          title="Enter schedules this post; Shift+Enter schedules it and opens the next draft"
           value={typed}
         />
       </Label>

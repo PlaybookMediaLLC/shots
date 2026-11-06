@@ -1117,6 +1117,11 @@ export function WriteComposer({
           length={post.length}
           limit={activePublication.serialized.limit}
           number={number}
+          standard={
+            activePublication.serialized.limit > CAPABILITIES[active].captionLimit
+              ? CAPABILITIES[active].captionLimit
+              : undefined
+          }
           thread={Boolean(CAPABILITIES[active].thread)}
         />
         {excess[number] && CAPABILITIES[active].thread ? (
@@ -2143,6 +2148,12 @@ export function WriteComposer({
                     >
                       <ChannelIcon channel={item.account.channel} />
                       {item.publication.serialized.length} / {item.publication.serialized.limit}
+                      {item.publication.serialized.limit >
+                      CAPABILITIES[item.account.channel].captionLimit ? (
+                        <span className="text-muted-foreground">
+                          ({CAPABILITIES[item.account.channel].captionLimit} without verification)
+                        </span>
+                      ) : null}
                     </span>
                   )
                 })}
@@ -2531,20 +2542,28 @@ function initials(name: string): string {
 
 /**
  * A post's length for the platform being edited: a ring that fills toward
- * the limit, amber from 90%, red past it. Quiet posts hide it until it nears
- * the limit; the post in use always shows it.
+ * the limit, amber from 90%, red past it. It is always readable — a counter
+ * you can only see once you are nearly over cannot be written to — and dims
+ * on a post that is not in use so the page stays quiet.
+ *
+ * An account whose platform raised its limit (a verified X account posts up
+ * to 25,000) also shows the standard count, because the length that matters
+ * to most writers is still the one everyone else sees.
  */
 function PostCount({
   active,
   length,
   limit,
   number,
+  standard,
   thread,
 }: {
   active: boolean
   length: number
   limit: number
   number: number
+  /** The platform's standard limit, when this account's is higher. */
+  standard?: number
   thread: boolean
 }) {
   const ratio = length / limit
@@ -2554,13 +2573,16 @@ function PostCount({
       : ratio >= 0.9
         ? 'text-amber-600 dark:text-amber-400'
         : 'text-muted-foreground'
+  const overStandard = standard !== undefined && length > standard
   return (
     <span
       className={cn(
         'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
         tone,
-        !active && ratio < 0.9 && 'opacity-0'
+        !active && ratio < 0.9 && 'opacity-60'
       )}
+      // Counted as the platform counts it, which writers cannot check outside the app.
+      title="Counted as the platform counts it: a line break is one character, a link counts as 23, and an emoji as two."
     >
       <span
         aria-hidden
@@ -2573,6 +2595,14 @@ function PostCount({
       <span data-testid={`post-length-${number}`}>
         {length} / {limit}
       </span>
+      {standard !== undefined ? (
+        <span
+          className={cn(overStandard ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
+          data-testid={`post-standard-length-${number}`}
+        >
+          ({standard} without verification)
+        </span>
+      ) : null}
       {thread ? <span className="text-muted-foreground">#{number}</span> : null}
     </span>
   )
