@@ -2,6 +2,7 @@
 
 import type { TRPCClient } from '@trpc/client'
 import { uploadByteLimit } from '@/lib/write/media-limits'
+import { captureVideoPoster } from './video-poster'
 import type { AppRouter } from '@/lib/trpc/router'
 
 /**
@@ -52,7 +53,7 @@ export interface SaveToWorkspaceInput {
   onReserved?: (assetId: string) => void | Promise<void>
   parentAssetId?: string
   projectId?: string
-  classification?: 'input' | 'export' | 'derived' | 'capture'
+  classification?: 'input' | 'export' | 'derived' | 'capture' | 'poster'
   blob: Blob
   fileName: string
   trpcClient: TRPCClient<AppRouter>
@@ -170,8 +171,33 @@ export async function saveExportToWorkspace(input: SaveToWorkspaceInput): Promis
     await uploadWithProgress(uploadUrl, blob, WRITE_ONCE, percent(blob.size, input.onProgress))
     await trpcClient.asset.completeUpload.mutate({ assetId: asset.id, sha256 })
   }
+  if (blob.type.startsWith('video/')) await savePoster(blob, asset.id, trpcClient)
 
   return { assetId: asset.id }
+}
+
+/**
+ * Store the video's opening frame beside it. The video is already saved, and
+ * lists fall back to the browser's own first frame, so a failure stops nothing.
+ */
+async function savePoster(
+  video: Blob,
+  parentAssetId: string,
+  trpcClient: TRPCClient<AppRouter>
+): Promise<void> {
+  try {
+    const poster = await captureVideoPoster(video)
+    if (poster)
+      await saveExportToWorkspace({
+        blob: poster,
+        classification: 'poster',
+        fileName: 'poster.jpg',
+        parentAssetId,
+        trpcClient,
+      })
+  } catch (error) {
+    console.warn('The video poster was not saved.', error)
+  }
 }
 
 /**

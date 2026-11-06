@@ -59,3 +59,20 @@ test('an authenticated user can prepare a social aspect ratio, style it, and cle
     page.getByText('Drag & drop, click to browse, or paste', { exact: true })
   ).toBeVisible()
 })
+
+test(
+  'Use in post opens a draft with the design attached',
+  { tag: '@journey' },
+  async ({ app, page }) => {
+    await app.openEditor()
+    await uploadImage(page)
+    await page.getByRole('button', { exact: true, name: 'Export' }).click()
+    await page.getByRole('button', { exact: true, name: 'PNG' }).click()
+    await page.getByRole('button', { exact: true, name: 'Use in post' }).click()
+    await page.waitForURL((url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname), { timeout: 90_000 })
+    await expect(page.getByTestId('media-strip-item')).toHaveCount(1, { timeout: 60_000 })
+    await expect(
+      page.getByRole('textbox', { name: 'Draft body' }).locator('img[src*="/api/v1/assets/"]')
+    ).toHaveCount(1)
+  }
+)

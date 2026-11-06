@@ -4,6 +4,9 @@ import { EditorWorkspace } from '@/components/platform-shell/EditorWorkspace'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { getPageAccess } from '@/lib/auth/page-access'
+import { accessAllows } from '@/lib/auth/permissions'
+import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
+import { CanStartPostProvider } from '@/lib/platform/can-start-post'
 
 /**
  * The screenshot editor (`/`) and the store studio (`/create/store`) share this
@@ -23,7 +26,11 @@ export default async function EditorsLayout({ children }: { children: ReactNode 
           variant="editor"
         >
           <ErrorBoundary>
-            <EditorWorkspace />
+            <CanStartPostProvider
+              value={accessAllows(access, 'artifact:edit') && contentDraftsEnabled()}
+            >
+              <EditorWorkspace />
+            </CanStartPostProvider>
           </ErrorBoundary>
         </PlatformShell>
       ) : null}
