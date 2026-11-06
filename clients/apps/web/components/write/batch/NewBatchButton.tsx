@@ -14,6 +14,12 @@ import { cn } from '@/lib/utils'
 /** The kinds of batch; each opens the same batch page, set up for it. */
 const TOOLS = [
   {
+    description:
+      'Paste a block of written posts, one per blank line. No files, no CSV: each piece becomes its own post, with its character count and its time.',
+    label: 'Text posts',
+    value: 'text',
+  },
+  {
     description: 'Up to 100 videos, one post each, with captions and times in bulk.',
     label: 'Video upload',
     value: 'videos',
