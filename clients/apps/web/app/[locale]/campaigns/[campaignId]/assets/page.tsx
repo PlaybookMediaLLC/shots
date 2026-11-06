@@ -60,7 +60,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
         createdAt: design.createdAt.getTime(),
         critique: critiqueSchema.safeParse(design.critique).data ?? null,
         designId: design.id,
-        editHref: `/?design=${design.id}`,
+        editHref: `/editor?design=${design.id}`,
         fromEarlierPlan:
           plan && design.planVersion !== null ? design.planVersion !== plan.version : undefined,
         id: design.id,

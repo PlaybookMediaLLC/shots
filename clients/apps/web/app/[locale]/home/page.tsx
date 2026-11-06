@@ -41,7 +41,7 @@ export default async function HomePage({
       for (const item of Array.isArray(value) ? value : value === undefined ? [] : [value])
         search.append(key, item)
     }
-    redirect(platformHref(locale === 'en' ? '/' : `/${locale}`, `/?${search}`))
+    redirect(platformHref(locale === 'en' ? '/' : `/${locale}`, `/editor?${search}`))
   }
   // A contract that grants drafts without a paid plan gets Home too; paid starters lead to the plan page.
   const requestHeaders = await headers()

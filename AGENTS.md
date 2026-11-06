@@ -262,7 +262,7 @@ Resolve conflicts by class:
    `lib/`, `tests/`, ...) was missed by rename detection. Port the change into
    the same path under `clients/apps/web/` (upstream's `tests/` is
    `clients/apps/web/test/`; upstream's `app/[locale]/page.tsx` is
-   `clients/apps/web/app/[locale]/(editors)/page.tsx`, the route group the
+   `clients/apps/web/app/[locale]/(editors)/editor/page.tsx`, the route group the
    screenshot editor shares with Store screenshots), then `git rm` the root copy.
 4. `bun.lock` is deleted in the fork (npm is the only package manager). When
    upstream changes it, resolve the modify/delete conflict with

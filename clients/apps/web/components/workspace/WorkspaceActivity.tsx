@@ -70,7 +70,7 @@ const SECTIONS: Section[] = [
     load: async (trpc) => {
       const { items } = await trpc.project.list.query({ limit: 5, sort: 'updated' })
       return items.map((project) => ({
-        href: `/?project=${encodeURIComponent(project.id)}`,
+        href: `/editor?project=${encodeURIComponent(project.id)}`,
         id: project.id,
         meta: (
           <>

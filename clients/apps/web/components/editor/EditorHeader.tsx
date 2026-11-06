@@ -395,6 +395,9 @@ export function EditorHeader() {
             render={renderExportBlob}
           />
 
+          {/* The AI copilot, which fork code renders here without this file knowing it. */}
+          <span className="contents" id="editor-header-slot" />
+
           <Popover onOpenChange={exportBusy ? undefined : setExportOpen} open={exportOpen}>
             <PopoverTrigger asChild>
               <Button variant="custom" size={null}

@@ -212,7 +212,7 @@ const ROUTES: [PlatformArea, string[]][] = [
 /** Match complete path segments, including localized legacy URLs. */
 export function platformArea(pathname: string): PlatformArea | undefined {
   const path = withoutLocale(pathname.split(/[?#]/)[0]!)
-  if (path === '/') return 'create'
+  if (path === '/' || path === '/editor') return 'create'
   return ROUTES.find(([, routes]) =>
     routes.some((route) => path === route || path.startsWith(`${route}/`))
   )?.[0]

@@ -262,7 +262,7 @@ function AttachmentRow({
           </Button>
           <Button asChild size="sm" variant="outline">
             <a
-              href={`/?asset=${encodeURIComponent(String(node.assetId))}&fromDraft=${encodeURIComponent(draftId)}`}
+              href={`/editor?asset=${encodeURIComponent(String(node.assetId))}&fromDraft=${encodeURIComponent(draftId)}`}
               rel="noopener noreferrer"
               target="_blank"
             >

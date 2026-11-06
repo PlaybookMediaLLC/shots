@@ -64,7 +64,7 @@ function errorMessage(error: unknown): string {
 }
 
 function editorHref(projectId: string): string {
-  return `/?project=${encodeURIComponent(projectId)}`
+  return `/editor?project=${encodeURIComponent(projectId)}`
 }
 
 /** The workspace's projects: search, open, rename, duplicate, delete, and start new ones. */
