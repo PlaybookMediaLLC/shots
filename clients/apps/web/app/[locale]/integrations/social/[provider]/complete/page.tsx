@@ -14,7 +14,7 @@ import {
 } from '@/lib/tenant/social-oauth-completion'
 
 export const metadata: Metadata = {
-  title: 'Connection completed — Shots',
+  title: 'Connection completed',
   robots: { index: false, follow: false },
   referrer: 'no-referrer',
 }

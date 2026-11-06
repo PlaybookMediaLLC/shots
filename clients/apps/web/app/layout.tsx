@@ -1,6 +1,6 @@
 import { AppThemeProvider } from '@/components/platform-shell/AppThemeProvider'
 import type { Metadata, Viewport } from 'next'
-import { SITE_URL } from '@/lib/seo/metadata'
+import { OG_DEFAULTS, SITE_URL } from '@/lib/seo/metadata'
 import {
   Geist,
   Geist_Mono,
@@ -266,20 +266,31 @@ const fontVariables = [
 ].join(' ')
 
 export const metadata: Metadata = {
+  applicationName: 'Shots',
   title: {
-    default: 'Shots - Screenshot Beautifier & Mockup Maker',
+    default: 'Shots: Turn every release into a launch',
     template: '%s | Shots',
   },
   // Add your Google Search Console verification code here
   // Get it from: https://search.google.com/search-console
   verification: {
     google: process.env.GOOGLE_SITE_VERIFICATION || '',
+    other: { 'msvalidate.01': 'A3B8CB50BBD78710971A13FA3EE1E544' },
     // yandex: "your-yandex-verification",
-    // bing: "your-bing-verification",
   },
   description:
     'Shots turns every release into a cited launch brief, on-brand visuals, and posts you approve. Every plan includes a screenshot editor.',
+  abstract: 'Turn every release into a launch campaign that a person approves.',
   keywords: [
+    // Platform keywords
+    'product launch platform',
+    'release announcement tool',
+    'launch campaign generator',
+    'changelog to social posts',
+    'GitHub release to social media',
+    'AI launch copy with citations',
+    'product marketing for developers',
+    'feature announcement',
     // Primary keywords
     'screenshot editor online',
     'online screenshot editor',
@@ -346,7 +357,6 @@ export const metadata: Metadata = {
     'Instagram post creator',
     'LinkedIn banner maker',
     // Long-tail keywords
-    'product launch platform',
     'beautify screenshots online',
     'add background to screenshot',
     'screenshot to video converter',
@@ -359,32 +369,21 @@ export const metadata: Metadata = {
   creator: 'Shots',
   publisher: 'Shots',
   metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: '/',
-  },
+  // Matches the Referrer-Policy header in next.config.ts.
+  referrer: 'strict-origin-when-cross-origin',
+  // Stops iOS from linking version numbers and dates as phone numbers.
+  formatDetection: { telephone: false, address: false, email: false },
+  appleWebApp: { title: 'Shots', statusBarStyle: 'default' },
+  classification: 'Product launch software',
+  archives: [`${SITE_URL}/changelog`],
+  bookmarks: [`${SITE_URL}/landing`, `${SITE_URL}/pricing`, `${SITE_URL}/docs`],
   openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: '/',
-    siteName: 'Shots',
-    title: 'Shots - Screenshot Editor Online',
+    ...OG_DEFAULTS,
+    title: 'Shots: Turn every release into a launch',
     description: `Shots turns every release into a cited launch brief, on-brand visuals, and posts you approve. Every plan includes a screenshot editor with ${atLeast(PRODUCT_FACTS.backgrounds)} backgrounds, 3D effects, and video export.`,
-    images: [
-      {
-        url: `${SITE_URL}/og.jpg`,
-        width: 1200,
-        height: 630,
-        alt: 'Shots - Launch what you shipped.',
-      },
-    ],
   },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Shots - Screenshot Editor Online',
-    description:
-      'Shots turns every release into a cited launch brief, on-brand visuals, and posts you approve. Every plan includes a screenshot editor.',
-    images: [`${SITE_URL}/og.jpg`],
-  },
+  // Next fills the title, description and image from each page's Open Graph data.
+  twitter: { card: 'summary_large_image' },
   robots: {
     index: true,
     follow: true,
@@ -408,7 +407,7 @@ export const metadata: Metadata = {
     apple: [{ url: '/apple-touch-icon.png?v=10', sizes: '180x180', type: 'image/png' }],
   },
   manifest: '/site.webmanifest',
-  category: 'Design Tools',
+  category: 'Marketing software',
   other: {
     'google-adsense-account': ADSENSE_CLIENT,
   },
@@ -439,7 +438,6 @@ export default async function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(${installDeploymentRecovery.toString()})()` }} />
       </head>
-      <meta name="msvalidate.01" content="A3B8CB50BBD78710971A13FA3EE1E544" />
       <link rel="alternate" type="text/markdown" href="/llms.txt" title="LLMs.txt" />
       <link
         rel="alternate"

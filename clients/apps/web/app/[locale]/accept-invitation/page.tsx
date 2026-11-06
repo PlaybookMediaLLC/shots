@@ -3,6 +3,8 @@ import { headers } from 'next/headers'
 import { AcceptInvitation } from '@/components/auth/AcceptInvitation'
 import { getLocalizedPath, getPageAccess } from '@/lib/auth/page-access'
 
+export const metadata = { title: 'Workspace invitation' }
+
 type AcceptInvitationPageProps = {
   params: Promise<{ locale: string }>
   searchParams: Promise<{ invitationId?: string }>

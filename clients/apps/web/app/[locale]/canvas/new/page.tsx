@@ -4,6 +4,8 @@ import { accessAllows } from '@/lib/auth/permissions'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { NewCanvas } from '@/components/canvas-workspace/NewCanvas'
 
+export const metadata = { title: 'New canvas' }
+
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value)
 
 export default async function NewCanvasPage({

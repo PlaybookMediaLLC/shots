@@ -5,12 +5,13 @@ import { Footer } from '@/components/landing/Footer';
 import { CompressVideoLoader } from '@/components/compress-video/CompressVideoLoader';
 import { SectionTitle, ToolFaq, ToolHero } from '@/components/tools/ToolLayout';
 import { CARD_CLASS } from '@/components/tools/ui';
+import { PRO_PLAN_OFFER } from '@/lib/seo/json-ld';
 import { OG_DEFAULTS, SITE_URL } from '@/lib/seo/metadata';
 import { TOOLS_HUB_PATH } from '@/lib/seo/tools';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Compress Video Online: Free, No Upload',
+  title: 'Compress Video Online: No Upload',
   description:
     'Reduce video file size in your browser. Pick a quality level or a target size in MB, and download an MP4. Included in every plan. No watermark, no upload.',
   keywords: [
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     ...OG_DEFAULTS,
-    title: 'Compress Video Online: Free, No Upload',
+    title: 'Compress Video Online: No Upload',
     description:
       'Make videos smaller on your device, by quality level or to a target size in MB. Included in every plan. No watermark.',
     url: '/compress-video',
@@ -71,7 +72,7 @@ const faqs = [
       'Some videos are already compressed very efficiently, such as clips exported from editing apps at low bitrates. Re-encoding them cannot save much. The tool shows the before and after sizes, so you can keep your original if it is smaller.',
   },
   {
-    question: 'Is it free, and is there a watermark?',
+    question: 'Does it cost extra, and is there a watermark?',
     answer:
       'It is included in every Shots plan, with no daily limit and no watermark. Shots is open source under the Apache 2.0 licence.',
   },
@@ -130,16 +131,11 @@ const jsonLd = {
       applicationSubCategory: 'Video Compressor',
       operatingSystem: 'Any (Web Browser)',
       description:
-        'Free video compressor that runs in the browser with FFmpeg WebAssembly. Compress by quality level or to a target size in MB without uploading the video.',
-      isAccessibleForFree: true,
+        'Video compressor that runs in the browser with FFmpeg WebAssembly. Compress by quality level or to a target size in MB without uploading the video.',
       publisher: {
         '@id': `${SITE_URL}/#organization`,
       },
-      offers: {
-        '@type': 'Offer',
-        price: '0',
-        priceCurrency: 'USD',
-      },
+      offers: PRO_PLAN_OFFER,
       featureList: [
         'In-browser compression with FFmpeg WebAssembly',
         'Four quality levels or a target size in MB',

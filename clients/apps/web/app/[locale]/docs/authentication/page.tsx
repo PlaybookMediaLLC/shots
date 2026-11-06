@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table'
 
 export const metadata: Metadata = {
-  title: "Shots API Authentication",
+  title: { absolute: "Shots API Authentication" },
   description:
     "Authentication for Shots editor utility endpoints and workspace-scoped /api/v1 tenant operations: signed-in sessions and workspace API keys.",
   keywords: [
