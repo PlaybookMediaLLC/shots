@@ -568,10 +568,8 @@ test(
       await other.keyboard.press('Escape')
       await page.bringToFront()
       await expect(page.getByRole('listbox')).toBeVisible()
-      await page.keyboard.type('heading')
-      await expect(
-        page.getByRole('option').filter({ hasText: 'Large section heading.' })
-      ).toBeVisible()
+      await page.keyboard.type('bullets')
+      await expect(page.getByRole('option').filter({ hasText: 'Bulleted list' })).toBeVisible()
     } finally {
       await other.close()
     }

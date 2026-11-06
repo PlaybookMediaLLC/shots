@@ -13,7 +13,8 @@ async function openStudio(identity: E2EIdentity, page: Page) {
 
 async function editHeading(page: Page, text: string) {
   const box = (await page.locator('[data-store-canvas-slide]').boundingBox())!
-  await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.1)
+  // The heading's first line: a short heading doesn't reach further down the slide.
+  await page.mouse.dblclick(box.x + box.width * 0.5, box.y + box.height * 0.075)
   await expect(page.locator('[data-store-inline-editor]')).toBeVisible()
   await page.keyboard.press('ControlOrMeta+a')
   await page.keyboard.type(text)
@@ -232,7 +233,7 @@ test(
     const listed = library.locator(`a[href$="/create/store/${id}"][aria-label^="Open "]`)
     await expect(listed).toHaveCount(1)
     const name = (await listed.getAttribute('aria-label'))!.replace(/^Open /, '')
-    await expect(library.getByText(/In this workspace/)).toBeVisible()
+    await expect(library.getByRole('heading', { name: 'In this workspace' })).toBeVisible()
     await listed.click()
     await expect(second.locator('[data-store-canvas-slide]')).toContainText('Saved twice')
     await expect(

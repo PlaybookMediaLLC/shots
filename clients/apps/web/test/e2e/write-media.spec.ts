@@ -122,8 +122,8 @@ test(
         })
       ).status
     ).toBe(200)
-    // Only the GIPHY boundary is substituted. The gate stays off, no GIPHY
-    // server is contacted, and the fixture animation has real tenant storage.
+    // Only the GIPHY boundary is substituted. No GIPHY server is contacted,
+    // and the fixture animation has real tenant storage.
     await page.route('**/api/v1/content-drafts/giphy*', async (route) => {
       const request = route.request()
       if (request.method() === 'POST') {
@@ -460,15 +460,22 @@ test(
         .evaluateAll((items) => items.map((item) => item.getAttribute('data-attachment-id')))
     ).toEqual(originalOrder.reverse())
     await manager.getByRole('button', { name: 'Frame', exact: true }).first().click()
-    await page.getByLabel('Frame color').fill('#ff8800')
+    await page.getByLabel('Frame color').click()
+    await page.getByLabel('Hex color').fill('#ff8800')
+    await page.getByLabel('Hex color').press('Enter')
+    await expect(page.getByLabel('Frame color')).toContainText(/ff8800/i)
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Use brand color #6366f1' }).click()
     await page.getByRole('button', { name: 'Preview frame', exact: true }).click()
     await expect(page.getByAltText('Framed image preview')).toBeVisible({ timeout: 60_000 })
     await page.getByRole('button', { name: 'Apply frame', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Frame image' })).toHaveCount(0)
     await manager.getByRole('button', { name: 'Frame', exact: true }).first().click()
-    await expect(page.getByLabel('Frame color')).toHaveValue('#6366f1')
-    await page.getByLabel('Frame color').fill('#ff8800')
+    await expect(page.getByLabel('Frame color')).toContainText(/#6366f1/i)
+    await page.getByLabel('Frame color').click()
+    await page.getByLabel('Hex color').fill('#ff8800')
+    await page.getByLabel('Hex color').press('Enter')
+    await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await page.keyboard.press('Escape')
     await draftEditor(page).click()
@@ -622,6 +629,13 @@ test(
     await openNewDraft(page)
     await draftEditor(page).click()
     await page.keyboard.type('Document and image preview.')
+    // The server refuses until GIPHY approves; the picker says so rather than showing nothing.
+    await page.route('**/api/v1/content-drafts/giphy*', (route) =>
+      route.fulfill({
+        status: 503,
+        json: { message: 'GIPHY search is not enabled. Provider approval is still required.' },
+      })
+    )
     await editorMore(page, 'GIF')
     await page.getByLabel('Search GIFs').fill('release')
     await page.getByRole('button', { name: 'Search', exact: true }).click()

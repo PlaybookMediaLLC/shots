@@ -98,6 +98,8 @@ for (const outcome of ['verified', 'unknown'] as const) {
         expect(response.status).toBe(200)
         return socialSetListSchema.parse(response.body).items
       }
+      // A workspace starts with an empty default profile; a connection is one with an account.
+      const connected = async () => (await list()).filter((set) => set.accounts.length > 0)
       const exchanges = () =>
         provider.calls.filter((call) => call.url === '/integrations/social-connect/bluesky')
       try {
@@ -126,7 +128,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
         expect(new Set(provider.calls.map((call) => `${call.method} ${call.url}`))).toEqual(
           new Set(['GET /api/public/v1/me', 'GET /api/public/v1/connection-availability'])
         )
-        expect(await list()).toHaveLength(0)
+        expect(await connected()).toHaveLength(0)
         expect(page.url()).toBe(originalURL)
         await dialog.getByRole('button', { name: 'Bluesky', exact: true }).click()
         await expect(dialog.getByLabel('App Password', { exact: true })).toHaveValue('')
@@ -145,7 +147,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
         await dialog.getByRole('button', { name: 'Connect', exact: true }).click()
         if (outcome === 'unknown') {
           await expect(dialog.getByRole('alert')).toContainText('result may be unknown')
-          expect(await list()).toHaveLength(0)
+          expect(await connected()).toHaveLength(0)
           await expect(dialog.getByLabel('App Password', { exact: true })).toHaveCount(0)
           await dialog.getByRole('button', { name: 'Check connection result' }).click()
           await expect(dialog.getByRole('alert')).toContainText('result is unknown')
@@ -156,7 +158,7 @@ for (const outcome of ['verified', 'unknown'] as const) {
         } else {
           await expect(dialog.getByText('Bluesky connected', { exact: true })).toBeVisible()
           expect(page.url()).toBe(originalURL)
-          const sets = await list()
+          const sets = await connected()
           expect(sets).toHaveLength(1)
           const created = sets[0]
           expect(created.visibility).toBe('PRIVATE')
@@ -209,8 +211,8 @@ for (const outcome of ['verified', 'unknown'] as const) {
           await dialog.getByLabel('App Password', { exact: true }).fill(password)
           await dialog.getByRole('button', { name: 'Connect', exact: true }).click()
           await expect(dialog.getByText('Bluesky connected', { exact: true })).toBeVisible()
-          expect((await list()).map((item) => item.id)).toEqual([created.id])
-          expect((await list())[0].accounts[0].id).toBe(created.accounts[0].id)
+          expect((await connected()).map((item) => item.id)).toEqual([created.id])
+          expect((await connected())[0].accounts[0].id).toBe(created.accounts[0].id)
           const reconnect = provider.calls.find((call) => call.url.includes('/social/bluesky?'))
           expect(new URL(reconnect?.url ?? '/', provider.url).searchParams.get('refresh')).toBe(did)
         }

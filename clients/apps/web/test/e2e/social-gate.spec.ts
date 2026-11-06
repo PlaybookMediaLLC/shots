@@ -355,8 +355,7 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         })
         expect(incomplete.status).toBe(409)
         await page.goto(`/publish/${id}`)
-        // Post options open beside the draft from the platform's chip.
-        await page.getByTestId('options-chip').click()
+        // What a video platform must have is on the page, above the post.
         if (draft.channel === 'youtube') {
           await page.getByLabel('YouTube title', { exact: true }).fill('Fixture video')
           await page.getByRole('combobox', { name: 'YouTube privacy' }).click()
@@ -374,7 +373,6 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         }
         await expectSaved(page)
         await page.reload()
-        await page.getByTestId('options-chip').click()
         if (draft.channel === 'youtube') {
           await expect(page.getByLabel('YouTube title', { exact: true })).toHaveValue(
             'Fixture video'

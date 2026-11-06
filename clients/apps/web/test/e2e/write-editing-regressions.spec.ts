@@ -139,7 +139,7 @@ test(
     })
     const search = page.getByRole('searchbox', { name: 'Search drafts' }).first()
     await search.fill('<b>&amp;')
-    await expect(page.getByText('No drafts match these filters.').first()).toBeVisible()
+    await expect(page.getByText('Nothing matches these filters.').first()).toBeVisible()
     await search.fill('Retry keeps')
     await expect(
       page.getByTestId('draft-row').filter({ hasText: 'Retry keeps this title' })

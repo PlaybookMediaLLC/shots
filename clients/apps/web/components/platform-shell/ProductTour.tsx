@@ -243,7 +243,8 @@ export function ProductTourProvider({
   }, [element])
 
   // An unseen tour starts by itself once, where its first element shows: not
-  // on a phone, whose navigation is closed, and not over an open dialog.
+  // on a phone, whose navigation is closed, and not over anything the person has
+  // open. Its card would take the next Escape and leave a menu open behind it.
   useEffect(() => {
     if (!autoStart || session || status !== 'ready' || !preferences) return
     // A tip leaves the tab's list once saved, so "Reset help tips" brings the tour back here too.
@@ -257,7 +258,7 @@ export function ProductTourProvider({
     const timer = window.setTimeout(() => {
       if (
         findAnchor(first.anchor) &&
-        !document.querySelector('[role="dialog"], [role="alertdialog"]')
+        !document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')
       ) {
         setSession({ tourId: unseen.id, stepIndex: 0 })
       }

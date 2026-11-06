@@ -55,6 +55,36 @@ test('a new member gets the workspace tour once, and the tours menu replays it',
   await expect(page.getByRole('button', { name: 'Product tours' })).toBeFocused()
 })
 
+test('the tour does not start over an open menu, so Escape still closes the menu', async ({
+  app,
+  page,
+}) => {
+  // Preferences decide when the tour may start; holding them lets the menu open first.
+  let release = () => {}
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/v1/me/preferences', async (route) => {
+    await held
+    await route.continue()
+  })
+  await app.open('/home')
+  await page
+    .getByRole('complementary', { name: 'Primary navigation' })
+    .getByRole('button', { name: 'New', exact: true })
+    .click()
+  const menu = page.getByRole('menu')
+  await expect(menu).toBeVisible()
+  const preferences = page.waitForResponse('**/api/v1/me/preferences')
+  release()
+  await preferences
+  // eslint-disable-next-line no-restricted-syntax -- Proves something does not happen: past the tour's 800 ms start delay.
+  await page.waitForTimeout(1_500)
+  await expect(page.getByTestId('product-tour-step')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(menu).toBeHidden()
+})
+
 test('the workspace tour leads into the Publish tour on its page', async ({ app, page }) => {
   await app.open('/home')
   const card = page.getByTestId('product-tour-step')

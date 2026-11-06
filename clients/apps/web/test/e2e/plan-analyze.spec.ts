@@ -65,18 +65,18 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
   })
   await test.step('P02 same-named provider identities are distinguishable', async () => {
     await expect(
-      page.getByRole('checkbox', { name: 'Show Same name x', exact: true })
+      page.getByRole('checkbox', { name: 'Show Same name X', exact: true })
     ).toBeVisible()
     await expect(
-      page.getByRole('checkbox', { name: 'Show Same name linkedin', exact: true })
+      page.getByRole('checkbox', { name: 'Show Same name LinkedIn', exact: true })
     ).toBeVisible()
   })
   await test.step('P03 P05 P06 all mixed and none selection use stable account IDs', async () => {
     const all = page.getByRole('checkbox', { name: 'All profiles' })
     await expect(all).toBeChecked()
-    await page.getByRole('checkbox', { name: 'Show Same name linkedin', exact: true }).uncheck()
+    await page.getByRole('checkbox', { name: 'Show Same name LinkedIn', exact: true }).uncheck()
     await expect(all).toBeChecked({ indeterminate: true })
-    await page.getByRole('checkbox', { name: 'Show Same name x', exact: true }).uncheck()
+    await page.getByRole('checkbox', { name: 'Show Same name X', exact: true }).uncheck()
     await expect(all).not.toBeChecked()
     await all.check()
   })
@@ -180,7 +180,7 @@ test('Plan acceptance: authenticated account selection, creation, lifecycle, mov
     )
     await expect(page.getByRole('textbox', { name: 'Time', exact: true })).toHaveValue('12:00 PM')
     await expect(page.getByRole('checkbox', { name: 'Open in editor' })).toBeChecked()
-    await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Article')
+    await expect(page.getByRole('combobox', { name: 'Post type' })).toContainText('Post or thread')
     await page.getByRole('button', { name: 'Plan draft', exact: true }).click()
     await expect(page.getByRole('alert')).toContainText('Write some content')
     await page.keyboard.press('Escape')
@@ -618,17 +618,17 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await app.open('/publish/analyze')
     await expect(page.getByLabel('Analytics account')).toContainText('All accounts')
     await expect(page.getByRole('row', { name: /^All accounts/ })).toContainText('2')
-    await expect(page.getByRole('row', { name: /^x · / })).toContainText('1.2M')
-    await expect(page.getByRole('row', { name: /^linkedin · / })).toContainText(
+    await expect(page.getByRole('row', { name: /^X · / })).toContainText('1.2M')
+    await expect(page.getByRole('row', { name: /^LinkedIn · / })).toContainText(
       'Not available on this network'
     )
-    await page.getByRole('button', { name: /^x · / }).click()
-    await expect(page.getByLabel('Analytics account')).toContainText(' · x · ')
+    await page.getByRole('button', { name: /^X · / }).click()
+    await expect(page.getByLabel('Analytics account')).toContainText(' · X · ')
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await app.open(`/publish/analyze?account=${workspace.channels.x}&limit=1`)
   await test.step('A01 A06 A07 all seven areas show account scope and exact accessible totals', async () => {
-    await expect(page.getByLabel('Analytics account')).toContainText(' · x · ')
+    await expect(page.getByLabel('Analytics account')).toContainText(' · X · ')
     for (const title of [
       'Followers',
       'Impressions',
@@ -642,7 +642,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveText('1.2M')
   })
   await test.step('A02 A03 A04 account changes clear old values and show capability-based availability', async () => {
-    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · LinkedIn · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
     // No cards of dashes, no grid of empty hours, no goal: one notice and the real post count.
     await expect(
@@ -651,7 +651,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByRole('heading', { name: 'Published Posts', exact: true })).toBeVisible()
     for (const title of ['Followers', 'Hourly Engagement', 'Posting Streak'])
       await expect(page.getByRole('heading', { name: title, exact: true })).toHaveCount(0)
-    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · X · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A05 decorative loading is inaccessible and A02 aborted responses cannot cross accounts', async () => {
@@ -660,7 +660,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     const gate = new Promise<void>((resolve) => {
       release = resolve
     })
-    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · LinkedIn · /)
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
@@ -669,18 +669,18 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
       await gate
       await route.fulfill({ response }).catch(() => {})
     })
-    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · X · /)
     await expect(page.getByRole('status').filter({ hasText: 'Loading analytics' })).toBeVisible()
     await expect(page.locator('[aria-hidden="true"] .animate-pulse')).toHaveCount(6)
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
-    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · LinkedIn · /)
     release()
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
     await expect(page.getByLabel('Followers: 1,200,000')).toHaveCount(0)
     await page.unroute(path)
-    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · X · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A04 A17 one malformed metric preserves neighboring cards and recovers independently', async () => {
@@ -705,7 +705,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByRole('button', { name: 'Retry metric', exact: true })).toHaveCount(0)
   })
   await test.step('A16 A28 A35 legitimate zero chart exports independently from an empty post list', async () => {
-    await chooseOption(page.getByLabel('Analytics account'), / · linkedin · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · LinkedIn · /)
     await expect(
       page.getByText('No confirmed posts in this scope.', { exact: false })
     ).toBeVisible()
@@ -717,7 +717,7 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     await expect(page.getByRole('button', { name: 'Export chart CSV' })).toBeEnabled()
     await expect(page.getByRole('img', { name: /Observed values/ })).toBeVisible()
     await page.getByRole('button', { name: 'Overview' }).click()
-    await chooseOption(page.getByLabel('Analytics account'), / · x · /)
+    await chooseOption(page.getByLabel('Analytics account'), / · X · /)
     await expect(page.getByLabel('Followers: 1,200,000')).toBeVisible()
   })
   await test.step('A18 metric help opens its actual definition', async () => {
@@ -795,7 +795,9 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
   })
   await test.step('A21 A22 A23 A24 A25 hourly modes and exact cell drilldown show sample evidence', async () => {
     await chooseOption(page.getByLabel('Hourly mode'), 'Days')
-    await expect(page.getByLabel('Weekday').locator('option')).toHaveCount(7)
+    await page.getByLabel('Weekday').click()
+    await expect(page.getByRole('option')).toHaveCount(7)
+    await page.keyboard.press('Escape')
     await chooseOption(page.getByLabel('Hourly mode'), 'Heatmap')
     await expect(
       page
@@ -898,7 +900,10 @@ test('Analyze acceptance: scoped reports, chart and post exports, goals, and pub
     ])
       await expect(page.getByLabel(label, { exact: true })).toBeVisible()
     await chooseOption(page.getByLabel('Image crop'), 'Square')
-    await page.getByLabel('Image color').fill('#2a4860')
+    await page.getByLabel('Image color').click()
+    await page.getByLabel('Hex color').fill('#2a4860')
+    await page.getByLabel('Hex color').press('Enter')
+    await page.keyboard.press('Escape')
     await page.getByLabel('Image frame').click()
     await page.getByRole('option').nth(1).click()
     await page.getByLabel('Image gradient').click()

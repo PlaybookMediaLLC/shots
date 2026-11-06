@@ -130,6 +130,7 @@ test(
     await startWorkspace({ channels: ['x'] })
     await openNewDraft(page)
     const editor = draftEditor(page)
+    await page.getByTestId('options-chip').click()
     await page.getByText('Split automatically on paste').click()
     await editor.click()
     await settleSelection(page)
@@ -147,6 +148,8 @@ test(
     await preview.getByRole('button', { name: 'Split into 5 posts' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(5)
     await expectSaved(page)
+    // Narrow, the options panel becomes a sheet that hides the page behind it.
+    await page.getByTestId('options-chip').click()
 
     await page.setViewportSize({ width: 584, height: 715 })
     const avatar = page.locator('[data-post-avatar]').first()
