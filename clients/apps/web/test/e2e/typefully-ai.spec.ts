@@ -2,7 +2,7 @@ import { apiRequest, draftEditor, expect, expectSaved, test } from './framework'
 
 test(
   'prompt examples and reviewed voice notes enter the existing editable assistant workflow',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
@@ -81,7 +81,7 @@ test(
 
 test(
   'saved voice samples and style guidance survive reload, configure the assistant, and honor the workspace AI switch',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     const workspace = await startWorkspace({ channels: ['x', 'linkedin'] })
     const sets = (await apiRequest(page, '/api/v1/social-sets')).body as {

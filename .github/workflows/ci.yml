@@ -15,9 +15,252 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  NODE_VERSION: '22.23.4'
+  # Each browser shard runs its own stack on its own runner, so this trades
+  # concurrent job slots for wall clock. The whole suite is roughly 9,200
+  # worker-seconds and each shard runs 4 Playwright workers, so six shards put
+  # about 6.5 minutes of tests on the critical path. Raising it shortens the
+  # run until the shared image builds, not the tests, decide the wall clock.
+  E2E_SHARDS: '6'
+
 jobs:
-  publishing-services:
+  # One place decides what this revision needs: which browser tests, on how
+  # many shards, and which area jobs can be skipped. Everything downstream
+  # reads these outputs, and `CI validation` re-reads them to tell a legitimate
+  # skip from a job that never ran.
+  plan:
+    name: Plan
     if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      go: ${{ steps.areas.outputs.go }}
+      native: ${{ steps.areas.outputs.native }}
+      docs_only: ${{ steps.e2e.outputs.docs_only }}
+      e2e_tier: ${{ steps.e2e.outputs.tier }}
+      e2e_matrix: ${{ steps.e2e.outputs.matrix }}
+      e2e_run: ${{ steps.e2e.outputs.run == 'true' && steps.release.outputs.reuse != 'true' }}
+    steps:
+      # A pull request's merge commit has its base as the first parent, so two
+      # commits of history are enough to list what the pull request changes.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: List what this revision changes
+        id: changed
+        run: |
+          set -euo pipefail
+          # No parent means nothing to compare against, and every selection
+          # below then falls back to running everything.
+          files="$(git rev-parse --verify --quiet HEAD^1 >/dev/null && git diff --name-only HEAD^1 HEAD || true)"
+          {
+            echo 'files<<CHANGED_FILES_EOF'
+            printf '%s\n' "$files"
+            echo CHANGED_FILES_EOF
+          } >> "$GITHUB_OUTPUT"
+          count="$(printf '%s\n' "$files" | sed '/^$/d' | wc -l | tr -d ' ')"
+          echo "$count changed file(s)." >> "$GITHUB_STEP_SUMMARY"
+          # A merge can change thousands of files; the plan below is the point.
+          if [[ "$count" -le 50 ]]; then
+            printf '%s\n' "$files" | sed '/^$/d; s/^/- /' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      # Area filters, not test selection: a job is skipped only when nothing it
+      # can observe changed. An unreadable diff runs everything.
+      - name: Decide which areas must run
+        id: areas
+        env:
+          FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          set -euo pipefail
+          area() {
+            if [[ -z "${FILES//[[:space:]]/}" ]] || grep -qE "$2" <<< "$FILES"; then
+              echo "$1=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$1=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+          area go '^(server/|Makefile$|\.github/workflows/ci\.yml$)'
+          area native '^(clients/integrations/|clients/package-lock\.json$|\.github/workflows/ci\.yml$)'
+      - name: Plan the browser tests
+        id: e2e
+        env:
+          BASE: ${{ github.base_ref }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHARDS: ${{ env.E2E_SHARDS }}
+        run: node dev/e2e-plan.mjs
+      # A release pull request re-tests the exact tree the push to develop
+      # already tested: the same commit, the same images, the same suite. Reuse
+      # that result rather than spending a second full run on it.
+      - name: Reuse this commit's full suite
+        id: release
+        if: github.base_ref == 'main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+            --commit "$HEAD_SHA" --event push --branch develop --json conclusion,databaseId,status \
+            --jq 'map(select(.status == "completed" and .conclusion == "success")) | .[0].databaseId // ""')"
+          if [[ -z "$run" ]]; then
+            echo "No successful push run for $HEAD_SHA; running the full suite." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "reuse=true" >> "$GITHUB_OUTPUT"
+          echo "Browser tests reused from run $run, which passed on this exact commit." >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/$GITHUB_REPOSITORY/actions/runs/$run" >> "$GITHUB_STEP_SUMMARY"
+
+  # Every image the stack needs is built once per run, here, with a layer
+  # cache, and handed to the jobs that need it as a run artifact. A browser
+  # shard that built them itself recompiled the Go tree and reinstalled
+  # node_modules per shard, which was about a third of the whole runner budget.
+  web-image:
+    name: Build web image
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: clients/apps/web/Dockerfile
+          # The browser suite's Compose files name the second tag.
+          tags: |
+            screenshot-studio:${{ github.sha }}
+            screenshot-studio-web-e2e:latest
+          load: true
+          cache-from: type=gha,scope=screenshot-studio-web
+      - name: Smoke test production container
+        run: |
+          # No database: the web reaches all data through the Go backend.
+          docker run --detach --rm --name screenshot-studio-smoke \
+            --publish 3000:3000 \
+            screenshot-studio:${{ github.sha }}
+          trap 'docker logs screenshot-studio-smoke || true; docker stop screenshot-studio-smoke || true' EXIT
+          for _ in $(seq 1 20); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health; then
+              curl --fail --silent --show-error http://127.0.0.1:3000/indexnow-key.txt > /tmp/indexnow-key.txt
+              diff clients/apps/web/public/indexnow-key.txt /tmp/indexnow-key.txt
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+      - name: Export the tested image
+        run: |
+          docker save screenshot-studio:${{ github.sha }} screenshot-studio-web-e2e:latest |
+            gzip -1 > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-web-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/image.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      # Browser shards can consume the smoke-tested image while this cache uploads.
+      # PRs restore the shared branch cache without exporting a PR-only copy.
+      - name: Update the shared web build cache
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: clients/apps/web/Dockerfile
+          cache-to: type=gha,mode=max,scope=screenshot-studio-web
+
+  backend-image:
+    name: Build backend images
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          tags: screenshot-studio-backend:local
+          load: true
+          cache-from: type=gha,scope=social-backend
+          # PR caches cannot seed other PRs; branch pushes refresh the shared cache.
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=social-backend' || '' }}
+      # The social gate compiles the same tree with the e2e build tag, so it
+      # cannot share layers with the image above and needs a cache of its own.
+      # It used to build here with no cache at all.
+      - name: Build the end-to-end backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          build-args: GO_BUILD_TAGS=e2e
+          tags: screenshot-studio-backend:social-gate
+          load: true
+          cache-from: type=gha,scope=social-backend-e2e
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=social-backend-e2e' || '' }}
+      - name: Export the backend image
+        run: docker save screenshot-studio-backend:local | gzip -1 > "$RUNNER_TEMP/backend.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-backend-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/backend.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+      - name: Export the end-to-end backend image
+        run: docker save screenshot-studio-backend:social-gate | gzip -1 > "$RUNNER_TEMP/backend-e2e.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-backend-e2e-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/backend-e2e.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  collab-image:
+    name: Build collab image
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: clients/apps/collab-server/Dockerfile
+          tags: screenshot-studio-collab:local
+          load: true
+          cache-from: type=gha,scope=screenshot-studio-collab
+          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=screenshot-studio-collab' || '' }}
+      - name: Smoke test the collaboration server image
+        run: |
+          docker run --detach --rm --name collab-smoke --publish 1234:1234 \
+            --env COLLAB_BACKEND_URL=http://127.0.0.1:9 --env COLLAB_SERVICE_TOKEN=smoke \
+            screenshot-studio-collab:local
+          trap 'docker logs collab-smoke || true; docker stop collab-smoke || true' EXIT
+          curl --fail --silent --show-error --retry 20 --retry-delay 1 --retry-all-errors \
+            http://127.0.0.1:1234/health
+      - name: Export the tested image
+        run: docker save screenshot-studio-collab:local | gzip -1 > "$RUNNER_TEMP/image.tar.gz"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-collab-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/image.tar.gz
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  go-checks:
+    name: Go checks
+    needs: plan
+    if: needs.plan.outputs.go == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -47,12 +290,30 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: server/go.mod
-          cache-dependency-path: server/go.sum
+          # setup-go keys its cache on go.sum alone with no restore-keys, so a
+          # dependency bump threw away every compiled first-party package and
+          # recompiled the standard library twice (once more for -race).
+          cache: false
+      - name: Cache the Go module and build output
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-${{ runner.os }}-${{ hashFiles('server/go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-${{ runner.os }}-${{ hashFiles('server/go.sum') }}-
+            go-${{ runner.os }}-
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install --yes postgresql-client
-      - run: go generate ./ent ./internal/social/ent
-      - name: Verify generated Ent clients are current
-        run: git diff --exit-code -- ent internal/social/ent
+      # `make` targets, not inlined commands: `make -C server check` then runs
+      # exactly what CI runs. The race package list lived here and had drifted
+      # to sixteen packages while the Makefile still named seven.
+      - run: make generate
+      - name: Verify generated clients are current
+        run: git diff --exit-code -- ent internal/social/ent internal/frontenddeploy/vercelapi/client.gen.go
+      - name: Verify the module graph is unchanged
+        run: git diff --exit-code -- go.mod go.sum
       - name: Create the social test database
         run: psql postgresql://postgres:postgres@127.0.0.1:5432/publishing_acceptance -c 'CREATE DATABASE social_test'
       - name: Create and migrate maintenance test database
@@ -69,27 +330,69 @@ jobs:
         run: |
           psql postgresql://postgres:postgres@127.0.0.1:5432/publishing_acceptance -c 'CREATE DATABASE notifications_test'
           DATABASE_URL="$NOTIFICATIONS_TEST_DATABASE_URL" go run ./cmd/platform-migrate
-      - name: Verify Go formatting
-        run: test -z "$(gofmt -l .)"
-      - run: go test ./...
+      - run: make fmt-check
+      # The race packages are excluded here; they ran twice against the one
+      # shared test database, once with the detector and once without.
+      - run: make test
       - name: Verify social migrations are repeatable
         run: |
           DATABASE_URL="$SOCIAL_TEST_DATABASE_URL" go run ./cmd/social-migrate
           DATABASE_URL="$SOCIAL_TEST_DATABASE_URL" go run ./cmd/social-migrate
-      - run: go test -race ./internal/notifications ./internal/authstore ./internal/httpapi ./internal/socialapi ./internal/publishing ./internal/temporalpublishing ./internal/maintenance ./internal/temporalmaintenance ./internal/onboarding ./internal/temporalonboarding ./internal/enrichment ./internal/social/tenantpublishing
-      - run: go test -race ./internal/socialconnect ./internal/agentclients ./internal/mcp ./internal/shotsapi
-      - run: go vet ./...
-      - uses: docker/setup-buildx-action@v3
-      - name: Build the backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: server
-          cache-from: type=gha,scope=social-backend
-          # PR caches cannot seed other PRs; branch pushes refresh the shared cache.
-          cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=social-backend' || '' }}
+      - run: make race
+      - run: make vet
 
-  quality:
-    name: Client quality
+  # `quality:check` ran format, lint, typecheck and unit tests one after the
+  # other in a single job: 5 minutes to the first red, and no way to tell at a
+  # glance which one failed. Each is now its own signal.
+  client-lint:
+    name: Client lint
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/package-lock.json
+      - run: npm ci --prefer-offline --no-audit
+        working-directory: clients
+      - name: Cache the ESLint results
+        uses: actions/cache@v4
+        with:
+          path: clients/.eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('clients/package-lock.json', 'clients/eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('clients/package-lock.json', 'clients/eslint.config.mjs') }}-
+      - run: npm run format:check
+        working-directory: clients
+      - run: npm run lint -- --max-warnings=0
+        working-directory: clients
+
+  client-typecheck:
+    name: Client typecheck
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/package-lock.json
+      - run: npm ci --prefer-offline --no-audit
+        working-directory: clients
+      # The web app imports the backend SDK from the workspace, as the publish
+      # path builds it.
+      - run: npm run build:sdk
+        working-directory: clients
+      - run: npm run typecheck
+        working-directory: clients
+
+  client-unit:
+    name: Client unit tests
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -105,123 +408,53 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: clients/package-lock.json
-      - run: npm ci
+      - uses: azure/setup-helm@v4
+      - run: npm ci --prefer-offline --no-audit
         working-directory: clients
-      # Workspace scripts, as the SDK publish path builds it.
       - run: npm run build:sdk
         working-directory: clients
-      - run: python3 -m unittest discover -s infra/digitalocean -p 'test_*.py'
-      - run: npm run quality:check
+      - run: npm run test
         working-directory: clients
+      # The server-module tier: every test/*.server.ts suite, including the
+      # four that had no caller at all before (workspace invitations and
+      # membership, GIF search, link images).
+      - run: npm run test:server
+        working-directory: clients
+      - run: python3 -m unittest discover -s infra/digitalocean -p 'test_*.py'
       - run: python3 dev/verify-rfcs.py
-      - run: npm run test:publishing-backend-client
-        working-directory: clients/apps/web
-      - run: npm run test:screenshot-capture
-        working-directory: clients/apps/web
       - name: Validate local development configuration
         run: |
           ./dev/studio status
           docker compose --env-file .local/dev.env --file dev/compose.yaml config --quiet
-      - name: Build and smoke test the collaboration server image
-        run: |
-          docker build --file clients/apps/collab-server/Dockerfile --tag screenshot-studio-collab:${{ github.sha }} .
-          docker run --detach --rm --name collab-smoke --publish 1234:1234 \
-            --env COLLAB_BACKEND_URL=http://127.0.0.1:9 --env COLLAB_SERVICE_TOKEN=smoke \
-            screenshot-studio-collab:${{ github.sha }}
-          trap 'docker logs collab-smoke || true; docker stop collab-smoke || true' EXIT
-          for _ in $(seq 1 20); do
-            if curl --fail --silent --show-error http://127.0.0.1:1234/health; then
-              exit 0
-            fi
-            sleep 1
-          done
-          exit 1
+          docker compose --env-file .local/dev.env --file dev/compose.yaml \
+            --file dev/compose.e2e.yaml --file dev/compose.social-gate.yaml config --quiet
+      # Formerly its own workflow (helm.yml), which duplicated these four
+      # commands on a trigger surface this workflow already covers.
       - run: helm lint infra/charts/screenshot-studio
       - run: helm template screenshot-studio infra/charts/screenshot-studio > /dev/null
       - run: helm lint infra/charts/screenshot-studio --values infra/charts/screenshot-studio/values-kind.yaml --set existingSecret=screenshot-studio-local
       - run: helm template screenshot-studio infra/charts/screenshot-studio --values infra/charts/screenshot-studio/values-kind.yaml --set existingSecret=screenshot-studio-local > /dev/null
 
-  web-image:
-    name: Build web image
-    if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: clients/apps/web/Dockerfile
-          tags: screenshot-studio:${{ github.sha }}
-          load: true
-          cache-from: type=gha,scope=screenshot-studio-web
-      - name: Smoke test production container
-        run: |
-          # No database: the web reaches all data through the Go backend.
-          docker run --detach --rm --name screenshot-studio-smoke \
-            --publish 3000:3000 \
-            screenshot-studio:${{ github.sha }}
-          trap 'docker logs screenshot-studio-smoke || true; docker stop screenshot-studio-smoke || true' EXIT
-          for _ in $(seq 1 20); do
-            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health; then
-              curl --fail --silent --show-error http://127.0.0.1:3000/indexnow-key.txt > /tmp/indexnow-key.txt
-              diff clients/apps/web/public/indexnow-key.txt /tmp/indexnow-key.txt
-              exit 0
-            fi
-            sleep 1
-          done
-          exit 1
-      - name: Export the tested image
-        run: docker save screenshot-studio:${{ github.sha }} | gzip -1 > "$RUNNER_TEMP/web-image.tar.gz"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ci-web-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/web-image.tar.gz
-          compression-level: 0
-          retention-days: 1
-          if-no-files-found: error
-      # Browser shards can consume the smoke-tested image while this cache uploads.
-      # PRs restore the shared branch cache without exporting a PR-only copy.
-      - name: Update the shared web build cache
-        if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: clients/apps/web/Dockerfile
-          cache-to: type=gha,mode=max,scope=screenshot-studio-web
-
-  validate:
-    name: CI validation
-    needs: [quality, web-image]
-    if: always() && github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require client checks and the production image
-        env:
-          QUALITY: ${{ needs.quality.result }}
-          IMAGE: ${{ needs.web-image.result }}
-        run: test "$QUALITY" = success && test "$IMAGE" = success
-
   native-clients:
-    if: github.event.action != 'closed'
+    name: Native clients
+    needs: plan
+    if: needs.plan.outputs.native == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: |
             clients/package-lock.json
             clients/integrations/raycast/package-lock.json
             clients/integrations/zapier/package-lock.json
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
         working-directory: clients
       # Native host dependencies belong to each client's own TypeScript project.
       - run: npm ci --prefix clients/integrations/raycast
@@ -238,6 +471,7 @@ jobs:
   # match the zod contracts, and a pull request may not break the document
   # unless the break is listed in breaking-changes-allowed.txt (RFC 014).
   openapi:
+    name: Public API contract
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -247,14 +481,14 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: clients/package-lock.json
       - uses: actions/setup-go@v5
         with:
           go-version-file: server/go.mod
           cache: false
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
         working-directory: clients
       - name: Verify the OpenAPI document and typed client are current
         working-directory: clients
@@ -278,83 +512,61 @@ jobs:
             --fail-on ERR --format githubactions \
             --err-ignore server/internal/shotsapi/breaking-changes-allowed.txt
 
-  # Stack setup and quality checks start beside the shared image build.
-  # Which browser tests run (test/e2e/README.md, "When the suite runs"):
-  # a pull request into develop runs the @smoke tests, and a push to develop
-  # or a release pull request into main runs the full suite in 3 shards. A
-  # pull request that changes only docs runs none.
-  e2e-plan:
-    name: Plan browser tests
-    if: github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      run: ${{ steps.plan.outputs.run }}
-    steps:
-      # A pull request's merge commit has its base as the first parent, so two
-      # commits of history are enough to list what the pull request changes.
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - id: plan
-        env:
-          BASE: ${{ github.base_ref }}
-          EVENT: ${{ github.event_name }}
-          REF: ${{ github.ref }}
-        run: |
-          full='[{"shard":"1/3","shard_index":1,"args":"--shard=1/3"},{"shard":"2/3","shard_index":2,"args":"--shard=2/3"},{"shard":"3/3","shard_index":3,"args":"--shard=3/3"}]'
-          smoke='[{"shard":"smoke","shard_index":1,"args":"--grep=@smoke"}]'
-          if [[ "$EVENT" == push ]]; then
-            # A push to main follows a release pull request, which ran the full suite.
-            [[ "$REF" == refs/heads/develop ]] && run=true || run=false
-            matrix="$full"
-          elif [[ "$BASE" == main ]]; then
-            run=true
-            matrix="$full"
-          else
-            git diff --name-only HEAD^1 HEAD | grep -qvE '^docs/|\.md$' && run=true || run=false
-            matrix="$smoke"
-          fi
-          echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
+  # Browser flows, one shard per runner, each with its own stack. The shards
+  # load the images the build jobs produced and compile nothing; which tests
+  # each one runs comes from dev/e2e-plan.mjs, balanced by measured duration
+  # when test/e2e/durations.json is current.
   integration:
     name: integration (${{ matrix.shard }})
-    needs: e2e-plan
-    if: needs.e2e-plan.outputs.run == 'true'
+    # Only the plan. The image jobs are waited on inside the job, by artifact,
+    # so setup and the stack's dependencies start beside the builds instead of
+    # after them (dev/ci-image.cjs).
+    needs: plan
+    if: needs.plan.outputs.e2e_run == 'true'
     runs-on: ubuntu-latest
     # Stack setup overlaps the shared image build, then the suite and recovery.
-    timeout-minutes: 45
+    timeout-minutes: 40
     permissions:
       contents: read
       actions: read
     env:
       E2E_DOCKER_HOST_GATEWAY: 'true'
+      # Nothing in this job builds an image, so nothing has to be installed
+      # into a container or compiled twice.
+      STUDIO_PREBUILT_IMAGES: 'true'
+      E2E_APP_IMAGE_READY: 'true'
+      # Keeps each shard's blob report file distinct when they are merged.
+      E2E_SHARD_ID: ${{ matrix.shard_index }}
     strategy:
       fail-fast: false
-      # Each shard runs on 4 Playwright workers (playwright.config.ts).
+      # Each shard runs 4 Playwright workers (playwright.config.ts).
       matrix:
-        include: ${{ fromJSON(needs.e2e-plan.outputs.matrix) }}
+        include: ${{ fromJSON(needs.plan.outputs.e2e_matrix) }}
     steps:
-      # The host install, the dev image and its node_modules volume each hold a
-      # copy of the dependencies, which can fill the runner's disk. The job
-      # never uses these preinstalled toolchains.
+      # Three dependency copies and three local image builds used to fill the
+      # runner's disk. With the images handed over and no container install,
+      # only the preinstalled toolchains this job never uses are in the way.
       - name: Free runner disk space
         run: |
           df -h /
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet /opt/ghc
           df -h /
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: clients/package-lock.json
-      - name: Install npm dependencies
-        timeout-minutes: 8
-        working-directory: clients
-        run: npm ci --prefer-offline --no-audit
+      - name: Install npm dependencies and prefetch the service images
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          # Postgres, Redis, RustFS, Temporal and the mock's Node image are
+          # ~1 GB of pulls that need nothing from the install.
+          ./dev/studio prefetch > "$RUNNER_TEMP/prefetch.log" 2>&1 &
+          prefetch=$!
+          (cd clients && npm ci --prefer-offline --no-audit)
+          wait "$prefetch" || { cat "$RUNNER_TEMP/prefetch.log"; exit 1; }
       - name: Restore Playwright browsers
         id: browsers
         uses: actions/cache/restore@v4
@@ -381,6 +593,16 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ steps.browsers.outputs.cache-primary-key }}
+      - uses: ./.github/actions/load-ci-image
+        with:
+          image: backend
+      - uses: ./.github/actions/load-ci-image
+        with:
+          image: collab
+      # Dependencies only. The app joins once its image is built, so this
+      # whole bring-up overlaps the web image job instead of following it.
+      - name: Start the stack's dependencies
+        run: ./dev/studio up --services-only
       - name: Test the design renderer over CDP
         # Real Chromium over CDP, the path Cloudflare Browser Rendering uses in
         # production. Once is enough, so only on shard 1.
@@ -388,40 +610,35 @@ jobs:
         timeout-minutes: 5
         working-directory: clients/apps/web
         run: npm run test:design-renderer
-      - name: Start and smoke-test the local stack
-        run: ./dev/studio up
-      - name: Run local stack smoke test
-        run: ./dev/studio smoke
+      - uses: ./.github/actions/load-ci-image
+        with:
+          image: web
+      - name: Start the smoke-tested production app
+        run: ./dev/studio up --lane production
+      - name: Verify tenant isolation
+        if: matrix.shard_index == 1
+        run: ./dev/studio tenant-isolation
       - name: Smoke test the API reference, OpenAPI document, and agent endpoints
         if: matrix.shard_index == 1
         working-directory: clients/apps/web
         run: VERIFY_BASE_URL=http://127.0.0.1:3000 npm run verify:agents
-      - name: Verify tenant isolation
-        run: ./dev/studio tenant-isolation
-      # Setup overlaps the one shared build; no per-shard build competes for CPU.
-      - name: Wait for the tested production image
-        id: image
-        timeout-minutes: 21
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { waitForImage } = require('./dev/ci-image.cjs');
-            await waitForImage({ github, context, core });
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ steps.image.outputs.name }}
-          path: ${{ runner.temp }}/ci-web
-      - name: Load the tested production image
-        run: |
-          docker load --input "$RUNNER_TEMP/ci-web/web-image.tar.gz"
-          docker image inspect screenshot-studio:${{ github.sha }} >/dev/null
-          docker tag screenshot-studio:${{ github.sha }} screenshot-studio-web-e2e
       - name: Verify browser end-to-end flows
-        env:
-          E2E_APP_IMAGE_READY: 'true'
         run: ./dev/studio e2e ${{ matrix.args }}
-      # The suite's time baseline: per-test and setup durations. Before the
-      # recovery check, which runs Playwright again and rewrites the report.
+      # Collected before the recovery check, which recreates the app and so
+      # destroys the container that served the failing tests. Collecting only
+      # at the end left every failure on the recovery shard with no
+      # server-side evidence, which is why the two-factor flake could not be
+      # diagnosed from CI output.
+      - if: always() && hashFiles('.local/dev.env') != ''
+        name: Collect end-to-end stack logs
+        run: docker compose --env-file .local/dev.env --file dev/compose.yaml --profile e2e logs --no-color
+      # The recovery run writes its own reports (E2E_REPORT_LANE), so it no
+      # longer overwrites the suite's; both are collected below.
+      - name: Verify dependency failure and recovery
+        if: matrix.shard_index == 2
+        run: make e2e-recovery
+      # The suite's time baseline: per-test and setup durations, and what the
+      # nightly run builds the committed shard manifest from.
       - if: always() && hashFiles('clients/apps/web/playwright-report/results-*.json') != ''
         name: Summarize end-to-end durations
         working-directory: clients/apps/web
@@ -432,20 +649,14 @@ jobs:
         with:
           name: e2e-durations-${{ github.run_id }}-${{ matrix.shard_index }}
           path: clients/apps/web/playwright-report/results-*.json
-      # Collected before the recovery check, which calls `compose up
-      # --force-recreate app` and so destroys the container that served the
-      # failing tests. Collecting only at the end left every failure on the
-      # recovery shard with no server-side evidence, which is why the
-      # two-factor flake could not be diagnosed from CI output.
-      - if: always() && hashFiles('.local/dev.env') != ''
-        name: Collect end-to-end stack logs
-        run: docker compose --env-file .local/dev.env --file dev/compose.yaml --profile e2e logs --no-color
-      # On the shard with the most time to spare (alphabetical shards by test count).
-      - name: Verify dependency failure and recovery
-        if: matrix.shard_index == 2
-        env:
-          E2E_APP_IMAGE_READY: 'true'
-        run: make e2e-recovery
+      # One HTML report with traces across every shard, merged by `e2e-report`.
+      - if: always() && hashFiles('clients/apps/web/blob-report/*') != ''
+        name: Upload the blob report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-blob-${{ github.run_id }}-${{ matrix.shard_index }}
+          path: clients/apps/web/blob-report
+          retention-days: 7
       # Always: test-results holds only failed attempts' traces, and a flaky
       # test passes on retry, so a failure-only upload lost every flake's trace.
       - if: always()
@@ -465,21 +676,79 @@ jobs:
         name: Remove local stack data
         run: ./dev/studio down --purge --yes
 
-  social-gate:
-    if: github.event.action != 'closed'
+  # One HTML report with every shard's traces, instead of one zip per shard.
+  e2e-report:
+    name: Browser test report
+    needs: [plan, integration]
+    if: always() && needs.plan.outputs.e2e_run == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: clients/package-lock.json
-      - name: Install npm dependencies
-        timeout-minutes: 8
-        working-directory: clients
-        run: npm ci --prefer-offline --no-audit
+      - uses: actions/download-artifact@v4
+        id: reports
+        continue-on-error: true
+        with:
+          path: ${{ runner.temp }}/blob-reports
+          pattern: e2e-blob-${{ github.run_id }}-*
+          merge-multiple: true
+      - name: Merge the shard reports
+        if: steps.reports.outcome == 'success'
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+          PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ runner.temp }}/playwright-html
+        run: |
+          set -euo pipefail
+          (cd clients && npm ci --prefer-offline --no-audit)
+          cd clients/apps/web
+          npx playwright merge-reports --reporter html "$RUNNER_TEMP/blob-reports"
+      - if: steps.reports.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report-${{ github.run_id }}
+          path: ${{ runner.temp }}/playwright-html
+          if-no-files-found: ignore
+          retention-days: 7
+
+  social-gate:
+    name: Social publishing gate
+    needs: plan
+    # A prose-only pull request cannot change what the worker publishes.
+    if: github.event_name != 'pull_request' || needs.plan.outputs.docs_only != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      actions: read
+    env:
+      STUDIO_PREBUILT_IMAGES: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/package-lock.json
+      - name: Install npm dependencies and prefetch the service images
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          ./dev/studio prefetch > "$RUNNER_TEMP/prefetch.log" 2>&1 &
+          prefetch=$!
+          (cd clients && npm ci --prefer-offline --no-audit)
+          wait "$prefetch" || { cat "$RUNNER_TEMP/prefetch.log"; exit 1; }
+      # This job downloaded Chromium from scratch on every run.
+      - name: Restore Playwright browsers
+        id: browsers
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('clients/node_modules/playwright-core/package.json') }}
       - name: Install browser system dependencies
         timeout-minutes: 12
         working-directory: clients
@@ -494,6 +763,21 @@ jobs:
         env:
           PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: '60000'
         run: npx playwright install chromium
+      - name: Save Playwright browsers
+        if: steps.browsers.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browsers.outputs.cache-primary-key }}
+      # The gate compiles the Go tree with the e2e build tag, so it cannot
+      # share layers with the product backend. It used to build that tree with
+      # no cache at all, beside the job that builds it with one.
+      - uses: ./.github/actions/load-ci-image
+        with:
+          image: backend-e2e
+      - uses: ./.github/actions/load-ci-image
+        with:
+          image: web
       - name: Run real Go social publishing gate
         run: ./dev/social-gate
       - if: failure()
@@ -505,3 +789,59 @@ jobs:
             clients/apps/web/playwright-report/
             clients/apps/web/test-results/
           if-no-files-found: ignore
+
+  # The one required status check. It used to require the client checks and
+  # the web image only, so a pull request could merge into develop with the
+  # Go suite, the API contract gate, the native clients, the social gate and
+  # the browser tests all red. Every gate is named here, and a job may only
+  # be skipped for the reason `plan` recorded.
+  validate:
+    name: CI validation
+    needs:
+      - plan
+      - web-image
+      - backend-image
+      - collab-image
+      - go-checks
+      - client-lint
+      - client-typecheck
+      - client-unit
+      - native-clients
+      - openapi
+      - social-gate
+      - integration
+    if: always() && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every gate
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          SKIPPABLE: >-
+            ${{ needs.plan.outputs.go != 'true' && 'go-checks ' || '' }}${{ needs.plan.outputs.native != 'true' && 'native-clients ' || '' }}${{ needs.plan.outputs.e2e_run != 'true' && 'integration ' || '' }}${{ github.event_name == 'pull_request' && needs.plan.outputs.docs_only == 'true' && 'social-gate' || '' }}
+        run: |
+          set -euo pipefail
+          failed=''
+          {
+            echo '| Gate | Result |'
+            echo '|---|---|'
+          } >> "$GITHUB_STEP_SUMMARY"
+          for job in $(jq -r 'keys[]' <<< "$RESULTS"); do
+            result="$(jq -r --arg job "$job" '.[$job].result' <<< "$RESULTS")"
+            case "$result" in
+              success) ;;
+              skipped)
+                case " $SKIPPABLE " in
+                  *" $job "*) result="skipped (not affected)" ;;
+                  *) failed="$failed $job" ;;
+                esac
+                ;;
+              *) failed="$failed $job" ;;
+            esac
+            echo "| $job | $result |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          if [[ -n "$failed" ]]; then
+            echo "These gates did not pass:$failed" >&2
+            exit 1
+          fi
+          echo 'Every gate passed.'

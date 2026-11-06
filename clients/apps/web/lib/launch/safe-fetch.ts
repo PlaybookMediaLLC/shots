@@ -2,6 +2,7 @@ import { lookup } from 'node:dns/promises'
 import http from 'node:http'
 import https from 'node:https'
 import { isIP } from 'node:net'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 /**
  * Fetch a release source link without letting the link reach anything private.
@@ -176,6 +177,9 @@ function header(headers: TransportResponse['headers'], name: string): string {
 }
 
 export function allowedTestHosts(): Set<string> {
+  // The same gate the screenshot downloader uses: a deployed build never
+  // reaches a private address, however its environment is set (lib/e2e-hooks.ts).
+  if (!testHooksAllowed()) return new Set()
   return new Set(
     (process.env.SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS ?? '')
       .split(',')

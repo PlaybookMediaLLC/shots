@@ -232,7 +232,7 @@ test(
 
 test(
   'refine previews and applies only on accept, the assistant adds a post, follow-ups are set in review, and a failed destination is retried alone',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
     const draftId = await newDraft(page)

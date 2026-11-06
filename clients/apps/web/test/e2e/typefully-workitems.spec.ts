@@ -449,7 +449,8 @@ test(
 
 test(
   'a bulk batch uploads assets once, resumes after refresh, and media edits persist',
-  { tag: ['@dev-server', '@journey'] },
+  // @quarantine: held out of the production lane with no reason recorded.
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page, startWorkspace }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))

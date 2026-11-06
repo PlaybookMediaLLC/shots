@@ -22,6 +22,26 @@ compose() {
   docker compose "${compose_args[@]}" "$@"
 }
 
+# CI builds every image exactly once, in its own job, with a layer cache, and
+# hands the result to each browser shard as a run artifact. A shard that built
+# them itself compiled the Go tree and installed node_modules again per shard,
+# which was a third of the whole run's runner budget. Locally this is unset and
+# Compose builds as it always has.
+prebuilt_images() {
+  [[ "${STUDIO_PREBUILT_IMAGES:-}" == "true" ]]
+}
+
+# `compose up --build` with prebuilt images would rebuild what was handed over.
+compose_up() {
+  local up_args=(up --detach)
+  prebuilt_images || up_args+=(--build)
+  compose "${up_args[@]}" "$@"
+}
+
+# Which app lane the running stack serves, so a second `start_e2e_app` in the
+# same session is a no-op instead of a recreate.
+E2E_LANE_FILE_NAME="e2e-lane"
+
 random_hex() {
   openssl rand -hex "$1"
 }
@@ -163,6 +183,11 @@ sync_dependencies() {
   local lock_hash
   local state_file="$LOCAL_DIR/package-lock.sha"
 
+  # The dev app image already installed them in its own layer, and the e2e
+  # lanes run the production image, which bundles what it needs. This third
+  # copy exists only to keep a developer's bind-mounted volume current.
+  prebuilt_images && return
+
   lock_hash="$(shasum -a 256 "$ROOT_DIR/clients/package-lock.json" | awk '{print $1}')"
   if [[ -f "$state_file" && "$(cat "$state_file")" == "$lock_hash" ]]; then
     return
@@ -209,14 +234,14 @@ EOF
 wait_for_http() {
   local url="$1"
   local label="$2"
-  local attempt
 
-  for attempt in $(seq 1 30); do
-    if curl --fail --silent --show-error "$url" >/dev/null 2>&1; then
-      return
-    fi
-    sleep 1
-  done
+  # curl drives the schedule, as publishing-backend-ready already does: one
+  # process for the whole wait instead of a fresh curl every second, and a
+  # 60 s budget rather than 30 attempts of unbounded length.
+  if curl --fail --silent --output /dev/null --max-time 10 \
+    --retry 60 --retry-delay 1 --retry-max-time 60 --retry-all-errors "$url"; then
+    return
+  fi
 
   echo "$label did not become ready: $url" >&2
   exit 1
@@ -238,8 +263,18 @@ wait_for_screenshot_mock() {
   exit 1
 }
 
+# `--services-only` covers everything that does not need the web app, so CI can
+# prove the stack healthy while the production image is still being built.
 smoke() {
   local storage_test_url
+  local scope="all"
+
+  if [[ "${1:-}" == "--services-only" ]]; then
+    scope="services"
+  elif [[ -n "${1:-}" ]]; then
+    echo "Unknown smoke option: $1" >&2
+    exit 2
+  fi
 
   load_env
   local app_url="http://localhost:${STUDIO_WEB_PORT:-3000}"
@@ -255,6 +290,10 @@ smoke() {
     --aws-sigv4 "aws:amz:us-east-1:s3" --user "$RUSTFS_ACCESS_KEY:$RUSTFS_SECRET_KEY" | grep -qx smoke
   curl --fail --silent --show-error --request DELETE "$storage_test_url" \
     --aws-sigv4 "aws:amz:us-east-1:s3" --user "$RUSTFS_ACCESS_KEY:$RUSTFS_SECRET_KEY" >/dev/null
+  if [[ "$scope" == "services" ]]; then
+    echo "Local stack services are healthy."
+    return
+  fi
   wait_for_http "${app_url}/api/health" "Screenshot Studio"
   wait_for_http "${app_url}/api/auth/ok" "Better Auth"
   # A cold editor compile can outlast the locale proxy's request
@@ -307,72 +346,42 @@ wait_for_redirect_or_ok() {
   exit 1
 }
 
-warm_route() {
-  local url="$1"
-  local label="$2"
-  local attempt
-  local status
-
-  # Like wait_for_redirect_or_ok, for API routes: signed out they answer 401,
-  # which proves the route compiled just as well. A 5xx does not.
-  for attempt in $(seq 1 60); do
-    status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 120 "$url" || true)"
-    if [[ "$status" =~ ^[234] ]]; then
-      return
-    fi
-    sleep 1
-  done
-
-  echo "$label did not become ready: $url (last status ${status:-none})" >&2
-  exit 1
+# The URL the browser suite and the e2e app agree on.
+e2e_app_url() {
+  printf '%s' "${E2E_BASE_URL:-http://localhost:${STUDIO_WEB_PORT:-3000}}"
 }
 
-warm_recovery_route() {
-  local url="$1"
-  local manage_app="$2"
-  local attempt
-  local status
-
-  for attempt in $(seq 1 10); do
-    status="$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 30 --request POST "$url" || true)"
-    if [[ "$status" == "401" ]]; then
-      return
-    fi
-    # Turbopack can miss nested routes until a file event refreshes its router.
-    # Only refresh our managed dev server; a generic 404 is never a ready API.
-    if [[ "$status" == "404" && "$manage_app" == "true" ]]; then
-      touch "$WEB_DIR/app/api/v1/content-drafts/[id]/revisions/[revisionId]/recover/route.ts"
-    fi
-    sleep 1
-  done
-
-  echo "Draft recovery API did not become ready: $url (last status ${status:-none})" >&2
-  exit 1
+# The social mock and the suite's own origin, beside whatever is configured.
+e2e_trusted_origins() {
+  local app_url="$1"
+  printf '%s' "$BETTER_AUTH_TRUSTED_ORIGINS,${app_url%/},http://localhost:5680,http://host.docker.internal:5680"
 }
 
-# Starts the e2e services with the app of one lane: `production` runs the
-# production build (dev/compose.e2e.yaml), `dev-server` runs `next dev`.
+# Starts the e2e services with the production app image — the artifact that
+# ships. There used to be a second `next dev` lane for the tests that needed
+# hooks the production build hid; those hooks are now asked for explicitly
+# (PLATFORM_E2E_HOOKS, clients/apps/web/lib/e2e-hooks.ts), so one lane runs
+# every test and nothing has to be compiled route by route first.
+#
+# Calling this again while the same lane is already serving is a no-op, so a
+# caller may bring the app up for its own checks and still run the suite
+# against it without a recreate.
 start_e2e_app() {
-  local lane="$1" app_url="$2" trusted_origins="$3"
-  local lane_files=()
-  if [[ "$lane" == production ]]; then
-    lane_files=(--file "$ROOT_DIR/dev/compose.e2e.yaml")
+  local app_url="$1" trusted_origins="$2"
+  local lane_files=(--file "$ROOT_DIR/dev/compose.e2e.yaml")
+  local lane_file="$LOCAL_DIR/$E2E_LANE_FILE_NAME"
+
+  if [[ "$(cat "$lane_file" 2>/dev/null || true)" == "production" ]] &&
+    curl --fail --silent --output /dev/null --max-time 10 "${app_url%/}/api/health"; then
+    return
   fi
   # Recreating app would strand the renderer, which shares app's network;
   # end-to-end flows do not render designs, so it is simply stopped.
   compose --profile renderer stop render-browser >/dev/null 2>&1 || true
   compose stop app >/dev/null 2>&1 || true
-  if [[ "$lane" == production ]]; then
-    # CI builds the image once, with a layer cache, and sets E2E_APP_IMAGE_READY.
-    if [[ "${E2E_APP_IMAGE_READY:-}" != "true" ]]; then
-      compose "${lane_files[@]}" build app
-    fi
-  else
-    # Start the dev server from an empty dev cache. On Linux, a Turbopack
-    # cache written by the previous server (verify:agents, tenant-isolation)
-    # made the recreated one answer every HMR connection with "HMR hash
-    # mismatch", reloading each page in a loop so sign-up never hydrated.
-    compose run --rm --no-deps app sh -c 'rm -rf apps/web/.next/* apps/web/.next/.[!.]*'
+  # CI builds the image once, with a layer cache, and sets E2E_APP_IMAGE_READY.
+  if [[ "${E2E_APP_IMAGE_READY:-}" != "true" ]]; then
+    compose "${lane_files[@]}" build app
   fi
   # Plain node does not reload bind-mounted mock code between local runs.
   compose --profile e2e up --detach --force-recreate screenshot-mock
@@ -389,66 +398,26 @@ start_e2e_app() {
     PLATFORM_ENRICHMENT_DISABLED="github,appstore" \
     PLATFORM_ENRICHMENT_EXA_API_KEY="" \
     PLATFORM_CREATIVE_SETS="enabled" \
-    PLATFORM_AI_SCRIPTED=1 compose ${lane_files[@]+"${lane_files[@]}"} --profile e2e up --detach screenshot-mock publishing-backend publishing-orchestrator app
+    PLATFORM_ASSET_DOWNLOAD_TTL="${E2E_ASSET_DOWNLOAD_TTL:-5s}" \
+    PLATFORM_AI_SCRIPTED=1 compose "${lane_files[@]}" --profile e2e up --detach screenshot-mock publishing-backend publishing-orchestrator app
+  printf 'production\n' >"$lane_file"
   wait_for_screenshot_mock
   # Publishing runs in the backend, so it is the service that must reach the
   # suite's social API mock.
   wait_for_http "http://127.0.0.1:8080/readyz" "Publishing backend"
+  wait_for_http "${app_url%/}/api/health" "Screenshot Studio"
 }
 
-# `next dev` compiles each route on its first request.
-warm_e2e_routes() {
-  local app_url="$1" manage_screenshot_mock="$2"
-  # Every spec signs up first; a cold Better Auth route compiles during that
-  # first POST and the dev server reloads the page under it, emptying the form.
-  wait_for_http "${app_url%/}/api/auth/ok" "Better Auth"
-  wait_for_http "${app_url%/}/sign-up" "Screenshot Studio sign-up route"
-  # The stack runs `next dev`, so a route is compiled on its first request.
-  # A browser navigation to an uncompiled route keeps `page.url()` on the
-  # previous page until the server responds, so an unwarmed route looks to
-  # Playwright exactly like a redirect that never happened. Warm every route
-  # the suite navigates to, not just the entry points: /two-factor,
-  # /onboarding and /workspace are reached mid-test, so they were paying a
-  # cold compile inside a timed assertion. Measured cold on a developer
-  # machine: /two-factor 10s, /workspace 15s, /onboarding 31s.
-  # A 307 is a warm hit too, the redirect still compiles the route.
-  wait_for_redirect_or_ok "${app_url%/}/sign-in" "Screenshot Studio sign-in route"
-  # Every spec starts at sign-up, and a cold compile there reloads the page
-  # mid-typing; the campaign pages stalled the same way.
-  wait_for_redirect_or_ok "${app_url%/}/sign-up" "Screenshot Studio sign-up route"
-  wait_for_redirect_or_ok "${app_url%/}/campaigns" "Screenshot Studio campaigns route"
-  wait_for_redirect_or_ok "${app_url%/}/campaigns/new" "Screenshot Studio new campaign route"
-  # A campaign's pages redirect signed-out traffic after compiling, so any id warms them.
-  for campaign_page in "" /spec /plan /assets /copy; do
-    wait_for_redirect_or_ok "${app_url%/}/campaigns/warm-up${campaign_page}" "Screenshot Studio campaign${campaign_page:- overview} route"
-  done
-  wait_for_redirect_or_ok "${app_url%/}/assets" "Screenshot Studio assets route"
-  wait_for_redirect_or_ok "${app_url%/}/drafts" "Screenshot Studio drafts route"
-  wait_for_redirect_or_ok "${app_url%/}/drafts/warm-up" "Screenshot Studio draft composer route"
-  # Legacy /drafts only compiles its redirect, not the current writing routes.
-  wait_for_redirect_or_ok "${app_url%/}/write" "Screenshot Studio writing library route"
-  wait_for_redirect_or_ok "${app_url%/}/publish/warm-up" "Screenshot Studio writing composer route"
-  wait_for_redirect_or_ok "${app_url%/}/two-factor" "Screenshot Studio two-factor route"
-  wait_for_redirect_or_ok "${app_url%/}/onboarding" "Screenshot Studio onboarding route"
-  wait_for_redirect_or_ok "${app_url%/}/workspace" "Screenshot Studio workspace route"
-  wait_for_redirect_or_ok "${app_url%/}/accept-invitation" "Screenshot Studio invitation route"
-  # API routes the suite calls mid-test; a cold compile there ran tests out of time.
-  warm_route "${app_url%/}/api/tenant/releases" "Tenant releases API"
-  warm_route "${app_url%/}/api/tenant/assets/upload-url" "Tenant assets API"
-  warm_route "${app_url%/}/api/v1/bootstrap" "Shell bootstrap API"
-  warm_route "${app_url%/}/api/v1/content-drafts" "Content drafts API"
-  warm_route "${app_url%/}/api/v1/organizations/warm-up" "Shell organizations API"
-  warm_recovery_route "${app_url%/}/api/v1/content-drafts/warm-up/revisions/warm-up/recover" "$manage_screenshot_mock"
-  wait_for_http "$app_url" "Screenshot Studio editor route"
-}
-
-# Runs npm in the web app with the variables the browser suite reads.
+# Runs npm in the web app with the variables the browser suite reads. The
+# compose-log switch follows whoever owns the stack: a deployed target (Kind)
+# sets E2E_MANAGE_SCREENSHOT_MOCK=false and has no Compose project to read.
 e2e_npm() {
   local app_url="$1"
   shift
   E2E_BASE_URL="$app_url" \
+    E2E_ASSET_DOWNLOAD_TTL_MS="${E2E_ASSET_DOWNLOAD_TTL_MS:-5000}" \
     E2E_DATABASE_URL="${E2E_DATABASE_URL:-$HOST_DATABASE_URL}" \
-    E2E_COMPOSE_LOGS="$manage_screenshot_mock" \
+    E2E_COMPOSE_LOGS="${E2E_MANAGE_SCREENSHOT_MOCK:-true}" \
     E2E_MAINTENANCE_SECRET="$CLEANUP_SECRET" \
     E2E_R2_ACCESS_KEY_ID="${E2E_R2_ACCESS_KEY_ID:-$R2_ACCESS_KEY_ID}" \
     E2E_R2_BUCKET_NAME="${E2E_R2_BUCKET_NAME:-$R2_BUCKET_NAME}" \
@@ -464,51 +433,45 @@ e2e_npm() {
 run_e2e() {
   local test_script="$1"
   shift
-  local app_url="${E2E_BASE_URL:-http://localhost:${STUDIO_WEB_PORT:-3000}}"
-  local e2e_trusted_origins
+  local app_url
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
-  local lane listing ran_lane=false
+  # Names this run's reports. The recovery and onboarding runs invoke
+  # Playwright a second time against the same app; without a name of their
+  # own they overwrote the suite's JSON and blob reports.
+  local report="${E2E_REPORT_LANE:-production}"
 
   load_env
-  if [[ "$manage_screenshot_mock" == "true" ]]; then
-    sync_dependencies
-  fi
-  e2e_trusted_origins="$BETTER_AUTH_TRUSTED_ORIGINS,${app_url%/},http://localhost:5680,http://host.docker.internal:5680"
+  app_url="$(e2e_app_url)"
   if [[ "$manage_screenshot_mock" != "true" ]]; then
-    # A deployed stack (Kind) runs the production build: only that lane applies.
+    # A deployed stack (Kind) serves the production build already.
     wait_for_http "${app_url%/}/api/health" "Screenshot Studio"
-    E2E_LANE=production e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
+    E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
     return "$test_result"
   fi
-  # Two lanes, as Next.js recommends: the production build for every test it
-  # can serve, then `next dev` for the tests tagged @dev-server, which need
-  # its hooks (the scripted AI model, screenshot-mock downloads).
-  for lane in production dev-server; do
-    if ! listing="$(e2e_npm "$app_url" run --silent "$test_script" -- "$@" --list --pass-with-no-tests --project="$lane" --reporter=list 2>&1)"; then
-      echo "$listing" >&2
-      return 1
-    fi
-    grep -qE 'Total: [1-9]' <<<"$listing" || continue
-    ran_lane=true
-    start_e2e_app "$lane" "$app_url" "$e2e_trusted_origins"
-    wait_for_http "${app_url%/}/api/health" "Screenshot Studio"
-    if [[ "$lane" == dev-server ]]; then
-      warm_e2e_routes "$app_url" "$manage_screenshot_mock"
-    fi
-    E2E_LANE="$lane" e2e_npm "$app_url" run "$test_script" -- --project="$lane" "$@" || test_result=1
-    # Recreating app discards the logs of the server that ran the lane; keep
-    # them beside the Playwright results, which CI uploads on failure.
-    mkdir -p "$WEB_DIR/test-results"
-    compose logs --no-color app >"$WEB_DIR/test-results/app-$lane.log" 2>&1 || true
-  done
-  if [[ "$ran_lane" != true ]]; then
-    echo "No end-to-end tests match: $*" >&2
-    return 1
-  fi
-  SCREENSHOT_API_URL="" SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS="" OPENROUTER_BASE_URL="" \
-    compose up --detach --force-recreate publishing-backend publishing-orchestrator app
+  sync_dependencies
+  start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
+  E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
+  # Keep the server's logs beside the Playwright results, which CI uploads.
+  mkdir -p "$WEB_DIR/test-results"
+  compose logs --no-color app >"$WEB_DIR/test-results/app-$report.log" 2>&1 || true
   return "$test_result"
+}
+
+# The tests held out of the suite because the production build has a real bug
+# behind them (test/e2e/README.md, "Quarantine"). They run against the same
+# production image as everything else — a pass means the bug is fixed and the
+# test can rejoin the suite. Nightly and non-blocking, never on the pull
+# request path, so a known bug costs no review time.
+quarantine() {
+  local app_url
+  load_env
+  app_url="$(e2e_app_url)"
+  sync_dependencies
+  start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
+  E2E_LANE=quarantine e2e_npm "$app_url" run test:e2e -- --project=quarantine "$@"
+  mkdir -p "$WEB_DIR/test-results"
+  compose logs --no-color app >"$WEB_DIR/test-results/app-quarantine.log" 2>&1 || true
 }
 
 e2e() {
@@ -516,11 +479,11 @@ e2e() {
 }
 
 e2e_onboarding() {
-  run_e2e test:e2e:onboarding
+  E2E_REPORT_LANE=onboarding run_e2e test:e2e:onboarding
 }
 
 e2e_recovery() {
-  run_e2e test:e2e:recovery
+  E2E_REPORT_LANE=recovery run_e2e test:e2e:recovery
 }
 
 e2e_file() {
@@ -578,11 +541,61 @@ dev_login() {
   echo "Dev login: $email (password: STUDIO_DEV_PASSWORD in .local/dev.env)"
 }
 
-up() {
+# Everything the app depends on. CI starts these first so the stack is ready
+# while the production web image is still being built in another job.
+services() {
   ensure_env
   compose rm --force --stop rustfs-init >/dev/null 2>&1 || true
-  compose up --detach --build postgres redis rustfs rustfs-init publishing-backend publishing-orchestrator collab
+  compose_up postgres redis rustfs rustfs-init publishing-backend publishing-orchestrator collab
   sync_dependencies
+}
+
+# Pulls the third-party images without starting anything, so the download can
+# overlap work that does not need them (CI runs it beside `npm ci`).
+prefetch() {
+  ensure_env
+  compose --profile e2e pull --quiet --ignore-buildable --policy missing
+}
+
+up() {
+  local lane="dev"
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      # The production image, as the browser suite runs it.
+      --lane)
+        lane="${2:-}"
+        [[ -n "$lane" ]] || { echo "up --lane needs a lane: dev or production" >&2; exit 2; }
+        shift 2
+        ;;
+      # Dependencies only: no app, and a smoke test that does not need one.
+      --services-only) lane="none"; shift ;;
+      *) echo "Unknown up option: $1" >&2; exit 2 ;;
+    esac
+  done
+  case "$lane" in
+    dev|production|none) ;;
+    *) echo "Unknown app lane: $lane" >&2; exit 2 ;;
+  esac
+
+  services
+  if [[ "$lane" == "none" ]]; then
+    smoke --services-only
+    echo "Backend: http://localhost:8080 (Temporal UI: http://localhost:8233)"
+    return
+  fi
+  if [[ "$lane" == "production" ]]; then
+    local app_url
+    load_env
+    app_url="$(e2e_app_url)"
+    start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
+    smoke
+    dev_login
+    echo "App:     $app_url (production build)"
+    echo "Backend: http://localhost:8080 (Temporal UI: http://localhost:8233)"
+    echo "RustFS:  http://localhost:9004/rustfs/console/"
+    return
+  fi
   # The render browser runs locally by default for parity with production,
   # where designs render in Cloudflare Browser Rendering over the same CDP
   # path. CI skips it (its flows do not render designs); STUDIO_RENDERER=off
@@ -598,6 +611,7 @@ up() {
   else
     compose up --detach app
   fi
+  printf 'dev\n' >"$LOCAL_DIR/$E2E_LANE_FILE_NAME"
   smoke
   dev_login
   echo "App:     http://localhost:${STUDIO_WEB_PORT:-3000}"
@@ -632,6 +646,7 @@ down() {
     fi
   fi
 
+  rm -f "$LOCAL_DIR/$E2E_LANE_FILE_NAME"
   if [[ "$mode" == "purge" ]]; then
     compose --profile e2e --profile renderer down --volumes --remove-orphans
     return
@@ -648,11 +663,18 @@ kind_up() {
     kind create cluster --name "$KIND_CLUSTER" --wait 60s
   fi
 
-  docker build --file "$WEB_DIR/Dockerfile" --tag screenshot-studio:kind-dev "$ROOT_DIR"
-  docker build --tag screenshot-studio-backend:kind-dev "$ROOT_DIR/server"
+  # Three cold, uncached `docker build` runs outlast any sane job timeout, and
+  # a timed-out job is cancelled, so it uploads no diagnostics either. CI
+  # builds these with a layer cache before calling this and sets
+  # STUDIO_PREBUILT_IMAGES; locally they are plain builds with Docker's own
+  # layer cache.
+  if ! prebuilt_images; then
+    docker build --file "$WEB_DIR/Dockerfile" --tag screenshot-studio:kind-dev "$ROOT_DIR"
+    docker build --tag screenshot-studio-backend:kind-dev "$ROOT_DIR/server"
+    docker build --file "$ROOT_DIR/clients/apps/collab-server/Dockerfile" \
+      --tag screenshot-studio-collab:kind-dev "$ROOT_DIR"
+  fi
   kind load docker-image screenshot-studio:kind-dev --name "$KIND_CLUSTER"
-  docker build --file "$ROOT_DIR/clients/apps/collab-server/Dockerfile" \
-    --tag screenshot-studio-collab:kind-dev "$ROOT_DIR"
   kind load docker-image screenshot-studio-backend:kind-dev --name "$KIND_CLUSTER"
   kind load docker-image screenshot-studio-collab:kind-dev --name "$KIND_CLUSTER"
   kubectl create namespace "$KIND_NAMESPACE" --dry-run=client --output=yaml | kubectl apply --filename -
@@ -704,13 +726,17 @@ Usage: dev/studio <command>
 
 Commands:
   env                        Create or refresh the ignored local environment.
-  up                         Start the hot-reload Compose stack.
+  prefetch                   Pull the third-party service images, start nothing.
+  up [--lane production]     Start the Compose stack; the production app image
+                             instead of the hot-reload one with --lane.
+  up --services-only         Start everything except the app.
   down [--keep-data|--purge] Stop the Compose stack and prompt for data handling.
   reset                      Stop the Compose stack and remove all local data.
-  smoke                      Verify Compose service health.
+  smoke [--services-only]    Verify Compose service health.
   rate-limit-smoke           Verify Redis-backed screenshot API rate limiting.
   tenant-isolation           Verify two-organization session and API-key isolation.
   e2e                        Run all browser end-to-end flows.
+  e2e-quarantine             Run the flows held out for production-build bugs.
   e2e-file <path>            Run one browser end-to-end flow.
   e2e-onboarding             Verify browser sign-up and workspace onboarding.
   e2e-recovery               Verify dependency failure and recovery behavior.
@@ -724,13 +750,15 @@ EOF
 
 case "${1:-}" in
   env) ensure_env ;;
-  up) up ;;
+  prefetch) prefetch ;;
+  up) shift; up "$@" ;;
   down) shift; down "$@" ;;
   reset) down --purge --yes ;;
-  smoke) smoke ;;
+  smoke) shift; smoke "$@" ;;
   rate-limit-smoke) rate_limit_smoke ;;
   tenant-isolation) tenant_isolation ;;
   e2e) shift; e2e "$@" ;;
+  e2e-quarantine) shift; quarantine "$@" ;;
   e2e-file) shift; e2e_file "$@" ;;
   e2e-onboarding) e2e_onboarding ;;
   e2e-recovery) e2e_recovery ;;
