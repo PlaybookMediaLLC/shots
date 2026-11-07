@@ -301,10 +301,20 @@ test(
     await page.getByTestId('platform-tab-linkedin').click()
     await page.getByRole('button', { name: 'Edit for LinkedIn independently' }).click()
     await expect(page.getByTestId('manual-version-linkedin')).toBeVisible()
-    // Over the forked text, past slate's selection sync.
-    await draftEditor(page).getByText('Second post', { exact: true }).selectText()
-    await settleSelection(page)
-    await page.keyboard.type('A longer note for LinkedIn readers.')
+    await expectSaved(page)
+    // Over the forked text, past slate's selection sync. A slow dev server can
+    // re-render the fork after the selection, so the typing lands at the start
+    // instead: select the whole text again until the note has replaced it.
+    const forked = draftEditor(page)
+      .locator('[data-slate-string]')
+      .filter({ hasText: /Second post|LinkedIn readers/ })
+      .last()
+    await expect(async () => {
+      await forked.selectText()
+      await settleSelection(page)
+      await page.keyboard.type('A longer note for LinkedIn readers.')
+      await expect(forked).toHaveText('A longer note for LinkedIn readers.', { timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
     await expect(page.getByTestId('platform-tab-linkedin')).toContainText('Own text')
     await inPreview(page, async () => {
       await expect(await previewOf(page, 'linkedin')).toContainText(
