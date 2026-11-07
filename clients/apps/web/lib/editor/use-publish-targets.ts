@@ -2,9 +2,10 @@
 
 import * as React from 'react'
 import { DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
-import { isPublishChannel, type PublishAccount } from '@/lib/editor/publish'
+import { channelForPlatform } from '@/lib/content-drafts/serialize'
 import { type SocialSetListWire, writeApi } from '@/lib/write/client'
 import type { DraftChannel } from '@/lib/write/document'
+import { type PostAccount, postAccounts } from '@/lib/write/screenshot-post'
 
 /**
  * Where the editor can publish: the workspace's social sets with their
@@ -21,36 +22,49 @@ import type { DraftChannel } from '@/lib/write/document'
 
 /** One publishing identity as the editor offers it. */
 export type PublishSet = {
-  accounts: PublishAccount[]
+  accounts: PostAccount[]
   /** The platforms a new draft in this set starts with (RFC 024). */
   defaultChannels: DraftChannel[]
+  /** The X follow-ups a new draft in this set may carry. */
+  engagementDefaults: SocialSetListWire['items'][number]['engagementDefaults']
   id: string
   name: string
+  /** The channel the set writes for first, when nothing narrower is chosen. */
+  primaryChannel: DraftChannel
   timeZone: string
 }
 
 /** A time the workspace's engagement recommends, with why. */
 export type RecommendedTime = { at: string; reason: string }
 
-/** A set and its accounts, keeping only the platforms the editor writes captions for. */
+/** Channel names, from either a provider platform or a draft channel. */
+const channelsOf = (platforms: readonly (string | null | undefined)[]): DraftChannel[] => [
+  ...new Set(platforms.flatMap((platform) => channelForPlatform(platform ?? '') ?? [])),
+]
+
+/** Each set with its accounts as post destinations. */
 function publishSets(list: SocialSetListWire): PublishSet[] {
-  return list.items.map((set) => ({
-    accounts: set.accounts.flatMap((account) =>
-      isPublishChannel(account.platform)
-        ? [
-            {
-              channel: account.platform,
-              id: account.id,
-              name: account.handle ?? account.displayName ?? account.platform,
-            },
-          ]
-        : []
-    ),
-    defaultChannels: set.defaultPlatforms.filter(isPublishChannel),
-    id: set.id,
-    name: set.name,
-    timeZone: set.timeZone,
-  }))
+  return list.items.map((set) => {
+    const accounts = postAccounts(set.accounts)
+    return {
+      accounts,
+      defaultChannels: channelsOf(set.defaultPlatforms),
+      engagementDefaults: set.engagementDefaults,
+      id: set.id,
+      name: set.name,
+      primaryChannel:
+        channelsOf([set.primaryPlatform])[0] ?? accounts[0]?.channel ?? ('x' as DraftChannel),
+      timeZone: set.timeZone,
+    }
+  })
+}
+
+/**
+ * The profile a new post lands in when nobody picks one: the workspace's,
+ * as the composer resolves it, rather than whichever is listed first.
+ */
+function defaultSet(list: SocialSetListWire): string | undefined {
+  return (list.items.find((item) => item.visibility === 'WORKSPACE') ?? list.items[0])?.id
 }
 
 /** How far the set list has got: publishing is off, loading, loaded, or broken. */
@@ -63,10 +77,13 @@ function refused(error: unknown): boolean {
 
 /** The sets the signed-in member can publish to, loaded once per opening. */
 export function usePublishSets(enabled: boolean): {
+  /** The set a post goes to when none is chosen. */
+  defaultSetId: string | undefined
   sets: PublishSet[]
   status: PublishSetsStatus
 } {
   const [sets, setSets] = React.useState<PublishSet[] | null>(null)
+  const [defaultSetId, setDefaultSetId] = React.useState<string>()
   const [failure, setFailure] = React.useState<'unavailable' | 'error' | null>(null)
   // Settled once the list arrived or the workspace was refused; anything
   // else is tried again the next time the surface opens, without the state
@@ -80,6 +97,7 @@ export function usePublishSets(enabled: boolean): {
         settled.current = true
         if (!active) return
         setFailure(null)
+        setDefaultSetId(defaultSet(list))
         setSets(publishSets(list))
       },
       (error: unknown) => {
@@ -92,7 +110,7 @@ export function usePublishSets(enabled: boolean): {
       active = false
     }
   }, [enabled])
-  return { sets: sets ?? [], status: sets ? 'ready' : (failure ?? 'loading') }
+  return { defaultSetId, sets: sets ?? [], status: sets ? 'ready' : (failure ?? 'loading') }
 }
 
 /**

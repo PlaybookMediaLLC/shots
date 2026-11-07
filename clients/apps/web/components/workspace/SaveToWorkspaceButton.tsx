@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { startPostWithAssets } from '@/components/write/pending-draft'
 import { useHydratedSession } from '@/lib/auth/client'
+import { renderLiveDesign } from '@/lib/editor/post-handoff'
 import { draftAttachHref, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
@@ -61,13 +62,41 @@ function saveFailure(error: unknown): string {
     : 'The export could not be saved. Your work is unchanged.'
 }
 
+/** Props of {@link UseInPostButton}. */
+export type UseInPostButtonProps = {
+  /**
+   * Renders the design with the export panel's settings. Without one (the
+   * AI panels), it is rendered as the editor's default still export.
+   */
+  createExport?: () => Promise<Blob>
+  disabled?: boolean
+  fileName?: string
+  /** The button's words, where the surface says what it posts. */
+  label?: string
+  /** The type `createExport` produces, for checking each platform's rules first. */
+  mediaType?: string
+  /** Open with one post per AI version. */
+  startWithVersions?: boolean
+  variant?: React.ComponentProps<typeof Button>['variant']
+}
+
 /**
  * Export the design and take it into Publish, with no Library steps in
  * between. Framing an existing attachment returns to the draft it came from;
  * anything else opens the preparation dialog, which writes the caption,
  * thread, follow-ups and destination before the draft or batch item exists.
+ * The export controls and the AI Captions and Variants panels all open the
+ * same dialog through here.
  */
-export function UseInPostButton({ createExport, disabled, fileName }: SaveToWorkspaceButtonProps) {
+export function UseInPostButton({
+  createExport,
+  disabled,
+  fileName,
+  label = 'Use in post',
+  mediaType,
+  startWithVersions,
+  variant,
+}: UseInPostButtonProps) {
   const router = useRouter()
   const trpcClient = useTRPCClient()
   const [busy, setBusy] = React.useState(false)
@@ -76,7 +105,7 @@ export function UseInPostButton({ createExport, disabled, fileName }: SaveToWork
   async function returnToDraft(draft: string): Promise<void> {
     setBusy(true)
     try {
-      const blob = await createExport()
+      const blob = await (createExport ?? renderLiveDesign)()
       const { assetId } = await saveExportToWorkspace({
         blob,
         classification: 'export',
@@ -103,20 +132,24 @@ export function UseInPostButton({ createExport, disabled, fileName }: SaveToWork
       <Button
         disabled={disabled || busy}
         onClick={() => {
-          const draft = draftFromUrl()
+          // Versions are new posts; only the design itself replaces an attachment.
+          const draft = startWithVersions ? null : draftFromUrl()
           if (draft) void returnToDraft(draft)
           else setPreparing(true)
         }}
         type="button"
+        {...(variant ? { variant } : {})}
       >
-        {busy ? 'Preparing…' : 'Use in post'}
+        {busy ? 'Preparing…' : label}
       </Button>
       {preparing ? (
         <PrepareScreenshotPost
-          createExport={createExport}
+          {...(createExport ? { createExport } : {})}
           {...(fileName ? { fileName } : {})}
+          {...(mediaType ? { mediaType } : {})}
           onOpenChange={setPreparing}
           open
+          {...(startWithVersions ? { startWithVersions } : {})}
         />
       ) : null}
     </>

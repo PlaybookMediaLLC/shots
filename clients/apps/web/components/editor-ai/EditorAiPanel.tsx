@@ -15,9 +15,7 @@ import { useImageStore } from '@/lib/store'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { CaptionsPanel } from './CaptionsPanel'
-import { PublishPanel, type PublishVariant } from './PublishPanel'
 import { useEditorCopilot, type VariantsRequest } from './useEditorCopilot'
-import { usePublishSets } from '@/lib/editor/use-publish-targets'
 import { VariantsPanel } from './VariantsPanel'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -29,14 +27,7 @@ import { Textarea } from '@/components/ui/textarea'
  * - Suggestions: up to three one-click improvements from a design review;
  * - Variants: complete versions of the design to compare and apply (the
  *   copilot opens it for "give me four versions");
- * - Captions: alt text and platform captions for the design;
- * - Publish: the design, or every version of it, as Publish drafts carrying
- *   those captions.
- *
- * Captions and Publish share one publishing identity: the captions are
- * written in that profile's voice (RFC 024) and the drafts go to its
- * accounts, so what the editor writes is what the account would have
- * written.
+ * - Captions: alt text and platform captions for the design.
  *
  * Every AI change goes through the editor's own store actions and is one
  * undo step, so ⌘Z always takes it back.
@@ -44,11 +35,10 @@ import { Textarea } from '@/components/ui/textarea'
 
 type Status = { backgrounds: boolean; captions: boolean; copilot: boolean; variants: boolean }
 type Suggestion = { changes: DesignChanges; reason: string; title: string }
-type Tab = 'copilot' | 'variants' | 'captions' | 'publish'
+type Tab = 'copilot' | 'variants' | 'captions'
 const TAB_LABELS: Record<Tab, string> = {
   captions: 'Captions',
   copilot: 'Copilot',
-  publish: 'Publish',
   variants: 'Variants',
 }
 
@@ -90,23 +80,6 @@ export function EditorAiPanel() {
   const hasImage = useImageStore(
     (state) => Boolean(state.uploadedImageUrl) || state.mockups.length > 0
   )
-  // The versions on offer in the Variants panel, so Publish can make a draft
-  // from each one without the panel owning publishing too.
-  const [variants, setVariants] = useState<PublishVariant[]>([])
-  // A workspace whose plan or rollout excludes publishing has no Publish
-  // tab at all, rather than one with no destinations.
-  const { sets, status: publishStatus } = usePublishSets(open)
-  const publishable = publishStatus !== 'unavailable'
-  const [socialSetId, setSocialSetId] = useState<string>()
-  const activeSet = sets.find((candidate) => candidate.id === socialSetId) ?? sets[0] ?? null
-  const openCaptions = useCallback(() => setTab('captions'), [])
-  const tabs: Tab[] = publishable
-    ? ['copilot', 'variants', 'captions', 'publish']
-    : ['copilot', 'variants', 'captions']
-  // The tab can disappear under someone standing on it.
-  useEffect(() => {
-    if (!publishable) setTab((current) => (current === 'publish' ? 'copilot' : current))
-  }, [publishable])
 
   // Signed-out visitors and unconfigured environments get no AI surface.
   useEffect(() => {
@@ -208,9 +181,8 @@ export function EditorAiPanel() {
           className="fixed bottom-16 right-3 top-[72px] z-40 flex w-[min(380px,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border bg-background shadow-2xl"
           data-export-exclude
         >
-          {/* Four tabs plus the chat actions can exceed the panel's width. */}
-          <header className="flex flex-wrap items-center gap-1 border-b p-2">
-            {tabs.map((value) => (
+          <header className="flex items-center gap-1 border-b p-2">
+            {(['copilot', 'variants', 'captions'] as const).map((value) => (
               <Button
                 variant="custom"
                 size={null}
@@ -375,24 +347,11 @@ export function EditorAiPanel() {
               </form>
             </>
           ) : tab === 'captions' ? (
-            <CaptionsPanel disabled={!hasImage} set={activeSet} />
-          ) : null}
-          {publishable ? (
-            <PublishPanel
-              disabled={!hasImage}
-              hidden={tab !== 'publish'}
-              onOpenCaptions={openCaptions}
-              onSocialSetChange={setSocialSetId}
-              sets={sets}
-              socialSetId={activeSet?.id}
-              status={publishStatus}
-              variants={variants}
-            />
+            <CaptionsPanel disabled={!hasImage} />
           ) : null}
           <VariantsPanel
             disabled={!hasImage}
             hidden={tab !== 'variants'}
-            onCandidates={setVariants}
             onRequestHandled={clearVariantsRequest}
             request={variantsRequest}
           />

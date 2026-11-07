@@ -13,12 +13,22 @@ import {
 } from '@/lib/captions/channels'
 import { exportDesignDocument } from '@/lib/design/export'
 import { captureCanvasSnapshot } from '@/lib/design/snapshot'
+import { usePostHandoff } from '@/lib/editor/post-handoff'
+import { usePublishSets } from '@/lib/editor/use-publish-targets'
+import { useCanStartPost } from '@/lib/platform/can-start-post'
 import { useImageStore } from '@/lib/store'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
+import { UseInPostButton } from '@/components/workspace/SaveToWorkspaceButton'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import type { PublishSet } from '@/lib/editor/use-publish-targets'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const DEFAULT_CHANNELS: CaptionChannel[] = ['x', 'linkedin', 'instagram']
 
@@ -47,15 +57,24 @@ function Counter({ length, limit }: { length: number; limit: number }) {
 /**
  * Alt text and a caption per platform for the design, written from a
  * snapshot and its text. Everything is editable; it is saved with the
- * design (so projects keep it), the Share dialog uses it, and Publish
+ * design (so projects keep it), the Share dialog uses it, and "Use in post"
  * attaches each caption to the platform it was written for.
  *
- * With a publishing profile, the captions are written in that profile's
- * voice: the same style guide and writing samples the composer's writing
- * assistant uses (RFC 024), rather than generic marketing copy.
+ * The captions are written in a publishing profile's voice: the same style
+ * guide and writing samples the composer's writing assistant uses (RFC 024),
+ * rather than generic marketing copy. The profile is the one the post
+ * dialog posts from, so the voice and the account agree.
  */
-export function CaptionsPanel({ disabled, set }: { disabled: boolean; set: PublishSet | null }) {
+export function CaptionsPanel({ disabled }: { disabled: boolean }) {
   const trpcClient = useTRPCClient()
+  const canStartPost = useCanStartPost()
+  const { defaultSetId, sets } = usePublishSets(true)
+  const chosenSetId = usePostHandoff((state) => state.socialSetId)
+  const chooseSet = usePostHandoff((state) => state.setSocialSetId)
+  const set =
+    sets.find((item) => item.id === chosenSetId) ??
+    sets.find((item) => item.id === defaultSetId) ??
+    null
   const saved = useImageStore((state) => state.copy)
   const [channels, setChannels] = useState<CaptionChannel[]>(() => {
     const existing = captionChannelSchema.options.filter((channel) => saved?.captions[channel])
@@ -102,6 +121,23 @@ export function CaptionsPanel({ disabled, set }: { disabled: boolean; set: Publi
         Alt text and captions for each platform, from what the design shows. Review them before
         posting: AI can misread an image.
       </p>
+      {sets.length > 1 && set ? (
+        <Label className="grid gap-1 text-xs font-medium">
+          Voice
+          <Select onValueChange={chooseSet} value={set.id}>
+            <SelectTrigger aria-label="Write in the voice of">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sets.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {item.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Label>
+      ) : null}
       {set ? (
         <p className="text-xs text-muted-foreground">
           Written in {set.name}’s voice: its style guide and writing samples.
@@ -149,6 +185,10 @@ export function CaptionsPanel({ disabled, set }: { disabled: boolean; set: Publi
       <p className="text-[11px] text-muted-foreground">
         Sends a snapshot of the design to the AI provider and uses AI credits.
       </p>
+
+      {saved && canStartPost ? (
+        <UseInPostButton disabled={disabled} label="Post with these captions" variant="outline" />
+      ) : null}
 
       {saved ? (
         <div className="space-y-3">
