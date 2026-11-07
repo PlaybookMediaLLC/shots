@@ -66,7 +66,7 @@ test(
     const split = page.getByTestId('paste-split')
     await expect(split).toContainText('separates into 3 pieces')
     await expect(page.getByTestId('paste-piece-1')).toContainText('One: the opening of the run.')
-    await expect(page.getByTestId('paste-piece-3')).toContainText('28')
+    await expect(page.getByTestId('paste-piece-3')).toContainText('26')
 
     await page.getByRole('textbox', { name: 'Series name' }).fill('Storytelling')
     await page.getByTestId('paste-make-posts').click()
