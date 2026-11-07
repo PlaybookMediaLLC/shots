@@ -16,7 +16,10 @@ import {
   carriedFollowUps,
   explanationPosts,
   isCaptionedChannel,
+  platformAcceptsSize,
+  platformTarget,
   postAccounts,
+  postRenders,
   primaryFor,
   promptBrief,
   screenshotBatchItem,
@@ -25,7 +28,11 @@ import {
   screenshotPostVersions,
   screenshotPrompts,
   withLeadMedia,
+  withPlatformMedia,
 } from '@/lib/write/screenshot-post'
+import { CANVAS_TARGET_ID } from '@/lib/export/sizes'
+import { draftChannelSchema } from '@/lib/write/document'
+import { bodyFor, versionFor } from '@/lib/write/versions'
 
 const assetId = '0f1e2d3c-4b5a-4968-8778-66554433221f'
 const media = [draftAssetNode({ id: assetId, mediaType: 'image/png' })]
@@ -243,6 +250,78 @@ test('a shape a chosen platform refuses is reported before anything renders', ()
   const refused = screenshotMediaProblems(['x', 'instagram'], story)
   assert.equal(refused.length, 1)
   assert.match(refused[0]!, /Instagram/)
+})
+
+test('every platform has an export size its own media rules accept', () => {
+  for (const channel of draftChannelSchema.options) {
+    const target = platformTarget(channel)
+    assert.notEqual(target.id, CANVAS_TARGET_ID, channel)
+    // Only a platform the editor writes a caption for is ever drawn for.
+    if (!isCaptionedChannel(channel)) continue
+    assert.ok(platformAcceptsSize(channel, target), channel)
+  }
+  // Instagram keeps 0.8-1.91 and 320px, which a story shape fails.
+  assert.equal(platformAcceptsSize('instagram', { height: 1920, width: 1080 }), false)
+  assert.equal(platformAcceptsSize('x', { height: 1920, width: 1080 }), true)
+})
+
+test('platforms that read the same shape share one render', () => {
+  // X, Bluesky and Mastodon are one wide picture, not three identical ones.
+  assert.deepEqual(
+    postRenders(['x', 'bluesky', 'instagram', 'mastodon']).map((render) => [
+      render.target.id,
+      render.channels,
+    ]),
+    [
+      ['x-post', ['x', 'bluesky', 'mastodon']],
+      ['instagram-square', ['instagram']],
+    ]
+  )
+  // One platform needs no second render, so the dialog offers no choice.
+  assert.equal(postRenders(['x']).length, 1)
+  assert.deepEqual(postRenders([]), [])
+})
+
+test('a platform drawn at its own size posts that picture, not the body’s', () => {
+  const square = draftAssetNode({
+    id: '0f1e2d3c-4b5a-4968-8778-66554433aaaa',
+    mediaType: 'image/jpeg',
+  })
+  const body = screenshotPostBody({ caption: 'For X', media })
+  const versions = screenshotPostVersions({
+    body,
+    channelText: { instagram: 'For Instagram', linkedin: 'For LinkedIn' },
+    media: { instagram: square },
+  })!
+  platformVersionsSchema.parse(versions)
+
+  // Instagram swaps the body's picture for its own and keeps its caption.
+  const instagram = versionFor(versions, 'instagram')
+  const pictures = instagram.body!.filter((node) => node.type === 'img')
+  assert.equal(pictures.length, 1)
+  assert.equal((pictures[0] as { assetId?: string }).assetId, square.assetId)
+  assert.match(JSON.stringify(instagram.body), /For Instagram/)
+
+  // LinkedIn was drawn no picture of its own, so it keeps the body's.
+  const linkedin = versionFor(versions, 'linkedin')
+  assert.equal(
+    (linkedin.body!.find((node) => node.type === 'img') as { assetId?: string }).assetId,
+    assetId
+  )
+  // The body itself is untouched, and X still reads it.
+  assert.equal(bodyFor(body, versions, 'x'), body)
+})
+
+test('a picture for a platform with no version of its own changes nothing', () => {
+  const square = draftAssetNode({
+    id: '0f1e2d3c-4b5a-4968-8778-66554433bbbb',
+    mediaType: 'image/jpeg',
+  })
+  const versions = screenshotPostVersions({
+    body: screenshotPostBody({ caption: 'For X', media }),
+    channelText: { linkedin: 'For LinkedIn' },
+  })!
+  assert.deepEqual(withPlatformMedia(versions, { bluesky: square }), versions)
 })
 
 // A body gets new random post ids on every build, so a key derived from the

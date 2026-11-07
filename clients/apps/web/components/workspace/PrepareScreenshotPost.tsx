@@ -40,7 +40,11 @@ import {
   usePostHandoff,
 } from '@/lib/editor/post-handoff'
 import { usePublishSets, useRecommendedTimes } from '@/lib/editor/use-publish-targets'
-import { canvasSizeOf, documentCanvasSize } from '@/lib/export/adapt'
+import type { DesignDocument } from '@/lib/design/document'
+import { exportDesignDocument } from '@/lib/design/export'
+import { adaptDocumentToSize, canvasSizeOf, documentCanvasSize } from '@/lib/export/adapt'
+import { imageAspectOf } from '@/lib/export/export-design'
+import type { ExportTarget } from '@/lib/export/sizes'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { readEditorReturn } from '@/lib/platform/editor-handoff'
 import { useProjectSession } from '@/lib/projects/session'
@@ -58,6 +62,9 @@ import {
   captionsOverLimit,
   carriedFollowUps,
   explanationPosts,
+  platformAcceptsSize,
+  type PostMedia,
+  postRenders,
   primaryFor,
   screenshotBatchItem,
   screenshotMediaProblems,
@@ -184,6 +191,7 @@ export function PrepareScreenshotPost({
   const [everyVersion, setEveryVersion] = React.useState(startWithVersions)
   const [selected, setSelected] = React.useState<string[]>([])
   const [plannedFor, setPlannedFor] = React.useState(NO_TIME)
+  const [fitToPlatforms, setFitToPlatforms] = React.useState(true)
   const [busy, setBusy] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   // One upload per design and one key per distinct request for as long as
@@ -314,6 +322,14 @@ export function PrepareScreenshotPost({
   // or the open design.
   const posting = exports ? 'exports' : everyVersion && versions.length > 0 ? 'versions' : 'live'
   const count = exports ? exports.length : posting === 'versions' ? versions.length : 1
+  // One render per distinct platform size. Offered only when it changes
+  // something and there is a design to lay out again: a batch export's
+  // screenshots are already rendered, so they keep the shape they have.
+  const renders = postRenders(channels)
+  const canFit = renders.length > 1 && posting !== 'exports'
+  const fitting = fitToPlatforms && canFit
+  // The render the body's platform posts; every other render is a version.
+  const primaryRender = renders.find((render) => render.channels.includes(channel))
   // The shapes the platforms will see, measured before anything renders. A
   // version can change the canvas, so each is measured on its own; the
   // export is a multiple of the canvas, so the proportions are the canvas's.
@@ -330,9 +346,28 @@ export function PrepareScreenshotPost({
             ...canvasSizeOf(aspectRatio, custom ?? undefined),
           },
         ]
-  const mediaWarnings = [
-    ...new Set(shapes.flatMap((shape) => screenshotMediaProblems(channels, shape))),
-  ]
+  const mediaWarnings = fitting
+    ? [
+        ...new Set(
+          renders.flatMap((render) =>
+            screenshotMediaProblems(render.channels, {
+              height: render.target.height,
+              mimeType: RENDERED_MEDIA_TYPE,
+              width: render.target.width,
+            })
+          )
+        ),
+      ]
+    : [...new Set(shapes.flatMap((shape) => screenshotMediaProblems(channels, shape)))]
+  // Platforms that would refuse the canvas as it stands, named when the
+  // offer to draw their own size is turned down.
+  const refusedCanvas = canFit
+    ? channels.filter((platform) =>
+        shapes.some(({ height, width }) =>
+          height && width ? !platformAcceptsSize(platform, { height, width }) : false
+        )
+      )
+    : []
   const thread = React.useMemo(() => {
     if (!explanation.trim()) return { error: '', posts: [] as string[] }
     try {
@@ -392,8 +427,42 @@ export function PrepareScreenshotPost({
     ]
   }
 
+  /**
+   * The design laid out again at `target`, as its own upload. Keyed by the
+   * size so each is stored once and a retry reuses it.
+   */
+  function renderAt(
+    design: HandoffDesign,
+    document: DesignDocument,
+    target: ExportTarget
+  ): HandoffDesign {
+    return {
+      ...design,
+      fileName: (type) => exportFileName(`${design.name}-${target.id}`, type),
+      key: `${design.key}:${target.id}`,
+      render: async () =>
+        renderDesign(
+          adaptDocumentToSize(document, target, {
+            imageAspect: await imageAspectOf(document.image.src),
+          })
+        ),
+    }
+  }
+
+  /** The design behind one post, when there is one to lay out again. */
+  function documentFor(index: number): DesignDocument | null {
+    if (exports) return null
+    if (posting === 'versions') return versions[index]?.document ?? null
+    return exportDesignDocument({ keepLocalSources: true })
+  }
+
   /** One design's draft, everything but its request key. */
-  function draftFor(asset: { assetId: string; mediaType: string }, design: HandoffDesign) {
+  function draftFor(
+    asset: { assetId: string; mediaType: string },
+    design: HandoffDesign,
+    /** The picture drawn for a platform, where it is not the body's. */
+    platformMedia: Partial<Record<DraftChannel, PostMedia>> = {}
+  ) {
     const postBody = screenshotPostBody({
       altText: design.altText,
       caption: body,
@@ -404,6 +473,7 @@ export function PrepareScreenshotPost({
       automation: keepFollowUps && hasX ? followUps : undefined,
       body: postBody,
       channelText,
+      media: platformMedia,
     })
     // In the library: the campaign it belongs to, the version it is, or
     // the caption's first line, as bulk posts are named.
@@ -413,7 +483,12 @@ export function PrepareScreenshotPost({
         ? design.name
         : body.trim().split('\n')[0]?.slice(0, 80)
     return {
-      assetIds: [asset.assetId],
+      assetIds: [
+        ...new Set([
+          asset.assetId,
+          ...Object.values(platformMedia).map((media) => media.assetId),
+        ]),
+      ],
       body: postBody,
       plainText: draftPlainText(postBody),
       ...(chosen.length > 0
@@ -472,11 +547,28 @@ export function PrepareScreenshotPost({
       const drafts: { id: string }[] = []
       for (const [index, design] of list.entries()) {
         step(index, campaignId ? 'Attaching to the campaign' : 'Preparing draft')
-        const asset = await session.store(design)
+        const document = fitting ? documentFor(index) : null
+        // Fitting draws the body at the primary platform's size too, so the
+        // post it opens is the picture that platform will publish.
+        const main =
+          document && primaryRender ? renderAt(design, document, primaryRender.target) : design
+        const asset = await session.store(main)
         // The rendered bytes, which can differ from the shape checked above
-        // (an export's own format, a screenshot of any size).
-        const refused = screenshotMediaProblems(channels, asset.facts)
+        // (an export's own format, a screenshot of any size). Only the
+        // platforms that share this picture are measured against it.
+        const sharing = document && primaryRender ? primaryRender.channels : channels
+        const refused = screenshotMediaProblems(sharing, asset.facts)
         if (refused.length > 0) throw new Error(refused.join(' '))
+        // Every other distinct size, each stored once and checked on its own bytes.
+        const platformMedia: Partial<Record<DraftChannel, PostMedia>> = {}
+        for (const render of document ? renders : []) {
+          if (!document || render.target.id === primaryRender?.target.id) continue
+          const sized = await session.store(renderAt(design, document, render.target))
+          const sizedRefused = screenshotMediaProblems(render.channels, sized.facts)
+          if (sizedRefused.length > 0) throw new Error(sizedRefused.join(' '))
+          const node = draftAssetNode({ id: sized.assetId, mediaType: sized.mediaType })
+          for (const platform of render.channels) platformMedia[platform] = node
+        }
         const caption = body.trim().slice(0, 4_000)
         // Everything the draft depends on, and nothing generated: the same
         // choices on a retry reuse the same built draft and key, so the
@@ -497,8 +589,9 @@ export function PrepareScreenshotPost({
             campaign?.name,
             campaignPostId,
             count,
+            Object.entries(platformMedia).map(([platform, media]) => [platform, media.assetId]),
           ],
-          () => draftFor(asset, design)
+          () => draftFor(asset, design, platformMedia)
         )
         let draft = campaignId
           ? // One call: the backend links the export to the campaign and
@@ -887,6 +980,34 @@ export function PrepareScreenshotPost({
               </p>
             </div>
           )}
+          {canFit ? (
+            <fieldset className="grid gap-1.5">
+              <legend className="text-xs font-medium">Picture size</legend>
+              <Label className="flex items-start gap-2 font-normal">
+                <Checkbox
+                  checked={fitToPlatforms}
+                  onCheckedChange={(value) => setFitToPlatforms(value === true)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block">Draw each platform at its own size</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {renders
+                      .map(
+                        (render) =>
+                          `${render.channels.map((platform) => CAPABILITIES[platform].label).join(', ')} ${render.target.width}\u00d7${render.target.height}`
+                      )
+                      .join(' \u00b7 ')}
+                  </span>
+                </span>
+              </Label>
+              {!fitting && refusedCanvas.length > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {refusedCanvas.map((platform) => CAPABILITIES[platform].label).join(', ')} would
+                  refuse the canvas as it is.
+                </p>
+              ) : null}
+            </fieldset>
+          ) : null}
           {mediaWarnings.map((warning) => (
             <p className="text-xs text-destructive" key={warning} role="status">
               {warning}

@@ -17,6 +17,7 @@ import { exportDesignDocument } from '@/lib/design/export'
 import { patchFromModel } from '@/lib/design/model-changes'
 import { applyStoredDocument } from '@/lib/design/open-design'
 import { rememberUploadedSources } from '@/lib/design/upload-sources'
+import { useImageStore } from '@/lib/store'
 import { UseInPostButton } from '@/components/workspace/SaveToWorkspaceButton'
 import { usePostHandoff } from '@/lib/editor/post-handoff'
 import { useCanStartPost } from '@/lib/platform/can-start-post'
@@ -83,6 +84,7 @@ export function VariantsPanel({
         const base = exportDesignDocument({ keepLocalSources: true })
         const view = exportDesignDocument()
         const { variants } = await trpcClient.editorAi.variants.mutate({
+          brandKitId: useImageStore.getState().brand?.kitId,
           count: wanted,
           document: view,
           instruction: words.trim() || undefined,
