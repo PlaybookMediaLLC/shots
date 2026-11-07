@@ -6,6 +6,7 @@ import { useProjectSession } from '@/lib/projects/session'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { startPostWithAssets } from '@/components/write/pending-draft'
+import { attachToDraftHref, returnDraftId } from '@/lib/platform/asset-handoff'
 import { useHydratedSession } from '@/lib/auth/client'
 import { useTRPCClient } from '@/lib/trpc/react'
 import {
@@ -35,8 +36,7 @@ type SaveState = 'idle' | 'saving' | 'saved'
 
 /** The draft this editor was opened from, when a person came to frame its media. */
 function draftFromUrl(): string | null {
-  const draft = new URLSearchParams(window.location.search).get('fromDraft')
-  return draft && /^[a-z0-9_-]{1,128}$/i.test(draft) ? draft : null
+  return returnDraftId(window.location.search)
 }
 
 /**
@@ -69,7 +69,7 @@ export function UseInPostButton({ createExport, disabled, fileName }: SaveToWork
       })
       const draft = draftFromUrl()
       if (draft && blob.type.startsWith('image/'))
-        router.push(`/publish/${encodeURIComponent(draft)}?attach=${encodeURIComponent(assetId)}`)
+        router.push(attachToDraftHref(draft, { id: assetId, mediaType: blob.type }))
       else
         await startPostWithAssets([{ id: assetId, mediaType: blob.type }], (id) =>
           router.push(`/publish/${encodeURIComponent(id)}`)
@@ -95,9 +95,11 @@ export function SaveToWorkspaceButton({
 }: SaveToWorkspaceButtonProps) {
   const trpcClient = useTRPCClient()
   const { data: session, isPending } = useHydratedSession()
-  const [draftExport, setDraftExport] = React.useState<{ draft: string; assetId: string } | null>(
-    null
-  )
+  const [draftExport, setDraftExport] = React.useState<{
+    assetId: string
+    draft: string
+    mediaType: string
+  } | null>(null)
   const [state, setState] = React.useState<SaveState>('idle')
 
   // Render nothing while the session loads or if it has lapsed; the
@@ -120,7 +122,8 @@ export function SaveToWorkspaceButton({
 
       setState('saved')
       const draft = draftFromUrl()
-      if (draft && blob.type.startsWith('image/')) setDraftExport({ draft, assetId })
+      if (draft && blob.type.startsWith('image/'))
+        setDraftExport({ assetId, draft, mediaType: blob.type })
       toast.success('Saved to workspace', {
         action: {
           label: 'View assets',
@@ -151,7 +154,10 @@ export function SaveToWorkspaceButton({
       {draftExport && (
         <a
           className="text-sm underline"
-          href={`/publish/${encodeURIComponent(draftExport.draft)}?attach=${encodeURIComponent(draftExport.assetId)}`}
+          href={attachToDraftHref(draftExport.draft, {
+            id: draftExport.assetId,
+            mediaType: draftExport.mediaType,
+          })}
         >
           Review export in draft
         </a>

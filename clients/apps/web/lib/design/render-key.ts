@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { canonicalJson } from './canonical-json'
 import type { DesignDocument } from './document'
 
 /**
@@ -14,21 +15,13 @@ import type { DesignDocument } from './document'
 
 export const RENDER_KEY_VERSION = 2
 
-function canonical(value: unknown, assets: Record<string, string>): unknown {
-  if (typeof value === 'string' && value.startsWith('asset:')) {
-    const fingerprint = assets[value.slice('asset:'.length)]
-    return fingerprint ? `asset:${fingerprint}` : value
+/** An `asset:<id>` reference as its content fingerprint, when one is known. */
+function byContent(assets: Record<string, string>) {
+  return (text: string) => {
+    if (!text.startsWith('asset:')) return text
+    const fingerprint = assets[text.slice('asset:'.length)]
+    return fingerprint ? `asset:${fingerprint}` : text
   }
-  if (Array.isArray(value)) return value.map((entry) => canonical(entry, assets))
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([, entry]) => entry !== undefined)
-        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-        .map(([key, entry]) => [key, canonical(entry, assets)])
-    )
-  }
-  return value
 }
 
 export function designRenderKey(input: {
@@ -42,11 +35,9 @@ export function designRenderKey(input: {
 }): string {
   return createHash('sha256')
     .update(
-      JSON.stringify(
-        canonical(
-          { document: input.document, options: input.options, version: RENDER_KEY_VERSION },
-          input.assets
-        )
+      canonicalJson(
+        { document: input.document, options: input.options, version: RENDER_KEY_VERSION },
+        byContent(input.assets)
       )
     )
     .digest('hex')

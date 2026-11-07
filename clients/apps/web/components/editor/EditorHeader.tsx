@@ -55,6 +55,7 @@ import { useLibraryStyleSources } from '@/components/export/batch/use-library-st
 import { cn } from '@/lib/utils'
 import { ProjectMenu } from '@/components/projects/ProjectMenu'
 import { ShareButton } from './share/ShareButton'
+import { PublishButton } from './publish/PublishButton'
 import { FeedbackWidget } from '@/components/FeedbackWidget'
 import { AccountMenu } from '@/components/auth/AccountMenu'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -395,6 +396,8 @@ export function EditorHeader() {
             open={shareOpen}
             render={renderExportBlob}
           />
+
+          <PublishButton compact={isMobile} disabled={!hasContent} />
 
           {/* The AI copilot, which fork code renders here without this file knowing it. */}
           <span className="contents" id="editor-header-slot" />

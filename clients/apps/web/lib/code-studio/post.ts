@@ -1,5 +1,5 @@
 import { xLength } from '@/lib/content-drafts/x-length'
-import { draftAssetNode } from '@/lib/platform/asset-handoff'
+import { type DraftPostMedia, draftPostBody } from '@/lib/platform/asset-handoff'
 import type { PlateBody } from '@/lib/write/document'
 import { postBreak } from '@/lib/write/versions'
 import { languageLabel } from './languages'
@@ -30,7 +30,7 @@ function codeReply(code: string): PlateBody {
 }
 
 /** One post per media item, a carousel of images, or a document, plus an optional code reply. */
-export type CodePostMedia = { id: string; mediaType: string; alt: string }
+export type CodePostMedia = DraftPostMedia & { alt: string }
 
 /**
  * A draft body for "Post this": the first post holds the media with its alt
@@ -42,9 +42,7 @@ export function codePostBody(input: {
   reply?: { code: string }
 }): PlateBody {
   return [
-    postBreak(),
-    { type: 'p', children: [{ text: input.caption ?? '' }] },
-    ...input.media.map((media) => ({ ...draftAssetNode(media), alt: media.alt })),
+    ...draftPostBody({ caption: input.caption, media: input.media }),
     ...(input.reply ? codeReply(input.reply.code) : []),
   ]
 }

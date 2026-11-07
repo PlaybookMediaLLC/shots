@@ -29,6 +29,7 @@ export default async function EditorsLayout({ children }: { children: ReactNode 
             <EditorAccessProvider
               value={{
                 canEdit: accessAllows(access, 'artifact:edit'),
+                canPublish: accessAllows(access, 'publish:manage') && contentDraftsEnabled(),
                 canStartPost: accessAllows(access, 'artifact:edit') && contentDraftsEnabled(),
               }}
             >

@@ -2412,10 +2412,12 @@ export function WriteComposer({
           <MediaImportDialog
             editor={editorInstance}
             returnedAsset={params.get('attach') ?? ''}
+            returnedType={params.get('attachType') ?? ''}
             onClose={() => {
               setDialog(null)
               const url = new URL(window.location.href)
               url.searchParams.delete('attach')
+              url.searchParams.delete('attachType')
               window.history.replaceState(null, '', url)
             }}
           />

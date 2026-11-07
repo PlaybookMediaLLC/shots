@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { canonicalJson } from '@/lib/design/canonical-json'
 import { designRenderKey } from '@/lib/design/render-key'
 import { getDesignTemplate } from '@/lib/design/templates'
 
@@ -37,6 +38,20 @@ test('any change to pixels-relevant input changes the key', () => {
   assert.notEqual(
     base,
     designRenderKey({ assets, document: { ...document, texts: [] }, options: png })
+  )
+})
+
+test('canonical text is what both the server and the browser hash', () => {
+  // The server key (node:crypto) and the editor's publish revision
+  // (contentHash) hash this one text, so they agree on what "the same
+  // design" means.
+  assert.equal(canonicalJson({ b: 1, a: [2, { d: 3, c: 4 }] }), '{"a":[2,{"c":4,"d":3}],"b":1}')
+  // An absent value and an undefined one are the same design.
+  assert.equal(canonicalJson({ a: 1, b: undefined }), canonicalJson({ a: 1 }))
+  // Leaf strings can be rewritten, which is how an asset is keyed by its content.
+  assert.equal(
+    canonicalJson({ src: 'asset:1' }, (text) => text.replace('asset:1', 'asset:aa')),
+    '{"src":"asset:aa"}'
   )
 })
 
