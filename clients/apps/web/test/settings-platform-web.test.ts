@@ -105,7 +105,7 @@ test('settings sections are grouped and each has its own address', () => {
 })
 
 test('a writing sample cannot close the fence it is quoted in', async () => {
-  const { voiceInstructions } = await import('@/lib/write/refine')
+  const { voiceInstructions } = await import('@/lib/write/voice')
   const prompt = voiceInstructions({
     audience: '',
     endings: [],

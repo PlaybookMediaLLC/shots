@@ -75,14 +75,25 @@ const clamp = (value: number, min: number, max: number) => Math.min(max, Math.ma
 const validAspect = (aspect: number | undefined): aspect is number =>
   aspect !== undefined && Number.isFinite(aspect) && aspect > 0
 
-/** The output size a document renders at. */
-export function documentCanvasSize(document: DesignDocument): CanvasPixelSize {
-  const canvas = document.canvas
-  if (canvas?.aspectRatio === 'custom' && canvas.size) return { ...canvas.size }
+/**
+ * The output size a ratio choice renders at: a custom canvas keeps its own
+ * size, every other ratio takes its preset. Callers holding the editor's
+ * ratio rather than a document (the editor's publish preflight) use this.
+ */
+export function canvasSizeOf(
+  aspectRatio: string | undefined,
+  size?: CanvasPixelSize
+): CanvasPixelSize {
+  if (aspectRatio === 'custom' && size) return { ...size }
   const preset = getAspectRatioPreset(
-    canvas?.aspectRatio && canvas.aspectRatio !== 'custom' ? canvas.aspectRatio : '4_3'
+    aspectRatio && aspectRatio !== 'custom' ? aspectRatio : '4_3'
   )
   return { height: preset?.height ?? 1440, width: preset?.width ?? 1920 }
+}
+
+/** The output size a document renders at. */
+export function documentCanvasSize(document: DesignDocument): CanvasPixelSize {
+  return canvasSizeOf(document.canvas?.aspectRatio, document.canvas?.size)
 }
 
 /**

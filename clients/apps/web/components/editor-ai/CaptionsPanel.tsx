@@ -18,6 +18,7 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import type { PublishSet } from '@/lib/editor/use-publish-targets'
 
 const DEFAULT_CHANNELS: CaptionChannel[] = ['x', 'linkedin', 'instagram']
 
@@ -46,9 +47,14 @@ function Counter({ length, limit }: { length: number; limit: number }) {
 /**
  * Alt text and a caption per platform for the design, written from a
  * snapshot and its text. Everything is editable; it is saved with the
- * design (so projects keep it) and the Share dialog uses it.
+ * design (so projects keep it), the Share dialog uses it, and Publish
+ * attaches each caption to the platform it was written for.
+ *
+ * With a publishing profile, the captions are written in that profile's
+ * voice: the same style guide and writing samples the composer's writing
+ * assistant uses (RFC 024), rather than generic marketing copy.
  */
-export function CaptionsPanel({ disabled }: { disabled: boolean }) {
+export function CaptionsPanel({ disabled, set }: { disabled: boolean; set: PublishSet | null }) {
   const trpcClient = useTRPCClient()
   const saved = useImageStore((state) => state.copy)
   const [channels, setChannels] = useState<CaptionChannel[]>(() => {
@@ -76,6 +82,7 @@ export function CaptionsPanel({ disabled }: { disabled: boolean }) {
         document: exportDesignDocument(),
         notes: notes.trim() || undefined,
         snapshot,
+        socialSetId: set?.id,
       })
       // Merge onto what is saved now: edits made while the request ran are kept.
       const latest = useImageStore.getState().copy
@@ -95,6 +102,11 @@ export function CaptionsPanel({ disabled }: { disabled: boolean }) {
         Alt text and captions for each platform, from what the design shows. Review them before
         posting: AI can misread an image.
       </p>
+      {set ? (
+        <p className="text-xs text-muted-foreground">
+          Written in {set.name}’s voice: its style guide and writing samples.
+        </p>
+      ) : null}
       <div aria-label="Platforms" className="flex flex-wrap gap-1.5" role="group">
         {captionChannelSchema.options.map((channel) => {
           const on = channels.includes(channel)

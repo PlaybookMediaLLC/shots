@@ -28,6 +28,9 @@ export const contentDraftEditableStatusSchema = z.enum(['draft', 'archived'])
 /** Plate JSON: the editor's value, a list of block nodes. */
 export const plateValueSchema = z.array(z.record(z.string(), z.unknown())).max(5_000)
 
+/** How many connected accounts one draft or staged batch item may name. */
+export const DRAFT_ACCOUNT_LIMIT = 10
+
 /** A draft as the API returns it. */
 export const contentDraftSchema = z.object({
   assetIds: z.array(z.string()),
@@ -89,7 +92,7 @@ export const contentDraftSchema = z.object({
 export const contentDraftFieldsSchema = draftWriteInputSchema.extend({
   assetIds: z.array(contentDraftIdSchema).max(20).optional(),
   body: plateValueSchema.optional(),
-  channelConnectionIds: z.array(contentDraftIdSchema).max(10).optional(),
+  channelConnectionIds: z.array(contentDraftIdSchema).max(DRAFT_ACCOUNT_LIMIT).optional(),
   /** Text a channel posts instead of the body's, by channel. */
   channelText: z.partialRecord(draftChannelSchema, z.string().max(100_000)).optional(),
   /** Comment threads on the body and their authors' names. */
