@@ -17,6 +17,9 @@ import { exportDesignDocument } from '@/lib/design/export'
 import { patchFromModel } from '@/lib/design/model-changes'
 import { applyStoredDocument } from '@/lib/design/open-design'
 import { rememberUploadedSources } from '@/lib/design/upload-sources'
+import { UseInPostButton } from '@/components/workspace/SaveToWorkspaceButton'
+import { usePostHandoff } from '@/lib/editor/post-handoff'
+import { useCanStartPost } from '@/lib/platform/can-start-post'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { type VariantsRequest, withoutImageSources } from './useEditorCopilot'
@@ -33,25 +36,23 @@ const LARGE = { format: 'jpeg', maxWidth: 1200, quality: 'high' } as const
  * changes until the user applies one; applying is one undo step, and the
  * versions stay here to compare or switch to another.
  *
- * The versions are also reported upward, so Publish can make one draft from
- * each of them: one screenshot, several images, several posts to review.
+ * The versions are also offered to the post dialog, so one screenshot can
+ * become a post per version to review side by side.
  */
 export function VariantsPanel({
   disabled,
   hidden,
-  onCandidates,
   onRequestHandled,
   request,
 }: {
   disabled: boolean
   /** Hidden rather than unmounted, so the versions survive switching tabs. */
   hidden: boolean
-  /** The versions on offer now, for the Publish panel. */
-  onCandidates: (candidates: { document: DesignDocument; title: string }[]) => void
   onRequestHandled: () => void
   request: (VariantsRequest & { id: number }) | null
 }) {
   const trpcClient = useTRPCClient()
+  const canStartPost = useCanStartPost()
   const [estimate, setEstimate] = useState<{ lower: number; upper: number } | null>(null)
   const [estimateError, setEstimateError] = useState(false)
   const [instruction, setInstruction] = useState('')
@@ -117,18 +118,15 @@ export function VariantsPanel({
     [trpcClient]
   )
 
-  // Publish posts the version as it is previewed here, so what is reviewed
-  // side by side is exactly what each draft attaches.
-  useEffect(
-    () =>
-      onCandidates(
-        candidates.map((candidate) => ({
-          document: candidate.preview,
-          title: candidate.title,
-        }))
-      ),
-    [candidates, onCandidates]
-  )
+  // The post dialog renders each version as it is previewed here, so what
+  // is compared side by side is exactly what each post attaches. Versions
+  // that are no longer on screen are no longer on offer.
+  useEffect(() => {
+    usePostHandoff.getState().setVersions(
+      candidates.map((candidate) => ({ document: candidate.preview, title: candidate.title }))
+    )
+  }, [candidates])
+  useEffect(() => () => usePostHandoff.getState().setVersions([]), [])
 
   // The copilot's "give me four versions" arrives here.
   // Handled once: the request is cleared, so a remount never runs it again.
@@ -240,6 +238,14 @@ export function VariantsPanel({
             </li>
           ))}
         </ul>
+      ) : null}
+      {candidates.length > 0 && canStartPost ? (
+        <UseInPostButton
+          disabled={disabled}
+          label={`Post the ${candidates.length} versions`}
+          startWithVersions
+          variant="outline"
+        />
       ) : null}
 
       <Dialog onOpenChange={(open) => !open && setInspecting(null)} open={inspecting !== null}>
