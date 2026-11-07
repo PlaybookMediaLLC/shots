@@ -69,6 +69,9 @@ test(
     await page.getByRole('button', { exact: true, name: 'Export' }).click()
     await page.getByRole('button', { exact: true, name: 'PNG' }).click()
     await page.getByRole('button', { exact: true, name: 'Use in post' }).click()
+    // The caption, thread and destination are chosen before the draft exists.
+    const prepare = page.getByRole('dialog', { name: 'Prepare post' })
+    await prepare.getByRole('button', { exact: true, name: 'Create draft' }).click()
     await page.waitForURL((url) => /^\/publish\/[a-z0-9]+$/.test(url.pathname), { timeout: 90_000 })
     await expect(page.getByTestId('media-strip-item')).toHaveCount(1, { timeout: 60_000 })
     await expect(

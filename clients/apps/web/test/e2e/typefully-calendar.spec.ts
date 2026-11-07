@@ -84,21 +84,28 @@ test(
     await page.screenshot({ path: '.context/shots/typefully-month.png', fullPage: true })
 
     await app.open(`/publish/${one}`)
-    const queued = page
+    // Publish now is irreversible, so it sits in the queued post's menu.
+    const menu = page
       .getByTestId('draft-post')
-      .filter({ has: page.getByRole('button', { name: 'Publish now', exact: true }) })
-    // The page renders the trigger before React attaches its handler, so an early
-    // click is dropped; the proof of a handled click is the open dialog.
+      .getByRole('button', { name: 'More actions for the X post', exact: true })
+    const publishNow = page.getByRole('menuitem', { name: 'Publish now…', exact: true })
     const confirm = page.getByRole('alertdialog')
-    await expect(async () => {
-      if (!(await confirm.isVisible())) {
-        await queued.getByRole('button', { name: 'Publish now', exact: true }).click()
-      }
-      await expect(confirm).toBeVisible({ timeout: 2_000 })
-    }).toPass({ timeout: 60_000 })
+    const openConfirmation = async () => {
+      // The page renders the trigger before React attaches its handler, so an early
+      // click is dropped; the proof of a handled click is the open dialog.
+      await expect(async () => {
+        if (!(await confirm.isVisible())) {
+          if (!(await publishNow.isVisible())) await menu.click()
+          await publishNow.click({ timeout: 2_000 })
+        }
+        await expect(confirm).toBeVisible({ timeout: 2_000 })
+      }).toPass({ timeout: 60_000 })
+    }
+    await openConfirmation()
     await expect(confirm).toContainText('Later draft edits are not included')
     await page.getByRole('button', { name: 'Keep scheduled' }).click()
-    await queued.getByRole('button', { name: 'Publish now', exact: true }).click()
+    await expect(confirm).toBeHidden()
+    await openConfirmation()
     const publishing = page.waitForResponse(
       (response) =>
         response.url().endsWith('/publish-now') && response.request().method() === 'POST'
