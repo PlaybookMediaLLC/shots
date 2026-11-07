@@ -132,12 +132,15 @@ export async function loadWrite(
       .map((post) => ({
         accountIds: [post.channelConnectionId],
         at: post.scheduledFor.toISOString(),
+        // The whole caption, so the queue can expand a post without opening it.
         caption: post.caption,
         draftId: post.draftId,
         id: post.id,
         kind: 'scheduled' as const,
         platform: post.platform,
         state: postState(post.status, post.scheduledFor, now.getTime()),
+        /** The draft's name, which gathers a run written together. */
+        title: post.draftTitle,
       })),
     ...planned.map((draft) => ({
       accountIds: draft.channelConnectionIds,
@@ -148,6 +151,7 @@ export async function loadWrite(
       kind: 'planned' as const,
       platform: draft.primaryPlatform,
       state: null,
+      title: draft.title,
     })),
   ].sort((a, b) => a.at.localeCompare(b.at))
   const queue = filterQueue(

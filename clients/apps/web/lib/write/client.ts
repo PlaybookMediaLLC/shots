@@ -1,7 +1,11 @@
 import type { z } from 'zod'
 import type { draftFinisherSchema, draftTagSchema } from '@/lib/api/contracts/draft-tags'
 import type { CalendarPlacement, CalendarResultWire } from '@/lib/api/contracts/plan-analyze'
-import type { engagementSchema, socialSetSchema } from '@/lib/api/contracts/social-sets'
+import type {
+  engagementSchema,
+  socialSetListSchema,
+  socialSetSchema,
+} from '@/lib/api/contracts/social-sets'
 import type {
   draftActivitySchema,
   draftCopyResultSchema,
@@ -17,6 +21,9 @@ import { call, type DraftPostWire, type DraftWire } from '@/lib/content-drafts/c
 
 /** A social set as the API sends it. */
 export type SocialSetWire = z.output<typeof socialSetSchema>
+
+/** The sets you can see, with their connected accounts, as the API sends them. */
+export type SocialSetListWire = z.output<typeof socialSetListSchema>
 
 /** A set's tag as the API sends it. */
 export type DraftTagWire = z.output<typeof draftTagSchema>
@@ -36,6 +43,8 @@ const post = (id: string) => `/api/v1/content-draft-posts/${encodeURIComponent(i
 
 /** The Write API. */
 export const writeApi = {
+  /** The sets you can write in and the accounts each one posts from. */
+  sets: () => call<SocialSetListWire>('/api/v1/social-sets'),
   /** Search communities without exposing the connection's credentials to the browser. */
   communities: (setId: string, query: string) =>
     call<{ items: { id: string; name: string }[] }>(

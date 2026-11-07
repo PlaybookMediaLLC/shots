@@ -18,6 +18,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { postRanges } from '@/components/drafts/thread'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import {
   attachmentEntry,
   attachmentsIn,
@@ -261,7 +262,7 @@ function AttachmentRow({
           </Button>
           <Button asChild size="sm" variant="outline">
             <a
-              href={`/editor?asset=${encodeURIComponent(String(node.assetId))}&fromDraft=${encodeURIComponent(draftId)}`}
+              href={editorHref({ assetId: String(node.assetId) }, { draftId })}
               rel="noopener noreferrer"
               target="_blank"
             >

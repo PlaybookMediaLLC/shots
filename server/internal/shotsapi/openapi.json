@@ -12550,6 +12550,13 @@
                         "suppressSlackOnPublish": {
                           "type": "boolean"
                         },
+                        "campaignId": {
+                          "default": null,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "plannedFor": {
                           "default": null,
                           "type": [
@@ -13148,6 +13155,7 @@
                         "lastPublishedAt",
                         "engagement",
                         "naturalPostingTime",
+                        "campaignId",
                         "plannedFor",
                         "primaryPlatform",
                         "socialSetId",
@@ -13735,6 +13743,13 @@
                         "suppressSlackOnPublish": {
                           "type": "boolean"
                         },
+                        "campaignId": {
+                          "default": null,
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
                         "plannedFor": {
                           "default": null,
                           "type": [
@@ -14333,6 +14348,7 @@
                         "lastPublishedAt",
                         "engagement",
                         "naturalPostingTime",
+                        "campaignId",
                         "plannedFor",
                         "primaryPlatform",
                         "socialSetId",
@@ -19804,6 +19820,13 @@
                 "suppressSlackOnPublish": {
                   "type": "boolean"
                 },
+                "campaignId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "plannedFor": {
                   "default": null,
                   "type": [
@@ -20402,6 +20425,7 @@
                 "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
+                "campaignId",
                 "plannedFor",
                 "primaryPlatform",
                 "socialSetId",
@@ -24769,6 +24793,13 @@
                 "suppressSlackOnPublish": {
                   "type": "boolean"
                 },
+                "campaignId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "plannedFor": {
                   "default": null,
                   "type": [
@@ -25367,6 +25398,7 @@
                 "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
+                "campaignId",
                 "plannedFor",
                 "primaryPlatform",
                 "socialSetId",
@@ -25643,6 +25675,13 @@
                 "suppressSlackOnPublish": {
                   "type": "boolean"
                 },
+                "campaignId": {
+                  "default": null,
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "plannedFor": {
                   "default": null,
                   "type": [
@@ -26241,6 +26280,7 @@
                 "lastPublishedAt",
                 "engagement",
                 "naturalPostingTime",
+                "campaignId",
                 "plannedFor",
                 "primaryPlatform",
                 "socialSetId",
@@ -27100,6 +27140,13 @@
           "suppressSlackOnPublish": {
             "type": "boolean"
           },
+          "campaignId": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "plannedFor": {
             "default": null,
             "type": [
@@ -27698,6 +27745,7 @@
           "lastPublishedAt",
           "engagement",
           "naturalPostingTime",
+          "campaignId",
           "plannedFor",
           "primaryPlatform",
           "socialSetId",
@@ -29080,6 +29128,13 @@
               "suppressSlackOnPublish": {
                 "type": "boolean"
               },
+              "campaignId": {
+                "default": null,
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "plannedFor": {
                 "default": null,
                 "type": [
@@ -29678,6 +29733,7 @@
               "lastPublishedAt",
               "engagement",
               "naturalPostingTime",
+              "campaignId",
               "plannedFor",
               "primaryPlatform",
               "socialSetId",

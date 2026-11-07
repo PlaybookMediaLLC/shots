@@ -6,6 +6,7 @@ import { campaignPostTransitions } from '@/lib/tenant/campaign-status'
 import {
   approveCampaignDesign,
   createCampaign,
+  createCampaignPublishDraft,
   getCampaign,
   listCampaigns,
   scheduleCampaignPost,
@@ -13,6 +14,7 @@ import {
   transitionCampaignPosts,
   updateCampaignPost,
 } from '@/lib/tenant/campaigns'
+import { campaignPublishDraftSchema } from '@/lib/tenant/campaign-publish-draft'
 import {
   campaignApprovalSchema,
   campaignCreateSchema,
@@ -99,6 +101,17 @@ export const campaignRouter = router({
       await backendSDK(ctx.access).approveCampaignAsset(input.campaignId, input.assetId)
       return { approved: true }
     }),
+  /**
+   * An edited campaign visual becomes a Publish draft. The backend checks the
+   * campaign role again and does the asset link and the draft in one
+   * transaction; `release:create` here only gates membership and the role
+   * that may change a campaign.
+   */
+  publishDraft: organizationProcedure('release:create')
+    .input(campaignPublishDraftSchema)
+    .mutation(async ({ ctx, input }) => ({
+      draft: await createCampaignPublishDraft(ctx.access, input),
+    })),
   /** A hand edit to a post; stale copy and prohibited terms come back as outcomes. */
   updatePost: organizationProcedure('release:create')
     .input(

@@ -580,6 +580,19 @@ export type UpdateCampaignPostInput = {
   title?: string
 }
 
+/**
+ * An edited campaign visual on its way to Publish: the exported workspace
+ * asset, the generated post its copy came from (which must belong to the
+ * same campaign), the caption kept on the campaign's asset board, and the
+ * draft to create.
+ */
+export type CampaignPublishDraftInput = {
+  assetId: string
+  campaignPostId?: string
+  caption?: string
+  draft: BackendContentDraftCreate
+}
+
 export type CreateProductSurfaceInput = {
   description?: string
   environment: ProductSurface['environment']
@@ -961,6 +974,8 @@ export type BackendContentDraft = {
   publishedPosts: number
   attentionAt?: string | null
   lastPublishedAt?: string | null
+  /** The campaign an edited campaign visual was published from, if any. */
+  campaignId?: string | null
   /** Write (RFC 025): an article's title and cover, for an article draft. */
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */
@@ -2909,6 +2924,19 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /**
+   * Turns an edited campaign visual into a Publish draft: the export is
+   * attached to the campaign and the draft is created in one transaction, so
+   * a failure leaves neither. `draft` is the ordinary draft body the composer
+   * writes; its `requestKey` makes a retry return the first draft.
+   */
+  async createCampaignPublishDraft(campaignId: string, input: CampaignPublishDraftInput) {
+    return this.request<BackendContentDraft>(
+      `v1/campaigns/${encodeURIComponent(campaignId)}/publish-drafts`,
+      { body: input, method: 'POST' }
+    )
+  }
+
   /** Edits a post's copy, call to action, or title; see `UpdateCampaignPostInput`. */
   async updateCampaignPost(campaignId: string, postId: string, input: UpdateCampaignPostInput) {
     return this.request<BackendCampaignPost>(
@@ -3763,6 +3791,13 @@ export class ScreenshotStudioBackendSDK {
   async getDraftWritingContext(id: string, channel: string) {
     return this.request<WritingContext>(
       `v1/content-drafts/${encodeURIComponent(id)}/writing-context?channel=${encodeURIComponent(channel)}`
+    )
+  }
+
+  /** The same voice for a set with no draft yet, for copy written before one exists. */
+  async getSocialSetWritingContext(id: string, channel: string) {
+    return this.request<WritingContext>(
+      `v1/social-sets/${encodeURIComponent(id)}/writing-context?channel=${encodeURIComponent(channel)}`
     )
   }
 

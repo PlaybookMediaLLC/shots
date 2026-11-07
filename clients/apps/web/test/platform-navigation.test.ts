@@ -27,7 +27,8 @@ import {
   prepareWorkspaceSwitch,
   registerNavigationGuard,
 } from '@/lib/platform/navigation-guard'
-import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import { draftAssetNode, draftPostBody, supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import { draftAttachHref, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 
 test('canonical editors, aliases and localized routes select the owning job', () => {
@@ -126,6 +127,55 @@ test('library attachment keeps immutable media identity through writing serializ
   assert.equal(supportedDraftMedia('image/svg+xml'), false)
   assert.throws(() => draftAssetNode({ id, mediaType: 'application/pdf' }), /supported/)
   assert.throws(() => draftAssetNode({ id: '../../another-tenant', mediaType: 'image/png' }))
+})
+
+test('a post made from studio output carries its caption and its rendered image', () => {
+  const id = 'cm123456789012345678901234'
+  const body = draftPostBody({
+    caption: 'Shipped the new editor',
+    media: [{ alt: 'The editor with a gradient background', id, mediaType: 'image/png' }],
+  })
+
+  // One post: the break gives it the identity and settings the composer edits.
+  assert.equal(body[0].type, 'post_break')
+  const serialized = serializeDraft(body, 'x')
+  assert.equal(serialized.posts.length, 1)
+  assert.equal(serialized.posts[0].caption, 'Shipped the new editor')
+  // The post references the stored asset, never a copy of its bytes, and
+  // keeps the alt text and media type the studio already knew.
+  assert.deepEqual(serialized.assetIds, [id])
+  assert.equal(serialized.posts[0].media[0].alt, 'The editor with a gradient background')
+  assert.equal(serialized.posts[0].media[0].mimeType, 'image/png')
+  // An image with no words is a post; an empty one is the blocker the publish
+  // dialog shows while its render is still running.
+  const silent = serializeDraft(draftPostBody({ media: [{ id, mediaType: 'image/png' }] }), 'x')
+  assert.equal(silent.posts.length, 1)
+  assert.equal(silent.posts[0].images, 1)
+  assert.deepEqual(serializeDraft(draftPostBody({ media: [] }), 'x').errors, [
+    'Write something to post.',
+  ])
+})
+
+test('an export returns only to a draft the return address actually names', () => {
+  const draft = 'cm123456789012345678901234'
+  assert.equal(readEditorReturn(`?fromDraft=${draft}`).draftId, draft)
+  assert.equal(readEditorReturn('?fromDraft=').draftId, undefined)
+  assert.equal(readEditorReturn('').draftId, undefined)
+  // A hand-edited address cannot send the export somewhere else.
+  for (const unsafe of ['../../other', 'https://other.test/publish/x', 'a b'])
+    assert.equal(readEditorReturn(`?fromDraft=${encodeURIComponent(unsafe)}`).draftId, undefined)
+
+  // The composer opens the returned export for review; the media type travels
+  // with it so each destination's formats can be checked before scheduling.
+  assert.equal(
+    draftAttachHref(draft, 'cm999999999999999999999999', 'image/png'),
+    `/publish/${draft}?attach=cm999999999999999999999999&attachType=image%2Fpng`
+  )
+  // Without a known type, only the asset travels.
+  assert.equal(
+    draftAttachHref(draft, 'cm999999999999999999999999'),
+    `/publish/${draft}?attach=cm999999999999999999999999`
+  )
 })
 
 test('shell links wait only for opted-in editor saves and retain failures', async () => {

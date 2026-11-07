@@ -11,6 +11,7 @@ import { isCampaignStudioConfigured } from '@/lib/ai/agents/campaign-studio'
 import { critiqueSchema } from '@/lib/ai/launch/critique'
 import { accessAllows } from '@/lib/auth/permissions'
 import type { TenantContext } from '@/lib/auth/access'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import { latestLaunchRuns } from '@/lib/launch/runs'
 import { getCampaignPlans, getReleaseSpecs } from '@/lib/launch/store'
 import { createTenantDownloadUrl } from '@/lib/storage/client'
@@ -19,6 +20,17 @@ import { listCampaignDesigns } from '@/lib/tenant/designs'
 import { requireCampaignPageAccess } from '../../page-access'
 
 export const metadata: Metadata = { title: 'Campaign assets' }
+
+/**
+ * The campaign asset kinds the board shows as visuals, and what it calls
+ * them. Captures have their own section, and anything unlisted is internal.
+ */
+const BOARD_ASSET_NAMES: Record<string, string> = {
+  'code-visual': 'Code visual',
+  'editor-export': 'Edited in the editor',
+  'product-shot': 'Product shot',
+}
+const BOARD_ASSET_KINDS = Object.keys(BOARD_ASSET_NAMES)
 
 type CampaignAssetsPageProps = {
   params: Promise<{ campaignId: string; locale: string }>
@@ -60,7 +72,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
         createdAt: design.createdAt.getTime(),
         critique: critiqueSchema.safeParse(design.critique).data ?? null,
         designId: design.id,
-        editHref: `/editor?design=${design.id}`,
+        editHref: editorHref({ designId: design.id }, { campaignId: campaign.id }),
         fromEarlierPlan:
           plan && design.planVersion !== null ? design.planVersion !== plan.version : undefined,
         id: design.id,
@@ -77,16 +89,23 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
       ...campaign.assets
         .filter(
           (link) =>
-            (link.kind === 'product-shot' || link.kind === 'code-visual') &&
+            BOARD_ASSET_KINDS.includes(link.kind) &&
             !designs.some((design) => design.renderedAsset?.id === link.assetId)
         )
         .map(async (link): Promise<BoardVisual> => ({
+          // An export edited from this campaign is already published through
+          // Publish, so it is shown as a record, not as a visual to approve
+          // for the campaign's own posts.
+          approvable: link.kind !== 'editor-export',
           approvedVariant: null,
           caption: link.caption,
           createdAt: link.createdAt.getTime(),
           critique: null,
           designId: null,
-          editHref: link.kind === 'code-visual' ? '/library?type=code' : `/?asset=${link.asset.id}`,
+          editHref:
+            link.kind === 'code-visual'
+              ? '/library?type=code'
+              : editorHref({ assetId: link.asset.id }, { campaignId: campaign.id }),
           fromEarlierPlan:
             plan && link.planVersion !== null ? link.planVersion !== plan.version : undefined,
           id: link.id,
@@ -95,7 +114,7 @@ export default async function CampaignAssetsPage({ params }: CampaignAssetsPageP
             url: await sign(link.asset.id),
             width: link.asset.width,
           },
-          name: link.kind === 'code-visual' ? 'Code visual' : 'Product shot',
+          name: BOARD_ASSET_NAMES[link.kind] ?? 'Product shot',
           planAssetKey: link.planAssetKey,
           renderedAssetId: link.asset.id,
           variantLabel: link.variantLabel,

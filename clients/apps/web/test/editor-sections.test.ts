@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import React from 'react';
 import { Button } from '../components/ui/button';
-import { ExportPresetsSection, exportPresets } from '../components/editor/sections/ExportPresetsSection';
+import { ExportPresetsSection } from '../components/editor/sections/ExportPresetsSection';
+import { EXPORT_SIZE_PRESETS } from '../lib/export/sizes';
 import { predefinedPresets } from '../components/editor/sections/QuickTemplatesSection';
 import { themes } from '../components/editor/sections/ScreenshotDesignSection';
 import { useImageStore } from '../lib/store';
@@ -20,12 +21,12 @@ function buttons(node: React.ReactNode): React.ReactElement<{ onClick: () => voi
 
 test('every export preset applies the advertised pixel dimensions to the export resolver', () => {
   const controls = buttons(ExportPresetsSection());
-  assert.equal(controls.length, exportPresets.length);
+  assert.equal(controls.length, EXPORT_SIZE_PRESETS.length);
   controls.forEach((button, index) => {
     button.props.onClick();
     const resolved = getAspectRatioPreset(useImageStore.getState().selectedAspectRatio);
-    assert.equal(resolved?.width, exportPresets[index].width);
-    assert.equal(resolved?.height, exportPresets[index].height);
+    assert.equal(resolved?.width, EXPORT_SIZE_PRESETS[index].width);
+    assert.equal(resolved?.height, EXPORT_SIZE_PRESETS[index].height);
   });
 });
 

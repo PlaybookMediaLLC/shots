@@ -129,6 +129,16 @@ export function readBrandKit(stored: StoredBrandKit): BrandKit | null {
   }
 }
 
+/**
+ * One stored kit by id, whichever version it is. A design records the id of
+ * the exact version it applied, so reading it back must not go through the
+ * library, which keeps only the latest version of each name.
+ */
+export function brandKitById(stored: readonly StoredBrandKit[], id: string): BrandKit | null {
+  const found = stored.find((kit) => kit.id === id)
+  return found ? readBrandKit(found) : null
+}
+
 /** The library: the latest active version of each kit, by name. */
 export function brandKitLibrary(stored: readonly StoredBrandKit[]): BrandKit[] {
   const latest = new Map<string, StoredBrandKit>()

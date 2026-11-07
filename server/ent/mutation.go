@@ -33278,6 +33278,7 @@ type ContentDraftMutation struct {
 	pinned_at                    *time.Time
 	plan_time_zone               *string
 	source_draft_id              *string
+	campaign_id                  *string
 	collab_generation            *int
 	addcollab_generation         *int
 	collab_state                 *[]byte
@@ -34839,6 +34840,55 @@ func (m *ContentDraftMutation) ResetSourceDraftID() {
 	delete(m.clearedFields, contentdraft.FieldSourceDraftID)
 }
 
+// SetCampaignID sets the "campaign_id" field.
+func (m *ContentDraftMutation) SetCampaignID(s string) {
+	m.campaign_id = &s
+}
+
+// CampaignID returns the value of the "campaign_id" field in the mutation.
+func (m *ContentDraftMutation) CampaignID() (r string, exists bool) {
+	v := m.campaign_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCampaignID returns the old "campaign_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldCampaignID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCampaignID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCampaignID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCampaignID: %w", err)
+	}
+	return oldValue.CampaignID, nil
+}
+
+// ClearCampaignID clears the value of the "campaign_id" field.
+func (m *ContentDraftMutation) ClearCampaignID() {
+	m.campaign_id = nil
+	m.clearedFields[contentdraft.FieldCampaignID] = struct{}{}
+}
+
+// CampaignIDCleared returns if the "campaign_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) CampaignIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldCampaignID]
+	return ok
+}
+
+// ResetCampaignID resets all changes to the "campaign_id" field.
+func (m *ContentDraftMutation) ResetCampaignID() {
+	m.campaign_id = nil
+	delete(m.clearedFields, contentdraft.FieldCampaignID)
+}
+
 // SetCollabGeneration sets the "collab_generation" field.
 func (m *ContentDraftMutation) SetCollabGeneration(i int) {
 	m.collab_generation = &i
@@ -35148,7 +35198,7 @@ func (m *ContentDraftMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentDraftMutation) Fields() []string {
-	fields := make([]string, 0, 38)
+	fields := make([]string, 0, 39)
 	if m.organization_id != nil {
 		fields = append(fields, contentdraft.FieldOrganizationID)
 	}
@@ -35245,6 +35295,9 @@ func (m *ContentDraftMutation) Fields() []string {
 	if m.source_draft_id != nil {
 		fields = append(fields, contentdraft.FieldSourceDraftID)
 	}
+	if m.campaign_id != nil {
+		fields = append(fields, contentdraft.FieldCampaignID)
+	}
 	if m.collab_generation != nil {
 		fields = append(fields, contentdraft.FieldCollabGeneration)
 	}
@@ -35335,6 +35388,8 @@ func (m *ContentDraftMutation) Field(name string) (ent.Value, bool) {
 		return m.PlanTimeZone()
 	case contentdraft.FieldSourceDraftID:
 		return m.SourceDraftID()
+	case contentdraft.FieldCampaignID:
+		return m.CampaignID()
 	case contentdraft.FieldCollabGeneration:
 		return m.CollabGeneration()
 	case contentdraft.FieldCollabState:
@@ -35420,6 +35475,8 @@ func (m *ContentDraftMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldPlanTimeZone(ctx)
 	case contentdraft.FieldSourceDraftID:
 		return m.OldSourceDraftID(ctx)
+	case contentdraft.FieldCampaignID:
+		return m.OldCampaignID(ctx)
 	case contentdraft.FieldCollabGeneration:
 		return m.OldCollabGeneration(ctx)
 	case contentdraft.FieldCollabState:
@@ -35665,6 +35722,13 @@ func (m *ContentDraftMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSourceDraftID(v)
 		return nil
+	case contentdraft.FieldCampaignID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCampaignID(v)
+		return nil
 	case contentdraft.FieldCollabGeneration:
 		v, ok := value.(int)
 		if !ok {
@@ -35824,6 +35888,9 @@ func (m *ContentDraftMutation) ClearedFields() []string {
 	if m.FieldCleared(contentdraft.FieldSourceDraftID) {
 		fields = append(fields, contentdraft.FieldSourceDraftID)
 	}
+	if m.FieldCleared(contentdraft.FieldCampaignID) {
+		fields = append(fields, contentdraft.FieldCampaignID)
+	}
 	if m.FieldCleared(contentdraft.FieldCollabState) {
 		fields = append(fields, contentdraft.FieldCollabState)
 	}
@@ -35882,6 +35949,9 @@ func (m *ContentDraftMutation) ClearField(name string) error {
 		return nil
 	case contentdraft.FieldSourceDraftID:
 		m.ClearSourceDraftID()
+		return nil
+	case contentdraft.FieldCampaignID:
+		m.ClearCampaignID()
 		return nil
 	case contentdraft.FieldCollabState:
 		m.ClearCollabState()
@@ -35995,6 +36065,9 @@ func (m *ContentDraftMutation) ResetField(name string) error {
 		return nil
 	case contentdraft.FieldSourceDraftID:
 		m.ResetSourceDraftID()
+		return nil
+	case contentdraft.FieldCampaignID:
+		m.ResetCampaignID()
 		return nil
 	case contentdraft.FieldCollabGeneration:
 		m.ResetCollabGeneration()

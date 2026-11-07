@@ -107,6 +107,38 @@ export async function critiqueDesign(document: DesignDocument, snapshotJpegBase6
 export type Variant = Proposal
 
 /**
+ * The brand a design must stay within, as the brand kit defines it. Versions
+ * explore composition, frame and typography scale; they do not invent a new
+ * palette or typeface for a workspace that has one.
+ */
+export type VariantBrand = {
+  accent: string
+  background: string
+  bodyFont: string | null
+  foreground: string
+  headingFont: string | null
+  name: string
+  palette: readonly string[]
+  secondary?: string
+}
+
+/** The brand constraint as the model reads it. */
+function brandConstraint(brand: VariantBrand): string {
+  const colors = [brand.background, brand.foreground, brand.accent, brand.secondary, ...brand.palette]
+    .filter((color): color is string => Boolean(color))
+    .join(', ')
+  const fonts = [brand.headingFont, brand.bodyFont].filter(Boolean).join(' for headlines, ')
+  return [
+    `\n\nEvery version must stay on the \u201c${brand.name}\u201d brand.`,
+    `Use only these colours: ${colors}.`,
+    fonts ? `Use these font ids: ${fonts}.` : '',
+    'Explore layout, frame, perspective and type scale instead of new colours or typefaces.',
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
+
+/**
  * Propose `count` complete versions of a design for the user to compare.
  * Each must change the composition, not only its colours (unless asked),
  * and differ from the others; a proposal that does not is sent back to the
@@ -115,7 +147,7 @@ export type Variant = Proposal
  */
 export async function proposeVariants(
   document: DesignDocument,
-  options: { count: number; instruction?: string }
+  options: { brand?: VariantBrand | null; count: number; instruction?: string }
 ): Promise<Variant[]> {
   const variants: Variant[] = []
   await generateText({
@@ -123,7 +155,7 @@ export async function proposeVariants(
       {
         content: `${designContext(document)}\n\nPropose ${options.count} versions.${
           options.instruction ? ` The user asked: ${options.instruction}` : ''
-        }`,
+        }${options.brand ? brandConstraint(options.brand) : ''}`,
         role: 'user',
       },
     ],

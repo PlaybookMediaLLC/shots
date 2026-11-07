@@ -14,6 +14,12 @@ import { cn } from '@/lib/utils'
 /** The kinds of batch; each opens the same batch page, set up for it. */
 const TOOLS = [
   {
+    description:
+      'Paste a block of written posts, one per blank line. No files, no CSV: each piece becomes its own post, with its character count and its time.',
+    label: 'Text posts',
+    value: 'text',
+  },
+  {
     description: 'Up to 100 videos, one post each, with captions and times in bulk.',
     label: 'Video upload',
     value: 'videos',
@@ -45,7 +51,12 @@ export function NewBatchButton({
   defaultSetId?: string
 }) {
   const [tool, setTool] = React.useState('')
-  const [title, setTitle] = React.useState(() => `Batch ${new Date().toLocaleDateString()}`)
+  // The name follows the kind picked until it is typed over, so a batch in the
+  // list says what is in it rather than only when it was started.
+  const [title, setTitle] = React.useState('')
+  const suggested = tool
+    ? `${TOOLS.find((item) => item.value === tool)?.label ?? 'Batch'} · ${new Date().toLocaleDateString()}`
+    : ''
   const [setId, setSetId] = React.useState(
     defaultSetId && sets.some((set) => set.id === defaultSetId) ? defaultSetId : sets[0]?.id
   )
@@ -54,7 +65,7 @@ export function NewBatchButton({
     setBusy(true)
     void call<ContentBatch>('/api/v1/content-batches', {
       method: 'POST',
-      body: { title, socialSetId: setId },
+      body: { title: title.trim() || suggested, socialSetId: setId },
     })
       .then((batch) =>
         window.location.assign(
@@ -110,7 +121,7 @@ export function NewBatchButton({
             <Label className="grid gap-1 font-normal">
               Name
               <Input
-                value={title}
+                value={title || suggested}
                 maxLength={200}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -126,7 +137,7 @@ export function NewBatchButton({
                 value={setId}
               />
             </Label>
-            <Button type="submit" disabled={busy || !title.trim() || !setId}>
+            <Button type="submit" disabled={busy || !(title.trim() || suggested) || !setId}>
               Start a batch
             </Button>
           </div>

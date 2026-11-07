@@ -154,6 +154,11 @@ func SourceDraftID(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldSourceDraftID, v))
 }
 
+// CampaignID applies equality check predicate on the "campaign_id" field. It's identical to CampaignIDEQ.
+func CampaignID(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignID, v))
+}
+
 // CollabGeneration applies equality check predicate on the "collab_generation" field. It's identical to CollabGenerationEQ.
 func CollabGeneration(v int) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldCollabGeneration, v))
@@ -1297,6 +1302,81 @@ func SourceDraftIDEqualFold(v string) predicate.ContentDraft {
 // SourceDraftIDContainsFold applies the ContainsFold predicate on the "source_draft_id" field.
 func SourceDraftIDContainsFold(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldContainsFold(FieldSourceDraftID, v))
+}
+
+// CampaignIDEQ applies the EQ predicate on the "campaign_id" field.
+func CampaignIDEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignID, v))
+}
+
+// CampaignIDNEQ applies the NEQ predicate on the "campaign_id" field.
+func CampaignIDNEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNEQ(FieldCampaignID, v))
+}
+
+// CampaignIDIn applies the In predicate on the "campaign_id" field.
+func CampaignIDIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIn(FieldCampaignID, vs...))
+}
+
+// CampaignIDNotIn applies the NotIn predicate on the "campaign_id" field.
+func CampaignIDNotIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotIn(FieldCampaignID, vs...))
+}
+
+// CampaignIDGT applies the GT predicate on the "campaign_id" field.
+func CampaignIDGT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGT(FieldCampaignID, v))
+}
+
+// CampaignIDGTE applies the GTE predicate on the "campaign_id" field.
+func CampaignIDGTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGTE(FieldCampaignID, v))
+}
+
+// CampaignIDLT applies the LT predicate on the "campaign_id" field.
+func CampaignIDLT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLT(FieldCampaignID, v))
+}
+
+// CampaignIDLTE applies the LTE predicate on the "campaign_id" field.
+func CampaignIDLTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLTE(FieldCampaignID, v))
+}
+
+// CampaignIDContains applies the Contains predicate on the "campaign_id" field.
+func CampaignIDContains(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContains(FieldCampaignID, v))
+}
+
+// CampaignIDHasPrefix applies the HasPrefix predicate on the "campaign_id" field.
+func CampaignIDHasPrefix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasPrefix(FieldCampaignID, v))
+}
+
+// CampaignIDHasSuffix applies the HasSuffix predicate on the "campaign_id" field.
+func CampaignIDHasSuffix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasSuffix(FieldCampaignID, v))
+}
+
+// CampaignIDIsNil applies the IsNil predicate on the "campaign_id" field.
+func CampaignIDIsNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIsNull(FieldCampaignID))
+}
+
+// CampaignIDNotNil applies the NotNil predicate on the "campaign_id" field.
+func CampaignIDNotNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotNull(FieldCampaignID))
+}
+
+// CampaignIDEqualFold applies the EqualFold predicate on the "campaign_id" field.
+func CampaignIDEqualFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEqualFold(FieldCampaignID, v))
+}
+
+// CampaignIDContainsFold applies the ContainsFold predicate on the "campaign_id" field.
+func CampaignIDContainsFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContainsFold(FieldCampaignID, v))
 }
 
 // CollabGenerationEQ applies the EQ predicate on the "collab_generation" field.

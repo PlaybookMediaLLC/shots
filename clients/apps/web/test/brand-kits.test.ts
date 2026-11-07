@@ -8,6 +8,7 @@ import {
   readableOn,
 } from '@/lib/brand/apply'
 import {
+  brandKitById,
   brandKitDefinition,
   brandKitLibrary,
   fontIdForName,
@@ -164,6 +165,18 @@ test('the library shows the latest active version of each kit', () => {
     library.map((entry) => [entry.name, entry.id]),
     [['Acme', 'a2']]
   )
+})
+
+test('a kit reads back by the exact version id a design applied, not only the latest', () => {
+  const versions = [
+    stored({ colors: { background: '#ffffff', foreground: '#000000' } }, { id: 'a1', version: 1 }),
+    stored({ colors: { background: '#000000', foreground: '#ffffff' } }, { id: 'a2', version: 2 }),
+  ]
+  // A design bound to v1 keeps v1's colours after v2 is published; the
+  // library would have dropped v1 and left the design with no brand at all.
+  assert.equal(brandKitById(versions, 'a1')?.colors.background, '#ffffff')
+  assert.equal(brandKitById(versions, 'a2')?.colors.background, '#000000')
+  assert.equal(brandKitById(versions, 'another-workspace'), null)
 })
 
 test('applying a kit sets colours, fonts, background, and a logo', () => {

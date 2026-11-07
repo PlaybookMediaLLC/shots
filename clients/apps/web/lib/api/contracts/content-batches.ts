@@ -12,6 +12,7 @@ import {
   contentDraftCreateSchema,
   contentDraftIdSchema,
   contentDraftPostSchema,
+  DRAFT_ACCOUNT_LIMIT,
 } from './content-drafts'
 
 /**
@@ -69,7 +70,7 @@ export const batchItemInputSchema = z.object({
   importKey: z.string().min(16).max(128),
   caption: z.string().max(100_000),
   media: z.array(batchMediaSchema).max(BATCH_MEDIA_LIMIT),
-  channelConnectionIds: z.array(contentDraftIdSchema).max(10),
+  channelConnectionIds: z.array(contentDraftIdSchema).max(DRAFT_ACCOUNT_LIMIT),
   /** A grid video concept; its rendered video becomes the item's media. */
   grid: batchGridSchema.optional(),
   /** The file or folder name the item came from; caption CSVs match on it. */
@@ -285,7 +286,7 @@ export const validateContentBatchContract = defineContract({
       .array(
         z.object({
           itemId: contentDraftIdSchema,
-          channelConnectionIds: z.array(contentDraftIdSchema).min(1).max(10),
+          channelConnectionIds: z.array(contentDraftIdSchema).min(1).max(DRAFT_ACCOUNT_LIMIT),
         })
       )
       .min(1)

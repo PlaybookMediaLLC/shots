@@ -54,6 +54,18 @@ import { cn } from '@/lib/utils'
 import { ScaleSlider } from '../ScaleSlider'
 import { SizePicker } from '../SizePicker'
 import { Input } from '@/components/ui/input'
+import dynamic from 'next/dynamic'
+import { useCanStartPost } from '@/lib/platform/can-start-post'
+
+// The post dialog reaches Publish's profiles, batches and campaign copy; the
+// batch workspace loads none of that until someone asks for posts.
+const PrepareScreenshotPost = dynamic(
+  () =>
+    import('@/components/workspace/PrepareScreenshotPost').then(
+      (module) => module.PrepareScreenshotPost
+    ),
+  { ssr: false }
+)
 
 /**
  * A style a batch can apply: the current design, a saved preset, or a brand
@@ -297,6 +309,8 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
   const [importing, setImporting] = React.useState<{ done: number; total: number } | null>(null)
   const [running, setRunning] = React.useState(false)
   const [confirmClear, setConfirmClear] = React.useState(false)
+  const [publishing, setPublishing] = React.useState(false)
+  const canStartPost = useCanStartPost()
   /** Files the last import could not add, with the reason; shown until dismissed. */
   const [notAdded, setNotAdded] = React.useState<string[]>([])
   const controller = React.useRef<AbortController | null>(null)
@@ -442,6 +456,17 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
     itemsRef.current.forEach(revoke)
     setItems(() => [])
   }
+
+  // Rendered screenshots as posts: the first size of each, since a post
+  // carries one image, and the batch page keeps each item's file name.
+  const publishExports = React.useMemo(
+    () =>
+      items.flatMap((item) => {
+        const output = item.outputs?.[0]
+        return output ? [{ blob: output.blob, name: item.name }] : []
+      }),
+    [items]
+  )
 
   const total = items.length
   const done = items.filter((item) => item.status === 'done').length
@@ -746,6 +771,12 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
               Download {done} finished
             </Button>
           ) : null}
+          {!running && canStartPost && publishExports.length > 0 ? (
+            <Button onClick={() => setPublishing(true)} size="sm" variant="outline">
+              Create {publishExports.length} post{publishExports.length === 1 ? '' : 's'}
+              {format !== 'pdf' && targets.length > 1 ? ' (first size)' : ''}
+            </Button>
+          ) : null}
           <Button
             disabled={locked || total === 0 || targets.length === 0 || !style}
             onClick={() => void (remaining > 0 ? exportAll() : download())}
@@ -754,6 +785,15 @@ export function BatchWorkspace({ onOpenChange, open, styleSources = [] }: BatchW
             {running ? 'Rendering…' : remaining > 0 ? `Export ${total} as ZIP` : 'Download ZIP'}
           </Button>
         </footer>
+
+        {publishing ? (
+          <PrepareScreenshotPost
+            exports={publishExports}
+            initialDestination="batch"
+            onOpenChange={setPublishing}
+            open
+          />
+        ) : null}
 
         <AlertDialog onOpenChange={setConfirmClear} open={confirmClear}>
           <AlertDialogContent className="sm:max-w-[400px]">

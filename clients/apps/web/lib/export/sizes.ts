@@ -96,6 +96,13 @@ export const EXPORT_SIZE_PRESETS: readonly ExportTarget[] = [
     label: 'Chrome Web Store',
     width: 1280,
   },
+  {
+    group: 'app-store',
+    height: 400,
+    id: 'chrome-web-store-small',
+    label: 'Chrome Web Store small',
+    width: 640,
+  },
 ]
 
 /** A preset by id. */

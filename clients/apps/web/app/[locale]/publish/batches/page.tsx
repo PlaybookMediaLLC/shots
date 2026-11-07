@@ -4,6 +4,7 @@ import { EmptyState, Group, Page, Pill, Row, Section } from '@/components/platfo
 import { LibraryIcon } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
+import { DiscardBatchButton } from '@/components/write/batch/DiscardBatchButton'
 import { NewBatchButton } from '@/components/write/batch/NewBatchButton'
 import { accessAllows } from '@/lib/auth/permissions'
 import { listContentBatches } from '@/lib/tenant/content-batches'
@@ -76,6 +77,11 @@ export default async function BatchesPage({
                   <Pill>
                     {batch.itemCount} {batch.itemCount === 1 ? 'post' : 'posts'}
                   </Pill>
+                  {/* Starting a batch creates it before its first file or row, so an
+                      abandoned start needs a way out of this list. */}
+                  {canEdit && batch.itemCount === 0 ? (
+                    <DiscardBatchButton id={batch.id} title={batch.title} />
+                  ) : null}
                 </Row>
               ))}
             </Group>

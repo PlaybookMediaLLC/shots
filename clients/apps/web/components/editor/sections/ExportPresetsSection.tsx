@@ -5,41 +5,35 @@ import { SectionWrapper } from "./SectionWrapper";
 import { useImageStore } from "@/lib/store";
 import { toast } from "sonner";
 import { Button } from '@/components/ui/button'
+import { EXPORT_SIZE_PRESETS, SIZE_GROUP_LABELS } from '@/lib/export/sizes'
 
-export const exportPresets = [
-  { id: "chrome-web-store", name: "Chrome Web Store", platform: "Extension", width: 1280, height: 800 },
-  { id: "chrome-web-store-small", name: "Chrome Web Store Small", platform: "Extension", width: 640, height: 400 },
-  { id: "twitter-post", name: "Twitter/X", platform: "Social", width: 1200, height: 675 },
-  { id: "instagram-square", name: "Instagram Square", platform: "Social", width: 1080, height: 1080 },
-  { id: "instagram-story", name: "Instagram Story", platform: "Social", width: 1080, height: 1920 },
-  { id: "facebook-post", name: "Facebook", platform: "Social", width: 1200, height: 630 },
-  { id: "linkedin-post", name: "LinkedIn", platform: "Social", width: 1200, height: 627 },
-  { id: "youtube-thumbnail", name: "YouTube", platform: "Video", width: 1280, height: 720 },
-  { id: "pinterest-pin", name: "Pinterest", platform: "Social", width: 1000, height: 1500 },
-  { id: "devices-ipad", name: "iPad Pro", platform: "Device", width: 2048, height: 2732 },
-];
-
+/**
+ * Resize the canvas to a published size. The sizes themselves belong to the
+ * export pipeline (`lib/export/sizes.ts`), which the export panel's size
+ * picker and the pre-publish handoff also read, so a platform's dimensions
+ * are stated once.
+ */
 export function ExportPresetsSection() {
   return (
     <SectionWrapper title="Export Presets" defaultOpen={false}>
       <p className="mb-2 text-[10px] text-muted-foreground">Canvas size at 1×. Export scale multiplies these dimensions.</p>
       <div className="grid grid-cols-2 gap-1.5">
-        {exportPresets.map((preset) => (
+        {EXPORT_SIZE_PRESETS.map((preset) => (
           <Button variant="custom" size={null}
             key={preset.id}
             onClick={() => {
               useImageStore.getState().setCustomDimensions(preset.width, preset.height);
-              toast.success(`${preset.name}: ${preset.width}×${preset.height} at 1×`);
+              toast.success(`${preset.label}: ${preset.width}×${preset.height} at 1×`);
             }}
             className="px-2.5 py-2 rounded-lg border border-border/30 hover:border-border/60 hover:bg-accent/50 transition-all text-left active:scale-[0.98]"
           >
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                {preset.platform}
+                {SIZE_GROUP_LABELS[preset.group]}
               </span>
             </div>
             <p className="text-[11px] font-semibold text-foreground mt-0.5">
-              {preset.name}
+              {preset.label}
             </p>
             <p className="text-[9px] text-muted-foreground">{preset.width}×{preset.height}</p>
           </Button>
