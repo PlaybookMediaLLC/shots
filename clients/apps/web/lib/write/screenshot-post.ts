@@ -20,8 +20,9 @@ import {
   type PlateBody,
   type PlatformVersions,
 } from '@/lib/write/document'
+import { type ExportTarget, getSizePreset } from '@/lib/export/sizes'
 import { importedBody, importedPosts, splitThread } from '@/lib/write/import-text'
-import { type MediaFacts, mediaProblems } from '@/lib/write/media-rules'
+import { DESTINATION_MEDIA, type MediaFacts, mediaProblems } from '@/lib/write/media-rules'
 import { WRITING_PROMPTS } from '@/lib/write/prompt-library'
 import { readVersions, withOptions } from '@/lib/write/versions'
 
@@ -129,11 +130,38 @@ export function screenshotPostVersions(input: {
   body?: PlateBody
   /** Captions written for platforms other than the body's. */
   channelText?: Partial<Record<DraftChannel, string>>
+  /** The picture drawn for a platform, where it is not the body's. */
+  media?: Partial<Record<DraftChannel, PostMedia>>
 }): PlatformVersions | undefined {
   const carried = carriedFollowUps(input.automation)
   let versions = readVersions(undefined, input.channelText ?? {}, input.body ?? [])
+  if (input.media) versions = withPlatformMedia(versions, input.media)
   if (carried) versions = withOptions(versions, 'x', { automation: carried })
   return versions.versions.length > 0 ? versions : undefined
+}
+
+/**
+ * Give each platform's version the picture drawn for it.
+ *
+ * `readVersions` copies the body's media into every version it makes, which
+ * is right when one picture serves everyone. When a platform was drawn at
+ * its own size, its version must carry that picture instead: per-channel
+ * text alone cannot hold per-channel media. A platform with no picture of
+ * its own, and a platform with no version yet, are both left alone.
+ */
+export function withPlatformMedia(
+  versions: PlatformVersions,
+  media: Partial<Record<DraftChannel, PostMedia>>
+): PlatformVersions {
+  return {
+    ...versions,
+    versions: versions.versions.map((version) => {
+      const own = media[version.channel]
+      if (!own || !version.body) return version
+      const kept = version.body.filter((node) => node.type !== 'img' && node.type !== 'video')
+      return { ...version, body: [...kept, own] as PlateBody }
+    }),
+  }
 }
 
 /**
@@ -305,6 +333,71 @@ export function screenshotMediaProblems(
   image: MediaFacts
 ): string[] {
   return [...new Set(channels.flatMap((channel) => mediaProblems(channel, [image])))]
+}
+
+/**
+ * The export size each platform's feed shows a screenshot at, named from
+ * the presets the editor's size picker already offers. Only the id is here:
+ * the dimensions stay in `lib/export/sizes.ts`, so a size is never written
+ * down twice. TikTok and YouTube publish video, so a still is never drawn
+ * for them; they are listed because the record is total.
+ */
+const PLATFORM_SIZE_IDS: Record<DraftChannel, string> = {
+  // Text-first feeds read a wide screenshot well.
+  bluesky: 'x-post',
+  // Instagram refuses anything outside 0.8-1.91; square sits safely inside.
+  instagram: 'instagram-square',
+  linkedin: 'linkedin-post',
+  mastodon: 'x-post',
+  threads: 'x-post',
+  tiktok: 'instagram-story',
+  x: 'x-post',
+  youtube: 'youtube-thumbnail',
+}
+
+/** The export size a platform publishes a still image at. */
+export function platformTarget(channel: DraftChannel): ExportTarget {
+  const preset = getSizePreset(PLATFORM_SIZE_IDS[channel])
+  // Unreachable while the test covering every channel passes; a renamed
+  // preset must fail loudly rather than quietly publish the wrong size.
+  if (!preset) throw new Error(`No export size preset for ${channel}.`)
+  return preset
+}
+
+/**
+ * Whether a platform's media rules accept a picture of this shape. Only the
+ * size rules, from the same file Go schedules with: the format and the byte
+ * count are not known until something is drawn, and `screenshotMediaProblems`
+ * checks those on the bytes themselves.
+ */
+export function platformAcceptsSize(
+  channel: DraftChannel,
+  size: { height: number; width: number }
+): boolean {
+  const rules = DESTINATION_MEDIA[channel]
+  if (rules.minImageWidth && size.width < rules.minImageWidth) return false
+  if (!rules.aspect) return true
+  const aspect = size.width / size.height
+  return aspect >= rules.aspect.min && aspect <= rules.aspect.max
+}
+
+/** One render and the platforms that post it. */
+export type PostRender = { channels: DraftChannel[]; target: ExportTarget }
+
+/**
+ * The renders a set of platforms needs, one per distinct size. Platforms
+ * that read the same shape share a render rather than drawing the same
+ * pixels again: X, Bluesky and Mastodon are one wide picture, not three.
+ */
+export function postRenders(channels: readonly DraftChannel[]): PostRender[] {
+  const renders: PostRender[] = []
+  for (const channel of channels) {
+    const target = platformTarget(channel)
+    const existing = renders.find((render) => render.target.id === target.id)
+    if (existing) existing.channels.push(channel)
+    else renders.push({ channels: [channel], target })
+  }
+  return renders
 }
 
 /** One of the saved writing prompts. */
