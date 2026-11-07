@@ -48,7 +48,15 @@ export function editorHref(source: EditorSource, from: EditorReturn = {}): strin
   return `${EDITOR_PATH}?${query}`
 }
 
-/** The draft, opened with a freshly exported asset waiting to be attached. */
-export function draftAttachHref(draftId: string, assetId: string): string {
-  return `/publish/${encodeURIComponent(draftId)}?${new URLSearchParams({ attach: assetId })}`
+/**
+ * The draft, opened with a freshly exported asset waiting to be attached. The
+ * composer attaches it only when the person says so. A known media type
+ * travels with it so the composer can check each destination's formats at
+ * once; the backend validates the asset and its type again when the draft is
+ * scheduled.
+ */
+export function draftAttachHref(draftId: string, assetId: string, mediaType?: string): string {
+  const query = new URLSearchParams({ attach: assetId })
+  if (mediaType) query.set('attachType', mediaType)
+  return `/publish/${encodeURIComponent(draftId)}?${query}`
 }

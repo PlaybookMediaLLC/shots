@@ -29,6 +29,25 @@ export function insertAttachments(editor: PlateEditor, nodes: TElement[]) {
 }
 
 /**
+ * Insert attachments that arrive from elsewhere (an export returned from the
+ * screenshot editor) at a top-level index, usually the end of a post, without
+ * moving the caret. A stored file the draft already holds is left out, so an
+ * export delivered twice is attached once. Returns how many were inserted.
+ */
+export function insertArrivedAttachments(
+  editor: PlateEditor,
+  at: number,
+  nodes: TElement[]
+): number {
+  const held = new Set(
+    (editor.children as TElement[]).flatMap(attachmentsIn).map((node) => node.assetId)
+  )
+  const fresh = nodes.filter((node) => !held.has(node.assetId))
+  if (fresh.length > 0) editor.tf.insertNodes(fresh, { at: [at], select: false })
+  return fresh.length
+}
+
+/**
  * Remove one attachment. Saved and seeded nodes can lack an id, so those match
  * by asset: copies of one asset without ids are interchangeable.
  */

@@ -55,14 +55,14 @@ import { useLibraryStyleSources } from '@/components/export/batch/use-library-st
 import { cn } from '@/lib/utils'
 import { ProjectMenu } from '@/components/projects/ProjectMenu'
 import { ShareButton } from './share/ShareButton'
+import { PublishButton } from './publish/PublishButton'
 import { FeedbackWidget } from '@/components/FeedbackWidget'
 import { AccountMenu } from '@/components/auth/AccountMenu'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { hasVisibleMockups, shouldRenderSourceImage } from '@/lib/device-mockups/layouts'
 import { removeScreenshot } from '@/lib/editor/remove-screenshot'
 import { importImages } from '@/lib/editor/import-images'
-import { hasMotionContent } from '@/lib/animation/motion-schema'
-import { hasCanvasContent } from '@/lib/editor/canvas-content'
+import { canExportMotion, hasCanvasContent } from '@/lib/editor/canvas-content'
 import {
   Select,
   SelectTrigger,
@@ -119,12 +119,9 @@ export function EditorHeader() {
   const {
     selectedAspectRatio,
     customDimensions,
-    slides,
     uploadedImageUrl,
     editorMode,
     mockups,
-    timeline,
-    animationClips,
     resetCanvasSettings,
     showTemplates,
     setShowTemplates,
@@ -191,9 +188,7 @@ export function EditorHeader() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleUndo, handleRedo])
 
-  const hasMotion = useImageStore((state) => hasMotionContent(state.motion))
-  const showVideoExport =
-    slides.length > 0 || timeline.tracks.length > 0 || animationClips.length > 0 || hasMotion
+  const showVideoExport = useImageStore(canExportMotion)
 
   const { copyImage, isCopying, copyProgress, renderExportBlob } = useExport(selectedAspectRatio)
   const [shareOpen, setShareOpen] = React.useState(false)
@@ -395,6 +390,8 @@ export function EditorHeader() {
             open={shareOpen}
             render={renderExportBlob}
           />
+
+          <PublishButton compact={isMobile} disabled={!hasContent} />
 
           {/* The AI copilot, which fork code renders here without this file knowing it. */}
           <span className="contents" id="editor-header-slot" />

@@ -115,7 +115,7 @@ export function UseInPostButton({
       })
       // Only an image replaces the attachment being framed; a video export
       // belongs to a post of its own, as it did before.
-      if (blob.type.startsWith('image/')) router.push(draftAttachHref(draft, assetId))
+      if (blob.type.startsWith('image/')) router.push(draftAttachHref(draft, assetId, blob.type))
       else
         await startPostWithAssets([{ id: assetId, mediaType: blob.type }], (id) =>
           router.push(`/publish/${encodeURIComponent(id)}`)
@@ -163,9 +163,11 @@ export function SaveToWorkspaceButton({
 }: SaveToWorkspaceButtonProps) {
   const trpcClient = useTRPCClient()
   const { data: session, isPending } = useHydratedSession()
-  const [draftExport, setDraftExport] = React.useState<{ draft: string; assetId: string } | null>(
-    null
-  )
+  const [draftExport, setDraftExport] = React.useState<{
+    assetId: string
+    draft: string
+    mediaType: string
+  } | null>(null)
   const [state, setState] = React.useState<SaveState>('idle')
 
   // Render nothing while the session loads or if it has lapsed; the
@@ -188,7 +190,8 @@ export function SaveToWorkspaceButton({
 
       setState('saved')
       const draft = draftFromUrl()
-      if (draft && blob.type.startsWith('image/')) setDraftExport({ draft, assetId })
+      if (draft && blob.type.startsWith('image/'))
+        setDraftExport({ assetId, draft, mediaType: blob.type })
       toast.success('Saved to workspace', {
         action: {
           label: 'View assets',
@@ -219,7 +222,7 @@ export function SaveToWorkspaceButton({
       {draftExport && (
         <a
           className="text-sm underline"
-          href={draftAttachHref(draftExport.draft, draftExport.assetId)}
+          href={draftAttachHref(draftExport.draft, draftExport.assetId, draftExport.mediaType)}
         >
           Review export in draft
         </a>
