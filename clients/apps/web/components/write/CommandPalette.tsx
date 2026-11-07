@@ -6,6 +6,8 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { startBlankDraft } from './pending-draft'
+import { carriedChannels } from '@/lib/write/composing-session'
+import { countingChannelFor } from '@/lib/write/paste-split'
 import { type DraftSearchItem, draftPage } from '@/components/platform-hub/work'
 import { listedStatus } from '@/lib/content-drafts/post-status'
 import { draftName } from '@/lib/write/library'
@@ -202,7 +204,8 @@ export default function CommandPalette({
                           socialSetId: data.activeSet?.id,
                         },
                         (id) => router.push(draftHref(id, data.activeSet?.id)),
-                        beforeLeaveRef.current ?? undefined
+                        beforeLeaveRef.current ?? undefined,
+                        account.channel
                       )
                   )
                 }
@@ -247,9 +250,13 @@ export default function CommandPalette({
                 go(
                   () =>
                     startBlankDraft(
-                      { socialSetId: data.activeSet?.id },
+                      {
+                        channelConnectionIds: carriedChannels(data.activeSet),
+                        socialSetId: data.activeSet?.id,
+                      },
                       (id) => router.push(draftHref(id, data.activeSet?.id)),
-                      beforeLeaveRef.current ?? undefined
+                      beforeLeaveRef.current ?? undefined,
+                      countingChannelFor(data.activeSet?.accounts)
                     )
                 )
               }

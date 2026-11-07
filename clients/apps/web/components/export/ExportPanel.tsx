@@ -532,7 +532,12 @@ export function ExportPanel({ embed, onBusyChange, onExported, onOpenBatch }: Ex
 
         {info.kind === 'raster' || animated ? (
           <>
-            {canStartPost ? <UseInPostButton createExport={createWorkspaceExport} /> : null}
+            {canStartPost ? (
+              <UseInPostButton
+                createExport={createWorkspaceExport}
+                mediaType={FORMAT_INFO[format].mime}
+              />
+            ) : null}
             <SaveToWorkspaceButton createExport={createWorkspaceExport} />
           </>
         ) : null}

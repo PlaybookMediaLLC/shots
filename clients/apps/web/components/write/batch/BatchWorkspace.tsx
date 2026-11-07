@@ -85,8 +85,12 @@ import {
   unusedFiles,
 } from '@/lib/write/bulk-import'
 import { groupFiles, isInFolder, storedFileName } from '@/lib/write/bulk-intake'
+import { CAPABILITIES } from '@/lib/write/capabilities'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { VersionOptions } from '@/lib/write/document'
 import { importedBody, importedPosts } from '@/lib/write/import-text'
+import { countingChannelFor, measurePieces, pastePieces } from '@/lib/write/paste-split'
+import { CHANNEL_META } from '@/components/drafts/channel-meta'
 import { uploadByteLimit } from '@/lib/write/media-limits'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
@@ -132,7 +136,7 @@ function mediaInput({
 const settledWell = (outcome?: string) => outcome === 'Scheduled' || Boolean(outcome?.endsWith('…'))
 
 /** Which tool a batch was started for; it narrows what the page offers first. */
-export type BatchStart = 'videos' | 'images' | 'grid'
+export type BatchStart = 'videos' | 'images' | 'grid' | 'text'
 type Upload = { progress: number; error?: string }
 
 /** A path a person can read: '2026-11-03 09:30 (Europe/Paris)'. */
@@ -494,8 +498,9 @@ export function BatchWorkspace({
     })
   )
 
-  // Adding items: selected files, a CSV and shared settings, previewed first.
+  // Adding items: selected files, pasted text, a CSV and shared settings, previewed first.
   const [csv, setCSV] = React.useState('')
+  const [pasted, setPasted] = React.useState('')
   const [chosen, setChosen] = React.useState<File[]>([])
   const [perImage, setPerImage] = React.useState(false)
   const [accountFilter, setAccountFilter] = React.useState('')
@@ -512,10 +517,45 @@ export function BatchWorkspace({
   } | null>(null)
   const dropzone = useDropzone({ noClick: true, noKeyboard: true, onDrop: setChosen })
   const folderChosen = chosen.some(isInFolder)
+  // Pasted posts, measured for the brand's tightest platform before they are staged.
+  const countingChannel = countingChannelFor(accounts)
+  const countingLimit = CAPABILITIES[countingChannel].captionLimit
+  const pastedPieces = measurePieces(pastePieces(pasted), countingChannel)
+  const pastedOver = pastedPieces.filter((piece) => piece.over).length
+  /** A post's caption length as its platform counts it; a saved draft reports its own text. */
+  const captionLength = (item: BatchItem) =>
+    platformCaptionLength(countingChannel, item.draft?.plainText ?? item.caption)
   const [busy, setBusy] = React.useState<string | null>(null)
 
   const previewImport = async () => {
     try {
+      // Written posts with no media: one per piece, the way the new-draft box
+      // reads a paste, so the same block works here and there.
+      if (pasted.trim() && !csv.trim() && !chosen.length) {
+        const pieces = pastePieces(pasted)
+        if (items.length + pieces.length > BATCH_ITEM_LIMIT)
+          throw new Error(
+            `A batch holds up to ${BATCH_ITEM_LIMIT} posts; this would make ${items.length + pieces.length}.`
+          )
+        setPreview({
+          mapping: null,
+          skipped: [],
+          unused: [],
+          staged: pieces.map((piece, index) => ({
+            files: [],
+            line: index + 1,
+            problems: [],
+            input: {
+              importKey: importKey(),
+              caption: piece,
+              media: [],
+              channelConnectionIds: sharedAccounts,
+              timing: {},
+            },
+          })),
+        })
+        return
+      }
       // Folders group their files into posts; the preview shows how before anything is added.
       if (!csv.trim() && (perImage || folderChosen)) {
         const { posts, skipped } = groupFiles(chosen, perImage ? 'per-image' : 'folder')
@@ -662,6 +702,8 @@ export function BatchWorkspace({
       )
       setCSV('')
       setChosen([])
+      // The pasted block has become posts; leaving it would stage them twice.
+      setPasted('')
       startUploads()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The items could not be added.')
@@ -1160,9 +1202,40 @@ export function BatchWorkspace({
         {items.length < BATCH_ITEM_LIMIT ? (
           <Section
             title="Add posts"
-            description="Choose files, paste or load a CSV, or both. Nothing is added until you review the preview."
+            description="Paste written posts, choose files, or load a CSV. Nothing is added until you review the preview."
           >
             <Group>
+              {/* Written posts need no files and no CSV: the block a writer already
+                  has, one post per blank line, measured before anything is added. */}
+              <Row
+                label="Written posts"
+                layout="stacked"
+                description={`One post per piece, separated by a blank line or a line of dashes — the same split the new-draft box offers. Lengths are counted for ${CHANNEL_META[countingChannel].label}, whose limit is ${countingLimit}.`}
+              >
+                <Textarea
+                  aria-label="Batch text posts"
+                  rows={6}
+                  value={pasted}
+                  placeholder={'First post.\n\nSecond post.\n\nThird post.'}
+                  onChange={(event) => setPasted(event.target.value)}
+                />
+                {pastedPieces.length > 0 ? (
+                  <p className="text-xs text-muted-foreground" data-testid="batch-text-summary">
+                    {pastedPieces.length} post{pastedPieces.length === 1 ? '' : 's'}
+                    {pastedOver > 0
+                      ? ` · ${pastedOver} over ${CHANNEL_META[countingChannel].label}’s limit`
+                      : ''}
+                    {' · '}
+                    {/* The first few lengths say the shape of the run; a hundred of
+                        them would say nothing and fill the page. */}
+                    {pastedPieces
+                      .slice(0, 12)
+                      .map((piece) => piece.length)
+                      .join(', ')}
+                    {pastedPieces.length > 12 ? '…' : ''} characters
+                  </p>
+                ) : null}
+              </Row>
               <Row
                 label={
                   start === 'videos'
@@ -1333,7 +1406,7 @@ export function BatchWorkspace({
                 <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() => void previewImport()}
-                    disabled={!chosen.length && !csv.trim()}
+                    disabled={!chosen.length && !csv.trim() && !pasted.trim()}
                   >
                     Preview import
                   </Button>
@@ -1606,6 +1679,22 @@ export function BatchWorkspace({
                       <strong className="min-w-0 flex-1 truncate font-medium">
                         {item.draft?.title ?? (item.caption.split('\n')[0] || 'Untitled post')}
                       </strong>
+                      {/* A written post's length, where it is written, counted as
+                          the tightest connected platform counts it. */}
+                      {captionLength ? (
+                        <span
+                          className={cn(
+                            'text-xs tabular-nums',
+                            captionLength(item) > countingLimit
+                              ? 'text-red-700 dark:text-red-300'
+                              : 'text-muted-foreground'
+                          )}
+                          data-testid={`batch-item-length-${index + 1}`}
+                          title={`Counted for ${CHANNEL_META[countingChannel].label}`}
+                        >
+                          {captionLength(item)} / {countingLimit}
+                        </span>
+                      ) : null}
                       <Pill tone={status.tone}>{status.text}</Pill>
                       {item.draftId ? (
                         <Button asChild size="sm" variant="ghost">

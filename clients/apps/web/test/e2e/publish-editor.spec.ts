@@ -236,7 +236,9 @@ test(
 
     await page.goto('/write?tab=queue')
     const queue = page.getByTestId('queue')
-    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled in the next 7 days')
+    await expect(queue.getByTestId('queue-goal')).toContainText(
+      'recurring slots used in the next 7 days'
+    )
     await expect(queue.getByRole('link', { name: 'Edit schedule' })).toBeVisible()
     const slot = queue.getByTestId('queue-free-slot').first()
     await expect(slot).toBeVisible()
@@ -355,9 +357,18 @@ test(
     await expectSaved(page)
     await expect(fixes).toHaveCount(0)
     await page.getByTestId('dock-schedule-button').click()
-    await expect(page.getByText(/Scheduled for|Queued|scheduled/i).first()).toBeVisible()
+    // Not any "scheduled" on the page: the draft's own text says it before anything is queued.
+    await expect(page.getByText(/^Scheduled 1 post for /)).toBeVisible()
     await expect(page.getByTestId('schedule-dialog')).toHaveCount(0)
-    const posts = await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)
-    expect((posts.body as { posts: unknown[] }).posts).toHaveLength(1)
+    await expect
+      .poll(
+        async () =>
+          (
+            (await apiRequest(page, `/api/v1/content-drafts/${id}/posts`)).body as {
+              posts: unknown[]
+            }
+          ).posts.length
+      )
+      .toBe(1)
   }
 )

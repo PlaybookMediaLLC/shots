@@ -22,7 +22,6 @@ import {
   rememberedPublication,
   uploadPublication,
 } from '@/lib/platform/publish-handoff'
-import { leavePublishWorkspace, rememberPublishOrigin } from '@/lib/platform/publish-origin'
 
 /**
  * The editor's half of publishing: what a design can be published as, which
@@ -290,15 +289,4 @@ test('a failed export says why, can run again, and is attached only when it succ
   // A finished export can be dismissed from the list.
   dismissIncomingMedia(draft, id)
   assert.deepEqual(incomingMedia(draft), [])
-})
-
-test('closing the workspace returns to the design it was opened from', () => {
-  // Nothing opened from the editor in this tab: closing is a plain step back.
-  assert.deepEqual(leavePublishWorkspace('draft-a'), { back: true })
-  rememberPublishOrigin('draft-a', '/editor?project=p1')
-  // Still on the draft it opened: one step back is the editor.
-  assert.deepEqual(leavePublishWorkspace('draft-a'), { back: true })
-  // Moved on to another draft (scheduling opens the next one): back would
-  // land on the first draft, so closing goes to the editor's address.
-  assert.deepEqual(leavePublishWorkspace('draft-b'), { href: '/editor?project=p1' })
 })

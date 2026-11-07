@@ -1,12 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { Button } from '@/components/ui/button'
-import { leavePublishWorkspace } from '@/lib/platform/publish-origin'
 import { useWrite, type WriteLibrary, WriteProvider } from './write-context'
 
 /**
@@ -41,6 +40,11 @@ export function PublishWorkspace({
   children: React.ReactNode
   data: WriteLibrary
 }) {
+  // Next keeps a parallel slot's last page through a soft navigation the slot
+  // has no page for, such as an attachment's "Edit in editor" link to
+  // `/editor?asset=…`. The workspace shows only at a draft's address.
+  const pathname = usePathname()
+  if (!DRAFT_PATH.test(pathname)) return null
   return (
     <WriteProvider
       activeId={activeId}
@@ -50,7 +54,7 @@ export function PublishWorkspace({
       canReview={canReview}
       data={data}
     >
-      <WorkspaceDialog draftId={activeId}>{children}</WorkspaceDialog>
+      <WorkspaceDialog>{children}</WorkspaceDialog>
       {/* The composer opens its profile's settings over itself (?settings=scheduling). */}
       {data.activeSet ? (
         <DraftSettingsDrawer
@@ -62,6 +66,9 @@ export function PublishWorkspace({
     </WriteProvider>
   )
 }
+
+/** A draft's address, with or without a locale prefix. */
+const DRAFT_PATH = /\/publish\/[^/]+$/
 
 /** Whether Escape belongs to something being typed or picked, not to the workspace. */
 function escapeIsTaken(target: EventTarget | null): boolean {
@@ -75,8 +82,25 @@ function escapeIsTaken(target: EventTarget | null): boolean {
   )
 }
 
-function WorkspaceDialog({ children, draftId }: { children: React.ReactNode; draftId: string }) {
-  const router = useRouter()
+/**
+ * Step back through history until the address is no longer a draft's.
+ *
+ * The workspace only opens by a push from the editor, and every draft it then
+ * moves to (scheduling opens the next one by default) is another entry on top,
+ * so the first entry that is not a draft is the design it was opened over.
+ * Going back restores that entry as it was, which navigating to the editor's
+ * address again does not: Next keeps the slot's last page through that.
+ */
+function backToDesign(steps = 50): void {
+  const onPop = () => {
+    if (DRAFT_PATH.test(window.location.pathname) && --steps > 0) window.history.back()
+    else window.removeEventListener('popstate', onPop)
+  }
+  window.addEventListener('popstate', onPop)
+  window.history.back()
+}
+
+function WorkspaceDialog({ children }: { children: React.ReactNode }) {
   const { beforeLeaveRef } = useWrite()
   const closing = React.useRef(false)
 
@@ -97,9 +121,7 @@ function WorkspaceDialog({ children, draftId }: { children: React.ReactNode; dra
     closing.current = true
     try {
       await beforeLeaveRef.current?.()
-      const leave = leavePublishWorkspace(draftId)
-      if ('href' in leave) router.replace(leave.href)
-      else router.back()
+      backToDesign()
     } catch {
       closing.current = false
     }

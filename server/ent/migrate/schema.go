@@ -1113,6 +1113,7 @@ var (
 		{Name: "pinnedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "planTimeZone", Type: field.TypeString, Nullable: true},
 		{Name: "sourceDraftId", Type: field.TypeString, Nullable: true},
+		{Name: "campaignId", Type: field.TypeString, Nullable: true},
 		{Name: "collabGeneration", Type: field.TypeInt, Default: 0},
 		{Name: "collabState", Type: field.TypeBytes, Nullable: true},
 		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
@@ -1129,12 +1130,17 @@ var (
 			{
 				Name:    "contentdraft_organizationId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[38]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[39]},
 			},
 			{
 				Name:    "contentdraft_socialSetId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[38]},
+				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[39]},
+			},
+			{
+				Name:    "contentdraft_organizationId_campaignId",
+				Unique:  false,
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[33]},
 			},
 		},
 	}

@@ -80,6 +80,8 @@ const (
 	FieldPlanTimeZone = "planTimeZone"
 	// FieldSourceDraftID holds the string denoting the source_draft_id field in the database.
 	FieldSourceDraftID = "sourceDraftId"
+	// FieldCampaignID holds the string denoting the campaign_id field in the database.
+	FieldCampaignID = "campaignId"
 	// FieldCollabGeneration holds the string denoting the collab_generation field in the database.
 	FieldCollabGeneration = "collabGeneration"
 	// FieldCollabState holds the string denoting the collab_state field in the database.
@@ -131,6 +133,7 @@ var Columns = []string{
 	FieldPinnedAt,
 	FieldPlanTimeZone,
 	FieldSourceDraftID,
+	FieldCampaignID,
 	FieldCollabGeneration,
 	FieldCollabState,
 	FieldCreatedByUserID,
@@ -379,6 +382,11 @@ func ByPlanTimeZone(opts ...sql.OrderTermOption) OrderOption {
 // BySourceDraftID orders the results by the source_draft_id field.
 func BySourceDraftID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceDraftID, opts...).ToFunc()
+}
+
+// ByCampaignID orders the results by the campaign_id field.
+func ByCampaignID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCampaignID, opts...).ToFunc()
 }
 
 // ByCollabGeneration orders the results by the collab_generation field.

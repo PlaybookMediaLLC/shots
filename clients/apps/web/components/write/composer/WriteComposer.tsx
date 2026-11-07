@@ -90,7 +90,9 @@ import { platformEditorServices } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
+import { countingNote } from '@/lib/write/caption-counting'
 import { writeApi } from '@/lib/write/client'
+import { rememberChannels, takeOffNotice } from '@/lib/write/composing-session'
 import {
   type DraftChannel,
   type PlateBody,
@@ -567,8 +569,12 @@ export function WriteComposer({
   // Write's tools the toolbar, the More menu and the slash menu open.
   const [tool, setTool] = React.useState<ComposerTool | null>(null)
   const [postSetting, setPostSetting] = React.useState<PostSettingRequest | null>(null)
+  // The brand this draft belongs to: its own, or the library's active one for
+  // a draft the backend has not named a set for yet. Everything keyed by brand
+  // reads it here, so the composer and the library never disagree on the key.
+  const draftSet = server.socialSetId ?? set?.id ?? null
   // The set's thread finishers are the slash menu's snippets.
-  const snippetSet = server.socialSetId ?? set?.id ?? null
+  const snippetSet = draftSet
   const [snippets, setSnippets] = React.useState<Snippet[]>([])
   const [snippetsRead, setSnippetsRead] = React.useState(0)
   React.useEffect(() => {
@@ -615,6 +621,9 @@ export function WriteComposer({
   // Platforms switched off for lacking media, and those the person chose to keep on regardless.
   const switchedOff = React.useRef(new Set<string>())
   const keptOn = React.useRef(new Set<string>())
+  // Whether a switch has been set by hand in this draft: only then does the
+  // next new draft in this brand open on what this one publishes to.
+  const touchedPlatforms = React.useRef(false)
   const applySwitch = (accountId: string, on: boolean) => {
     const account = accounts.find((item) => item.id === accountId)
     if (!account) return
@@ -631,7 +640,16 @@ export function WriteComposer({
     if (on) keptOn.current.add(accountId)
     else keptOn.current.delete(accountId)
     applySwitch(accountId, on)
+    touchedPlatforms.current = true
   }
+  // Once the writer has set a switch by hand, the next new draft in this brand
+  // opens on whatever the draft ends up publishing to — read from the document,
+  // because turning one account on can turn another off on the same platform.
+  const enabledKey = enabled.join(',')
+  React.useEffect(() => {
+    if (touchedPlatforms.current) rememberChannels(draftSet, enabled)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabledKey, draftSet])
   const mediaAccounts = accounts.map((account) => {
     const version = versionFor(document.versions, account.channel)
     const body =
@@ -661,12 +679,16 @@ export function WriteComposer({
       switchedOff.current.add(id)
       applySwitch(id, false)
     }
-    const names = off.map((id) => {
+    // The switch always happens; the message is once per account per session,
+    // so a run of text posts is not told the same thing on every draft.
+    const fresh = takeOffNotice(draftSet, off)
+    if (fresh.length === 0) return
+    const names = fresh.map((id) => {
       const channel = accounts.find((item) => item.id === id)?.channel
       return channel ? CHANNEL_META[channel].label : 'A platform'
     })
     toast(`${names.join(' and ')} switched off: this post has no media yet.`, {
-      action: { label: 'Undo', onClick: () => off.forEach((id) => toggle(id, true)) },
+      action: { label: 'Undo', onClick: () => fresh.forEach((id) => toggle(id, true)) },
     })
     // Only a change in the post or its destinations can change the answer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -697,7 +719,12 @@ export function WriteComposer({
       void refreshPosts()
       if (newDraft)
         void draftsApi
-          .create({ socialSetId: draft.socialSetId ?? undefined })
+          // The next post in a run starts on the accounts this one went to, not
+          // on the brand's defaults: that is the switch the writer just set.
+          .create({
+            channelConnectionIds: enabled.length ? [...enabled] : undefined,
+            socialSetId: draft.socialSetId ?? undefined,
+          })
           .then((next) => router.push(`/publish/${next.id}`))
           .catch(() =>
             toast.error(
@@ -1126,9 +1153,15 @@ export function WriteComposer({
       <>
         <PostCount
           active={inUse}
+          channel={active}
           length={post.length}
           limit={activePublication.serialized.limit}
           number={number}
+          standard={
+            activePublication.serialized.limit > CAPABILITIES[active].captionLimit
+              ? CAPABILITIES[active].captionLimit
+              : undefined
+          }
           thread={Boolean(CAPABILITIES[active].thread)}
         />
         {excess[number] && CAPABILITIES[active].thread ? (
@@ -1368,6 +1401,9 @@ export function WriteComposer({
     ) : sidePanel === 'assistant' ? (
       <AssistantPanel
         channel={active}
+        hasImage={document.value.some((node) =>
+          attachmentsIn(node).some((media) => media.type === 'img')
+        )}
         onInsert={
           canEditText && (active === primary || versionOfTab.mode === 'manual')
             ? (text) => {
@@ -1376,6 +1412,7 @@ export function WriteComposer({
             : undefined
         }
         draftId={initial.id}
+        openWithPrompt={params.get('prompt') ?? undefined}
         posts={activePublication.serialized.posts.map((post) => post.caption)}
         set={set}
       />
@@ -1924,8 +1961,10 @@ export function WriteComposer({
             <div className="mx-auto w-full max-w-[419px] flex-1">{previewPanel}</div>
           ) : null}
           {/* Hidden, not removed: unmounting would drop the live room, undo history and caret. */}
+          {/* A column, so the publish bar below is pushed to the foot of the
+              page: its day and time stay in one place whatever the post's length. */}
           <div
-            className={cn('relative flex-1', previewing && 'hidden')}
+            className={cn('relative flex flex-1 flex-col', previewing && 'hidden')}
             data-testid="composer-body"
             ref={bodyArea}
             onPasteCapture={() => setPasteNotice(true)}
@@ -2078,6 +2117,7 @@ export function WriteComposer({
                     : undefined
                 }
                 primary={primary}
+                publishing={publishing}
                 value={document.value as PlateBody}
               />
             )}
@@ -2164,6 +2204,12 @@ export function WriteComposer({
                     >
                       <ChannelIcon channel={item.account.channel} />
                       {item.publication.serialized.length} / {item.publication.serialized.limit}
+                      {item.publication.serialized.limit >
+                      CAPABILITIES[item.account.channel].captionLimit ? (
+                        <span className="text-muted-foreground">
+                          ({CAPABILITIES[item.account.channel].captionLimit} for a standard account)
+                        </span>
+                      ) : null}
                     </span>
                   )
                 })}
@@ -2221,6 +2267,9 @@ export function WriteComposer({
             />
               </>
             )}
+            {/* Takes the slack under a short post, so the bar below it does not
+                float in the middle of the page. */}
+            <div className="h-32 shrink-0 grow" />
             {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
             {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
             <div
@@ -2258,7 +2307,6 @@ export function WriteComposer({
               )}
             </div>
             ) : null}
-            <div className="h-32" />
           </div>
         </div>
         {sidePanel && !focus && !narrow && !settingsOpen(params) ? (
@@ -2570,20 +2618,30 @@ function initials(name: string): string {
 
 /**
  * A post's length for the platform being edited: a ring that fills toward
- * the limit, amber from 90%, red past it. Quiet posts hide it until it nears
- * the limit; the post in use always shows it.
+ * the limit, amber from 90%, red past it. It is always readable — a counter
+ * you can only see once you are nearly over cannot be written to — and dims
+ * on a post that is not in use so the page stays quiet.
+ *
+ * An account whose platform raised its limit (a verified X account posts up
+ * to 25,000) also shows the standard count, because the length that matters
+ * to most writers is still the one everyone else sees.
  */
 function PostCount({
   active,
+  channel,
   length,
   limit,
   number,
+  standard,
   thread,
 }: {
   active: boolean
+  channel: DraftChannel
   length: number
   limit: number
   number: number
+  /** The platform's standard limit, when this account's is higher. */
+  standard?: number
   thread: boolean
 }) {
   const ratio = length / limit
@@ -2593,13 +2651,16 @@ function PostCount({
       : ratio >= 0.9
         ? 'text-amber-600 dark:text-amber-400'
         : 'text-muted-foreground'
+  const overStandard = standard !== undefined && length > standard
   return (
     <span
       className={cn(
         'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
         tone,
-        !active && ratio < 0.9 && 'opacity-0'
+        !active && ratio < 0.9 && 'opacity-60'
       )}
+      // Counted as the platform counts it, which writers cannot check outside the app.
+      title={countingNote(channel)}
     >
       <span
         aria-hidden
@@ -2612,6 +2673,14 @@ function PostCount({
       <span data-testid={`post-length-${number}`}>
         {length} / {limit}
       </span>
+      {standard !== undefined ? (
+        <span
+          className={cn(overStandard ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
+          data-testid={`post-standard-length-${number}`}
+        >
+          ({standard} for a standard account)
+        </span>
+      ) : null}
       {thread ? <span className="text-muted-foreground">#{number}</span> : null}
     </span>
   )

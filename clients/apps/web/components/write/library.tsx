@@ -5,6 +5,7 @@ import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import { BulkScheduleDialog } from './bulk-schedule'
 
 import { useWriteRouter } from '@/components/write/write-context'
+import { useSearchParams } from 'next/navigation'
 
 import * as React from 'react'
 // Hover-intent prefetch: the rail lists up to 100 drafts.
@@ -59,8 +60,17 @@ import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import { LocalTime, useHydrated } from '@/components/drafts/local-time'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { listedAttention, postState, stateLabel } from '@/lib/content-drafts/post-status'
-import { platformLabel } from '@/lib/content-drafts/serialize'
+import {
+  channelForPlatform,
+  platformCaptionLength,
+  platformLabel,
+} from '@/lib/content-drafts/serialize'
+import { CAPABILITIES } from '@/lib/write/capabilities'
+import { type QueueRow, queueGroups, queueRuns, queueWarnings } from '@/lib/write/queue-actions'
+import { DraftPostLinks, QueueBulkBar, QueueWarnings, RetryAllFailed } from './queue-tools'
 import { writeApi } from '@/lib/write/client'
+import { carriedChannels } from '@/lib/write/composing-session'
+import { countingChannelFor } from '@/lib/write/paste-split'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
 import { socialSetHref } from '@/components/workspace/settings-sections'
@@ -78,6 +88,9 @@ import {
 } from './write-context'
 import { useKeys } from './shortcuts'
 import { createWritingDraft, startBlankDraft } from './pending-draft'
+
+/** The drag type a queued post carries, so only a queue row accepts it. */
+const QUEUE_DRAG = 'application/x-shots-queue-post'
 
 /** The library tabs, in order. */
 const TABS = [
@@ -138,7 +151,7 @@ const KIND_LABELS: Record<DraftKind, string> = {
  * changes access (a public link) asks first.
  */
 export function WriteRail() {
-  const { activeId, canEdit, data, libraryPending, setQuery } = useWrite()
+  const { activeId, canEdit, canPublish, data, libraryPending, setQuery } = useWrite()
   const [now, setNow] = React.useState<number | undefined>()
   React.useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000)
@@ -148,6 +161,21 @@ export function WriteRail() {
   const [lastClicked, setLastClicked] = React.useState<string | null>(null)
   const [managingTags, setManagingTags] = React.useState(false)
   const tab = data.query.tab
+  // A run of drafts just split out of one paste arrives here named in the URL:
+  // select them and open the series scheduler, so one confirmation times them
+  // all. The parameter is cleared once read, so a reload is not a second step.
+  const params = useSearchParams()
+  const series = params.get('series')
+  const [scheduling, setScheduling] = React.useState(false)
+  React.useEffect(() => {
+    if (!series) return
+    const ids = series.split(',').filter(Boolean)
+    if (ids.length) {
+      setSelected(ids)
+      setScheduling(true)
+    }
+    setQuery({ series: undefined })
+  }, [series, setQuery])
   const filtered = Boolean(
     data.query.q ||
     data.query.tag ||
@@ -156,10 +184,19 @@ export function WriteRail() {
     data.query.from ||
     data.query.to
   )
+  // Drafts with a queued post are still drafts, but they are not unfinished
+  // work; the Drafts tab can set them aside without changing what a draft is.
+  const [hideQueued, setHideQueued] = React.useState(false)
+  const queuedInList =
+    tab === 'drafts' ? data.library.filter((draft) => draft.queuedPosts > 0).length : 0
+  const shownLibrary =
+    tab === 'drafts' && hideQueued
+      ? data.library.filter((draft) => draft.queuedPosts === 0)
+      : data.library
   const select = (id: string, range: boolean) => {
     setSelected((current) => {
       if (range && lastClicked) {
-        const ids = data.library.map((draft) => draft.id)
+        const ids = shownLibrary.map((draft) => draft.id)
         const [from, to] = [ids.indexOf(lastClicked), ids.indexOf(id)].sort((a, b) => a - b)
         return [...new Set([...current, ...ids.slice(from, to + 1)])]
       }
@@ -300,7 +337,15 @@ export function WriteRail() {
         </div>
       ) : null}
       {canEdit && tab !== 'queue' ? <NewDraftMenu /> : null}
-      {selected.length > 0 ? <BulkBar onDone={() => setSelected([])} selected={selected} /> : null}
+      {selected.length > 0 ? (
+        <BulkBar
+          key={scheduling ? 'series' : 'selection'}
+          onDone={() => setSelected([])}
+          onSchedulerClosed={() => setScheduling(false)}
+          openScheduler={scheduling}
+          selected={selected}
+        />
+      ) : null}
       <nav
         aria-label="Drafts"
         className="mt-2 min-h-0 flex-1 overflow-y-auto border-t border-border"
@@ -339,7 +384,35 @@ export function WriteRail() {
           </div>
         ) : (
           <ul>
-            {data.library.map((draft) => (
+            {tab === 'failed' && canPublish ? (
+              <li className="flex flex-wrap items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
+                <span>
+                  {data.library.length} draft{data.library.length === 1 ? '' : 's'} with a failed
+                  post.
+                </span>
+                <RetryAllFailed draftIds={data.library.map((draft) => draft.id)} />
+              </li>
+            ) : null}
+            {/* Scheduling does not finish a draft, so a scheduled one still
+                belongs here — but "Drafts" then stops meaning unfinished work.
+                The list says how many are queued and hides them on request. */}
+            {tab === 'drafts' && queuedInList > 0 ? (
+              <li className="flex flex-wrap items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
+                <span>
+                  {queuedInList} of these {queuedInList === 1 ? 'is' : 'are'} already scheduled.
+                </span>
+                <Button
+                  aria-pressed={hideQueued}
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => setHideQueued((current) => !current)}
+                  size={null}
+                  variant="ghost"
+                >
+                  {hideQueued ? 'Show them' : 'Hide them'}
+                </Button>
+              </li>
+            ) : null}
+            {shownLibrary.map((draft) => (
               <DraftRow
                 now={now}
                 active={draft.id === activeId}
@@ -576,13 +649,15 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
       const start = kind === 'standard' && !target ? startBlankDraft : createWritingDraft
       await start(
         {
+          channelConnectionIds: carriedChannels(data.activeSet),
           kind,
           socialSetId: data.activeSet?.id,
           tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
           target,
         },
         (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined
+        beforeLeaveRef.current ?? undefined,
+        countingChannelFor(data.activeSet?.accounts)
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The draft could not be created.')
@@ -782,6 +857,7 @@ function DraftRow({
 }) {
   const { data, saved, canEdit } = useWrite()
   const hydrated = useHydrated()
+  const [showingLinks, setShowingLinks] = React.useState(false)
   const shown = { ...draft, ...saved[draft.id] }
   const destinations = (data.activeSet?.accounts ?? []).filter((connection) =>
     shown.channelConnectionIds.includes(connection.id)
@@ -868,6 +944,20 @@ function DraftRow({
           </p>
         ) : null}
       </Link>
+      {/* Where it went live, on the tab that is about what went out. Outside the
+          row's link: a control inside an anchor is not reachable by keyboard. */}
+      {data.query.tab === 'posted' && draft.publishedPosts > 0 ? (
+        <Button
+          aria-expanded={showingLinks}
+          className="mx-4 mb-2 h-6 px-0 text-[11px] text-sky-700 underline dark:text-sky-300"
+          onClick={() => setShowingLinks((current) => !current)}
+          size={null}
+          variant="ghost"
+        >
+          {showingLinks ? 'Hide the links' : 'Where it went live'}
+        </Button>
+      ) : null}
+      {showingLinks ? <DraftPostLinks draftId={draft.id} /> : null}
       <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100">
         <DraftRowMenu draft={shown} onSelect={() => onSelect(draft.id, false)} />
       </div>
@@ -1291,10 +1381,21 @@ function CopyDialog({
 }
 
 /** Actions on several selected drafts. */
-function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] }) {
+function BulkBar({
+  onDone,
+  openScheduler = false,
+  onSchedulerClosed,
+  selected,
+}: {
+  onDone: () => void
+  /** A run that just arrived from a split paste opens its scheduler at once. */
+  openScheduler?: boolean
+  onSchedulerClosed?: () => void
+  selected: string[]
+}) {
   const router = useWriteRouter()
-  const { activeId, beforeLeaveRef, data, hideDraft, canPublish } = useWrite()
-  const [scheduling, setScheduling] = React.useState(false)
+  const { activeId, beforeLeaveRef, canEdit, data, hideDraft, canPublish } = useWrite()
+  const [scheduling, setScheduling] = React.useState(openScheduler && canPublish)
   const [confirm, setConfirm] = React.useState(false)
   const [progress, setProgress] = React.useState<number | null>(null)
   const run = async (label: string, work: (id: string) => Promise<unknown>) => {
@@ -1338,7 +1439,14 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
       aria-label="Selected drafts"
     >
       {scheduling && (
-        <BulkScheduleDialog selected={selected} onClose={() => setScheduling(false)} />
+        <BulkScheduleDialog
+          initialMode={openScheduler ? 'spread' : 'queue'}
+          selected={selected}
+          onClose={() => {
+            setScheduling(false)
+            onSchedulerClosed?.()
+          }}
+        />
       )}
       {canPublish && (
         <Button size="sm" variant="ghost" onClick={() => setScheduling(true)}>
@@ -1350,6 +1458,53 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
           ? `${selected.length} selected`
           : `${progress} of ${selected.length} completed…`}
       </span>
+      {/* Platforms belong to the draft, so a run's destinations change here
+          rather than on the commitments the queue already holds. */}
+      {canEdit && (data.activeSet?.accounts.length ?? 0) > 0 ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button disabled={progress !== null} size="sm" type="button" variant="ghost">
+              Platforms
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {(data.activeSet?.accounts ?? []).map((account) => (
+              <React.Fragment key={account.id}>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void run(`Added ${CHANNEL_META[account.channel].label}`, async (id) => {
+                      const fresh = await draftsApi.get(id)
+                      return draftsApi.save(id, {
+                        baseVersion: fresh.version,
+                        channelConnectionIds: [
+                          ...new Set([...fresh.channelConnectionIds, account.id]),
+                        ],
+                      })
+                    })
+                  }
+                >
+                  Add {CHANNEL_META[account.channel].label}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    void run(`Removed ${CHANNEL_META[account.channel].label}`, async (id) => {
+                      const fresh = await draftsApi.get(id)
+                      return draftsApi.save(id, {
+                        baseVersion: fresh.version,
+                        channelConnectionIds: fresh.channelConnectionIds.filter(
+                          (entry) => entry !== account.id
+                        ),
+                      })
+                    })
+                  }
+                >
+                  Remove {CHANNEL_META[account.channel].label}
+                </DropdownMenuItem>
+              </React.Fragment>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
       <Button
         disabled={progress !== null}
         onClick={() => void run('Pinned', (id) => writeApi.properties(id, { pinned: true }))}
@@ -1427,10 +1582,72 @@ function BulkBar({ onDone, selected }: { onDone: () => void; selected: string[] 
  */
 function QueueList() {
   const router = useWriteRouter()
-  const { beforeLeaveRef, canEdit, data, setQuery } = useWrite()
+  const { beforeLeaveRef, canEdit, canPublish, data, setQuery } = useWrite()
   const set = data.activeSet
   const zone = set?.timeZone ?? 'UTC'
   const hydrated = useHydrated()
+  // Only scheduled posts can be selected: a planned draft has no commitment to
+  // move, swap or take out of the queue.
+  const [picked, setPicked] = React.useState<string[]>([])
+  const [dragging, setDragging] = React.useState<string | null>(null)
+  const selectable = React.useMemo(
+    () => new Map(data.queue.filter((item) => item.kind === 'scheduled').map((item) => [item.id, item])),
+    [data.queue]
+  )
+  const chosen = picked.flatMap((id) => {
+    const row = selectable.get(id)
+    return row ? [row] : []
+  })
+  const warnings = React.useMemo(
+    () => queueWarnings([...selectable.values()], { minutesApart: 30 }),
+    [selectable]
+  )
+  // Read over the whole queue, so a run spread across two days is one run on
+  // both of them rather than two groups, or a group and a stray post. For the
+  // same reason the collapsed runs are held here, not per day.
+  const runs = React.useMemo(() => queueRuns(data.queue), [data.queue])
+  const [collapsed, setCollapsed] = React.useState<string[]>([])
+  const onCollapse = (name: string, shut: boolean) =>
+    setCollapsed((current) =>
+      shut ? [...new Set([...current, name])] : current.filter((item) => item !== name)
+    )
+  const toggleRow = (id: string, on: boolean) =>
+    setPicked((current) => (on ? [...new Set([...current, id])] : current.filter((item) => item !== id)))
+  // Dropping one queued post on another exchanges their times, which is what
+  // editing the order of a written sequence actually means.
+  const swap = (fromId: string, toId: string) => {
+    if (fromId === toId) return
+    void draftsApi
+      .swapPosts(fromId, toId)
+      .then(() => {
+        toast.success('Swapped their times.')
+        router.refresh()
+      })
+      .catch((error: unknown) =>
+        toast.error(
+          error instanceof Error ? error.message : 'Those two posts could not be swapped.'
+        )
+      )
+  }
+  // The backend exchanges two commitments on one account, so a row only takes
+  // a drop from a post that shares its account: offering more would be an
+  // invitation to a refusal.
+  const dragged = dragging ? selectable.get(dragging) : undefined
+  const rowProps = (item: WriteLibrary['queue'][number]) => ({
+    accepts: Boolean(
+      dragged &&
+        dragged.id !== item.id &&
+        item.kind === 'scheduled' &&
+        item.accountIds.some((id) => dragged.accountIds.includes(id))
+    ),
+    dragging: dragging === item.id,
+    onDragEnd: () => setDragging(null),
+    onDragStart: () => setDragging(item.id),
+    onDrop: (fromId: string) => swap(fromId, item.id),
+    onToggle: canPublish && item.kind === 'scheduled' ? toggleRow : undefined,
+    selected: picked.includes(item.id),
+    warned: warnings.some((warning) => warning.ids.includes(item.id)),
+  })
   // A filter hides posts that fill slots, so a filtered queue lists its posts and no free slots.
   const filtered = Boolean(data.query.account || data.query.from || data.query.to || data.query.q)
   // Slots depend on the clock, so they are read after hydration, as LocalTime does.
@@ -1447,9 +1664,12 @@ function QueueList() {
   const later = data.queue.filter((item) => !shown.has(item.id) && !earlier.includes(item))
   const free = days.reduce((total, day) => total + day.free.length, 0)
   const total = days.reduce((sum, day) => sum + day.slots, 0)
+  // Two different counts, so the header never reads as "nothing is scheduled".
+  const scheduledCount = data.queue.filter((item) => item.kind === 'scheduled').length
+  const plannedCount = data.queue.length - scheduledCount
   const newAt = (day: string, time: string) =>
     void createWritingDraft(
-      { socialSetId: set?.id },
+      { channelConnectionIds: carriedChannels(set), socialSetId: set?.id },
       (id) => {
         const href = draftHref(id, set?.id)
         router.push(`${href}${href.includes('?') ? '&' : '?'}day=${day}&time=${time}`)
@@ -1483,12 +1703,18 @@ function QueueList() {
   return (
     <div data-testid="queue">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3 pb-1 text-[11px] text-muted-foreground">
+        {/* What is queued leads: recurring slots are a separate, smaller fact. */}
         <span data-testid="queue-goal">
+          {`${scheduledCount} ${scheduledCount === 1 ? 'post' : 'posts'} scheduled`}
+          {plannedCount > 0
+            ? ` · ${plannedCount} planned`
+            : ''}
+          {' · '}
           {filtered
-            ? 'Filtered, so free slots are hidden'
+            ? 'filtered, so free slots are hidden'
             : total > 0
-              ? `${total - free} of ${total} slots filled in the next 7 days`
-              : 'No weekly slots yet'}
+              ? `${total - free} of ${total} recurring slots used in the next 7 days`
+              : 'no recurring slots yet'}
           {' · '}
           {zone.replaceAll('_', ' ')}
         </span>
@@ -1502,16 +1728,31 @@ function QueueList() {
         ) : null}
       </div>
       {horizon}
+      <QueueWarnings onSelect={setPicked} warnings={warnings} />
+      {chosen.length > 0 ? (
+        <QueueBulkBar
+          onDone={() => {
+            setPicked([])
+            router.refresh()
+          }}
+          rows={chosen}
+          zone={zone}
+        />
+      ) : null}
       {earlier.length > 0 ? (
         <section aria-label="Needs a look">
           <h3 className="px-4 pt-3 text-[11px] font-medium text-amber-700 dark:text-amber-300">
             Needs a look
           </h3>
-          <ul>
-            {earlier.map((item) => (
-              <QueueItem item={item} key={item.id} />
-            ))}
-          </ul>
+          <QueueRows
+            collapsed={collapsed}
+            items={earlier}
+            onCollapse={onCollapse}
+            onPick={setPicked}
+            rowProps={rowProps}
+            runs={runs}
+            zone={zone}
+          />
         </section>
       ) : null}
       {days.map(({ day, free: open, items }) =>
@@ -1523,52 +1764,33 @@ function QueueList() {
                 value={`${day}T12:00:00Z`}
               />
             </h3>
-            <ul>
-              {[
-                ...items.map((item) => ({
-                  clock: wallTime(new Date(item.at), zone).slice(11, 16),
-                  item,
-                })),
-                ...open.map((clock) => ({ clock, item: null })),
-              ]
-                .sort((a, b) => a.clock.localeCompare(b.clock))
-                .map((row) =>
-                  row.item ? (
-                    <QueueItem item={row.item} key={row.item.id} />
-                  ) : (
-                    <li
-                      className="m-2 flex items-center justify-between gap-2 rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
-                      data-testid="queue-free-slot"
-                      key={`${day}-${row.clock}`}
-                    >
-                      <span>
-                        <ClockLabel time={row.clock} /> · free
-                      </span>
-                      {canEdit ? (
-                        <Button
-                          className="h-6 px-2 text-[11px]"
-                          onClick={() => newAt(day, row.clock)}
-                          size={null}
-                          variant="ghost"
-                        >
-                          + New
-                        </Button>
-                      ) : null}
-                    </li>
-                  )
-                )}
-            </ul>
+            <QueueRows
+              collapsed={collapsed}
+              day={day}
+              free={open}
+              items={items}
+              onCollapse={onCollapse}
+              onNew={canEdit ? (clock) => newAt(day, clock) : undefined}
+              onPick={setPicked}
+              rowProps={rowProps}
+              runs={runs}
+              zone={zone}
+            />
           </section>
         )
       )}
       {later.length > 0 ? (
         <section aria-label="Later">
           <h3 className="px-4 pt-3 text-[11px] font-medium text-muted-foreground">Later</h3>
-          <ul>
-            {later.map((item) => (
-              <QueueItem item={item} key={item.id} />
-            ))}
-          </ul>
+          <QueueRows
+            collapsed={collapsed}
+            items={later}
+            onCollapse={onCollapse}
+            onPick={setPicked}
+            rowProps={rowProps}
+            runs={runs}
+            zone={zone}
+          />
         </section>
       ) : null}
       {data.queue.length === 0 && free === 0 ? (
@@ -1604,48 +1826,296 @@ function ClockLabel({ time }: { time: string }) {
   )
 }
 
-/** One queued post or planned draft in the queue. */
-function QueueItem({ item }: { item: WriteLibrary['queue'][number] }) {
-  const { data } = useWrite()
+/** The props a queue row needs beyond its item, all supplied by the list. */
+type QueueRowProps = {
+  /** A post is being dragged that this row could exchange times with. */
+  accepts: boolean
+  dragging: boolean
+  onDragEnd: () => void
+  onDragStart: () => void
+  onDrop: (fromId: string) => void
+  /** Missing when this row cannot be acted on in bulk. */
+  onToggle?: (id: string, on: boolean) => void
+  selected: boolean
+  warned: boolean
+}
+
+/**
+ * A stretch of the queue, with the posts written as one run gathered under
+ * the run's name. A run can be collapsed to a line, and selected whole, which
+ * is what moving or cancelling "those seven posts" needs.
+ */
+function QueueRows({
+  collapsed,
+  day,
+  free = [],
+  items,
+  onCollapse,
+  onNew,
+  onPick,
+  rowProps,
+  runs,
+  zone,
+}: {
+  /** Runs collapsed to a line, held by the queue so a run reads the same on every day. */
+  collapsed: string[]
+  /** The day this stretch covers, when it is one day with free slots. */
+  day?: string
+  /** Free weekly slots on `day`, as "HH:MM" in the brand's zone. */
+  free?: string[]
+  items: WriteLibrary['queue'][number][]
+  onCollapse: (name: string, shut: boolean) => void
+  onNew?: (clock: string) => void
+  onPick: React.Dispatch<React.SetStateAction<string[]>>
+  rowProps: (item: WriteLibrary['queue'][number]) => QueueRowProps
+  /** The runs the whole queue holds, so one spread over two days stays one run. */
+  runs: Map<string, QueueRow[]>
+  zone: string
+}) {
+  const byId = new Map(items.map((item) => [item.id, item]))
+  // Runs and free slots share one timeline, so an empty slot still reads as a
+  // gap in the day rather than a list appended under it. Sorted by the whole
+  // wall time, because "Needs a look" and "Later" span days.
+  const entries = [
+    ...queueGroups(items, runs).map((group) => ({
+      group,
+      slot: null,
+      when: wallTime(new Date(group.rows[0].at), zone).slice(0, 16),
+    })),
+    ...free.map((clock) => ({ group: null, slot: clock, when: `${day ?? ''}T${clock}` })),
+  ].sort((a, b) => a.when.localeCompare(b.when))
   return (
-    <li>
-      <Link
-        className={cn(
-          'm-2 block rounded-lg border px-3 py-2.5 hover:bg-foreground/[0.02]',
-          item.kind === 'planned' ? 'border-dashed border-violet-400/40' : 'border-border'
-        )}
-        data-testid={item.kind === 'planned' ? 'queue-planned' : 'queue-item'}
-        href={draftHref(item.draftId, data.activeSet?.id)}
-      >
-        <p
-          className={cn(
-            'flex items-center gap-1.5 text-[11px]',
-            item.kind === 'planned'
-              ? 'text-violet-700 dark:text-violet-300'
-              : 'text-sky-700 dark:text-sky-300'
-          )}
-        >
-          <LocalTime
-            options={{
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              month: 'short',
-              timeZone: data.activeSet?.timeZone,
-              timeZoneName: 'short',
-              weekday: 'short',
-            }}
-            value={item.at}
+    <ul>
+      {entries.map(({ group, slot }) => {
+        if (!group)
+          return (
+            <li
+              className="m-2 flex items-center justify-between gap-2 rounded-lg border border-dashed border-border px-3 py-1.5 text-[11px] text-muted-foreground"
+              data-testid="queue-free-slot"
+              key={`free-${slot}`}
+            >
+              <span>
+                <ClockLabel time={slot as string} /> · free
+              </span>
+              {onNew ? (
+                <Button
+                  className="h-6 px-2 text-[11px]"
+                  onClick={() => onNew(slot as string)}
+                  size={null}
+                  variant="ghost"
+                >
+                  + New
+                </Button>
+              ) : null}
+            </li>
+          )
+        const rows = group.rows.flatMap((row) => byId.get(row.id) ?? [])
+        if (!group.name)
+          return rows.map((item) => <QueueItem item={item} key={item.id} {...rowProps(item)} />)
+        const shut = collapsed.includes(group.name)
+        const name = group.name
+        // The whole run, which can reach beyond this day: its header counts and
+        // spans all of it, and "Select the run" picks all of it.
+        const whole = runs.get(group.name) ?? rows
+        const span = `${wallTime(new Date(whole[0].at), zone).slice(11, 16)}–${wallTime(
+          new Date(whole[whole.length - 1].at),
+          zone
+        ).slice(11, 16)}`
+        return (
+          <li key={group.name}>
+            <div
+              className="mx-2 mt-2 flex items-center gap-2 rounded-lg bg-foreground/[0.03] px-2 py-1 text-[11px]"
+              data-testid="queue-group"
+            >
+              <Button
+                aria-expanded={!shut}
+                className="h-6 min-w-0 flex-1 justify-start gap-1 px-1 text-[11px] font-medium"
+                onClick={() => onCollapse(name, !shut)}
+                size={null}
+                variant="ghost"
+              >
+                <CaretDownIcon
+                  aria-hidden
+                  className={cn('size-3 transition-transform', shut && '-rotate-90')}
+                />
+                <span className="truncate">{group.name}</span>
+                <span className="text-muted-foreground">
+                  · {whole.length} posts · {span}
+                  {whole.length > rows.length ? ` · ${rows.length} here` : ''}
+                </span>
+              </Button>
+              <Button
+                className="h-6 px-2 text-[11px]"
+                onClick={() =>
+                  onPick((current) => [
+                    ...new Set([
+                      ...current,
+                      ...whole.filter((row) => row.kind === 'scheduled').map((row) => row.id),
+                    ]),
+                  ])
+                }
+                size={null}
+                variant="ghost"
+              >
+                Select the run
+              </Button>
+            </div>
+            {shut ? null : (
+              <ul>
+                {rows.map((item) => (
+                  <QueueItem item={item} key={item.id} {...rowProps(item)} />
+                ))}
+              </ul>
+            )}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/**
+ * One queued post or planned draft. It opens its draft, can be selected for a
+ * bulk change, expands in place to its whole text, length and destination
+ * (so checking a queue is not a round trip per post), and can be dragged onto
+ * another queued post to exchange their times.
+ */
+function QueueItem({
+  accepts = false,
+  dragging = false,
+  item,
+  onDragEnd,
+  onDragStart,
+  onDrop,
+  onToggle,
+  selected = false,
+  warned = false,
+}: { item: WriteLibrary['queue'][number] } & Partial<QueueRowProps>) {
+  const { data } = useWrite()
+  const [open, setOpen] = React.useState(false)
+  const [over, setOver] = React.useState(false)
+  const account = data.activeSet?.accounts.find((entry) => item.accountIds.includes(entry.id))
+  const channel = channelForPlatform(item.platform ?? '')
+  // A queued post carries the text it will publish, so its length is the real
+  // one. A planned draft carries only an opening, so counting it would be a
+  // number about nothing: expanding one shows what there is and says so.
+  const counted = item.kind === 'scheduled' && channel
+  const length = counted ? platformCaptionLength(channel, item.caption) : 0
+  const limit = counted ? CAPABILITIES[channel].captionLimit : null
+  return (
+    <li
+      className={cn(
+        'm-2 rounded-lg border',
+        item.kind === 'planned' ? 'border-dashed border-violet-400/40' : 'border-border',
+        selected && 'border-sky-400/60 bg-sky-400/[0.06]',
+        warned && !selected && 'border-amber-400/50',
+        over && 'border-sky-500',
+        dragging && 'opacity-50'
+      )}
+      draggable={item.kind === 'scheduled' && Boolean(onDrop)}
+      onDragEnd={() => {
+        setOver(false)
+        onDragEnd?.()
+      }}
+      onDragOver={(event) => {
+        // Only our own drag, only onto a post it can be exchanged with, and
+        // only once: dragover fires continuously.
+        if (!accepts || !event.dataTransfer.types.includes(QUEUE_DRAG)) return
+        event.preventDefault()
+        if (!over) setOver(true)
+      }}
+      onDragLeave={() => setOver(false)}
+      onDragStart={(event) => {
+        event.dataTransfer.setData(QUEUE_DRAG, item.id)
+        event.dataTransfer.effectAllowed = 'move'
+        onDragStart?.()
+      }}
+      onDrop={(event) => {
+        setOver(false)
+        if (!accepts) return
+        const from = event.dataTransfer.getData(QUEUE_DRAG)
+        if (from) onDrop?.(from)
+      }}
+    >
+      <div className="flex items-start gap-2 px-2 py-2">
+        {onToggle ? (
+          <Checkbox
+            aria-label={`Select “${item.caption.slice(0, 60) || 'this post'}”`}
+            checked={selected}
+            className="mt-0.5"
+            onCheckedChange={(checked) => onToggle(item.id, checked === true)}
           />
-          · {item.kind === 'planned' ? 'planned, not scheduled' : platformLabel(item.platform)}
-          {item.state && item.state !== 'Scheduled' ? (
-            <span className="text-amber-700 dark:text-amber-300">· {item.state}</span>
-          ) : null}
+        ) : null}
+        {/* The row carries the drag, so its link must not start one of its own. */}
+        <Link
+          className="min-w-0 flex-1 rounded-md hover:bg-foreground/[0.02]"
+          data-testid={item.kind === 'planned' ? 'queue-planned' : 'queue-item'}
+          draggable={false}
+          href={draftHref(item.draftId, data.activeSet?.id)}
+        >
+          <p
+            className={cn(
+              'flex flex-wrap items-center gap-1.5 text-[11px]',
+              item.kind === 'planned'
+                ? 'text-violet-700 dark:text-violet-300'
+                : 'text-sky-700 dark:text-sky-300'
+            )}
+          >
+            <LocalTime
+              options={{
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                month: 'short',
+                timeZone: data.activeSet?.timeZone,
+                timeZoneName: 'short',
+                weekday: 'short',
+              }}
+              value={item.at}
+            />
+            · {item.kind === 'planned' ? 'planned, not scheduled' : platformLabel(item.platform)}
+            {account ? (
+              <span className="text-muted-foreground">
+                · {account.handle ? `@${account.handle}` : account.displayName}
+              </span>
+            ) : null}
+            {item.state && item.state !== 'Scheduled' ? (
+              <span className="text-amber-700 dark:text-amber-300">· {item.state}</span>
+            ) : null}
+          </p>
+          <p
+            className={cn(
+              'mt-0.5 text-[13px] leading-snug text-foreground',
+              open ? 'whitespace-pre-wrap' : 'line-clamp-2'
+            )}
+          >
+            {item.caption}
+          </p>
+        </Link>
+        <Button
+          aria-expanded={open}
+          aria-label={open ? 'Show less of this post' : 'Show the whole post'}
+          className="size-6 shrink-0"
+          onClick={() => setOpen((current) => !current)}
+          size={null}
+          variant="ghost"
+        >
+          <CaretDownIcon aria-hidden className={cn('size-3', open && 'rotate-180')} />
+        </Button>
+      </div>
+      {open ? (
+        <p className="px-2 pb-2 text-[11px] text-muted-foreground">
+          {counted ? (
+            <span className="tabular-nums">
+              {length}
+              {limit ? ` / ${limit}` : ''} characters
+              {limit && length > limit ? ' · over the limit' : ''}
+            </span>
+          ) : (
+            'The draft’s opening. Open it to read and count the whole post.'
+          )}
         </p>
-        <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-foreground">
-          {item.caption}
-        </p>
-      </Link>
+      ) : null}
     </li>
   )
 }

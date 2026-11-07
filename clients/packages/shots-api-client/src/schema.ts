@@ -1744,6 +1744,8 @@ export interface components {
                 naturalPostingTime: boolean;
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
+                campaignId: string | null;
+                /** @default null */
                 plannedFor: string | null;
                 /** @default null */
                 primaryPlatform: string | null;
@@ -2847,6 +2849,8 @@ export interface components {
                 naturalPostingTime: boolean;
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
+                campaignId: string | null;
+                /** @default null */
                 plannedFor: string | null;
                 /** @default null */
                 primaryPlatform: string | null;
@@ -3046,6 +3050,8 @@ export interface components {
                 /** @default false */
                 naturalPostingTime: boolean;
                 suppressSlackOnPublish?: boolean;
+                /** @default null */
+                campaignId: string | null;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -3378,6 +3384,8 @@ export interface components {
             /** @default false */
             naturalPostingTime: boolean;
             suppressSlackOnPublish?: boolean;
+            /** @default null */
+            campaignId: string | null;
             /** @default null */
             plannedFor: string | null;
             /** @default null */
@@ -3821,6 +3829,8 @@ export interface components {
                 /** @default false */
                 naturalPostingTime: boolean;
                 suppressSlackOnPublish?: boolean;
+                /** @default null */
+                campaignId: string | null;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -9775,6 +9785,8 @@ export interface operations {
                             naturalPostingTime: boolean;
                             suppressSlackOnPublish?: boolean;
                             /** @default null */
+                            campaignId: string | null;
+                            /** @default null */
                             plannedFor: string | null;
                             /** @default null */
                             primaryPlatform: string | null;
@@ -10045,6 +10057,8 @@ export interface operations {
                             /** @default false */
                             naturalPostingTime: boolean;
                             suppressSlackOnPublish?: boolean;
+                            /** @default null */
+                            campaignId: string | null;
                             /** @default null */
                             plannedFor: string | null;
                             /** @default null */

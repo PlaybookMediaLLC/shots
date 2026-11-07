@@ -374,6 +374,20 @@ func (_c *ContentDraftCreate) SetNillableSourceDraftID(v *string) *ContentDraftC
 	return _c
 }
 
+// SetCampaignID sets the "campaign_id" field.
+func (_c *ContentDraftCreate) SetCampaignID(v string) *ContentDraftCreate {
+	_c.mutation.SetCampaignID(v)
+	return _c
+}
+
+// SetNillableCampaignID sets the "campaign_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableCampaignID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetCampaignID(*v)
+	}
+	return _c
+}
+
 // SetCollabGeneration sets the "collab_generation" field.
 func (_c *ContentDraftCreate) SetCollabGeneration(v int) *ContentDraftCreate {
 	_c.mutation.SetCollabGeneration(v)
@@ -814,6 +828,10 @@ func (_c *ContentDraftCreate) createSpec() (*ContentDraft, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.SourceDraftID(); ok {
 		_spec.SetField(contentdraft.FieldSourceDraftID, field.TypeString, value)
 		_node.SourceDraftID = &value
+	}
+	if value, ok := _c.mutation.CampaignID(); ok {
+		_spec.SetField(contentdraft.FieldCampaignID, field.TypeString, value)
+		_node.CampaignID = &value
 	}
 	if value, ok := _c.mutation.CollabGeneration(); ok {
 		_spec.SetField(contentdraft.FieldCollabGeneration, field.TypeInt, value)

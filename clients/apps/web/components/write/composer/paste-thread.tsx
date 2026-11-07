@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo, useState } from 'react'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
@@ -15,10 +16,24 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { importedBody, importedPosts, splitThread } from '@/lib/write/import-text'
+import {
+  importedBody,
+  importedPosts,
+  splitThread,
+  THREAD_POST_LIMIT,
+} from '@/lib/write/import-text'
 import type { DraftChannel } from '@/lib/write/document'
+import { withLeadMedia, type PostMedia } from '@/lib/write/screenshot-post'
 import { postRanges } from '@/components/drafts/thread'
 import { toast } from 'sonner'
+
+const LibraryAssetPicker = dynamic(
+  () =>
+    import('@/components/platform-hub/LibraryAssetPicker').then(
+      (module) => module.LibraryAssetPicker
+    ),
+  { ssr: false }
+)
 
 /** Preview a paste before appending ordinary, editable Plate posts. */
 export function PasteThreadDialog({
@@ -35,6 +50,9 @@ export function PasteThreadDialog({
   const [text, setText] = useState('')
   const [length, setLength] = useState(limit)
   const [automatic, setAutomatic] = useState(false)
+  // A screenshot belongs on the post that opens the explanation, not under it.
+  const [lead, setLead] = useState<PostMedia[]>([])
+  const [picking, setPicking] = useState(false)
   const preview = useMemo(() => {
     try {
       return {
@@ -48,11 +66,12 @@ export function PasteThreadDialog({
   const insert = () => {
     const current = editor.current
     if (!current || !preview.posts.length) return
-    if (postRanges(current.children).length + preview.posts.length > 25) {
-      toast.error('The combined thread would exceed 25 posts.')
+    if (postRanges(current.children).length + preview.posts.length > THREAD_POST_LIMIT) {
+      toast.error(`The combined thread would exceed ${THREAD_POST_LIMIT} posts.`)
       return
     }
-    current.tf.insertNodes(importedBody(preview.posts) as Value, { at: [current.children.length] })
+    const body = withLeadMedia(importedBody(preview.posts), lead)
+    current.tf.insertNodes(body as Value, { at: [current.children.length] })
     onClose()
     current.tf.focus()
   }
@@ -92,11 +111,42 @@ export function PasteThreadDialog({
             />
           </Label>
         )}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Button onClick={() => setPicking(true)} size="sm" type="button" variant="outline">
+            {lead.length ? 'Change opening image' : 'Attach to the opening post'}
+          </Button>
+          {lead.length ? (
+            <>
+              <span className="text-xs text-muted-foreground">
+                {lead.length} attached to post 1
+              </span>
+              <Button onClick={() => setLead([])} size="sm" type="button" variant="ghost">
+                Remove
+              </Button>
+            </>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              A screenshot on post 1 explains what the thread is about.
+            </span>
+          )}
+        </div>
+        {picking ? (
+          <LibraryAssetPicker
+            channel={channel}
+            onClose={() => setPicking(false)}
+            onInsert={setLead}
+          />
+        ) : null}
         {preview.error && <p role="alert">{preview.error}</p>}
         <ol className="grid max-h-60 gap-3 overflow-auto text-sm">
           {preview.posts.map((post, index) => (
             <li className="whitespace-pre-wrap rounded border p-2" key={index}>
               <strong>{index + 1}.</strong> {post}
+              {index === 0 && lead.length ? (
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  With {lead.length === 1 ? 'the attachment' : `${lead.length} attachments`}
+                </span>
+              ) : null}
             </li>
           ))}
         </ol>

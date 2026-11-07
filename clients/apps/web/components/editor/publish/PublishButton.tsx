@@ -14,10 +14,10 @@ import { draftsApi } from '@/lib/content-drafts/client'
 import { canExportMotion } from '@/lib/editor/canvas-content'
 import { safeBaseName } from '@/lib/export/naming'
 import { useExportSettings } from '@/lib/export/use-export-settings'
-import { draftPostBody, returnDraftId } from '@/lib/platform/asset-handoff'
+import { draftPostBody } from '@/lib/platform/asset-handoff'
 import { useCanStartPost } from '@/lib/platform/can-start-post'
+import { readEditorReturn } from '@/lib/platform/editor-handoff'
 import { startIncomingMedia } from '@/lib/platform/incoming-media'
-import { rememberPublishOrigin } from '@/lib/platform/publish-origin'
 import {
   preparePublication,
   publishKindLabel,
@@ -48,7 +48,13 @@ let lastDraftId: string | null = null
 
 type Where = 'new' | 'draft'
 
-export function PublishButton({ compact = false, disabled }: { compact?: boolean; disabled: boolean }) {
+export function PublishButton({
+  compact = false,
+  disabled,
+}: {
+  compact?: boolean
+  disabled: boolean
+}) {
   const canStartPost = useCanStartPost()
   const router = useRouter()
   const trpcClient = useTRPCClient()
@@ -110,7 +116,6 @@ export function PublishButton({ compact = false, disabled }: { compact?: boolean
         })
       )
       setOpen(false)
-      rememberPublishOrigin(draftId, `${window.location.pathname}${window.location.search}`)
       router.push(`/publish/${encodeURIComponent(draftId)}`)
     } catch (failure) {
       setError(
@@ -123,7 +128,7 @@ export function PublishButton({ compact = false, disabled }: { compact?: boolean
   }
 
   const begin = () => {
-    const returned = returnDraftId(window.location.search)
+    const returned = readEditorReturn(window.location.search).draftId ?? null
     const draft = returned ?? lastDraftId
     setTarget(draft ? { id: draft, returned: Boolean(returned) } : null)
     setWhere(draft ? 'draft' : 'new')
@@ -149,13 +154,17 @@ export function PublishButton({ compact = false, disabled }: { compact?: boolean
         >
           <PaperPlaneTiltIcon size={15} />
           {/* Named in full from xl up, like Export Video, so the header fits a laptop. */}
-          {!compact ? <span className="hidden xl:inline">{busy ? 'Opening…' : 'Publish'}</span> : null}
+          {!compact ? (
+            <span className="hidden xl:inline">{busy ? 'Opening…' : 'Publish'}</span>
+          ) : null}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="grid w-72 gap-4 p-4" data-testid="publish-menu">
         {kinds.length > 1 ? (
           <fieldset className="grid gap-2">
-            <legend className="mb-1 text-xs font-medium text-foreground">Publish this design as</legend>
+            <legend className="mb-1 text-xs font-medium text-foreground">
+              Publish this design as
+            </legend>
             <RadioGroup onValueChange={(value) => setKind(value as PublishKind)} value={chosen}>
               {kinds.map((option) => (
                 <Label className="flex items-center gap-2 text-xs font-normal" key={option}>
@@ -181,8 +190,8 @@ export function PublishButton({ compact = false, disabled }: { compact?: boolean
           </fieldset>
         ) : null}
         <p className="text-[11px] text-muted-foreground">
-          Publish opens over the design and the export joins the post when it is ready. Your
-          design stays as it is.
+          Publish opens over the design and the export joins the post when it is ready. Your design
+          stays as it is.
         </p>
         {error ? (
           <p className="text-xs text-destructive" role="alert">

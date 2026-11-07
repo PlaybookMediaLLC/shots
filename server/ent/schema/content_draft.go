@@ -76,6 +76,10 @@ func (ContentDraft) Fields() []ent.Field {
 		field.String("plan_time_zone").StorageKey("planTimeZone").Optional().Nillable(),
 		// The draft this one was duplicated, copied or recovered from.
 		field.String("source_draft_id").StorageKey("sourceDraftId").Optional().Nillable().Immutable(),
+		// The campaign an edited campaign visual was published from
+		// (campaign_publish_draft.go). The draft publishes through Publish
+		// like any other; this only keeps the campaign it came from reachable.
+		field.String("campaign_id").StorageKey("campaignId").Optional().Nillable().Immutable(),
 		// Yjs document state, written only by the collaboration service.
 		// External body replacements invalidate cached rooms and projections.
 		field.Int("collab_generation").StorageKey("collabGeneration").Default(0).NonNegative(),
@@ -88,5 +92,9 @@ func (ContentDraft) Fields() []ent.Field {
 }
 
 func (ContentDraft) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("organization_id", "updated_at"), index.Fields("social_set_id", "updated_at")}
+	return []ent.Index{
+		index.Fields("organization_id", "updated_at"),
+		index.Fields("social_set_id", "updated_at"),
+		index.Fields("organization_id", "campaign_id"),
+	}
 }

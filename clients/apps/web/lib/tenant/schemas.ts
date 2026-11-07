@@ -13,7 +13,8 @@ const contentTypeSchema = z
   )
 
 const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/i, 'SHA-256 must be hexadecimal.')
-const assetIdSchema = z.string().uuid()
+/** A workspace asset's id, shared with the campaign publish-draft handoff. */
+export const assetIdSchema = z.string().uuid()
 
 export const assetCompleteSchema = z.object({
   assetId: assetIdSchema,

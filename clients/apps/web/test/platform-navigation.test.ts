@@ -27,13 +27,8 @@ import {
   prepareWorkspaceSwitch,
   registerNavigationGuard,
 } from '@/lib/platform/navigation-guard'
-import {
-  attachToDraftHref,
-  draftAssetNode,
-  draftPostBody,
-  returnDraftId,
-  supportedDraftMedia,
-} from '@/lib/platform/asset-handoff'
+import { draftAssetNode, draftPostBody, supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import { draftAttachHref, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
 
 test('canonical editors, aliases and localized routes select the owning job', () => {
@@ -163,18 +158,23 @@ test('a post made from studio output carries its caption and its rendered image'
 
 test('an export returns only to a draft the return address actually names', () => {
   const draft = 'cm123456789012345678901234'
-  assert.equal(returnDraftId(`?fromDraft=${draft}`), draft)
-  assert.equal(returnDraftId('?fromDraft='), null)
-  assert.equal(returnDraftId(''), null)
+  assert.equal(readEditorReturn(`?fromDraft=${draft}`).draftId, draft)
+  assert.equal(readEditorReturn('?fromDraft=').draftId, undefined)
+  assert.equal(readEditorReturn('').draftId, undefined)
   // A hand-edited address cannot send the export somewhere else.
   for (const unsafe of ['../../other', 'https://other.test/publish/x', 'a b'])
-    assert.equal(returnDraftId(`?fromDraft=${encodeURIComponent(unsafe)}`), null)
+    assert.equal(readEditorReturn(`?fromDraft=${encodeURIComponent(unsafe)}`).draftId, undefined)
 
   // The composer opens the returned export for review; the media type travels
   // with it so each destination's formats can be checked before scheduling.
   assert.equal(
-    attachToDraftHref(draft, { id: 'cm999999999999999999999999', mediaType: 'image/png' }),
+    draftAttachHref(draft, 'cm999999999999999999999999', 'image/png'),
     `/publish/${draft}?attach=cm999999999999999999999999&attachType=image%2Fpng`
+  )
+  // Without a known type, only the asset travels.
+  assert.equal(
+    draftAttachHref(draft, 'cm999999999999999999999999'),
+    `/publish/${draft}?attach=cm999999999999999999999999`
   )
 })
 

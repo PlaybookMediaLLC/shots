@@ -13,6 +13,7 @@ import { readLinkPreview } from '@/lib/link-preview/fetch'
 import { postLinkProblems } from '@/lib/link-preview/gate'
 import { type PostEditResult, type PostSnapshot, postFields } from '@/lib/launch/post-edit'
 import type { CampaignApprovalDecision } from './campaign-status'
+import type { CampaignPublishDraftInput } from './campaign-publish-draft'
 import type {
   CampaignCreateInput,
   CampaignPostScheduleInput,
@@ -134,6 +135,19 @@ export async function scheduleCampaignPost(
       scheduledAt: input.scheduledAt?.toISOString(),
     })
   )
+}
+
+/**
+ * An edited campaign visual becomes a Publish draft. The backend attaches
+ * the export to the campaign and creates the draft in one transaction, so a
+ * failure leaves neither, and the draft keeps the campaign it came from.
+ */
+export async function createCampaignPublishDraft(
+  context: TenantContext,
+  input: CampaignPublishDraftInput
+) {
+  const { campaignId, ...handoff } = input
+  return withDates(await backendSDK(context).createCampaignPublishDraft(campaignId, handoff))
 }
 
 /** Approve a design's current render as the visual its posts publish with. */

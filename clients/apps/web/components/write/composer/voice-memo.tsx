@@ -9,8 +9,13 @@ import { call } from '@/lib/content-drafts/client'
 import { validateVoiceMemo } from '@/lib/write/voice-memo'
 import type { DraftChannel } from '@/lib/write/document'
 
-/** A voice memo becomes editable source material before an assistant request is sent. */
-export function VoiceMemo({draftId,channel,onUse}: {draftId:string;channel:DraftChannel;onUse:(text:string)=>void}) {
+/**
+ * A voice memo becomes editable source material: the reviewed transcript
+ * either briefs the assistant or, when the caller takes one, becomes caption
+ * copy in the draft directly, so a spoken explanation of a change can be
+ * edited as a post without a model rewriting it first.
+ */
+export function VoiceMemo({draftId,channel,onInsert,onUse}: {draftId:string;channel:DraftChannel;onInsert?:(text:string)=>void;onUse:(text:string)=>void}) {
   const [file,setFile] = useState<File | null>(null)
   const [transcript,setTranscript] = useState('')
   const [busy,setBusy] = useState(false)
@@ -42,7 +47,10 @@ export function VoiceMemo({draftId,channel,onUse}: {draftId:string;channel:Draft
     {error && <p role="alert" className="mt-2 text-xs">{error}</p>}
     {transcript && <div className="mt-3 grid gap-2">
       <Textarea aria-label="Review voice transcript" rows={5} maxLength={7_600} value={transcript} onChange={event => setTranscript(event.target.value)} />
-      <Button type="button" size="sm" variant="outline" disabled={!transcript.trim()} onClick={() => onUse(`Help me turn these voice notes into a draft. Use only these facts and ask about anything unclear.\n\n${transcript.trim()}`)}>Use reviewed transcript</Button>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" variant="outline" disabled={!transcript.trim()} onClick={() => onUse(`Help me turn these voice notes into a draft. Use only these facts and ask about anything unclear.\n\n${transcript.trim()}`)}>Use reviewed transcript</Button>
+        {onInsert && <Button type="button" size="sm" variant="outline" disabled={!transcript.trim()} onClick={() => onInsert(transcript.trim())}>Add as a post</Button>}
+      </div>
     </div>}
     </DisclosureContent>
   </Disclosure>

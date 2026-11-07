@@ -25,28 +25,6 @@ export function draftAssetNode(asset: { id: string; mediaType: string }) {
   }
 }
 
-/**
- * The draft an editor was opened from, read from an editor URL's `fromDraft`.
- * Null when the parameter is missing or is not a draft identifier, so a
- * hand-edited return address cannot send an export somewhere else.
- */
-export function returnDraftId(search: string): string | null {
-  const asked = new URLSearchParams(search).get('fromDraft')
-  return asked && contentDraftIdSchema.safeParse(asked).success ? asked : null
-}
-
-/**
- * Where an export returns to the draft it was opened from: the composer opens
- * it for review and attaches it only when the person says so. The media type
- * travels with it so the composer can check each destination's formats; the
- * backend validates both the asset and the type again when the draft is
- * scheduled.
- */
-export function attachToDraftHref(draftId: string, asset: { id: string; mediaType: string }) {
-  const query = new URLSearchParams({ attach: asset.id, attachType: asset.mediaType })
-  return `/publish/${encodeURIComponent(draftId)}?${query}`
-}
-
 /** One attachment a studio hands to a post, with the alt text it already knows. */
 export type DraftPostMedia = { alt?: string; id: string; mediaType: string }
 
