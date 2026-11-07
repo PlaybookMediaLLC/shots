@@ -4,37 +4,60 @@ import type { TRPCClient } from '@trpc/client'
 import type { AppRouter } from '@/lib/trpc/router'
 import { outputFormatSchema } from '@/lib/export/formats'
 import {
+  dismissIncomingMedia,
+  incomingMedia,
+  retryIncomingMedia,
+  startIncomingMedia,
+  takeIncomingMedia,
+} from '@/lib/platform/incoming-media'
+import {
   compositionRevision,
   publishExportConfig,
-  publishFormatChanged,
+  publishKindLabel,
+  publishKinds,
   publishableFormat,
+  type PublicationNode,
   type PublicationRender,
   rememberPublication,
   rememberedPublication,
   uploadPublication,
 } from '@/lib/platform/publish-handoff'
+import { leavePublishWorkspace, rememberPublishOrigin } from '@/lib/platform/publish-origin'
 
 /**
- * The editor's half of publishing: which format a post carries, which render
- * those bytes came from, and when a render has to be stored again.
- * `renderPublication` itself draws the live stage and is covered by the
- * browser journey, not here.
+ * The editor's half of publishing: what a design can be published as, which
+ * format a post carries, which render those bytes came from, when a render has
+ * to be stored again, and how exports reach the open draft.
+ * `renderPublications` itself draws the live stage and runs the encoders, so
+ * the browser journey covers it, not this file.
  */
 
 const config = { format: 'png', quality: 'high', scale: 2, transparent: false } as const
 
-test('a post carries a still image, whatever the export panel is set to', () => {
+test('a design offers every kind it can publish, the canvas image first', () => {
+  assert.deepEqual(publishKinds({ canAnimate: false, slideCount: 0 }), ['image'])
+  // One slide is just the image; two or more are a carousel.
+  assert.deepEqual(publishKinds({ canAnimate: false, slideCount: 1 }), ['image'])
+  assert.deepEqual(publishKinds({ canAnimate: false, slideCount: 3 }), ['image', 'slides'])
+  // Motion, a timeline or slides play: video and GIF, as Export offers them.
+  assert.deepEqual(publishKinds({ canAnimate: true, slideCount: 3 }), [
+    'image',
+    'slides',
+    'video',
+    'gif',
+  ])
+  assert.equal(publishKindLabel('slides', 3), 'All 3 slides')
+  assert.equal(publishKindLabel('video', 0), 'Video (MP4)')
+})
+
+test('a still post carries a still image, whatever the export panel is set to', () => {
   // A raster choice is kept: someone who exports JPEG for its size posts JPEG.
-  for (const format of ['png', 'jpeg', 'webp'] as const) {
+  for (const format of ['png', 'jpeg', 'webp'] as const)
     assert.equal(publishableFormat(format), format)
-    assert.equal(publishFormatChanged(format), false)
-  }
-  // Nothing else is a still image a post can carry, and silently posting
-  // a PDF or a video file as an image would fail at the provider.
-  for (const format of ['svg', 'pdf', 'gif', 'mp4', 'webm'] as const) {
+  // Nothing else is a still image a post can carry; video and GIF publish
+  // through their own kinds, not as a still format.
+  for (const format of ['svg', 'pdf', 'gif', 'mp4', 'webm'] as const)
     assert.equal(publishableFormat(format), 'png')
-    assert.equal(publishFormatChanged(format), true)
-  }
   // Every format the editor offers decides one way or the other.
   for (const format of outputFormatSchema.options)
     assert.ok(['png', 'jpeg', 'webp'].includes(publishableFormat(format)))
@@ -120,11 +143,8 @@ function recordingClient() {
 function renderOf(revision: string): PublicationRender {
   return {
     blob: new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }),
-    config,
-    height: 1080,
     mimeType: 'image/png',
     revision,
-    width: 1920,
   }
 }
 
@@ -168,18 +188,117 @@ test('the same composition is stored once, however often publishing is retried',
   assert.equal(upload.reserved[1].classification, 'export')
 })
 
-test('reopening the publish dialog attaches the asset the last one stored', () => {
+test('publishing an unchanged design again attaches the assets already stored', () => {
   const asset = { assetId: 'asset-1', revision: 'rev-1' }
   rememberPublication('workspace-1', asset)
+  // A carousel stores one asset per slide; all of them stay remembered.
+  rememberPublication('workspace-1', { assetId: 'asset-2', revision: 'rev-1-slide-2' })
 
-  // Closing the dialog drops its own state, so the same design has to find
-  // its asset here rather than storing the pixels again.
   assert.deepEqual(rememberedPublication('workspace-1', 'rev-1'), asset)
+  assert.deepEqual(rememberedPublication('workspace-1', 'rev-1-slide-2'), {
+    assetId: 'asset-2',
+    revision: 'rev-1-slide-2',
+  })
   // Any edit, and any other export, is a different publication.
   assert.equal(rememberedPublication('workspace-1', 'rev-2'), undefined)
   // An asset of another workspace is never offered: it could not be read there.
   assert.equal(rememberedPublication('workspace-2', 'rev-1'), undefined)
 
-  rememberPublication('workspace-1', { assetId: 'asset-2', revision: 'rev-2' })
+  // The memory is bounded; the oldest goes first.
+  for (let index = 0; index < 40; index++)
+    rememberPublication('workspace-1', { assetId: `filler-${index}`, revision: `filler-${index}` })
   assert.equal(rememberedPublication('workspace-1', 'rev-1'), undefined)
+  assert.ok(rememberedPublication('workspace-1', 'filler-39'))
+})
+
+const node = (id: string): PublicationNode => ({
+  assetId: id,
+  children: [{ text: '' }],
+  mimeType: 'image/png',
+  type: 'img',
+  url: `/api/v1/assets/${id}/content`,
+})
+
+/** Let queued exports settle. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+test('exports reach the open draft once each, in the order they were started', async () => {
+  const draft = 'draft-order'
+  let finishVideo: (nodes: PublicationNode[]) => void = () => {}
+  startIncomingMedia(
+    draft,
+    'Video (MP4)',
+    (report) =>
+      new Promise((resolve) => {
+        report(40)
+        finishVideo = resolve
+      })
+  )
+  startIncomingMedia(draft, 'Image', async () => [node('image')])
+  await settle()
+
+  // The video is still encoding: it reports progress and nothing is attachable yet.
+  assert.deepEqual(
+    incomingMedia(draft).map((job) => [job.label, job.state, job.progress]),
+    [
+      ['Video (MP4)', 'working', 40],
+      ['Image', 'working', 0],
+    ]
+  )
+  assert.deepEqual(takeIncomingMedia(draft), [])
+
+  // Exports run one at a time: they share one stage and one encoder.
+  finishVideo([node('video')])
+  await settle()
+  await settle()
+  assert.deepEqual(
+    takeIncomingMedia(draft).map((item) => item.assetId),
+    ['video', 'image']
+  )
+  // Taken once: a composer that renders again cannot insert them twice.
+  assert.deepEqual(takeIncomingMedia(draft), [])
+  // Another draft's exports are its own.
+  assert.deepEqual(incomingMedia('another-draft'), [])
+})
+
+test('a failed export says why, can run again, and is attached only when it succeeds', async () => {
+  const draft = 'draft-failure'
+  let attempts = 0
+  const id = startIncomingMedia(draft, 'GIF', async () => {
+    attempts += 1
+    if (attempts === 1) throw new Error('Upload failed. Your text is saved; retry the attachment.')
+    return [node('gif')]
+  })
+  await settle()
+  assert.deepEqual(
+    incomingMedia(draft).map((job) => [job.state, job.error]),
+    [['failed', 'Upload failed. Your text is saved; retry the attachment.']]
+  )
+  assert.deepEqual(takeIncomingMedia(draft), [])
+
+  retryIncomingMedia(draft, id)
+  // A second click while it runs cannot start it twice.
+  retryIncomingMedia(draft, id)
+  await settle()
+  await settle()
+  assert.equal(attempts, 2)
+  assert.deepEqual(
+    takeIncomingMedia(draft).map((item) => item.assetId),
+    ['gif']
+  )
+
+  // A finished export can be dismissed from the list.
+  dismissIncomingMedia(draft, id)
+  assert.deepEqual(incomingMedia(draft), [])
+})
+
+test('closing the workspace returns to the design it was opened from', () => {
+  // Nothing opened from the editor in this tab: closing is a plain step back.
+  assert.deepEqual(leavePublishWorkspace('draft-a'), { back: true })
+  rememberPublishOrigin('draft-a', '/editor?project=p1')
+  // Still on the draft it opened: one step back is the editor.
+  assert.deepEqual(leavePublishWorkspace('draft-a'), { back: true })
+  // Moved on to another draft (scheduling opens the next one): back would
+  // land on the first draft, so closing goes to the editor's address.
+  assert.deepEqual(leavePublishWorkspace('draft-b'), { href: '/editor?project=p1' })
 })

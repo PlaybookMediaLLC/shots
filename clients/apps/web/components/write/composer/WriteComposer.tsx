@@ -150,6 +150,7 @@ import { BackupsBrowser, ShareDialog } from './share-backups'
 import { AssistantPanel } from './assistant'
 import { withAssetDescription } from '@/lib/write/media-operations'
 import { PreviewImageDescription } from './describe-images'
+import { IncomingMedia } from './incoming-media'
 import { MediaImportDialog } from './media-import-dialog'
 import { MediaStrip } from './media-strip'
 import { withBrowserScope } from '@/lib/auth/browser-scope'
@@ -256,6 +257,7 @@ export function WriteComposer({
   collabUrl,
   draft: initial,
   giphy = false,
+  layout = 'page',
   posts: initialPosts,
   requireApproval,
   set,
@@ -269,6 +271,12 @@ export function WriteComposer({
   draft: DraftWire
   /** Whether GIF search is approved and configured. */
   giphy?: boolean
+  /**
+   * `page`: the Publish page, where Preview takes the draft's place.
+   * `workspace`: the publishing workspace over the screenshot editor, where
+   * the preview stays beside the draft so every edit shows as it is typed.
+   */
+  layout?: 'page' | 'workspace'
   posts: DraftPostWire[]
   requireApproval: boolean
   set: WriteSet | null
@@ -368,8 +376,16 @@ export function WriteComposer({
     }
   }, [beforeLeaveRef, flush])
   const textDirection = usePreferences().preferences?.textDirection ?? 'ltr'
+  // In the workspace, a wide screen keeps a second column beside the draft:
+  // the preview, or whichever panel was opened instead of it.
+  const split = layout === 'workspace' && !narrow
   const [panelWidth, setPanelWidth] = React.useState(420)
   const resize = React.useRef<{ x: number; width: number } | null>(null)
+  const panelLimits = React.useCallback(
+    (scroller: number) =>
+      split ? { max: Math.round(scroller * 0.65), min: 320 } : { max: 640, min: 256 },
+    [split]
+  )
   const [tab, setTab] = React.useState<DraftChannel>(() => primaryChannel(initial.primaryPlatform))
   const [panel, setPanel] = React.useState<Panel | null>(() => {
     const asked = params.get('panel')
@@ -440,6 +456,9 @@ export function WriteComposer({
     poll: PostPoll
   } | null>(null)
   const [editorInstance, setEditorInstance] = React.useState<PlateEditor | null>(null)
+  // The main version's editor while it is mounted and live, and only then:
+  // arrivals from the screenshot editor are inserted into it.
+  const [primaryEditor, setPrimaryEditor] = React.useState<PlateEditor | null>(null)
   const [resync, setResync] = React.useState<DraftChannel | null>(null)
   const primary = document.primaryPlatform
   const accounts = set?.accounts ?? []
@@ -479,9 +498,17 @@ export function WriteComposer({
   }, [])
   // Preview takes the draft's place, so coming back returns to where it was left, caret included.
   const scrollBeforePreview = React.useRef<number | null>(null)
+  // The workspace's columns start at 55/45 and keep the split this person last chose.
   React.useLayoutEffect(() => {
     const main = bodyArea.current?.closest('main')
-    if (!main) return
+    if (!split || !main) return
+    const { max, min } = panelLimits(main.clientWidth)
+    const share = readWorkspaceShare()
+    setPanelWidth(Math.min(max, Math.max(min, Math.round(main.clientWidth * share))))
+  }, [panelLimits, split])
+  React.useLayoutEffect(() => {
+    const main = bodyArea.current?.closest('main')
+    if (!main || split) return
     if (panel === 'preview') {
       // Hiding the editor drops its focus without a blur event, and Slate won't refocus an
       // editor it believes is focused, so it has to be told before coming back.
@@ -494,7 +521,7 @@ export function WriteComposer({
       scrollBeforePreview.current = null
       editor.current?.tf.focus()
     } else if (main.scrollTop !== draftScroll.current) main.scrollTop = draftScroll.current
-  }, [panel])
+  }, [panel, split])
   const [pasteNotice, setPasteNotice] = React.useState(false)
 
   const renderBlocks = async (): Promise<BlockImages> => {
@@ -1280,11 +1307,15 @@ export function WriteComposer({
           }
         }
       : undefined
-  // Preview takes the draft's place; every other panel sits beside it.
-  const sidePanel = panel === 'preview' ? null : panel
-  const previewing = panel === 'preview' && !focus
+  // On the page, Preview takes the draft's place and every other panel sits
+  // beside it. In the workspace the preview is the column beside the draft,
+  // and another panel takes that column until it is closed.
+  const sidePanel: Panel | null = split ? (panel ?? 'preview') : panel === 'preview' ? null : panel
+  const previewing = !split && panel === 'preview' && !focus
   const panelContent =
-    panel === 'options' ? (
+    sidePanel === 'preview' ? (
+      previewPanel
+    ) : sidePanel === 'options' ? (
       <div data-testid="post-options">
         <VersionOptionsBar
           channel={active}
@@ -1310,7 +1341,7 @@ export function WriteComposer({
         />
         {threadTools?.(pasteNotice)}
       </div>
-    ) : panel === 'properties' ? (
+    ) : sidePanel === 'properties' ? (
       <PropertiesPanel
         aiEnabled={aiEnabled}
         canEdit={canEdit}
@@ -1324,9 +1355,9 @@ export function WriteComposer({
         status={status?.label ?? 'Draft'}
         title={document.title}
       />
-    ) : panel === 'comments' && !canEdit ? (
+    ) : sidePanel === 'comments' && !canEdit ? (
       <MemberComments draft={server} currentUserId={user.id} onDraft={setServer} />
-    ) : panel === 'comments' ? (
+    ) : sidePanel === 'comments' ? (
       <CommentsPanel
         draft={server}
         editor={editorInstance}
@@ -1334,7 +1365,7 @@ export function WriteComposer({
         users={{ [user.id]: user.name }}
         versions={document.versions}
       />
-    ) : panel === 'assistant' ? (
+    ) : sidePanel === 'assistant' ? (
       <AssistantPanel
         channel={active}
         onInsert={
@@ -1378,7 +1409,7 @@ export function WriteComposer({
         {/* The panel gives way before the editor drops below a readable column. */}
         <div className="flex min-w-[min(26rem,100%)] flex-1 flex-col">
           <header className="sticky top-0 z-20 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/90 px-3 py-2 backdrop-blur">
-            <DraftsDrawerButton />
+            {layout === 'page' ? <DraftsDrawerButton /> : null}
             {set ? (
               // The brand's dot shows only beside its name: alone, it read as a save indicator.
               <span
@@ -1934,6 +1965,7 @@ export function WriteComposer({
                 onEditor={(next) => {
                   // A tab without its own editor must not reach the one that has left the page.
                   editor.current = next
+                  setPrimaryEditor(next)
                   if (!next) return
                   editorChannel.current = active
                   setEditorInstance(next)
@@ -2051,6 +2083,13 @@ export function WriteComposer({
             )}
             {focus ? null : (
               <>
+          {server.kind === 'article' ? null : (
+            <IncomingMedia
+              draftId={initial.id}
+              // Only the main version's live editor takes arrivals; another version waits.
+              editor={canEditText ? primaryEditor : null}
+            />
+          )}
           {server.kind === 'article' ? null : (
             <MediaStrip
               canEdit={canEditText}
@@ -2226,17 +2265,21 @@ export function WriteComposer({
           <aside
             aria-label={PANEL_TITLES[sidePanel]}
             // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
-            className="sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 max-w-[48vw] self-start overflow-y-auto border-l border-border animate-in fade-in duration-150"
+            className={cn(
+              'sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 self-start overflow-y-auto border-l border-border animate-in fade-in duration-150',
+              split ? 'max-w-[70%]' : 'max-w-[48vw]'
+            )}
             ref={fitToScroller}
             data-composer-panel
+            data-testid={split ? 'workspace-side-column' : undefined}
             style={{ width: panelWidth }}
           >
             <div
               role="separator"
               aria-label="Resize sidebar"
               aria-orientation="vertical"
-              aria-valuemin={256}
-              aria-valuemax={640}
+              aria-valuemin={panelLimits(bodyArea.current?.closest('main')?.clientWidth ?? 0).min}
+              aria-valuemax={panelLimits(bodyArea.current?.closest('main')?.clientWidth ?? 0).max}
               aria-valuenow={panelWidth}
               tabIndex={0}
               className="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize touch-none hover:bg-sky-400 focus:bg-sky-400"
@@ -2245,16 +2288,17 @@ export function WriteComposer({
                 event.currentTarget.setPointerCapture(event.pointerId)
               }}
               onPointerMove={(event) => {
-                if (resize.current)
-                  setPanelWidth(
-                    Math.min(
-                      640,
-                      Math.max(256, resize.current.width + resize.current.x - event.clientX)
-                    )
-                  )
+                if (!resize.current) return
+                const { max, min } = panelLimits(
+                  bodyArea.current?.closest('main')?.clientWidth ?? 0
+                )
+                setPanelWidth(
+                  Math.min(max, Math.max(min, resize.current.width + resize.current.x - event.clientX))
+                )
               }}
               onPointerUp={() => {
                 resize.current = null
+                rememberWorkspaceShare(split, panelWidth, bodyArea.current)
               }}
               onPointerCancel={() => {
                 resize.current = null
@@ -2262,13 +2306,26 @@ export function WriteComposer({
               onKeyDown={(event) => {
                 if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
                   event.preventDefault()
-                  setPanelWidth((width) =>
-                    Math.min(640, Math.max(256, width + (event.key === 'ArrowLeft' ? 32 : -32)))
+                  const { max, min } = panelLimits(
+                    bodyArea.current?.closest('main')?.clientWidth ?? 0
                   )
+                  const next = Math.min(
+                    max,
+                    Math.max(min, panelWidth + (event.key === 'ArrowLeft' ? 32 : -32))
+                  )
+                  setPanelWidth(next)
+                  rememberWorkspaceShare(split, next, bodyArea.current)
                 }
               }}
             />
-            <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[sidePanel]} />
+            {/* The workspace's preview is its standing column, so it has no close. */}
+            {split && sidePanel === 'preview' ? (
+              <div className="border-b border-border px-4 py-2">
+                <h2 className="text-ui-lg font-medium text-foreground">Preview</h2>
+              </div>
+            ) : (
+              <PanelHeader onClose={() => setPanel(null)} title={PANEL_TITLES[sidePanel]} />
+            )}
             {panelContent}
           </aside>
         ) : null}
@@ -2639,6 +2696,29 @@ function FixList({
       ) : null}
     </div>
   )
+}
+
+const WORKSPACE_SHARE_KEY = 'shots:publish-workspace:side-share'
+
+/** The share of the workspace the side column takes: 45% until someone drags it. */
+function readWorkspaceShare(): number {
+  try {
+    const stored = Number(window.localStorage.getItem(WORKSPACE_SHARE_KEY))
+    return stored >= 0.2 && stored <= 0.7 ? stored : 0.45
+  } catch {
+    return 0.45
+  }
+}
+
+/** Keep a dragged split for the next time the workspace opens; the page keeps its own width. */
+function rememberWorkspaceShare(split: boolean, width: number, body: HTMLElement | null) {
+  const scroller = body?.closest('main')?.clientWidth
+  if (!split || !scroller) return
+  try {
+    window.localStorage.setItem(WORKSPACE_SHARE_KEY, String(width / scroller))
+  } catch {
+    // Private mode or a full store only loses the memory.
+  }
 }
 
 /** Panel titles. */

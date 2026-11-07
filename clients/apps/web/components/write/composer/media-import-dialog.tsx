@@ -17,6 +17,7 @@ import { postRanges } from '@/components/drafts/thread'
 import { call } from '@/lib/content-drafts/client'
 import { assetContentUrl } from '@/lib/editor/services'
 import { draftAssetNode, supportedDraftMedia } from '@/lib/platform/asset-handoff'
+import { insertArrivedAttachments } from '@/lib/write/media-operations'
 
 /**
  * The node an attached export becomes.
@@ -60,7 +61,7 @@ export function MediaImportDialog({
       await call(`/api/v1/assets/${encodeURIComponent(returnedAsset)}/download-url`)
       const range = postRanges(editor.children)[post]
       if (!range) throw new Error('That post changed. Choose a destination again.')
-      editor.tf.insertNodes(returnedNode(returnedAsset, returnedType), { at: [range[1]] })
+      insertArrivedAttachments(editor, range[1], [returnedNode(returnedAsset, returnedType)])
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The media could not be loaded.')
