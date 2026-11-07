@@ -48,7 +48,10 @@ export default async function BatchPage({
         canPublish={accessAllows(access, 'publish:manage')}
         initial={contentBatchSchema.parse(batch)}
         start={
-          query.start === 'videos' || query.start === 'images' || query.start === 'grid'
+          query.start === 'videos' ||
+          query.start === 'images' ||
+          query.start === 'grid' ||
+          query.start === 'text'
             ? query.start
             : undefined
         }

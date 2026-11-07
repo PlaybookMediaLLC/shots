@@ -22,6 +22,8 @@ import {
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
 import { startBlankDraft } from './pending-draft'
+import { carriedChannels } from '@/lib/write/composing-session'
+import { countingChannelFor } from '@/lib/write/paste-split'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
@@ -71,6 +73,12 @@ export const SHORTCUT_REFERENCE: {
         key: 'enter',
         label: 'Schedule at the next free slot (opens the review)',
         mod: true,
+      },
+      // ⌘Enter already makes a new post in a thread, so scheduling from the
+      // keyboard lives in the field where the time is typed.
+      {
+        key: 'enter',
+        label: 'In the dock’s “Or type it” field: schedule (with ⇧: schedule and open the next draft)',
       },
       { alt: true, key: 'arrowup', label: 'Move the post up' },
       { alt: true, key: 'arrowdown', label: 'Move the post down' },
@@ -187,11 +195,13 @@ function FrameLayout({
     try {
       startBlankDraft(
         {
+          channelConnectionIds: carriedChannels(data.activeSet),
           socialSetId: data.activeSet?.id,
           tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
         },
         (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined
+        beforeLeaveRef.current ?? undefined,
+        countingChannelFor(data.activeSet?.accounts)
       )
     } finally {
       setCreating(false)

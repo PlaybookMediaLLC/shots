@@ -236,7 +236,9 @@ test(
 
     await page.goto('/write?tab=queue')
     const queue = page.getByTestId('queue')
-    await expect(queue.getByTestId('queue-goal')).toContainText('slots filled in the next 7 days')
+    await expect(queue.getByTestId('queue-goal')).toContainText(
+      'recurring slots used in the next 7 days'
+    )
     await expect(queue.getByRole('link', { name: 'Edit schedule' })).toBeVisible()
     const slot = queue.getByTestId('queue-free-slot').first()
     await expect(slot).toBeVisible()

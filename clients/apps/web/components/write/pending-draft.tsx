@@ -5,7 +5,12 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { draftsApi } from '@/lib/content-drafts/client'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
+import type { DraftChannel } from '@/lib/write/document'
+import { importedBody } from '@/lib/write/import-text'
+import { pastePieces } from '@/lib/write/paste-split'
+import { seriesTitle } from '@/lib/write/series'
 import { postBreak } from '@/lib/write/versions'
+import { PasteSplit, type PasteChoice } from './paste-split'
 import { prepareWorkspaceSwitch } from '@/lib/platform/navigation-guard'
 import { platformHref } from '@/lib/platform/navigation'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
@@ -26,12 +31,23 @@ type PendingDraft = {
   text: string
   error?: string
   planRequired?: boolean
+  /**
+   * A paste that separates into pieces, awaiting the writer's choice. While
+   * it is set nothing is created: the choice decides what to create.
+   */
+  pieces?: string[]
   /** Nothing has been saved: the draft is made by the first word or attachment. */
   waiting?: boolean
 }
 let pending: PendingDraft | null = null
 /** Attach media to a post still waiting to be made, and make it. */
 let attachToWaiting: ((nodes: ReturnType<typeof draftAssetNode>[]) => void) | null = null
+/** Act on a paste the writer has separated into pieces. */
+let resolvePaste: ((choice: PasteChoice, seriesName: string) => Promise<void>) | null = null
+/** The platform the new-draft box counts pasted pieces against. */
+let countingChannel: DraftChannel = 'x'
+/** Open the library's series scheduler on drafts just created; set while the box is mounted. */
+let navigateToSeries: (ids: string[]) => void = () => undefined
 let retry: (() => Promise<void>) | null = null
 const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => {
@@ -66,9 +82,12 @@ export async function createWritingDraft(
 export function startBlankDraft(
   input: Parameters<typeof draftsApi.create>[0],
   navigate: (id: string) => void,
-  beforeLeave?: () => Promise<void>
+  beforeLeave?: () => Promise<void>,
+  /** The platform a pasted run is measured against; X unless the brand says otherwise. */
+  channel: DraftChannel = 'x'
 ) {
   if (pending) return
+  countingChannel = channel
   update({ text: '', waiting: true })
   prepareCreation(input, navigate, beforeLeave)
 }
@@ -80,6 +99,66 @@ function prepareCreation(
 ) {
   // One key for every try: a retry after a lost response gets the same draft back, not a second one.
   let request = { requestKey: crypto.randomUUID(), ...input }
+  // One key per piece, kept across attempts: a run that failed halfway is
+  // finished by pressing again, and the pieces already created come back by
+  // their key instead of being made a second time. The key belongs to the
+  // piece's place and its words, so editing a piece before trying again asks
+  // for a new draft rather than replaying the one with the old words.
+  const pieceKeys = new Map<string, string>()
+  const keyForPiece = (index: number, piece: string) => {
+    const at = `${index}\u0000${piece}`
+    const existing = pieceKeys.get(at)
+    if (existing) return existing
+    const fresh = crypto.randomUUID()
+    pieceKeys.set(at, fresh)
+    return fresh
+  }
+  // Several posts from one paste: each piece becomes its own draft, sharing a
+  // series title, and the library opens its series scheduler on all of them.
+  resolvePaste = async (choice, seriesName) => {
+    const pieces = pending?.pieces ?? []
+    if (choice === 'one') {
+      update({ ...(pending ?? { text: '' }), pieces: undefined, waiting: false })
+      return retry?.()
+    }
+    if (choice === 'thread') {
+      request = { ...request, body: importedBody(pieces) }
+      // The draft already holds the pasted text as posts; leaving it buffered
+      // too would type the whole block into the editor again.
+      update({ ...(pending ?? { text: '' }), pieces: undefined, text: '', waiting: false })
+      return retry?.()
+    }
+    update({ ...(pending ?? { text: '' }), error: undefined, waiting: false })
+    try {
+      await beforeLeave?.()
+      const created: string[] = []
+      for (const [index, piece] of pieces.entries()) {
+        const draft = await draftsApi.create({
+          ...request,
+          body: importedBody([piece]),
+          requestKey: keyForPiece(index, piece),
+          title: seriesTitle(seriesName, index, pieces.length),
+        })
+        created.push(draft.id)
+      }
+      update(null)
+      resolvePaste = null
+      retry = null
+      navigateToSeries(created)
+    } catch (error) {
+      const planRequired = isPlanRefusal(error)
+      update({
+        pieces,
+        text: pending?.text ?? '',
+        error: planRequired
+          ? 'Writing posts needs Pro.'
+          : error instanceof Error
+            ? error.message
+            : 'The posts could not be created.',
+        planRequired,
+      })
+    }
+  }
   attachToWaiting = (nodes) => {
     request = {
       ...request,
@@ -157,6 +236,8 @@ export function takePendingDraft(id: string): string | null {
 
 /** A typing surface that remains mounted while the route and editor load. */
 export function PendingDraftInput() {
+  const router = useRouter()
+  const pathname = usePathname()
   const value = React.useSyncExternalStore(
     subscribe,
     () => pending,
@@ -169,14 +250,28 @@ export function PendingDraftInput() {
     window.addEventListener('beforeunload', guard)
     return () => window.removeEventListener('beforeunload', guard)
   }, [])
+  // A run of drafts lands in the library with its series scheduler open, so
+  // one confirmation times all of them.
+  React.useEffect(() => {
+    navigateToSeries = (ids) =>
+      router.push(
+        platformHref(pathname, `/publish?series=${ids.map(encodeURIComponent).join(',')}`)
+      )
+    return () => {
+      navigateToSeries = () => undefined
+    }
+  }, [pathname, router])
   const box = React.useRef<HTMLDivElement>(null)
   const field = React.useRef<HTMLTextAreaElement>(null)
   const open = Boolean(value)
   const [picking, setPicking] = React.useState(false)
+  const [splitting, setSplitting] = React.useState(false)
   const cancel = () => {
     retry = null
     attachToWaiting = null
+    resolvePaste = null
     setPicking(false)
+    setSplitting(false)
     update(null)
   }
   // The box covers the page, so focus stays in it. A menu or dialog that opened
@@ -216,15 +311,54 @@ export function PendingDraftInput() {
           value={value.text}
           onChange={(event) => {
             if (!pending) return
+            // A paste the writer has not answered for yet holds everything: the
+            // choice decides what is created, so typing must not create one
+            // draft. Editing it re-reads the pieces, so what the panel lists is
+            // always what would be created; an edit that leaves one piece ends
+            // the choice and the box goes back to making a single post.
+            if (pending.pieces) {
+              const pieces = pastePieces(event.target.value)
+              return update({
+                ...pending,
+                pieces: pieces.length > 1 ? pieces : undefined,
+                text: event.target.value,
+              })
+            }
             const makeIt = pending.waiting && event.target.value.trim()
             update({ ...pending, text: event.target.value, waiting: makeIt ? false : pending.waiting })
             if (makeIt) void retry?.()
+          }}
+          // Only a paste offers the split. Typing a blank line is writing one
+          // post with a paragraph in it, and must not interrupt.
+          onPaste={(event) => {
+            if (!pending?.waiting) return
+            const pasted = event.clipboardData.getData('text/plain')
+            const box = event.currentTarget
+            const next =
+              box.value.slice(0, box.selectionStart ?? 0) +
+              pasted +
+              box.value.slice(box.selectionEnd ?? 0)
+            const pieces = pastePieces(next)
+            if (pieces.length < 2) return
+            event.preventDefault()
+            update({ ...pending, pieces, text: next })
           }}
           onKeyDown={(event) => {
             if (event.key === 'Escape' && value.waiting && !value.text) cancel()
           }}
         />
-        {value.waiting ? (
+        {value.pieces ? (
+          <PasteSplit
+            busy={splitting}
+            channel={countingChannel}
+            onChoose={(choice, seriesName) => {
+              setSplitting(true)
+              void resolvePaste?.(choice, seriesName).finally(() => setSplitting(false))
+            }}
+            pieces={value.pieces}
+          />
+        ) : null}
+        {value.waiting && !value.pieces ? (
           <div className="flex gap-2">
             <Button onClick={() => setPicking(true)} variant="outline">
               Add media
@@ -234,13 +368,20 @@ export function PendingDraftInput() {
             </Button>
           </div>
         ) : null}
+        {value.pieces ? (
+          <Button className="w-fit" onClick={cancel} variant="ghost">
+            Cancel
+          </Button>
+        ) : null}
         {picking ? (
           <LibraryAssetPicker
             onClose={() => setPicking(false)}
             onInsert={(nodes) => attachToWaiting?.(nodes)}
           />
         ) : null}
-        {value.error ? (
+        {/* A pending paste answers for itself: its three buttons are the retry,
+            and the one below would instead make a single draft of the block. */}
+        {value.error && !value.pieces ? (
           <div className="flex gap-2">
             {value.planRequired ? (
               <ButtonLink

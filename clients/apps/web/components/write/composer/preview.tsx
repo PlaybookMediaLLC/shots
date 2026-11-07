@@ -20,6 +20,8 @@ import {
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { assetContentUrl } from '@/lib/editor/services'
 import type { SerializedMedia } from '@/lib/content-drafts/serialize'
+import { CAPABILITIES } from '@/lib/write/capabilities'
+import { countingNote } from '@/lib/write/caption-counting'
 import { previewLineLimit, previewScale, xCollapsedText } from '@/lib/write/preview-layout'
 import type { DraftChannel, DraftTarget } from '@/lib/write/document'
 import type { Publication } from '@/lib/write/publication'
@@ -145,6 +147,7 @@ export function PreviewPanel({
       <p className="text-[11px] text-muted-foreground">
         Cutoffs vary by app and device.
       </p>
+      <PreviewLengths item={item} />
       {item.publication.problems.length > 0 ? (
         <ul className="grid gap-0.5" role="alert">
           {item.publication.problems.map((problem) => (
@@ -160,6 +163,53 @@ export function PreviewPanel({
         </p>
       ))}
     </div>
+  )
+}
+
+/**
+ * Each post's length beside the preview, counted as the platform counts it
+ * (a link weighs 23 on X, an emoji two, a line break one). Writing to an
+ * exact length is otherwise impossible to check inside the app, and an
+ * account whose platform raised its limit also sees the standard count,
+ * because that is the length everyone else is held to.
+ */
+function PreviewLengths({ item }: { item: PreviewItem }) {
+  const { channel } = item.account
+  const { limit, posts } = item.publication.serialized
+  const standard = CAPABILITIES[channel].captionLimit
+  if (posts.length === 0) return null
+  return (
+    <ul
+      className="grid gap-0.5 text-[11px] tabular-nums"
+      data-testid="preview-lengths"
+      title={countingNote(channel)}
+    >
+      {posts.map((post, index) => {
+        const over = post.length > limit
+        const overStandard = limit > standard && post.length > standard
+        return (
+          <li
+            className={cn(
+              'flex items-center gap-1.5',
+              over
+                ? 'text-red-700 dark:text-red-300'
+                : overStandard
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-muted-foreground'
+            )}
+            data-testid={`preview-length-${index + 1}`}
+            key={index}
+          >
+            <span>
+              {posts.length > 1 ? `#${index + 1} · ` : ''}
+              {post.length} / {limit}
+            </span>
+            {limit > standard ? <span>({standard} for a standard account)</span> : null}
+            {over ? <span>over the limit</span> : null}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

@@ -25,6 +25,9 @@ import {
 import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
 import type { contentDraftScheduleSchema } from '@/lib/api/contracts/content-drafts'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
+import { readComposing } from '@/lib/write/composing-session'
+import { nextSeriesTime } from '@/lib/write/series-time'
+import { wallTime } from '@/lib/write/zoned-time'
 import { useWrite, useWriteRouter } from './write-context'
 
 type Row = {
@@ -45,21 +48,40 @@ type Row = {
  * than duplicates; a refused row is corrected and previewed again.
  */
 export function BulkScheduleDialog({
+  initialMode = 'queue',
   selected,
   onClose,
 }: {
+  /** A run split out of one paste is spread from a start time, not fitted to slots. */
+  initialMode?: 'queue' | 'spread'
   selected: string[]
   onClose: () => void
 }) {
   const { data, beforeLeaveRef } = useWrite()
   const router = useWriteRouter()
   const set = data.activeSet
-  const [mode, setMode] = useState<'queue' | 'spread'>('queue')
-  const [start, setStart] = useState(
-    `${zonedDayKey(new Date(Date.now() + 86400_000), set?.timeZone ?? 'UTC')}T09:00`
-  )
+  const [mode, setMode] = useState<'queue' | 'spread'>(initialMode)
+  // A run started from the composer continues where the last post left off,
+  // at the gap this session has been using; otherwise tomorrow morning. The
+  // dialog only ever opens in the browser, so reading the session here is safe.
+  const [memory] = useState(() => readComposing(set?.id))
+  const [start, setStart] = useState(() => {
+    const zone = set?.timeZone ?? 'UTC'
+    const at = nextSeriesTime({
+      gapMinutes: memory.gapMinutes,
+      now: new Date(),
+      queued: [
+        ...data.queue.map((item) => item.at),
+        ...(memory.lastScheduledAt ? [memory.lastScheduledAt] : []),
+      ],
+      slots: [],
+    })
+    return at
+      ? wallTime(at, zone).slice(0, 16)
+      : `${zonedDayKey(new Date(Date.now() + 86400_000), zone)}T09:00`
+  })
   const [perDay, setPerDay] = useState(2)
-  const [spacing, setSpacing] = useState(240)
+  const [spacing, setSpacing] = useState(memory.gapMinutes)
   const [shift, setShift] = useState(0)
   const [seed] = useState(() => crypto.randomUUID())
   const [rows, setRows] = useState<Row[] | null>(null)

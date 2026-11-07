@@ -523,7 +523,8 @@ export function ResyncDialog({
 /**
  * A synced version: what it will post, read-only, and the way to give it its
  * own text. A manual version whose primary moved on says so and offers a
- * comparison.
+ * comparison. A platform switched off for this post says only that: it
+ * publishes nothing, so no notice about how its text is built applies.
  */
 export function SyncedVersion({
   channel,
@@ -532,6 +533,7 @@ export function SyncedVersion({
   onFork,
   onSplit,
   primary,
+  publishing = true,
   value,
 }: {
   channel: DraftChannel
@@ -542,10 +544,26 @@ export function SyncedVersion({
   /** Give this platform its own text, split into posts that fit. */
   onSplit?: () => void
   primary: DraftChannel
+  /** Whether this platform's switch is on for this post. */
+  publishing?: boolean
   value: PlateBody
 }) {
   const posts = serializeDraft(value, channel).posts
   const hasPoll = bodyPosts(value).some((post) => post.settings.poll)
+  if (!publishing)
+    return (
+      <div className="py-6" data-testid={`synced-version-${channel}`}>
+        <div className={cn('mb-4', POST_COLUMN)}>
+          <p
+            className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground"
+            data-testid={`platform-off-${channel}`}
+          >
+            {CHANNEL_META[channel].label} is switched off for this post, so nothing is sent there.
+            Turn its switch on above to see what it would publish.
+          </p>
+        </div>
+      </div>
+    )
   return (
     <div className="py-6" data-testid={`synced-version-${channel}`}>
       <div className={cn('mb-4', POST_COLUMN)}>
