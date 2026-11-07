@@ -73,6 +73,11 @@ export const contentDraftSchema = z.object({
   engagement: draftEngagementSchema,
   naturalPostingTime: z.boolean().default(false),
   suppressSlackOnPublish: z.boolean().optional(),
+  /**
+   * The campaign an edited campaign visual was published from. Only the
+   * campaign handoff sets it; a draft cannot claim a campaign on its own.
+   */
+  campaignId: z.string().nullable().default(null),
   /** A calendar placement without scheduling, as an ISO 8601 instant. */
   plannedFor: timestampSchema.nullable().default(null),
   primaryPlatform: z.string().nullable().default(null),

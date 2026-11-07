@@ -16,6 +16,7 @@ func (s *Server) registerCampaignAssets(mux *http.ServeMux) {
 	handle("GET /v1/campaigns/{id}/assets/{assetId}", s.getCampaignAsset)
 	handle("PUT /v1/campaigns/{id}/assets/{assetId}", s.linkCampaignAsset)
 	handle("POST /v1/campaigns/{id}/copy", s.saveCampaignCopy)
+	handle("POST /v1/campaigns/{id}/publish-drafts", s.createCampaignPublishDraft)
 	handle("PUT /v1/designs/{id}", s.replaceDesign)
 	handle("POST /v1/campaigns/{id}/designs/{designId}/approval", s.approveCampaignDesign)
 	handle("POST /v1/campaigns/{id}/assets/{assetId}/approval", s.approveCampaignAsset)
@@ -82,6 +83,27 @@ func (s *Server) saveCampaignCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]int{"angleCount": len(input.Angles), "postCount": len(input.Posts)})
+}
+
+// createCampaignPublishDraft turns an edited campaign visual into a Publish
+// draft, attaching the export to the campaign in the same transaction.
+func (s *Server) createCampaignPublishDraft(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if !resourceIDPattern.MatchString(id) {
+		writeError(w, http.StatusBadRequest, "invalid campaign ID")
+		return
+	}
+	var input product.CampaignPublishDraftInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid publish draft")
+		return
+	}
+	draft, err := s.configuration.CreateCampaignPublishDraft(r.Context(), workspaceActor(r), id, input)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, draft)
 }
 
 func (s *Server) replaceDesign(w http.ResponseWriter, r *http.Request) {

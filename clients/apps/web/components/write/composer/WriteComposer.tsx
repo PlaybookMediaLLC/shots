@@ -1337,6 +1337,9 @@ export function WriteComposer({
     ) : panel === 'assistant' ? (
       <AssistantPanel
         channel={active}
+        hasImage={document.value.some((node) =>
+          attachmentsIn(node).some((media) => media.type === 'img')
+        )}
         onInsert={
           canEditText && (active === primary || versionOfTab.mode === 'manual')
             ? (text) => {
@@ -1345,6 +1348,7 @@ export function WriteComposer({
             : undefined
         }
         draftId={initial.id}
+        openWithPrompt={params.get('prompt') ?? undefined}
         posts={activePublication.serialized.posts.map((post) => post.caption)}
         set={set}
       />

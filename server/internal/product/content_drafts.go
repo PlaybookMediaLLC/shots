@@ -103,7 +103,10 @@ type ContentDraftRecord struct {
 	SocialSetID            *string           `json:"socialSetId"`
 	// Write (RFC 025): the draft's kind and target, platform versions,
 	// article, internal scratchpad, tags of its set, pin and plan zone.
-	Article          *draftdoc.Article         `json:"article"`
+	Article *draftdoc.Article `json:"article"`
+	// CampaignID names the campaign an edited campaign visual was published
+	// from, so the draft can lead back to it.
+	CampaignID       *string                   `json:"campaignId"`
 	Kind             string                    `json:"kind"`
 	PinnedAt         *time.Time                `json:"pinnedAt"`
 	PlanTimeZone     *string                   `json:"planTimeZone"`
@@ -176,6 +179,11 @@ type ContentDraftInput struct {
 	Scratchpad       string                     `json:"scratchpad"`
 	TagIDs           []string                   `json:"tagIds"`
 	Target           *draftdoc.Target           `json:"target"`
+	// campaignID is the campaign an edited visual was published from. It is
+	// unexported on purpose: only CreateCampaignPublishDraft sets it, after
+	// checking the caller's role on that campaign, so a plain draft create
+	// cannot claim one.
+	campaignID string
 }
 
 // ContentDraftUpdate changes the fields it sets, based on BaseVersion.
@@ -215,7 +223,8 @@ func contentDraftRecord(row *ent.ContentDraft) ContentDraftRecord {
 		NaturalPostingTime: row.NaturalPostingTime, SuppressSlackOnPublish: row.SuppressSlackOnPublish, PlannedFor: row.PlannedFor, PrimaryPlatform: row.PrimaryPlatform,
 		SocialSetID: row.SocialSetID, Article: row.Article, Kind: string(row.Kind), PinnedAt: row.PinnedAt,
 		PlanTimeZone: row.PlanTimeZone, PlatformVersions: nonNilVersions(row.PlatformVersions), Scratchpad: row.Scratchpad,
-		SourceDraftID: row.SourceDraftID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target}
+		SourceDraftID: row.SourceDraftID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
+		CampaignID: row.CampaignID}
 }
 
 func nonNilVersions(doc draftdoc.PlatformVersions) draftdoc.PlatformVersions {
@@ -684,6 +693,9 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 		SetEngagement(set.EngagementDefaults).
 		SetKind(contentdraft.Kind(kind)).SetPlatformVersions(versions).SetScratchpad(scratchpad).SetTagIds(tags).
 		SetNillableCreatedByUserID(projectActor(actor)).SetNillableUpdatedByUserID(projectActor(actor))
+	if input.campaignID != "" {
+		create.SetCampaignID(input.campaignID)
+	}
 	if target != nil {
 		create.SetTarget(target)
 		if kind == "repurpose" && target.SourceDraftID != "" {
@@ -705,8 +717,11 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if err := rememberDraftMentions(ctx, tx, row); err != nil {
 		return nil, err
 	}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.content_draft_created", "content_draft", row.ID,
-		map[string]any{"kind": kind, "socialSetId": set.ID}); err != nil {
+	creation := map[string]any{"kind": kind, "socialSetId": set.ID}
+	if input.campaignID != "" {
+		creation["campaignId"] = input.campaignID
+	}
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.content_draft_created", "content_draft", row.ID, creation); err != nil {
 		return nil, err
 	}
 	if err := emitDraftEvent(ctx, tx, row, webhooks.DraftCreated, nil); err != nil {

@@ -623,17 +623,17 @@ func init() {
 	// contentdraft.DefaultTagIds holds the default value on creation for the tag_ids field.
 	contentdraft.DefaultTagIds = contentdraftDescTagIds.Default.([]string)
 	// contentdraftDescCollabGeneration is the schema descriptor for collab_generation field.
-	contentdraftDescCollabGeneration := contentdraftFields[33].Descriptor()
+	contentdraftDescCollabGeneration := contentdraftFields[34].Descriptor()
 	// contentdraft.DefaultCollabGeneration holds the default value on creation for the collab_generation field.
 	contentdraft.DefaultCollabGeneration = contentdraftDescCollabGeneration.Default.(int)
 	// contentdraft.CollabGenerationValidator is a validator for the "collab_generation" field. It is called by the builders before save.
 	contentdraft.CollabGenerationValidator = contentdraftDescCollabGeneration.Validators[0].(func(int) error)
 	// contentdraftDescCreatedAt is the schema descriptor for created_at field.
-	contentdraftDescCreatedAt := contentdraftFields[37].Descriptor()
+	contentdraftDescCreatedAt := contentdraftFields[38].Descriptor()
 	// contentdraft.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentdraft.DefaultCreatedAt = contentdraftDescCreatedAt.Default.(func() time.Time)
 	// contentdraftDescUpdatedAt is the schema descriptor for updated_at field.
-	contentdraftDescUpdatedAt := contentdraftFields[38].Descriptor()
+	contentdraftDescUpdatedAt := contentdraftFields[39].Descriptor()
 	// contentdraft.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentdraft.DefaultUpdatedAt = contentdraftDescUpdatedAt.Default.(func() time.Time)
 	// contentdraft.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

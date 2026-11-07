@@ -74,6 +74,7 @@ type ConfigurationStore interface {
 	SharingStore
 	GetCampaignAsset(context.Context, product.Actor, string, string) (*product.CampaignAssetLink, error)
 	LinkCampaignAsset(context.Context, product.Actor, string, string, product.LinkCampaignAssetInput) (*product.CampaignAssetLink, error)
+	CreateCampaignPublishDraft(context.Context, product.Actor, string, product.CampaignPublishDraftInput) (*product.ContentDraftRecord, error)
 	SaveCampaignCopy(context.Context, product.Actor, string, product.SaveCampaignCopyInput) error
 	ReplaceDesign(context.Context, product.Actor, string, product.ReplaceDesignInput) error
 	GetLaunchCampaign(context.Context, product.Actor, string) (*product.LaunchCampaign, error)

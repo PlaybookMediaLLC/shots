@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { campaignPublishDraftSchema } from '@/lib/tenant/campaign-publish-draft'
 import {
   campaignCreateSchema,
   productSurfaceUpdateSchema,
@@ -45,4 +46,29 @@ test('partial updates do not reset omitted fields to their create defaults', () 
   assert.deepEqual(productSurfaceUpdateSchema.parse({ name: 'Renamed' }), { name: 'Renamed' })
   assert.deepEqual(releaseUpdateSchema.parse({ title: 'Renamed' }), { title: 'Renamed' })
   assert.deepEqual(releaseUpdateSchema.parse({ description: null }), { description: null })
+})
+
+test('a campaign publish draft needs a real campaign, asset and draft', () => {
+  const handoff = {
+    campaignId: 'clf0f1a2c3d4e5f6g7h8',
+    assetId: '0f1e2d3c-4b5a-4968-8778-66554433221f',
+    draft: { assetIds: ['0f1e2d3c-4b5a-4968-8778-66554433221f'], body: [] },
+  }
+  assert.equal(campaignPublishDraftSchema.safeParse(handoff).success, true)
+  // The campaign post the copy came from is optional, but must look like one.
+  assert.equal(
+    campaignPublishDraftSchema.safeParse({ ...handoff, campaignPostId: 'nope' }).success,
+    false
+  )
+  assert.equal(campaignPublishDraftSchema.safeParse({ ...handoff, assetId: 'nope' }).success, false)
+  assert.equal(
+    campaignPublishDraftSchema.safeParse({ ...handoff, campaignId: 'nope' }).success,
+    false
+  )
+  // The draft keeps the composer's own shape, including its retry key.
+  const parsed = campaignPublishDraftSchema.parse({
+    ...handoff,
+    draft: { ...handoff.draft, requestKey: '0f1e2d3c-4b5a-4968-8778-66554433221f' },
+  })
+  assert.equal(parsed.draft.requestKey, '0f1e2d3c-4b5a-4968-8778-66554433221f')
 })
