@@ -215,24 +215,7 @@ export function chartPoints(
 }
 /** RFC 4180 encoding; text cells cannot execute spreadsheet formulas. */
 export function csv(rows: (string | number | null | undefined)[][]): string {
-  return (
-    '\uFEFF' +
-    rows
-      .map((row) =>
-        row
-          .map((value) => {
-            let text = value == null ? '' : String(value)
-            // Control prefixes are part of the spreadsheet formula-injection threat model.
-            // eslint-disable-next-line no-control-regex
-            if (typeof value === 'string' && /^[\s\u0000-\u001f]*[=+@-]/.test(text))
-              text = "'" + text
-            return '"' + text.replaceAll('"', '""') + '"'
-          })
-          .join(',')
-      )
-      .join('\r\n') +
-    '\r\n'
-  )
+  return '\uFEFF' + rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
 }
 export function chartCSV(report: AnalyticsReport, key: string, growth: boolean): string {
   const metric = report.metrics[key]
@@ -308,3 +291,4 @@ export function postsCSV(report: AnalyticsReport, rows = report.posts): string {
     ]),
   ])
 }
+import { csvCell } from '@/lib/csv'

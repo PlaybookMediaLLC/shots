@@ -157,16 +157,17 @@ export function scheduleBlockers(
     if (empty)
       for (const text of mediaProblems(channel, []))
         problems.push({ channel, text: text.replace(' Add one to the post.', '') })
-    else for (const problem of item.publication.problems)
-      problems.push({
-        channel,
-        fix: item.publication.accountProblems.includes(problem) ? 'account' : undefined,
-        options: item.publication.optionProblems.includes(problem),
-        // Some problems already start with the platform's name.
-        text: problem.startsWith(CHANNEL_META[channel].label)
-          ? problem
-          : `${CHANNEL_META[channel].label}: ${problem}`,
-      })
+    else
+      for (const problem of item.publication.problems)
+        problems.push({
+          channel,
+          fix: item.publication.accountProblems.includes(problem) ? 'account' : undefined,
+          options: item.publication.optionProblems.includes(problem),
+          // Some problems already start with the platform's name.
+          text: problem.startsWith(CHANNEL_META[channel].label)
+            ? problem
+            : `${CHANNEL_META[channel].label}: ${problem}`,
+        })
   }
   if (context.requireApproval && !context.approved) {
     problems.push({
@@ -182,10 +183,12 @@ export function scheduleBlockers(
 /** Queue the draft and confirm it, with an Undo unless this replaced earlier posts. */
 async function commitSchedule(
   context: ScheduleContext,
-  timing: { disambiguation?: 'earlier' | 'later'; localTime: string; timeZone: string } | {
-    expectedQueueSlot?: string
-    queue: true
-  },
+  timing:
+    | { disambiguation?: 'earlier' | 'later'; localTime: string; timeZone: string }
+    | {
+        expectedQueueSlot?: string
+        queue: true
+      },
   options: {
     naturalPostingTime: boolean | undefined
     newDraft: boolean
@@ -281,6 +284,7 @@ export function ScheduleDock({
   )
   const [time, setTime] = React.useState(fromSlot?.time ?? '09:00')
   const [typed, setTyped] = React.useState('')
+  const [timeValid, setTimeValid] = React.useState(true)
   // Otherwise a run of posts continues from the last one, and a brand with
   // weekly slots offers its next free one. That answer depends on the clock
   // and on this session's memory, neither of which the server has, so it is
@@ -318,6 +322,7 @@ export function ScheduleDock({
   const rescheduling = (context.scheduled ?? []).length > 0
   const past = instant !== null && instant.getTime() <= Date.now()
   const schedule = async (andNext: boolean) => {
+    if (!timeValid) return
     setBusy(andNext ? 'next' : 'schedule')
     try {
       await commitSchedule(
@@ -367,6 +372,8 @@ export function ScheduleDock({
       <Label className="grid gap-1 text-xs text-muted-foreground">
         Time
         <TimePicker
+          required
+          onValidityChange={setTimeValid}
           aria-label="Schedule time"
           onChange={(value) => {
             touched.current = true
@@ -387,7 +394,8 @@ export function ScheduleDock({
           // schedules and opens the next draft. (The composer's own ⌘Enter makes a
           // new post in a thread, so it cannot also mean "schedule".)
           onKeyDown={(event) => {
-            if (event.key !== 'Enter' || blocked || busy !== null || past || !instant) return
+            if (event.key !== 'Enter' || !timeValid || blocked || busy !== null || past || !instant)
+              return
             if (rescheduling) return
             event.preventDefault()
             void schedule(event.shiftKey)
@@ -405,7 +413,7 @@ export function ScheduleDock({
         <>
           <Button
             data-testid="dock-schedule-button"
-            disabled={blocked || busy !== null || past}
+            disabled={!timeValid || blocked || busy !== null || past}
             onClick={() => void schedule(false)}
             size="sm"
             type="button"
@@ -418,7 +426,7 @@ export function ScheduleDock({
               accounts, a gap later, without going back to the library. */}
           <Button
             data-testid="dock-schedule-next-button"
-            disabled={blocked || busy !== null || past}
+            disabled={!timeValid || blocked || busy !== null || past}
             onClick={() => void schedule(true)}
             size="sm"
             title="Schedule this post, then open a new draft on the same platforms at the next time"
@@ -499,6 +507,7 @@ export function ScheduleDialog({
   const [time, setTime] = React.useState(
     initialTime && /^([01]\d|2[0-3]):[0-5]\d$/.test(initialTime) ? initialTime : '09:00'
   )
+  const [timeValid, setTimeValid] = React.useState(true)
   const [queue, setQueue] = React.useState(Boolean(initialQueue && data.advancedScheduling))
   const [continueWriting, setContinueWriting] = React.useState(context.draft.status === 'draft')
   // The draft's own choice, copied from its set when it was created (RFC 024).
@@ -582,6 +591,7 @@ export function ScheduleDialog({
   )
   const freeSlots = slots.filter((slot) => !slot.busy).slice(0, 3)
   const schedule = async () => {
+    if (!queue && !timeValid) return
     setAction('schedule')
     setError('')
     try {
@@ -609,6 +619,7 @@ export function ScheduleDialog({
     }
   }
   const plan = async (clear = false) => {
+    if (!clear && !timeValid) return
     setAction(clear ? 'clear' : 'plan')
     setError('')
     try {
@@ -633,7 +644,7 @@ export function ScheduleDialog({
   const confirmable = !(
     busy ||
     problems.length > 0 ||
-    (queue ? !reviewedSlot : !instant || past)
+    (queue ? !reviewedSlot : !timeValid || !instant || past)
   )
   // A draft with queued posts is rescheduled: confirming replaces them (listed below).
   const rescheduling = (context.scheduled ?? []).length > 0
@@ -736,6 +747,8 @@ export function ScheduleDialog({
                 <Label className="grid content-start gap-1.5 text-xs text-muted-foreground">
                   Time
                   <TimePicker
+                    required
+                    onValidityChange={setTimeValid}
                     aria-label="Time"
                     className="w-full"
                     onChange={(next) => {
@@ -810,8 +823,7 @@ export function ScheduleDialog({
             ) : null}
             {chosen && localZone && localZone !== zone ? (
               <p className="text-xs text-muted-foreground">
-                Your time:{' '}
-                {formatWhen(chosen, localZone)} · {localZone.replaceAll('_', ' ')}
+                Your time: {formatWhen(chosen, localZone)} · {localZone.replaceAll('_', ' ')}
               </p>
             ) : null}
           </div>
@@ -990,6 +1002,7 @@ export function ScheduleDialog({
             <Button
               disabled={
                 busy ||
+                !timeValid ||
                 context.draft.status === 'archived' ||
                 queue ||
                 !instant ||
@@ -1034,7 +1047,9 @@ function MoreOptions({ children }: { children: React.ReactNode }) {
       <DisclosureTrigger className="rounded-lg px-4 py-3 text-sm text-foreground select-none hover:bg-foreground/[0.03]">
         More options
       </DisclosureTrigger>
-      <DisclosureContent className="grid gap-5 border-t border-border p-4">{children}</DisclosureContent>
+      <DisclosureContent className="grid gap-5 border-t border-border p-4">
+        {children}
+      </DisclosureContent>
     </Disclosure>
   )
 }
@@ -1217,8 +1232,7 @@ function ReplacedPosts({
                 account?.handle ??
                 (channel ? CHANNEL_META[channel].label : post.platform)}
               <span className="text-muted-foreground">
-                ·{' '}
-                <LocalTime value={post.scheduledFor} zone={timeZone} />
+                · <LocalTime value={post.scheduledFor} zone={timeZone} />
               </span>
               {selected.has(post.channelConnectionId) ? (
                 <span className="text-muted-foreground">

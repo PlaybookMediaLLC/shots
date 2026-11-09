@@ -7,7 +7,10 @@ import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { experimentListSchema, type experimentStateSchema } from '@/lib/api/contracts/settings-platform'
+import {
+  experimentListSchema,
+  type experimentStateSchema,
+} from '@/lib/api/contracts/settings-platform'
 import { settingsErrorMessage, settingsRequest } from '@/lib/settings/client'
 
 type Experiment = z.output<typeof experimentStateSchema>
@@ -27,7 +30,9 @@ function ExperimentRow({ canManage, experiment }: { canManage: boolean; experime
   const [state, run] = useSaveState()
   const [adminState, runAdmin] = useSaveState()
   const editable = experiment.userEditable && experiment.status === 'experimental'
-  const status = experiment.disabledByAdmin ? 'Disabled by an admin' : STATUS_LABELS[experiment.status]
+  const status = experiment.disabledByAdmin
+    ? 'Disabled by an admin'
+    : STATUS_LABELS[experiment.status]
   const reason = !experiment.entitled
     ? 'Your plan does not include what this needs.'
     : experiment.disabledByAdmin
@@ -66,25 +71,46 @@ function ExperimentRow({ canManage, experiment }: { canManage: boolean; experime
       label={
         <span className="flex flex-wrap items-center gap-2">
           {experiment.name}
-          <Pill tone={experiment.status === 'promoted' ? 'green' : experiment.status === 'unavailable' ? 'gray' : 'purple'}>
+          <Pill
+            tone={
+              experiment.status === 'promoted'
+                ? 'green'
+                : experiment.status === 'unavailable'
+                  ? 'gray'
+                  : 'purple'
+            }
+          >
             {status}
           </Pill>
         </span>
       }
     >
       <div className="flex flex-wrap items-center justify-end gap-3">
-        <SaveStatus state={state === 'idle' ? adminState : state} />
         {canManage && experiment.userEditable ? (
-          <Button onClick={() => void setWorkspace(!experiment.disabledByAdmin)} size="sm" type="button" variant="outline">
-            {experiment.disabledByAdmin ? 'Allow in workspace' : 'Turn off for workspace'}
-          </Button>
+          <span className="flex items-center gap-2" aria-label="Workspace preference">
+            <SaveStatus state={adminState} />
+            <Button
+              disabled={adminState === 'saving'}
+              onClick={() => void setWorkspace(!experiment.disabledByAdmin)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {experiment.disabledByAdmin ? 'Allow in workspace' : 'Turn off for workspace'}
+            </Button>
+          </span>
         ) : null}
-        <Switch
-          aria-label={`${experiment.name}: ${experiment.enabled ? 'on' : 'off'}`}
-          checked={experiment.enabled}
-          disabled={!editable || !experiment.entitled || experiment.disabledByAdmin}
-          onCheckedChange={(on) => void toggle(on)}
-        />
+        <span className="flex items-center gap-2" aria-label="Personal preference">
+          <SaveStatus state={state} />
+          <Switch
+            aria-label={`${experiment.name}: ${experiment.enabled ? 'on' : 'off'}`}
+            checked={experiment.enabled}
+            disabled={
+              state === 'saving' || !editable || !experiment.entitled || experiment.disabledByAdmin
+            }
+            onCheckedChange={(on) => void toggle(on)}
+          />
+        </span>
       </div>
     </Row>
   )

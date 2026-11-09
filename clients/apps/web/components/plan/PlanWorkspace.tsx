@@ -738,7 +738,8 @@ export function PlanWorkspace({
                     <span>
                       <strong>{set.name}</strong>
                       <small className="block text-muted-foreground">
-                        {set.accounts.map((a) => platformLabel(a.platform)).join(' · ') || 'No connected accounts'}
+                        {set.accounts.map((a) => platformLabel(a.platform)).join(' · ') ||
+                          'No connected accounts'}
                       </small>
                     </span>
                   </Label>
@@ -992,25 +993,25 @@ export function PlanWorkspace({
           {/* It floats over the grid: reserved room left an empty band whenever all was well. */}
           <div className="relative z-20 h-0 shrink-0">
             <div className="absolute inset-x-0 top-0 bg-background px-4 text-sm">
-            {load === 'error' ? (
-              <div role="alert" className="flex items-center gap-2">
-                {failure}{' '}
-                <Button variant="outline" size="sm" onClick={reload}>
-                  Retry calendar
-                </Button>
-              </div>
-            ) : load === 'loading' ? (
-              <p role="status" className="py-2">
-                Loading calendar…
-              </p>
-            ) : notesFailed ? (
-              <div role="alert" className="flex items-center gap-2">
-                Notes could not load.{' '}
-                <Button variant="outline" size="sm" onClick={reload}>
-                  Retry calendar
-                </Button>
-              </div>
-            ) : null}
+              {load === 'error' ? (
+                <div role="alert" className="flex items-center gap-2">
+                  {failure}{' '}
+                  <Button variant="outline" size="sm" onClick={reload}>
+                    Retry calendar
+                  </Button>
+                </div>
+              ) : load === 'loading' ? (
+                <p role="status" className="py-2">
+                  Loading calendar…
+                </p>
+              ) : notesFailed ? (
+                <div role="alert" className="flex items-center gap-2">
+                  Notes could not load.{' '}
+                  <Button variant="outline" size="sm" onClick={reload}>
+                    Retry calendar
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
           <div ref={container} className="min-h-0 flex-1 overflow-auto" data-local-dropzone="">
@@ -1249,12 +1250,14 @@ function TimeFields({
   choice,
   onLocal,
   onChoice,
+  onValidityChange,
 }: {
   local: string
   zone: string
   choice: 'earlier' | 'later'
   onLocal: (v: string) => void
   onChoice: (v: 'earlier' | 'later') => void
+  onValidityChange: (valid: boolean) => void
 }) {
   const when = useWhen()
   const resolved = localDateTimeSchema.safeParse(local).success
@@ -1278,6 +1281,8 @@ function TimeFields({
             onChange={(day) => onLocal(`${day}T${local.slice(11)}`)}
           />
           <TimePicker
+            required
+            onValidityChange={onValidityChange}
             className="w-full"
             aria-label="Time"
             value={local.slice(11)}
@@ -1330,6 +1335,7 @@ function PlanComposer({
   const [body, setBody] = React.useState<Value>([{ type: 'p', children: [{ text: '' }] }])
   const [kind, setKind] = React.useState<'standard' | 'article'>('standard')
   const [title, setTitle] = React.useState('')
+  const [timeValid, setTimeValid] = React.useState(true)
   const [local, setLocal] = React.useState(`${context.day}T${context.time}`)
   const [choice, setChoice] = React.useState<'earlier' | 'later'>('earlier')
   const [openEditor, setOpenEditor] = React.useState(true)
@@ -1362,7 +1368,7 @@ function PlanComposer({
     }
   }, [setId])
   const commit = async (schedule: boolean) => {
-    if (busy) return
+    if (busy || !timeValid) return
     setBusy(true)
     setError('')
     try {
@@ -1668,6 +1674,7 @@ function PlanComposer({
           choice={choice}
           onLocal={setLocal}
           onChoice={setChoice}
+          onValidityChange={setTimeValid}
         />
         <Label className="font-normal">
           <Checkbox
@@ -1694,12 +1701,15 @@ function PlanComposer({
           >
             Close
           </Button>
-          <Button disabled={busy || (picker && !selected)} onClick={() => void commit(false)}>
+          <Button
+            disabled={busy || !timeValid || (picker && !selected)}
+            onClick={() => void commit(false)}
+          >
             {picker ? 'Plan' : 'Plan draft'}
           </Button>
           {picker ? (
             <Button
-              disabled={busy || !selected || !canPublish}
+              disabled={busy || !timeValid || !selected || !canPublish}
               title={!canPublish ? 'Publishing permission required.' : undefined}
               onClick={() => void commit(true)}
             >
@@ -1749,6 +1759,7 @@ function PlanDetail({
   const [draft, setDraft] = React.useState<DraftWire | null>(null)
   const [activity, setActivity] = React.useState<DraftActivityWire[]>([])
   const [revisionCount, setRevisionCount] = React.useState<number | null>(null)
+  const [timeValid, setTimeValid] = React.useState(true)
   const [local, setLocal] = React.useState(wallTime(new Date(item.at), item.zone))
   const router = useRouter()
   const when = useWhen()
@@ -1865,6 +1876,7 @@ function PlanDetail({
             choice={choice}
             onLocal={setLocal}
             onChoice={setChoice}
+            onValidityChange={setTimeValid}
           />
           {item.deliveryStatus === 'SCHEDULED' && swapCandidates.length > 0 ? (
             <Label className="grid gap-1.5">
@@ -1897,17 +1909,21 @@ function PlanDetail({
             <Button
               disabled={
                 busy ||
+                !timeValid ||
                 (item.status === 'Planned' ? !canEdit : !canPublish) ||
                 !['Planned', 'Scheduled', 'Overdue'].includes(item.status)
               }
               onClick={() =>
                 void run(async () => {
+                  if (!timeValid) return
                   const at = selectedInstant(local, item.zone, choice)
                   await mutate('move', [placement(item, at.toISOString())])
                 })
               }
             >
-              {item.postId && queued.length > 1 ? `Move this ${platformLabel(item.platform)} post` : 'Move'}
+              {item.postId && queued.length > 1
+                ? `Move this ${platformLabel(item.platform)} post`
+                : 'Move'}
             </Button>
             {item.status === 'Planned' ? (
               <>
@@ -1915,6 +1931,7 @@ function PlanDetail({
                   disabled={busy || !canPublish}
                   onClick={() =>
                     void run(async () => {
+                      if (!timeValid) return
                       const at = selectedInstant(local, item.zone, choice)
                       onClose()
                       router.push(reviewScheduleHref(item.draftId, at, item.zone))
@@ -1944,10 +1961,10 @@ function PlanDetail({
           </div>
           {item.postId && queued.length > 1 ? (
             <p className="text-xs text-muted-foreground" data-testid="unschedule-scope">
-              Move changes only this {platformLabel(item.platform)} post. Unschedule returns the whole draft to a
-              plan and cancels every queued destination:{' '}
-              {queued.map((post) => platformLabel(post.platform)).join(', ')}. To stop one destination only, cancel
-              it from the draft’s posts in the editor.
+              Move changes only this {platformLabel(item.platform)} post. Unschedule returns the
+              whole draft to a plan and cancels every queued destination:{' '}
+              {queued.map((post) => platformLabel(post.platform)).join(', ')}. To stop one
+              destination only, cancel it from the draft’s posts in the editor.
             </p>
           ) : null}
           {!canEdit ? (

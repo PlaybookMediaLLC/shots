@@ -1,4 +1,22 @@
 import type { CampaignPlanContent } from './spec-schema'
+import { resolveLocalTime } from '@/lib/write/zoned-time'
+
+/** Empty means the workspace default; a custom schedule must name one unambiguous instant. */
+export function customScheduleTime(day: string, time: string, zone: string): string | undefined {
+  if (!day && !time) return undefined
+  if (!day || !time)
+    throw new Error(
+      'Choose both a publish day and time, or clear both to use the workspace default.'
+    )
+  const resolved = resolveLocalTime(`${day}T${time}`, zone)
+  if (resolved.kind === 'gap')
+    throw new Error(`That time does not exist in ${zone}. Choose a time outside the clock change.`)
+  if (resolved.kind === 'ambiguous')
+    throw new Error(
+      `That time occurs twice in ${zone}. Choose another time or select a fixed zone such as UTC.`
+    )
+  return resolved.at.toISOString()
+}
 
 /**
  * The connection platforms that publish each post channel. Mirrors

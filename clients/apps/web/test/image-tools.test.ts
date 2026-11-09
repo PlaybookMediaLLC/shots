@@ -575,3 +575,23 @@ test("output names keep the extension the source arrived with", () => {
   assert.equal(buildOutputName("resize", "shot.jfif", "jpeg"), "shot-resized.jfif");
   assert.equal(buildOutputName("resize", "shot.jpe", "jpeg"), "shot-resized.jpe");
 });
+
+test('locked crop sizes remain proportional at every image edge', () => {
+  const source = { width: 1000, height: 500 }
+  for (const ratio of [1, 16 / 9, 3 / 4]) {
+    for (const x of [-200, 0, 800, 1200])
+      for (const y of [-200, 0, 400, 700]) {
+        const crop = clampCropRect({ x, y, width: 1500, height: 700 }, source, ratio)
+        assert.ok(crop.x >= 0 && crop.y >= 0)
+        assert.ok(crop.x + crop.width <= source.width)
+        assert.ok(crop.y + crop.height <= source.height)
+        assert.ok(Math.abs(crop.width - crop.height * ratio) <= 1)
+      }
+  }
+  assert.deepEqual(clampCropRect({ x: 0, y: 0, width: 400, height: 500 }, source, 1), {
+    x: 0,
+    y: 0,
+    width: 400,
+    height: 400,
+  })
+})

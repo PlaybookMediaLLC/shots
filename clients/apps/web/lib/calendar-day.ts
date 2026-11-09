@@ -34,7 +34,11 @@ const DAY_FORMATS = [
 export function parseDayInput(input: string, now: Date = new Date()): string | null {
   const text = input.trim().toLowerCase().replace(/,/g, '').replace(/\s+/g, ' ')
   if (!text) return null
-  const relative = { today: 0, tomorrow: 1, yesterday: -1 }[text]
+  const relative = new Map([
+    ['today', 0],
+    ['tomorrow', 1],
+    ['yesterday', -1],
+  ]).get(text)
   if (relative !== undefined) return dayKey(addDays(now, relative))
   for (const pattern of DAY_FORMATS) {
     const date = parse(text, pattern, now)

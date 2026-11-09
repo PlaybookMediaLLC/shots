@@ -60,6 +60,7 @@ export function BulkScheduleDialog({
   const { data, beforeLeaveRef } = useWrite()
   const router = useWriteRouter()
   const set = data.activeSet
+  const [timeValid, setTimeValid] = useState(true)
   const [mode, setMode] = useState<'queue' | 'spread'>(initialMode)
   // A run started from the composer continues where the last post left off,
   // at the gap this session has been using; otherwise tomorrow morning. The
@@ -99,7 +100,7 @@ export function BulkScheduleDialog({
   // Scheduled rows are kept; the rest are validated and timed again. It is
   // offered only once no row awaits an answer, which only its retry may settle.
   const preview = async () => {
-    if (!set) return
+    if (!set || (mode === 'spread' && !timeValid)) return
     setBusy(true)
     setError('')
     setSkipBlocked(false)
@@ -244,6 +245,8 @@ export function BulkScheduleDialog({
                       onChange={(day) => setStart(`${day}T${start.slice(11)}`)}
                     />
                     <TimePicker
+                      required
+                      onValidityChange={setTimeValid}
                       aria-label="Start time"
                       className="w-full"
                       value={start.slice(11)}
@@ -284,7 +287,10 @@ export function BulkScheduleDialog({
                 </Label>
               </div>
             )}
-            <Button disabled={busy || selected.length > 50} onClick={() => void preview()}>
+            <Button
+              disabled={busy || (mode === 'spread' && !timeValid) || selected.length > 50}
+              onClick={() => void preview()}
+            >
               {busy ? 'Checking drafts…' : 'Preview and validate'}
             </Button>
             {selected.length > 50 && <p role="alert">Select at most 50 drafts.</p>}

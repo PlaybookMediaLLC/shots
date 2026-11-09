@@ -20,7 +20,6 @@ import {
   ACCEPT,
   DEFAULT_SETTINGS,
   VideoCompressionError,
-  cancelCompression,
   checkFile,
   clampTargetMb,
   compressVideo,
@@ -153,6 +152,7 @@ export function CompressVideoApp() {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const dragDepthRef = React.useRef(0);
   const runRef = React.useRef(0);
+  const ownedWork = React.useRef<AbortController | null>(null)
   const urlsRef = React.useRef<string[]>([]);
 
   const trackUrl = React.useCallback((blob: Blob) => {
@@ -174,6 +174,8 @@ export function CompressVideoApp() {
   React.useEffect(() => {
     return () => {
       runRef.current += 1;
+      ownedWork.current?.abort()
+      ownedWork.current = null
       releaseUrls();
     };
   }, [releaseUrls]);
@@ -210,13 +212,15 @@ export function CompressVideoApp() {
       }
 
       const run = ++runRef.current;
+      const abort = new AbortController()
+      ownedWork.current = abort
       releaseUrls();
       setError(null);
       const source = { file, url: trackUrl(file) };
       setPhase({ kind: 'probing', source });
 
       try {
-        const info = await probeVideo(file);
+        const info = await probeVideo(file, abort.signal);
         if (runRef.current !== run) return;
         setPhase({ kind: 'ready', source, info });
         if (info.durationSec === null) update({ mode: 'level' });
@@ -226,6 +230,8 @@ export function CompressVideoApp() {
         releaseUrls();
         setPhase({ kind: 'idle' });
         setError(errorMessage(caught));
+      } finally {
+        if (runRef.current === run) ownedWork.current = null
       }
     },
     [releaseUrls, trackUrl, update]
@@ -237,6 +243,8 @@ export function CompressVideoApp() {
     if (phase.kind === 'done') releaseUrl(phase.result.url);
 
     const run = ++runRef.current;
+    const abort = new AbortController()
+    ownedWork.current = abort
     const used = { ...settings };
     const startedAt = performance.now();
     setError(null);
@@ -244,6 +252,7 @@ export function CompressVideoApp() {
 
     try {
       const output = await compressVideo(source.file, info, used, {
+        signal: abort.signal,
         onProgress: (progress) => {
           if (runRef.current !== run) return;
           const elapsedSec = (performance.now() - startedAt) / 1000;
@@ -264,13 +273,16 @@ export function CompressVideoApp() {
       setPhase({ kind: 'ready', source, info });
       if (caught instanceof VideoCompressionError && caught.code === 'aborted') return;
       setError(errorMessage(caught));
+    } finally {
+      if (runRef.current === run) ownedWork.current = null
     }
   }, [phase, releaseUrl, settings, trackUrl]);
 
   const stop = React.useCallback(() => {
     if (phase.kind !== 'working' && phase.kind !== 'probing') return;
     runRef.current += 1;
-    cancelCompression();
+    ownedWork.current?.abort();
+    ownedWork.current = null
     if (phase.kind === 'working') {
       setPhase({ kind: 'ready', source: phase.source, info: phase.info });
     } else {
@@ -280,12 +292,13 @@ export function CompressVideoApp() {
   }, [phase, releaseUrls]);
 
   const reset = React.useCallback(() => {
-    if (busy) cancelCompression();
+    ownedWork.current?.abort();
+    ownedWork.current = null
     runRef.current += 1;
     releaseUrls();
     setError(null);
     setPhase({ kind: 'idle' });
-  }, [busy, releaseUrls]);
+  }, [releaseUrls]);
 
   const editSettings = React.useCallback(() => {
     if (phase.kind !== 'done') return;
@@ -435,9 +448,9 @@ export function CompressVideoApp() {
 
         <div className="relative flex justify-center overflow-hidden rounded-xl bg-background/70 p-3 sm:p-4">
           {phase.kind === 'done' ? (
-            <VideoPreview src={phase.result.url} label="Compressed video" />
+            <VideoPreview key={phase.result.url} src={phase.result.url} label="Compressed video" />
           ) : (
-            <VideoPreview src={source.url} label="Original video" />
+            <VideoPreview key={source.url} src={source.url} label="Original video" />
           )}
         </div>
 

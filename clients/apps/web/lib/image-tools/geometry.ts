@@ -125,7 +125,11 @@ export function matchLockedAxis(
  * back in before being trimmed, so dragging past an edge slides the selection
  * instead of shrinking it.
  */
-export function clampCropRect(rect: CropRect, source: Dimensions): CropRect {
+export function clampCropRect(rect: CropRect, source: Dimensions, ratio?: number | null): CropRect {
+  if (ratio && Number.isFinite(ratio) && ratio > 0) {
+    const width = Math.min(Math.max(1, rect.width), source.width, source.height * ratio)
+    rect = { ...rect, width, height: width / ratio }
+  }
   const width = Math.min(Math.max(1, Math.round(rect.width)), source.width);
   const height = Math.min(Math.max(1, Math.round(rect.height)), source.height);
   const x = Math.min(Math.max(0, Math.round(rect.x)), source.width - width);
