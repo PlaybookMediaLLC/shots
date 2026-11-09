@@ -60,7 +60,15 @@ export function guardWorkflowNavigation(requestDiscard: (leave: () => void) => v
       anchor.hasAttribute('download')
     )
       return
-    if (anchor.href === window.location.href) return
+    const target = new URL(anchor.href)
+    const current = new URL(window.location.href)
+    // Section jumps keep the editor mounted and must leave its protection armed.
+    if (
+      target.origin === current.origin &&
+      target.pathname === current.pathname &&
+      target.search === current.search
+    )
+      return
     event.preventDefault()
     event.stopPropagation()
     requestDiscard(() => {

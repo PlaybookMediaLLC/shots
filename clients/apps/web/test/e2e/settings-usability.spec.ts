@@ -159,3 +159,36 @@ test('a brand draft survives reload and is published only by the publish action'
   await expect(page.getByText('v2 · active', { exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Publish visual brand kit' })).toBeDisabled()
 })
+
+test('an invalid publishing time cannot submit an older time', async ({ page, workspace }) => {
+  await openWorkspaceSetting(page, 'General')
+  const time = page.getByLabel('Default publishing time', { exact: true })
+  await time.fill('10:30')
+  await time.blur()
+  await page.getByLabel('Description', { exact: true }).fill('Time validation regression')
+  await time.fill('nonsense')
+  await time.blur()
+  await expect(time).toHaveAttribute('aria-invalid', 'true')
+  const before = await db.row<{ defaultPublishTime: string }>(
+    'SELECT "defaultPublishTime" FROM workspace_settings WHERE "organizationId" = $1',
+    [workspace.id]
+  )
+  await page.getByRole('button', { name: 'Save workspace' }).click()
+  await expect(time).toBeFocused()
+  expect(
+    await db.row(
+      'SELECT "defaultPublishTime" FROM workspace_settings WHERE "organizationId" = $1',
+      [workspace.id]
+    )
+  ).toEqual(before)
+  await time.fill('11:15')
+  await time.blur()
+  await page.getByRole('button', { name: 'Save workspace' }).click()
+  await expect(page.getByText('Workspace details updated.')).toBeVisible()
+  expect(
+    await db.row(
+      'SELECT "defaultPublishTime" FROM workspace_settings WHERE "organizationId" = $1',
+      [workspace.id]
+    )
+  ).toMatchObject({ defaultPublishTime: '11:15' })
+})

@@ -153,6 +153,7 @@ function LocalTimeFields({
   disabled,
   label,
   onChange,
+  onValidityChange,
   value,
 }: {
   disabled?: boolean
@@ -163,6 +164,7 @@ function LocalTimeFields({
    */
   onChange: (edit: (current: string) => string) => void
   value: string
+  onValidityChange: (valid: boolean) => void
 }) {
   const [day = '', time = ''] = value ? value.split('T') : []
   return (
@@ -176,6 +178,8 @@ function LocalTimeFields({
         }}
       />
       <TimePicker
+        required={!!day}
+        onValidityChange={onValidityChange}
         aria-label={`${label} time`}
         disabled={disabled}
         value={time}
@@ -734,9 +738,11 @@ export function BatchWorkspace({
       setVerdicts((current) => Object.fromEntries(Object.entries(current).filter(stale)))
       setSelected((current) => Object.fromEntries(Object.entries(current).filter(stale)))
     }
-    return saveItem(item.id, typeof body === 'function' ? body : () => body).catch(
+    return saveItem(item.id, typeof body === 'function' ? body : () => body).then(
+      () => true,
       (error: unknown) => {
         toast.error(error instanceof Error ? error.message : 'The item could not be saved.')
+        return false
       }
     )
   }
@@ -848,10 +854,15 @@ export function BatchWorkspace({
   const [gridOpen, setGridOpen] = React.useState(start === 'grid')
   const showGrid = gridOpen || items.some((item) => item.grid)
 
+  const [timeValidity, setTimeValidity] = React.useState<Record<string, boolean>>({})
+  const [spreadValid, setSpreadValid] = React.useState(true)
+  const [timingRevision, setTimingRevision] = React.useState<Record<string, number>>({})
+  const hasInvalidTimes = items.some((item) => timeValidity[item.id] === false)
   const [timesMode, setTimesMode] = React.useState<'queue' | 'spread'>('queue')
   const [spread, setSpread] = React.useState({ start: '', perDay: 2, spacing: 240, shift: 0 })
   const [seed] = React.useState(() => crypto.randomUUID())
   const planTimes = async () => {
+    if (timesMode === 'spread' && !spreadValid) return
     // Items with nothing scheduled yet on some account, or no accounts chosen yet.
     const targets = items.filter((item) => {
       const ids = itemAccounts(item)
@@ -880,8 +891,11 @@ export function BatchWorkspace({
               },
       })
       const timings = timesMode === 'queue' ? queueTimings(times) : spreadTimings(times, zone)
-      for (const [index, item] of targets.entries())
-        await updateItem(item, { timing: timings[index] })
+      for (const [index, item] of targets.entries()) {
+        if (!(await updateItem(item, { timing: timings[index] }))) continue
+        // A deliberate bulk replacement also resets a draft when the valid time is unchanged.
+        setTimingRevision((current) => ({ ...current, [item.id]: (current[item.id] ?? 0) + 1 }))
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The times could not be planned.')
     } finally {
@@ -891,6 +905,7 @@ export function BatchWorkspace({
 
   // Drafts: each finished item becomes its own draft; a retry returns the same one.
   const saveDrafts = async () => {
+    if (hasInvalidTimes) return toast.error('Correct the invalid times before continuing.')
     setBusy('drafts')
     // An edit still being saved, such as a caption left by clicking here, goes first.
     await settled()
@@ -975,6 +990,7 @@ export function BatchWorkspace({
   const [postsLeft, setPostsLeft] = React.useState<number | null>(null)
   const verdictKey = (itemId: string, accountId: string) => `${itemId}/${accountId}`
   const check = async () => {
+    if (hasInvalidTimes) return toast.error('Correct the invalid times before continuing.')
     setBusy('check')
     try {
       // The server checks each item's stored time, so edits on their way land first.
@@ -1061,6 +1077,7 @@ export function BatchWorkspace({
   )
 
   const schedule = async () => {
+    if (hasInvalidTimes) return toast.error('Correct the invalid times before continuing.')
     setBusy('schedule')
     try {
       // Each item schedules at its saved time: a time changed since the check dropped its verdicts.
@@ -1577,6 +1594,7 @@ export function BatchWorkspace({
                     <div className="grid gap-1 text-sm">
                       Start ({zone})
                       <LocalTimeFields
+                        onValidityChange={setSpreadValid}
                         label="Spread start"
                         value={spread.start}
                         onChange={(edit) =>
@@ -1635,7 +1653,9 @@ export function BatchWorkspace({
                 ) : null}
                 <Button
                   variant="outline"
-                  disabled={busy !== null || !items.length}
+                  disabled={
+                    busy !== null || (timesMode === 'spread' && !spreadValid) || !items.length
+                  }
                   onClick={() => void planTimes()}
                 >
                   <CalendarIcon />
@@ -1769,7 +1789,15 @@ export function BatchWorkspace({
                             {item.timing.timeZone || zone}
                           </span>
                           <LocalTimeFields
+                            key={timingRevision[item.id] ?? 0}
                             disabled={busy !== null}
+                            onValidityChange={(valid) =>
+                              setTimeValidity((current) =>
+                                current[item.id] === valid
+                                  ? current
+                                  : { ...current, [item.id]: valid }
+                              )
+                            }
                             label={`Item ${index + 1}`}
                             value={item.timing.mode === 'time' ? (item.timing.localTime ?? '') : ''}
                             onChange={(edit) =>
@@ -2021,7 +2049,7 @@ export function BatchWorkspace({
               <Button
                 size={compact}
                 variant={next === 'save' ? 'default' : 'outline'}
-                disabled={busy !== null || !ready.length}
+                disabled={busy !== null || hasInvalidTimes || !ready.length}
                 onClick={() => void saveDrafts()}
               >
                 {busy === 'drafts' ? 'Saving drafts…' : 'Save ready items as drafts'}
@@ -2029,7 +2057,7 @@ export function BatchWorkspace({
               <Button
                 size={compact}
                 variant="outline"
-                disabled={busy !== null || !drafted.length}
+                disabled={busy !== null || hasInvalidTimes || !drafted.length}
                 onClick={() => void requestReviews()}
               >
                 Request review for drafts
@@ -2039,7 +2067,7 @@ export function BatchWorkspace({
                   <Button
                     size={compact}
                     variant={next === 'check' ? 'default' : 'outline'}
-                    disabled={busy !== null || !drafted.length}
+                    disabled={busy !== null || hasInvalidTimes || !drafted.length}
                     onClick={() => void check()}
                   >
                     {busy === 'check' ? 'Checking…' : 'Check every item and account'}

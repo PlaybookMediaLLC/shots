@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { enforceCitations, findCitationIssues } from '@/lib/launch/citations'
 import {
-  campaignPlanSchema,
   claimsMeanTheSame,
   isRegisteredCaptureUrl,
   listSpecClaims,
@@ -10,7 +9,7 @@ import {
   resolveClaimRef,
   validatePlanReferences,
 } from '@/lib/launch/spec-schema'
-import { sampleSpec } from './launch-fixtures'
+import { samplePlan, sampleSpec } from './launch-fixtures'
 import {
   formatPillars,
   formatSection,
@@ -90,36 +89,7 @@ test('the editing format names the line that is missing a citation', () => {
 
 test('plan references must point at angles, assets, channels, claims, and registered URLs', () => {
   const spec = sampleSpec()
-  const plan = campaignPlanSchema.parse({
-    angles: [
-      {
-        hook: 'Stop chasing invoices',
-        key: 'G1',
-        pillar: 'Hands-off billing',
-        specRefs: ['capabilities.0'],
-        title: 'Time back',
-      },
-    ],
-    assets: [
-      {
-        angleKey: 'G1',
-        capability: 'Recurring invoices',
-        captureHint: { device: 'desktop', focus: 'The schedule picker', url: '' },
-        format: '16:9',
-        headline: 'Invoices that send themselves',
-        key: 'A1',
-        kind: 'hero',
-        variants: 2,
-      },
-    ],
-    channels: [
-      { cadence: 'Launch day plus one follow-up', channel: 'linkedin', role: 'Reach buyers' },
-    ],
-    summary: 'Lead with time saved.',
-    timeline: [
-      { angleKey: 'G1', assetKeys: ['A1'], channel: 'linkedin', day: 0, note: '', phase: 'launch' },
-    ],
-  })
+  const plan = samplePlan()
   assert.deepEqual(validatePlanReferences(plan, spec, []), [])
   const broken = {
     ...plan,

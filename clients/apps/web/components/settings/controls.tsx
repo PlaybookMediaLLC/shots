@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import type { SaveResult } from '@/components/settings/PreferencesProvider'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { settingsErrorMessage } from '@/lib/settings/client'
 import { cn } from '@/lib/utils'
 
 /** Where a save is: nothing yet, under way, confirmed by the server, or refused. */
@@ -21,16 +22,27 @@ export type SaveState = z.infer<typeof saveStateSchema>
  */
 export function useSaveState(): [SaveState, (run: () => Promise<SaveResult>) => Promise<boolean>] {
   const [state, setState] = useState<SaveState>('idle')
+  const pending = useRef(0)
+  const failed = useRef(false)
   const run = useCallback(async (save: () => Promise<SaveResult>) => {
+    if (pending.current === 0) failed.current = false
+    pending.current++
     setState('saving')
-    const result = await save()
-    if (result.ok) {
-      setState('saved')
-      return true
+    try {
+      const result = await save()
+      if (!result.ok) {
+        failed.current = true
+        toast.error(result.error)
+      }
+      return result.ok
+    } catch (error) {
+      failed.current = true
+      toast.error(settingsErrorMessage(error))
+      return false
+    } finally {
+      pending.current--
+      setState(pending.current > 0 ? 'saving' : failed.current ? 'error' : 'saved')
     }
-    setState('error')
-    toast.error(result.error)
-    return false
   }, [])
   return [state, run]
 }
@@ -41,7 +53,10 @@ export function SaveStatus({ state }: { state: SaveState }) {
   return (
     <span
       aria-live="polite"
-      className={cn('min-w-16 text-xs', state === 'error' ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground')}
+      className={cn(
+        'min-w-16 text-xs',
+        state === 'error' ? 'text-red-700 dark:text-red-300' : 'text-muted-foreground'
+      )}
       role="status"
     >
       {text}
@@ -104,7 +119,9 @@ export function ChoiceGroup<Value extends string>({
               <RadioGroupItem value={choice.value} />
               {choice.label}
             </span>
-            {choice.description ? <span className="text-xs text-muted-foreground">{choice.description}</span> : null}
+            {choice.description ? (
+              <span className="text-xs text-muted-foreground">{choice.description}</span>
+            ) : null}
           </Label>
         ))}
       </RadioGroup>

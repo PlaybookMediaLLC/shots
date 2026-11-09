@@ -1,5 +1,7 @@
 'use client'
 
+import { useRef, useState } from 'react'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { ChannelIcon } from '@/components/drafts/channel-meta'
 import { Group, Row } from '@/components/platform-ui'
@@ -15,10 +17,21 @@ import { type SocialSetRecord, useSaveSocialSet } from './api'
  * members and credentials are never on it, and turning it off takes the page
  * down on the next request.
  */
-export function PublicProfilePage({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
+export function PublicProfilePage({
+  canManage,
+  set,
+}: {
+  canManage: boolean
+  set: SocialSetRecord
+}) {
   const save = useSaveSocialSet(set.id)
   const [state, run] = useSaveState()
-  const url = typeof window === 'undefined' ? `/p/${set.publicSlug}` : `${window.location.origin}/p/${set.publicSlug}`
+  const [copyError, setCopyError] = useState(false)
+  const addressRef = useRef<HTMLInputElement>(null)
+  const url =
+    typeof window === 'undefined'
+      ? `/p/${set.publicSlug}`
+      : `${window.location.origin}/p/${set.publicSlug}`
   const accounts = set.accounts.filter((account) => account.health !== 'removed')
   return (
     <div className="grid gap-6">
@@ -40,11 +53,24 @@ export function PublicProfilePage({ canManage, set }: { canManage: boolean; set:
         {set.publicProfile ? (
           <Row description="Anyone with this address can see the profile." label="Public address">
             <div className="flex flex-wrap items-center gap-2">
-              <code className="rounded bg-foreground/[0.05] px-2 py-1 text-xs">{url}</code>
+              <Input
+                aria-label="Public profile address"
+                readOnly
+                value={url}
+                ref={addressRef}
+                onFocus={(event) => event.target.select()}
+              />
               <Button
                 onClick={async () => {
-                  await navigator.clipboard.writeText(url)
-                  toast.success('Address copied.')
+                  try {
+                    await navigator.clipboard.writeText(url)
+                    setCopyError(false)
+                    toast.success('Address copied.')
+                  } catch {
+                    setCopyError(true)
+                    addressRef.current?.focus()
+                    addressRef.current?.select()
+                  }
                 }}
                 size="sm"
                 type="button"
@@ -52,6 +78,11 @@ export function PublicProfilePage({ canManage, set }: { canManage: boolean; set:
               >
                 Copy
               </Button>
+              {copyError ? (
+                <p className="text-xs text-destructive" role="alert">
+                  Clipboard access failed. Select the address and copy it manually.
+                </p>
+              ) : null}
               <Button asChild size="sm" variant="outline">
                 <a href={url} rel="noreferrer" target="_blank">
                   Open
@@ -61,10 +92,19 @@ export function PublicProfilePage({ canManage, set }: { canManage: boolean; set:
           </Row>
         ) : null}
       </Group>
-      <section aria-label="Public profile preview" className="grid gap-3 rounded-2xl border border-border p-5">
-        <p className="text-xs font-medium text-muted-foreground">Preview{set.publicProfile ? '' : ' (not public)'}</p>
+      <section
+        aria-label="Public profile preview"
+        className="grid gap-3 rounded-2xl border border-border p-5"
+      >
+        <p className="text-xs font-medium text-muted-foreground">
+          Preview{set.publicProfile ? '' : ' (not public)'}
+        </p>
         <div className="flex items-center gap-3">
-          <span aria-hidden className="size-10 rounded-full" style={{ backgroundColor: set.color }} />
+          <span
+            aria-hidden
+            className="size-10 rounded-full"
+            style={{ backgroundColor: set.color }}
+          />
           <p className="text-lg font-medium text-foreground">{set.name}</p>
         </div>
         {accounts.length === 0 ? (
@@ -77,7 +117,9 @@ export function PublicProfilePage({ canManage, set }: { canManage: boolean; set:
                 <li className="flex items-center gap-2 text-sm" key={account.id}>
                   {channel ? <ChannelIcon channel={channel} className="size-4" /> : null}
                   <span className="text-foreground">{account.displayName ?? account.platform}</span>
-                  {account.handle ? <span className="text-muted-foreground">@{account.handle}</span> : null}
+                  {account.handle ? (
+                    <span className="text-muted-foreground">@{account.handle}</span>
+                  ) : null}
                 </li>
               )
             })}

@@ -26,6 +26,7 @@ class ImageToolsWorkerClient {
   private pending = new Map<string, PendingRequest>();
   private ready = false;
   private bootPromise: Promise<void> | null = null;
+  private finishBoot: (() => void) | null = null;
   private requestCounter = 0;
 
   private isSupported(): boolean {
@@ -43,23 +44,30 @@ class ImageToolsWorkerClient {
       }
 
       try {
-        this.worker = new Worker(
+        const worker = new Worker(
           new URL("./image-tools.worker.ts", import.meta.url),
           { type: "module" }
         );
 
-        const timeout = setTimeout(() => {
-          this.ready = false;
+        this.worker = worker;
+        const finish = () => {
+          clearTimeout(timeout);
+          if (this.finishBoot === finish) this.finishBoot = null;
           resolve();
+        };
+        const timeout = setTimeout(() => {
+          if (this.worker === worker) this.ready = false;
+          finish();
         }, READY_TIMEOUT_MS);
+        this.finishBoot = finish;
 
-        this.worker.onmessage = (event: MessageEvent) => {
+        worker.onmessage = (event: MessageEvent) => {
+          if (this.worker !== worker) return;
           const data = event.data;
 
           if (data?.type === "ready") {
-            clearTimeout(timeout);
             this.ready = true;
-            resolve();
+            finish();
             return;
           }
 
@@ -75,11 +83,11 @@ class ImageToolsWorkerClient {
           }
         };
 
-        this.worker.onerror = () => {
-          clearTimeout(timeout);
+        worker.onerror = () => {
+          if (this.worker !== worker) return;
           this.ready = false;
           this.failAllPending(new Error("Image worker crashed"));
-          resolve();
+          finish();
         };
       } catch {
         this.ready = false;
@@ -106,8 +114,10 @@ class ImageToolsWorkerClient {
    * Processes one file, in the worker when available and on the main thread
    * otherwise. A worker failure falls back rather than surfacing to the user.
    */
-  async process(file: Blob, options: ProcessOptions): Promise<ProcessResult> {
-    await this.boot();
+  async process(file: Blob, options: ProcessOptions, signal?: AbortSignal): Promise<ProcessResult> {
+    signal?.throwIfAborted()
+    await this.boot()
+    signal?.throwIfAborted();
 
     if (!this.ready || !this.worker) {
       return processFile(file, options);
@@ -118,6 +128,7 @@ class ImageToolsWorkerClient {
     } catch (error) {
       // A per-file failure inside the worker is worth one main-thread retry:
       // the common cause is an OffscreenCanvas size limit, not a bad file.
+      signal?.throwIfAborted()
       if (error instanceof Error && error.message === "Image worker crashed") {
         return processFile(file, options);
       }
@@ -151,6 +162,9 @@ class ImageToolsWorkerClient {
   }
 
   terminate(): void {
+    this.finishBoot?.();
+    this.finishBoot = null;
+    this.bootPromise = null;
     if (!this.worker) return;
     this.worker.terminate();
     this.worker = null;

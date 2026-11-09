@@ -1,6 +1,8 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
+import { prepareLinkNavigation } from '@/lib/platform/navigation-guard'
+import { toast } from 'sonner'
 import { Pill } from '@/components/platform-ui'
 import {
   Select,
@@ -52,7 +54,17 @@ export function VersionSelect({
       <Select
         onValueChange={(nextValue) => {
           const id = nextValue
-          router.push(id === versions[0]?.id ? pathname : `${pathname}?version=${id}`)
+          void prepareLinkNavigation()
+            .then(() =>
+              router.push(id === versions[0]?.id ? pathname : `${pathname}?version=${id}`)
+            )
+            .catch((error: unknown) =>
+              toast.error(
+                error instanceof Error
+                  ? error.message
+                  : 'Save or discard your changes before leaving.'
+              )
+            )
         }}
         value={current}
       >

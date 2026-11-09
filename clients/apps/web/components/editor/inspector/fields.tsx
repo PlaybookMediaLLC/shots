@@ -14,10 +14,11 @@ import { Label } from '@/components/ui/label'
 
 /** A labelled colour swatch that opens the colour picker. */
 export function ColorField({ label, onChange, value }: { label: string; onChange: (color: string) => void; value: string }) {
+  const id = React.useId()
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <ColorPicker color={value} onChange={onChange} />
+      <Label className="text-xs text-muted-foreground" htmlFor={id}>{label}</Label>
+      <ColorPicker color={value} onChange={onChange} id={id} label={label} />
     </div>
   )
 }

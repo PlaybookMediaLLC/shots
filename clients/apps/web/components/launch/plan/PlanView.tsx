@@ -171,13 +171,14 @@ export function PlanView({
   const pathname = usePathname()
   const [approving, setApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [, startRefresh] = useTransition()
+  const [refreshing, startRefresh] = useTransition()
+  const [editorBlocked, setEditorBlocked] = useState(false)
 
   const runButton = canEdit ? (
     <RunButton
       activeRunId={activeRunId}
       className={plan ? 'md:items-end' : 'items-center'}
-      disabled={!aiConfigured}
+      disabled={!aiConfigured || editorBlocked || approving || refreshing}
       doneMessage="Plan ready"
       hint="About a minute"
       initialError={lastRunError}
@@ -218,6 +219,7 @@ export function PlanView({
   const timeline = [...content.timeline].sort((a, b) => a.day - b.day)
 
   async function approve() {
+    if (editorBlocked || approving || refreshing) return
     setApproving(true)
     setError(null)
     try {
@@ -249,7 +251,7 @@ export function PlanView({
             {isLatest && canApprove && current.status !== 'APPROVED' ? (
               <Button
                 className="rounded-lg"
-                disabled={approving}
+                disabled={approving || editorBlocked || refreshing}
                 onClick={() => void approve()}
                 size="sm"
                 type="button"
@@ -262,6 +264,11 @@ export function PlanView({
         </div>
       </div>
 
+      {editorBlocked ? (
+        <p className="text-sm text-muted-foreground">
+          Save or reset your plan edits before approving.
+        </p>
+      ) : null}
       {error ? (
         <p
           className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"
@@ -317,7 +324,7 @@ export function PlanView({
           <div className="-mt-1">
             <RevisePanel
               campaignId={campaignId}
-              disabled={!aiConfigured}
+              disabled={!aiConfigured || editorBlocked || approving || refreshing}
               placeholder="For example: add a teaser on LinkedIn and drop the story asset"
               target={{ planId: current.id, type: 'plan' }}
               triggerLabel="Revise plan with AI"
@@ -424,7 +431,9 @@ export function PlanView({
           if (items.length === 0) return null
           return (
             <div className="flex flex-col gap-2" key={phase}>
-              <h3 className="text-ui-lg font-medium text-foreground/80">{PLAN_PHASE_LABELS[phase]}</h3>
+              <h3 className="text-ui-lg font-medium text-foreground/80">
+                {PLAN_PHASE_LABELS[phase]}
+              </h3>
               <Group>
                 <ol className="divide-y divide-foreground/[0.07]">
                   {items.map((item, position) => (
@@ -463,6 +472,8 @@ export function PlanView({
           content={content}
           key={current.id}
           planId={current.id}
+          disabled={approving || refreshing}
+          onBlockedChange={setEditorBlocked}
         />
       ) : null}
     </>

@@ -112,6 +112,10 @@ export function AnalyzeWorkspace({
   const [sharing, setSharing] = React.useState(false)
   const [image, setImage] = React.useState<string | null>(null)
   const chart = React.useRef<HTMLDivElement>(null)
+  const actionGeneration = React.useRef(0)
+  const invalidateAction = React.useCallback(() => {
+    actionGeneration.current++
+  }, [])
   const when = useWhen()
   // Report ranges are calendar days, not moments: read them in UTC so the day stays the one named.
   const day = (key: string) => when(key, 'UTC', DAY_STYLE)
@@ -124,11 +128,20 @@ export function AnalyzeWorkspace({
     ([id]) => !report || !noStats(report) || id === 'publishedPosts'
   )
   const update = (patch: Partial<AnalyticsQuery>) => {
+    actionGeneration.current++
+    setWorking(false)
+    setFormError('')
+    setImage(null)
+    setInspection(null)
     setQuery((q) => ({ ...q, ...patch, cursor: '', asOf: undefined }))
     setCursorStack([])
     setRow(null)
   }
   React.useEffect(() => {
+    actionGeneration.current++
+    setWorking(false)
+    setImage(null)
+    setInspection(null)
     if ((!publicToken && !accountId) || brandId) return
     const controller = new AbortController()
     setError('')
@@ -140,8 +153,11 @@ export function AnalyzeWorkspace({
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message)
       })
-    return () => controller.abort()
-  }, [key, refresh, accountId, brandId, publicToken])
+    return () => {
+      invalidateAction()
+      controller.abort()
+    }
+  }, [key, refresh, accountId, brandId, publicToken, invalidateAction])
   React.useEffect(() => {
     const params = new URLSearchParams(queryString({ ...query, cursor: '', asOf: undefined }))
     if (brandId) params.set('set', brandId)
@@ -150,14 +166,15 @@ export function AnalyzeWorkspace({
     window.history.replaceState(null, '', `${window.location.pathname}?${params}`)
   }, [query, accountId, brandId, metric, publicToken])
   const action = async (fn: () => Promise<void>) => {
+    const generation = actionGeneration.current
     setWorking(true)
     setFormError('')
     try {
       await fn()
     } catch (e) {
-      setFormError((e as Error).message)
+      if (generation === actionGeneration.current) setFormError((e as Error).message)
     } finally {
-      setWorking(false)
+      if (generation === actionGeneration.current) setWorking(false)
     }
   }
   const refreshOne = async (id: string) => {
@@ -205,12 +222,14 @@ export function AnalyzeWorkspace({
   }
   const fullRows = async () => {
     if (!report) return []
+    const generation = actionGeneration.current
     const rows: Row[] = [],
       snapshot = { ...query, asOf: report.asOf, cursor: '', limit: 500 }
     const seen = new Set<string>()
     let hasMore = true
     while (hasMore) {
       const page = readAnalyticsReport(await call(`${endpoint}?${queryString(snapshot)}`))
+      if (generation !== actionGeneration.current) return []
       rows.push(...page.posts)
       if (!page.nextCursor) break
       if (seen.has(page.nextCursor))
@@ -224,7 +243,9 @@ export function AnalyzeWorkspace({
   const exportPosts = () =>
     action(async () => {
       if (!report) return
+      const generation = actionGeneration.current
       const rows = await fullRows()
+      if (generation !== actionGeneration.current) return
       downloadBlob(
         new Blob([postsCSV(report, rows)], { type: 'text/csv;charset=utf-8' }),
         `shots-${report.platform}-posts-${query.from}-${query.to}.csv`
@@ -232,20 +253,23 @@ export function AnalyzeWorkspace({
     })
   const inspectHourly = (ids: string[], label: string) =>
     void action(async () => {
+      const generation = actionGeneration.current
       const all = await fullRows()
+      if (generation !== actionGeneration.current) return
       setInspection({ label, rows: all.filter((p) => ids.includes(p.id)) })
     })
   const [inspection, setInspection] = React.useState<{ label: string; rows: Row[] } | null>(null)
   const shareImage = () =>
     action(async () => {
-      if (chart.current)
-        setImage(
-          await domToPng(chart.current, {
-            backgroundColor: '#ffffff',
-            scale: 2,
-            filter: (node) => !(node instanceof HTMLElement && node.dataset.slot === 'disclosure'),
-          })
-        )
+      const generation = actionGeneration.current
+      const element = chart.current
+      if (!element) return
+      const rendered = await domToPng(element, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        filter: (node) => !(node instanceof HTMLElement && node.dataset.slot === 'disclosure'),
+      })
+      if (generation === actionGeneration.current && element === chart.current) setImage(rendered)
     })
   if (!publicToken && !accounts.length)
     return (
@@ -383,8 +407,8 @@ export function AnalyzeWorkspace({
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              {report.name} · {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)} (
-              {query.timeZone}) · {STATES[report.status]}.{' '}
+              {report.name} · {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)}{' '}
+              ({query.timeZone}) · {STATES[report.status]}.{' '}
               {report.coverageStart
                 ? `Stats start ${when(report.coverageStart, query.timeZone, DAY_STYLE)}.`
                 : null}
@@ -457,8 +481,8 @@ export function AnalyzeWorkspace({
                         {growth && metric === 'followers' ? ' interval growth' : ''}
                       </h3>
                       <p className="text-sm">
-                        {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)} · {query.timeZone} ·{' '}
-                        {query.grouping}
+                        {platformLabel(report.platform)} · {day(query.from)} – {day(query.to)} ·{' '}
+                        {query.timeZone} · {query.grouping}
                       </p>
                       <p className="my-3 text-3xl">
                         {formatValue(
@@ -478,12 +502,12 @@ export function AnalyzeWorkspace({
                     <Disclosure className="mt-4">
                       <DisclosureTrigger>About {METRICS[metric]}</DisclosureTrigger>
                       <DisclosureContent>
-                      <p>{report.metrics[metric].definition}</p>
-                      <p>
-                        Change compares the preceding equal number of calendar days. A zero or
-                        missing baseline has no percentage comparison.{' '}
-                        {report.metrics[metric].missing} posts lack this metric.
-                      </p>
+                        <p>{report.metrics[metric].definition}</p>
+                        <p>
+                          Change compares the preceding equal number of calendar days. A zero or
+                          missing baseline has no percentage comparison.{' '}
+                          {report.metrics[metric].missing} posts lack this metric.
+                        </p>
                       </DisclosureContent>
                     </Disclosure>
                   </>
