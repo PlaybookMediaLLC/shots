@@ -26,6 +26,8 @@ import {
   LockKey,
   FileText,
   Microphone,
+  Brain,
+  Waveform,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -43,6 +45,7 @@ import { SettingsNotifications } from './founder-hub/notifications'
 import { SettingsPermissions } from './founder-hub/permissions'
 import { SettingsTemplates } from './founder-hub/templates'
 import { SettingsDictation } from './founder-hub/dictation'
+import { SettingsAIProvider } from './founder-hub/ai-provider'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -54,6 +57,8 @@ const PAGE_CONTENT = {
   permissions: SettingsPermissions,
   templates: SettingsTemplates,
   dictation: SettingsDictation,
+  intelligence: () => <SettingsAIProvider kind="llm" />,
+  transcription: () => <SettingsAIProvider kind="stt" />,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -65,6 +70,8 @@ const PAGE_ICONS = {
   permissions: LockKey,
   templates: FileText,
   dictation: Microphone,
+  intelligence: Brain,
+  transcription: Waveform,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
