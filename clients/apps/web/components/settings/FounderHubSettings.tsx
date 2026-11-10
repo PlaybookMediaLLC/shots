@@ -34,6 +34,8 @@ import {
   Code,
   AddressBook,
   CreditCard,
+  User,
+  UsersThree,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -58,8 +60,11 @@ import { SettingsTodo } from './founder-hub/todo'
 import { SettingsDevelopers } from './founder-hub/developers'
 import { SettingsCRM } from './founder-hub/crm'
 import { WorkspaceBilling } from '@/components/workspace/WorkspaceBilling'
+import { SettingsAccount } from './founder-hub/account'
+import { SettingsTeam } from './founder-hub/team'
 
 const PAGE_CONTENT = {
+  account: SettingsAccount,
   general: SettingsApp,
   appearance: SettingsAppearance,
   dictionary: SettingsDictionary,
@@ -77,8 +82,10 @@ const PAGE_CONTENT = {
   developers: () => <SettingsDevelopers canManage={false} />,
   crm: () => <SettingsCRM canManage={false} />,
   billing: () => <WorkspaceBilling canManage={false} />,
+  team: SettingsTeam,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
+  account: User,
   general: Gear,
   appearance: Sun,
   dictionary: BookOpen,
@@ -96,6 +103,7 @@ const PAGE_ICONS = {
   developers: Code,
   crm: AddressBook,
   billing: CreditCard,
+  team: UsersThree,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
@@ -284,18 +292,18 @@ function SettingsSurface({
           <div className="bg-card min-h-0 min-w-0 flex-1 overflow-hidden rounded-tl-xl">
             <div className="scrollbar-hide h-full min-h-0 w-full min-w-0 overflow-x-hidden overflow-y-auto px-6 pt-6 pb-10">
               <fieldset
-                disabled={!deviceId && !['appearance', 'templates'].includes(page)}
+                disabled={!deviceId && !['account', 'appearance', 'templates'].includes(page)}
                 className="min-w-0 border-0 p-0"
               >
-              {page === 'developers' ? (
-                <SettingsDevelopers canManage={canManageDeveloper} />
-              ) : page === 'crm' ? (
-                <SettingsCRM canManage={canManageDeveloper} />
-              ) : page === 'billing' ? (
-                <WorkspaceBilling canManage={canManageBilling} />
-              ) : (
-                <Component key={`${page}:${deviceId}`} />
-              )}
+                {page === 'developers' ? (
+                  <SettingsDevelopers canManage={canManageDeveloper} />
+                ) : page === 'crm' ? (
+                  <SettingsCRM canManage={canManageDeveloper} />
+                ) : page === 'billing' ? (
+                  <WorkspaceBilling canManage={canManageBilling} />
+                ) : (
+                  <Component key={`${page}:${deviceId}`} />
+                )}
               </fieldset>
             </div>
           </div>

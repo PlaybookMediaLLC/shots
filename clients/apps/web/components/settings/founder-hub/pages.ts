@@ -1,5 +1,6 @@
 /** Original settings destinations; aliases preserve existing desktop deep links. */
 export const FOUNDER_HUB_PAGES = [
+  { id: 'account', title: 'Account', group: 'Account' },
   { id: 'general', title: 'General', group: 'App' },
   { id: 'appearance', title: 'Appearance', group: 'App' },
   { id: 'notifications', title: 'Notifications', group: 'App' },
@@ -13,6 +14,7 @@ export const FOUNDER_HUB_PAGES = [
   { id: 'developers', title: 'Developers', group: 'Advanced' },
   { id: 'crm', title: 'CRM', group: 'Advanced' },
   { id: 'billing', title: 'Billing', group: 'Workspace' },
+  { id: 'team', title: 'Team', group: 'Workspace' },
   { id: 'meetings', title: 'Meetings', group: 'Workspace' },
   { id: 'templates', title: 'Templates', group: 'Workspace' },
   { id: 'privacy', title: 'Privacy', group: 'Advanced' },
