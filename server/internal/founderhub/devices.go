@@ -127,7 +127,7 @@ func ValidCloudsyncStatusResult(value string) bool {
 
 func (input DeviceCommandInput) Valid() bool {
 	switch input.Kind {
-	case "auto-format", "dictation-status":
+	case "auto-format", "dictation-status", "cloudsync-log":
 		return ValidPrivateAction(input.Argument, true)
 	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut", "cloudsync-status", "cloudsync-now":
 		return input.Argument == ""

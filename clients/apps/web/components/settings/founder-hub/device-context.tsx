@@ -97,6 +97,8 @@ export function useNativeSettingsAction() {
       mutation.isPending ||
       Boolean(!error && result && ['pending', 'running'].includes(result.status)),
     deviceId: result?.deviceId,
+    commandId: result?.id,
+    kind: result?.kind,
     result: result?.result ?? '',
     error: error
       ? settingsErrorMessage(error)

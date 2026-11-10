@@ -72,7 +72,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
-      kind: z.enum(['auto-format', 'dictation-status']),
+      kind: z.enum(['auto-format', 'dictation-status', 'cloudsync-log']),
       argument: z.string().min(1).max(201000),
     })
     .strict(),

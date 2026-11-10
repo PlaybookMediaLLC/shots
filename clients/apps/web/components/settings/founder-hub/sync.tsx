@@ -1,5 +1,7 @@
 'use client'
 
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { founderHubCloudsyncStatusSchema } from 'screenshot-studio-backend-sdk'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/i18n/navigation'
@@ -8,6 +10,7 @@ import { BooleanSetting } from './general/app'
 import { useFounderHubDevices, useNativeSettingsAction, useSelectedDevice } from './device-context'
 import { useConfigValue } from './settings-context'
 import { useBillingAccess } from './billing-access'
+import { createCloudsyncLogRequest } from './private-action'
 
 /** Account-owned sync preference and registered desktop state from Shots. */
 export function SettingsSync() {
@@ -17,6 +20,34 @@ export function SettingsSync() {
   const { isPro } = useBillingAccess()
   const action = useNativeSettingsAction()
   const syncStatus = readSyncStatus(action.deviceId === device?.deviceId ? action.result : '')
+  const [logRequest, setLogRequest] = useState<{
+    deviceId: string
+    request: Awaited<ReturnType<typeof createCloudsyncLogRequest>>
+  }>()
+  const requestLog = useMutation({
+    mutationFn: async () => {
+      if (!device?.report.autoFormatKey) throw new Error('Secure log access is unavailable.')
+      return {
+        deviceId: device.deviceId,
+        request: await createCloudsyncLogRequest(device.report.autoFormatKey),
+      }
+    },
+    onSuccess: ({ deviceId, request }) => {
+      setLogRequest({ deviceId, request })
+      action.run({ kind: 'cloudsync-log', argument: request.argument })
+    },
+  })
+  const syncLog = useQuery({
+    queryKey: ['founder-hub-sync-log', device?.deviceId, action.commandId],
+    enabled:
+      action.kind === 'cloudsync-log' &&
+      Boolean(
+        logRequest && logRequest.deviceId === device?.deviceId && action.commandId && action.result
+      ),
+    queryFn: () => logRequest!.request.readResult(action.result),
+    staleTime: Infinity,
+    gcTime: 0,
+  })
   return (
     <div className="flex flex-col gap-8">
       <SettingsPageTitle title="Sync" />
@@ -137,6 +168,50 @@ export function SettingsSync() {
                 Sync now
               </Button>
             </div>
+          </section>
+          <section className="grid gap-3">
+            <div>
+              <h3 className="text-sm font-medium">Sync log</h3>
+              <p className="text-xs text-muted-foreground">
+                Recent local sync entries are encrypted on the desktop and decrypted only in this
+                browser.
+              </p>
+            </div>
+            {syncLog.isError && (
+              <p role="alert" className="text-sm text-destructive">
+                The encrypted sync log could not be loaded. Try again from the selected desktop.
+              </p>
+            )}
+            {requestLog.error && (
+              <p role="alert" className="text-sm text-destructive">
+                {requestLog.error.message}
+              </p>
+            )}
+            {action.kind === 'cloudsync-log' && action.isPending && (
+              <p role="status" className="text-sm text-muted-foreground">
+                Waiting for the desktop…
+              </p>
+            )}
+            {syncLog.data !== undefined && (
+              <pre className="max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
+                {syncLog.data || 'No sync activity yet.'}
+              </pre>
+            )}
+            <Button
+              variant="outline"
+              disabled={
+                !device ||
+                !device.report.supportsCloudsyncSettings ||
+                !device.report.autoFormatKey ||
+                action.isPending ||
+                requestLog.isPending
+              }
+              onClick={() => requestLog.mutate()}
+            >
+              {requestLog.isPending || (action.kind === 'cloudsync-log' && action.isPending)
+                ? 'Loading…'
+                : 'View sync log'}
+            </Button>
           </section>
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">Connected computers</h3>

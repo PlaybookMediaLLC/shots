@@ -1,4 +1,3 @@
-// Ported from apps/desktop/src/settings/shots-private-action.ts; see dev/import-founder-hub-ui.mjs.
 import { z } from 'zod'
 
 const encoded = z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/)
@@ -11,15 +10,16 @@ const envelopeSchema = z
   })
   .strict()
 const responseSchema = envelopeSchema.omit({ publicKey: true })
+const syncLogSchema = z.string().max(110_000)
 export const autoFormatExamplesSchema = z.array(z.string().trim().min(1).max(12000)).min(1).max(3)
 export const autoFormatResultSchema = z.string().trim().min(1).max(16000)
 const context = new TextEncoder()
 
-function encode(value: ArrayBuffer | Uint8Array): string {
+function encode(value: ArrayBuffer | Uint8Array) {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value)
   return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''))
 }
-function decode(value: string): Uint8Array<ArrayBuffer> {
+function decode(value: string) {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0))
 }
 export async function createPrivateActionIdentity() {
@@ -47,13 +47,18 @@ async function sharedKey(privateKey: CryptoKey, publicKey: string) {
     ['encrypt', 'decrypt']
   )
 }
-async function seal(key: CryptoKey, value: unknown, direction: 'request' | 'response') {
+async function seal(
+  key: CryptoKey,
+  value: unknown,
+  direction: 'request' | 'response',
+  purpose: 'auto-format' | 'cloudsync-log' = 'auto-format'
+) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: 'AES-GCM',
       iv,
-      additionalData: context.encode(`shots-founder-hub:auto-format:${direction}`),
+      additionalData: context.encode(`shots-founder-hub:${purpose}:${direction}`),
     },
     key,
     context.encode(JSON.stringify(value))
@@ -63,13 +68,14 @@ async function seal(key: CryptoKey, value: unknown, direction: 'request' | 'resp
 async function open(
   key: CryptoKey,
   value: z.infer<typeof responseSchema>,
-  direction: 'request' | 'response'
-): Promise<unknown> {
+  direction: 'request' | 'response',
+  purpose: 'auto-format' | 'cloudsync-log' = 'auto-format'
+) {
   const cleartext = await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
       iv: decode(value.iv),
-      additionalData: context.encode(`shots-founder-hub:auto-format:${direction}`),
+      additionalData: context.encode(`shots-founder-hub:${purpose}:${direction}`),
     },
     key,
     decode(value.ciphertext)
@@ -98,5 +104,20 @@ export async function openAutoFormatRequest(privateKey: CryptoKey, argument: str
     examples: autoFormatExamplesSchema.parse(await open(key, envelope, 'request')),
     sealResult: async (format: string) =>
       JSON.stringify(await seal(key, autoFormatResultSchema.parse(format), 'response')),
+  }
+}
+/** Encrypts a sync-log request to the selected desktop; only its ephemeral key can read the response. */
+export async function createCloudsyncLogRequest(devicePublicKey: string) {
+  const identity = await createPrivateActionIdentity()
+  const key = await sharedKey(identity.privateKey, devicePublicKey)
+  return {
+    argument: JSON.stringify({
+      publicKey: identity.publicKey,
+      ...(await seal(key, {}, 'request', 'cloudsync-log')),
+    }),
+    readResult: async (result: string) =>
+      syncLogSchema.parse(
+        await open(key, responseSchema.parse(JSON.parse(result)), 'response', 'cloudsync-log')
+      ),
   }
 }
