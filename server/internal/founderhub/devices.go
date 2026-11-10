@@ -29,6 +29,7 @@ type DeviceReport struct {
 	Permissions                map[string]string `json:"permissions"`
 	SupportsCloudsyncSettings  bool              `json:"supportsCloudsyncSettings,omitempty"`
 	SupportsAIProviderSettings bool              `json:"supportsAIProviderSettings,omitempty"`
+	SupportsCloudsyncRecovery  bool              `json:"supportsCloudsyncRecovery,omitempty"`
 	AutoFormatKey              string            `json:"autoFormatKey,omitempty"`
 }
 
@@ -78,9 +79,10 @@ func ValidPermission(value string) bool {
 }
 
 type DeviceCommandInput struct {
-	DeviceID string `json:"deviceId"`
-	Kind     string `json:"kind"`
-	Argument string `json:"argument"`
+	DeviceID       string `json:"deviceId"`
+	ExpectedUserID string `json:"expectedUserId,omitempty"`
+	Kind           string `json:"kind"`
+	Argument       string `json:"argument"`
 }
 
 type CloudsyncStatusResult struct {
@@ -127,8 +129,11 @@ func ValidCloudsyncStatusResult(value string) bool {
 }
 
 func (input DeviceCommandInput) Valid() bool {
+	if len(input.ExpectedUserID) > 200 {
+		return false
+	}
 	switch input.Kind {
-	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider":
+	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider", "cloudsync-recovery":
 		return ValidPrivateAction(input.Argument, true)
 	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut", "cloudsync-status", "cloudsync-now":
 		return input.Argument == ""

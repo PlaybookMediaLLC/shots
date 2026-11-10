@@ -39,6 +39,18 @@ const aiProviderRequestSchema = z.discriminatedUnion('operation', [
 const aiProviderResultSchema = z
   .object({ configured: z.boolean(), baseUrl: z.string().max(2048) })
   .strict()
+const cloudsyncRecoveryRequestSchema = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('status') }).strict(),
+  z.object({ operation: z.literal('create') }).strict(),
+  z.object({ operation: z.literal('confirm') }).strict(),
+  z.object({ operation: z.literal('import'), recoveryKey: z.string().min(1).max(512) }).strict(),
+])
+const cloudsyncRecoveryResultSchema = z
+  .object({
+    configured: z.boolean(),
+    recoveryKey: z.string().max(512).optional(),
+  })
+  .strict()
 export const autoFormatExamplesSchema = z.array(z.string().trim().min(1).max(12000)).min(1).max(3)
 export const autoFormatResultSchema = z.string().trim().min(1).max(16000)
 const context = new TextEncoder()
@@ -79,7 +91,7 @@ async function seal(
   key: CryptoKey,
   value: unknown,
   direction: 'request' | 'response',
-  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' = 'auto-format'
+  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' | 'cloudsync-recovery' = 'auto-format'
 ) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt(
@@ -97,7 +109,7 @@ async function open(
   key: CryptoKey,
   value: z.infer<typeof responseSchema>,
   direction: 'request' | 'response',
-  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' = 'auto-format'
+  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' | 'cloudsync-recovery' = 'auto-format'
 ) {
   const cleartext = await crypto.subtle.decrypt(
     {
@@ -166,6 +178,26 @@ export async function createAIProviderRequest(
     readResult: async (result: string) =>
       aiProviderResultSchema.parse(
         await open(key, responseSchema.parse(JSON.parse(result)), 'response', 'ai-provider')
+      ),
+  }
+}
+
+/** Recovery keys remain encrypted while Founder Hub transports them to the selected desktop. */
+export async function createCloudsyncRecoveryRequest(
+  devicePublicKey: string,
+  input: z.input<typeof cloudsyncRecoveryRequestSchema>
+) {
+  const value = cloudsyncRecoveryRequestSchema.parse(input)
+  const identity = await createPrivateActionIdentity()
+  const key = await sharedKey(identity.privateKey, devicePublicKey)
+  return {
+    argument: JSON.stringify({
+      publicKey: identity.publicKey,
+      ...(await seal(key, value, 'request', 'cloudsync-recovery')),
+    }),
+    readResult: async (result: string) =>
+      cloudsyncRecoveryResultSchema.parse(
+        await open(key, responseSchema.parse(JSON.parse(result)), 'response', 'cloudsync-recovery')
       ),
   }
 }

@@ -34,9 +34,18 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
   const [apiKey, setApiKey] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [providerRequest, setProviderRequest] = useState<{
+    userId: string
     providerId: string
+    kind: 'llm' | 'stt'
     request: Awaited<ReturnType<typeof createAIProviderRequest>>
   }>()
+  const [providerStateUserId, setProviderStateUserId] = useState(action.userId)
+  if (providerStateUserId !== action.userId) {
+    setProviderStateUserId(action.userId)
+    setApiKey('')
+    setBaseUrl('')
+    setProviderRequest(undefined)
+  }
   const providerId = kind === 'llm' ? llm.current_llm_provider : stt.current_stt_provider
   const providerAction = useMutation({
     mutationFn: async (operation: 'status' | 'save' | 'clear') => {
@@ -53,20 +62,22 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
             }
           : { operation, type: kind, providerId }
       const request = await createAIProviderRequest(device.report.autoFormatKey, input)
-      return { providerId, request }
+      return { userId: action.userId, providerId, request }
     },
-    onSuccess: ({ providerId, request }) => {
-      setProviderRequest({ providerId, request })
-      action.run({ kind: 'ai-provider', argument: request.argument })
+    onSuccess: ({ userId, providerId, request }) => {
+      setProviderRequest({ userId, providerId, kind, request })
+      action.run({ kind: 'ai-provider', argument: request.argument, expectedUserId: userId })
       setApiKey('')
     },
   })
   const providerResult = useQuery({
-    queryKey: ['founder-hub-ai-provider', device?.deviceId, action.commandId],
+    queryKey: ['founder-hub-ai-provider', action.userId, device?.deviceId, action.commandId],
     enabled:
       action.kind === 'ai-provider' &&
       Boolean(
         providerRequest &&
+        providerRequest.userId === action.userId &&
+        providerRequest.kind === kind &&
         providerRequest.providerId === providerId &&
         action.commandId &&
         action.result
@@ -75,7 +86,12 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
     staleTime: Infinity,
     gcTime: 0,
   })
-  const storedConfig = providerRequest?.providerId === providerId ? providerResult.data : undefined
+  const storedConfig =
+    providerRequest?.userId === action.userId &&
+    providerRequest.kind === kind &&
+    providerRequest.providerId === providerId
+      ? providerResult.data
+      : undefined
   const provider = providerId
   const model = kind === 'llm' ? llm.current_llm_model : stt.current_stt_model
   const providerKey = kind === 'llm' ? 'current_llm_provider' : 'current_stt_provider'

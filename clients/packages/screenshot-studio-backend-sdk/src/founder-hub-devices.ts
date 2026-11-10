@@ -34,6 +34,7 @@ export const founderHubDeviceReportSchema = z
     ),
     supportsCloudsyncSettings: z.boolean().optional(),
     supportsAIProviderSettings: z.boolean().optional(),
+    supportsCloudsyncRecovery: z.boolean().optional(),
     autoFormatKey: z
       .string()
       .regex(/^[A-Za-z0-9+/]{87}=$/)
@@ -73,13 +74,21 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
-      kind: z.enum(['auto-format', 'dictation-status', 'cloudsync-log', 'ai-provider']),
+      expectedUserId: z.string().min(1).max(200).optional(),
+      kind: z.enum([
+        'auto-format',
+        'dictation-status',
+        'cloudsync-log',
+        'ai-provider',
+        'cloudsync-recovery',
+      ]),
       argument: z.string().min(1).max(201000),
     })
     .strict(),
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.enum([
         'show-release-notes',
         'dictation-retry',
@@ -92,6 +101,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.enum(['cloudsync-status', 'cloudsync-now']),
       argument: z.literal(''),
     })
@@ -99,6 +109,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('choose-export-directory'),
       argument: z.literal(''),
     })
@@ -106,6 +117,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('open-export-directory'),
       argument: z.literal(''),
     })
@@ -113,6 +125,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('request-permission'),
       argument: founderHubPermissionSchema,
     })
@@ -120,6 +133,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('open-permission'),
       argument: founderHubPermissionSchema,
     })
@@ -127,6 +141,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('set-lock'),
       argument: z.enum(['true', 'false']),
     })
@@ -134,6 +149,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.literal('preview-sound'),
       argument: z.enum(['ready', 'success', 'chime', 'sparkle', 'bloom']),
     })

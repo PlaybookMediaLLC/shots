@@ -43,6 +43,11 @@ export function useFounderHubDevices() {
   if (!context) throw new Error('Founder Hub device provider is missing.')
   return context.devices
 }
+export function useFounderHubUserId() {
+  const context = useContext(Devices)
+  if (!context) throw new Error('Founder Hub device provider is missing.')
+  return context.userId
+}
 /** A bounded native action; only the selected desktop can acknowledge its execution. */
 export function useNativeSettingsAction() {
   const context = useContext(Devices)
@@ -50,13 +55,18 @@ export function useNativeSettingsAction() {
   const { selected, userId } = context
   const client = useQueryClient()
   const mutation = useMutation({
+    mutationKey: ['founder-hub-command', userId],
     mutationFn: async (
       input: Omit<z.infer<typeof founderHubDeviceCommandInputSchema>, 'deviceId'>
     ) => {
       if (!selected) throw new Error('Select a connected desktop first.')
       return settingsRequest('/api/founder-hub/devices/commands', founderHubDeviceCommandSchema, {
         method: 'POST',
-        body: founderHubDeviceCommandInputSchema.parse({ ...input, deviceId: selected.deviceId }),
+        body: founderHubDeviceCommandInputSchema.parse({
+          ...input,
+          deviceId: selected.deviceId,
+          expectedUserId: input.expectedUserId ?? userId,
+        }),
       })
     },
   })
@@ -92,6 +102,7 @@ export function useNativeSettingsAction() {
   const result = command.data ?? mutation.data
   const error = mutation.error || command.error
   return {
+    userId,
     run: mutation.mutate,
     isPending:
       mutation.isPending ||

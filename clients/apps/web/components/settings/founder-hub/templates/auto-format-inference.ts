@@ -11,9 +11,11 @@ export const MAX_FORMAT_EXAMPLE_LENGTH = 12000
 
 export async function inferSummaryFormat({
   device,
+  userId,
   examples,
 }: {
   device: z.infer<typeof founderHubDeviceSchema>
+  userId: string
   examples: string[]
 }): Promise<string> {
   if (!device.report.autoFormatKey)
@@ -24,7 +26,12 @@ export async function inferSummaryFormat({
     founderHubDeviceCommandSchema,
     {
       method: 'POST',
-      body: { deviceId: device.deviceId, kind: 'auto-format', argument: encrypted.argument },
+      body: {
+        deviceId: device.deviceId,
+        expectedUserId: userId,
+        kind: 'auto-format',
+        argument: encrypted.argument,
+      },
       signal: AbortSignal.timeout(15000),
     }
   )

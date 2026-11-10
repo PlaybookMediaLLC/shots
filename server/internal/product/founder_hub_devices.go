@@ -138,7 +138,10 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 	if !founderHubDeviceID.MatchString(input.DeviceID) || !input.Valid() {
 		return nil, ErrInvalidInput
 	}
-	if input.Kind == "auto-format" || input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" || input.Kind == "cloudsync-log" {
+	if input.ExpectedUserID != "" && input.ExpectedUserID != actor.UserID {
+		return nil, publishing.ErrForbidden
+	}
+	if input.Kind == "auto-format" || input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" || input.Kind == "cloudsync-log" || input.Kind == "cloudsync-recovery" {
 		account, err := c.GetFounderHubSettingsAccount(ctx, actor)
 		if err != nil {
 			return nil, err
@@ -171,13 +174,16 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 	if time.Since(device.ReportedAt) > time.Minute {
 		return nil, publishing.ErrConflict
 	}
-	if (input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" || input.Kind == "cloudsync-log") && !device.Report.SupportsCloudsyncSettings {
+	if (input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" || input.Kind == "cloudsync-log" || input.Kind == "cloudsync-recovery") && !device.Report.SupportsCloudsyncSettings {
 		return nil, publishing.ErrConflict
 	}
 	if input.Kind == "ai-provider" && !device.Report.SupportsAIProviderSettings {
 		return nil, publishing.ErrConflict
 	}
-	if (input.Kind == "auto-format" || input.Kind == "dictation-status" || input.Kind == "cloudsync-log" || input.Kind == "ai-provider") && device.Report.AutoFormatKey == "" {
+	if input.Kind == "cloudsync-recovery" && !device.Report.SupportsCloudsyncRecovery {
+		return nil, publishing.ErrConflict
+	}
+	if (input.Kind == "auto-format" || input.Kind == "dictation-status" || input.Kind == "cloudsync-log" || input.Kind == "ai-provider" || input.Kind == "cloudsync-recovery") && device.Report.AutoFormatKey == "" {
 		return nil, publishing.ErrConflict
 	}
 	pending, err := db.PlatformFounderHubDeviceCommand.Query().Where(cmd.UserID(actor.UserID), cmd.DeviceID(input.DeviceID), cmd.StatusIn("pending", "running"), cmd.ExpiresAtGT(time.Now())).Count(ctx)
@@ -234,7 +240,7 @@ func (c *Configuration) FinishFounderHubDeviceCommand(ctx context.Context, actor
 		return nil, err
 	}
 	switch row.Kind {
-	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider":
+	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider", "cloudsync-recovery":
 		if input.Status == "succeeded" && !founderhub.ValidPrivateAction(input.Result, false) {
 			return nil, ErrInvalidInput
 		}

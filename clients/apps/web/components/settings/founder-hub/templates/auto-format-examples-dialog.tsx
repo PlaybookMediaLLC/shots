@@ -22,7 +22,7 @@ import {
   MAX_FORMAT_EXAMPLE_LENGTH,
   MAX_FORMAT_EXAMPLES,
 } from './auto-format-inference'
-import { useSelectedDevice } from '../device-context'
+import { useFounderHubUserId, useSelectedDevice } from '../device-context'
 export function AutoFormatExamplesDialog({
   onClose,
   onGenerated,
@@ -32,6 +32,7 @@ export function AutoFormatExamplesDialog({
 }) {
   const { _: _t } = _useLingui()
   const device = useSelectedDevice()
+  const userId = useFounderHubUserId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [examples, setExamples] = useState([''])
   const populatedExamples = examples.map((example) => example.trim()).filter(Boolean)
@@ -61,6 +62,7 @@ export function AutoFormatExamplesDialog({
       }
       return inferSummaryFormat({
         device: device!,
+        userId,
         examples: populatedExamples,
       })
     },
