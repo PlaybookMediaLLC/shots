@@ -77,7 +77,7 @@ Each decision replaces the v0.1 position named in brackets.
 
 **Conditional (RFC 007 trigger)**
 
-- Capture hardening items in section 5.5.
+- Capture hardening (5.5), staying signed in (5.6) and capture at scale (5.7).
 
 **Fixes to existing code**
 
@@ -233,6 +233,100 @@ Only when RFC 007's trigger is met. Each item is a change to the existing recipe
 | Missing fonts on the provider | A font check on the test page before a connection is marked ready |
 | JavaScript dialogs, permission prompts, downloads, new windows | Dialogs dismissed, prompts denied, downloads blocked, new windows closed; each recorded on the attempt |
 | DNS rebinding cannot be observed on Cloudflare (already recorded in the capture review) | Stated as residual risk. The browser runs on the provider's network, so it cannot reach Shots' internal addresses |
+
+### 5.6 Signed-in capture: staying signed in
+
+Signed-in capture exists today (section 2). A person signs in once through a live remote browser; Shots stores the encrypted cookies and local storage, never a password; each capture restores that session in a fresh browser.
+
+**Gap.** The stored session is kept 24 hours by default, set by one platform-wide setting. A team that deploys twice a week is asked to sign in again before almost every capture.
+
+**Change, in order of preference**
+
+| # | Mechanism | How it works | When to use |
+|---|---|---|---|
+| 1 | Per-connection retention | Retention becomes a setting on each app connection, chosen by the person connecting, from 1 to 30 days, default 14. The platform setting stays as the upper bound | Default for everyone |
+| 2 | Refresh on use | After every successful capture the refreshed session is saved again and its expiry is extended, so an app that is captured regularly stays connected | Always on |
+| 3 | Keep-alive visit | For a connection with no capture in the last half of its retention period, a short scheduled visit restores the session, confirms the account, saves the refreshed state and closes. One visit per connection per period, counted against the workspace's capture allowance | Opt-in per connection |
+| 4 | App-provided sign-in | The customer's app exposes an endpoint that, on a request signed by Shots, returns a one-time sign-in link for the demo account. Shots opens it in the remote browser when the stored session is missing or expired | Customers who want fully unattended capture |
+| — | Stored passwords | Not adopted. Shots would hold customer credentials and still could not pass two-factor | — |
+
+A person is told before a session lapses: a notice 48 hours ahead, and again when a job parks for sign-in.
+
+**Edge cases**
+
+| # | Case | Required behaviour |
+|---|---|---|
+| L1 | The app ends the session on its side before Shots' retention does | The capture finds the sign-in page, the job parks as needing sign-in, and the connection is marked accordingly. Retention is an upper bound, not a promise |
+| L2 | The restored session is signed in as a different account | Refused, as today; the connection needs sign-in |
+| L3 | The demo account's password is changed or the account is disabled | Same as L1 |
+| L4 | The app allows one session per account | Captures for a connection run one at a time (already enforced by the connection lease). The keep-alive visit takes the same lease |
+| L5 | A keep-alive visit triggers "new sign-in" emails in the customer's app | Stated in the connect screen; keep-alive is opt-in |
+| L6 | The connection is revoked | Stored state is deleted at once, as today, including any keep-alive schedule |
+| L7 | The sign-in endpoint is slow, down, or returns a link to a host not on the connection's login hosts | The link is refused or the job parks for sign-in; the endpoint is never retried in a tight loop |
+| L8 | A replayed or forged request to the customer's sign-in endpoint | Requests carry a timestamp and a signature over the body with a per-connection secret; the customer's side rejects old or unsigned requests. The link is single-use and short-lived |
+| L9 | The encryption key for stored sessions is rotated | A previous-key setting already exists so old sessions stay readable; confirm that a session is re-encrypted with the new key when it is next saved |
+| L10 | A longer retention period makes a leaked session more valuable | State stays encrypted at rest, is bound to one connection and its approved hosts, and is only ever loaded into the provider's browser. The connect screen shows the chosen period |
+
+### 5.7 Capture at scale
+
+**How capture runs today (read from the code)**
+
+| Aspect | Today | Consequence at volume |
+|---|---|---|
+| Unit of work | One job per recipe (one screen). Each job opens its own browser, restores the session and proves the build | A deployment with 10 screens opens 10 browsers, one after another |
+| Worker | The capture worker runs inside the single backend container with a fixed limit of 3 browser runs at once | About 120 single-screen captures an hour for the whole platform |
+| Per workspace | One running capture; a busy job polls again after 15 seconds to 2 minutes | Polling costs a workflow step and a database transaction each time, and the winner is arbitrary |
+| Deadline | 30 minutes from admission, including time spent waiting for a slot | Under load, jobs fail without ever running |
+| Dispatch | Through the outbox, which runs once a minute and handles 100 rows per run across all event types | Up to a minute before a capture starts; a hard ceiling of 100 starts a minute shared with everything else |
+| Provider ceiling | Not tracked. Cloudflare's documented limits for paid accounts are 120 browsers at once and one new browser a second | Past that, launches fail and are retried blindly |
+
+**Changes, in the order to make them**
+
+| # | Change | Detail |
+|---|---|---|
+| S1 | One browser session per deployment and connection | The runner claims every queued job for the same connection and deployment, opens one browser, restores the session and proves the build once, then runs each recipe in turn. Each recipe keeps its own step and time budget, its own result and its own failure; one failing does not stop the rest. Jobs, attempts and fencing stay per recipe |
+| S2 | Deadline counts running time | The 30-minute deadline starts when a job first gets a slot. Waiting has its own, longer limit (default 6 hours), after which the job ends as "not started" with the reason |
+| S3 | Start immediately, keep the outbox as the guarantee | After the admitting transaction commits, the workflow is started directly. The outbox row remains and its later delivery is a no-op, because the workflow ID is already taken |
+| S4 | Capture workers as their own component | The repository already builds the worker as a separate binary and can exclude queues per process. Run a component that serves only the capture queue, with the per-process limit as a setting instead of the fixed 3. Browser runs are mostly waiting on the network, so one small instance can hold tens of sessions |
+| S5 | Platform-wide admission | A claim succeeds only if three counts allow it, checked in one transaction: the connection (1), the workspace (by plan, default 1), and the platform (a setting kept below the provider's limit, default 80% of it). New browser launches pass through a shared one-per-second limiter |
+| S6 | Fair waiting instead of polling | Waiting jobs are ordered by workspace turn, then age, so one workspace with 200 jobs cannot starve the rest. A job waits for a "slot granted" signal; a slow fallback timer covers a lost signal |
+| S7 | Provider back-pressure | A launch refused for rate or capacity reasons pauses new launches platform-wide for a short, growing interval and is not counted against the job's attempts |
+| S8 | A second browser provider | The provider interface already exists. Add a second implementation and route by connection when one account's ceiling is reached or a customer needs a fixed egress address |
+| S9 | Metering and retention | Browser seconds are recorded per attempt and counted against the workspace's plan. Attempt rows older than a retention period are deleted |
+
+Fixes F3 (no capture for redeploys) and F4 (cancel superseded jobs) in section 7a remove work before it is queued and belong with S1–S3.
+
+**Capacity by stage.** Assumes a deployment's session takes about two minutes with S1.
+
+| Stage | Changes | Rough ceiling |
+|---|---|---|
+| Today | — | 120 screens an hour |
+| 1 | S1, S2, S3, and the worker limit raised to 20 | 600 deployments an hour |
+| 2 | S4, S5, S6, S7 at 96 browsers | 2,900 deployments an hour, about 69,000 a day |
+| 3 | S8, or higher limits agreed with the provider | Multiples of stage 2 per provider account |
+
+The launch limit of one browser a second is 3,600 sessions an hour, which is close to what 120 two-minute sessions can hold, so the two provider limits bind at about the same point. These figures are arithmetic, not measurements.
+
+**When to move to the next stage.** Stage 1 when signed-in capture is turned on for the first pilot. Stage 2 when the 95th-percentile wait for a slot passes five minutes, or peak use passes half the platform limit. Stage 3 when peak use passes 80% of the provider's limit for a week.
+
+**Edge cases**
+
+| # | Case | Required behaviour |
+|---|---|---|
+| Q1 | A browser crashes halfway through a session of 10 recipes | Finished recipes keep their results; the rest return to the queue and run in a new session |
+| Q2 | The build changes while a session is running | The build is checked again before each recipe; remaining recipes end as superseded (F4) |
+| Q3 | One recipe hangs | Its own time budget ends it; the session continues with the next |
+| Q4 | A worker instance is stopped during a deploy of Shots itself | Heartbeats stop, Temporal retries on another instance, the stale attempt is fenced out, and the orphaned browser is closed by the existing cleanup loop |
+| Q5 | Slots are counted as used by a session that no longer exists | Counts come from attempts with a live lease, so they free themselves when the lease expires |
+| Q6 | A slot-granted signal is lost | The fallback timer makes the job ask again |
+| Q7 | One workspace queues hundreds of jobs | Its jobs take turns with other workspaces; its own plan limit bounds how many run at once |
+| Q8 | The provider is down | New launches pause, waiting jobs keep their place, running time is not consumed, and the waiting limit in S2 eventually ends them with a clear reason |
+| Q9 | Two worker instances claim the same job | Already prevented by the workflow ID and the fencing token |
+| Q10 | The same stored session restored in several browsers at once | Not done: one connection runs one session at a time, which S1 makes sufficient |
+| Q11 | Public (not signed-in) captures | They use a separate screenshot service and are outside these limits today; they stay separate, with their own rate limit |
+| Q12 | A plan allows several captures at once but the demo account allows one session | The connection limit of 1 still applies; more parallelism needs more connections |
+
+**What this depends on.** S1 changes two of RFC 007's stated limits (a 90-second run and 10 steps) from per browser to per recipe within a browser. That needs the owner's agreement (decision 13).
 
 ---
 
@@ -661,7 +755,8 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 | 2 | Server voice domain, upload, sync, web voice inbox | S1–S19 and D1–D6 pass; `make tenant-isolation` extended to voice notes and passes; another member cannot read a private note |
 | 3 | Voice to draft | V1–V6 pass; a draft from a voice note goes through the existing approval policy unchanged |
 | 3b | Voice commands, 5.4 | K1–K25 pass; the spoken example schedules one X post at the right instant after one tap, and waits for approval in a workspace that requires it |
-| 4 (conditional) | Capture hardening, 5.5 | RFC 007 trigger met; each row has a regression test in the existing capture suite |
+| 4 (conditional) | Capture hardening (5.5), staying signed in (5.6), and stage 1 of capture at scale (5.7: S1–S3) | RFC 007 trigger met; each row has a regression test in the existing capture suite; L1–L10 and Q1–Q12 pass; a 10-screen deployment opens one browser |
+| 5 (by measurement) | Stages 2 and 3 of capture at scale (5.7: S4–S9) | Entered on the thresholds in 5.7; a load test on staging holds the platform limit without failed launches and with no workspace starved |
 | Parallel | Fixes F1–F9 in section 7a | F1 first and on its own. F1, F5 and F7 merged before Gate 3b. F8's drill done before voice launch. Each fix has its regression test |
 
 **Stop conditions.** If test (a) finds no format that survives a kill, recording design is reopened before Gate 1. If pilots do not use voice notes by the metric set at Gate 0, the work stops at the gate it is on.
@@ -678,6 +773,9 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 | 6 | A removed member's private notes | Delete after 30 days with notice |
 | 7 | Sign in with Apple | Add it; it is the simplest way through the App Store rule |
 | 8 | Whether a spoken command may schedule with no confirming tap | No at launch. If wanted later: a per-member opt-in, with the app reading the post and time back aloud and waiting for a spoken "confirm" |
+| 12 | Default period a signed-in capture session is kept | 14 days, chosen per connection up to 30 |
+| 13 | Run all of a deployment's screens in one browser session, making the run and step limits per screen | Yes; it is the largest single gain in capacity and cost |
+| 14 | How many captures a workspace may run at once | 1 by default, more by plan |
 | 9 | Whether approvals by a member who is later removed still authorize a send | Yes, but record the approver on the post so it can be audited and changed later |
 | 10 | Whether authors may approve their own content | A per-workspace setting, default allowed, since small teams have one person |
 | 11 | Scheduled posts when a workspace downgrades | Keep already-scheduled posts; block new scheduling over the plan's allowance |
@@ -688,7 +786,7 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 
 **Read directly in the repository (`329d1630`):** `AGENTS.md`, `server/README.md`, `docs/rfcs/README.md`, RFC 007 and the capture review's implementation status, `docs/deployment.md`, `docs/release-automation.md`, `docs/vision.md`, the capture and outbox Ent schemas, `server/go.mod`, `server/internal/platformai/platformai.go`, the web model catalog, pricing and provider settings, and the Better Auth server configuration.
 
-**Confirmed by reading the code directly:** P0 and the three parts of F2 (the 500 retry in `fetch`, the mapping of every other error to "unknown", and the daily-cap error type), the capture admission and retry behaviour behind F4, the single webhook secret behind F6, the missing provider preferences behind F5, and the outbox having no retention. For P0: `CreateScheduledPost` in `server/internal/product/scheduled_posts.go` and `server/internal/publishing/repository.go` has no approval check for content drafts, and `requireDraftApproval` is called only from the draft schedule, batch and publish-now paths. It was not exercised with a live request.
+**Confirmed by reading the code directly:** the capture pipeline facts in 5.7 (one job per recipe, the fixed worker limit of 3, the per-workspace limit and polling, the 30-minute deadline, dispatch through the once-a-minute outbox). Also P0 and the three parts of F2 (the 500 retry in `fetch`, the mapping of every other error to "unknown", and the daily-cap error type), the capture admission and retry behaviour behind F4, the single webhook secret behind F6, the missing provider preferences behind F5, and the outbox having no retention. For P0: `CreateScheduledPost` in `server/internal/product/scheduled_posts.go` and `server/internal/publishing/repository.go` has no approval check for content drafts, and `requireDraftApproval` is called only from the draft schedule, batch and publish-now paths. It was not exercised with a live request.
 
 **The other rows in 6.4 and 6.5 come from two delegated code reads on 2026-11-09**, each returning file and line references and test names. They were not re-read line by line. Items marked "inferred" in the tables had no test or direct statement behind them. The main references:
 
@@ -706,7 +804,7 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 | Apps that create accounts must offer in-app account deletion | Confirmed | [Apple: offering account deletion](https://developer.apple.com/support/offering-account-deletion-in-your-app) |
 | Rules on linking to web purchase from the app | Not confirmed | Check the current guideline text before submission; A2 avoids the question by having no purchase screens |
 | Better Auth has an Expo integration that stores the session in the device's secure store and accepts a native Apple ID token | Confirmed for version 1.6, which the repo uses. A reported issue with secure-store key names should be checked at Gate 0 | [Better Auth Expo integration, v1.6](https://better-auth.com/docs/1.6/integrations/expo), [issue 5426](https://github.com/better-auth/better-auth/issues/5426) |
-| Cloudflare Browser Run concurrency limits | Not checked; not needed while capture is one per workspace | — |
+| Cloudflare Browser Run allows 120 browsers at once and one new browser a second on paid accounts (raised in April 2026) | Confirmed from the vendor's documentation; the REST request limit was not found | [Browser Run limits](https://developers.cloudflare.com/browser-run/limits/index.md), [changelog](https://developers.cloudflare.com/changelog/post/2026-04-15-br-rename/index.md) |
 | Prices of cheaper OpenRouter models | Third-party trackers only | Not relied on; the plan uses the model already configured |
 
 **Not done**
