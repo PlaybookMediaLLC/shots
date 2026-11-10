@@ -33,6 +33,7 @@ import * as internal from '@/lib/api/contracts/internal'
 import * as founderHub from '@/lib/api/contracts/founder-hub'
 import * as founderHubDevices from '@/lib/api/contracts/founder-hub-devices'
 import * as founderHubResources from '@/lib/api/contracts/founder-hub-resources'
+import * as founderHubTemplates from '@/lib/api/contracts/founder-hub-templates'
 import * as linkPreview from '@/lib/api/contracts/link-preview'
 import * as notifications from '@/lib/api/contracts/notifications'
 import * as onboardingRuns from '@/lib/api/contracts/onboarding-runs'
@@ -93,6 +94,7 @@ const contracts = new Map<string, RouteContract>(
     founderHub,
     founderHubDevices,
     founderHubResources,
+    founderHubTemplates,
     linkPreview,
     onboardingRuns,
     outboundWebhooks,
