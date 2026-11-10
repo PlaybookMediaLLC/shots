@@ -36,6 +36,9 @@ import {
   CreditCard,
   User,
   UsersThree,
+  Gift,
+  DownloadSimple,
+  ChartLine,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -62,6 +65,9 @@ import { SettingsCRM } from './founder-hub/crm'
 import { WorkspaceBilling } from '@/components/workspace/WorkspaceBilling'
 import { SettingsAccount } from './founder-hub/account'
 import { SettingsTeam } from './founder-hub/team'
+import { SettingsReferrals } from './founder-hub/referrals'
+import { SettingsInsights } from './founder-hub/insights'
+import { SettingsImports } from './founder-hub/imports'
 
 const PAGE_CONTENT = {
   account: SettingsAccount,
@@ -80,9 +86,12 @@ const PAGE_CONTENT = {
   sync: SettingsSync,
   todo: SettingsTodo,
   developers: () => <SettingsDevelopers canManage={false} />,
-  crm: () => <SettingsCRM canManage={false} />,
+  crm: SettingsCRM,
   billing: () => <WorkspaceBilling canManage={false} />,
   team: SettingsTeam,
+  referrals: SettingsReferrals,
+  imports: SettingsImports,
+  insights: SettingsInsights,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   account: User,
@@ -104,6 +113,9 @@ const PAGE_ICONS = {
   crm: AddressBook,
   billing: CreditCard,
   team: UsersThree,
+  referrals: Gift,
+  imports: DownloadSimple,
+  insights: ChartLine,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
@@ -292,13 +304,25 @@ function SettingsSurface({
           <div className="bg-card min-h-0 min-w-0 flex-1 overflow-hidden rounded-tl-xl">
             <div className="scrollbar-hide h-full min-h-0 w-full min-w-0 overflow-x-hidden overflow-y-auto px-6 pt-6 pb-10">
               <fieldset
-                disabled={!deviceId && !['account', 'appearance', 'templates'].includes(page)}
+                disabled={
+                  !deviceId &&
+                  ![
+                    'account',
+                    'appearance',
+                    'templates',
+                    'billing',
+                    'developers',
+                    'crm',
+                    'team',
+                    'referrals',
+                  ].includes(page)
+                }
                 className="min-w-0 border-0 p-0"
               >
                 {page === 'developers' ? (
                   <SettingsDevelopers canManage={canManageDeveloper} />
                 ) : page === 'crm' ? (
-                  <SettingsCRM canManage={canManageDeveloper} />
+                  <SettingsCRM />
                 ) : page === 'billing' ? (
                   <WorkspaceBilling canManage={canManageBilling} />
                 ) : (

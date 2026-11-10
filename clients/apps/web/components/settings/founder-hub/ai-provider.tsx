@@ -35,6 +35,7 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
   const [baseUrl, setBaseUrl] = useState('')
   const [providerRequest, setProviderRequest] = useState<{
     userId: string
+    deviceId: string
     providerId: string
     kind: 'llm' | 'stt'
     request: Awaited<ReturnType<typeof createAIProviderRequest>>
@@ -48,7 +49,7 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
   }
   const providerId = kind === 'llm' ? llm.current_llm_provider : stt.current_stt_provider
   const providerAction = useMutation({
-    mutationFn: async (operation: 'status' | 'save' | 'clear') => {
+    mutationFn: async (operation: 'status' | 'save' | 'clear' | 'discover') => {
       if (!device?.report.autoFormatKey || !device.report.supportsAIProviderSettings || !providerId)
         throw new Error('Select an up-to-date connected desktop and provider first.')
       const input =
@@ -60,12 +61,14 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
               baseUrl: baseUrl || providerResult.data?.baseUrl || '',
               apiKey,
             }
-          : { operation, type: kind, providerId }
+          : operation === 'discover'
+            ? { operation, type: 'llm' as const, providerId }
+            : { operation, type: kind, providerId }
       const request = await createAIProviderRequest(device.report.autoFormatKey, input)
-      return { userId: action.userId, providerId, request }
+      return { userId: action.userId, deviceId: device.deviceId, providerId, request }
     },
-    onSuccess: ({ userId, providerId, request }) => {
-      setProviderRequest({ userId, providerId, kind, request })
+    onSuccess: ({ userId, deviceId, providerId, request }) => {
+      setProviderRequest({ userId, deviceId, providerId, kind, request })
       action.run({ kind: 'ai-provider', argument: request.argument, expectedUserId: userId })
       setApiKey('')
     },
@@ -77,6 +80,7 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
       Boolean(
         providerRequest &&
         providerRequest.userId === action.userId &&
+        providerRequest.deviceId === device?.deviceId &&
         providerRequest.kind === kind &&
         providerRequest.providerId === providerId &&
         action.commandId &&
@@ -88,6 +92,7 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
   })
   const storedConfig =
     providerRequest?.userId === action.userId &&
+    providerRequest.deviceId === device?.deviceId &&
     providerRequest.kind === kind &&
     providerRequest.providerId === providerId
       ? providerResult.data
@@ -104,6 +109,26 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
         Choose the provider and model used by Shots Founder Hub. Provider credentials are stored in
         the selected desktop’s secure keychain.
       </p>
+      <section className="flex flex-col items-start gap-2 rounded-lg border p-4">
+        <h2 className="text-sm font-medium">Model catalog and sign-in</h2>
+        <p className="text-muted-foreground text-xs">
+          Browse available models, download local transcription models, or sign in to a subscription
+          provider in the desktop app.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!device?.report.supportsSettingsNavigation || action.isPending}
+          onClick={() =>
+            action.run({
+              kind: 'open-settings-page',
+              argument: kind === 'llm' ? 'intelligence' : 'transcription',
+            })
+          }
+        >
+          {action.isPending ? 'Opening desktop settings…' : 'Open model settings on desktop'}
+        </Button>
+      </section>
       <div className="flex flex-col gap-6">
         <SettingRow
           title="Provider"
@@ -130,6 +155,35 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
             />
           )}
         </SettingRow>
+        {kind === 'llm' && (storedConfig?.models?.length ?? 0) > 0 && (
+          <SettingRow
+            title="Available models"
+            description="Choose a model returned by the selected desktop."
+          >
+            {(labels) => (
+              <Select
+                value={storedConfig?.models?.includes(model ?? '') ? model : undefined}
+                onValueChange={(value) => void save({ current_llm_model: value })}
+              >
+                <SelectTrigger {...labels} className="bg-card h-9">
+                  <SelectValue placeholder="Choose a discovered model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {storedConfig?.models?.map((modelId) => (
+                    <SelectItem key={modelId} value={modelId}>
+                      {modelId}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </SettingRow>
+        )}
+        {kind === 'llm' && storedConfig?.models?.length === 0 && (
+          <p role="status" className="text-xs text-muted-foreground">
+            No models were returned by this provider.
+          </p>
+        )}
         {kind === 'llm' && (
           <SettingRow
             title="Reasoning effort"
@@ -213,6 +267,22 @@ export function SettingsAIProvider({ kind }: { kind: 'llm' | 'stt' }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
+          {kind === 'llm' && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={
+                !providerId ||
+                !device?.report.supportsAIProviderSettings ||
+                !device?.report.autoFormatKey ||
+                action.isPending ||
+                providerAction.isPending
+              }
+              onClick={() => providerAction.mutate('discover')}
+            >
+              {providerAction.isPending ? 'Discovering models…' : 'Discover models'}
+            </Button>
+          )}
           <Button
             type="button"
             variant="outline"

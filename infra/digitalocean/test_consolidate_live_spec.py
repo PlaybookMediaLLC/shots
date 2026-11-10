@@ -91,6 +91,7 @@ class ConsolidateLiveSpecTest(unittest.TestCase):
                 "PLATFORM_SLACK_CALLBACK_URL", "INTEGRATION_ENCRYPTION_KEY",
                 "PLATFORM_WEBHOOK_ENCRYPTION_KEY", "PLATFORM_CAPTURE_CDP_URL", "PLATFORM_CAPTURE_CDP_TOKEN",
                 "PLATFORM_CAPTURE_STATE_KEY", "PLATFORM_CAPTURE_STATE_KEY_PREVIOUS", "PLATFORM_CAPTURE_STATE_MAX_AGE")
+        keys = (*keys, "NANGO_API_KEY")
         secrets = {key: "fixture-" + key for key in keys}
         secrets.update({key: "fixture" for key in ("R2_ENDPOINT", "R2_BUCKET_NAME", "R2_ACCESS_KEY_ID",
                                                   "R2_SECRET_ACCESS_KEY", "REDIS_URL")})

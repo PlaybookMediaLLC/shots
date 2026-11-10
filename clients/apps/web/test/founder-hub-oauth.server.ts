@@ -231,9 +231,9 @@ test('Founder Hub PKCE, rotation, identity, and revocation use the real Shots ba
     (await requireFounderHubAccess(accessHeaders(rotated.access_token))).accountUserId,
     first.accountUserId
   )
-  const gateway = process.env.FOUNDER_HUB_GATEWAY_URL
+  const gateway = z.url().parse(process.env.FOUNDER_HUB_GATEWAY_URL)
   let gatewayRefresh: string | undefined
-  if (gateway) {
+  {
     const exchange = await fetch(`${gateway}/auth/v1/token?grant_type=authorization_code`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -404,7 +404,7 @@ test('Founder Hub PKCE, rotation, identity, and revocation use the real Shots ba
     (await exchange({ grant_type: 'refresh_token', refresh_token: rotated.refresh_token })).status,
     400
   )
-  if (gateway) {
+  {
     assert.equal((await fetch(`${gateway}/rest/v1/workspaces`, { headers })).status, 401)
     assert.equal(
       (

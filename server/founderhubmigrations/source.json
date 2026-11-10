@@ -166,5 +166,7 @@
   "20261109193000_shots_authority_projection.sql": "b42b2841821faa86b97dce393033173e048777383b7e339dd9d3820812c02827",
   "20261109194000_shots_permission_boundary.sql": "56bfc0f2888a2dba3d9b33065d9f54e1d452e779a6e71656aa3fc58eabe6a8e0",
   "20261109200000_shots_cloud_api_keys.sql": "5c19fd4cfac71f452bd2287005a565e4fc6ec85e6da5908db2cd01853c05334c",
-  "20261109201000_shots_cloud_snapshot_permissions.sql": "4bda44e2c224aa3f5e7cf67251947071c69eb3f0a6d90c6f4c93b1bc4daa844c"
+  "20261109201000_shots_cloud_snapshot_permissions.sql": "4bda44e2c224aa3f5e7cf67251947071c69eb3f0a6d90c6f4c93b1bc4daa844c",
+  "20261110014000_owner_scoped_nango_connection_write.sql": "6fea89fb9c2d848909be932948f3ee82c811cf3e68804798f69959cc6f66f519",
+  "20261110014001_restrict_nango_connection_mutations.sql": "e569cb215a98df2a240856aad08a0c096ca296811ef0335f21ddad003fad1601"
 }

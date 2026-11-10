@@ -23,6 +23,13 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("GET /v1/founder-hub/settings", s.authenticateSession(http.HandlerFunc(s.listFounderHubSettings)))
 	mux.Handle("GET /v1/founder-hub/templates", s.authenticateSession(http.HandlerFunc(s.listFounderHubTemplates)))
 	mux.Handle("POST /v1/founder-hub/resources", s.authenticateSession(http.HandlerFunc(s.founderHubResourceAction)))
+	mux.Handle("GET /v1/founder-hub/referrals", s.authenticateSession(http.HandlerFunc(s.getFounderHubReferralSummary)))
+	mux.Handle("POST /v1/founder-hub/referrals/claim", s.authenticateSession(http.HandlerFunc(s.claimFounderHubReferral)))
+	mux.Handle("GET /v1/founder-hub/crm/providers", s.authenticateSession(http.HandlerFunc(s.listFounderHubCRMProviders)))
+	mux.Handle("GET /v1/founder-hub/crm/connections", s.authenticateSession(http.HandlerFunc(s.listFounderHubCRMConnections)))
+	mux.Handle("POST /v1/founder-hub/crm/connections", s.authenticateSession(http.HandlerFunc(s.registerFounderHubCRMConnection)))
+	mux.Handle("POST /v1/founder-hub/crm/session", s.authenticateSession(http.HandlerFunc(s.createFounderHubCRMConnectSession)))
+	mux.Handle("DELETE /v1/founder-hub/crm/connections/{id}", s.authenticateSession(http.HandlerFunc(s.deleteFounderHubCRMConnection)))
 	mux.Handle("GET /v1/founder-hub/resources/workspaces", s.authenticateSession(http.HandlerFunc(s.founderHubShareWorkspaces)))
 	mux.Handle("PATCH /v1/founder-hub/templates/{id}", s.authenticateSession(http.HandlerFunc(s.updateFounderHubTemplate)))
 	mux.Handle("PATCH /v1/founder-hub/settings", s.authenticateSession(http.HandlerFunc(s.updateFounderHubSettings)))
@@ -97,6 +104,46 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("POST /v1/internal/assets/{id}/download", s.authenticateService(http.HandlerFunc(s.readAssetDownload)))
 	mux.Handle("DELETE /v1/assets/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteAsset)))
 	mux.Handle("GET /v1/audit-logs", s.authenticateProduct(http.HandlerFunc(s.listAuditLogs)))
+}
+
+func (s *Server) listFounderHubCRMProviders(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"providers": product.FounderHubCRMProviders(), "configured": s.configuration.FounderHubCRMConfigured()})
+}
+
+func (s *Server) listFounderHubCRMConnections(w http.ResponseWriter, r *http.Request) {
+	connections, err := s.configuration.ListFounderHubCRMConnections(r.Context(), workspaceActor(r))
+	respond(w, http.StatusOK, map[string]any{"connections": connections}, err)
+}
+
+func (s *Server) registerFounderHubCRMConnection(w http.ResponseWriter, r *http.Request) {
+	var input product.FounderHubCRMRegisterInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid CRM connection")
+		return
+	}
+	if err := s.configuration.RegisterFounderHubCRMConnection(r.Context(), workspaceActor(r), input); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"registered": true})
+}
+
+func (s *Server) createFounderHubCRMConnectSession(w http.ResponseWriter, r *http.Request) {
+	var input product.FounderHubCRMConnectInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid CRM connection request")
+		return
+	}
+	result, err := s.configuration.CreateFounderHubCRMConnectSession(r.Context(), workspaceActor(r), input)
+	respond(w, http.StatusOK, result, err)
+}
+
+func (s *Server) deleteFounderHubCRMConnection(w http.ResponseWriter, r *http.Request) {
+	if err := s.configuration.DeleteFounderHubCRMConnection(r.Context(), workspaceActor(r), r.URL.Query().Get("provider"), r.PathValue("id")); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"disconnected": true})
 }
 
 func (s *Server) founderHubSession(w http.ResponseWriter, r *http.Request) {

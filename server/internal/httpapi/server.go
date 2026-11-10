@@ -170,6 +170,11 @@ type ConfigurationStore interface {
 	ListFounderHubSettings(context.Context, product.Actor) ([]product.FounderHubSettings, error)
 	ListFounderHubTemplates(context.Context, product.Actor, string, bool, string) (*product.FounderHubTemplatePage, error)
 	FounderHubResourceAction(context.Context, product.Actor, product.FounderHubResourceAction) (json.RawMessage, error)
+	ListFounderHubCRMConnections(context.Context, product.Actor) ([]product.FounderHubCRMConnection, error)
+	FounderHubCRMConfigured() bool
+	RegisterFounderHubCRMConnection(context.Context, product.Actor, product.FounderHubCRMRegisterInput) error
+	CreateFounderHubCRMConnectSession(context.Context, product.Actor, product.FounderHubCRMConnectInput) (*product.FounderHubCRMConnectSession, error)
+	DeleteFounderHubCRMConnection(context.Context, product.Actor, string, string) error
 	FounderHubShareWorkspaces(context.Context, product.Actor) ([]product.FounderHubShareWorkspace, error)
 	UpdateFounderHubTemplate(context.Context, product.Actor, string, product.FounderHubTemplateUpdate) (*product.FounderHubTemplate, error)
 	UpdateFounderHubSettings(context.Context, product.Actor, product.FounderHubSettingsUpdate) (*product.FounderHubSettings, error)
@@ -181,6 +186,8 @@ type ConfigurationStore interface {
 	GetFounderHubKeySession(context.Context, product.Actor) (*product.FounderHubSession, error)
 	GetFounderHubConnectorSession(context.Context, product.Actor, string) (*product.FounderHubSession, error)
 	GetFounderHubProfile(context.Context, string) (*product.FounderHubProfile, error)
+	FounderHubReferralSummary(context.Context, product.Actor) (json.RawMessage, error)
+	ClaimFounderHubReferral(context.Context, product.Actor, string) (*product.FounderHubReferralClaim, error)
 	RevokeFounderHubSession(context.Context, product.Actor) error
 	AuthorizeSensitive(context.Context, product.Actor) error
 	ListBrandKits(context.Context, string) ([]*ent.BrandKit, error)

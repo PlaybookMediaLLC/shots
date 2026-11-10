@@ -11,6 +11,11 @@ const envelopeSchema = z
   .strict()
 const responseSchema = envelopeSchema.omit({ publicKey: true })
 const syncLogSchema = z.string().max(110_000)
+const aiProviderModelIdSchema = z
+  .string()
+  .min(1)
+  .max(128)
+  .refine((modelId) => new TextEncoder().encode(JSON.stringify(modelId)).byteLength <= 130)
 const aiProviderRequestSchema = z.discriminatedUnion('operation', [
   z
     .object({
@@ -35,9 +40,20 @@ const aiProviderRequestSchema = z.discriminatedUnion('operation', [
       providerId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/),
     })
     .strict(),
+  z
+    .object({
+      operation: z.literal('discover'),
+      type: z.literal('llm'),
+      providerId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/),
+    })
+    .strict(),
 ])
 const aiProviderResultSchema = z
-  .object({ configured: z.boolean(), baseUrl: z.string().max(2048) })
+  .object({
+    configured: z.boolean(),
+    baseUrl: z.string().max(2048),
+    models: z.array(aiProviderModelIdSchema).max(400).optional(),
+  })
   .strict()
 const cloudsyncRecoveryRequestSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('status') }).strict(),

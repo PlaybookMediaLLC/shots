@@ -34,6 +34,25 @@ func TestFounderHubDeviceCommandsArePrivateAndClaimedOnlyOnce(t *testing.T) {
 	if _, err := w.repo.CreateFounderHubDeviceCommand(w.ctx, w.owner, invalid); !errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("arbitrary command accepted: %v", err)
 	}
+	settingsPage := founderhub.DeviceCommandInput{DeviceID: report.DeviceID, Kind: "open-settings-page", Argument: "imports"}
+	if _, err := w.repo.CreateFounderHubDeviceCommand(w.ctx, w.owner, settingsPage); !errors.Is(err, publishing.ErrConflict) {
+		t.Fatalf("desktop without settings navigation capability accepted command: %v", err)
+	}
+	report.Report.SupportsSettingsNavigation = true
+	if _, err := w.repo.ReportFounderHubDevice(w.ctx, w.owner, report); err != nil {
+		t.Fatal(err)
+	}
+	navigationCommand, err := w.repo.CreateFounderHubDeviceCommand(w.ctx, w.owner, settingsPage)
+	if err != nil {
+		t.Fatalf("capable desktop rejected settings navigation: %v", err)
+	}
+	claimedNavigation, err := w.repo.ReportFounderHubDevice(w.ctx, w.owner, report)
+	if err != nil || len(claimedNavigation) != 1 || claimedNavigation[0].ID != navigationCommand.ID {
+		t.Fatalf("navigation command was not delivered to the capable desktop: %v %v", claimedNavigation, err)
+	}
+	if _, err := w.repo.FinishFounderHubDeviceCommand(w.ctx, w.owner, navigationCommand.ID, FounderHubDeviceCommandResult{DeviceID: report.DeviceID, Status: "succeeded"}); err != nil {
+		t.Fatal(err)
+	}
 	created, err := w.repo.CreateFounderHubDeviceCommand(w.ctx, w.owner, input)
 	if err != nil {
 		t.Fatal(err)
@@ -147,5 +166,31 @@ func TestFounderHubDeviceCommandsArePrivateAndClaimedOnlyOnce(t *testing.T) {
 	}
 	if accepted != 4 {
 		t.Fatalf("concurrent requests exceeded the device queue limit: %d", accepted)
+	}
+}
+
+func TestFounderHubActivityInsightsResultIsAcceptedAndPersisted(t *testing.T) {
+	w := newTestWorkspace(t)
+	w.owner.OrganizationID = ""
+	report := FounderHubDeviceReportInput{DeviceID: "desktop-insights", Name: "Mac", Report: founderhub.DeviceReport{
+		Platform: "macos", Microphones: []string{}, InstalledApps: []founderhub.InstalledApp{}, DefaultIgnoredApps: []string{}, Permissions: map[string]string{}}}
+	if _, err := w.repo.ReportFounderHubDevice(w.ctx, w.owner, report); err != nil {
+		t.Fatal(err)
+	}
+	command, err := w.repo.CreateFounderHubDeviceCommand(w.ctx, w.owner, founderhub.DeviceCommandInput{
+		DeviceID: report.DeviceID, Kind: "activity-insights", Argument: "all",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.ReportFounderHubDevice(w.ctx, w.owner, report); err != nil {
+		t.Fatal(err)
+	}
+	result := `{"conversations":3,"totalConversations":4,"hours":1.5,"activeDays":2,"streak":1,"days":[{"key":"2026-11-09","count":2}],"weekdayCounts":[{"weekday":0,"count":1},{"weekday":1,"count":1},{"weekday":2,"count":0},{"weekday":3,"count":0},{"weekday":4,"count":0},{"weekday":5,"count":0},{"weekday":6,"count":0}]}`
+	completed, err := w.repo.FinishFounderHubDeviceCommand(w.ctx, w.owner, command.ID, FounderHubDeviceCommandResult{
+		DeviceID: report.DeviceID, Status: "succeeded", Result: result,
+	})
+	if err != nil || completed.Status != "succeeded" || completed.Result != result {
+		t.Fatalf("valid Insights result was not persisted: command=%+v err=%v", completed, err)
 	}
 }

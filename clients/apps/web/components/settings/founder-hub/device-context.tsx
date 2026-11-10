@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { z } from 'zod'
 import {
@@ -54,13 +54,15 @@ export function useNativeSettingsAction() {
   if (!context) throw new Error('Founder Hub device provider is missing.')
   const { selected, userId } = context
   const client = useQueryClient()
+  const [commandId, setCommandId] = useState<string>()
+  const requestNumber = useRef(0)
   const mutation = useMutation({
     mutationKey: ['founder-hub-command', userId],
     mutationFn: async (
       input: Omit<z.infer<typeof founderHubDeviceCommandInputSchema>, 'deviceId'>
     ) => {
       if (!selected) throw new Error('Select a connected desktop first.')
-      return settingsRequest('/api/founder-hub/devices/commands', founderHubDeviceCommandSchema, {
+      const command = await settingsRequest('/api/founder-hub/devices/commands', founderHubDeviceCommandSchema, {
         method: 'POST',
         body: founderHubDeviceCommandInputSchema.parse({
           ...input,
@@ -68,20 +70,38 @@ export function useNativeSettingsAction() {
           expectedUserId: input.expectedUserId ?? userId,
         }),
       })
+      return command
     },
   })
+  const mutate = mutation.mutate
+  const run = useCallback(
+    (input: Omit<z.infer<typeof founderHubDeviceCommandInputSchema>, 'deviceId'>) => {
+      const request = ++requestNumber.current
+      setCommandId(undefined)
+      mutate(input, {
+        onSuccess: (created) => {
+          if (request !== requestNumber.current) return
+          client.setQueryData(['founder-hub-command', userId, created.id], created)
+          setCommandId(created.id)
+        },
+      })
+    },
+    [client, mutate, userId]
+  )
   const command = useQuery({
-    queryKey: ['founder-hub-command', userId, mutation.data?.id],
-    enabled: Boolean(mutation.data),
+    queryKey: ['founder-hub-command', userId, commandId],
+    enabled: Boolean(commandId),
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     queryFn: async ({ signal }) => {
-      if (Date.parse(mutation.data!.expiresAt) <= Date.now()) {
-        return { ...mutation.data!, status: 'expired' as const }
+      const queryKey = ['founder-hub-command', userId, commandId] as const
+      const created = client.getQueryData<z.infer<typeof founderHubDeviceCommandSchema>>(queryKey)
+      if (created && Date.parse(created.expiresAt) <= Date.now()) {
+        return { ...created, status: 'expired' as const }
       }
       const result = await settingsRequest(
-        `/api/founder-hub/devices/commands/${mutation.data!.id}`,
+        `/api/founder-hub/devices/commands/${commandId}`,
         founderHubDeviceCommandSchema,
         { signal }
       )
@@ -103,13 +123,14 @@ export function useNativeSettingsAction() {
   const error = mutation.error || command.error
   return {
     userId,
-    run: mutation.mutate,
+    run,
     isPending:
-      mutation.isPending ||
+      Boolean(!result && mutation.isPending) ||
       Boolean(!error && result && ['pending', 'running'].includes(result.status)),
     deviceId: result?.deviceId,
     commandId: result?.id,
     kind: result?.kind,
+    argument: result?.argument,
     result: result?.result ?? '',
     error: error
       ? settingsErrorMessage(error)

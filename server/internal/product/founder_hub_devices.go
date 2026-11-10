@@ -180,6 +180,9 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 	if input.Kind == "ai-provider" && !device.Report.SupportsAIProviderSettings {
 		return nil, publishing.ErrConflict
 	}
+	if input.Kind == "open-settings-page" && !device.Report.SupportsSettingsNavigation {
+		return nil, publishing.ErrConflict
+	}
 	if input.Kind == "cloudsync-recovery" && !device.Report.SupportsCloudsyncRecovery {
 		return nil, publishing.ErrConflict
 	}
@@ -249,6 +252,13 @@ func (c *Configuration) FinishFounderHubDeviceCommand(ctx context.Context, actor
 		}
 	case "cloudsync-status":
 		if input.Status == "succeeded" && !founderhub.ValidCloudsyncStatusResult(input.Result) {
+			return nil, ErrInvalidInput
+		}
+		if input.Status == "failed" && input.Result != "" {
+			return nil, ErrInvalidInput
+		}
+	case "activity-insights":
+		if input.Status == "succeeded" && !founderhub.ValidActivityInsightsResult(input.Result) {
 			return nil, ErrInvalidInput
 		}
 		if input.Status == "failed" && input.Result != "" {

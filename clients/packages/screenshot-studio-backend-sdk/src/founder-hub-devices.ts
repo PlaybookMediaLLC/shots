@@ -35,6 +35,7 @@ export const founderHubDeviceReportSchema = z
     supportsCloudsyncSettings: z.boolean().optional(),
     supportsAIProviderSettings: z.boolean().optional(),
     supportsCloudsyncRecovery: z.boolean().optional(),
+    supportsSettingsNavigation: z.boolean().optional(),
     autoFormatKey: z
       .string()
       .regex(/^[A-Za-z0-9+/]{87}=$/)
@@ -102,8 +103,24 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
       expectedUserId: z.string().min(1).max(200).optional(),
+      kind: z.literal('open-settings-page'),
+      argument: z.enum(['imports', 'intelligence', 'transcription']),
+    })
+    .strict(),
+  z
+    .object({
+      deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
       kind: z.enum(['cloudsync-status', 'cloudsync-now']),
       argument: z.literal(''),
+    })
+    .strict(),
+  z
+    .object({
+      deviceId: founderHubDeviceSchema.shape.deviceId,
+      expectedUserId: z.string().min(1).max(200).optional(),
+      kind: z.literal('activity-insights'),
+      argument: z.enum(['all', '30d', '7d']),
     })
     .strict(),
   z

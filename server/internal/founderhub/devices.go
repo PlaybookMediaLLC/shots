@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"math"
 	"strings"
+	"time"
 )
 
 type InstalledApp struct {
@@ -30,6 +32,7 @@ type DeviceReport struct {
 	SupportsCloudsyncSettings  bool              `json:"supportsCloudsyncSettings,omitempty"`
 	SupportsAIProviderSettings bool              `json:"supportsAIProviderSettings,omitempty"`
 	SupportsCloudsyncRecovery  bool              `json:"supportsCloudsyncRecovery,omitempty"`
+	SupportsSettingsNavigation bool              `json:"supportsSettingsNavigation,omitempty"`
 	AutoFormatKey              string            `json:"autoFormatKey,omitempty"`
 }
 
@@ -128,6 +131,75 @@ func ValidCloudsyncStatusResult(value string) bool {
 	return true
 }
 
+type ActivityInsightsResult struct {
+	Conversations      *int                    `json:"conversations"`
+	TotalConversations *int                    `json:"totalConversations"`
+	Hours              *float64                `json:"hours"`
+	ActiveDays         *int                    `json:"activeDays"`
+	Streak             *int                    `json:"streak"`
+	Days               *[]ActivityInsightDay   `json:"days"`
+	WeekdayCounts      *[]ActivityWeekdayCount `json:"weekdayCounts"`
+}
+
+type ActivityInsightDay struct {
+	Key   *string `json:"key"`
+	Count *int    `json:"count"`
+}
+
+type ActivityWeekdayCount struct {
+	Weekday *int `json:"weekday"`
+	Count   *int `json:"count"`
+}
+
+const maxSafeJSONInteger int64 = 1<<53 - 1
+
+func ValidActivityInsightsResult(value string) bool {
+	if len(value) == 0 || len(value) > 65536 {
+		return false
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(value), &fields) != nil || len(fields) != 7 {
+		return false
+	}
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.DisallowUnknownFields()
+	var result ActivityInsightsResult
+	if decoder.Decode(&result) != nil || decoder.Decode(new(any)) != io.EOF {
+		return false
+	}
+	if result.Conversations == nil || result.TotalConversations == nil || result.Hours == nil ||
+		result.ActiveDays == nil || result.Streak == nil || result.Days == nil || result.WeekdayCounts == nil {
+		return false
+	}
+	if *result.Conversations < 0 || int64(*result.Conversations) > maxSafeJSONInteger ||
+		*result.TotalConversations < *result.Conversations || int64(*result.TotalConversations) > maxSafeJSONInteger ||
+		math.IsNaN(*result.Hours) || math.IsInf(*result.Hours, 0) || *result.Hours < 0 ||
+		*result.ActiveDays < 0 || int64(*result.ActiveDays) > maxSafeJSONInteger ||
+		*result.Streak < 0 || int64(*result.Streak) > maxSafeJSONInteger ||
+		len(*result.Days) > 400 || len(*result.WeekdayCounts) != 7 {
+		return false
+	}
+	previousDay := ""
+	for _, day := range *result.Days {
+		if day.Key == nil || day.Count == nil || *day.Count < 0 || int64(*day.Count) > maxSafeJSONInteger || len(*day.Key) != len("2006-01-02") {
+			return false
+		}
+		parsed, err := time.Parse("2006-01-02", *day.Key)
+		if err != nil || parsed.Format("2006-01-02") != *day.Key || (previousDay != "" && *day.Key <= previousDay) {
+			return false
+		}
+		previousDay = *day.Key
+	}
+	seenWeekdays := [7]bool{}
+	for _, day := range *result.WeekdayCounts {
+		if day.Weekday == nil || day.Count == nil || *day.Weekday < 0 || *day.Weekday > 6 || seenWeekdays[*day.Weekday] || *day.Count < 0 || int64(*day.Count) > maxSafeJSONInteger {
+			return false
+		}
+		seenWeekdays[*day.Weekday] = true
+	}
+	return true
+}
+
 func (input DeviceCommandInput) Valid() bool {
 	if len(input.ExpectedUserID) > 200 {
 		return false
@@ -137,6 +209,10 @@ func (input DeviceCommandInput) Valid() bool {
 		return ValidPrivateAction(input.Argument, true)
 	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut", "cloudsync-status", "cloudsync-now":
 		return input.Argument == ""
+	case "open-settings-page":
+		return input.Argument == "imports" || input.Argument == "intelligence" || input.Argument == "transcription"
+	case "activity-insights":
+		return input.Argument == "all" || input.Argument == "30d" || input.Argument == "7d"
 	case "request-permission", "open-permission":
 		return ValidPermission(input.Argument)
 	case "set-lock":

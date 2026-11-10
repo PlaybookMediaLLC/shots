@@ -20,6 +20,10 @@ import { founderHubTemplateSchema, founderHubTemplateQuerySchema, founderHubTemp
 export * from './founder-hub-templates.ts'
 import { founderHubResourceActionSchema, founderHubResourceResultSchema, founderHubShareWorkspaceSchema } from './founder-hub-resources.ts'
 export * from './founder-hub-resources.ts'
+import { founderHubReferralSummarySchema, founderHubReferralClaimSchema, founderHubReferralClaimResultSchema } from './founder-hub-referrals.ts'
+export * from './founder-hub-referrals.ts'
+import { founderHubCRMProvidersSchema, founderHubCRMConnectionsSchema, founderHubCRMConnectInputSchema, founderHubCRMConnectSessionSchema, founderHubCRMDisconnectResultSchema, founderHubCRMRegisterInputSchema, founderHubCRMRegisterResultSchema } from './founder-hub-crm.ts'
+export * from './founder-hub-crm.ts'
 import {
   founderHubDeviceSchema,
   founderHubDeviceReportInputSchema,
@@ -2745,6 +2749,44 @@ export class ScreenshotStudioBackendSDK {
 
   async founderHubShareWorkspaces() {
     return z.array(founderHubShareWorkspaceSchema).parse(await this.request('v1/founder-hub/resources/workspaces'))
+  }
+
+  async getFounderHubReferralSummary() {
+    return founderHubReferralSummarySchema.parse(await this.request('v1/founder-hub/referrals'))
+  }
+
+  async claimFounderHubReferral(input: z.input<typeof founderHubReferralClaimSchema>) {
+    return founderHubReferralClaimResultSchema.parse(await this.request('v1/founder-hub/referrals/claim', {
+      method: 'POST',
+      body: founderHubReferralClaimSchema.parse(input),
+    }))
+  }
+
+  async getFounderHubCRMProviders() {
+    return founderHubCRMProvidersSchema.parse(await this.request('v1/founder-hub/crm/providers'))
+  }
+
+  async getFounderHubCRMConnections() {
+    return founderHubCRMConnectionsSchema.parse(await this.request('v1/founder-hub/crm/connections'))
+  }
+
+  async createFounderHubCRMConnectSession(input: z.input<typeof founderHubCRMConnectInputSchema>) {
+    return founderHubCRMConnectSessionSchema.parse(await this.request('v1/founder-hub/crm/session', {
+      method: 'POST',
+      body: founderHubCRMConnectInputSchema.parse(input),
+    }))
+  }
+
+  async registerFounderHubCRMConnection(input: z.input<typeof founderHubCRMRegisterInputSchema>) {
+    return founderHubCRMRegisterResultSchema.parse(await this.request('v1/founder-hub/crm/connections', {
+      method: 'POST',
+      body: founderHubCRMRegisterInputSchema.parse(input),
+    }))
+  }
+
+  async deleteFounderHubCRMConnection(provider: string, connectionId: string) {
+    const query = new URLSearchParams({ provider })
+    return founderHubCRMDisconnectResultSchema.parse(await this.request(`v1/founder-hub/crm/connections/${encodeURIComponent(connectionId)}?${query}`, { method: 'DELETE' }))
   }
 
   async updateFounderHubTemplate(id: string, input: z.input<typeof founderHubTemplateUpdateSchema>, native = false) {

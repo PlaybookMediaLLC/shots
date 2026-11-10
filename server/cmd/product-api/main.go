@@ -84,6 +84,9 @@ func main() {
 	configuration := product.NewConfiguration(db.Client).WithNotifications(notifications.New(db.SQL, db.Client)).WithAuthStore(authstore.New(db.SQL)).
 		WithAgentClients(agentClients).WithInvitationEmailVerification(os.Getenv("AUTH_REQUIRE_EMAIL_VERIFICATION") != "false").
 		WithAssetDownloads(cfg.ServiceToken, os.Getenv("BETTER_AUTH_URL"))
+	if nangoKey := os.Getenv("NANGO_API_KEY"); nangoKey != "" {
+		configuration.WithFounderHubNango(product.NewFounderHubNangoClient(nangoKey, os.Getenv("NANGO_API_BASE"), os.Getenv("NANGO_CONNECT_URL")))
+	}
 	if objects != nil {
 		configuration.WithObjectStore(objects)
 	}
