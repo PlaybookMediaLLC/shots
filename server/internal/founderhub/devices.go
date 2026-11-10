@@ -14,21 +14,22 @@ type InstalledApp struct {
 }
 
 type DeviceReport struct {
-	Platform                  string            `json:"platform"`
-	Version                   string            `json:"version"`
-	Identifier                string            `json:"identifier"`
-	Locale                    string            `json:"locale"`
-	Timezone                  string            `json:"timezone"`
-	AppStore                  bool              `json:"appStore"`
-	LockAvailable             bool              `json:"lockAvailable"`
-	HomeDirectory             string            `json:"homeDirectory"`
-	DownloadsDirectory        string            `json:"downloadsDirectory"`
-	Microphones               []string          `json:"microphones"`
-	InstalledApps             []InstalledApp    `json:"installedApps"`
-	DefaultIgnoredApps        []string          `json:"defaultIgnoredApps"`
-	Permissions               map[string]string `json:"permissions"`
-	SupportsCloudsyncSettings bool              `json:"supportsCloudsyncSettings,omitempty"`
-	AutoFormatKey             string            `json:"autoFormatKey,omitempty"`
+	Platform                   string            `json:"platform"`
+	Version                    string            `json:"version"`
+	Identifier                 string            `json:"identifier"`
+	Locale                     string            `json:"locale"`
+	Timezone                   string            `json:"timezone"`
+	AppStore                   bool              `json:"appStore"`
+	LockAvailable              bool              `json:"lockAvailable"`
+	HomeDirectory              string            `json:"homeDirectory"`
+	DownloadsDirectory         string            `json:"downloadsDirectory"`
+	Microphones                []string          `json:"microphones"`
+	InstalledApps              []InstalledApp    `json:"installedApps"`
+	DefaultIgnoredApps         []string          `json:"defaultIgnoredApps"`
+	Permissions                map[string]string `json:"permissions"`
+	SupportsCloudsyncSettings  bool              `json:"supportsCloudsyncSettings,omitempty"`
+	SupportsAIProviderSettings bool              `json:"supportsAIProviderSettings,omitempty"`
+	AutoFormatKey              string            `json:"autoFormatKey,omitempty"`
 }
 
 func (report DeviceReport) Valid() bool {
@@ -127,7 +128,7 @@ func ValidCloudsyncStatusResult(value string) bool {
 
 func (input DeviceCommandInput) Valid() bool {
 	switch input.Kind {
-	case "auto-format", "dictation-status", "cloudsync-log":
+	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider":
 		return ValidPrivateAction(input.Argument, true)
 	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut", "cloudsync-status", "cloudsync-now":
 		return input.Argument == ""

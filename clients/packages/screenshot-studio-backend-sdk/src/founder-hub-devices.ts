@@ -33,6 +33,7 @@ export const founderHubDeviceReportSchema = z
       z.enum(['authorized', 'denied', 'neverRequested', 'unknown'])
     ),
     supportsCloudsyncSettings: z.boolean().optional(),
+    supportsAIProviderSettings: z.boolean().optional(),
     autoFormatKey: z
       .string()
       .regex(/^[A-Za-z0-9+/]{87}=$/)
@@ -72,7 +73,7 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
-      kind: z.enum(['auto-format', 'dictation-status', 'cloudsync-log']),
+      kind: z.enum(['auto-format', 'dictation-status', 'cloudsync-log', 'ai-provider']),
       argument: z.string().min(1).max(201000),
     })
     .strict(),

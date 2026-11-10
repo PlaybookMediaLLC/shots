@@ -174,7 +174,10 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 	if (input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" || input.Kind == "cloudsync-log") && !device.Report.SupportsCloudsyncSettings {
 		return nil, publishing.ErrConflict
 	}
-	if (input.Kind == "auto-format" || input.Kind == "dictation-status" || input.Kind == "cloudsync-log") && device.Report.AutoFormatKey == "" {
+	if input.Kind == "ai-provider" && !device.Report.SupportsAIProviderSettings {
+		return nil, publishing.ErrConflict
+	}
+	if (input.Kind == "auto-format" || input.Kind == "dictation-status" || input.Kind == "cloudsync-log" || input.Kind == "ai-provider") && device.Report.AutoFormatKey == "" {
 		return nil, publishing.ErrConflict
 	}
 	pending, err := db.PlatformFounderHubDeviceCommand.Query().Where(cmd.UserID(actor.UserID), cmd.DeviceID(input.DeviceID), cmd.StatusIn("pending", "running"), cmd.ExpiresAtGT(time.Now())).Count(ctx)
@@ -231,7 +234,7 @@ func (c *Configuration) FinishFounderHubDeviceCommand(ctx context.Context, actor
 		return nil, err
 	}
 	switch row.Kind {
-	case "auto-format", "dictation-status", "cloudsync-log":
+	case "auto-format", "dictation-status", "cloudsync-log", "ai-provider":
 		if input.Status == "succeeded" && !founderhub.ValidPrivateAction(input.Result, false) {
 			return nil, ErrInvalidInput
 		}

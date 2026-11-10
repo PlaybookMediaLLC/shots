@@ -11,6 +11,34 @@ const envelopeSchema = z
   .strict()
 const responseSchema = envelopeSchema.omit({ publicKey: true })
 const syncLogSchema = z.string().max(110_000)
+const aiProviderRequestSchema = z.discriminatedUnion('operation', [
+  z
+    .object({
+      operation: z.literal('status'),
+      type: z.enum(['llm', 'stt']),
+      providerId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('save'),
+      type: z.enum(['llm', 'stt']),
+      providerId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/),
+      baseUrl: z.string().max(2048),
+      apiKey: z.string().max(16000),
+    })
+    .strict(),
+  z
+    .object({
+      operation: z.literal('clear'),
+      type: z.enum(['llm', 'stt']),
+      providerId: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/),
+    })
+    .strict(),
+])
+const aiProviderResultSchema = z
+  .object({ configured: z.boolean(), baseUrl: z.string().max(2048) })
+  .strict()
 export const autoFormatExamplesSchema = z.array(z.string().trim().min(1).max(12000)).min(1).max(3)
 export const autoFormatResultSchema = z.string().trim().min(1).max(16000)
 const context = new TextEncoder()
@@ -51,7 +79,7 @@ async function seal(
   key: CryptoKey,
   value: unknown,
   direction: 'request' | 'response',
-  purpose: 'auto-format' | 'cloudsync-log' = 'auto-format'
+  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' = 'auto-format'
 ) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt(
@@ -69,7 +97,7 @@ async function open(
   key: CryptoKey,
   value: z.infer<typeof responseSchema>,
   direction: 'request' | 'response',
-  purpose: 'auto-format' | 'cloudsync-log' = 'auto-format'
+  purpose: 'auto-format' | 'cloudsync-log' | 'ai-provider' = 'auto-format'
 ) {
   const cleartext = await crypto.subtle.decrypt(
     {
@@ -118,6 +146,26 @@ export async function createCloudsyncLogRequest(devicePublicKey: string) {
     readResult: async (result: string) =>
       syncLogSchema.parse(
         await open(key, responseSchema.parse(JSON.parse(result)), 'response', 'cloudsync-log')
+      ),
+  }
+}
+
+/** Keep provider credentials encrypted between Founder Hub and the selected desktop. */
+export async function createAIProviderRequest(
+  devicePublicKey: string,
+  input: z.input<typeof aiProviderRequestSchema>
+) {
+  const value = aiProviderRequestSchema.parse(input)
+  const identity = await createPrivateActionIdentity()
+  const key = await sharedKey(identity.privateKey, devicePublicKey)
+  return {
+    argument: JSON.stringify({
+      publicKey: identity.publicKey,
+      ...(await seal(key, value, 'request', 'ai-provider')),
+    }),
+    readResult: async (result: string) =>
+      aiProviderResultSchema.parse(
+        await open(key, responseSchema.parse(JSON.parse(result)), 'response', 'ai-provider')
       ),
   }
 }
