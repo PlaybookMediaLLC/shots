@@ -1,7 +1,7 @@
-# Voice capture and evidence capture: audited plan
+# Shots: audited plan for voice capture and evidence capture
 
 **Status:** Proposed. Voice capture is not authorized in the [RFC index](../rfcs/README.md); owner decision 1 in section 8 comes first.
-**Date:** 2026-11-10
+**Version:** 0.3 · 2026-11-10
 **Replaces:** an external v0.1 architecture proposal (a 23-section design with schema appendices), which is not in this repository. Section references such as "v0.1 §7" point to it.
 **Checked against:** the repository `PlaybookMediaLLC/shots` at `329d1630`, with the approval and scheduling findings re-checked against `develop` at `5285a789` (#497).
 
@@ -176,7 +176,7 @@ Example: "Shots, post the following tweet at 10 am tomorrow: entrepreneurship is
 | 4. Check | Server, plain code | Every field is validated and resolved (below) |
 | 5. Propose | Server | A proposal is stored against the note and the transcript revision it was parsed from |
 | 6. Confirm | Phone | A card shows the post text (editable), the account, and the full date, time and zone. Guessed or flagged fields are shown as questions |
-| 7. Schedule | Server | Confirm re-runs every check in step 4, creates a content draft from the confirmed text, and schedules it through `ScheduleContentDraft` as the signed-in member. That is the path that enforces "Require approval", and it is the only one voice commands use |
+| 7. Schedule | Server | Confirm re-runs every check in step 4, creates a content draft from the confirmed text, and schedules it through `ScheduleContentDraft` as the signed-in member. That path enforces "Require approval"; the older `CreateScheduledPost` path does not (6.5, P0) and must not be used here |
 | 8. Send | Existing Temporal post workflow | Unchanged |
 
 **Model output (step 3)**
@@ -354,7 +354,7 @@ Status is from a read of the code on 2026-11-09, with file references in section
 
 | # | Case | What the code does today | Status | Fix |
 |---|---|---|---|---|
-| P0 | A scheduling security fix | Reported privately to the owner; not described in this public document | **Open** | F1 |
+| P0 | Scheduling a content draft through the scheduled-posts endpoint in a workspace that requires approval | `CreateScheduledPost` accepts a content draft ID and a caption from a signed-in publisher and never calls `requireDraftApproval`; its own comment says "a content draft has no approval step". At send time only a "changes requested" status stops the post. Unreviewed text can therefore be scheduled where approval is required | **Gap, most serious** | Call `requireDraftApproval` in `CreateScheduledPost` for content drafts, or refuse content drafts on that endpoint; add a test |
 | P1 | Content edited after approval | Drafts: approval is tied to a version number; an edit bumps it and scheduling refuses until re-approved. Since #497 on `develop`, a review decision must name the version the reviewer saw and fails if the draft moved, and review and scheduling take a shared lock. Campaign posts: editing an approved post returns it to draft. There is no content hash | Covered on `develop` | — |
 | P2 | One approver approves, another rejects | No quorum; one decision governs. Campaign post copy: first decision wins. Variants and drafts: a later "changes requested" cancels queued posts; since #497 this happens at the moment of the decision, not only at send time | **Works, undocumented** | Document the rule |
 | P3 | Approver loses the role before the send | Not rechecked. The send-time check looks at workspace deletion, connection status and review status. `scheduled_post` does not record who scheduled or approved it | **Gap** | Record the scheduler and approver on the post. Decide whether a removed approver's approvals stand (owner decision 9) |
@@ -440,7 +440,7 @@ These came out of checking sections 6.4 and 6.5 against the code. Each fix below
 
 | Order | Fix | Cases | Size |
 |---|---|---|---|
-| F1 | Scheduling security fix, reported privately | P0 | Small |
+| F1 | Approval cannot be skipped through the scheduled-posts endpoint | P0 | Small |
 | F2 | Rate limits retry durably; daily caps fail with a reason; no resend after a server error | P11 | Medium |
 | F3 | Redeploys and rollbacks are not new releases | C3 | Medium |
 | F4 | Superseded capture jobs are cancelled | C4, C9 | Medium |
@@ -452,9 +452,26 @@ These came out of checking sections 6.4 and 6.5 against the code. Each fix below
 
 F1, F5 and F7 are prerequisites for voice commands (Gate 3b). F1 and F2 change publishing internals, not the screens Meta is reviewing; ship them with their tests and re-run `./dev/social-gate` before release.
 
-### F1. Scheduling security fix
+### F1. Approval cannot be skipped through the scheduled-posts endpoint
 
-Reported privately to the owner and tracked outside this public document. It ships first and on its own, with a regression test. It is a prerequisite for voice commands.
+**Today.** `CreateScheduledPost` (`server/internal/product/scheduled_posts.go`) accepts a content draft ID and a caller-supplied caption from a signed-in publisher. It never calls `requireDraftApproval`, and `isEligible` returns true for any content draft with an active connection. Two problems follow: an unapproved draft can be scheduled, and even for an approved draft the caption is whatever the caller sends, not the approved text.
+
+**Change.**
+
+1. List the callers of this endpoint that pass a content draft. The versioned path (`ScheduleContentDraft`) is the intended one for drafts.
+2. If nothing in the product still needs it, `CreateScheduledPost` refuses content drafts outright and points to the draft scheduling path. If something does, it refuses them whenever the workspace has "Require approval" on.
+3. Correct the comment that says a content draft has no approval step.
+4. Check the reported behaviour that `scheduleContentDraft` takes captions from the request (`content_draft_schedule.go`, near line 857). If confirmed, build captions on the server from the stored draft version so the Go layer does not depend on the web layer to send approved text.
+
+**After.** In a workspace that requires approval, every route to a scheduled content-draft post goes through `requireDraftApproval` and carries the stored draft's text.
+
+**Edge cases.**
+
+- Posts already scheduled through the old route: a one-off query lists posts in `SCHEDULED` state whose draft is not approved at its current version in workspaces that require approval. The owner of each workspace is told; nothing is cancelled automatically.
+- Approved variants scheduled by API keys are unaffected; that path already checks the variant's approval.
+- A workspace that turns "Require approval" on while posts are queued: queued posts keep the rule they were scheduled under, as today.
+
+**Test.** With approval required and a draft pending review, a publisher's request to the scheduled-posts endpoint returns a conflict and creates no post. With approval off, existing behaviour is unchanged.
 
 ### F2. Rate limits, daily caps and server errors
 
@@ -645,7 +662,7 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 
 **Read directly in the repository (`329d1630`):** `AGENTS.md`, `server/README.md`, `docs/rfcs/README.md`, RFC 007 and the capture review's implementation status, `docs/deployment.md`, `docs/release-automation.md`, `docs/vision.md`, the capture and outbox Ent schemas, `server/go.mod`, `server/internal/platformai/platformai.go`, the web model catalog, pricing and provider settings, and the Better Auth server configuration.
 
-**Confirmed by reading the code directly:** the three parts of F2 (the 500 retry in `fetch`, the mapping of every other error to "unknown", and the daily-cap error type), the capture admission and retry behaviour behind F4, the single webhook secret behind F6, the missing provider preferences behind F5, the outbox having no retention, and P0.
+**Confirmed by reading the code directly:** P0 and the three parts of F2 (the 500 retry in `fetch`, the mapping of every other error to "unknown", and the daily-cap error type), the capture admission and retry behaviour behind F4, the single webhook secret behind F6, the missing provider preferences behind F5, and the outbox having no retention. For P0: `CreateScheduledPost` in `server/internal/product/scheduled_posts.go` and `server/internal/publishing/repository.go` has no approval check for content drafts, and `requireDraftApproval` is called only from the draft schedule, batch and publish-now paths. It was not exercised with a live request.
 
 **The other rows in 6.4 and 6.5 come from two delegated code reads on 2026-11-09**, each returning file and line references and test names. They were not re-read line by line. Items marked "inferred" in the tables had no test or direct statement behind them. The main references:
 
