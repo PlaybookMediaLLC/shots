@@ -32,6 +32,7 @@ import {
   ArrowsClockwise,
   CheckSquare,
   Code,
+  AddressBook,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -54,6 +55,7 @@ import { SettingsAutomations } from './founder-hub/automations'
 import { SettingsSync } from './founder-hub/sync'
 import { SettingsTodo } from './founder-hub/todo'
 import { SettingsDevelopers } from './founder-hub/developers'
+import { SettingsCRM } from './founder-hub/crm'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -71,6 +73,7 @@ const PAGE_CONTENT = {
   sync: SettingsSync,
   todo: SettingsTodo,
   developers: () => <SettingsDevelopers canManage={false} />,
+  crm: () => <SettingsCRM canManage={false} />,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -88,6 +91,7 @@ const PAGE_ICONS = {
   sync: ArrowsClockwise,
   todo: CheckSquare,
   developers: Code,
+  crm: AddressBook,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
@@ -276,6 +280,8 @@ function SettingsSurface({
               >
               {page === 'developers' ? (
                 <SettingsDevelopers canManage={canManageDeveloper} />
+              ) : page === 'crm' ? (
+                <SettingsCRM canManage={canManageDeveloper} />
               ) : (
                 <Component key={`${page}:${deviceId}`} />
               )}
