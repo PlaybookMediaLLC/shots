@@ -288,7 +288,7 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.ReviewContentDraft(ctx, reviewer, approvalDraft.ID, product.ContentDraftReviewInput{Action: "approve"}); err != nil {
+	if _, err := repo.ReviewContentDraft(ctx, reviewer, approvalDraft.ID, product.ContentDraftReviewInput{Version: approvalDraft.Version, Action: "approve"}); err != nil {
 		t.Fatal(err)
 	}
 	approval, err := repo.ScheduleContentDraft(ctx, reviewer, approvalDraft.ID, product.ScheduleContentDraftInput{ScheduledFor: due, Version: approvalDraft.Version,
@@ -296,7 +296,7 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.ReviewContentDraft(ctx, reviewer, approvalDraft.ID, product.ContentDraftReviewInput{Action: "changes"}); err != nil {
+	if _, err := repo.ReviewContentDraft(ctx, reviewer, approvalDraft.ID, product.ContentDraftReviewInput{Version: approval.Draft.Version, Action: "changes"}); err != nil {
 		t.Fatal(err)
 	}
 	// A separate workspace whose account the provider revokes after scheduling.

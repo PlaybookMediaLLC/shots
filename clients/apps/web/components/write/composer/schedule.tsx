@@ -2,6 +2,7 @@
 
 import { openBrandSettings } from '@/components/drafts/DraftSettingsDrawer'
 import * as React from 'react'
+import { preparePublication } from '@/lib/write/publication'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   socialSetKey,
@@ -197,18 +198,16 @@ async function commitSchedule(
     zone: string
   }
 ): Promise<void> {
-  await context.flush()
+  const prepared = await preparePublication(context)
   const queued = 'queue' in timing
   const rescheduling = (context.scheduled ?? []).length > 0
   const result = await draftsApi.schedule(context.draft.id, {
-    blockImages: await context.renderBlocks(),
+    ...prepared,
     channelConnectionIds: context.items.map((item) => item.account.id),
     ...timing,
     naturalPostingTime: options.naturalPostingTime,
-    version: context.versionRef.current,
     baseCalendarVersion: context.draft.calendarVersion,
   })
-  context.versionRef.current = result.draft.version
   // What the next draft in this run opens on: these accounts, a gap after this time.
   const committed = result.posts
     .map((post) => new Date(post.scheduledFor).getTime())
@@ -1331,14 +1330,12 @@ export function PublishReview({
     setBusy(true)
     setError('')
     try {
-      await context.flush()
+      const prepared = await preparePublication(context)
       const result = await draftsApi.schedule(context.draft.id, {
-        blockImages: await context.renderBlocks(),
+        ...prepared,
         channelConnectionIds: context.items.map((item) => item.account.id),
         publishNow: true,
-        version: context.versionRef.current,
       })
-      context.versionRef.current = result.draft.version
       context.onDone(result)
       toast.success(
         result.created

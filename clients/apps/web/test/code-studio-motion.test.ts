@@ -217,3 +217,19 @@ test('morphs move matched tokens and fade the rest; typing fills added lines in 
   assert.deepEqual(typedLengths('a', 'a\nbc\nd', 0.5), [1, 2, 0])
   assert.deepEqual(typedLengths('a', 'a\nbc\nd', 1), [1, 2, 1])
 })
+
+test('long identical text and large replacements have bounded line comparisons', () => {
+  const lines = 40_000
+  const same = Array(lines).fill('a').join('\n')
+  const replaced = Array(lines).fill('b').join('\n')
+  assert.equal(lineDiff(same, same).length, lines)
+  const rows = lineDiff(same, replaced)
+  assert.equal(rows.length, lines * 2)
+  assert.deepEqual(diffStats(rows), { added: lines, removed: lines })
+  assert.deepEqual(lineDiff('same\nold\ntail', 'same\nnew\ntail'), [
+    { kind: 'same', before: 1, after: 1 },
+    { kind: 'del', before: 2 },
+    { kind: 'add', after: 2 },
+    { kind: 'same', before: 3, after: 3 },
+  ])
+})

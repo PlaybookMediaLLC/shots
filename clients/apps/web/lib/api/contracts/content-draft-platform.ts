@@ -180,6 +180,7 @@ export const refreshDraftPostMetricsContract = defineContract({
 export const reviewContentDraftContract = defineContract({
   body: z.object({
     action: z.enum(['request', 'approve', 'changes']),
+    version: z.number().int().min(1),
     note: z.string().max(2_000).optional(),
   }),
   method: 'POST',

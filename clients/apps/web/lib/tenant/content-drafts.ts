@@ -14,7 +14,10 @@ import type { OrganizationAccess, TenantContext } from '@/lib/auth/access'
 import { backendSDK, orNull, serviceBackend, withDates } from '@/lib/backend/sdk'
 import { channelForPlatform, type DraftChannel } from '@/lib/content-drafts/serialize'
 import type { z } from 'zod'
-import { revisionReasonSchema } from '@/lib/api/contracts/content-draft-platform'
+import {
+  revisionReasonSchema,
+  type reviewContentDraftContract,
+} from '@/lib/api/contracts/content-draft-platform'
 import type { createPostSchema } from '@/lib/api/contracts/posts'
 import { listBackendConnections } from '@/lib/tenant/publishing-backend'
 import { buildPublication } from '@/lib/write/publication'
@@ -388,7 +391,7 @@ export async function refreshContentDraftPostMetrics(context: TenantContext, id:
 export async function reviewContentDraft(
   context: TenantContext,
   id: string,
-  input: { action: 'request' | 'approve' | 'changes'; note?: string }
+  input: z.input<typeof reviewContentDraftContract.body>
 ) {
   const draft = await orNull(backendSDK(context).reviewContentDraft(id, input))
   return draft ? readDraft(draft) : null
