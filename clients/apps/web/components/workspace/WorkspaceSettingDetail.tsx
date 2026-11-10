@@ -49,6 +49,7 @@ const SETTINGS_CONTENT = {
       userId={userId}
       page={founderHubPage}
       canManageDeveloper={can('workspace:update')}
+      canManageBilling={can('billing:manage')}
       key={userId}
     />
   ),

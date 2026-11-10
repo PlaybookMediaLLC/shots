@@ -12,6 +12,7 @@ export const FOUNDER_HUB_PAGES = [
   { id: 'todo', title: 'Ticket', group: 'Workspace' },
   { id: 'developers', title: 'Developers', group: 'Advanced' },
   { id: 'crm', title: 'CRM', group: 'Advanced' },
+  { id: 'billing', title: 'Billing', group: 'Workspace' },
   { id: 'meetings', title: 'Meetings', group: 'Workspace' },
   { id: 'templates', title: 'Templates', group: 'Workspace' },
   { id: 'privacy', title: 'Privacy', group: 'Advanced' },
