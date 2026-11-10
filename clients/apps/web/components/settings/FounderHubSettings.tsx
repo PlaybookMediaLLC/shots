@@ -25,6 +25,7 @@ import {
   Bell,
   LockKey,
   FileText,
+  Microphone,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -41,6 +42,7 @@ import { SettingsPrivacy } from './founder-hub/privacy'
 import { SettingsNotifications } from './founder-hub/notifications'
 import { SettingsPermissions } from './founder-hub/permissions'
 import { SettingsTemplates } from './founder-hub/templates'
+import { SettingsDictation } from './founder-hub/dictation'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -51,6 +53,7 @@ const PAGE_CONTENT = {
   notifications: SettingsNotifications,
   permissions: SettingsPermissions,
   templates: SettingsTemplates,
+  dictation: SettingsDictation,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -61,6 +64,7 @@ const PAGE_ICONS = {
   notifications: Bell,
   permissions: LockKey,
   templates: FileText,
+  dictation: Microphone,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({

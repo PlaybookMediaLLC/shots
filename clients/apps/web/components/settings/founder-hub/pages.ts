@@ -4,6 +4,7 @@ export const FOUNDER_HUB_PAGES = [
   { id: 'appearance', title: 'Appearance', group: 'App' },
   { id: 'notifications', title: 'Notifications', group: 'App' },
   { id: 'dictionary', title: 'Dictionary', group: 'AI' },
+  { id: 'dictation', title: 'Dictation', group: 'AI' },
   { id: 'meetings', title: 'Meetings', group: 'Workspace' },
   { id: 'templates', title: 'Templates', group: 'Workspace' },
   { id: 'privacy', title: 'Privacy', group: 'Advanced' },
