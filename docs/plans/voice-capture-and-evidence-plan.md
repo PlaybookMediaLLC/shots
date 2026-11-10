@@ -307,7 +307,21 @@ Fixes F3 (no capture for redeploys) and F4 (cancel superseded jobs) in section 7
 
 The launch limit of one browser a second is 3,600 sessions an hour, which is close to what 120 two-minute sessions can hold, so the two provider limits bind at about the same point. These figures are arithmetic, not measurements.
 
-**When to move to the next stage.** Stage 1 when signed-in capture is turned on for the first pilot. Stage 2 when the 95th-percentile wait for a slot passes five minutes, or peak use passes half the platform limit. Stage 3 when peak use passes 80% of the provider's limit for a week.
+**Stage 4: maximum throughput.** Once stage 2 is in place, capacity is set by browser-time. These changes raise captures per browser and keep browsers for work that needs one.
+
+| # | Change | Detail | Limit |
+|---|---|---|---|
+| S10 | Parallel tabs in one session | Recipes for one connection run in up to 4 tabs of the same browser. Tabs share the signed-in session, so the customer's app still sees one session. Each tab keeps its recipe's own budget, result and failure | Browser memory. Confirm with the provider that its limit counts browsers, not tabs |
+| S11 | Variants from one page load | Viewport and theme variants are taken by resizing and re-shooting the loaded page. A recipe may opt out when the page needs a fresh load | — |
+| S12 | Skip what cannot have changed | Capture only screens whose route is touched by the change, and reuse the previous image when the page's content hash is unchanged. When unsure, capture | A wrong skip shows a stale image; skipped screens are labelled as carried over |
+| S13 | Priorities | Deployment captures first, then manual, then keep-alive visits and backfills, which run only when slots are idle | — |
+| S14 | More browsers | Higher limits agreed with the provider, a second provider, or a self-hosted Chromium pool behind the existing provider interface | A self-hosted pool means owning isolation between customers and outbound network controls, which the managed provider supplies today |
+
+With S10 and S11 a session is short enough that the provider's launch rate, one new browser a second, becomes the binding limit: about 3,600 sessions an hour, or roughly 86,000 deployments a day per provider account. Beyond that, capacity comes only from S14. These are arithmetic from the documented limits.
+
+Two limits remain whatever is built. The customer's app usually allows one session per demo account, so parallelism beyond tabs needs more demo accounts and a staging environment that tolerates the load. And a browser is never shared between workspaces, even to save launches.
+
+**When to move to the next stage.** Stage 1 when signed-in capture is turned on for the first pilot. Stage 2 when the 95th-percentile wait for a slot passes five minutes, or peak use passes half the platform limit. Stage 3 when peak use passes 80% of the provider's limit for a week. Stage 4 when browser cost per capture, or the provider's launch rate, becomes the constraint.
 
 **Edge cases**
 
@@ -756,7 +770,7 @@ The workflow evaluator reads `kind`, so both the GitHub path and the Vercel and 
 | 3 | Voice to draft | V1–V6 pass; a draft from a voice note goes through the existing approval policy unchanged |
 | 3b | Voice commands, 5.4 | K1–K25 pass; the spoken example schedules one X post at the right instant after one tap, and waits for approval in a workspace that requires it |
 | 4 (conditional) | Capture hardening (5.5), staying signed in (5.6), and stage 1 of capture at scale (5.7: S1–S3) | RFC 007 trigger met; each row has a regression test in the existing capture suite; L1–L10 and Q1–Q12 pass; a 10-screen deployment opens one browser |
-| 5 (by measurement) | Stages 2 and 3 of capture at scale (5.7: S4–S9) | Entered on the thresholds in 5.7; a load test on staging holds the platform limit without failed launches and with no workspace starved |
+| 5 (by measurement) | Stages 2 to 4 of capture at scale (5.7: S4–S14) | Entered on the thresholds in 5.7; a load test on staging holds the platform limit without failed launches and with no workspace starved |
 | Parallel | Fixes F1–F9 in section 7a | F1 first and on its own. F1, F5 and F7 merged before Gate 3b. F8's drill done before voice launch. Each fix has its regression test |
 
 **Stop conditions.** If test (a) finds no format that survives a kill, recording design is reopened before Gate 1. If pilots do not use voice notes by the metric set at Gate 0, the work stops at the gate it is on.
