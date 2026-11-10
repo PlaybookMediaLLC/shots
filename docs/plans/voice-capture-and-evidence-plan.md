@@ -171,7 +171,7 @@ Example: "Shots, post the following tweet at 10 am tomorrow: entrepreneurship is
 | Step | Where | What happens |
 |---|---|---|
 | 1. Transcribe | Phone | On-device transcript saved with the recording time and the phone's time zone at that moment |
-| 2. Sync | Phone → server | Transcript revision posted. If the member has voice commands turned on (which carries the remote-text disclosure), a parse is queued for that revision |
+| 2. Sync | Phone → server | Transcript revision posted. If the member has voice commands turned on (which carries the remote-text disclosure), the server parses that revision inline and returns the proposal in the same response (6.10) |
 | 3. Understand | Server, one model call | The transcript, recording time and zone, and the member's connected accounts go to the model, which must answer in a fixed JSON schema |
 | 4. Check | Server, plain code | Every field is validated and resolved (below) |
 | 5. Propose | Server | A proposal is stored against the note and the transcript revision it was parsed from |
@@ -417,6 +417,32 @@ Recording never depends on anything outside the phone.
 - **Order.** Internal workspace, then pilot workspaces, then general availability. Voice commands follow voice notes by at least one release.
 - **App versions.** The server states the minimum supported app version. An older app keeps recording locally and is told to update before it can sync.
 - **Measured from day one:** recordings started, recovered after interruption, and lost; sync failures by reason; transcript availability by locale; proposals made, confirmed, edited before confirm, expired; fields flagged as guessed; posts scheduled from voice and their final status. Transcript text and audio never go into logs or metrics.
+
+### 6.10 Queueing and scale
+
+| Work | How it is queued |
+|---|---|
+| Recording and transcription | Not queued; on the phone |
+| Unsent notes and uploads | A queue in the phone's SQLite, retried with backoff |
+| Audio bytes | Uploaded from the phone straight to R2; never through the backend |
+| Audio check (format, duration) | A Temporal activity on the existing worker |
+| Voice command parse | Inline in the sync request with a 5-second limit; on failure the note is marked waiting and a maintenance sweep retries it |
+| Scheduled post | The existing per-post Temporal workflow |
+
+The parse does not go through the outbox. The outbox is dispatched about once a minute, 100 rows per run, which would delay the confirmation card by up to a minute and share that budget with all other events.
+
+**Load.** 1,000 notes a day is one every 86 seconds; 100,000 a day averages about 1.2 a second. Each is a small write and one model call that mostly waits on the network.
+
+**What runs out first, and the lever for each**
+
+| Limit | Lever |
+|---|---|
+| Model provider rate limit | The per-member parse limit; the sweep absorbs bursts |
+| Backend instances (the API and worker share one container in production) | More instances, or run the API and worker as the separate binaries the repository already builds. Whether the combined container is safe to run as several copies is not checked |
+| Database connections (sessions are checked on every request) | Connection pooling |
+| Temporal worker concurrency for audio checks | Existing concurrency settings, or a separate task queue for voice so audio checks cannot delay publishing |
+
+None of this has been load-tested.
 
 ---
 
