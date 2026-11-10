@@ -5,6 +5,7 @@ import type {
 import type { z } from 'zod'
 import type {
   calendarPostSchema,
+  reviewContentDraftContract,
   contentDraftRevisionSchema,
   contentDraftSettingsSchema,
   linkCardSchema,
@@ -102,7 +103,11 @@ export const draftsApi = {
     call<DraftWire>(base, { body: input, method: 'POST' }),
   get: (id: string) => call<DraftWire>(one(id)),
   posts: (id: string) => call<{ posts: DraftPostWire[] }>(`${one(id)}/posts`),
-  remove: (id: string, expected?: { version: number; calendarVersion: number }) => call<{ deleted: true }>(`${one(id)}${expected ? `?version=${expected.version}&calendarVersion=${expected.calendarVersion}` : ''}`, { method: 'DELETE' }),
+  remove: (id: string, expected?: { version: number; calendarVersion: number }) =>
+    call<{ deleted: true }>(
+      `${one(id)}${expected ? `?version=${expected.version}&calendarVersion=${expected.calendarVersion}` : ''}`,
+      { method: 'DELETE' }
+    ),
   save: (id: string, input: DraftSave) =>
     call<DraftWire>(one(id), { body: input, method: 'PATCH' }),
   schedule: (id: string, input: z.input<typeof contentDraftScheduleSchema>) =>
@@ -110,7 +115,7 @@ export const draftsApi = {
       body: input,
       method: 'POST',
     }),
-  review: (id: string, input: { action: 'request' | 'approve' | 'changes'; note?: string }) =>
+  review: (id: string, input: z.input<typeof reviewContentDraftContract.body>) =>
     call<DraftWire>(`${one(id)}/review`, { body: input, method: 'POST' }),
   share: (id: string, enabled: boolean) =>
     call<DraftWire>(`${one(id)}/share`, { body: { enabled }, method: 'PUT' }),

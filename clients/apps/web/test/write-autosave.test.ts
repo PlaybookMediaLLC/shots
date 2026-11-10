@@ -33,6 +33,7 @@ after(() => {
 const draft = {
   id: 'draft',
   version: 1,
+  collabGeneration: 1,
   title: 'Original',
   body: [],
   article: null,
@@ -45,7 +46,7 @@ const draft = {
 } as unknown as DraftWire
 const paragraph = (text: string) => [{ type: 'p', children: [{ text }] }]
 
-async function mount() {
+async function mount(collaborating = false) {
   let state!: ReturnType<typeof useDraftDocument>
   const container = document.createElement('div')
   document.body.append(container)
@@ -53,7 +54,7 @@ async function mount() {
   function Harness() {
     const current = useDraftDocument({
       canEdit: true,
-      collaborating: false,
+      collaborating,
       draft,
       onSaved: () => undefined,
     })
@@ -314,4 +315,181 @@ test('a conflicting edit survives reopening the draft until it is discarded', as
   const again = await mount()
   assert.equal(again.state.conflict, null)
   await again.unmount()
+})
+
+test('a sharing response adopts its clean document before a title-only save', async (t) => {
+  const fresh = {
+    ...draft,
+    version: 4,
+    body: paragraph('Teammate body'),
+    channelConnectionIds: ['account-b'],
+  }
+  const save = t.mock.method(draftsApi, 'save', async (_id: string, input: DraftSave) => ({
+    ...fresh,
+    ...input,
+    version: 5,
+  }))
+  const editor = await mount()
+  await act(async () => editor.state.setServer(fresh))
+  assert.deepEqual(editor.state.document.value, fresh.body)
+  await act(async () => {
+    editor.state.update({ title: 'My title' })
+    await editor.state.flush()
+  })
+  const sent = save.mock.calls[0].arguments[1]
+  assert.equal(sent.baseVersion, 4)
+  assert.deepEqual(sent.body, fresh.body)
+  assert.deepEqual(sent.channelConnectionIds, ['account-b'])
+  await act(async () => editor.state.setServer(draft))
+  assert.equal(editor.state.versionRef.current, 5)
+  assert.equal(editor.state.server.version, 5)
+  await editor.unmount()
+})
+
+test('a newer metadata response cannot authorize a dirty local body', async (t) => {
+  const fresh = { ...draft, version: 4, body: paragraph('Remote body') }
+  const save = t.mock.method(
+    draftsApi,
+    'save',
+    async (_id: string, _input: DraftSave): Promise<DraftWire> => {
+      throw new DraftRequestError('Conflict', 409)
+    }
+  )
+  t.mock.method(draftsApi, 'get', async () => fresh)
+  const editor = await mount()
+  await act(async () => {
+    editor.state.update({ value: paragraph('Local body') })
+    editor.state.setServer(fresh)
+    await assert.rejects(editor.state.flush())
+  })
+  assert.equal(save.mock.calls[0].arguments[1].baseVersion, 1)
+  assert.deepEqual(editor.state.document.value, fresh.body)
+  assert.deepEqual(editor.state.conflict?.value, paragraph('Local body'))
+  await act(async () => editor.state.discardConflict())
+  await editor.unmount()
+})
+
+test('metadata received during a save cannot advance the next write past unseen remote work', async (t) => {
+  const pending = deferred<DraftWire>()
+  const fresh = { ...draft, version: 4, body: paragraph('Teammate body') }
+  const save = t.mock.method(
+    draftsApi,
+    'save',
+    async (_id: string, input: DraftSave): Promise<DraftWire> => {
+      if (input.baseVersion === 1) return pending.promise
+      throw new DraftRequestError('Conflict', 409)
+    }
+  )
+  t.mock.method(draftsApi, 'get', async () => fresh)
+  const editor = await mount()
+  let saving!: Promise<void>
+  await act(async () => {
+    editor.state.update({ title: 'First' })
+    saving = editor.state.flush()
+  })
+  await act(async () => {
+    editor.state.setServer(fresh)
+    editor.state.update({ title: 'Second' })
+    pending.resolve({ ...draft, title: 'First', version: 2 })
+    await assert.rejects(saving)
+  })
+  assert.equal(save.mock.calls[1].arguments[1].baseVersion, 2)
+  assert.deepEqual(editor.state.document.value, fresh.body)
+  assert.equal(editor.state.conflict?.title, 'Second')
+  await act(async () => editor.state.discardConflict())
+  await editor.unmount()
+})
+
+test('live autosave rebases independent remote title, destinations, article and manual versions', async (t) => {
+  const remote = {
+    ...draft,
+    version: 2,
+    title: 'Teammate title',
+    channelConnectionIds: ['account-b'],
+    platformVersions: {
+      schemaVersion: 1,
+      versions: [{ channel: 'linkedin', mode: 'manual', body: paragraph('Manual remote') }],
+    },
+  } as DraftWire
+  let attempts = 0
+  const save = t.mock.method(
+    draftsApi,
+    'save',
+    async (_id: string, input: DraftSave): Promise<DraftWire> => {
+      if (++attempts === 1) throw new DraftRequestError('Conflict', 409)
+      return { ...remote, ...input, version: 3 } as DraftWire
+    }
+  )
+  t.mock.method(draftsApi, 'get', async () => remote)
+  const editor = await mount(true)
+  await act(async () => {
+    editor.state.update({ value: paragraph('Shared live body') })
+    await editor.state.flush()
+  })
+  const sent = save.mock.calls[1].arguments[1]
+  assert.equal(sent.baseVersion, 2)
+  assert.equal(sent.title, 'Teammate title')
+  assert.deepEqual(sent.channelConnectionIds, ['account-b'])
+  assert.equal(sent.plainText, 'Shared live body')
+  assert.deepEqual(sent.platformVersions, remote.platformVersions)
+  assert.equal(editor.state.document.title, 'Teammate title')
+  await editor.unmount()
+})
+
+test('live autosave preserves a local title while adopting remote destinations', async (t) => {
+  let attempts = 0
+  const remote = { ...draft, version: 2, channelConnectionIds: ['account-b'] }
+  const save = t.mock.method(draftsApi, 'save', async (_id: string, input: DraftSave) => {
+    if (++attempts === 1) throw new DraftRequestError('Conflict', 409)
+    return { ...remote, ...input, version: 3 }
+  })
+  t.mock.method(draftsApi, 'get', async () => remote)
+  const editor = await mount(true)
+  await act(async () => {
+    editor.state.update({ title: 'Local title' })
+    await editor.state.flush()
+  })
+  assert.equal(save.mock.calls[1].arguments[1].title, 'Local title')
+  assert.deepEqual(save.mock.calls[1].arguments[1].channelConnectionIds, ['account-b'])
+  await editor.unmount()
+})
+
+test('live autosave refuses overlapping titles and keeps both versions for a choice', async (t) => {
+  const save = t.mock.method(draftsApi, 'save', async (): Promise<DraftWire> => {
+    throw new DraftRequestError('Conflict', 409)
+  })
+  t.mock.method(draftsApi, 'get', async () => ({ ...draft, version: 2, title: 'Remote title' }))
+  const editor = await mount(true)
+  await act(async () => {
+    editor.state.update({ title: 'Local title' })
+    await assert.rejects(editor.state.flush())
+  })
+  assert.equal(save.mock.callCount(), 1)
+  assert.equal(editor.state.document.title, 'Remote title')
+  assert.equal(editor.state.conflict?.title, 'Local title')
+  await act(async () => editor.state.discardConflict())
+  await editor.unmount()
+})
+
+test('typing during a delayed conflict reload is preserved in the conflict copy', async (t) => {
+  const pending = deferred<DraftWire>()
+  t.mock.method(draftsApi, 'save', async (): Promise<DraftWire> => {
+    throw new DraftRequestError('Conflict', 409)
+  })
+  t.mock.method(draftsApi, 'get', () => pending.promise)
+  const editor = await mount()
+  let saving!: Promise<void>
+  await act(async () => {
+    editor.state.update({ title: 'Before reload' })
+    saving = editor.state.flush()
+  })
+  await act(async () => {
+    editor.state.update({ title: 'Typed while loading' })
+    pending.resolve({ ...draft, version: 2, title: 'Remote title' })
+    await assert.rejects(saving)
+  })
+  assert.equal(editor.state.document.title, 'Remote title')
+  assert.equal(editor.state.conflict?.title, 'Typed while loading')
+  await act(async () => editor.state.discardConflict())
+  await editor.unmount()
 })

@@ -968,10 +968,16 @@ export function BatchWorkspace({
         item.draft?.reviewStatus === 'pending'
       )
         continue
-      await draftsApi.review(item.draftId, { action: 'request' }).catch((error: unknown) => {
-        failed[item.id] =
-          `Review not requested: ${error instanceof Error ? error.message : 'try again.'}`
-      })
+      if (!item.draft) {
+        failed[item.id] = 'Review not requested: reload this draft and try again.'
+        continue
+      }
+      await draftsApi
+        .review(item.draftId, { action: 'request', version: item.draft.version })
+        .catch((error: unknown) => {
+          failed[item.id] =
+            `Review not requested: ${error instanceof Error ? error.message : 'try again.'}`
+        })
     }
     setOutcomes((current) => ({ ...current, ...failed }))
     const count = Object.keys(failed).length

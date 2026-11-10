@@ -282,7 +282,7 @@ func TestWriteWorkspace(t *testing.T) {
 		if _, err := repo.ShareContentDraft(ctx, owner, source.ID, true); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, source.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, source.ID, ContentDraftReviewInput{Version: source.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		tag, err := repo.CreateContentDraftTag(ctx, owner, defaultSet.ID, ContentDraftTagInput{Name: ptr("Evergreen")})
