@@ -32,6 +32,7 @@ export const founderHubDeviceReportSchema = z
       founderHubPermissionSchema,
       z.enum(['authorized', 'denied', 'neverRequested', 'unknown'])
     ),
+    supportsCloudsyncSettings: z.boolean().optional(),
     autoFormatKey: z
       .string()
       .regex(/^[A-Za-z0-9+/]{87}=$/)
@@ -47,6 +48,25 @@ export const founderHubDeviceSchema = z.object({
 })
 /** Heartbeat and capability snapshot from the native gateway. */
 export const founderHubDeviceReportInputSchema = founderHubDeviceSchema.omit({ reportedAt: true })
+/** Sanitized local CloudSync health returned by the desktop's bounded command channel. */
+export const founderHubCloudsyncStatusSchema = z
+  .object({
+    cloudsync_enabled: z.boolean(),
+    configured: z.boolean(),
+    running: z.boolean(),
+    activity_paused: z.boolean(),
+    deferred_for_capture: z.boolean(),
+    last_sync_at_ms: z.number().int().min(0).max(8_640_000_000_000_000).nullable(),
+    has_unsent_changes: z.boolean().nullable(),
+    last_error_kind: z.enum(['transient', 'auth', 'fatal']).nullable(),
+    consecutive_failures: z.number().int().nonnegative(),
+    recovery_pending: z.boolean(),
+    recovery_delayed: z.boolean(),
+    conflicted_notes: z.number().int().nonnegative(),
+    pending_update_records: z.number().int().nonnegative(),
+    too_large_records: z.number().int().nonnegative(),
+  })
+  .strict()
 /** Only these explicit settings actions can be requested; no paths, shell text or arbitrary plugin calls. */
 export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
@@ -59,7 +79,19 @@ export const founderHubDeviceCommandInputSchema = z.discriminatedUnion('kind', [
   z
     .object({
       deviceId: founderHubDeviceSchema.shape.deviceId,
-      kind: z.enum(['show-release-notes', 'dictation-retry', 'dictation-cancel', 'show-dictation-shortcut']),
+      kind: z.enum([
+        'show-release-notes',
+        'dictation-retry',
+        'dictation-cancel',
+        'show-dictation-shortcut',
+      ]),
+      argument: z.literal(''),
+    })
+    .strict(),
+  z
+    .object({
+      deviceId: founderHubDeviceSchema.shape.deviceId,
+      kind: z.enum(['cloudsync-status', 'cloudsync-now']),
       argument: z.literal(''),
     })
     .strict(),

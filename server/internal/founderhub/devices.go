@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"strings"
 )
 
 type InstalledApp struct {
@@ -13,20 +14,21 @@ type InstalledApp struct {
 }
 
 type DeviceReport struct {
-	Platform           string            `json:"platform"`
-	Version            string            `json:"version"`
-	Identifier         string            `json:"identifier"`
-	Locale             string            `json:"locale"`
-	Timezone           string            `json:"timezone"`
-	AppStore           bool              `json:"appStore"`
-	LockAvailable      bool              `json:"lockAvailable"`
-	HomeDirectory      string            `json:"homeDirectory"`
-	DownloadsDirectory string            `json:"downloadsDirectory"`
-	Microphones        []string          `json:"microphones"`
-	InstalledApps      []InstalledApp    `json:"installedApps"`
-	DefaultIgnoredApps []string          `json:"defaultIgnoredApps"`
-	Permissions        map[string]string `json:"permissions"`
-	AutoFormatKey      string            `json:"autoFormatKey,omitempty"`
+	Platform                  string            `json:"platform"`
+	Version                   string            `json:"version"`
+	Identifier                string            `json:"identifier"`
+	Locale                    string            `json:"locale"`
+	Timezone                  string            `json:"timezone"`
+	AppStore                  bool              `json:"appStore"`
+	LockAvailable             bool              `json:"lockAvailable"`
+	HomeDirectory             string            `json:"homeDirectory"`
+	DownloadsDirectory        string            `json:"downloadsDirectory"`
+	Microphones               []string          `json:"microphones"`
+	InstalledApps             []InstalledApp    `json:"installedApps"`
+	DefaultIgnoredApps        []string          `json:"defaultIgnoredApps"`
+	Permissions               map[string]string `json:"permissions"`
+	SupportsCloudsyncSettings bool              `json:"supportsCloudsyncSettings,omitempty"`
+	AutoFormatKey             string            `json:"autoFormatKey,omitempty"`
 }
 
 func (report DeviceReport) Valid() bool {
@@ -80,11 +82,54 @@ type DeviceCommandInput struct {
 	Argument string `json:"argument"`
 }
 
+type CloudsyncStatusResult struct {
+	CloudsyncEnabled     *bool   `json:"cloudsync_enabled"`
+	Configured           *bool   `json:"configured"`
+	Running              *bool   `json:"running"`
+	ActivityPaused       *bool   `json:"activity_paused"`
+	DeferredForCapture   *bool   `json:"deferred_for_capture"`
+	LastSyncAtMS         *int64  `json:"last_sync_at_ms"`
+	HasUnsentChanges     *bool   `json:"has_unsent_changes"`
+	LastErrorKind        *string `json:"last_error_kind"`
+	ConsecutiveFailures  *int    `json:"consecutive_failures"`
+	RecoveryPending      *bool   `json:"recovery_pending"`
+	RecoveryDelayed      *bool   `json:"recovery_delayed"`
+	ConflictedNotes      *int    `json:"conflicted_notes"`
+	PendingUpdateRecords *int    `json:"pending_update_records"`
+	TooLargeRecords      *int    `json:"too_large_records"`
+}
+
+func ValidCloudsyncStatusResult(value string) bool {
+	if len(value) == 0 || len(value) > 4096 {
+		return false
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal([]byte(value), &fields) != nil || len(fields) != 14 {
+		return false
+	}
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.DisallowUnknownFields()
+	var status CloudsyncStatusResult
+	if decoder.Decode(&status) != nil || decoder.Decode(new(any)) != io.EOF {
+		return false
+	}
+	if status.CloudsyncEnabled == nil || status.Configured == nil || status.Running == nil || status.ActivityPaused == nil || status.DeferredForCapture == nil || status.ConsecutiveFailures == nil || status.RecoveryPending == nil || status.RecoveryDelayed == nil || status.ConflictedNotes == nil || status.PendingUpdateRecords == nil || status.TooLargeRecords == nil {
+		return false
+	}
+	if *status.ConsecutiveFailures < 0 || *status.ConflictedNotes < 0 || *status.PendingUpdateRecords < 0 || *status.TooLargeRecords < 0 || (status.LastSyncAtMS != nil && (*status.LastSyncAtMS < 0 || *status.LastSyncAtMS > 8640000000000000)) {
+		return false
+	}
+	if status.LastErrorKind != nil && *status.LastErrorKind != "transient" && *status.LastErrorKind != "auth" && *status.LastErrorKind != "fatal" {
+		return false
+	}
+	return true
+}
+
 func (input DeviceCommandInput) Valid() bool {
 	switch input.Kind {
 	case "auto-format", "dictation-status":
 		return ValidPrivateAction(input.Argument, true)
-	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut":
+	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut", "cloudsync-status", "cloudsync-now":
 		return input.Argument == ""
 	case "request-permission", "open-permission":
 		return ValidPermission(input.Argument)

@@ -138,7 +138,7 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 	if !founderHubDeviceID.MatchString(input.DeviceID) || !input.Valid() {
 		return nil, ErrInvalidInput
 	}
-	if input.Kind == "auto-format" {
+	if input.Kind == "auto-format" || input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now" {
 		account, err := c.GetFounderHubSettingsAccount(ctx, actor)
 		if err != nil {
 			return nil, err
@@ -169,6 +169,9 @@ func (c *Configuration) CreateFounderHubDeviceCommand(ctx context.Context, actor
 		return nil, err
 	}
 	if time.Since(device.ReportedAt) > time.Minute {
+		return nil, publishing.ErrConflict
+	}
+	if (input.Kind == "cloudsync-status" || input.Kind == "cloudsync-now") && !device.Report.SupportsCloudsyncSettings {
 		return nil, publishing.ErrConflict
 	}
 	if (input.Kind == "auto-format" || input.Kind == "dictation-status") && device.Report.AutoFormatKey == "" {
@@ -227,12 +230,25 @@ func (c *Configuration) FinishFounderHubDeviceCommand(ctx context.Context, actor
 	if err != nil {
 		return nil, err
 	}
-	if (row.Kind == "auto-format" || row.Kind == "dictation-status") && input.Status == "succeeded" {
-		if !founderhub.ValidPrivateAction(input.Result, false) {
+	switch row.Kind {
+	case "auto-format", "dictation-status":
+		if input.Status == "succeeded" && !founderhub.ValidPrivateAction(input.Result, false) {
 			return nil, ErrInvalidInput
 		}
-	} else if input.Result != "" {
-		return nil, ErrInvalidInput
+		if input.Status == "failed" && input.Result != "" {
+			return nil, ErrInvalidInput
+		}
+	case "cloudsync-status":
+		if input.Status == "succeeded" && !founderhub.ValidCloudsyncStatusResult(input.Result) {
+			return nil, ErrInvalidInput
+		}
+		if input.Status == "failed" && input.Result != "" {
+			return nil, ErrInvalidInput
+		}
+	default:
+		if input.Result != "" {
+			return nil, ErrInvalidInput
+		}
 	}
 	updated, err := c.client.PlatformFounderHubDeviceCommand.Update().Where(cmd.ID(row.ID), cmd.Status("running"), cmd.ExpiresAtGT(time.Now())).SetStatus(input.Status).SetError(input.Error).SetResult(input.Result).Save(ctx)
 	if err != nil {
