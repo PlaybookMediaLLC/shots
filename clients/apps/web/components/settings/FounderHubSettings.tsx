@@ -29,6 +29,7 @@ import {
   Brain,
   Waveform,
   Lightning,
+  ArrowsClockwise,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -48,6 +49,7 @@ import { SettingsTemplates } from './founder-hub/templates'
 import { SettingsDictation } from './founder-hub/dictation'
 import { SettingsAIProvider } from './founder-hub/ai-provider'
 import { SettingsAutomations } from './founder-hub/automations'
+import { SettingsSync } from './founder-hub/sync'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -62,6 +64,7 @@ const PAGE_CONTENT = {
   intelligence: () => <SettingsAIProvider kind="llm" />,
   transcription: () => <SettingsAIProvider kind="stt" />,
   automations: SettingsAutomations,
+  sync: SettingsSync,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -76,6 +79,7 @@ const PAGE_ICONS = {
   intelligence: Brain,
   transcription: Waveform,
   automations: Lightning,
+  sync: ArrowsClockwise,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
