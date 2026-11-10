@@ -7,6 +7,7 @@ export const FOUNDER_HUB_PAGES = [
   { id: 'dictation', title: 'Dictation', group: 'AI' },
   { id: 'intelligence', title: 'Intelligence', group: 'AI' },
   { id: 'transcription', title: 'Transcription', group: 'AI' },
+  { id: 'automations', title: 'Automations', group: 'Workspace' },
   { id: 'meetings', title: 'Meetings', group: 'Workspace' },
   { id: 'templates', title: 'Templates', group: 'Workspace' },
   { id: 'privacy', title: 'Privacy', group: 'Advanced' },
