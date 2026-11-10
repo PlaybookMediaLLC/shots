@@ -30,6 +30,7 @@ import {
   Waveform,
   Lightning,
   ArrowsClockwise,
+  CheckSquare,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -50,6 +51,7 @@ import { SettingsDictation } from './founder-hub/dictation'
 import { SettingsAIProvider } from './founder-hub/ai-provider'
 import { SettingsAutomations } from './founder-hub/automations'
 import { SettingsSync } from './founder-hub/sync'
+import { SettingsTodo } from './founder-hub/todo'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -65,6 +67,7 @@ const PAGE_CONTENT = {
   transcription: () => <SettingsAIProvider kind="stt" />,
   automations: SettingsAutomations,
   sync: SettingsSync,
+  todo: SettingsTodo,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -80,6 +83,7 @@ const PAGE_ICONS = {
   transcription: Waveform,
   automations: Lightning,
   sync: ArrowsClockwise,
+  todo: CheckSquare,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
