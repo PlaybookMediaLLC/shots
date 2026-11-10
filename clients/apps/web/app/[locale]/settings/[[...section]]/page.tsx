@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { WorkspaceSettings } from '@/components/workspace/WorkspaceSettings'
+import { findFounderHubPage } from '@/components/settings/founder-hub/pages'
 import { findSettingsSection, findSocialSetPage } from '@/components/workspace/settings-sections'
 import { MCP_URL } from '@/lib/agents/mcp-clients'
 import { contentDraftsEnabled } from '@/lib/content-drafts/flag'
@@ -28,10 +29,18 @@ export async function generateMetadata({ params }: WorkspacePageProps): Promise<
  */
 function resolveSection(segments: string[] | undefined) {
   const section = findSettingsSection(segments?.[0])
+  if (section?.id === 'founder-hub') {
+    const founderHubPage = findFounderHubPage(segments?.[1])
+    return founderHubPage && (!segments || segments.length <= 2)
+      ? { section, founderHubPage }
+      : null
+  }
   if (!section || !segments || segments.length <= 1) return section ? { section } : null
   if (section.id !== 'social-sets' || segments.length > 3) return null
   const page = findSocialSetPage(segments[2])
-  return page && /^[a-z0-9]{10,32}$/.test(segments[1] ?? '') ? { page, section, socialSetId: segments[1]! } : null
+  return page && /^[a-z0-9]{10,32}$/.test(segments[1] ?? '')
+    ? { page, section, socialSetId: segments[1]! }
+    : null
 }
 
 export default async function WorkspacePage({ params, searchParams }: WorkspacePageProps) {
@@ -66,7 +75,10 @@ export default async function WorkspacePage({ params, searchParams }: WorkspaceP
         organization={access.organization}
         role={access.role}
         section={resolved.section.id}
-        socialSet={resolved.socialSetId ? { id: resolved.socialSetId, page: resolved.page } : undefined}
+        founderHubPage={resolved.founderHubPage}
+        socialSet={
+          resolved.socialSetId ? { id: resolved.socialSetId, page: resolved.page } : undefined
+        }
         twoFactorEnabled={Boolean(access.session.user.twoFactorEnabled)}
         userId={access.session.user.id}
       />

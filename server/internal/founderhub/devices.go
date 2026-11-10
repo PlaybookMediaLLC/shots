@@ -1,0 +1,119 @@
+package founderhub
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+)
+
+type InstalledApp struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type DeviceReport struct {
+	Platform           string            `json:"platform"`
+	Version            string            `json:"version"`
+	Identifier         string            `json:"identifier"`
+	Locale             string            `json:"locale"`
+	Timezone           string            `json:"timezone"`
+	AppStore           bool              `json:"appStore"`
+	LockAvailable      bool              `json:"lockAvailable"`
+	HomeDirectory      string            `json:"homeDirectory"`
+	DownloadsDirectory string            `json:"downloadsDirectory"`
+	Microphones        []string          `json:"microphones"`
+	InstalledApps      []InstalledApp    `json:"installedApps"`
+	DefaultIgnoredApps []string          `json:"defaultIgnoredApps"`
+	Permissions        map[string]string `json:"permissions"`
+	AutoFormatKey      string            `json:"autoFormatKey,omitempty"`
+}
+
+func (report DeviceReport) Valid() bool {
+	if report.AutoFormatKey != "" && !validEncoded(report.AutoFormatKey, 65, 65) {
+		return false
+	}
+	if report.Platform != "macos" && report.Platform != "windows" && report.Platform != "linux" {
+		return false
+	}
+	if len(report.Version) > 100 || len(report.Identifier) > 200 || len(report.Locale) > 100 || len(report.Timezone) > 100 || len(report.HomeDirectory) > 4096 || len(report.DownloadsDirectory) > 4096 || len(report.Microphones) > 256 || len(report.InstalledApps) > 10000 || len(report.DefaultIgnoredApps) > 1000 {
+		return false
+	}
+	for _, value := range report.Microphones {
+		if len(value) > 1000 {
+			return false
+		}
+	}
+	for _, app := range report.InstalledApps {
+		if len(app.ID) > 1000 || len(app.Name) > 1000 {
+			return false
+		}
+	}
+	for _, value := range report.DefaultIgnoredApps {
+		if len(value) > 1000 {
+			return false
+		}
+	}
+	for permission, status := range report.Permissions {
+		if !ValidPermission(permission) {
+			return false
+		}
+		if status != "authorized" && status != "denied" && status != "neverRequested" && status != "unknown" {
+			return false
+		}
+	}
+	encoded, err := json.Marshal(report)
+	return err == nil && len(encoded) <= 1048576
+}
+
+func ValidPermission(value string) bool {
+	switch value {
+	case "microphone", "systemAudio", "accessibility", "calendar", "screenRecording", "reminders", "contacts", "inputMonitoring":
+		return true
+	}
+	return false
+}
+
+type DeviceCommandInput struct {
+	DeviceID string `json:"deviceId"`
+	Kind     string `json:"kind"`
+	Argument string `json:"argument"`
+}
+
+func (input DeviceCommandInput) Valid() bool {
+	switch input.Kind {
+	case "auto-format", "dictation-status":
+		return ValidPrivateAction(input.Argument, true)
+	case "choose-export-directory", "open-export-directory", "show-release-notes", "dictation-retry", "dictation-cancel", "show-dictation-shortcut":
+		return input.Argument == ""
+	case "request-permission", "open-permission":
+		return ValidPermission(input.Argument)
+	case "set-lock":
+		return input.Argument == "true" || input.Argument == "false"
+	case "preview-sound":
+		return input.Argument == "ready" || input.Argument == "success" || input.Argument == "chime" || input.Argument == "sparkle" || input.Argument == "bloom"
+	}
+	return false
+}
+
+func validEncoded(value string, min, max int) bool {
+	decoded, err := base64.StdEncoding.Strict().DecodeString(value)
+	return err == nil && len(decoded) >= min && len(decoded) <= max
+}
+
+func ValidPrivateAction(value string, request bool) bool {
+	if len(value) > 201000 {
+		return false
+	}
+	var envelope struct {
+		PublicKey  string `json:"publicKey,omitempty"`
+		IV         string `json:"iv"`
+		Ciphertext string `json:"ciphertext"`
+	}
+	decoder := json.NewDecoder(bytes.NewBufferString(value))
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&envelope) != nil || decoder.Decode(new(any)) != io.EOF {
+		return false
+	}
+	return ((request && validEncoded(envelope.PublicKey, 65, 65)) || (!request && envelope.PublicKey == "")) && validEncoded(envelope.IV, 12, 12) && validEncoded(envelope.Ciphertext, 16, 150000)
+}

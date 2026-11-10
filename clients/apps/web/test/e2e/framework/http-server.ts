@@ -60,9 +60,10 @@ export async function startHttpMockServer(
   return {
     calls,
     close: () =>
-      new Promise((resolve, reject) =>
+      new Promise((resolve, reject) => {
         server.close((error) => (error ? reject(error) : resolve()))
-      ),
+        server.closeAllConnections()
+      }),
     containerUrl: `http://host.docker.internal:${address.port}`,
     url: `http://127.0.0.1:${address.port}`,
   }

@@ -47,6 +47,14 @@ export const SETTING_GROUPS: { id: SettingGroup; title: string }[] = [
 /** Every section, in the order the navigation lists them within their group. */
 const SECTIONS = [
   {
+    description: 'Founder Hub preferences, connected computers, and meeting settings.',
+    group: 'personal',
+    id: 'founder-hub',
+    slug: 'founder-hub',
+    title: 'Founder Hub',
+    keywords: 'desktop meetings transcription intelligence dictionary automations',
+  },
+  {
     description: 'Your name, sign-in email, sessions, and account deletion.',
     group: 'personal',
     id: 'profile',
@@ -154,7 +162,8 @@ const SECTIONS = [
     title: 'Profiles',
   },
   {
-    description: 'Manage the social accounts this workspace posts from, and the profile each belongs to.',
+    description:
+      'Manage the social accounts this workspace posts from, and the profile each belongs to.',
     group: 'publishing',
     id: 'channels',
     slug: 'channels',

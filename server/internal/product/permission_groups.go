@@ -60,12 +60,19 @@ func deniedPermissions(ctx context.Context, client *ent.Client, organizationID, 
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
+	return memberDeniedPermissions(role, groups, assignment), nil
+}
+
+func memberDeniedPermissions(role string, groups []*ent.PermissionGroup, assignment *ent.PermissionGroupMember) []string {
+	if role == "owner" {
+		return []string{}
+	}
 	for _, group := range groups {
 		if (assignment != nil && group.ID == assignment.PermissionGroupID) || (assignment == nil && group.IsDefault) {
-			return group.DeniedPermissions, nil
+			return group.DeniedPermissions
 		}
 	}
-	return []string{}, nil
+	return []string{}
 }
 
 // requireNotDenied refuses a member whose permission group denies permission.

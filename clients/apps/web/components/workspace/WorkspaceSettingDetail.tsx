@@ -4,6 +4,7 @@ import { AccountSettings } from '@/components/settings/AccountSettings'
 import { AppearanceSettings } from '@/components/settings/AppearanceSettings'
 import { DeveloperTools } from '@/components/settings/DeveloperTools'
 import { ExperimentalSettings } from '@/components/settings/ExperimentalSettings'
+import { FounderHubSettings } from '@/components/settings/FounderHubSettings'
 import { InstallSettings } from '@/components/settings/InstallSettings'
 import { IntegrationCatalog } from '@/components/settings/IntegrationCatalog'
 import { NewTeamSettings } from '@/components/settings/NewTeamSettings'
@@ -43,6 +44,9 @@ type SettingsContext = Omit<WorkspaceSettingsProps, 'section'> & {
  * ask for content when a section is added, and only the open section renders.
  */
 const SETTINGS_CONTENT = {
+  'founder-hub': ({ userId, founderHubPage }) => (
+    <FounderHubSettings userId={userId} page={founderHubPage} key={userId} />
+  ),
   profile: ({ email, name }) => <AccountSettings email={email} name={name} />,
   notifications: () => <WorkspaceNotifications />,
   appearance: () => <AppearanceSettings />,
@@ -122,10 +126,7 @@ const SETTINGS_CONTENT = {
     />
   ),
   whitelabel: ({ can, organization }) => (
-    <WorkspaceWhitelabelSettings
-      canManage={can('brand:manage')}
-      organizationId={organization.id}
-    />
+    <WorkspaceWhitelabelSettings canManage={can('brand:manage')} organizationId={organization.id} />
   ),
   audit: ({ can, organization }) => (
     <WorkspaceAuditSettings

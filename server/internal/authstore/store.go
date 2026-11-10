@@ -22,6 +22,7 @@ var tables = map[string]bool{
 	"account": true, "apikey": true, "invitation": true, "member": true, "organization": true,
 	"scimProvider": true, "session": true, "ssoProvider": true, "twoFactor": true, "user": true,
 	"verification": true,
+	"oauthClient":  true, "oauthRefreshToken": true, "oauthAccessToken": true, "oauthConsent": true, "jwks": true,
 }
 
 type Where struct {
@@ -110,6 +111,7 @@ type query struct {
 	args    []any
 	columns map[string]string
 	table   string
+	guard   string
 }
 
 func (q *query) param(column string, value any) (string, error) {
@@ -257,6 +259,9 @@ func (q *query) clause(where Where) (string, error) {
 // OR clause holds when any are given.
 func (q *query) filter(where []Where) (string, error) {
 	var and, or []string
+	if q.guard != "" {
+		and = append(and, q.guard)
+	}
 	for _, item := range where {
 		clause, err := q.clause(item)
 		if err != nil {
@@ -348,6 +353,12 @@ func (s *Store) Execute(ctx context.Context, request Request) (*Result, error) {
 		return result, nil
 	}
 	q := &query{columns: schema[request.Model], table: quote(request.Model)}
+	if (request.Model == "oauthRefreshToken" || request.Model == "oauthAccessToken") &&
+		(request.Op == "findOne" || request.Op == "findMany" || request.Op == "count") {
+		q.guard = fmt.Sprintf(`EXISTS (SELECT 1 FROM "session" s JOIN "user" u ON u.id=s."userId"
+			WHERE s.id=%[1]s."sessionId" AND s."userId"=%[1]s."userId" AND s."expiresAt">now()
+			AND (NOT coalesce(u.banned,false) OR u."banExpires"<now()))`, q.table)
+	}
 	switch request.Op {
 	case "create":
 		names, values := []string{}, []string{}

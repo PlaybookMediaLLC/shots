@@ -64,9 +64,10 @@ const DefaultStatus = StatusREQUESTED
 
 // Status values.
 const (
-	StatusREQUESTED Status = "REQUESTED"
-	StatusCANCELLED Status = "CANCELLED"
-	StatusCOMPLETED Status = "COMPLETED"
+	StatusREQUESTED  Status = "REQUESTED"
+	StatusPROCESSING Status = "PROCESSING"
+	StatusCANCELLED  Status = "CANCELLED"
+	StatusCOMPLETED  Status = "COMPLETED"
 )
 
 func (s Status) String() string {
@@ -76,7 +77,7 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusREQUESTED, StatusCANCELLED, StatusCOMPLETED:
+	case StatusREQUESTED, StatusPROCESSING, StatusCANCELLED, StatusCOMPLETED:
 		return nil
 	default:
 		return fmt.Errorf("accountdeletionrequest: invalid enum value for status field: %q", s)

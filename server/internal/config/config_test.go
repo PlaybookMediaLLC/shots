@@ -144,4 +144,10 @@ func TestMaintenanceRequiresDedicatedDependencies(t *testing.T) {
 	if _, err := LoadOrchestrator(); err == nil {
 		t.Fatal("insecure unsubscribe origin accepted")
 	}
+	for _, origin := range []string{"http://localhost:4001", "http://127.0.0.1:4001", "http://[::1]:4001"} {
+		t.Setenv("BETTER_AUTH_URL", origin)
+		if _, err := LoadOrchestrator(); err != nil {
+			t.Fatalf("local maintenance origin %s: %v", origin, err)
+		}
+	}
 }
