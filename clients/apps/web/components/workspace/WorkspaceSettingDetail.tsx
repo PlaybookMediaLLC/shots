@@ -44,8 +44,13 @@ type SettingsContext = Omit<WorkspaceSettingsProps, 'section'> & {
  * ask for content when a section is added, and only the open section renders.
  */
 const SETTINGS_CONTENT = {
-  'founder-hub': ({ userId, founderHubPage }) => (
-    <FounderHubSettings userId={userId} page={founderHubPage} key={userId} />
+  'founder-hub': ({ userId, founderHubPage, can }) => (
+    <FounderHubSettings
+      userId={userId}
+      page={founderHubPage}
+      canManageDeveloper={can('workspace:update')}
+      key={userId}
+    />
   ),
   profile: ({ email, name }) => <AccountSettings email={email} name={name} />,
   notifications: () => <WorkspaceNotifications />,

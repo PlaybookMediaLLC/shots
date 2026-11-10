@@ -10,6 +10,7 @@ export const FOUNDER_HUB_PAGES = [
   { id: 'automations', title: 'Automations', group: 'Workspace' },
   { id: 'sync', title: 'Sync', group: 'Workspace' },
   { id: 'todo', title: 'Ticket', group: 'Workspace' },
+  { id: 'developers', title: 'Developers', group: 'Advanced' },
   { id: 'meetings', title: 'Meetings', group: 'Workspace' },
   { id: 'templates', title: 'Templates', group: 'Workspace' },
   { id: 'privacy', title: 'Privacy', group: 'Advanced' },

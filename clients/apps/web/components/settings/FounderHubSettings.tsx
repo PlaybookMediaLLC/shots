@@ -31,6 +31,7 @@ import {
   Lightning,
   ArrowsClockwise,
   CheckSquare,
+  Code,
 } from '@phosphor-icons/react'
 import { settingsRequest, settingsErrorMessage } from '@/lib/settings/client'
 import { FOUNDER_HUB_PAGES, type FounderHubPage } from './founder-hub/pages'
@@ -52,6 +53,7 @@ import { SettingsAIProvider } from './founder-hub/ai-provider'
 import { SettingsAutomations } from './founder-hub/automations'
 import { SettingsSync } from './founder-hub/sync'
 import { SettingsTodo } from './founder-hub/todo'
+import { SettingsDevelopers } from './founder-hub/developers'
 
 const PAGE_CONTENT = {
   general: SettingsApp,
@@ -68,6 +70,7 @@ const PAGE_CONTENT = {
   automations: SettingsAutomations,
   sync: SettingsSync,
   todo: SettingsTodo,
+  developers: () => <SettingsDevelopers canManage={false} />,
 } satisfies Record<FounderHubPage, ComponentType>
 const PAGE_ICONS = {
   general: Gear,
@@ -84,14 +87,17 @@ const PAGE_ICONS = {
   automations: Lightning,
   sync: ArrowsClockwise,
   todo: CheckSquare,
+  developers: Code,
 }
 /** Original Founder Hub settings pages backed by the authenticated Shots account. */
 export function FounderHubSettings({
   userId,
   page = 'general',
+  canManageDeveloper = false,
 }: {
   userId: string
   page?: FounderHubPage
+  canManageDeveloper?: boolean
 }) {
   const [selection, setSelection] = useState<{ userId: string; deviceId: string }>()
   const i18n = useMemo(() => setupI18n({ locale: 'en', messages: { en: {} } }), [])
@@ -172,6 +178,7 @@ export function FounderHubSettings({
             )}
             <SettingsSurface
               page={page}
+              canManageDeveloper={canManageDeveloper}
               deviceId={selectedId}
               onDeviceChange={(deviceId) => setSelection({ userId, deviceId })}
               devices={devices.data}
@@ -185,11 +192,13 @@ export function FounderHubSettings({
 
 function SettingsSurface({
   page,
+  canManageDeveloper,
   deviceId,
   onDeviceChange,
   devices,
 }: {
   page: FounderHubPage
+  canManageDeveloper: boolean
   deviceId: string
   onDeviceChange: (value: string) => void
   devices: z.infer<typeof founderHubDeviceSchema>[]
@@ -265,7 +274,11 @@ function SettingsSurface({
                 disabled={!deviceId && !['appearance', 'templates'].includes(page)}
                 className="min-w-0 border-0 p-0"
               >
+              {page === 'developers' ? (
+                <SettingsDevelopers canManage={canManageDeveloper} />
+              ) : (
                 <Component key={`${page}:${deviceId}`} />
+              )}
               </fieldset>
             </div>
           </div>
