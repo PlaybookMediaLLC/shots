@@ -394,4 +394,14 @@ func TestAuthorizationRefusesEachFailedCheck(t *testing.T) {
 			check(t, scenario.wantRole, scenario.wantSession)
 		})
 	}
+	t.Run("a delegated session acts in a workspace other than the active one", func(t *testing.T) {
+		w.exec(t, `UPDATE session SET "activeOrganizationId"='other' WHERE id=$1`, reader.SessionID)
+		t.Cleanup(func() {
+			w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, reader.SessionID, w.org)
+		})
+		role, err := auth.AuthorizedRole(publishing.ForDelegatedSession(w.ctx), w.org, reader.UserID, reader.SessionID, readRoles...)
+		if err != nil || role != "viewer" {
+			t.Fatalf("delegated role=%q err=%v", role, err)
+		}
+	})
 }

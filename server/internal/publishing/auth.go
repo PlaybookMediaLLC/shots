@@ -173,16 +173,16 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 
 // admittedRole reads in one query what AuthorizedRole checks for a session:
 // a live session of an active account, an active workspace that is this one
-// or none, exactly one membership, and no deletion in progress. It returns
-// the role, or false when any check refuses.
+// or none (any, for a delegated session), exactly one membership, and no
+// deletion in progress. It returns the role, or false when any check refuses.
 func (r *Repository) admittedRole(ctx context.Context, organizationID, userID, sessionID string) (string, bool, error) {
 	var roles []string
 	err := r.client.PlatformQuery(ctx, `SELECT m.role FROM session s JOIN "user" u ON u.id=s."userId"
         JOIN member m ON m."userId"=u.id AND m."organizationId"=$1
         WHERE s.id=$2 AND s."userId"=$3 AND s."expiresAt">$4 AND coalesce(u.banned,false)=false
-        AND (s."activeOrganizationId" IS NULL OR s."activeOrganizationId"=$1)
+        AND ($5::boolean OR s."activeOrganizationId" IS NULL OR s."activeOrganizationId"=$1)
         AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=$1 AND d.status<>'CANCELLED')`,
-		[]any{organizationID, sessionID, userID, time.Now().UTC()}, func(row entsql.ColumnScanner) error {
+		[]any{organizationID, sessionID, userID, time.Now().UTC(), IsDelegatedSession(ctx)}, func(row entsql.ColumnScanner) error {
 			var role string
 			if err := row.Scan(&role); err != nil {
 				return err
