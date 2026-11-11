@@ -797,9 +797,10 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err != nil {
 		return nil, err
 	}
-	// shortcut: captions come from the request (the web serializes the draft), so
-	// approval binds the version, not the text; upgrade to a Go serializer shared by
-	// every schedule path, or check captions against a snapshot serialized at approval.
+	// Captions are the stored draft's at input.Version, so an approval binds the
+	// text: for the route and batch runs the web serializes them from the draft it
+	// reads and takes no text from its callers (a version only grows, and it is
+	// current here); CreatePost and voice confirm make the draft from them.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)

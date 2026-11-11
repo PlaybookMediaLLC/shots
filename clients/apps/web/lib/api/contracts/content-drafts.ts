@@ -10,12 +10,11 @@ import {
   contentDraftListQuerySchema,
   contentDraftStatusSchema,
 } from '@/lib/api/contracts/content-draft-list'
-import { automationSchema, draftKindSchema, draftChannelSchema } from '@/lib/write/document'
+import { draftKindSchema, draftChannelSchema } from '@/lib/write/document'
 import {
   draftEngagementSchema,
   draftWriteFieldsSchema,
   draftWriteInputSchema,
-  pollSchema,
   postAutomationSchema,
   scheduleTimingSchema,
 } from '@/lib/write/wire'
@@ -310,8 +309,9 @@ export const contentDraftPostSchema = z.object({
 })
 
 /**
- * A schedule request. The server serializes the draft for each channel, so
- * the posted captions are the ones the composer previewed.
+ * A schedule request. It carries no text: the server serializes the stored
+ * draft at `version` for each channel, captions, polls and follow-ups alike,
+ * so the posts carry what the composer previewed and a reviewer approved.
  */
 export const contentDraftScheduleSchema = scheduleTimingSchema.extend({
   /**
@@ -320,14 +320,6 @@ export const contentDraftScheduleSchema = scheduleTimingSchema.extend({
    */
   blockImages: z.array(contentDraftIdSchema.nullable()).max(50).optional(),
   channelConnectionIds: z.array(contentDraftIdSchema).min(1).max(10),
-  /** Per channel connection: X follow-ups and a poll. */
-  options: z
-    .record(
-      contentDraftIdSchema,
-      // X follow-ups: repost and reply at a count, quote later, timed reposts.
-      z.object({ autoActions: automationSchema.optional(), poll: pollSchema.optional() })
-    )
-    .optional(),
   /** The queue's next free slot instead of `scheduledFor`; the backend reserves it. */
   queue: z.boolean().optional(),
   /** A previewed queue slot; a changed queue is a conflict instead of a silent move. */
