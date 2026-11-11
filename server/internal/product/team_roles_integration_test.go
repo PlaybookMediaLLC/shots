@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/collab"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
@@ -196,6 +199,56 @@ func TestTeamCollaborationRoles(t *testing.T) {
 		if post.ScheduledByUserID == nil || *post.ScheduledByUserID != publisher.UserID || post.ApprovedByUserID == nil || *post.ApprovedByUserID != approver.UserID ||
 			post.ApprovedVersion == nil || *post.ApprovedVersion != approved.Version {
 			t.Fatalf("scheduledBy=%v approvedBy=%v approvedVersion=%v", post.ScheduledByUserID, post.ApprovedByUserID, post.ApprovedVersion)
+		}
+	})
+	t.Run("approval switches are an owner's or admin's decision, audited and never lost", func(t *testing.T) {
+		publisher, admin := w.actor("publisher"), w.actor("admin")
+		off, on := false, true
+		// A publisher keeps the queue, and may resend a switch unchanged, but cannot flip one.
+		slots := []schema.QueueSlot{{Weekday: 2, Time: "10:00"}}
+		if _, err := repo.UpdateContentDraftSettings(ctx, publisher, ContentDraftSettingsUpdate{PostingSlots: &slots, RequireApproval: &on}); err != nil {
+			t.Fatalf("publisher queue change: %v", err)
+		}
+		for _, change := range []ContentDraftSettingsUpdate{{RequireApproval: &off}, {AllowSelfApproval: &off}} {
+			if _, err := repo.UpdateContentDraftSettings(ctx, publisher, change); !errors.Is(err, publishing.ErrForbidden) {
+				t.Fatalf("a publisher changed approval: %v", err)
+			}
+		}
+		// Changes to both switches at once both land, each audited with before and after.
+		var wg sync.WaitGroup
+		errs := make(chan error, 2)
+		for _, change := range []ContentDraftSettingsUpdate{{RequireApproval: &off}, {AllowSelfApproval: &off}} {
+			wg.Go(func() {
+				_, err := repo.UpdateContentDraftSettings(ctx, admin, change)
+				errs <- err
+			})
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &on, AllowSelfApproval: &on})
+		})
+		settings, err := repo.GetContentDraftSettings(ctx, w.owner)
+		if err != nil || settings.RequireApproval || settings.AllowSelfApproval || len(settings.PostingSlots) != 1 {
+			t.Fatalf("an update was lost: %+v %v", settings, err)
+		}
+		audits := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.content_draft_settings_updated"),
+			auditlog.ActorUserID(admin.UserID)).AllX(ctx)
+		final := 0
+		for _, audit := range audits {
+			after, _ := audit.Metadata["after"].(map[string]any)
+			before, _ := audit.Metadata["before"].(map[string]any)
+			if after["requireApproval"] == false && after["allowSelfApproval"] == false && (before["requireApproval"] == true) != (before["allowSelfApproval"] == true) {
+				final++
+			}
+		}
+		if len(audits) != 2 || final != 1 {
+			t.Fatalf("audits=%+v", audits)
 		}
 	})
 	writer := w.actor("writer_publisher")

@@ -95,7 +95,9 @@ func (c *Configuration) GetContentDraftSettings(ctx context.Context, actor Actor
 	return &settings, err
 }
 
-// UpdateContentDraftSettings saves the settings an owner, admin or publisher sets.
+// UpdateContentDraftSettings saves the settings an owner, admin or publisher
+// sets. Changing an approval switch takes an owner or admin, signed in, and is
+// audited. One workspace's updates run one at a time, so none is lost.
 func (c *Configuration) UpdateContentDraftSettings(ctx context.Context, actor Actor, input ContentDraftSettingsUpdate) (*ContentDraftSettings, error) {
 	if err := c.authorizeScheduling(ctx, actor); err != nil {
 		return nil, err
@@ -108,9 +110,31 @@ func (c *Configuration) UpdateContentDraftSettings(ctx context.Context, actor Ac
 			return nil, err
 		}
 	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext('content-draft-settings:' || $1))`, actor.OrganizationID); err != nil {
+		return nil, err
+	}
 	current, err := c.draftSettings(ctx, actor.OrganizationID)
 	if err != nil {
 		return nil, err
+	}
+	before := current
+	if input.RequireApproval != nil {
+		current.RequireApproval = *input.RequireApproval
+	}
+	if input.AllowSelfApproval != nil {
+		current.AllowSelfApproval = *input.AllowSelfApproval
+	}
+	approvalChanged := current.RequireApproval != before.RequireApproval || current.AllowSelfApproval != before.AllowSelfApproval
+	if approvalChanged {
+		// Approval guards what goes out, so it is a person's decision, not a key's.
+		if err := c.authorizeDecision(ctx, actor, "owner", "admin"); err != nil {
+			return nil, err
+		}
 	}
 	if input.PostingSlots != nil {
 		slots, err := queueSlots(*input.PostingSlots)
@@ -122,24 +146,30 @@ func (c *Configuration) UpdateContentDraftSettings(ctx context.Context, actor Ac
 		if err != nil {
 			return nil, err
 		}
-		if _, err := c.client.SocialSet.UpdateOneID(set.ID).SetPostingSlots(slots).AddVersion(1).Save(ctx); err != nil {
+		if _, err := tx.SocialSet.UpdateOneID(set.ID).SetPostingSlots(slots).AddVersion(1).Save(ctx); err != nil {
 			return nil, err
 		}
 	}
-	if input.RequireApproval != nil {
-		current.RequireApproval = *input.RequireApproval
-	}
-	if input.AllowSelfApproval != nil {
-		current.AllowSelfApproval = *input.AllowSelfApproval
-	}
-	updated, err := c.client.ContentDraftSettings.Update().Where(contentdraftsettings.ID(actor.OrganizationID)).
+	updated, err := tx.ContentDraftSettings.Update().Where(contentdraftsettings.ID(actor.OrganizationID)).
 		SetPostingSlots(current.PostingSlots).SetRequireApproval(current.RequireApproval).
 		SetAllowSelfApproval(current.AllowSelfApproval).Save(ctx)
 	if err == nil && updated == 0 {
-		err = c.client.ContentDraftSettings.Create().SetID(actor.OrganizationID).SetPostingSlots(current.PostingSlots).
+		err = tx.ContentDraftSettings.Create().SetID(actor.OrganizationID).SetPostingSlots(current.PostingSlots).
 			SetRequireApproval(current.RequireApproval).SetAllowSelfApproval(current.AllowSelfApproval).Exec(ctx)
 	}
 	if err != nil {
+		return nil, err
+	}
+	if approvalChanged {
+		approval := func(s ContentDraftSettings) map[string]bool {
+			return map[string]bool{"requireApproval": s.RequireApproval, "allowSelfApproval": s.AllowSelfApproval}
+		}
+		if err := appendConfigurationAudit(ctx, tx, actor, "product.content_draft_settings_updated", "content_draft_settings", actor.OrganizationID,
+			map[string]any{"before": approval(before), "after": approval(current)}); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return &current, nil
