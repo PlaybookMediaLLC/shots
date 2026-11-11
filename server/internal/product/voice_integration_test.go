@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/maintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
@@ -1125,4 +1126,184 @@ func TestVoiceCompleteLosesToTheUploadSweep(t *testing.T) {
 	if !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("message=%v", err)
 	}
+}
+
+// S1 under a real race: two creates of one clientNoteId at once both answer
+// with the one note, exactly one of them as created.
+func TestVoiceCreateRace(t *testing.T) {
+	f := newVoiceFixture(t)
+	f.enable(true, false)
+	type outcome struct {
+		id      string
+		created bool
+		err     error
+	}
+	for round := range 20 {
+		input := CreateVoiceNoteInput{ClientNoteID: "race-" + strconv.Itoa(round), RecordedAt: time.Now(), RecordedTimeZone: "UTC"}
+		start, results := make(chan struct{}), make([]outcome, 2)
+		var wg sync.WaitGroup
+		for i := range results {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				note, created, err := f.repo.CreateVoiceNote(f.ctx, f.creator, input)
+				results[i] = outcome{created: created, err: err}
+				if note != nil {
+					results[i].id = note.ID
+				}
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if results[0].err != nil || results[1].err != nil || results[0].id == "" || results[0].id != results[1].id || results[0].created == results[1].created {
+			t.Fatalf("round %d: %+v", round, results)
+		}
+		if count := f.value(`SELECT count(*)::text FROM voice_note WHERE "ownerUserId"=$1 AND "clientNoteId"=$2`, f.creator.UserID, input.ClientNoteID); count != "1" {
+			t.Fatalf("round %d: %s notes", round, count)
+		}
+	}
+}
+
+// Every operation on a note: another member of the workspace and another
+// workspace find nothing (its existence never leaks); an API key, which has
+// no member, is refused. Nothing changes.
+func TestVoiceNoteOperationsAreTheOwnersAlone(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	note := f.note(f.creator, "private-note", true)
+	result, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/0-"+digestOf(run)+".wav", run)
+	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	revision := f.value(`SELECT revision::text FROM voice_note WHERE id=$1`, note.ID)
+	operations := map[string]func(Actor) error{
+		"get": func(a Actor) error { _, err := f.repo.GetVoiceNote(ctx, a, note.ID); return err },
+		"update": func(a Actor) error {
+			_, err := f.repo.UpdateVoiceNote(ctx, a, note.ID, UpdateVoiceNoteInput{ExpectedRevision: 1, Title: voicePtr("Mine now")})
+			return err
+		},
+		"delete": func(a Actor) error { return f.repo.DeleteVoiceNote(ctx, a, note.ID) },
+		"add transcript": func(a Actor) error {
+			_, _, err := f.repo.AddVoiceTranscript(ctx, a, note.ID, AddVoiceTranscriptInput{ClientRevisionID: "x", Origin: "user_edit", Text: "words"})
+			return err
+		},
+		"redact": func(a Actor) error {
+			_, err := f.repo.RedactVoiceTranscript(ctx, a, note.ID, result.Revision.ID)
+			return err
+		},
+		"sign upload": func(a Actor) error {
+			_, err := f.repo.SignVoiceRunUpload(ctx, a, note.ID, 1, pcm)
+			return err
+		},
+		"complete":     func(a Actor) error { _, err := f.repo.CompleteVoiceRun(ctx, a, note.ID, 0); return err },
+		"play":         func(a Actor) error { _, err := f.repo.SignVoiceRunAudio(ctx, a, note.ID, 0); return err },
+		"delete audio": func(a Actor) error { return f.repo.DeleteVoiceAudio(ctx, a, note.ID) },
+	}
+	for name, operation := range operations {
+		for _, caller := range []struct {
+			who   string
+			actor Actor
+			want  error
+		}{{"another member", f.owner, publishing.ErrNotFound}, {"another workspace", f.foreign, publishing.ErrNotFound}, {"an API key", f.apiKey, publishing.ErrForbidden}} {
+			expectVoice(t, operation(caller.actor), caller.want, caller.who+": "+name)
+		}
+	}
+	if after := f.value(`SELECT revision::text FROM voice_note WHERE id=$1`, note.ID); after != revision || f.objects.audio() != 1 {
+		t.Fatalf("someone else changed the note: revision %s -> %s, objects=%d", revision, after, f.objects.audio())
+	}
+}
+
+// The transcript's bounds, at their edges.
+func TestValidVoiceTranscript(t *testing.T) {
+	segments := func(lengths ...int) []schema.VoiceSegment {
+		list := []schema.VoiceSegment{}
+		for i, length := range lengths {
+			list = append(list, schema.VoiceSegment{StartMs: i * 1000, EndMs: i*1000 + 999, Text: strings.Repeat("a", length)})
+		}
+		return list
+	}
+	for name, test := range map[string]struct {
+		change func(*AddVoiceTranscriptInput)
+		valid  bool
+	}{
+		"plain":                             {func(*AddVoiceTranscriptInput) {}, true},
+		"100,000 characters":                {func(i *AddVoiceTranscriptInput) { i.Text = strings.Repeat("é", 100000) }, true},
+		"100,001 characters":                {func(i *AddVoiceTranscriptInput) { i.Text = strings.Repeat("é", 100001) }, false},
+		"segments of 100,000 characters":    {func(i *AddVoiceTranscriptInput) { i.Segments = segments(60000, 40000) }, true},
+		"segments of 100,001 characters":    {func(i *AddVoiceTranscriptInput) { i.Segments = segments(60000, 40001) }, false},
+		"a segment ending before it starts": {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{StartMs: 5, EndMs: 4}} }, false},
+		"a segment starting before zero":    {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{StartMs: -1, EndMs: 4}} }, false},
+		"a NUL in a segment":                {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{Text: "a\x00b"}} }, false},
+		"a NUL in the text":                 {func(i *AddVoiceTranscriptInput) { i.Text = "a\x00b" }, false},
+		"a 100-character clientRevisionId":  {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = strings.Repeat("r", 100) }, true},
+		"a 101-character clientRevisionId":  {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = strings.Repeat("r", 101) }, false},
+		"no clientRevisionId":               {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = "" }, false},
+		"a NUL in the clientRevisionId":     {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = "r\x00" }, false},
+		"an empty engine":                   {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr("") }, false},
+		"a 65-character engine":             {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr(strings.Repeat("e", 65)) }, false},
+		"a NUL in the engine":               {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr("e\x00") }, false},
+		"an unknown origin":                 {func(i *AddVoiceTranscriptInput) { i.Origin = "dictation" }, false},
+		"a locale that is not a tag":        {func(i *AddVoiceTranscriptInput) { i.Locale = voicePtr("en US") }, false},
+	} {
+		input := AddVoiceTranscriptInput{ClientRevisionID: "r", Origin: "on_device", Text: "words"}
+		test.change(&input)
+		if err := validVoiceTranscript(input); (err == nil) != test.valid || (err != nil && !errors.Is(err, ErrInvalidInput)) {
+			t.Errorf("%s: err=%v", name, err)
+		}
+	}
+}
+
+// The inbox pages by the server's receive time, breaking ties by id, and an
+// aged tombstone still refuses a replayed create after the sweep (S8).
+func TestVoiceNotePagingAndAgedTombstones(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, false)
+	for i := range 3 {
+		f.note(f.creator, "same-time-"+strconv.Itoa(i), false)
+	}
+	f.exec(`UPDATE voice_note SET "receivedAt"='2026-11-11 09:00:00' WHERE "ownerUserId"=$1`, f.creator.UserID)
+	order, cursor := []string{}, ""
+	for {
+		page, err := f.repo.ListVoiceNotes(ctx, f.creator, VoiceNoteListQuery{Limit: 1, Cursor: cursor})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page.Notes {
+			order = append(order, item.ID)
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+	if want := f.value(`SELECT string_agg(id, ',' ORDER BY id DESC) FROM voice_note WHERE "ownerUserId"=$1`, f.creator.UserID); strings.Join(order, ",") != want {
+		t.Fatalf("paged %v, want %s", order, want)
+	}
+
+	input := CreateVoiceNoteInput{ClientNoteID: "old-note", RecordedAt: time.Now(), RecordedTimeZone: "UTC"}
+	note, _, err := f.repo.CreateVoiceNote(ctx, f.creator, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(`UPDATE voice_note SET "deletedAt"=now()-interval '400 days',"updatedAt"=now()-interval '400 days' WHERE id=$1`, note.ID)
+	if _, err := f.repo.SweepVoice(ctx); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = f.repo.CreateVoiceNote(ctx, f.creator, input)
+	expectVoice(t, err, publishing.ErrConflict, "a replayed create of a note deleted 400 days ago")
 }
