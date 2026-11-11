@@ -439,9 +439,12 @@ run_e2e() {
   local app_url
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
-  local lane listing argument ran_lane=false check_oauth=false
-  # Keep secondary E2E runs from overwriting the main suite's reports.
+  local argument check_oauth=false
+  # Names this run's reports. The recovery and onboarding runs invoke
+  # Playwright a second time against the same app; without a name of their
+  # own they overwrote the suite's JSON and blob reports.
   local report="${E2E_REPORT_LANE:-production}"
+  # The Founder Hub sign-in check runs once per suite: unsharded, or in shard 1.
   if [[ "$#" == 0 ]]; then check_oauth=true; fi
   for argument in "$@"; do
     if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
@@ -455,38 +458,17 @@ run_e2e() {
     E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
     return "$test_result"
   fi
-  # Two lanes, as Next.js recommends: the production build for every test it
-  # can serve, then `next dev` for the tests tagged @dev-server, which need
-  # its hooks (the scripted AI model, screenshot-mock downloads).
-  for lane in production dev-server; do
-    if ! listing="$(e2e_npm "$app_url" run --silent "$test_script" -- "$@" --list --pass-with-no-tests --project="$lane" --reporter=list 2>&1)"; then
-      echo "$listing" >&2
-      return 1
-    fi
-    grep -qE 'Total: [1-9]' <<<"$listing" || continue
-    ran_lane=true
-    start_e2e_app "$lane" "$app_url" "$e2e_trusted_origins"
-    wait_for_http "${app_url%/}/api/health" "Screenshot Studio"
-    if [[ "$lane" == dev-server ]]; then
-      warm_e2e_routes "$app_url" "$manage_screenshot_mock"
-    fi
-    if [[ "$lane" == production && "$test_script" == test:e2e && "$check_oauth" == true ]]; then
-      FOUNDER_HUB_TEST_API_URL="${FOUNDER_HUB_TEST_API_URL:-http://127.0.0.1:8080}" \
-        BETTER_AUTH_URL="${app_url%/}" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
-        e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
-    fi
-    E2E_LANE="${E2E_REPORT_LANE:-$lane}" e2e_npm "$app_url" run "$test_script" -- --project="$lane" "$@" || test_result=1
-    # Recreating app discards the logs of the server that ran the lane; keep
-    # them beside the Playwright results, which CI uploads on failure.
-    mkdir -p "$WEB_DIR/test-results"
-    compose logs --no-color app >"$WEB_DIR/test-results/app-$lane.log" 2>&1 || true
-  done
-  if [[ "$ran_lane" != true ]]; then
-    echo "No end-to-end tests match: $*" >&2
-    return 1
+  sync_dependencies
+  start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
+  if [[ "$test_script" == test:e2e && "$check_oauth" == true ]]; then
+    FOUNDER_HUB_TEST_API_URL="${FOUNDER_HUB_TEST_API_URL:-http://127.0.0.1:8080}" \
+      BETTER_AUTH_URL="${app_url%/}" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
+      e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
   fi
-  SCREENSHOT_API_URL="" SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS="" OPENROUTER_BASE_URL="" \
-    compose up --detach --force-recreate publishing-backend publishing-orchestrator app
+  E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
+  # Keep the server's logs beside the Playwright results, which CI uploads.
+  mkdir -p "$WEB_DIR/test-results"
+  compose logs --no-color app >"$WEB_DIR/test-results/app-$report.log" 2>&1 || true
   return "$test_result"
 }
 
