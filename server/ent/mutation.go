@@ -37873,6 +37873,7 @@ type ContentDraftSettingsMutation struct {
 	posting_slots       *[]schema.QueueSlot
 	appendposting_slots []schema.QueueSlot
 	require_approval    *bool
+	allow_self_approval *bool
 	updated_at          *time.Time
 	clearedFields       map[string]struct{}
 	done                bool
@@ -38071,6 +38072,42 @@ func (m *ContentDraftSettingsMutation) ResetRequireApproval() {
 	m.require_approval = nil
 }
 
+// SetAllowSelfApproval sets the "allow_self_approval" field.
+func (m *ContentDraftSettingsMutation) SetAllowSelfApproval(b bool) {
+	m.allow_self_approval = &b
+}
+
+// AllowSelfApproval returns the value of the "allow_self_approval" field in the mutation.
+func (m *ContentDraftSettingsMutation) AllowSelfApproval() (r bool, exists bool) {
+	v := m.allow_self_approval
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowSelfApproval returns the old "allow_self_approval" field's value of the ContentDraftSettings entity.
+// If the ContentDraftSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftSettingsMutation) OldAllowSelfApproval(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowSelfApproval is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowSelfApproval requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowSelfApproval: %w", err)
+	}
+	return oldValue.AllowSelfApproval, nil
+}
+
+// ResetAllowSelfApproval resets all changes to the "allow_self_approval" field.
+func (m *ContentDraftSettingsMutation) ResetAllowSelfApproval() {
+	m.allow_self_approval = nil
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (m *ContentDraftSettingsMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
@@ -38141,12 +38178,15 @@ func (m *ContentDraftSettingsMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentDraftSettingsMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.posting_slots != nil {
 		fields = append(fields, contentdraftsettings.FieldPostingSlots)
 	}
 	if m.require_approval != nil {
 		fields = append(fields, contentdraftsettings.FieldRequireApproval)
+	}
+	if m.allow_self_approval != nil {
+		fields = append(fields, contentdraftsettings.FieldAllowSelfApproval)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, contentdraftsettings.FieldUpdatedAt)
@@ -38163,6 +38203,8 @@ func (m *ContentDraftSettingsMutation) Field(name string) (ent.Value, bool) {
 		return m.PostingSlots()
 	case contentdraftsettings.FieldRequireApproval:
 		return m.RequireApproval()
+	case contentdraftsettings.FieldAllowSelfApproval:
+		return m.AllowSelfApproval()
 	case contentdraftsettings.FieldUpdatedAt:
 		return m.UpdatedAt()
 	}
@@ -38178,6 +38220,8 @@ func (m *ContentDraftSettingsMutation) OldField(ctx context.Context, name string
 		return m.OldPostingSlots(ctx)
 	case contentdraftsettings.FieldRequireApproval:
 		return m.OldRequireApproval(ctx)
+	case contentdraftsettings.FieldAllowSelfApproval:
+		return m.OldAllowSelfApproval(ctx)
 	case contentdraftsettings.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
 	}
@@ -38202,6 +38246,13 @@ func (m *ContentDraftSettingsMutation) SetField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequireApproval(v)
+		return nil
+	case contentdraftsettings.FieldAllowSelfApproval:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowSelfApproval(v)
 		return nil
 	case contentdraftsettings.FieldUpdatedAt:
 		v, ok := value.(time.Time)
@@ -38264,6 +38315,9 @@ func (m *ContentDraftSettingsMutation) ResetField(name string) error {
 		return nil
 	case contentdraftsettings.FieldRequireApproval:
 		m.ResetRequireApproval()
+		return nil
+	case contentdraftsettings.FieldAllowSelfApproval:
+		m.ResetAllowSelfApproval()
 		return nil
 	case contentdraftsettings.FieldUpdatedAt:
 		m.ResetUpdatedAt()
@@ -97980,6 +98034,10 @@ type ScheduledPostMutation struct {
 	schedule_time_zone        *string
 	schedule_intent           *string
 	failure_code              *string
+	scheduled_by_user_id      *string
+	approved_by_user_id       *string
+	approved_version          *int
+	addapproved_version       *int
 	created_at                *time.Time
 	updated_at                *time.Time
 	clearedFields             map[string]struct{}
@@ -99444,6 +99502,174 @@ func (m *ScheduledPostMutation) ResetFailureCode() {
 	delete(m.clearedFields, scheduledpost.FieldFailureCode)
 }
 
+// SetScheduledByUserID sets the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) SetScheduledByUserID(s string) {
+	m.scheduled_by_user_id = &s
+}
+
+// ScheduledByUserID returns the value of the "scheduled_by_user_id" field in the mutation.
+func (m *ScheduledPostMutation) ScheduledByUserID() (r string, exists bool) {
+	v := m.scheduled_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScheduledByUserID returns the old "scheduled_by_user_id" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldScheduledByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScheduledByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScheduledByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScheduledByUserID: %w", err)
+	}
+	return oldValue.ScheduledByUserID, nil
+}
+
+// ClearScheduledByUserID clears the value of the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) ClearScheduledByUserID() {
+	m.scheduled_by_user_id = nil
+	m.clearedFields[scheduledpost.FieldScheduledByUserID] = struct{}{}
+}
+
+// ScheduledByUserIDCleared returns if the "scheduled_by_user_id" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ScheduledByUserIDCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldScheduledByUserID]
+	return ok
+}
+
+// ResetScheduledByUserID resets all changes to the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) ResetScheduledByUserID() {
+	m.scheduled_by_user_id = nil
+	delete(m.clearedFields, scheduledpost.FieldScheduledByUserID)
+}
+
+// SetApprovedByUserID sets the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) SetApprovedByUserID(s string) {
+	m.approved_by_user_id = &s
+}
+
+// ApprovedByUserID returns the value of the "approved_by_user_id" field in the mutation.
+func (m *ScheduledPostMutation) ApprovedByUserID() (r string, exists bool) {
+	v := m.approved_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedByUserID returns the old "approved_by_user_id" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldApprovedByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedByUserID: %w", err)
+	}
+	return oldValue.ApprovedByUserID, nil
+}
+
+// ClearApprovedByUserID clears the value of the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) ClearApprovedByUserID() {
+	m.approved_by_user_id = nil
+	m.clearedFields[scheduledpost.FieldApprovedByUserID] = struct{}{}
+}
+
+// ApprovedByUserIDCleared returns if the "approved_by_user_id" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ApprovedByUserIDCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldApprovedByUserID]
+	return ok
+}
+
+// ResetApprovedByUserID resets all changes to the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) ResetApprovedByUserID() {
+	m.approved_by_user_id = nil
+	delete(m.clearedFields, scheduledpost.FieldApprovedByUserID)
+}
+
+// SetApprovedVersion sets the "approved_version" field.
+func (m *ScheduledPostMutation) SetApprovedVersion(i int) {
+	m.approved_version = &i
+	m.addapproved_version = nil
+}
+
+// ApprovedVersion returns the value of the "approved_version" field in the mutation.
+func (m *ScheduledPostMutation) ApprovedVersion() (r int, exists bool) {
+	v := m.approved_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedVersion returns the old "approved_version" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldApprovedVersion(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedVersion: %w", err)
+	}
+	return oldValue.ApprovedVersion, nil
+}
+
+// AddApprovedVersion adds i to the "approved_version" field.
+func (m *ScheduledPostMutation) AddApprovedVersion(i int) {
+	if m.addapproved_version != nil {
+		*m.addapproved_version += i
+	} else {
+		m.addapproved_version = &i
+	}
+}
+
+// AddedApprovedVersion returns the value that was added to the "approved_version" field in this mutation.
+func (m *ScheduledPostMutation) AddedApprovedVersion() (r int, exists bool) {
+	v := m.addapproved_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearApprovedVersion clears the value of the "approved_version" field.
+func (m *ScheduledPostMutation) ClearApprovedVersion() {
+	m.approved_version = nil
+	m.addapproved_version = nil
+	m.clearedFields[scheduledpost.FieldApprovedVersion] = struct{}{}
+}
+
+// ApprovedVersionCleared returns if the "approved_version" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ApprovedVersionCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldApprovedVersion]
+	return ok
+}
+
+// ResetApprovedVersion resets all changes to the "approved_version" field.
+func (m *ScheduledPostMutation) ResetApprovedVersion() {
+	m.approved_version = nil
+	m.addapproved_version = nil
+	delete(m.clearedFields, scheduledpost.FieldApprovedVersion)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ScheduledPostMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -99631,7 +99857,7 @@ func (m *ScheduledPostMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ScheduledPostMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 33)
 	if m.organization_id != nil {
 		fields = append(fields, scheduledpost.FieldOrganizationID)
 	}
@@ -99716,6 +99942,15 @@ func (m *ScheduledPostMutation) Fields() []string {
 	if m.failure_code != nil {
 		fields = append(fields, scheduledpost.FieldFailureCode)
 	}
+	if m.scheduled_by_user_id != nil {
+		fields = append(fields, scheduledpost.FieldScheduledByUserID)
+	}
+	if m.approved_by_user_id != nil {
+		fields = append(fields, scheduledpost.FieldApprovedByUserID)
+	}
+	if m.approved_version != nil {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
+	}
 	if m.created_at != nil {
 		fields = append(fields, scheduledpost.FieldCreatedAt)
 	}
@@ -99786,6 +100021,12 @@ func (m *ScheduledPostMutation) Field(name string) (ent.Value, bool) {
 		return m.ScheduleIntent()
 	case scheduledpost.FieldFailureCode:
 		return m.FailureCode()
+	case scheduledpost.FieldScheduledByUserID:
+		return m.ScheduledByUserID()
+	case scheduledpost.FieldApprovedByUserID:
+		return m.ApprovedByUserID()
+	case scheduledpost.FieldApprovedVersion:
+		return m.ApprovedVersion()
 	case scheduledpost.FieldCreatedAt:
 		return m.CreatedAt()
 	case scheduledpost.FieldUpdatedAt:
@@ -99855,6 +100096,12 @@ func (m *ScheduledPostMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldScheduleIntent(ctx)
 	case scheduledpost.FieldFailureCode:
 		return m.OldFailureCode(ctx)
+	case scheduledpost.FieldScheduledByUserID:
+		return m.OldScheduledByUserID(ctx)
+	case scheduledpost.FieldApprovedByUserID:
+		return m.OldApprovedByUserID(ctx)
+	case scheduledpost.FieldApprovedVersion:
+		return m.OldApprovedVersion(ctx)
 	case scheduledpost.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case scheduledpost.FieldUpdatedAt:
@@ -100064,6 +100311,27 @@ func (m *ScheduledPostMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFailureCode(v)
 		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScheduledByUserID(v)
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedByUserID(v)
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedVersion(v)
+		return nil
 	case scheduledpost.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -100089,6 +100357,9 @@ func (m *ScheduledPostMutation) AddedFields() []string {
 	if m.addnatural_offset_seconds != nil {
 		fields = append(fields, scheduledpost.FieldNaturalOffsetSeconds)
 	}
+	if m.addapproved_version != nil {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
+	}
 	return fields
 }
 
@@ -100099,6 +100370,8 @@ func (m *ScheduledPostMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case scheduledpost.FieldNaturalOffsetSeconds:
 		return m.AddedNaturalOffsetSeconds()
+	case scheduledpost.FieldApprovedVersion:
+		return m.AddedApprovedVersion()
 	}
 	return nil, false
 }
@@ -100114,6 +100387,13 @@ func (m *ScheduledPostMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddNaturalOffsetSeconds(v)
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddApprovedVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown ScheduledPost numeric field %s", name)
@@ -100188,6 +100468,15 @@ func (m *ScheduledPostMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(scheduledpost.FieldFailureCode) {
 		fields = append(fields, scheduledpost.FieldFailureCode)
+	}
+	if m.FieldCleared(scheduledpost.FieldScheduledByUserID) {
+		fields = append(fields, scheduledpost.FieldScheduledByUserID)
+	}
+	if m.FieldCleared(scheduledpost.FieldApprovedByUserID) {
+		fields = append(fields, scheduledpost.FieldApprovedByUserID)
+	}
+	if m.FieldCleared(scheduledpost.FieldApprovedVersion) {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
 	}
 	return fields
 }
@@ -100268,6 +100557,15 @@ func (m *ScheduledPostMutation) ClearField(name string) error {
 		return nil
 	case scheduledpost.FieldFailureCode:
 		m.ClearFailureCode()
+		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		m.ClearScheduledByUserID()
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		m.ClearApprovedByUserID()
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		m.ClearApprovedVersion()
 		return nil
 	}
 	return fmt.Errorf("unknown ScheduledPost nullable field %s", name)
@@ -100360,6 +100658,15 @@ func (m *ScheduledPostMutation) ResetField(name string) error {
 		return nil
 	case scheduledpost.FieldFailureCode:
 		m.ResetFailureCode()
+		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		m.ResetScheduledByUserID()
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		m.ResetApprovedByUserID()
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		m.ResetApprovedVersion()
 		return nil
 	case scheduledpost.FieldCreatedAt:
 		m.ResetCreatedAt()

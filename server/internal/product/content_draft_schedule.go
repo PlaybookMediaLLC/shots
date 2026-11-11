@@ -797,6 +797,9 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err != nil {
 		return nil, err
 	}
+	// shortcut: captions come from the request (the web serializes the draft), so
+	// approval binds the version, not the text; upgrade to a Go serializer shared by
+	// every schedule path, or check captions against a snapshot serialized at approval.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)
@@ -806,6 +809,12 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	}
 	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
 		return nil, err
+	}
+	// Who approved the version these posts carry, if anyone did.
+	var approvedBy *string
+	var approvedVersion *int
+	if draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version {
+		approvedBy, approvedVersion = draft.ReviewedByUserID, draft.ApprovedVersion
 	}
 	var cancelled, kept []string
 	if input.Add {
@@ -859,6 +868,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			SetNaturalOffsetSeconds(placement.offset).SetScheduleTimeZone(placement.zone).SetScheduleIntent(intent).
 			SetScheduledFor(placement.at).SetStatus(scheduledpost.StatusSCHEDULED).
 			SetCaption(strings.TrimSpace(target.Caption)).
+			SetNillableScheduledByUserID(schedulerID(actor)).
+			SetNillableApprovedByUserID(approvedBy).SetNillableApprovedVersion(approvedVersion).
 			SetIdempotencyKey(contentDraftPostKey(draft.ID, target.ChannelConnectionID, input.Version)).Save(ctx)
 		if err != nil {
 			if ent.IsConstraintError(err) {

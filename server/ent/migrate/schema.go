@@ -1202,6 +1202,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "postingSlots", Type: field.TypeJSON},
 		{Name: "requireApproval", Type: field.TypeBool, Default: false},
+		{Name: "allowSelfApproval", Type: field.TypeBool, Default: true},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
 	// ContentDraftSettingsTable holds the schema information for the "content_draft_settings" table.
@@ -3236,6 +3237,9 @@ var (
 		{Name: "scheduleTimeZone", Type: field.TypeString, Nullable: true},
 		{Name: "scheduleIntent", Type: field.TypeString, Nullable: true},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "scheduledByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "approvedByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "approvedVersion", Type: field.TypeInt, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 		{Name: "channelConnectionId", Type: field.TypeString},
@@ -3248,7 +3252,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "scheduled_post_channel_connection_scheduled_posts",
-				Columns:    []*schema.Column{ScheduledPostColumns[30]},
+				Columns:    []*schema.Column{ScheduledPostColumns[33]},
 				RefColumns: []*schema.Column{ChannelConnectionColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3257,7 +3261,7 @@ var (
 			{
 				Name:    "scheduledpost_channelConnectionId_idempotencyKey",
 				Unique:  true,
-				Columns: []*schema.Column{ScheduledPostColumns[30], ScheduledPostColumns[19]},
+				Columns: []*schema.Column{ScheduledPostColumns[33], ScheduledPostColumns[19]},
 			},
 			{
 				Name:    "scheduledpost_organizationId_status_scheduledFor",
@@ -3267,7 +3271,7 @@ var (
 			{
 				Name:    "scheduledpost_status_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ScheduledPostColumns[17], ScheduledPostColumns[29]},
+				Columns: []*schema.Column{ScheduledPostColumns[17], ScheduledPostColumns[32]},
 			},
 			{
 				Name:    "scheduledpost_contentDraftId",

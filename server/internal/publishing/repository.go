@@ -184,6 +184,7 @@ func (r *Repository) CreateScheduledPost(ctx context.Context, actor Actor, input
 		SetStatus(scheduledpost.StatusSCHEDULED).
 		SetCaption(input.Caption).
 		SetIdempotencyKey(input.IdempotencyKey).
+		SetNillableScheduledByUserID(input.ScheduledBy).
 		Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -218,8 +219,8 @@ func nonEmpty(value string) *string {
 }
 
 // isEligible checks the destination is active and, for a variant post, that
-// the variant is approved. A content draft needs no approval (RFC 013): the
-// person scheduling it holds publish:manage.
+// the variant is approved. A content draft's approval is the product layer's:
+// where a workspace requires one, drafts schedule only through its check.
 func (r *Repository) isEligible(ctx context.Context, organizationID, variantID, connectionID string) (bool, error) {
 	connectionExists, err := r.client.ChannelConnection.Query().Where(
 		channelconnection.ID(connectionID),

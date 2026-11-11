@@ -352,6 +352,48 @@ func (_c *ScheduledPostCreate) SetNillableFailureCode(v *string) *ScheduledPostC
 	return _c
 }
 
+// SetScheduledByUserID sets the "scheduled_by_user_id" field.
+func (_c *ScheduledPostCreate) SetScheduledByUserID(v string) *ScheduledPostCreate {
+	_c.mutation.SetScheduledByUserID(v)
+	return _c
+}
+
+// SetNillableScheduledByUserID sets the "scheduled_by_user_id" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillableScheduledByUserID(v *string) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetScheduledByUserID(*v)
+	}
+	return _c
+}
+
+// SetApprovedByUserID sets the "approved_by_user_id" field.
+func (_c *ScheduledPostCreate) SetApprovedByUserID(v string) *ScheduledPostCreate {
+	_c.mutation.SetApprovedByUserID(v)
+	return _c
+}
+
+// SetNillableApprovedByUserID sets the "approved_by_user_id" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillableApprovedByUserID(v *string) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetApprovedByUserID(*v)
+	}
+	return _c
+}
+
+// SetApprovedVersion sets the "approved_version" field.
+func (_c *ScheduledPostCreate) SetApprovedVersion(v int) *ScheduledPostCreate {
+	_c.mutation.SetApprovedVersion(v)
+	return _c
+}
+
+// SetNillableApprovedVersion sets the "approved_version" field if the given value is not nil.
+func (_c *ScheduledPostCreate) SetNillableApprovedVersion(v *int) *ScheduledPostCreate {
+	if v != nil {
+		_c.SetApprovedVersion(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ScheduledPostCreate) SetCreatedAt(v time.Time) *ScheduledPostCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -641,6 +683,18 @@ func (_c *ScheduledPostCreate) createSpec() (*ScheduledPost, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.FailureCode(); ok {
 		_spec.SetField(scheduledpost.FieldFailureCode, field.TypeString, value)
 		_node.FailureCode = &value
+	}
+	if value, ok := _c.mutation.ScheduledByUserID(); ok {
+		_spec.SetField(scheduledpost.FieldScheduledByUserID, field.TypeString, value)
+		_node.ScheduledByUserID = &value
+	}
+	if value, ok := _c.mutation.ApprovedByUserID(); ok {
+		_spec.SetField(scheduledpost.FieldApprovedByUserID, field.TypeString, value)
+		_node.ApprovedByUserID = &value
+	}
+	if value, ok := _c.mutation.ApprovedVersion(); ok {
+		_spec.SetField(scheduledpost.FieldApprovedVersion, field.TypeInt, value)
+		_node.ApprovedVersion = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldCreatedAt, field.TypeTime, value)
