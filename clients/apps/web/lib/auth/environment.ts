@@ -58,6 +58,26 @@ export function getAuthSecret(): string {
   return getAuthEnvironment().BETTER_AUTH_SECRET ?? developmentSecret
 }
 
+export function getFounderHubMcpUrl(): string | undefined {
+  const configured = process.env.FOUNDER_HUB_MCP_URL
+  if (!configured) return undefined
+  const url = new URL(configured)
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+  if (
+    (url.protocol !== 'https:' && !(url.protocol === 'http:' && local)) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    url.pathname !== '/mcp'
+  ) {
+    throw new Error(
+      'FOUNDER_HUB_MCP_URL must be an HTTPS /mcp URL, or loopback HTTP for development.'
+    )
+  }
+  return url.toString()
+}
+
 export function getTrustedOrigins(): string[] {
   const configuredOrigins = getAuthEnvironment().BETTER_AUTH_TRUSTED_ORIGINS
   return (

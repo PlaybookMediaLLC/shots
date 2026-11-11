@@ -39,6 +39,7 @@ export function Combobox({
   value,
   valueLabel,
   'aria-describedby': describedBy,
+  'aria-labelledby': labelledBy,
   'aria-label': ariaLabel,
 }: {
   className?: string
@@ -55,6 +56,7 @@ export function Combobox({
   /** What the trigger shows, when it is not the chosen option's label. */
   valueLabel?: ReactNode
   'aria-describedby'?: string
+  'aria-labelledby'?: string
   'aria-label'?: string
 }) {
   const [open, setOpen] = useState(false)
@@ -70,6 +72,7 @@ export function Combobox({
         <button
           aria-controls={open ? listId : undefined}
           aria-describedby={describedBy}
+          aria-labelledby={labelledBy}
           aria-expanded={open}
           aria-haspopup="listbox"
           aria-label={ariaLabel}

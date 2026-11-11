@@ -17,6 +17,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -84,6 +86,163 @@ func run(t *testing.T, s *Store, job string) int {
 }
 func asset(t *testing.T, s *Store, id, org, status string) {
 	exec(t, s.DB, `INSERT INTO asset(id,"organizationId","objectKey","mediaType",bytes,status,"updatedAt") VALUES($1,$2,$3,'image/png',1,$4::"AssetStatus",now())`, id, org, "org/"+org+"/"+id, status)
+}
+
+func TestAccountDeletionWaitsForHubCleanupAndPreservesOtherWorkspaceCiphertext(t *testing.T) {
+	s, _ := setup(t)
+	exec(t, s.DB, `INSERT INTO platform_founder_hub_revision(id) VALUES('authority') ON CONFLICT DO NOTHING`)
+	exec(t, s.DB, `INSERT INTO "user"(id,name,email,"updatedAt") VALUES('retained','Retained','retained@example.invalid',now())`)
+	exec(t, s.DB, `INSERT INTO member(id,"userId","organizationId",role,"createdAt") VALUES('departing','user','a','owner',now()),('remaining','retained','a','member',now())`)
+	db, err := database.Open(context.Background(), os.Getenv("MAINTENANCE_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	profiles := product.NewConfiguration(db.Client)
+	initial, err := profiles.GetFounderHubProfile(context.Background(), "user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialJSON, err := json.Marshal(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(t, s.DB, `SELECT founder_hub.project_shots_authority(jsonb_set($1::jsonb,'{expiresAt}',to_jsonb(now()+interval '1 hour')))`, string(initialJSON))
+	shared := initial.Workspaces[0].WorkspaceID.String()
+	// Transfer in Shots without refreshing the Hub projection.
+	exec(t, s.DB, `UPDATE member SET role=CASE WHEN "userId"='user' THEN 'member' ELSE 'owner' END WHERE "organizationId"='a'`)
+	var owner, retained string
+	if err := s.DB.QueryRow(`SELECT "accountUserId" FROM platform_founder_hub_user WHERE "userId"='user'`).Scan(&owner); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DB.QueryRow(`SELECT "accountUserId" FROM platform_founder_hub_user WHERE "userId"='retained'`).Scan(&retained); err != nil {
+		t.Fatal(err)
+	}
+	exec(t, s.DB, `INSERT INTO session(id,"userId",token,"expiresAt","updatedAt") VALUES('active','user','test-token',now()+interval '1 day',now())`)
+	exec(t, s.DB, `INSERT INTO account_deletion_request(id,"userId","executeAfter") VALUES('delete-user','user',now()+interval '14 days')`)
+	if n := run(t, s, "account-deletions"); n != 0 {
+		t.Fatalf("deleted during grace: %d", n)
+	}
+	expect(t, s.DB, 1, `SELECT count(*) FROM session WHERE id='active'`)
+	expect(t, s.DB, 0, `SELECT count(*) FROM founder_hub_private.account_deletion_jobs WHERE owner_user_id=$1`, owner)
+	for _, workspace := range []string{owner, retained, shared} {
+		exec(t, s.DB, `INSERT INTO founder_hub.e2ee_freshness_events(workspace_id,record_id,payload_hash,payload,created_by,protocol)
+			VALUES($1,repeat('r',43),repeat('h',43),'encrypted-payload',$2,2)`, workspace, owner)
+		exec(t, s.DB, `INSERT INTO founder_hub.e2ee_replica_receipts(workspace_id,mutation_id,request_hash,accepted_head,events)
+			VALUES($1,gen_random_uuid(),'receipt',1,'[]')`, workspace)
+	}
+	exec(t, s.DB, `UPDATE account_deletion_request SET "executeAfter"=now()-interval '1 day' WHERE id='delete-user'`)
+	const share = "b0000000-0000-4000-8000-000000000001"
+	const attachment = "b0000000-0000-4000-8000-000000000002"
+	exec(t, s.DB, `INSERT INTO founder_hub.session_shares(id,workspace_id,session_id,created_by_user_id) VALUES($1,$2,'retained-meeting',$3)`, share, shared, owner)
+	exec(t, s.DB, `INSERT INTO founder_hub.session_share_snapshots(share_id) VALUES($1)`, share)
+	exec(t, s.DB, `INSERT INTO founder_hub.session_share_attachment_objects(id,share_id,owner_user_id,attachment_ref,version_ref,object_key,filename,content_type,size_bytes,sha256,state,reservation_expires_at,cleanup_not_before,finalized_at)
+		VALUES($1::uuid,$2::uuid,$3::uuid,repeat('a',43),repeat('v',43),($3::uuid)::text||'/'||($2::uuid)::text||'/'||($1::uuid)::text||'.sna1','retained.txt','text/plain',10,repeat('a',64),'ready',now()+interval '1 hour',now()+interval '1 day',now())`, attachment, share, owner)
+	exec(t, s.DB, `INSERT INTO founder_hub.session_share_snapshot_attachments(share_id,attachment_id,position) VALUES($1,$2,0)`, share, attachment)
+	if n := run(t, s, "account-deletions"); n != 0 {
+		t.Fatalf("deleted retained attachments: %d", n)
+	}
+	expect(t, s.DB, "REQUESTED", `SELECT status FROM account_deletion_request WHERE id='delete-user'`)
+	expect(t, s.DB, 1, `SELECT count(*) FROM session WHERE id='active'`)
+	expect(t, s.DB, "ready", `SELECT state FROM founder_hub.session_share_attachment_objects WHERE id=$1`, attachment)
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.session_share_snapshot_attachments WHERE attachment_id=$1`, attachment)
+	blockers, err := profiles.GetAccountDeletion(context.Background(), product.Actor{UserID: "user", SessionID: "active"})
+	if err != nil || len(blockers.Blockers) != 1 || blockers.Blockers[0].Code != "shared_attachments" {
+		t.Fatalf("missing actionable attachment blocker: %+v %v", blockers, err)
+	}
+	exec(t, s.DB, `INSERT INTO "user"(id,name,email,"updatedAt") VALUES('next','Next','next@example.invalid',now())`)
+	exec(t, s.DB, `INSERT INTO account_deletion_request(id,"userId","executeAfter") VALUES('next','next',now()-interval '1 hour')`)
+	if n := run(t, s, "account-deletions"); n != 1 {
+		t.Fatalf("attachment blocker starved a newer account: %d", n)
+	}
+	// Remove the protected fixture, then verify the replica-only ownership transfer below.
+	exec(t, s.DB, `DELETE FROM founder_hub.session_share_snapshot_attachments WHERE attachment_id=$1`, attachment)
+	exec(t, s.DB, `DELETE FROM founder_hub.session_share_attachment_objects WHERE id=$1`, attachment)
+	if n := run(t, s, "account-deletions"); n != 0 {
+		t.Fatalf("completed before encrypted cleanup: %d", n)
+	}
+	expect(t, s.DB, "PROCESSING", `SELECT status FROM account_deletion_request WHERE id='delete-user'`)
+	expect(t, s.DB, 0, `SELECT count(*) FROM session WHERE id='active'`)
+	expect(t, s.DB, retained, `SELECT owner_user_id FROM founder_hub.workspaces WHERE id=$1`, shared)
+	current, err := profiles.GetFounderHubProfile(context.Background(), "retained")
+	if err != nil || len(current.Workspaces) != 1 || len(current.Workspaces[0].Members) != 1 {
+		t.Fatalf("departing peer broke the retained member's snapshot: %+v %v", current, err)
+	}
+	// Also tolerate an old roster peer while validating the current actor and owner.
+	current.Workspaces[0].Members = append(current.Workspaces[0].Members, *initial.Workspaces[0].Owner)
+	currentJSON, err := json.Marshal(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(t, s.DB, `SELECT founder_hub.project_shots_authority(jsonb_set($1::jsonb,'{expiresAt}',to_jsonb(now()+interval '1 hour')))`, string(currentJSON))
+	for _, query := range []string{
+		`INSERT INTO session(id,"userId",token,"expiresAt","updatedAt") VALUES('new','user','new-token',now()+interval '1 day',now())`,
+		`INSERT INTO member(id,"userId","organizationId",role,"createdAt") VALUES('new','user','a','owner',now())`,
+		`UPDATE founder_hub_identity.users SET updated_at=now() WHERE id=$1`,
+	} {
+		args := []any{}
+		if strings.Contains(query, "$1") {
+			args = append(args, owner)
+		}
+		if _, err := s.DB.Exec(query, args...); err == nil {
+			t.Fatalf("deleting account was admitted: %s", query)
+		}
+	}
+	// Age this disposable fixture past the signed-upload horizon, then use the real checkpoint RPCs.
+	exec(t, s.DB, `UPDATE founder_hub_private.account_deletion_jobs SET requested_at=now()-interval '2 days', final_sweep_not_before=now()-interval '1 day',
+		lease_id='019d0000-0000-7000-8000-000000000001', lease_expires_at=now()+interval '15 minutes' WHERE owner_user_id=$1`, owner)
+	const lease = "019d0000-0000-7000-8000-000000000001"
+	if _, err := s.DB.Exec(`SELECT founder_hub.purge_shots_account_replica($1::uuid,$2::uuid)`, owner, lease); err == nil {
+		t.Fatal("purged before storage checkpoints")
+	}
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.e2ee_freshness_events WHERE workspace_id=$1`, owner)
+	exec(t, s.DB, `SELECT founder_hub.mark_account_deletion_stripe_deleted($1::uuid,$2::uuid,NULL)`, owner, lease)
+	exec(t, s.DB, `SELECT founder_hub.mark_account_deletion_prefix_swept($1::uuid,$2::uuid)`, owner, lease)
+	if _, err := s.DB.Exec(`SELECT founder_hub.finish_shots_account_deletion($1::uuid,$2::uuid)`, owner, lease); err == nil {
+		t.Fatal("finalized before replica purge")
+	}
+	if _, err := s.DB.Exec(`SELECT founder_hub.purge_shots_account_replica($1::uuid,gen_random_uuid())`, owner); err == nil {
+		t.Fatal("purged with stale lease")
+	}
+	exec(t, s.DB, `SELECT founder_hub.purge_shots_account_replica($1::uuid,$2::uuid)`, owner, lease)
+	exec(t, s.DB, `SELECT founder_hub.finish_shots_account_deletion($1::uuid,$2::uuid)`, owner, lease)
+	if n := run(t, s, "account-deletions"); n != 1 {
+		t.Fatalf("did not finish cleanup: %d", n)
+	}
+	expect(t, s.DB, "COMPLETED", `SELECT status FROM account_deletion_request WHERE id='delete-user'`)
+	expect(t, s.DB, "deleted-user@deleted.invalid", `SELECT email FROM "user" WHERE id='user'`)
+	expect(t, s.DB, 0, `SELECT count(*) FROM founder_hub.e2ee_freshness_events WHERE workspace_id=$1`, owner)
+	expect(t, s.DB, 0, `SELECT count(*) FROM founder_hub.e2ee_replica_receipts WHERE workspace_id=$1`, owner)
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.e2ee_freshness_events WHERE workspace_id=$1 AND created_by=$2`, retained, owner)
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.e2ee_replica_receipts WHERE workspace_id=$1`, retained)
+	expect(t, s.DB, retained, `SELECT owner_user_id FROM founder_hub.workspaces WHERE id=$1`, shared)
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.e2ee_freshness_events WHERE workspace_id=$1 AND created_by=$2`, shared, owner)
+	expect(t, s.DB, 1, `SELECT count(*) FROM founder_hub.e2ee_replica_receipts WHERE workspace_id=$1`, shared)
+	if _, err := s.DB.Exec(`INSERT INTO founder_hub_identity.users(id) VALUES($1)`, owner); err == nil {
+		t.Fatal("completed account was reprojected")
+	}
+	if n := run(t, s, "account-deletions"); n != 0 {
+		t.Fatalf("cleanup was not idempotent: %d", n)
+	}
+}
+
+func TestAccountDeletionBacklogDoesNotStarveNewRequests(t *testing.T) {
+	s, _ := setup(t)
+	exec(t, s.DB, `INSERT INTO "user"(id,name,email,"updatedAt") SELECT 'waiting-'||n,'Waiting','waiting-'||n||'@example.invalid',now() FROM generate_series(1,20) n`)
+	exec(t, s.DB, `INSERT INTO founder_hub_identity.users(id) SELECT "accountUserId" FROM platform_founder_hub_user WHERE "userId" LIKE 'waiting-%'`)
+	exec(t, s.DB, `INSERT INTO account_deletion_request(id,"userId","executeAfter") SELECT id,id,now()-interval '2 days' FROM "user" WHERE id LIKE 'waiting-%'`)
+	t.Cleanup(func() {
+		exec(t, s.DB, `DELETE FROM founder_hub_private.account_deletion_jobs WHERE owner_user_id IN (SELECT "accountUserId" FROM platform_founder_hub_user WHERE "userId" LIKE 'waiting-%')`)
+	})
+	if n := run(t, s, "account-deletions"); n != 0 {
+		t.Fatalf("completed before cleanup: %d", n)
+	}
+	expect(t, s.DB, 20, `SELECT count(*) FROM account_deletion_request WHERE status='PROCESSING'`)
+	exec(t, s.DB, `INSERT INTO account_deletion_request(id,"userId","executeAfter") VALUES('next','user',now()-interval '1 day')`)
+	if n := run(t, s, "account-deletions"); n != 1 {
+		t.Fatalf("waiting cleanups starved the next request: %d", n)
+	}
+	expect(t, s.DB, "COMPLETED", `SELECT status FROM account_deletion_request WHERE id='next'`)
 }
 func event(t *testing.T, s *Store, id, org, resource, kind string) {
 	exec(t, s.DB, `INSERT INTO outbox_event(id,"organizationId",type,"aggregateType","aggregateId",payload,"idempotencyKey") VALUES($1,$2,$3,'asset',$4,'{}',$1)`, id, org, kind, resource)

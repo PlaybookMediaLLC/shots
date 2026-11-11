@@ -230,6 +230,39 @@ both Ent-backed SQL sets to one database and records their history.
 `/social-migrate` remains in the image for isolated social tests; it is not a
 second production migration job.
 
+The migration command also configures the fixed `shots-founder-hub` OAuth
+client. Set `FOUNDER_HUB_WEB_ORIGIN` to the Founder Hub web origin to register
+its exact `/callback/shots/` browser return URL; HTTPS is required except for
+loopback development. An unset value keeps native redirects only. Re-running
+the command replaces the old browser origin and preserves the client's disabled
+state, PKCE requirement, and grants. Every deployment migration must receive the
+intended value; preview request headers never register redirect origins.
+
+The Shots web server and Founder Hub API share a separate
+`SHOTS_AUTH_SERVICE_TOKEN` of at least 32 bytes for the private Founder Hub
+session endpoint. Keep it server-side and separate from
+`PUBLISHING_SERVICE_TOKEN`. A user OAuth token alone cannot read the private
+workspace authority snapshot.
+
+For hosted connectors, set `FOUNDER_HUB_MCP_URL` on both the Shots web server and
+Founder Hub sync API to the exact public HTTPS `/mcp` URL (loopback HTTP is
+supported locally). Shots then exposes OAuth discovery and public PKCE client
+registration restricted to account profile and read-only meeting scopes.
+Connector requests recheck current consent, grants, sessions, and workspace
+permissions; connector tokens cannot authorize native storage or management.
+
+OAuth refresh retries share a database lease and an encrypted response for 15
+seconds. Reuse after that window revokes only the affected Shots session,
+including its OAuth grants. If rotation completes but its retry response cannot
+be saved, that session may need to sign in again after a lost response.
+
+`dev/studio e2e` runs the server OAuth integration test locally and on CI's first
+shard. To run it against another local stack, set `FOUNDER_HUB_TEST_API_URL`,
+`BETTER_AUTH_URL`, `PUBLISHING_SERVICE_TOKEN`, and `SHOTS_AUTH_SERVICE_TOKEN`, then
+run `npm run test:founder-hub-auth --workspace screenshot-studio` from `clients/`.
+Set `FOUNDER_HUB_GATEWAY_URL` to the local Hub API's `/cloud` URL to include real
+storage, resumable uploads, and gateway revocation checks.
+
 ```sh
 SOCIAL_TEST_DATABASE_URL=postgresql://postgres@localhost:55432/social_test?sslmode=disable go test ./internal/social/...
 ```

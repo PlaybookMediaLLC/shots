@@ -1,6 +1,7 @@
 'use client'
 
 import { apiKeyClient } from '@better-auth/api-key/client'
+import { oauthProviderClient } from '@better-auth/oauth-provider/client'
 import { scimClient } from '@better-auth/scim/client'
 import { ssoClient } from '@better-auth/sso/client'
 import { getGlobalBroadcastChannel } from 'better-auth/client'
@@ -12,13 +13,12 @@ import { betterAuthOrganizationRoles } from './permissions'
 export const authClient = createAuthClient({
   baseURL: process.env.NEXT_PUBLIC_APP_URL,
   plugins: [
+    oauthProviderClient(),
     organizationClient({ roles: betterAuthOrganizationRoles }),
     apiKeyClient(),
     twoFactorClient({
       onTwoFactorRedirect: () => {
-        const callbackURL = new URLSearchParams(window.location.search).get('callbackURL')
-        const search = callbackURL ? `?callbackURL=${encodeURIComponent(callbackURL)}` : ''
-        window.location.assign(`/two-factor${search}`)
+        window.location.assign(`/two-factor${window.location.search}`)
       },
     }),
     ssoClient(),

@@ -36,6 +36,26 @@ func (f *fakeConfiguration) AuthorizeRead(_ context.Context, actor product.Actor
 	return f.readError
 }
 func (f *fakeConfiguration) AuthorizeSession(context.Context, product.Actor) error { return nil }
+func (f *fakeConfiguration) GetFounderHubSession(context.Context, product.Actor) (*product.FounderHubSession, error) {
+	return nil, nil
+}
+
+func (f *fakeConfiguration) AuthorizeFounderHubSession(context.Context, product.Actor) (*product.FounderHubAuthorization, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) GetFounderHubSettingsAccount(context.Context, product.Actor) (*product.FounderHubSettingsAccount, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) GetFounderHubProfile(context.Context, string) (*product.FounderHubProfile, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) GetFounderHubKeySession(context.Context, product.Actor) (*product.FounderHubSession, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) GetFounderHubConnectorSession(context.Context, product.Actor, string) (*product.FounderHubSession, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) RevokeFounderHubSession(context.Context, product.Actor) error { return nil }
 func (f *fakeConfiguration) AuthorizeSensitive(_ context.Context, actor product.Actor) error {
 	f.actor = actor
 	return f.authorizationError
@@ -741,4 +761,23 @@ func TestWritingDefaultsRejectMachineCredentials(t *testing.T) {
 
 func (f *fakeConfiguration) ApproveCampaignAsset(ctx context.Context, actor product.Actor, campaignID, assetID string) (*product.CreativeApprovalDecision, error) {
 	return f.ApproveCampaignDesign(ctx, actor, campaignID, assetID)
+}
+
+func (f *fakeConfiguration) ListFounderHubTemplates(context.Context, product.Actor, string, bool, string) (*product.FounderHubTemplatePage, error) {
+	return &product.FounderHubTemplatePage{Items: []product.FounderHubTemplate{}}, nil
+}
+func (f *fakeConfiguration) FounderHubResourceAction(context.Context, product.Actor, product.FounderHubResourceAction) (json.RawMessage, error) {
+	return json.RawMessage("[]"), nil
+}
+func (f *fakeConfiguration) FounderHubShareWorkspaces(context.Context, product.Actor) ([]product.FounderHubShareWorkspace, error) {
+	return []product.FounderHubShareWorkspace{}, nil
+}
+func (f *fakeConfiguration) UpdateFounderHubTemplate(context.Context, product.Actor, string, product.FounderHubTemplateUpdate) (*product.FounderHubTemplate, error) {
+	return &product.FounderHubTemplate{}, nil
+}
+func (f *fakeConfiguration) ListFounderHubSettings(context.Context, product.Actor) ([]product.FounderHubSettings, error) {
+	return nil, nil
+}
+func (f *fakeConfiguration) UpdateFounderHubSettings(context.Context, product.Actor, product.FounderHubSettingsUpdate) (*product.FounderHubSettings, error) {
+	return nil, nil
 }

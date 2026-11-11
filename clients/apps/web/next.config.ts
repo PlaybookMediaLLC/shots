@@ -31,6 +31,8 @@ const NAVIGATION_MOVES: Pick<Redirect, 'source' | 'destination' | 'has'>[] = [
 ]
 
 const nextConfig: NextConfig = {
+  distDir: process.env.PLATFORM_NEXT_DIST_DIR || '.next',
+  typescript: { tsconfigPath: process.env.PLATFORM_NEXT_TSCONFIG_PATH || 'tsconfig.json' },
   output: 'standalone',
   // The repository root, so the web can import the media limits the Go
   // backend embeds (server/internal/medialimits/limits.json).

@@ -50,9 +50,9 @@ func (s *Server) registerSettingsPlatform(mux *http.ServeMux) {
 	product := func(handler http.HandlerFunc) http.Handler { return s.authenticateProduct(handler) }
 	mux.Handle("GET /v1/me/preferences", product(s.getUserPreferences))
 	mux.Handle("PATCH /v1/me/preferences", product(s.updateUserPreferences))
-	mux.Handle("GET /v1/me/account-deletion", product(s.getAccountDeletion))
-	mux.Handle("POST /v1/me/account-deletion", product(s.requestAccountDeletion))
-	mux.Handle("DELETE /v1/me/account-deletion", product(s.cancelAccountDeletion))
+	mux.Handle("GET /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.getAccountDeletion)))
+	mux.Handle("POST /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.requestAccountDeletion)))
+	mux.Handle("DELETE /v1/me/account-deletion", s.authenticateSession(http.HandlerFunc(s.cancelAccountDeletion)))
 	mux.Handle("GET /v1/experiments", product(s.listExperiments))
 	mux.Handle("PUT /v1/experiments/{id}/workspace", product(s.setWorkspaceExperiment))
 	mux.Handle("GET /v1/social-sets", product(s.listSocialSets))
