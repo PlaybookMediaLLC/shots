@@ -1461,6 +1461,78 @@ func (f UserPreferenceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserPreferenceMutation", m)
 }
 
+// The VoiceAudioRunFunc type is an adapter to allow the use of ordinary
+// function as VoiceAudioRun mutator.
+type VoiceAudioRunFunc func(context.Context, *ent.VoiceAudioRunMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceAudioRunFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceAudioRunMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceAudioRunMutation", m)
+}
+
+// The VoiceCommandFunc type is an adapter to allow the use of ordinary
+// function as VoiceCommand mutator.
+type VoiceCommandFunc func(context.Context, *ent.VoiceCommandMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceCommandFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceCommandMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceCommandMutation", m)
+}
+
+// The VoiceMemberSettingsFunc type is an adapter to allow the use of ordinary
+// function as VoiceMemberSettings mutator.
+type VoiceMemberSettingsFunc func(context.Context, *ent.VoiceMemberSettingsMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceMemberSettingsFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceMemberSettingsMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceMemberSettingsMutation", m)
+}
+
+// The VoiceNoteFunc type is an adapter to allow the use of ordinary
+// function as VoiceNote mutator.
+type VoiceNoteFunc func(context.Context, *ent.VoiceNoteMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceNoteFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceNoteMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceNoteMutation", m)
+}
+
+// The VoiceSettingsFunc type is an adapter to allow the use of ordinary
+// function as VoiceSettings mutator.
+type VoiceSettingsFunc func(context.Context, *ent.VoiceSettingsMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceSettingsFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceSettingsMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceSettingsMutation", m)
+}
+
+// The VoiceTranscriptRevisionFunc type is an adapter to allow the use of ordinary
+// function as VoiceTranscriptRevision mutator.
+type VoiceTranscriptRevisionFunc func(context.Context, *ent.VoiceTranscriptRevisionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f VoiceTranscriptRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.VoiceTranscriptRevisionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.VoiceTranscriptRevisionMutation", m)
+}
+
 // The WebhookDeliveryFunc type is an adapter to allow the use of ordinary
 // function as WebhookDelivery mutator.
 type WebhookDeliveryFunc func(context.Context, *ent.WebhookDeliveryMutation) (ent.Value, error)

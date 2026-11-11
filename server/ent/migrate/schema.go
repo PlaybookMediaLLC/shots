@@ -1113,6 +1113,7 @@ var (
 		{Name: "pinnedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "planTimeZone", Type: field.TypeString, Nullable: true},
 		{Name: "sourceDraftId", Type: field.TypeString, Nullable: true},
+		{Name: "sourceVoiceRevisionId", Type: field.TypeString, Nullable: true},
 		{Name: "campaignId", Type: field.TypeString, Nullable: true},
 		{Name: "collabGeneration", Type: field.TypeInt, Default: 0},
 		{Name: "collabState", Type: field.TypeBytes, Nullable: true},
@@ -1130,17 +1131,17 @@ var (
 			{
 				Name:    "contentdraft_organizationId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[39]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[40]},
 			},
 			{
 				Name:    "contentdraft_socialSetId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[39]},
+				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[40]},
 			},
 			{
 				Name:    "contentdraft_organizationId_campaignId",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[33]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[34]},
 			},
 		},
 	}
@@ -3765,6 +3766,181 @@ var (
 		Columns:    UserPreferenceColumns,
 		PrimaryKey: []*schema.Column{UserPreferenceColumns[0]},
 	}
+	// VoiceAudioRunColumns holds the columns for the "voice_audio_run" table.
+	VoiceAudioRunColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "noteId", Type: field.TypeString},
+		{Name: "runIndex", Type: field.TypeInt},
+		{Name: "startOffsetMs", Type: field.TypeInt},
+		{Name: "clientDurationMs", Type: field.TypeInt, Nullable: true},
+		{Name: "durationMs", Type: field.TypeInt, Nullable: true},
+		{Name: "sampleRateHz", Type: field.TypeInt, Nullable: true},
+		{Name: "contentType", Type: field.TypeString},
+		{Name: "bytes", Type: field.TypeInt64},
+		{Name: "sha256", Type: field.TypeString},
+		{Name: "objectKey", Type: field.TypeString, Unique: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "available", "failed", "deleted"}, Default: "pending"},
+		{Name: "failureReason", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// VoiceAudioRunTable holds the schema information for the "voice_audio_run" table.
+	VoiceAudioRunTable = &schema.Table{
+		Name:       "voice_audio_run",
+		Columns:    VoiceAudioRunColumns,
+		PrimaryKey: []*schema.Column{VoiceAudioRunColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "voiceaudiorun_noteId_runIndex",
+				Unique:  true,
+				Columns: []*schema.Column{VoiceAudioRunColumns[2], VoiceAudioRunColumns[3]},
+			},
+		},
+	}
+	// VoiceCommandColumns holds the columns for the "voice_command" table.
+	VoiceCommandColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "ownerUserId", Type: field.TypeString},
+		{Name: "noteId", Type: field.TypeString, Unique: true},
+		{Name: "transcriptRevisionId", Type: field.TypeString},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"waiting", "proposed", "confirmed", "expired", "withdrawn", "failed"}, Default: "waiting"},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"schedule_post", "create_draft", "none"}, Default: "none"},
+		{Name: "platform", Type: field.TypeString, Nullable: true},
+		{Name: "text", Type: field.TypeString, Nullable: true, Size: 2147483647},
+		{Name: "localTime", Type: field.TypeString, Nullable: true},
+		{Name: "timeZone", Type: field.TypeString},
+		{Name: "scheduledFor", Type: field.TypeTime, Nullable: true},
+		{Name: "channelConnectionId", Type: field.TypeString, Nullable: true},
+		{Name: "guessed", Type: field.TypeJSON},
+		{Name: "flags", Type: field.TypeJSON},
+		{Name: "notice", Type: field.TypeString, Nullable: true},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "nextAttemptAt", Type: field.TypeTime, Nullable: true},
+		{Name: "expiresAt", Type: field.TypeTime, Nullable: true},
+		{Name: "contentDraftId", Type: field.TypeString, Nullable: true},
+		{Name: "scheduledPostId", Type: field.TypeString, Nullable: true},
+		{Name: "failureReason", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// VoiceCommandTable holds the schema information for the "voice_command" table.
+	VoiceCommandTable = &schema.Table{
+		Name:       "voice_command",
+		Columns:    VoiceCommandColumns,
+		PrimaryKey: []*schema.Column{VoiceCommandColumns[0]},
+	}
+	// VoiceMemberSettingsColumns holds the columns for the "voice_member_settings" table.
+	VoiceMemberSettingsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "remoteTextConsentAt", Type: field.TypeTime, Nullable: true},
+		{Name: "voiceCommands", Type: field.TypeBool, Default: false},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// VoiceMemberSettingsTable holds the schema information for the "voice_member_settings" table.
+	VoiceMemberSettingsTable = &schema.Table{
+		Name:       "voice_member_settings",
+		Columns:    VoiceMemberSettingsColumns,
+		PrimaryKey: []*schema.Column{VoiceMemberSettingsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "voicemembersettings_organizationId_userId",
+				Unique:  true,
+				Columns: []*schema.Column{VoiceMemberSettingsColumns[1], VoiceMemberSettingsColumns[2]},
+			},
+		},
+	}
+	// VoiceNoteColumns holds the columns for the "voice_note" table.
+	VoiceNoteColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "ownerUserId", Type: field.TypeString},
+		{Name: "clientNoteId", Type: field.TypeString},
+		{Name: "title", Type: field.TypeString, Default: ""},
+		{Name: "projectId", Type: field.TypeString, Nullable: true},
+		{Name: "recordedAt", Type: field.TypeTime},
+		{Name: "recordedTimeZone", Type: field.TypeString},
+		{Name: "receivedAt", Type: field.TypeTime},
+		{Name: "locale", Type: field.TypeString, Nullable: true},
+		{Name: "durationMs", Type: field.TypeInt, Nullable: true},
+		{Name: "audioUploadConsent", Type: field.TypeBool, Default: false},
+		{Name: "revision", Type: field.TypeInt, Default: 1},
+		{Name: "currentTranscriptRevisionId", Type: field.TypeString, Nullable: true},
+		{Name: "deletedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// VoiceNoteTable holds the schema information for the "voice_note" table.
+	VoiceNoteTable = &schema.Table{
+		Name:       "voice_note",
+		Columns:    VoiceNoteColumns,
+		PrimaryKey: []*schema.Column{VoiceNoteColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "voicenote_organizationId_ownerUserId_clientNoteId",
+				Unique:  true,
+				Columns: []*schema.Column{VoiceNoteColumns[1], VoiceNoteColumns[2], VoiceNoteColumns[3]},
+			},
+			{
+				Name:    "voicenote_organizationId_ownerUserId_receivedAt",
+				Unique:  false,
+				Columns: []*schema.Column{VoiceNoteColumns[1], VoiceNoteColumns[2], VoiceNoteColumns[8]},
+			},
+		},
+	}
+	// VoiceSettingsColumns holds the columns for the "voice_settings" table.
+	VoiceSettingsColumns = []*schema.Column{
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "voiceNotes", Type: field.TypeBool, Default: false},
+		{Name: "audioUpload", Type: field.TypeBool, Default: false},
+		{Name: "draftGeneration", Type: field.TypeBool, Default: false},
+		{Name: "voiceCommands", Type: field.TypeBool, Default: false},
+		{Name: "updatedByUserId", Type: field.TypeString, Nullable: true},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// VoiceSettingsTable holds the schema information for the "voice_settings" table.
+	VoiceSettingsTable = &schema.Table{
+		Name:       "voice_settings",
+		Columns:    VoiceSettingsColumns,
+		PrimaryKey: []*schema.Column{VoiceSettingsColumns[0]},
+	}
+	// VoiceTranscriptRevisionColumns holds the columns for the "voice_transcript_revision" table.
+	VoiceTranscriptRevisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "noteId", Type: field.TypeString},
+		{Name: "clientRevisionId", Type: field.TypeString},
+		{Name: "parentId", Type: field.TypeString, Nullable: true},
+		{Name: "origin", Type: field.TypeEnum, Enums: []string{"on_device", "remote", "user_edit"}},
+		{Name: "locale", Type: field.TypeString, Nullable: true},
+		{Name: "engine", Type: field.TypeString, Nullable: true},
+		{Name: "text", Type: field.TypeString, Size: 2147483647},
+		{Name: "segments", Type: field.TypeJSON},
+		{Name: "redactedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "createdByUserId", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// VoiceTranscriptRevisionTable holds the schema information for the "voice_transcript_revision" table.
+	VoiceTranscriptRevisionTable = &schema.Table{
+		Name:       "voice_transcript_revision",
+		Columns:    VoiceTranscriptRevisionColumns,
+		PrimaryKey: []*schema.Column{VoiceTranscriptRevisionColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "voicetranscriptrevision_noteId_clientRevisionId",
+				Unique:  true,
+				Columns: []*schema.Column{VoiceTranscriptRevisionColumns[2], VoiceTranscriptRevisionColumns[3]},
+			},
+			{
+				Name:    "voicetranscriptrevision_noteId_createdAt",
+				Unique:  false,
+				Columns: []*schema.Column{VoiceTranscriptRevisionColumns[2], VoiceTranscriptRevisionColumns[12]},
+			},
+		},
+	}
 	// WebhookDeliveryColumns holds the columns for the "webhook_delivery" table.
 	WebhookDeliveryColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -4101,6 +4277,12 @@ var (
 		SurfaceCaptureTable,
 		UserTable,
 		UserPreferenceTable,
+		VoiceAudioRunTable,
+		VoiceCommandTable,
+		VoiceMemberSettingsTable,
+		VoiceNoteTable,
+		VoiceSettingsTable,
+		VoiceTranscriptRevisionTable,
 		WebhookDeliveryTable,
 		WebhookDeliveryAttemptTable,
 		WebhookSubscriptionTable,
@@ -4479,6 +4661,24 @@ func init() {
 	}
 	UserPreferenceTable.Annotation = &entsql.Annotation{
 		Table: "user_preference",
+	}
+	VoiceAudioRunTable.Annotation = &entsql.Annotation{
+		Table: "voice_audio_run",
+	}
+	VoiceCommandTable.Annotation = &entsql.Annotation{
+		Table: "voice_command",
+	}
+	VoiceMemberSettingsTable.Annotation = &entsql.Annotation{
+		Table: "voice_member_settings",
+	}
+	VoiceNoteTable.Annotation = &entsql.Annotation{
+		Table: "voice_note",
+	}
+	VoiceSettingsTable.Annotation = &entsql.Annotation{
+		Table: "voice_settings",
+	}
+	VoiceTranscriptRevisionTable.Annotation = &entsql.Annotation{
+		Table: "voice_transcript_revision",
 	}
 	WebhookDeliveryTable.Annotation = &entsql.Annotation{
 		Table: "webhook_delivery",

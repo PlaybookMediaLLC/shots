@@ -123,6 +123,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacecreditgrant"
@@ -623,17 +629,17 @@ func init() {
 	// contentdraft.DefaultTagIds holds the default value on creation for the tag_ids field.
 	contentdraft.DefaultTagIds = contentdraftDescTagIds.Default.([]string)
 	// contentdraftDescCollabGeneration is the schema descriptor for collab_generation field.
-	contentdraftDescCollabGeneration := contentdraftFields[34].Descriptor()
+	contentdraftDescCollabGeneration := contentdraftFields[35].Descriptor()
 	// contentdraft.DefaultCollabGeneration holds the default value on creation for the collab_generation field.
 	contentdraft.DefaultCollabGeneration = contentdraftDescCollabGeneration.Default.(int)
 	// contentdraft.CollabGenerationValidator is a validator for the "collab_generation" field. It is called by the builders before save.
 	contentdraft.CollabGenerationValidator = contentdraftDescCollabGeneration.Validators[0].(func(int) error)
 	// contentdraftDescCreatedAt is the schema descriptor for created_at field.
-	contentdraftDescCreatedAt := contentdraftFields[38].Descriptor()
+	contentdraftDescCreatedAt := contentdraftFields[39].Descriptor()
 	// contentdraft.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentdraft.DefaultCreatedAt = contentdraftDescCreatedAt.Default.(func() time.Time)
 	// contentdraftDescUpdatedAt is the schema descriptor for updated_at field.
-	contentdraftDescUpdatedAt := contentdraftFields[39].Descriptor()
+	contentdraftDescUpdatedAt := contentdraftFields[40].Descriptor()
 	// contentdraft.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentdraft.DefaultUpdatedAt = contentdraftDescUpdatedAt.Default.(func() time.Time)
 	// contentdraft.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2062,6 +2068,130 @@ func init() {
 	userpreference.DefaultUpdatedAt = userpreferenceDescUpdatedAt.Default.(func() time.Time)
 	// userpreference.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	userpreference.UpdateDefaultUpdatedAt = userpreferenceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voiceaudiorunFields := schema.VoiceAudioRun{}.Fields()
+	_ = voiceaudiorunFields
+	// voiceaudiorunDescRunIndex is the schema descriptor for run_index field.
+	voiceaudiorunDescRunIndex := voiceaudiorunFields[3].Descriptor()
+	// voiceaudiorun.RunIndexValidator is a validator for the "run_index" field. It is called by the builders before save.
+	voiceaudiorun.RunIndexValidator = voiceaudiorunDescRunIndex.Validators[0].(func(int) error)
+	// voiceaudiorunDescStartOffsetMs is the schema descriptor for start_offset_ms field.
+	voiceaudiorunDescStartOffsetMs := voiceaudiorunFields[4].Descriptor()
+	// voiceaudiorun.StartOffsetMsValidator is a validator for the "start_offset_ms" field. It is called by the builders before save.
+	voiceaudiorun.StartOffsetMsValidator = voiceaudiorunDescStartOffsetMs.Validators[0].(func(int) error)
+	// voiceaudiorunDescBytes is the schema descriptor for bytes field.
+	voiceaudiorunDescBytes := voiceaudiorunFields[9].Descriptor()
+	// voiceaudiorun.BytesValidator is a validator for the "bytes" field. It is called by the builders before save.
+	voiceaudiorun.BytesValidator = voiceaudiorunDescBytes.Validators[0].(func(int64) error)
+	// voiceaudiorunDescCreatedAt is the schema descriptor for created_at field.
+	voiceaudiorunDescCreatedAt := voiceaudiorunFields[14].Descriptor()
+	// voiceaudiorun.DefaultCreatedAt holds the default value on creation for the created_at field.
+	voiceaudiorun.DefaultCreatedAt = voiceaudiorunDescCreatedAt.Default.(func() time.Time)
+	// voiceaudiorunDescUpdatedAt is the schema descriptor for updated_at field.
+	voiceaudiorunDescUpdatedAt := voiceaudiorunFields[15].Descriptor()
+	// voiceaudiorun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	voiceaudiorun.DefaultUpdatedAt = voiceaudiorunDescUpdatedAt.Default.(func() time.Time)
+	// voiceaudiorun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	voiceaudiorun.UpdateDefaultUpdatedAt = voiceaudiorunDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voicecommandFields := schema.VoiceCommand{}.Fields()
+	_ = voicecommandFields
+	// voicecommandDescGuessed is the schema descriptor for guessed field.
+	voicecommandDescGuessed := voicecommandFields[13].Descriptor()
+	// voicecommand.DefaultGuessed holds the default value on creation for the guessed field.
+	voicecommand.DefaultGuessed = voicecommandDescGuessed.Default.([]string)
+	// voicecommandDescFlags is the schema descriptor for flags field.
+	voicecommandDescFlags := voicecommandFields[14].Descriptor()
+	// voicecommand.DefaultFlags holds the default value on creation for the flags field.
+	voicecommand.DefaultFlags = voicecommandDescFlags.Default.([]string)
+	// voicecommandDescAttempts is the schema descriptor for attempts field.
+	voicecommandDescAttempts := voicecommandFields[16].Descriptor()
+	// voicecommand.DefaultAttempts holds the default value on creation for the attempts field.
+	voicecommand.DefaultAttempts = voicecommandDescAttempts.Default.(int)
+	// voicecommand.AttemptsValidator is a validator for the "attempts" field. It is called by the builders before save.
+	voicecommand.AttemptsValidator = voicecommandDescAttempts.Validators[0].(func(int) error)
+	// voicecommandDescCreatedAt is the schema descriptor for created_at field.
+	voicecommandDescCreatedAt := voicecommandFields[22].Descriptor()
+	// voicecommand.DefaultCreatedAt holds the default value on creation for the created_at field.
+	voicecommand.DefaultCreatedAt = voicecommandDescCreatedAt.Default.(func() time.Time)
+	// voicecommandDescUpdatedAt is the schema descriptor for updated_at field.
+	voicecommandDescUpdatedAt := voicecommandFields[23].Descriptor()
+	// voicecommand.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	voicecommand.DefaultUpdatedAt = voicecommandDescUpdatedAt.Default.(func() time.Time)
+	// voicecommand.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	voicecommand.UpdateDefaultUpdatedAt = voicecommandDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voicemembersettingsFields := schema.VoiceMemberSettings{}.Fields()
+	_ = voicemembersettingsFields
+	// voicemembersettingsDescVoiceCommands is the schema descriptor for voice_commands field.
+	voicemembersettingsDescVoiceCommands := voicemembersettingsFields[4].Descriptor()
+	// voicemembersettings.DefaultVoiceCommands holds the default value on creation for the voice_commands field.
+	voicemembersettings.DefaultVoiceCommands = voicemembersettingsDescVoiceCommands.Default.(bool)
+	// voicemembersettingsDescUpdatedAt is the schema descriptor for updated_at field.
+	voicemembersettingsDescUpdatedAt := voicemembersettingsFields[5].Descriptor()
+	// voicemembersettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	voicemembersettings.DefaultUpdatedAt = voicemembersettingsDescUpdatedAt.Default.(func() time.Time)
+	// voicemembersettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	voicemembersettings.UpdateDefaultUpdatedAt = voicemembersettingsDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voicenoteFields := schema.VoiceNote{}.Fields()
+	_ = voicenoteFields
+	// voicenoteDescTitle is the schema descriptor for title field.
+	voicenoteDescTitle := voicenoteFields[4].Descriptor()
+	// voicenote.DefaultTitle holds the default value on creation for the title field.
+	voicenote.DefaultTitle = voicenoteDescTitle.Default.(string)
+	// voicenoteDescReceivedAt is the schema descriptor for received_at field.
+	voicenoteDescReceivedAt := voicenoteFields[8].Descriptor()
+	// voicenote.DefaultReceivedAt holds the default value on creation for the received_at field.
+	voicenote.DefaultReceivedAt = voicenoteDescReceivedAt.Default.(func() time.Time)
+	// voicenoteDescAudioUploadConsent is the schema descriptor for audio_upload_consent field.
+	voicenoteDescAudioUploadConsent := voicenoteFields[11].Descriptor()
+	// voicenote.DefaultAudioUploadConsent holds the default value on creation for the audio_upload_consent field.
+	voicenote.DefaultAudioUploadConsent = voicenoteDescAudioUploadConsent.Default.(bool)
+	// voicenoteDescRevision is the schema descriptor for revision field.
+	voicenoteDescRevision := voicenoteFields[12].Descriptor()
+	// voicenote.DefaultRevision holds the default value on creation for the revision field.
+	voicenote.DefaultRevision = voicenoteDescRevision.Default.(int)
+	// voicenoteDescCreatedAt is the schema descriptor for created_at field.
+	voicenoteDescCreatedAt := voicenoteFields[15].Descriptor()
+	// voicenote.DefaultCreatedAt holds the default value on creation for the created_at field.
+	voicenote.DefaultCreatedAt = voicenoteDescCreatedAt.Default.(func() time.Time)
+	// voicenoteDescUpdatedAt is the schema descriptor for updated_at field.
+	voicenoteDescUpdatedAt := voicenoteFields[16].Descriptor()
+	// voicenote.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	voicenote.DefaultUpdatedAt = voicenoteDescUpdatedAt.Default.(func() time.Time)
+	// voicenote.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	voicenote.UpdateDefaultUpdatedAt = voicenoteDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voicesettingsFields := schema.VoiceSettings{}.Fields()
+	_ = voicesettingsFields
+	// voicesettingsDescVoiceNotes is the schema descriptor for voice_notes field.
+	voicesettingsDescVoiceNotes := voicesettingsFields[1].Descriptor()
+	// voicesettings.DefaultVoiceNotes holds the default value on creation for the voice_notes field.
+	voicesettings.DefaultVoiceNotes = voicesettingsDescVoiceNotes.Default.(bool)
+	// voicesettingsDescAudioUpload is the schema descriptor for audio_upload field.
+	voicesettingsDescAudioUpload := voicesettingsFields[2].Descriptor()
+	// voicesettings.DefaultAudioUpload holds the default value on creation for the audio_upload field.
+	voicesettings.DefaultAudioUpload = voicesettingsDescAudioUpload.Default.(bool)
+	// voicesettingsDescDraftGeneration is the schema descriptor for draft_generation field.
+	voicesettingsDescDraftGeneration := voicesettingsFields[3].Descriptor()
+	// voicesettings.DefaultDraftGeneration holds the default value on creation for the draft_generation field.
+	voicesettings.DefaultDraftGeneration = voicesettingsDescDraftGeneration.Default.(bool)
+	// voicesettingsDescVoiceCommands is the schema descriptor for voice_commands field.
+	voicesettingsDescVoiceCommands := voicesettingsFields[4].Descriptor()
+	// voicesettings.DefaultVoiceCommands holds the default value on creation for the voice_commands field.
+	voicesettings.DefaultVoiceCommands = voicesettingsDescVoiceCommands.Default.(bool)
+	// voicesettingsDescUpdatedAt is the schema descriptor for updated_at field.
+	voicesettingsDescUpdatedAt := voicesettingsFields[6].Descriptor()
+	// voicesettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	voicesettings.DefaultUpdatedAt = voicesettingsDescUpdatedAt.Default.(func() time.Time)
+	// voicesettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	voicesettings.UpdateDefaultUpdatedAt = voicesettingsDescUpdatedAt.UpdateDefault.(func() time.Time)
+	voicetranscriptrevisionFields := schema.VoiceTranscriptRevision{}.Fields()
+	_ = voicetranscriptrevisionFields
+	// voicetranscriptrevisionDescSegments is the schema descriptor for segments field.
+	voicetranscriptrevisionDescSegments := voicetranscriptrevisionFields[9].Descriptor()
+	// voicetranscriptrevision.DefaultSegments holds the default value on creation for the segments field.
+	voicetranscriptrevision.DefaultSegments = voicetranscriptrevisionDescSegments.Default.([]schema.VoiceSegment)
+	// voicetranscriptrevisionDescCreatedAt is the schema descriptor for created_at field.
+	voicetranscriptrevisionDescCreatedAt := voicetranscriptrevisionFields[12].Descriptor()
+	// voicetranscriptrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	voicetranscriptrevision.DefaultCreatedAt = voicetranscriptrevisionDescCreatedAt.Default.(func() time.Time)
 	webhookdeliveryFields := schema.WebhookDelivery{}.Fields()
 	_ = webhookdeliveryFields
 	// webhookdeliveryDescAttempts is the schema descriptor for attempts field.

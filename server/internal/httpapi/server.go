@@ -63,6 +63,8 @@ type WorkflowScheduler interface {
 
 type ConfigurationStore interface {
 	PlanAnalyzeStore
+	VoiceStore
+	VoiceCommandStore
 	ProjectStore
 	CreativeSetStore
 	ContentDraftStore
@@ -325,6 +327,8 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerLibrary(mux)
 		s.registerSharing(mux)
 		s.registerPlanAnalyze(mux)
+		s.registerVoice(mux)
+		s.registerVoiceCommands(mux)
 		s.registerNotifications(mux)
 		s.registerOnboarding(mux)
 	}

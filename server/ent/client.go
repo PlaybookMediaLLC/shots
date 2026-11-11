@@ -136,6 +136,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdeliveryattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -393,6 +399,18 @@ type Client struct {
 	User *UserClient
 	// UserPreference is the client for interacting with the UserPreference builders.
 	UserPreference *UserPreferenceClient
+	// VoiceAudioRun is the client for interacting with the VoiceAudioRun builders.
+	VoiceAudioRun *VoiceAudioRunClient
+	// VoiceCommand is the client for interacting with the VoiceCommand builders.
+	VoiceCommand *VoiceCommandClient
+	// VoiceMemberSettings is the client for interacting with the VoiceMemberSettings builders.
+	VoiceMemberSettings *VoiceMemberSettingsClient
+	// VoiceNote is the client for interacting with the VoiceNote builders.
+	VoiceNote *VoiceNoteClient
+	// VoiceSettings is the client for interacting with the VoiceSettings builders.
+	VoiceSettings *VoiceSettingsClient
+	// VoiceTranscriptRevision is the client for interacting with the VoiceTranscriptRevision builders.
+	VoiceTranscriptRevision *VoiceTranscriptRevisionClient
 	// WebhookDelivery is the client for interacting with the WebhookDelivery builders.
 	WebhookDelivery *WebhookDeliveryClient
 	// WebhookDeliveryAttempt is the client for interacting with the WebhookDeliveryAttempt builders.
@@ -541,6 +559,12 @@ func (c *Client) init() {
 	c.SurfaceCapture = NewSurfaceCaptureClient(c.config)
 	c.User = NewUserClient(c.config)
 	c.UserPreference = NewUserPreferenceClient(c.config)
+	c.VoiceAudioRun = NewVoiceAudioRunClient(c.config)
+	c.VoiceCommand = NewVoiceCommandClient(c.config)
+	c.VoiceMemberSettings = NewVoiceMemberSettingsClient(c.config)
+	c.VoiceNote = NewVoiceNoteClient(c.config)
+	c.VoiceSettings = NewVoiceSettingsClient(c.config)
+	c.VoiceTranscriptRevision = NewVoiceTranscriptRevisionClient(c.config)
 	c.WebhookDelivery = NewWebhookDeliveryClient(c.config)
 	c.WebhookDeliveryAttempt = NewWebhookDeliveryAttemptClient(c.config)
 	c.WebhookSubscription = NewWebhookSubscriptionClient(c.config)
@@ -762,6 +786,12 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		SurfaceCapture:                  NewSurfaceCaptureClient(cfg),
 		User:                            NewUserClient(cfg),
 		UserPreference:                  NewUserPreferenceClient(cfg),
+		VoiceAudioRun:                   NewVoiceAudioRunClient(cfg),
+		VoiceCommand:                    NewVoiceCommandClient(cfg),
+		VoiceMemberSettings:             NewVoiceMemberSettingsClient(cfg),
+		VoiceNote:                       NewVoiceNoteClient(cfg),
+		VoiceSettings:                   NewVoiceSettingsClient(cfg),
+		VoiceTranscriptRevision:         NewVoiceTranscriptRevisionClient(cfg),
 		WebhookDelivery:                 NewWebhookDeliveryClient(cfg),
 		WebhookDeliveryAttempt:          NewWebhookDeliveryAttemptClient(cfg),
 		WebhookSubscription:             NewWebhookSubscriptionClient(cfg),
@@ -910,6 +940,12 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		SurfaceCapture:                  NewSurfaceCaptureClient(cfg),
 		User:                            NewUserClient(cfg),
 		UserPreference:                  NewUserPreferenceClient(cfg),
+		VoiceAudioRun:                   NewVoiceAudioRunClient(cfg),
+		VoiceCommand:                    NewVoiceCommandClient(cfg),
+		VoiceMemberSettings:             NewVoiceMemberSettingsClient(cfg),
+		VoiceNote:                       NewVoiceNoteClient(cfg),
+		VoiceSettings:                   NewVoiceSettingsClient(cfg),
+		VoiceTranscriptRevision:         NewVoiceTranscriptRevisionClient(cfg),
 		WebhookDelivery:                 NewWebhookDeliveryClient(cfg),
 		WebhookDeliveryAttempt:          NewWebhookDeliveryAttemptClient(cfg),
 		WebhookSubscription:             NewWebhookSubscriptionClient(cfg),
@@ -984,9 +1020,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.SocialTenantBinding, c.SourceApp, c.SourceChange,
 		c.StorePublishingCredential, c.StoreReview, c.StoreReviewComment,
 		c.SupportAccessGrant, c.SurfaceCapture, c.User, c.UserPreference,
-		c.WebhookDelivery, c.WebhookDeliveryAttempt, c.WebhookSubscription,
-		c.WorkspaceCreditGrant, c.WorkspaceDeletion, c.WorkspaceEntitlement,
-		c.WorkspaceGitHubInstallation, c.WorkspaceSettings,
+		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
+		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceCreditGrant,
+		c.WorkspaceDeletion, c.WorkspaceEntitlement, c.WorkspaceGitHubInstallation,
+		c.WorkspaceSettings,
 	} {
 		n.Use(hooks...)
 	}
@@ -1033,9 +1071,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.SocialTenantBinding, c.SourceApp, c.SourceChange,
 		c.StorePublishingCredential, c.StoreReview, c.StoreReviewComment,
 		c.SupportAccessGrant, c.SurfaceCapture, c.User, c.UserPreference,
-		c.WebhookDelivery, c.WebhookDeliveryAttempt, c.WebhookSubscription,
-		c.WorkspaceCreditGrant, c.WorkspaceDeletion, c.WorkspaceEntitlement,
-		c.WorkspaceGitHubInstallation, c.WorkspaceSettings,
+		c.VoiceAudioRun, c.VoiceCommand, c.VoiceMemberSettings, c.VoiceNote,
+		c.VoiceSettings, c.VoiceTranscriptRevision, c.WebhookDelivery,
+		c.WebhookDeliveryAttempt, c.WebhookSubscription, c.WorkspaceCreditGrant,
+		c.WorkspaceDeletion, c.WorkspaceEntitlement, c.WorkspaceGitHubInstallation,
+		c.WorkspaceSettings,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -1286,6 +1326,18 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.User.mutate(ctx, m)
 	case *UserPreferenceMutation:
 		return c.UserPreference.mutate(ctx, m)
+	case *VoiceAudioRunMutation:
+		return c.VoiceAudioRun.mutate(ctx, m)
+	case *VoiceCommandMutation:
+		return c.VoiceCommand.mutate(ctx, m)
+	case *VoiceMemberSettingsMutation:
+		return c.VoiceMemberSettings.mutate(ctx, m)
+	case *VoiceNoteMutation:
+		return c.VoiceNote.mutate(ctx, m)
+	case *VoiceSettingsMutation:
+		return c.VoiceSettings.mutate(ctx, m)
+	case *VoiceTranscriptRevisionMutation:
+		return c.VoiceTranscriptRevision.mutate(ctx, m)
 	case *WebhookDeliveryMutation:
 		return c.WebhookDelivery.mutate(ctx, m)
 	case *WebhookDeliveryAttemptMutation:
@@ -17528,6 +17580,804 @@ func (c *UserPreferenceClient) mutate(ctx context.Context, m *UserPreferenceMuta
 	}
 }
 
+// VoiceAudioRunClient is a client for the VoiceAudioRun schema.
+type VoiceAudioRunClient struct {
+	config
+}
+
+// NewVoiceAudioRunClient returns a client for the VoiceAudioRun from the given config.
+func NewVoiceAudioRunClient(c config) *VoiceAudioRunClient {
+	return &VoiceAudioRunClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voiceaudiorun.Hooks(f(g(h())))`.
+func (c *VoiceAudioRunClient) Use(hooks ...Hook) {
+	c.hooks.VoiceAudioRun = append(c.hooks.VoiceAudioRun, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voiceaudiorun.Intercept(f(g(h())))`.
+func (c *VoiceAudioRunClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceAudioRun = append(c.inters.VoiceAudioRun, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceAudioRun entity.
+func (c *VoiceAudioRunClient) Create() *VoiceAudioRunCreate {
+	mutation := newVoiceAudioRunMutation(c.config, OpCreate)
+	return &VoiceAudioRunCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceAudioRun entities.
+func (c *VoiceAudioRunClient) CreateBulk(builders ...*VoiceAudioRunCreate) *VoiceAudioRunCreateBulk {
+	return &VoiceAudioRunCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceAudioRunClient) MapCreateBulk(slice any, setFunc func(*VoiceAudioRunCreate, int)) *VoiceAudioRunCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceAudioRunCreateBulk{err: fmt.Errorf("calling to VoiceAudioRunClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceAudioRunCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceAudioRunCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceAudioRun.
+func (c *VoiceAudioRunClient) Update() *VoiceAudioRunUpdate {
+	mutation := newVoiceAudioRunMutation(c.config, OpUpdate)
+	return &VoiceAudioRunUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceAudioRunClient) UpdateOne(_m *VoiceAudioRun) *VoiceAudioRunUpdateOne {
+	mutation := newVoiceAudioRunMutation(c.config, OpUpdateOne, withVoiceAudioRun(_m))
+	return &VoiceAudioRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceAudioRunClient) UpdateOneID(id string) *VoiceAudioRunUpdateOne {
+	mutation := newVoiceAudioRunMutation(c.config, OpUpdateOne, withVoiceAudioRunID(id))
+	return &VoiceAudioRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceAudioRun.
+func (c *VoiceAudioRunClient) Delete() *VoiceAudioRunDelete {
+	mutation := newVoiceAudioRunMutation(c.config, OpDelete)
+	return &VoiceAudioRunDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceAudioRunClient) DeleteOne(_m *VoiceAudioRun) *VoiceAudioRunDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceAudioRunClient) DeleteOneID(id string) *VoiceAudioRunDeleteOne {
+	builder := c.Delete().Where(voiceaudiorun.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceAudioRunDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceAudioRun.
+func (c *VoiceAudioRunClient) Query() *VoiceAudioRunQuery {
+	return &VoiceAudioRunQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceAudioRun},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceAudioRun entity by its id.
+func (c *VoiceAudioRunClient) Get(ctx context.Context, id string) (*VoiceAudioRun, error) {
+	return c.Query().Where(voiceaudiorun.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceAudioRunClient) GetX(ctx context.Context, id string) *VoiceAudioRun {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceAudioRunClient) Hooks() []Hook {
+	return c.hooks.VoiceAudioRun
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceAudioRunClient) Interceptors() []Interceptor {
+	return c.inters.VoiceAudioRun
+}
+
+func (c *VoiceAudioRunClient) mutate(ctx context.Context, m *VoiceAudioRunMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceAudioRunCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceAudioRunUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceAudioRunUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceAudioRunDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceAudioRun mutation op: %q", m.Op())
+	}
+}
+
+// VoiceCommandClient is a client for the VoiceCommand schema.
+type VoiceCommandClient struct {
+	config
+}
+
+// NewVoiceCommandClient returns a client for the VoiceCommand from the given config.
+func NewVoiceCommandClient(c config) *VoiceCommandClient {
+	return &VoiceCommandClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voicecommand.Hooks(f(g(h())))`.
+func (c *VoiceCommandClient) Use(hooks ...Hook) {
+	c.hooks.VoiceCommand = append(c.hooks.VoiceCommand, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voicecommand.Intercept(f(g(h())))`.
+func (c *VoiceCommandClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceCommand = append(c.inters.VoiceCommand, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceCommand entity.
+func (c *VoiceCommandClient) Create() *VoiceCommandCreate {
+	mutation := newVoiceCommandMutation(c.config, OpCreate)
+	return &VoiceCommandCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceCommand entities.
+func (c *VoiceCommandClient) CreateBulk(builders ...*VoiceCommandCreate) *VoiceCommandCreateBulk {
+	return &VoiceCommandCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceCommandClient) MapCreateBulk(slice any, setFunc func(*VoiceCommandCreate, int)) *VoiceCommandCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceCommandCreateBulk{err: fmt.Errorf("calling to VoiceCommandClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceCommandCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceCommandCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceCommand.
+func (c *VoiceCommandClient) Update() *VoiceCommandUpdate {
+	mutation := newVoiceCommandMutation(c.config, OpUpdate)
+	return &VoiceCommandUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceCommandClient) UpdateOne(_m *VoiceCommand) *VoiceCommandUpdateOne {
+	mutation := newVoiceCommandMutation(c.config, OpUpdateOne, withVoiceCommand(_m))
+	return &VoiceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceCommandClient) UpdateOneID(id string) *VoiceCommandUpdateOne {
+	mutation := newVoiceCommandMutation(c.config, OpUpdateOne, withVoiceCommandID(id))
+	return &VoiceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceCommand.
+func (c *VoiceCommandClient) Delete() *VoiceCommandDelete {
+	mutation := newVoiceCommandMutation(c.config, OpDelete)
+	return &VoiceCommandDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceCommandClient) DeleteOne(_m *VoiceCommand) *VoiceCommandDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceCommandClient) DeleteOneID(id string) *VoiceCommandDeleteOne {
+	builder := c.Delete().Where(voicecommand.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceCommandDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceCommand.
+func (c *VoiceCommandClient) Query() *VoiceCommandQuery {
+	return &VoiceCommandQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceCommand},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceCommand entity by its id.
+func (c *VoiceCommandClient) Get(ctx context.Context, id string) (*VoiceCommand, error) {
+	return c.Query().Where(voicecommand.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceCommandClient) GetX(ctx context.Context, id string) *VoiceCommand {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceCommandClient) Hooks() []Hook {
+	return c.hooks.VoiceCommand
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceCommandClient) Interceptors() []Interceptor {
+	return c.inters.VoiceCommand
+}
+
+func (c *VoiceCommandClient) mutate(ctx context.Context, m *VoiceCommandMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceCommandCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceCommandUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceCommandDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceCommand mutation op: %q", m.Op())
+	}
+}
+
+// VoiceMemberSettingsClient is a client for the VoiceMemberSettings schema.
+type VoiceMemberSettingsClient struct {
+	config
+}
+
+// NewVoiceMemberSettingsClient returns a client for the VoiceMemberSettings from the given config.
+func NewVoiceMemberSettingsClient(c config) *VoiceMemberSettingsClient {
+	return &VoiceMemberSettingsClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voicemembersettings.Hooks(f(g(h())))`.
+func (c *VoiceMemberSettingsClient) Use(hooks ...Hook) {
+	c.hooks.VoiceMemberSettings = append(c.hooks.VoiceMemberSettings, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voicemembersettings.Intercept(f(g(h())))`.
+func (c *VoiceMemberSettingsClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceMemberSettings = append(c.inters.VoiceMemberSettings, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceMemberSettings entity.
+func (c *VoiceMemberSettingsClient) Create() *VoiceMemberSettingsCreate {
+	mutation := newVoiceMemberSettingsMutation(c.config, OpCreate)
+	return &VoiceMemberSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceMemberSettings entities.
+func (c *VoiceMemberSettingsClient) CreateBulk(builders ...*VoiceMemberSettingsCreate) *VoiceMemberSettingsCreateBulk {
+	return &VoiceMemberSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceMemberSettingsClient) MapCreateBulk(slice any, setFunc func(*VoiceMemberSettingsCreate, int)) *VoiceMemberSettingsCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceMemberSettingsCreateBulk{err: fmt.Errorf("calling to VoiceMemberSettingsClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceMemberSettingsCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceMemberSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceMemberSettings.
+func (c *VoiceMemberSettingsClient) Update() *VoiceMemberSettingsUpdate {
+	mutation := newVoiceMemberSettingsMutation(c.config, OpUpdate)
+	return &VoiceMemberSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceMemberSettingsClient) UpdateOne(_m *VoiceMemberSettings) *VoiceMemberSettingsUpdateOne {
+	mutation := newVoiceMemberSettingsMutation(c.config, OpUpdateOne, withVoiceMemberSettings(_m))
+	return &VoiceMemberSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceMemberSettingsClient) UpdateOneID(id string) *VoiceMemberSettingsUpdateOne {
+	mutation := newVoiceMemberSettingsMutation(c.config, OpUpdateOne, withVoiceMemberSettingsID(id))
+	return &VoiceMemberSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceMemberSettings.
+func (c *VoiceMemberSettingsClient) Delete() *VoiceMemberSettingsDelete {
+	mutation := newVoiceMemberSettingsMutation(c.config, OpDelete)
+	return &VoiceMemberSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceMemberSettingsClient) DeleteOne(_m *VoiceMemberSettings) *VoiceMemberSettingsDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceMemberSettingsClient) DeleteOneID(id string) *VoiceMemberSettingsDeleteOne {
+	builder := c.Delete().Where(voicemembersettings.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceMemberSettingsDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceMemberSettings.
+func (c *VoiceMemberSettingsClient) Query() *VoiceMemberSettingsQuery {
+	return &VoiceMemberSettingsQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceMemberSettings},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceMemberSettings entity by its id.
+func (c *VoiceMemberSettingsClient) Get(ctx context.Context, id string) (*VoiceMemberSettings, error) {
+	return c.Query().Where(voicemembersettings.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceMemberSettingsClient) GetX(ctx context.Context, id string) *VoiceMemberSettings {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceMemberSettingsClient) Hooks() []Hook {
+	return c.hooks.VoiceMemberSettings
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceMemberSettingsClient) Interceptors() []Interceptor {
+	return c.inters.VoiceMemberSettings
+}
+
+func (c *VoiceMemberSettingsClient) mutate(ctx context.Context, m *VoiceMemberSettingsMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceMemberSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceMemberSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceMemberSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceMemberSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceMemberSettings mutation op: %q", m.Op())
+	}
+}
+
+// VoiceNoteClient is a client for the VoiceNote schema.
+type VoiceNoteClient struct {
+	config
+}
+
+// NewVoiceNoteClient returns a client for the VoiceNote from the given config.
+func NewVoiceNoteClient(c config) *VoiceNoteClient {
+	return &VoiceNoteClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voicenote.Hooks(f(g(h())))`.
+func (c *VoiceNoteClient) Use(hooks ...Hook) {
+	c.hooks.VoiceNote = append(c.hooks.VoiceNote, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voicenote.Intercept(f(g(h())))`.
+func (c *VoiceNoteClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceNote = append(c.inters.VoiceNote, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceNote entity.
+func (c *VoiceNoteClient) Create() *VoiceNoteCreate {
+	mutation := newVoiceNoteMutation(c.config, OpCreate)
+	return &VoiceNoteCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceNote entities.
+func (c *VoiceNoteClient) CreateBulk(builders ...*VoiceNoteCreate) *VoiceNoteCreateBulk {
+	return &VoiceNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceNoteClient) MapCreateBulk(slice any, setFunc func(*VoiceNoteCreate, int)) *VoiceNoteCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceNoteCreateBulk{err: fmt.Errorf("calling to VoiceNoteClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceNoteCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceNote.
+func (c *VoiceNoteClient) Update() *VoiceNoteUpdate {
+	mutation := newVoiceNoteMutation(c.config, OpUpdate)
+	return &VoiceNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceNoteClient) UpdateOne(_m *VoiceNote) *VoiceNoteUpdateOne {
+	mutation := newVoiceNoteMutation(c.config, OpUpdateOne, withVoiceNote(_m))
+	return &VoiceNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceNoteClient) UpdateOneID(id string) *VoiceNoteUpdateOne {
+	mutation := newVoiceNoteMutation(c.config, OpUpdateOne, withVoiceNoteID(id))
+	return &VoiceNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceNote.
+func (c *VoiceNoteClient) Delete() *VoiceNoteDelete {
+	mutation := newVoiceNoteMutation(c.config, OpDelete)
+	return &VoiceNoteDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceNoteClient) DeleteOne(_m *VoiceNote) *VoiceNoteDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceNoteClient) DeleteOneID(id string) *VoiceNoteDeleteOne {
+	builder := c.Delete().Where(voicenote.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceNoteDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceNote.
+func (c *VoiceNoteClient) Query() *VoiceNoteQuery {
+	return &VoiceNoteQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceNote},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceNote entity by its id.
+func (c *VoiceNoteClient) Get(ctx context.Context, id string) (*VoiceNote, error) {
+	return c.Query().Where(voicenote.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceNoteClient) GetX(ctx context.Context, id string) *VoiceNote {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceNoteClient) Hooks() []Hook {
+	return c.hooks.VoiceNote
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceNoteClient) Interceptors() []Interceptor {
+	return c.inters.VoiceNote
+}
+
+func (c *VoiceNoteClient) mutate(ctx context.Context, m *VoiceNoteMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceNoteCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceNoteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceNote mutation op: %q", m.Op())
+	}
+}
+
+// VoiceSettingsClient is a client for the VoiceSettings schema.
+type VoiceSettingsClient struct {
+	config
+}
+
+// NewVoiceSettingsClient returns a client for the VoiceSettings from the given config.
+func NewVoiceSettingsClient(c config) *VoiceSettingsClient {
+	return &VoiceSettingsClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voicesettings.Hooks(f(g(h())))`.
+func (c *VoiceSettingsClient) Use(hooks ...Hook) {
+	c.hooks.VoiceSettings = append(c.hooks.VoiceSettings, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voicesettings.Intercept(f(g(h())))`.
+func (c *VoiceSettingsClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceSettings = append(c.inters.VoiceSettings, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceSettings entity.
+func (c *VoiceSettingsClient) Create() *VoiceSettingsCreate {
+	mutation := newVoiceSettingsMutation(c.config, OpCreate)
+	return &VoiceSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceSettings entities.
+func (c *VoiceSettingsClient) CreateBulk(builders ...*VoiceSettingsCreate) *VoiceSettingsCreateBulk {
+	return &VoiceSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceSettingsClient) MapCreateBulk(slice any, setFunc func(*VoiceSettingsCreate, int)) *VoiceSettingsCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceSettingsCreateBulk{err: fmt.Errorf("calling to VoiceSettingsClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceSettingsCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceSettings.
+func (c *VoiceSettingsClient) Update() *VoiceSettingsUpdate {
+	mutation := newVoiceSettingsMutation(c.config, OpUpdate)
+	return &VoiceSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceSettingsClient) UpdateOne(_m *VoiceSettings) *VoiceSettingsUpdateOne {
+	mutation := newVoiceSettingsMutation(c.config, OpUpdateOne, withVoiceSettings(_m))
+	return &VoiceSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceSettingsClient) UpdateOneID(id string) *VoiceSettingsUpdateOne {
+	mutation := newVoiceSettingsMutation(c.config, OpUpdateOne, withVoiceSettingsID(id))
+	return &VoiceSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceSettings.
+func (c *VoiceSettingsClient) Delete() *VoiceSettingsDelete {
+	mutation := newVoiceSettingsMutation(c.config, OpDelete)
+	return &VoiceSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceSettingsClient) DeleteOne(_m *VoiceSettings) *VoiceSettingsDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceSettingsClient) DeleteOneID(id string) *VoiceSettingsDeleteOne {
+	builder := c.Delete().Where(voicesettings.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceSettingsDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceSettings.
+func (c *VoiceSettingsClient) Query() *VoiceSettingsQuery {
+	return &VoiceSettingsQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceSettings},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceSettings entity by its id.
+func (c *VoiceSettingsClient) Get(ctx context.Context, id string) (*VoiceSettings, error) {
+	return c.Query().Where(voicesettings.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceSettingsClient) GetX(ctx context.Context, id string) *VoiceSettings {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceSettingsClient) Hooks() []Hook {
+	return c.hooks.VoiceSettings
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceSettingsClient) Interceptors() []Interceptor {
+	return c.inters.VoiceSettings
+}
+
+func (c *VoiceSettingsClient) mutate(ctx context.Context, m *VoiceSettingsMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceSettings mutation op: %q", m.Op())
+	}
+}
+
+// VoiceTranscriptRevisionClient is a client for the VoiceTranscriptRevision schema.
+type VoiceTranscriptRevisionClient struct {
+	config
+}
+
+// NewVoiceTranscriptRevisionClient returns a client for the VoiceTranscriptRevision from the given config.
+func NewVoiceTranscriptRevisionClient(c config) *VoiceTranscriptRevisionClient {
+	return &VoiceTranscriptRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `voicetranscriptrevision.Hooks(f(g(h())))`.
+func (c *VoiceTranscriptRevisionClient) Use(hooks ...Hook) {
+	c.hooks.VoiceTranscriptRevision = append(c.hooks.VoiceTranscriptRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `voicetranscriptrevision.Intercept(f(g(h())))`.
+func (c *VoiceTranscriptRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.VoiceTranscriptRevision = append(c.inters.VoiceTranscriptRevision, interceptors...)
+}
+
+// Create returns a builder for creating a VoiceTranscriptRevision entity.
+func (c *VoiceTranscriptRevisionClient) Create() *VoiceTranscriptRevisionCreate {
+	mutation := newVoiceTranscriptRevisionMutation(c.config, OpCreate)
+	return &VoiceTranscriptRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of VoiceTranscriptRevision entities.
+func (c *VoiceTranscriptRevisionClient) CreateBulk(builders ...*VoiceTranscriptRevisionCreate) *VoiceTranscriptRevisionCreateBulk {
+	return &VoiceTranscriptRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *VoiceTranscriptRevisionClient) MapCreateBulk(slice any, setFunc func(*VoiceTranscriptRevisionCreate, int)) *VoiceTranscriptRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &VoiceTranscriptRevisionCreateBulk{err: fmt.Errorf("calling to VoiceTranscriptRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*VoiceTranscriptRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &VoiceTranscriptRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for VoiceTranscriptRevision.
+func (c *VoiceTranscriptRevisionClient) Update() *VoiceTranscriptRevisionUpdate {
+	mutation := newVoiceTranscriptRevisionMutation(c.config, OpUpdate)
+	return &VoiceTranscriptRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *VoiceTranscriptRevisionClient) UpdateOne(_m *VoiceTranscriptRevision) *VoiceTranscriptRevisionUpdateOne {
+	mutation := newVoiceTranscriptRevisionMutation(c.config, OpUpdateOne, withVoiceTranscriptRevision(_m))
+	return &VoiceTranscriptRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *VoiceTranscriptRevisionClient) UpdateOneID(id string) *VoiceTranscriptRevisionUpdateOne {
+	mutation := newVoiceTranscriptRevisionMutation(c.config, OpUpdateOne, withVoiceTranscriptRevisionID(id))
+	return &VoiceTranscriptRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for VoiceTranscriptRevision.
+func (c *VoiceTranscriptRevisionClient) Delete() *VoiceTranscriptRevisionDelete {
+	mutation := newVoiceTranscriptRevisionMutation(c.config, OpDelete)
+	return &VoiceTranscriptRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *VoiceTranscriptRevisionClient) DeleteOne(_m *VoiceTranscriptRevision) *VoiceTranscriptRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *VoiceTranscriptRevisionClient) DeleteOneID(id string) *VoiceTranscriptRevisionDeleteOne {
+	builder := c.Delete().Where(voicetranscriptrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &VoiceTranscriptRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for VoiceTranscriptRevision.
+func (c *VoiceTranscriptRevisionClient) Query() *VoiceTranscriptRevisionQuery {
+	return &VoiceTranscriptRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeVoiceTranscriptRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a VoiceTranscriptRevision entity by its id.
+func (c *VoiceTranscriptRevisionClient) Get(ctx context.Context, id string) (*VoiceTranscriptRevision, error) {
+	return c.Query().Where(voicetranscriptrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *VoiceTranscriptRevisionClient) GetX(ctx context.Context, id string) *VoiceTranscriptRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *VoiceTranscriptRevisionClient) Hooks() []Hook {
+	return c.hooks.VoiceTranscriptRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *VoiceTranscriptRevisionClient) Interceptors() []Interceptor {
+	return c.inters.VoiceTranscriptRevision
+}
+
+func (c *VoiceTranscriptRevisionClient) mutate(ctx context.Context, m *VoiceTranscriptRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&VoiceTranscriptRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&VoiceTranscriptRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&VoiceTranscriptRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&VoiceTranscriptRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown VoiceTranscriptRevision mutation op: %q", m.Op())
+	}
+}
+
 // WebhookDeliveryClient is a client for the WebhookDelivery schema.
 type WebhookDeliveryClient struct {
 	config
@@ -18627,9 +19477,11 @@ type (
 		ShareLink, SocialOAuthStart, SocialSet, SocialSetWritingSample,
 		SocialTenantBinding, SourceApp, SourceChange, StorePublishingCredential,
 		StoreReview, StoreReviewComment, SupportAccessGrant, SurfaceCapture, User,
-		UserPreference, WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription,
-		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
-		WorkspaceGitHubInstallation, WorkspaceSettings []ent.Hook
+		UserPreference, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
+		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
+		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceCreditGrant,
+		WorkspaceDeletion, WorkspaceEntitlement, WorkspaceGitHubInstallation,
+		WorkspaceSettings []ent.Hook
 	}
 	inters struct {
 		AccountDeletionRequest, AgentAuthorization, AnalyticsAccount, AnalyticsPost,
@@ -18664,8 +19516,10 @@ type (
 		ShareLink, SocialOAuthStart, SocialSet, SocialSetWritingSample,
 		SocialTenantBinding, SourceApp, SourceChange, StorePublishingCredential,
 		StoreReview, StoreReviewComment, SupportAccessGrant, SurfaceCapture, User,
-		UserPreference, WebhookDelivery, WebhookDeliveryAttempt, WebhookSubscription,
-		WorkspaceCreditGrant, WorkspaceDeletion, WorkspaceEntitlement,
-		WorkspaceGitHubInstallation, WorkspaceSettings []ent.Interceptor
+		UserPreference, VoiceAudioRun, VoiceCommand, VoiceMemberSettings, VoiceNote,
+		VoiceSettings, VoiceTranscriptRevision, WebhookDelivery,
+		WebhookDeliveryAttempt, WebhookSubscription, WorkspaceCreditGrant,
+		WorkspaceDeletion, WorkspaceEntitlement, WorkspaceGitHubInstallation,
+		WorkspaceSettings []ent.Interceptor
 	}
 )
