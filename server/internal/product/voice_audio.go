@@ -312,7 +312,8 @@ func (c *Configuration) SignVoiceRunAudio(ctx context.Context, actor Actor, note
 // DeleteVoiceAudio deletes every run of the member's note: the objects are
 // purged and the rows keep a deleted marker; the transcripts stay (D1).
 func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteID string) error {
-	if _, err := c.ownedVoiceNote(ctx, actor, noteID); err != nil {
+	note, err := c.ownedVoiceNote(ctx, actor, noteID)
+	if err != nil {
 		return err
 	}
 	tx, err := c.client.Tx(ctx)
@@ -323,17 +324,12 @@ func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteI
 	if _, err := lockVoiceNote(ctx, tx, noteID); err != nil {
 		return err
 	}
-	deleted, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusNEQ(voiceaudiorun.StatusDeleted)).
-		SetStatus(voiceaudiorun.StatusDeleted).Save(ctx)
+	deleted, err := deleteVoiceAudioTx(ctx, tx, actor, noteID)
 	if err != nil {
 		return err
 	}
 	if deleted > 0 {
-		if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
-			return err
-		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.voice_audio_deleted", "voice_note", noteID,
-			map[string]any{"deletedRuns": deleted}); err != nil {
+		if err := c.recordVoiceDeletion(ctx, "voice_audio", note.OrganizationID, noteID); err != nil {
 			return err
 		}
 	}
@@ -342,6 +338,21 @@ func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteI
 	}
 	c.purgeVoiceObjectsNow(ctx, noteID)
 	return nil
+}
+
+// deleteVoiceAudioTx marks every run of a locked note deleted, its objects
+// purged after the commit, and audits it. It reports how many runs it marked.
+func deleteVoiceAudioTx(ctx context.Context, tx *ent.Tx, actor Actor, noteID string) (int, error) {
+	deleted, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusNEQ(voiceaudiorun.StatusDeleted)).
+		SetStatus(voiceaudiorun.StatusDeleted).Save(ctx)
+	if err != nil || deleted == 0 {
+		return 0, err
+	}
+	if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
+		return 0, err
+	}
+	return deleted, appendConfigurationAudit(ctx, tx, actor, "product.voice_audio_deleted", "voice_note", noteID,
+		map[string]any{"deletedRuns": deleted})
 }
 
 // purgeVoiceObjects deletes the stored objects of deleted and failed runs,

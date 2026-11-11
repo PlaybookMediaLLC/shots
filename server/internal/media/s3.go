@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -373,15 +374,53 @@ func DeletionLedgerDay(day time.Time) string {
 	return "deletion-ledger/" + day.UTC().Format("2006/01/02") + "/"
 }
 
+// DeletionRecord is one deletion-ledger entry: what was deleted, when its
+// deletion was requested, and the ID that names the entry (the outbox event
+// that carried the request, or one made for a deletion recorded in its own
+// request). It holds IDs only, never content.
+type DeletionRecord struct {
+	Kind           string    `json:"kind"`
+	OrganizationID string    `json:"organizationId"`
+	ID             string    `json:"id"`
+	EventID        string    `json:"eventId"`
+	RequestedAt    time.Time `json:"requestedAt"`
+}
+
+// deletionLedgerKey names an entry by its ID under the UTC day the deletion
+// was requested.
+func deletionLedgerKey(requestedAt time.Time, id string) (string, error) {
+	if !safeSegment(id) {
+		return "", errors.New("deletion ledger entry needs a safe ID")
+	}
+	return DeletionLedgerDay(requestedAt) + id + ".json", nil
+}
+
 // RecordDeletion writes one deletion-ledger entry, named by its request's ID
 // under the UTC day the deletion was requested. The ledger lives outside the
 // database and its backups, so a restore can replay the deletions it undoes
 // (docs/deployment.md).
 func (o *TenantObjects) RecordDeletion(ctx context.Context, requestedAt time.Time, id string, record []byte) error {
-	if !safeSegment(id) {
-		return errors.New("deletion ledger entry needs a safe ID")
+	key, err := deletionLedgerKey(requestedAt, id)
+	if err != nil {
+		return err
 	}
-	return o.store.Put(ctx, DeletionLedgerDay(requestedAt)+id+".json", "application/json", bytes.NewReader(record))
+	return o.store.Put(ctx, key, "application/json", bytes.NewReader(record))
+}
+
+// PutDeletionRecord writes one deletion-ledger entry through a store that
+// puts objects by key, as RecordDeletion files it.
+func PutDeletionRecord(ctx context.Context, store interface {
+	Put(context.Context, string, string, io.Reader) error
+}, record DeletionRecord) error {
+	body, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	key, err := deletionLedgerKey(record.RequestedAt, record.EventID)
+	if err != nil {
+		return err
+	}
+	return store.Put(ctx, key, "application/json", bytes.NewReader(body))
 }
 
 func (o *TenantObjects) SignDelivery(ctx context.Context, organizationID, key string) (string, error) {

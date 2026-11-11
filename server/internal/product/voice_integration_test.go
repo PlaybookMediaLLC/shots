@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ import (
 )
 
 // voiceObjects is object storage in memory: what was signed, stored and
-// deleted, and a switch to make deletes fail.
+// deleted, and switches to make deletes or writes fail.
 type voiceObjects struct {
 	mu          sync.Mutex
 	stored      map[string][]byte
@@ -32,6 +33,7 @@ type voiceObjects struct {
 	signedSize  int64
 	signedSum   []byte
 	failDeletes bool
+	failPuts    bool
 }
 
 func (o *voiceObjects) SignUpload(context.Context, string, string) (string, error) {
@@ -50,6 +52,9 @@ func (o *voiceObjects) Put(_ context.Context, key, _ string, body io.Reader) err
 	data, err := io.ReadAll(body)
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if o.failPuts {
+		return errors.New("storage is down")
+	}
 	o.stored[key] = data
 	return err
 }
@@ -91,6 +96,42 @@ func (o *voiceObjects) put(key string, data []byte) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.stored[key] = data
+}
+
+// audio counts the stored voice recordings.
+func (o *voiceObjects) audio() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	count := 0
+	for key := range o.stored {
+		if strings.HasPrefix(key, "voice/") {
+			count++
+		}
+	}
+	return count
+}
+
+// ledger reads back the deletion-ledger entries, each filed under the day it
+// was requested and named by its event ID.
+func (o *voiceObjects) ledger(t *testing.T) []media.DeletionRecord {
+	t.Helper()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	records := []media.DeletionRecord{}
+	for key, body := range o.stored {
+		if !strings.HasPrefix(key, "deletion-ledger/") {
+			continue
+		}
+		var record media.DeletionRecord
+		if err := json.Unmarshal(body, &record); err != nil {
+			t.Fatal(err)
+		}
+		if key != media.DeletionLedgerDay(record.RequestedAt)+record.EventID+".json" {
+			t.Fatalf("ledger entry %s is filed under the wrong key", key)
+		}
+		records = append(records, record)
+	}
+	return records
 }
 
 type voiceFixture struct {
@@ -666,8 +707,8 @@ func TestVoiceAudioRuns(t *testing.T) {
 		}
 	}
 	// The objects go at once; the purge is recorded once no upload URL is left.
-	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "4" || len(f.objects.stored) != 0 {
-		t.Fatalf("unrecorded runs=%s objects=%d", left, len(f.objects.stored))
+	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "4" || f.objects.audio() != 0 {
+		t.Fatalf("unrecorded runs=%s objects=%d", left, f.objects.audio())
 	}
 	_, err = f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, publishing.ErrNotFound, "play deleted audio")
@@ -905,8 +946,8 @@ func TestVoiceSweepRemovesAPurgedWorkspace(t *testing.T) {
 			(SELECT count(*) FROM voice_audio_run WHERE "organizationId"=$1), (SELECT count(*) FROM voice_command WHERE "organizationId"=$1),
 			(SELECT count(*) FROM voice_settings WHERE "organizationId"=$1), (SELECT count(*) FROM voice_member_settings WHERE "organizationId"=$1))`, f.org)
 	}
-	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "1,1,2,1,1,1" || len(f.objects.stored) != 2 {
-		t.Fatalf("removed while upload URLs are valid: rows=%s objects=%d err=%v", voiceRows(), len(f.objects.stored), err)
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "1,1,2,1,1,1" || f.objects.audio() != 2 {
+		t.Fatalf("removed while upload URLs are valid: rows=%s objects=%d err=%v", voiceRows(), f.objects.audio(), err)
 	}
 	f.exec(`UPDATE workspace_deletion SET "purgedAt"=now()-interval '21 minutes' WHERE id=$1`, "deletion_"+f.id)
 	f.objects.failDeletes = true
@@ -916,10 +957,119 @@ func TestVoiceSweepRemovesAPurgedWorkspace(t *testing.T) {
 		t.Fatalf("rows went before their objects: %s", voiceRows())
 	}
 	f.objects.failDeletes = false
-	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "0,0,0,0,0,0" || len(f.objects.stored) != 0 {
-		t.Fatalf("after the sweep: rows=%s objects=%d err=%v", voiceRows(), len(f.objects.stored), err)
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "0,0,0,0,0,0" || f.objects.audio() != 0 {
+		t.Fatalf("after the sweep: rows=%s objects=%d err=%v", voiceRows(), f.objects.audio(), err)
 	}
 	if _, err := f.repo.GetVoiceNote(ctx, f.foreign, kept.ID); err != nil {
 		t.Fatalf("another workspace's note: %v", err)
+	}
+}
+
+// D3: each deletion a member makes is written to the R2 deletion ledger
+// before it commits, and a replay after a database restore deletes it again
+// through the same paths.
+func TestVoiceDeletionLedger(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	recorded := func(clientNoteID string) (*VoiceNoteDetail, string, string) {
+		t.Helper()
+		note := f.note(f.creator, clientNoteID, true)
+		result, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+			t.Fatal(err)
+		}
+		key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".wav"
+		f.objects.put(key, run)
+		if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+			t.Fatal(err)
+		}
+		return note, result.Revision.ID, key
+	}
+	state := func(noteID string) string {
+		return f.value(`SELECT ("deletedAt" IS NOT NULL) || ':' || (SELECT string_agg(text, '') FROM voice_transcript_revision WHERE "noteId"=n.id) || ':' ||
+			(SELECT string_agg(status, ',') FROM voice_audio_run WHERE "noteId"=n.id) FROM voice_note n WHERE id=$1`, noteID)
+	}
+
+	// Writing: one entry for each deletion, none for a replayed request.
+	note, revisionID, _ := recorded("ledger-note")
+	before := time.Now().Add(-time.Second)
+	if _, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, revisionID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceAudio(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	written := map[string]string{}
+	for _, record := range f.objects.ledger(t) {
+		if record.OrganizationID != f.org || record.RequestedAt.Before(before) || record.RequestedAt.After(time.Now()) {
+			t.Fatalf("ledger entry=%+v", record)
+		}
+		written[record.Kind] += record.ID
+	}
+	if len(written) != 3 || written["voice_transcript"] != revisionID || written["voice_audio"] != note.ID || written["voice_note"] != note.ID {
+		t.Fatalf("ledger=%v", written)
+	}
+
+	// A deletion the ledger cannot record does not happen.
+	unrecorded, _, key := recorded("unrecorded-note")
+	f.objects.failPuts = true
+	expectVoice(t, f.repo.DeleteVoiceNote(ctx, f.creator, unrecorded.ID), ErrStorageUnavailable, "delete while the ledger is down")
+	f.objects.failPuts = false
+	if state(unrecorded.ID) != "false:private words:available" || f.objects.audio() != 1 {
+		t.Fatalf("an unrecorded deletion went ahead: %s", state(unrecorded.ID))
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, unrecorded.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Replaying: a restore to before the deletion brings the note back whole;
+	// the ledger's entries delete it again, once.
+	restoredTo := before.Add(-time.Hour)
+	f.exec(`UPDATE voice_note SET "deletedAt"=NULL WHERE id=$1`, unrecorded.ID)
+	f.exec(`UPDATE voice_transcript_revision SET text='private words',"redactedAt"=NULL WHERE "noteId"=$1`, unrecorded.ID)
+	f.exec(`UPDATE voice_audio_run SET status='available',"objectPurgedAt"=NULL WHERE "noteId"=$1`, unrecorded.ID)
+	f.objects.put(key, run)
+	jobs := &maintenance.Store{DB: f.db.SQL, Events: f.repo}
+	if replayed, err := jobs.ReplayDeletions(ctx, f.objects.ledger(t), restoredTo); err != nil || replayed != 1 {
+		t.Fatalf("replayed=%d err=%v", replayed, err)
+	}
+	if state(unrecorded.ID) != "true::deleted" || f.objects.audio() != 0 {
+		t.Fatalf("after the replay: %s objects=%d", state(unrecorded.ID), f.objects.audio())
+	}
+	if reason := f.value(`SELECT metadata->>'reason' FROM audit_log WHERE action='product.voice_note_deleted' AND "entityId"=$1 ORDER BY "createdAt" DESC LIMIT 1`, unrecorded.ID); reason != "ledger_replay" {
+		t.Fatalf("replay audit reason=%s", reason)
+	}
+	if replayed, err := jobs.ReplayDeletions(ctx, f.objects.ledger(t), restoredTo); err != nil || replayed != 0 {
+		t.Fatalf("a second replay=%d err=%v", replayed, err)
+	}
+
+	// Audio and transcript entries delete just that, and only in their workspace.
+	live, liveRevision, _ := recorded("live-note")
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_audio", f.other, live.ID); err != nil || changed {
+		t.Fatalf("another workspace's entry changed the note: %v %v", changed, err)
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_audio", f.org, live.ID); err != nil || !changed || state(live.ID) != "false:private words:deleted" {
+		t.Fatalf("audio replay: %v %v %s", changed, err, state(live.ID))
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_transcript", f.org, liveRevision); err != nil || !changed || state(live.ID) != "false::deleted" {
+		t.Fatalf("transcript replay: %v %v %s", changed, err, state(live.ID))
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_transcript", f.org, liveRevision); err != nil || changed {
+		t.Fatalf("a second transcript replay: %v %v", changed, err)
+	}
+	if _, err := f.repo.ReplayVoiceDeletion(ctx, "voice_memo", f.org, live.ID); err == nil {
+		t.Fatal("an unknown voice kind was skipped")
 	}
 }

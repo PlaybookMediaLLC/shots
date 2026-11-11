@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/lucsky/cuid"
 )
 
@@ -497,6 +499,9 @@ func (c *Configuration) DeleteVoiceNote(ctx context.Context, actor Actor, id str
 			if err := deleteVoiceNoteTx(ctx, tx, actor, row, "owner"); err != nil {
 				return err
 			}
+			if err := c.recordVoiceDeletion(ctx, "voice_note", row.OrganizationID, row.ID); err != nil {
+				return err
+			}
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -533,6 +538,22 @@ func deleteVoiceNoteTx(ctx context.Context, tx *ent.Tx, actor Actor, note *ent.V
 	}
 	return appendConfigurationAudit(ctx, tx, actor, "product.voice_note_deleted", "voice_note", note.ID,
 		map[string]any{"reason": reason, "redactedTranscripts": redacted, "deletedRuns": runs})
+}
+
+// recordVoiceDeletion appends a member's deletion to the R2 deletion ledger
+// before its transaction commits, so every committed deletion is named there
+// and a database restore cannot bring it back (docs/deployment.md, "Restoring
+// the database"). Sweep deletions are not recorded: after a restore the sweep
+// finds them due again. Without storage there is no ledger to write.
+func (c *Configuration) recordVoiceDeletion(ctx context.Context, kind, organizationID, id string) error {
+	if c.objects == nil {
+		return nil
+	}
+	record := media.DeletionRecord{Kind: kind, OrganizationID: organizationID, ID: id, EventID: cuid.New(), RequestedAt: time.Now().UTC()}
+	if err := media.PutDeletionRecord(ctx, c.objects, record); err != nil {
+		return fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+	}
+	return nil
 }
 
 // scrubVoiceCommand clears the transcript-derived words of the note's

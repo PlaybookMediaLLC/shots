@@ -14,6 +14,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 )
 
@@ -198,4 +199,67 @@ func (c *Configuration) sweepVoiceNotes(ctx context.Context, reason string, due 
 		}
 	}
 	return deleted, nil
+}
+
+// ReplayVoiceDeletion deletes again a member's voice deletion that a database
+// restore brought back (the deletion ledger, docs/deployment.md): a note
+// through the owner's deletion path, a note's audio, or one transcript's
+// text. A record the restored database never had, or already deleted,
+// changes nothing. It reports whether anything was deleted again.
+func (c *Configuration) ReplayVoiceDeletion(ctx context.Context, kind, organizationID, id string) (bool, error) {
+	noteID := id
+	switch kind {
+	case "voice_note", "voice_audio":
+	case "voice_transcript":
+		revision, err := c.client.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(id),
+			voicetranscriptrevision.OrganizationID(organizationID)).Only(ctx)
+		if ent.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		noteID = revision.NoteID
+	default:
+		return false, fmt.Errorf("unknown voice deletion kind %q", kind)
+	}
+	exists, err := c.client.VoiceNote.Query().Where(voicenote.ID(noteID), voicenote.OrganizationID(organizationID)).Exist(ctx)
+	if err != nil || !exists {
+		return false, err
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	note, err := lockVoiceNote(ctx, tx, noteID)
+	if err != nil {
+		return false, err
+	}
+	actor := Actor{OrganizationID: organizationID, Kind: "service", Display: "deletion-ledger-replay"}
+	changed := false
+	switch kind {
+	case "voice_note":
+		if changed = note.DeletedAt == nil; changed {
+			err = deleteVoiceNoteTx(ctx, tx, actor, note, "ledger_replay")
+		}
+	case "voice_audio":
+		var deleted int
+		deleted, err = deleteVoiceAudioTx(ctx, tx, actor, noteID)
+		changed = deleted > 0
+	case "voice_transcript":
+		var revision *ent.VoiceTranscriptRevision
+		if revision, err = tx.VoiceTranscriptRevision.Get(ctx, id); err == nil && revision.RedactedAt == nil {
+			_, err = redactVoiceTranscriptTx(ctx, tx, actor, revision)
+			changed = true
+		}
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	c.purgeVoiceObjectsNow(ctx, noteID)
+	return changed, nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/maintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 )
 
 func main() {
@@ -40,7 +41,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	replayed, err := (&maintenance.Store{DB: db.SQL}).ReplayDeletions(ctx, records, restoredTo)
+	voice := product.NewConfiguration(db.Client).WithObjectStore(store)
+	replayed, err := (&maintenance.Store{DB: db.SQL, Events: voice}).ReplayDeletions(ctx, records, restoredTo)
 	if err != nil {
 		log.Fatalf("replayed %d of %d ledger entries, then: %v", replayed, len(records), err)
 	}

@@ -5,22 +5,17 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/lucsky/cuid"
 )
 
-// DeletionRecord is one deletion-ledger entry: what was deleted, when its
-// deletion was requested, and the outbox event that carried the request. It
-// holds IDs only, never content. The ledger lives in object storage, outside
-// the database's backups, so a restore can replay deletions it would undo.
-type DeletionRecord struct {
-	Kind           string    `json:"kind"`
-	OrganizationID string    `json:"organizationId"`
-	ID             string    `json:"id"`
-	EventID        string    `json:"eventId"`
-	RequestedAt    time.Time `json:"requestedAt"`
-}
+// DeletionRecord is one deletion-ledger entry. The ledger lives in object
+// storage, outside the database's backups, so a restore can replay deletions
+// it would undo; media owns its format.
+type DeletionRecord = media.DeletionRecord
 
 func (s *Store) recordDeletion(ctx context.Context, record DeletionRecord) error {
 	body, err := json.Marshal(record)
@@ -33,12 +28,27 @@ func (s *Store) recordDeletion(ctx context.Context, record DeletionRecord) error
 // ReplayDeletions deletes again what a database restore brought back: each
 // ledger entry requested after the restore point. An asset becomes DELETED
 // with an asset.deleted outbox event, so the outbox removes any bytes left;
-// a record the restored database never had, or already deleted, is skipped.
-// It reports how many records it deleted again.
+// a voice note, its audio or a transcript is deleted again by the voice
+// domain (s.Events). A record the restored database never had, or already
+// deleted, is skipped. It reports how many records it deleted again.
 func (s *Store) ReplayDeletions(ctx context.Context, records []DeletionRecord, restoredTo time.Time) (int, error) {
 	replayed := 0
 	for _, record := range records {
 		if !record.RequestedAt.After(restoredTo) {
+			continue
+		}
+		if strings.HasPrefix(record.Kind, "voice_") {
+			replayer, ok := s.Events.(voiceDeletionReplayer)
+			if !ok {
+				return replayed, fmt.Errorf("deletion ledger entry %s needs the voice domain", record.EventID)
+			}
+			changed, err := replayer.ReplayVoiceDeletion(ctx, record.Kind, record.OrganizationID, record.ID)
+			if err != nil {
+				return replayed, err
+			}
+			if changed {
+				replayed++
+			}
 			continue
 		}
 		if record.Kind != "asset" {

@@ -190,22 +190,10 @@ func (c *Configuration) RedactVoiceTranscript(ctx context.Context, actor Actor, 
 		return nil, err
 	}
 	if revision.RedactedAt == nil {
-		if revision, err = revision.Update().SetText("").SetSegments([]schema.VoiceSegment{}).SetRedactedAt(time.Now().UTC()).Save(ctx); err != nil {
+		if revision, err = redactVoiceTranscriptTx(ctx, tx, actor, revision); err != nil {
 			return nil, err
 		}
-		if _, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.TranscriptRevisionID(revisionID),
-			voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
-			return nil, err
-		}
-		// A row withdrawn earlier may hold this revision's words under a newer revision's id.
-		if err := scrubVoiceCommand(ctx, tx, noteID); err != nil {
-			return nil, err
-		}
-		if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
-			return nil, err
-		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.voice_transcript_redacted", "voice_transcript_revision", revisionID,
-			map[string]any{"noteId": noteID}); err != nil {
+		if err := c.recordVoiceDeletion(ctx, "voice_transcript", revision.OrganizationID, revisionID); err != nil {
 			return nil, err
 		}
 	}
@@ -214,4 +202,28 @@ func (c *Configuration) RedactVoiceTranscript(ctx context.Context, actor Actor, 
 	}
 	result := voiceTranscriptRecord(revision)
 	return &result, nil
+}
+
+// redactVoiceTranscriptTx clears a revision of a locked note: its text and
+// segments, a pending proposal parsed from it, and the words of any command
+// row that can no longer be confirmed. It audits the purge (D1).
+func redactVoiceTranscriptTx(ctx context.Context, tx *ent.Tx, actor Actor, revision *ent.VoiceTranscriptRevision) (*ent.VoiceTranscriptRevision, error) {
+	noteID := revision.NoteID
+	revision, err := revision.Update().SetText("").SetSegments([]schema.VoiceSegment{}).SetRedactedAt(time.Now().UTC()).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.TranscriptRevisionID(revision.ID),
+		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
+		return nil, err
+	}
+	// A row withdrawn earlier may hold this revision's words under a newer revision's id.
+	if err := scrubVoiceCommand(ctx, tx, noteID); err != nil {
+		return nil, err
+	}
+	if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
+		return nil, err
+	}
+	return revision, appendConfigurationAudit(ctx, tx, actor, "product.voice_transcript_redacted", "voice_transcript_revision", revision.ID,
+		map[string]any{"noteId": noteID})
 }
