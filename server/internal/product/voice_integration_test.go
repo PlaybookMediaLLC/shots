@@ -655,8 +655,9 @@ func TestVoiceAudioRuns(t *testing.T) {
 			t.Fatalf("run=%+v", run)
 		}
 	}
-	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "0" || len(f.objects.stored) != 0 {
-		t.Fatalf("unpurged runs=%s objects=%d", left, len(f.objects.stored))
+	// The objects go at once; the purge is recorded once no upload URL is left.
+	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "4" || len(f.objects.stored) != 0 {
+		t.Fatalf("unrecorded runs=%s objects=%d", left, len(f.objects.stored))
 	}
 	_, err = f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, publishing.ErrNotFound, "play deleted audio")
@@ -688,6 +689,7 @@ func TestVoiceAudioRuns(t *testing.T) {
 	_, err = f.repo.SweepVoice(ctx)
 	expectVoice(t, err, ErrStorageUnavailable, "the sweep reports storage failures")
 	f.objects.failDeletes = false
+	f.exec(`UPDATE voice_audio_run SET "updatedAt"=now()-interval '21 minutes' WHERE "noteId"=$1`, second2.ID)
 	if _, err := f.repo.SweepVoice(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -698,6 +700,36 @@ func TestVoiceAudioRuns(t *testing.T) {
 	expectVoice(t, err, publishing.ErrConflict, "upload to a deleted note")
 	_, err = f.repo.CompleteVoiceRun(ctx, f.creator, second2.ID, 0)
 	expectVoice(t, err, publishing.ErrConflict, "complete a run of a deleted note")
+
+	// A note deleted while its upload is in flight: the signed PUT stays
+	// valid for 15 minutes and can land after the purge. The sweep deletes it
+	// again, and records the purge only once that URL has expired.
+	inflight := f.note(f.creator, "audio-note-3", true)
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, inflight.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, inflight.ID); err != nil {
+		t.Fatal(err)
+	}
+	key3 := "voice/" + f.org + "/" + inflight.ID + "/0-" + sum + ".wav"
+	purged := func() string {
+		return f.value(`SELECT ("objectPurgedAt" IS NOT NULL)::text FROM voice_audio_run WHERE "noteId"=$1`, inflight.ID)
+	}
+	f.objects.put(key3, run) // the late PUT
+	if _, err := f.repo.SweepVoice(ctx); err != nil || purged() != "false" {
+		t.Fatalf("purge recorded while the upload URL is valid: %s %v", purged(), err)
+	}
+	if exists, _ := f.objects.Exists(ctx, key3); exists {
+		t.Fatal("a late upload outlived the sweep")
+	}
+	f.objects.put(key3, run)
+	f.exec(`UPDATE voice_audio_run SET "updatedAt"=now()-interval '21 minutes' WHERE "noteId"=$1`, inflight.ID)
+	if _, err := f.repo.SweepVoice(ctx); err != nil || purged() != "true" {
+		t.Fatalf("purge not recorded after the URL expired: %s %v", purged(), err)
+	}
+	if exists, _ := f.objects.Exists(ctx, key3); exists {
+		t.Fatal("the last sweep left the late upload")
+	}
 }
 
 // Sweeps: unfinished uploads fail after a day (D5); a removed member is
@@ -719,7 +751,7 @@ func TestVoiceSweeps(t *testing.T) {
 	if _, err := f.repo.SweepVoice(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if status := f.value(`SELECT status || ':' || ("failureReason" IS NOT NULL) || ':' || ("objectPurgedAt" IS NOT NULL) FROM voice_audio_run WHERE "noteId"=$1`, note.ID); status != "failed:true:true" {
+	if status := f.value(`SELECT status || ':' || ("failureReason" IS NOT NULL) || ':' || ("objectPurgedAt" IS NOT NULL) FROM voice_audio_run WHERE "noteId"=$1`, note.ID); status != "failed:true:false" {
 		t.Fatalf("expired upload=%s", status)
 	}
 	if exists, _ := f.objects.Exists(ctx, key); exists {

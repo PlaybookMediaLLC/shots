@@ -37,8 +37,11 @@ var voiceAudioFormats = map[string]struct {
 
 const (
 	// voiceMaxRunIndex bounds a note to 50 runs.
-	voiceMaxRunIndex    = 49
-	voiceUploadExpiry   = 15 * time.Minute
+	voiceMaxRunIndex  = 49
+	voiceUploadExpiry = 15 * time.Minute
+	// voicePurgeAfter is when every upload URL signed before a run's last
+	// change has expired, so no late PUT can bring its object back.
+	voicePurgeAfter     = voiceUploadExpiry + 5*time.Minute
 	voicePlaybackExpiry = time.Hour
 )
 
@@ -342,8 +345,10 @@ func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteI
 }
 
 // purgeVoiceObjects deletes the stored objects of deleted and failed runs,
-// oldest first, and records each one storage confirms. It returns the first
-// storage failure after trying them all; unmarked runs are retried later.
+// oldest first, and records each one storage confirms once its last upload
+// URL has expired (voicePurgeAfter): until then a signed PUT can still land,
+// so the sweep deletes the object again. It returns the first storage
+// failure after trying them all; unmarked runs are retried later.
 func (c *Configuration) purgeVoiceObjects(ctx context.Context, limit int, where ...predicate.VoiceAudioRun) (int, error) {
 	if c.objects == nil {
 		// Without storage no upload was ever signed, so there is nothing to purge.
@@ -366,7 +371,8 @@ func (c *Configuration) purgeVoiceObjects(ctx context.Context, limit int, where 
 			continue
 		}
 		// A failed run started again since is pending and keeps its object.
-		marked, err := c.client.VoiceAudioRun.Update().Where(append([]predicate.VoiceAudioRun{voiceaudiorun.ID(run.ID)}, purgeable...)...).
+		marked, err := c.client.VoiceAudioRun.Update().Where(append([]predicate.VoiceAudioRun{voiceaudiorun.ID(run.ID),
+			voiceaudiorun.UpdatedAtLT(time.Now().Add(-voicePurgeAfter))}, purgeable...)...).
 			SetObjectPurgedAt(time.Now().UTC()).Save(ctx)
 		if err != nil {
 			return purged, err
