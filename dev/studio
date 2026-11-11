@@ -441,7 +441,7 @@ run_e2e() {
   local test_result=0
   local argument check_oauth=false
   local report="${E2E_REPORT_LANE:-production}"
-  if [[ "$#" == 0 ]]; then check_oauth=true; fi
+  if [[ "$#" == 0 || "${E2E_SHARD_ID:-}" == 1 ]]; then check_oauth=true; fi
   for argument in "$@"; do
     if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
   done

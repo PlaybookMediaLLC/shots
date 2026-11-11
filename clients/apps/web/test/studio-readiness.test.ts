@@ -16,6 +16,7 @@ function section(from: string, to: string): string {
 }
 
 const startApp = section('start_e2e_app() {', '# Runs npm in the web app')
+const runE2E = section('run_e2e() {', '# The tests held out of the suite')
 const composeUp = section('compose_up() {', 'E2E_LANE_FILE_NAME=')
 
 type Run = { status: number | null; stderr: string; commands: string[]; directory: string }
@@ -44,6 +45,44 @@ function runStudio(script: string, env: Record<string, string> = {}): Run {
       cwd: directory,
       encoding: 'utf8',
       env: { ...process.env, LOCAL_DIR: directory, ROOT_DIR: directory, ...env },
+      timeout: 10_000,
+    }
+  )
+  let commands: string[] = []
+  try {
+    commands = readFileSync(join(directory, 'commands'), 'utf8').trim().split('\n').filter(Boolean)
+  } catch {
+    commands = []
+  }
+  return { status: result.status, stderr: result.stderr, commands, directory }
+}
+
+function runE2EWith(args: string[], env: Record<string, string> = {}): Run {
+  const directory = mkdtempSync(join(tmpdir(), 'studio-e2e-'))
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `
+      set -euo pipefail
+      load_env() { :; }
+      e2e_app_url() { printf '%s' 'http://localhost:3000'; }
+      e2e_trusted_origins() { printf '%s' 'http://localhost:3000'; }
+      sync_dependencies() { :; }
+      start_e2e_app() { :; }
+      compose() { printf '%s\\n' "$*" >> commands; }
+      e2e_npm() { printf '%s\\n' "$*" >> commands; }
+      WEB_DIR='${directory}'
+      ${runE2E}
+      run_e2e test:e2e "$@"
+    `,
+      'run-e2e',
+      ...args,
+    ],
+    {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, LOCAL_DIR: directory, ...env },
       timeout: 10_000,
     }
   )
@@ -145,6 +184,20 @@ test('dev/studio has no second browser lane left to maintain', () => {
   assert.ok(!studio.includes('dev-server'), 'the dev-server lane is gone')
   assert.ok(!studio.includes('warm_e2e_routes'), 'route warming belonged to that lane')
   assert.match(startApp, /PLATFORM_AI_SCRIPTED=1/)
+})
+
+test('the first balanced E2E shard runs the Founder Hub OAuth check', () => {
+  const first = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '1' })
+  const later = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '2' })
+  try {
+    assert.equal(first.status, 0, first.stderr)
+    assert.ok(first.commands.some((command) => command.includes('test:founder-hub-auth')))
+    assert.equal(later.status, 0, later.stderr)
+    assert.ok(!later.commands.some((command) => command.includes('test:founder-hub-auth')))
+  } finally {
+    rmSync(first.directory, { recursive: true, force: true })
+    rmSync(later.directory, { recursive: true, force: true })
+  }
 })
 
 test('the e2e app shortens the signed-download lifetime it is tested against', () => {
