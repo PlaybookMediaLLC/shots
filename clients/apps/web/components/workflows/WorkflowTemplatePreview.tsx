@@ -93,7 +93,10 @@ const TONES = {
   review: 'bg-foreground text-background ring-foreground',
 }
 
-/** What a workspace starts a template with by default, so a card can draw it before the workspace loads. */
+/**
+ * A workspace's default choices with AI copy on, so a card can draw a template before the
+ * workspace loads. A workspace without an AI model starts without the AI copy step.
+ */
 const SAMPLE_INPUT: WorkflowTemplateInput = {
   brandKitId: '',
   destinationIds: [],
@@ -118,8 +121,9 @@ function diagramStep(node: AutomationNode, family: AutomationFamily) {
 }
 
 /**
- * A picture of the workflow a template builds: its real steps, from the trigger to the
- * person who approves. Labels show once the picture is wide enough to fit them.
+ * A picture of the workflow a template builds, from the trigger to the person who approves,
+ * with AI copy on. Labels show once the picture is wide enough to fit them; the six steps
+ * every template has fit a two-column card at 1024px and up.
  */
 export function WorkflowTemplateDiagram({ template }: { template: WorkflowTemplate }) {
   // A template's nodes come in run order; its end nodes add nothing to the picture.
@@ -129,7 +133,7 @@ export function WorkflowTemplateDiagram({ template }: { template: WorkflowTempla
   return (
     <div
       aria-hidden="true"
-      className="@container relative flex h-28 items-center overflow-hidden rounded-lg bg-muted/40 px-4 ring-1 ring-border/70 ring-inset"
+      className="@container relative flex h-28 items-center overflow-hidden rounded-lg bg-muted/40 px-2 ring-1 ring-border/70 ring-inset"
     >
       <span className="absolute inset-0 bg-[radial-gradient(var(--border)_1px,transparent_1px)] [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_80%)] bg-size-[12px_12px]" />
       <span className="relative flex w-full items-start">
@@ -137,7 +141,7 @@ export function WorkflowTemplateDiagram({ template }: { template: WorkflowTempla
           <Fragment key={id}>
             {index > 0 ? (
               <span
-                className="mt-[17.5px] h-px min-w-1.5 flex-1 bg-border transition-colors duration-300 group-hover:bg-emerald-500/70 motion-reduce:transition-none"
+                className="mt-[17.5px] h-px min-w-1 flex-1 bg-border transition-colors duration-300 group-hover:bg-emerald-500/70 motion-reduce:transition-none"
                 style={{ transitionDelay: `${index * 60}ms` }}
               />
             ) : null}

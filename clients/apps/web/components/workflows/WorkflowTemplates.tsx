@@ -190,7 +190,7 @@ function TemplatePicker() {
         title="Choose a template"
       >
         {/* Each card spans seven shared rows (picture, name, When, Rule, You get, sample, action), so they line up across a row. */}
-        <ul className="grid gap-4 md:grid-cols-2" data-tour-id="automate-templates">
+        <ul className="grid gap-4 lg:grid-cols-2" data-tour-id="automate-templates">
           {WORKFLOW_TEMPLATES.map((candidate) => (
             <li className="row-span-7 grid grid-rows-subgrid" key={candidate.id}>
               <ButtonLink
