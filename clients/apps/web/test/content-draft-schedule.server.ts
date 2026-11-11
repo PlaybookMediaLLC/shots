@@ -37,7 +37,7 @@ const stored = {
 }
 
 /** Go's API as the web server sees it, keeping the schedule request it receives. */
-function mockBackend(t: TestContext): { sent: () => unknown } {
+function mockBackend(t: TestContext, draft = stored): { sent: () => unknown } {
   const oldURL = process.env.PUBLISHING_API_URL
   const oldToken = process.env.PUBLISHING_SERVICE_TOKEN
   process.env.PUBLISHING_API_URL = 'http://backend.test:8082'
@@ -51,7 +51,7 @@ function mockBackend(t: TestContext): { sent: () => unknown } {
   let sent: unknown
   t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname
-    if (path === `/v1/content-drafts/${stored.id}`) return Response.json(stored)
+    if (path === `/v1/content-drafts/${stored.id}`) return Response.json(draft)
     if (path === '/v1/channel-connections')
       return Response.json({ items: [{ id: account, platform: 'x' }] })
     if (path === '/v1/social-sets') return Response.json({ items: [] })
@@ -112,4 +112,18 @@ test('a schedule for a newer version than the draft read is refused before Go', 
     status: 409,
   })
   assert.equal(backend.sent(), undefined)
+})
+
+test('a replay after scheduling moved the draft on still reaches Go', async (t) => {
+  // Scheduling version 3 moved the draft to version 4; a resent request for
+  // version 3 goes to Go, which answers it with the posts it already made.
+  const backend = mockBackend(t, { ...stored, version: 4 })
+  const body = scheduleContentDraftContract.body.parse({
+    channelConnectionIds: [account],
+    publishNow: true,
+    version: 3,
+  })
+  const result = await scheduleContentDraft(access, stored.id, body)
+  assert.equal(result?.created, true)
+  assert.equal((backend.sent() as { version: number }).version, 3)
 })

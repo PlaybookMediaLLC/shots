@@ -138,7 +138,7 @@ function draftChannel(platform: string): DraftChannel | null {
  * versions, kind and target) with the same function the composer previews
  * with, for the account's own standing; anything that blocks it is refused
  * before anything is queued. The caller sends no text, so the posts carry the
- * stored draft's (F1): the draft read here must be at `version`, and Go admits
+ * stored draft's (F1): the draft read here must not be older than `version`, and Go admits
  * only this server and creates posts only while `version` is current. Go
  * checks its approval, resolves the time and checks every payload again.
  */
@@ -170,10 +170,11 @@ export async function prepareContentDraftSchedule(
   }
   const built = await draftTargets(context, id, input.channelConnectionIds, input.blockImages)
   if (!built) return null
-  // Go checks `version` against the draft it holds; the text built here must
-  // come from that same version, or a later approval would cover older text.
+  // Go creates posts only while `version` is current, so text read at an older
+  // version must not be sent under it: a later approval would cover that text.
+  // A newer read passes, so Go can replay a schedule already made at `version`.
   const read = built[0]?.version
-  if (read !== undefined && read !== input.version) {
+  if (read !== undefined && read < input.version) {
     throw new ScheduledPostError(
       `This draft was saved elsewhere since you opened it; it is now at version ${read}.`,
       409
