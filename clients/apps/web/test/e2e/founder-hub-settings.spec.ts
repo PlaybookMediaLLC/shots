@@ -80,8 +80,6 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   page,
 }) => {
   expect(await (await page.request.get(getE2EUrl('/api/founder-hub/devices'))).json()).toEqual([])
-  const referrals = await page.request.get(getE2EUrl('/api/founder-hub/referrals'))
-  expect(referrals.status()).toBe(200)
   let referralsEnabled = true
   await page.route('**/api/founder-hub/referrals', (route) =>
     route.fulfill({
@@ -125,6 +123,26 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   await expect(page.getByText('Organization API keys')).toBeVisible()
   await expect(page.locator('fieldset').last()).toBeEnabled()
 
+  await app.open('/settings/founder-hub/imports')
+  await expect(page.getByRole('heading', { name: 'Imports' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open imports on desktop' })).toBeDisabled()
+
+  await app.open('/settings/founder-hub/intelligence')
+  await expect(page.getByRole('heading', { name: 'Model catalog and sign-in' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Open model settings on desktop' })).toBeDisabled()
+})
+
+test('Founder Hub referrals and CRM answer from the Founder Hub schema', async ({ app, page }) => {
+  // Referrals and CRM read the founder_hub schema, which only the paired
+  // stack migrates (`platform-migrate -founder-hub apply`); it runs this spec
+  // with its gateway URL set. The Shots-only stack answers them with 503.
+  test.skip(
+    !process.env.FOUNDER_HUB_GATEWAY_URL,
+    'Needs the Founder Hub domain schema; founder-hub-integration.yml runs it.'
+  )
+  const referrals = await page.request.get(getE2EUrl('/api/founder-hub/referrals'))
+  expect(referrals.status()).toBe(200)
+
   await app.open('/settings/founder-hub/crm')
   await expect(page.getByRole('heading', { name: 'CRM' })).toBeVisible()
   for (const provider of ['HubSpot', 'Attio', 'Salesforce', 'Pipedrive', 'Close']) {
@@ -134,14 +152,6 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   await expect(
     page.getByText('CRM providers are not configured for this Shots environment.')
   ).toBeVisible()
-
-  await app.open('/settings/founder-hub/imports')
-  await expect(page.getByRole('heading', { name: 'Imports' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open imports on desktop' })).toBeDisabled()
-
-  await app.open('/settings/founder-hub/intelligence')
-  await expect(page.getByRole('heading', { name: 'Model catalog and sign-in' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Open model settings on desktop' })).toBeDisabled()
 })
 
 test('native-only settings navigation requires a capable desktop and queues a bounded command', async ({

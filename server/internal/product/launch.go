@@ -179,6 +179,13 @@ func (c *Configuration) GetLaunchBrand(ctx context.Context, actor Actor) (*ent.B
 	return kit, profile, nil
 }
 
+// WorkspaceVoice is the brand voice for writing that belongs to no social set
+// (launch copy, campaign studio, store screenshots): the one WritingContext
+// format, from the brand profile alone.
+func WorkspaceVoice(profile *ent.BrandProfile) WritingContext {
+	return mergeWritingContext(profile, nil, nil, "")
+}
+
 // --------------------------------------------------------------- specs --
 
 type LaunchSpec struct {
@@ -602,7 +609,7 @@ func (c *Configuration) SaveLaunchPosts(ctx context.Context, actor Actor, campai
 	for _, post := range input.Posts {
 		texts = append(texts, post.Title, post.Copy, post.CallToAction)
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, texts...); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil, texts...); err != nil {
 		return nil, err
 	}
 	position := 0
@@ -1055,7 +1062,7 @@ func revisePost(ctx context.Context, tx *ent.Tx, post *ent.CampaignPost, expecte
 	if strings.TrimSpace(copyText) == "" {
 		return ErrInvalidInput
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, post.OrganizationID, title, copyText, callToAction); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), post.OrganizationID, nil, title, copyText, callToAction); err != nil {
 		return err
 	}
 	update := tx.CampaignPost.UpdateOneID(post.ID).Where(campaignpost.Copy(expectedCopy)).SetCopy(copyText)

@@ -186,19 +186,133 @@ export function listedStatus(draft: {
 }
 
 /**
- * What a person can do about a failure besides retrying it: reconnect the
- * account, or edit the post or its options. Null when retrying is the fix.
+ * The one next step for a failure: reconnect the account, reschedule (retry
+ * now or later), edit the post or its options, edit its media, or check the
+ * account before anything else (the platform may already have the post).
  */
-export function postFailureFix(code: string | null | undefined): 'reconnect' | 'edit' | null {
-  if (!code) return null
-  if (['ACCOUNT_RECONNECT', 'ACCOUNT_UNAVAILABLE', 'PROVIDER_PERMISSIONS', '401', '403'].includes(code))
-    return 'reconnect'
-  if (
-    ['POST_OPTIONS', 'VIDEO_TOO_LONG', 'MEDIA_UNSUPPORTED', 'MEDIA_UNAVAILABLE'].includes(code) ||
-    (/^4\d\d$/.test(code) && code !== '429')
-  )
-    return 'edit'
-  return null
+export type PostFailureAction = 'check-account' | 'edit' | 'edit-media' | 'reconnect' | 'reschedule'
+
+/**
+ * Each failure code the backend records (`server/internal/publishing/types.go`
+ * and provider statuses) with the one message a member sees and the one next
+ * action. Raw provider text is never shown; it stays on the attempt for support.
+ */
+const POST_FAILURES: Record<string, { action: PostFailureAction | null; reason: string }> = {
+  MEDIA_UNAVAILABLE: {
+    action: 'edit-media',
+    reason:
+      'An attachment was deleted or is unavailable, so nothing was sent. Restore it and schedule again.',
+  },
+  MISSED_WINDOW: {
+    action: 'reschedule',
+    reason:
+      'Publishing could not start within an hour of its time, so it was not sent. Publish it now or reschedule it.',
+  },
+  CHANGES_REQUESTED: {
+    action: 'edit',
+    reason:
+      'A reviewer asked for changes, so it was not sent. Revise it, get it approved, then schedule again.',
+  },
+  APPROVAL_REQUIRED: {
+    action: 'edit',
+    reason:
+      'Its content is no longer approved, so it was not sent. Get it approved, then schedule again.',
+  },
+  NOT_LIVE: {
+    action: 'reschedule',
+    reason: 'Checked on the account: it was not published. Retry it.',
+  },
+  ACCOUNT_UNAVAILABLE: {
+    action: 'reconnect',
+    reason:
+      'The account was disconnected or removed, so it was not sent. Reconnect it, then schedule again.',
+  },
+  WORKSPACE_INACTIVE: {
+    action: null,
+    reason: 'The workspace or this content is no longer active, so it was not sent.',
+  },
+  UNKNOWN_DELIVERY: {
+    action: 'check-account',
+    reason:
+      'The platform did not confirm the result. It may already be live: check the account before doing anything.',
+  },
+  ACCOUNT_RECONNECT: {
+    action: 'reconnect',
+    reason: 'The account must be reconnected, so nothing was sent. Reconnect it, then retry.',
+  },
+  PROVIDER_PERMISSIONS: {
+    action: 'reconnect',
+    reason:
+      'The platform did not return this account’s posting permissions. Retry it. If it fails again, reconnect the account.',
+  },
+  PROVIDER_DAILY_LIMIT: {
+    action: 'reschedule',
+    reason:
+      'The account reached the platform’s daily posting limit, so nothing was sent. Reschedule it for after the limit resets.',
+  },
+  POST_OPTIONS: {
+    action: 'edit',
+    reason:
+      'This account cannot post with these options, so nothing was sent. Change the platform options, then retry.',
+  },
+  VIDEO_TOO_LONG: {
+    action: 'edit-media',
+    reason:
+      'The video is longer than this account may post, so nothing was sent. Use a shorter video, then retry.',
+  },
+  MEDIA_UNSUPPORTED: {
+    action: 'edit-media',
+    reason:
+      'This platform takes one MP4 video, so nothing was sent. Replace the media, then retry.',
+  },
+  PUBLISHER_UNAVAILABLE: {
+    action: 'reschedule',
+    reason:
+      'Shots could not reach its publishing service, so nothing was sent. Retry it later, or send the details to support.',
+  },
+  PUBLISHER_ERROR: {
+    action: 'reschedule',
+    reason:
+      'Shots stopped before it handed the post to the platform, so nothing was sent. Retry it. If it fails again, copy the details below for support.',
+  },
+  UNKNOWN: {
+    action: 'reschedule',
+    reason:
+      'Shots stopped before it handed the post to the platform, so nothing was sent. Retry it. If it fails again, copy the details below for support.',
+  },
+  NETWORK: { action: 'reschedule', reason: 'The platform could not be reached. Retry it.' },
+  '429': {
+    action: 'reschedule',
+    reason:
+      'The platform kept rate-limiting this post, so nothing was sent. Reschedule it, or retry it later.',
+  },
+  '401': {
+    action: 'reconnect',
+    reason: 'The platform refused the account’s permission. Reconnect it, then retry.',
+  },
+  '403': {
+    action: 'reconnect',
+    reason: 'The platform refused the account’s permission. Reconnect it, then retry.',
+  },
+}
+
+/** The known entry for a code, or the rule for a bare provider status. */
+function postFailure(code: string): { action: PostFailureAction | null; reason: string } {
+  const known = POST_FAILURES[code]
+  if (known) return known
+  if (/^5\d\d$/.test(code))
+    return { action: 'reschedule', reason: 'The platform had an error. Retry it.' }
+  if (/^4\d\d$/.test(code))
+    return {
+      action: 'edit',
+      reason: 'The platform rejected the post. Check its text and media before retrying.',
+    }
+  return { action: null, reason: `It did not publish (${code}).` }
+}
+
+/** The one next action for a failure, or null when there is none to take. */
+export function postFailureFix(code: string | null | undefined): PostFailureAction | null {
+  return code ? postFailure(code).action : null
 }
 
 /**
@@ -207,57 +321,11 @@ export function postFailureFix(code: string | null | undefined): 'reconnect' | '
  * again.
  */
 export function retryCanHelp(code: string | null | undefined): boolean {
-  return postFailureFix(code) !== 'edit'
+  const fix = postFailureFix(code)
+  return fix !== 'edit' && fix !== 'edit-media'
 }
 
 /** Why a destination did not publish, or null when nothing went wrong. */
 export function postFailureReason(code: string | null | undefined): string | null {
-  switch (code) {
-    case null:
-    case undefined:
-    case '':
-      return null
-    case 'MEDIA_UNAVAILABLE':
-      return 'An attachment was deleted or is unavailable, so nothing was sent. Restore it and schedule again.'
-    case 'MISSED_WINDOW':
-      return 'Publishing could not start within an hour of its time, so it was not sent. Publish it now or reschedule it.'
-    case 'CHANGES_REQUESTED':
-      return 'A reviewer asked for changes, so it was not sent. Revise it, get it approved, then schedule again.'
-    case 'APPROVAL_REQUIRED':
-      return 'Its content is no longer approved, so it was not sent. Get it approved, then schedule again.'
-    case 'NOT_LIVE':
-      return 'Checked on the account: it was not published. Retry it.'
-    case 'ACCOUNT_UNAVAILABLE':
-      return 'The account was disconnected or removed, so it was not sent. Reconnect it, then schedule again.'
-    case 'WORKSPACE_INACTIVE':
-      return 'The workspace or this content is no longer active, so it was not sent.'
-    case 'UNKNOWN_DELIVERY':
-      return 'The platform did not confirm the result. It may already be live.'
-    case 'ACCOUNT_RECONNECT':
-      return 'The account must be reconnected, so nothing was sent. Reconnect it, then retry.'
-    case 'PROVIDER_PERMISSIONS':
-      return 'The platform did not return this account’s posting permissions. Retry it. If it fails again, reconnect the account.'
-    case 'POST_OPTIONS':
-      return 'This account cannot post with these options, so nothing was sent. Change the platform options, then retry.'
-    case 'VIDEO_TOO_LONG':
-      return 'The video is longer than this account may post, so nothing was sent. Use a shorter video, then retry.'
-    case 'MEDIA_UNSUPPORTED':
-      return 'This platform takes one MP4 video, so nothing was sent. Replace the media, then retry.'
-    case 'PUBLISHER_UNAVAILABLE':
-      return 'Shots could not reach its publishing service, so nothing was sent. Retry it later, or send the details to support.'
-    case 'PUBLISHER_ERROR':
-    case 'UNKNOWN':
-      return 'Shots stopped before it handed the post to the platform, so nothing was sent. Retry it. If it fails again, copy the details below for support.'
-    case 'NETWORK':
-      return 'The platform could not be reached. Retry it.'
-    case '429':
-      return 'The platform kept rate-limiting this post. Retry it later.'
-    case '401':
-    case '403':
-      return 'The platform refused the account’s permission. Reconnect it, then retry.'
-  }
-  if (/^5\d\d$/.test(code)) return 'The platform had an error. Retry it.'
-  if (/^4\d\d$/.test(code))
-    return 'The platform rejected the post. Check its text and media before retrying.'
-  return `It did not publish (${code}).`
+  return code ? postFailure(code).reason : null
 }

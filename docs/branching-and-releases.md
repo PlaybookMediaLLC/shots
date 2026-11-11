@@ -110,5 +110,27 @@ versions should be prepared before promotion. If publication fails after
 promotion, rerun the failed workflow for that exact main commit; never retag
 it using today's moving develop head. Do not delete release tags to recover.
 
+### Deploy order and rollbacks
+
+The backend owns migrations and the API, so `web-image.yml` deploys the web
+only after the same commit's backend deploy succeeds. Changes keep both
+directions working during a rollout: a new backend accepts what the previous
+web sends, and the new web sends a new request field only when it is used
+(the Go API refuses unknown JSON fields, so an older backend would answer
+400). Some changes cannot work against an older backend; for those, **roll
+back the web before the backend**:
+
+- `POST /api/v1/scheduled-posts` without `Idempotency-Key`: the web forwards
+  an empty key for the backend to derive one from the content; an older
+  backend requires the key.
+- Drafts made from a release (`releaseId`) and a confirmed repeat post
+  (`confirmDuplicate`): an older backend does not know the fields.
+- The brand voice in `GET /v1/launch/brand` (`voice`): an older backend does
+  not send it, so AI surfaces outside a social set write with no brand voice,
+  and nothing reports it.
+
+During a rollout the previous web cannot confirm a repeated post: the new
+backend refuses it with its reason until the new web is live.
+
 Merging a work PR into develop does not authorize a production release. The
 develop-to-main promotion remains an explicit release decision.

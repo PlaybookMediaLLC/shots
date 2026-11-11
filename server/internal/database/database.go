@@ -32,7 +32,10 @@ func Open(ctx context.Context, databaseURL string) (*Database, error) {
 	db := telemetry.OpenDB("product", stdlib.GetConnector(*config))
 	db.SetConnMaxIdleTime(5 * time.Minute)
 	db.SetConnMaxLifetime(30 * time.Minute)
-	db.SetMaxIdleConns(5)
+	// A page loads up to 15 backend reads at once. With fewer idle connections
+	// than open ones, each burst opened new connections (about 200 ms each to
+	// the database) and closed them right after.
+	db.SetMaxIdleConns(20)
 	db.SetMaxOpenConns(20)
 
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)

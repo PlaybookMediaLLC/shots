@@ -313,6 +313,31 @@ export function PropertiesPanel({
             </dd>
           </>
         ) : null}
+        {draft.releaseId ? (
+          <>
+            <dt className="text-muted-foreground">Release</dt>
+            <dd>
+              {/* A screenshot opened from a release keeps it, with its evidence. */}
+              <Link
+                className="text-sky-700 underline dark:text-sky-300"
+                href={`/releases/${encodeURIComponent(draft.releaseId)}`}
+              >
+                Open the release
+              </Link>
+            </dd>
+          </>
+        ) : null}
+        {draft.sourceVoiceRevisionId || draft.sourceVoiceRemoved ? (
+          <>
+            <dt className="text-muted-foreground">Source</dt>
+            {/* The note stays private to whoever recorded it, so there is no link. */}
+            <dd data-testid="properties-voice-source">
+              {draft.sourceVoiceRemoved
+                ? 'From a voice note · source removed'
+                : 'From a voice note'}
+            </dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Created</dt>
         <dd>
           <LocalTime value={draft.createdAt} />

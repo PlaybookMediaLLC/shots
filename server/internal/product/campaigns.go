@@ -382,7 +382,7 @@ func (c *Configuration) CreateCampaign(ctx context.Context, actor Actor, input C
 			return nil, publishing.ErrNotFound
 		}
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, campaignPostTexts(input.Posts)...); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil, campaignPostTexts(input.Posts)...); err != nil {
 		return nil, err
 	}
 	organization, err := tx.Organization.Get(ctx, actor.OrganizationID)

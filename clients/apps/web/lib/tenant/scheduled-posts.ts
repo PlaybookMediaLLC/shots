@@ -1,7 +1,5 @@
 import 'server-only'
 
-import { randomUUID } from 'node:crypto'
-
 export class ScheduledPostError extends Error {
   constructor(
     message: string,
@@ -12,6 +10,10 @@ export class ScheduledPostError extends Error {
   }
 }
 
+/**
+ * The caller's key, or empty: the backend then names the request by its
+ * content, so a retry without a key replays instead of posting twice.
+ */
 export function getScheduledPostIdempotencyKey(requestId: string | null): string {
-  return requestId?.slice(0, 128) || randomUUID()
+  return requestId?.slice(0, 128) ?? ''
 }

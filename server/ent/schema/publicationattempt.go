@@ -29,6 +29,9 @@ func (PublicationAttempt) Fields() []ent.Field {
 		field.Enum("outcome").StorageKey("outcome").Values("SUCCEEDED", "FAILED").Optional().Nillable(),
 		field.String("provider_post_id").StorageKey("providerPostId").Optional().Nillable(),
 		field.String("failure_code").StorageKey("failureCode").Optional().Nillable(),
+		// The provider's message, redacted (publishing.RedactProviderMessage); never shown raw to members.
+		field.String("provider_message").StorageKey("providerMessage").Optional().Nillable(),
+		field.String("remote_url").StorageKey("remoteUrl").Optional().Nillable(),
 	}
 }
 

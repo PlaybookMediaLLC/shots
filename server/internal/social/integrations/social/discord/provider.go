@@ -225,7 +225,7 @@ func filename(p string) string { return p[strings.LastIndex(p, "/")+1:] }
 // attempt (a consumed stream can't be replayed) and keeps handleErrors
 // classification.
 func (p *Provider) sendMessageWithMedia(ctx context.Context, channel, message string, media []integrations.MediaContent) (string, error) {
-	return integrations.RunStreamedUpload(ctx, p.Base, func() (string, error) {
+	return integrations.RunStreamedUpload(ctx, p.Base, false, func() (string, error) {
 		payload := messagePayload{Content: mentionTag.ReplaceAllString(message, "<$1>")}
 		if media != nil {
 			payload.Attachments = []attachment{}

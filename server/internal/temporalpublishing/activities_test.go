@@ -68,7 +68,7 @@ func (s *activityStore) Fail(_ context.Context, _ *ent.ScheduledPost, _ publishi
 	s.retryAt, s.failed = retryAt, code
 	return nil
 }
-func (s *activityStore) FailUnknown(context.Context, string, string, int) error {
+func (s *activityStore) FailUnknown(context.Context, string, string, int, string) error {
 	s.unknown = true
 	return nil
 }
@@ -90,7 +90,7 @@ func (s *activityStore) StartAttempt(context.Context, *ent.ScheduledPost, string
 type rateLimitedProvider struct{}
 
 func (rateLimitedProvider) Publish(context.Context, socialapi.PublishInput) (string, error) {
-	return "", &socialapi.Error{Status: 429}
+	return "", &socialapi.Error{Status: 429, RetryAfter: 7 * time.Minute, ProviderMessage: "Too many requests"}
 }
 
 type uncertainProvider struct{}
@@ -158,7 +158,8 @@ func TestSubmitActivityLeavesRateLimitRetryToWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Outcome != OutcomeRetry || result.FailureCode != "429" {
+	// The provider's retry guidance and message reach the workflow and the attempt.
+	if result.Outcome != OutcomeRetry || result.FailureCode != "429" || result.RetryAfter != 7*time.Minute || result.ProviderMessage != "Too many requests" {
 		t.Fatalf("result=%#v", result)
 	}
 }
@@ -193,6 +194,36 @@ func TestPrepareSendsOnlyEligibleOnTimePosts(t *testing.T) {
 				t.Fatalf("prepared=%#v unsent=%q cancelled=%q err=%v", prepared, store.unsent, store.cancelled, err)
 			}
 		})
+	}
+}
+
+// claimRecorder records whether Prepare claimed the post.
+type claimRecorder struct {
+	activityStore
+	claimed bool
+}
+
+func (s *claimRecorder) Claim(context.Context, string, string, time.Time) (bool, error) {
+	s.claimed = true
+	return true, nil
+}
+
+// While publishing is paused, Prepare fails before it claims the post, so
+// the post stays SCHEDULED and nothing goes out; once cleared it sends.
+func TestPrepareHoldsPostsWhilePublishingIsPaused(t *testing.T) {
+	now := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
+	store := &claimRecorder{activityStore: activityStore{job: publishing.PublishJob{
+		Post: &ent.ScheduledPost{ID: "p", ScheduledFor: now}, Connection: &ent.ChannelConnection{Platform: "x"}, WorkspaceActive: true,
+	}}}
+	activities := NewActivities(store, directProvider{})
+	activities.now = func() time.Time { return now }
+	t.Setenv("PUBLISHING_PAUSED", "true")
+	if prepared, err := activities.Prepare(context.Background(), PrepareInput{PostID: "p", RunID: "run-1"}); !errors.Is(err, errPublishingPaused) || prepared.Ready || store.claimed {
+		t.Fatalf("paused: prepared=%#v claimed=%v err=%v", prepared, store.claimed, err)
+	}
+	t.Setenv("PUBLISHING_PAUSED", "")
+	if prepared, err := activities.Prepare(context.Background(), PrepareInput{PostID: "p", RunID: "run-1"}); err != nil || !prepared.Ready || !store.claimed {
+		t.Fatalf("resumed: prepared=%#v claimed=%v err=%v", prepared, store.claimed, err)
 	}
 }
 

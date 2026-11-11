@@ -19,6 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdrafttag"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -106,15 +107,25 @@ type ContentDraftRecord struct {
 	Article *draftdoc.Article `json:"article"`
 	// CampaignID names the campaign an edited campaign visual was published
 	// from, so the draft can lead back to it.
-	CampaignID       *string                   `json:"campaignId"`
+	CampaignID *string `json:"campaignId"`
+	// CampaignPostID and ReleaseID name the campaign post and the release the
+	// draft was made from, when it was.
+	CampaignPostID   *string                   `json:"campaignPostId"`
+	ReleaseID        *string                   `json:"releaseId"`
 	Kind             string                    `json:"kind"`
 	PinnedAt         *time.Time                `json:"pinnedAt"`
 	PlanTimeZone     *string                   `json:"planTimeZone"`
 	PlatformVersions draftdoc.PlatformVersions `json:"platformVersions"`
 	Scratchpad       string                    `json:"scratchpad"`
 	SourceDraftID    *string                   `json:"sourceDraftId"`
-	TagIDs           []string                  `json:"tagIds"`
-	Target           *draftdoc.Target          `json:"target"`
+	// SourceVoiceRevisionID is the voice transcript revision the draft was
+	// made from; the revision may since have been redacted or deleted.
+	SourceVoiceRevisionID *string          `json:"sourceVoiceRevisionId"`
+	TagIDs                []string         `json:"tagIds"`
+	Target                *draftdoc.Target `json:"target"`
+	// SourceVoiceRemoved is set when that voice revision is gone, redacted or
+	// on a deleted note, for "source removed" (reads only).
+	SourceVoiceRemoved bool `json:"sourceVoiceRemoved"`
 	// Lists only: posts waiting to go out, the next scheduled one's time, and
 	// posts that failed or whose outcome is unknown, which need attention.
 	AttentionPosts int `json:"attentionPosts"`
@@ -179,11 +190,21 @@ type ContentDraftInput struct {
 	Scratchpad       string                     `json:"scratchpad"`
 	TagIDs           []string                   `json:"tagIds"`
 	Target           *draftdoc.Target           `json:"target"`
+	// ReleaseID is the workspace release the draft is made from (its
+	// screenshots and summary); it must exist in the workspace. Omitted when
+	// empty, so request fingerprints from before the field still match.
+	ReleaseID string `json:"releaseId,omitempty"`
 	// campaignID is the campaign an edited visual was published from. It is
 	// unexported on purpose: only CreateCampaignPublishDraft sets it, after
 	// checking the caller's role on that campaign, so a plain draft create
-	// cannot claim one.
-	campaignID string
+	// cannot claim one. campaignPostID is that campaign's post whose copy the
+	// draft took, checked there to belong to it.
+	campaignID     string
+	campaignPostID string
+	// sourceVoiceRevisionID is the voice transcript revision the draft is
+	// made from. Unexported for the same reason: only the voice paths set it,
+	// after loading the revision through its owner's note.
+	sourceVoiceRevisionID string
 }
 
 // ContentDraftUpdate changes the fields it sets, based on BaseVersion.
@@ -223,8 +244,8 @@ func contentDraftRecord(row *ent.ContentDraft) ContentDraftRecord {
 		NaturalPostingTime: row.NaturalPostingTime, SuppressSlackOnPublish: row.SuppressSlackOnPublish, PlannedFor: row.PlannedFor, PrimaryPlatform: row.PrimaryPlatform,
 		SocialSetID: row.SocialSetID, Article: row.Article, Kind: string(row.Kind), PinnedAt: row.PinnedAt,
 		PlanTimeZone: row.PlanTimeZone, PlatformVersions: nonNilVersions(row.PlatformVersions), Scratchpad: row.Scratchpad,
-		SourceDraftID: row.SourceDraftID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
-		CampaignID: row.CampaignID}
+		SourceDraftID: row.SourceDraftID, SourceVoiceRevisionID: row.SourceVoiceRevisionID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
+		CampaignID: row.CampaignID, CampaignPostID: row.CampaignPostID, ReleaseID: row.ReleaseID}
 }
 
 func nonNilVersions(doc draftdoc.PlatformVersions) draftdoc.PlatformVersions {
@@ -735,6 +756,22 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if input.campaignID != "" {
 		create.SetCampaignID(input.campaignID)
 	}
+	if input.campaignPostID != "" {
+		create.SetCampaignPostID(input.campaignPostID)
+	}
+	if input.ReleaseID != "" {
+		known, err := tx.Release.Query().Where(release.ID(input.ReleaseID), release.OrganizationID(actor.OrganizationID)).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !known {
+			return nil, publishing.ErrNotFound
+		}
+		create.SetReleaseID(input.ReleaseID)
+	}
+	if input.sourceVoiceRevisionID != "" {
+		create.SetSourceVoiceRevisionID(input.sourceVoiceRevisionID)
+	}
 	if target != nil {
 		create.SetTarget(target)
 		if kind == "repurpose" && target.SourceDraftID != "" {
@@ -760,6 +797,12 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if input.campaignID != "" {
 		creation["campaignId"] = input.campaignID
 	}
+	if input.campaignPostID != "" {
+		creation["campaignPostId"] = input.campaignPostID
+	}
+	if input.ReleaseID != "" {
+		creation["releaseId"] = input.ReleaseID
+	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.content_draft_created", "content_draft", row.ID, creation); err != nil {
 		return nil, err
 	}
@@ -783,7 +826,12 @@ func (c *Configuration) GetContentDraft(ctx context.Context, actor Actor, id str
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, []*ent.ContentDraft{row})
+	if err != nil {
+		return nil, err
+	}
 	result := contentDraftRecord(row)
+	result.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 	return &result, nil
 }
 
@@ -1034,6 +1082,10 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, rows)
+	if err != nil {
+		return nil, err
+	}
 	type summary struct {
 		attention, check, published, publishing, queued int
 		next, attentionAt, lastPublished                *time.Time
@@ -1083,6 +1135,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	}
 	return func(row *ent.ContentDraft) ContentDraftRecord {
 		record := contentDraftRecord(row)
+		record.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
 			record.PublishingPosts = item.publishing

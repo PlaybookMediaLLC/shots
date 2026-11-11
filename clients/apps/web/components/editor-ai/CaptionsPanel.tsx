@@ -11,8 +11,7 @@ import {
   captionLength,
   type DesignCopy,
 } from '@/lib/captions/channels'
-import { exportDesignDocument } from '@/lib/design/export'
-import { captureCanvasSnapshot } from '@/lib/design/snapshot'
+import { writeDesignCaptions } from '@/lib/captions/write'
 import { usePostHandoff } from '@/lib/editor/post-handoff'
 import { usePublishSets } from '@/lib/editor/use-publish-targets'
 import { useCanStartPost } from '@/lib/platform/can-start-post'
@@ -94,18 +93,11 @@ export function CaptionsPanel({ disabled }: { disabled: boolean }) {
   async function generate() {
     setLoading(true)
     try {
-      const snapshot = await captureCanvasSnapshot(1024)
-      if (!snapshot) throw new Error('The canvas could not be captured.')
-      const written = await trpcClient.editorAi.captions.mutate({
+      await writeDesignCaptions(trpcClient, {
         channels,
-        document: exportDesignDocument(),
         notes: notes.trim() || undefined,
-        snapshot,
         socialSetId: set?.id,
       })
-      // Merge onto what is saved now: edits made while the request ran are kept.
-      const latest = useImageStore.getState().copy
-      save({ altText: written.altText, captions: { ...latest?.captions, ...written.captions } })
     } catch (error) {
       toast.error('Could not write captions', {
         description: error instanceof Error ? error.message : undefined,

@@ -30,6 +30,8 @@ func TestConnectionRequiresActualGrantAndIdentity(t *testing.T) {
 		name, level, payload string
 		status               int
 		valid, transient     bool
+		// appLevel: X refused Shots' app access, which no account can fix.
+		appLevel bool
 	}{
 		{name: "write", level: "read-write", valid: true},
 		{name: "write and DMs", level: "read-write-directmessages", valid: true},
@@ -44,6 +46,7 @@ func TestConnectionRequiresActualGrantAndIdentity(t *testing.T) {
 		{name: "oversized response", level: "read-write", payload: strings.Repeat("x", (1<<20)+1)},
 		{name: "revoked", status: 401},
 		{name: "forbidden", status: 403},
+		{name: "app not enrolled", status: 403, payload: `{"title":"Client Forbidden","reason":"client-not-enrolled"}`, appLevel: true},
 		{name: "rate limited", status: 429, transient: true},
 		{name: "outage", status: 503, transient: true},
 	} {
@@ -69,7 +72,8 @@ func TestConnectionRequiresActualGrantAndIdentity(t *testing.T) {
 				if err != nil || auth == nil || auth.Verification.Validate("x", "1") != nil || !auth.NonExpiring || auth.ExpiresIn != 0 || (auth.Verification.Capabilities.X.LongPostMaxWeightedCharacters == nil || *auth.Verification.Capabilities.X.LongPostMaxWeightedCharacters != 25000) {
 					t.Fatalf("verified connection missing or invented capability: %v", err)
 				}
-			} else if auth != nil || err == nil || strings.Contains(err.Error(), "secret-canary") || errors.Is(err, integrations.ErrRefreshUnavailable) != tc.transient {
+			} else if auth != nil || err == nil || strings.Contains(err.Error(), "secret-canary") || errors.Is(err, integrations.ErrRefreshUnavailable) != tc.transient ||
+				errors.Is(err, integrations.ErrAppCredentialsRefused) != tc.appLevel {
 				t.Fatalf("unsafe/misclassified rejected connection: %v", err)
 			}
 		})

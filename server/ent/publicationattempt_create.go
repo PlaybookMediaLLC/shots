@@ -109,6 +109,34 @@ func (_c *PublicationAttemptCreate) SetNillableFailureCode(v *string) *Publicati
 	return _c
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (_c *PublicationAttemptCreate) SetProviderMessage(v string) *PublicationAttemptCreate {
+	_c.mutation.SetProviderMessage(v)
+	return _c
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_c *PublicationAttemptCreate) SetNillableProviderMessage(v *string) *PublicationAttemptCreate {
+	if v != nil {
+		_c.SetProviderMessage(*v)
+	}
+	return _c
+}
+
+// SetRemoteURL sets the "remote_url" field.
+func (_c *PublicationAttemptCreate) SetRemoteURL(v string) *PublicationAttemptCreate {
+	_c.mutation.SetRemoteURL(v)
+	return _c
+}
+
+// SetNillableRemoteURL sets the "remote_url" field if the given value is not nil.
+func (_c *PublicationAttemptCreate) SetNillableRemoteURL(v *string) *PublicationAttemptCreate {
+	if v != nil {
+		_c.SetRemoteURL(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *PublicationAttemptCreate) SetID(v string) *PublicationAttemptCreate {
 	_c.mutation.SetID(v)
@@ -250,6 +278,14 @@ func (_c *PublicationAttemptCreate) createSpec() (*PublicationAttempt, *sqlgraph
 	if value, ok := _c.mutation.FailureCode(); ok {
 		_spec.SetField(publicationattempt.FieldFailureCode, field.TypeString, value)
 		_node.FailureCode = &value
+	}
+	if value, ok := _c.mutation.ProviderMessage(); ok {
+		_spec.SetField(publicationattempt.FieldProviderMessage, field.TypeString, value)
+		_node.ProviderMessage = &value
+	}
+	if value, ok := _c.mutation.RemoteURL(); ok {
+		_spec.SetField(publicationattempt.FieldRemoteURL, field.TypeString, value)
+		_node.RemoteURL = &value
 	}
 	if nodes := _c.mutation.ScheduledPostIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

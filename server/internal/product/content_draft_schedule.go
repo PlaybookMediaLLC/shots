@@ -97,6 +97,79 @@ type ScheduleContentDraftInput struct {
 	// Add schedules these channels beside the draft's live posts instead of
 	// replacing them, so correcting one destination leaves the others queued.
 	Add bool `json:"add"`
+	// ConfirmDuplicate is a member's answer to DuplicateContentError: schedule
+	// the same post to an account again within a day.
+	ConfirmDuplicate bool `json:"confirmDuplicate"`
+}
+
+// duplicateWindow is how close in time an account's identical posts count as a repeat.
+const duplicateWindow = 24 * time.Hour
+
+// DuplicatePost is an account's queued or published post with the same text and media.
+type DuplicatePost struct {
+	At                  time.Time `json:"at"`
+	ChannelConnectionID string    `json:"channelConnectionId"`
+	PostID              string    `json:"postId"`
+	Status              string    `json:"status"`
+}
+
+// DuplicateContentError asks a member to confirm a post an account already
+// has queued or published within a day: platforms treat repeats as spam, and
+// a second schedule of one post is the usual cause of a double post.
+type DuplicateContentError struct {
+	Posts []DuplicatePost
+}
+
+func (e *DuplicateContentError) Error() string {
+	return "The same text and media is already queued or published on this account within a day. Confirm to schedule it again."
+}
+
+func (e *DuplicateContentError) Unwrap() error { return publishing.ErrConflict }
+
+// sameCaption compares captions as a reader does: spacing and case aside.
+func sameCaption(a, b string) bool {
+	return strings.EqualFold(strings.Join(strings.Fields(a), " "), strings.Join(strings.Fields(b), " "))
+}
+
+// recentDuplicates lists each target account's live posts within
+// duplicateWindow of at that carry the target's text and media.
+func recentDuplicates(ctx context.Context, tx *ent.Tx, organizationID string, at time.Time,
+	targets []ContentDraftScheduleTarget, images map[string][]string) ([]DuplicatePost, error) {
+	byConnection := make(map[string]ContentDraftScheduleTarget, len(targets))
+	ids := make([]string, 0, len(targets))
+	for _, target := range targets {
+		byConnection[target.ChannelConnectionID] = target
+		ids = append(ids, target.ChannelConnectionID)
+	}
+	from, to := at.Add(-duplicateWindow), at.Add(duplicateWindow)
+	// A post publishes at most an hour after its time (the late window), so one
+	// range on scheduledFor finds every candidate through the tenant's index.
+	rows, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID), scheduledpost.ChannelConnectionIDIn(ids...),
+		// UNKNOWN_DELIVERY may be live: the likeliest double post of all.
+		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING, scheduledpost.StatusPUBLISHED, scheduledpost.StatusUNKNOWN_DELIVERY),
+		scheduledpost.ScheduledForGT(from.Add(-time.Hour)), scheduledpost.ScheduledForLT(to)).
+		Select(scheduledpost.FieldID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldCaption, scheduledpost.FieldAssetIds,
+			scheduledpost.FieldScheduledFor, scheduledpost.FieldPublishedAt, scheduledpost.FieldStatus).
+		Order(ent.Asc(scheduledpost.FieldScheduledFor)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var duplicates []DuplicatePost
+	for _, row := range rows {
+		target := byConnection[row.ChannelConnectionID]
+		if !sameCaption(row.Caption, target.Caption) || !slices.Equal(row.AssetIds, images[row.ChannelConnectionID]) {
+			continue
+		}
+		when := row.ScheduledFor
+		if row.PublishedAt != nil {
+			when = *row.PublishedAt
+		}
+		if !when.After(from) || !when.Before(to) {
+			continue
+		}
+		duplicates = append(duplicates, DuplicatePost{At: when.UTC(), ChannelConnectionID: row.ChannelConnectionID, PostID: row.ID, Status: string(row.Status)})
+	}
+	return duplicates, nil
 }
 
 // naturalOffsetLimit bounds a natural posting time's offset: four minutes.
@@ -241,10 +314,7 @@ func contentDraftPost(post *ent.ScheduledPost, platform string) ContentDraftPost
 		value := string(*post.ScheduleMode)
 		mode = &value
 	}
-	postURL := livePostURL(platform, post.RemotePostID)
-	if receipt := post.ThreadProgress.Publication; receipt != nil && receipt.URL != "" {
-		postURL = &receipt.URL
-	}
+	postURL := postoptions.PostURL(platform, post.RemotePostID, post.ThreadProgress)
 	return ContentDraftPost{Caption: post.Caption, ChannelConnectionID: post.ChannelConnectionID,
 		CreatedAt: post.CreatedAt, ID: post.ID, Platform: platform, ScheduledFor: post.ScheduledFor,
 		Status: string(post.Status), Metrics: post.Metrics, MetricsAt: post.MetricsAt,
@@ -797,6 +867,11 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err != nil {
 		return nil, err
 	}
+	// Captions are the stored draft's at input.Version, so an approval binds the
+	// text: for the route and batch runs the web serializes them from the draft it
+	// read at that version and takes no text from its callers; CreatePost and voice
+	// confirm make the draft from them. Alt text and the browser-rendered table
+	// images are not bound: publishing reads alt text from the asset when it posts.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)
@@ -804,8 +879,14 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			captions = append(captions, reply.Caption)
 		}
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, &set.ID, captions...); err != nil {
 		return nil, err
+	}
+	// Who approved the version these posts carry, if anyone did.
+	var approvedBy *string
+	var approvedVersion *int
+	if draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version {
+		approvedBy, approvedVersion = draft.ReviewedByUserID, draft.ApprovedVersion
 	}
 	var cancelled, kept []string
 	if input.Add {
@@ -819,6 +900,16 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	placement, err := placeDraftSchedule(ctx, tx, set, draft, input, time.Now())
 	if err != nil {
 		return nil, err
+	}
+	// A member confirms a repeat; an API key's caller owns its own idempotency.
+	if actor.IsSession() && !input.ConfirmDuplicate {
+		duplicates, err := recentDuplicates(ctx, tx, actor.OrganizationID, placement.at, input.Targets, images)
+		if err != nil {
+			return nil, err
+		}
+		if len(duplicates) > 0 {
+			return nil, &DuplicateContentError{Posts: duplicates}
+		}
 	}
 	refund, err := c.ChargeMonthlyQuota(ctx, actor.OrganizationID, QuotaPosts, len(input.Targets))
 	if err != nil {
@@ -859,6 +950,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			SetNaturalOffsetSeconds(placement.offset).SetScheduleTimeZone(placement.zone).SetScheduleIntent(intent).
 			SetScheduledFor(placement.at).SetStatus(scheduledpost.StatusSCHEDULED).
 			SetCaption(strings.TrimSpace(target.Caption)).
+			SetNillableScheduledByUserID(schedulerID(actor)).
+			SetNillableApprovedByUserID(approvedBy).SetNillableApprovedVersion(approvedVersion).
 			SetIdempotencyKey(contentDraftPostKey(draft.ID, target.ChannelConnectionID, input.Version)).Save(ctx)
 		if err != nil {
 			if ent.IsConstraintError(err) {

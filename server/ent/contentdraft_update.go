@@ -791,8 +791,17 @@ func (_u *ContentDraftUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.SourceDraftIDCleared() {
 		_spec.ClearField(contentdraft.FieldSourceDraftID, field.TypeString)
 	}
+	if _u.mutation.SourceVoiceRevisionIDCleared() {
+		_spec.ClearField(contentdraft.FieldSourceVoiceRevisionID, field.TypeString)
+	}
 	if _u.mutation.CampaignIDCleared() {
 		_spec.ClearField(contentdraft.FieldCampaignID, field.TypeString)
+	}
+	if _u.mutation.ReleaseIDCleared() {
+		_spec.ClearField(contentdraft.FieldReleaseID, field.TypeString)
+	}
+	if _u.mutation.CampaignPostIDCleared() {
+		_spec.ClearField(contentdraft.FieldCampaignPostID, field.TypeString)
 	}
 	if value, ok := _u.mutation.CollabGeneration(); ok {
 		_spec.SetField(contentdraft.FieldCollabGeneration, field.TypeInt, value)
@@ -1631,8 +1640,17 @@ func (_u *ContentDraftUpdateOne) sqlSave(ctx context.Context) (_node *ContentDra
 	if _u.mutation.SourceDraftIDCleared() {
 		_spec.ClearField(contentdraft.FieldSourceDraftID, field.TypeString)
 	}
+	if _u.mutation.SourceVoiceRevisionIDCleared() {
+		_spec.ClearField(contentdraft.FieldSourceVoiceRevisionID, field.TypeString)
+	}
 	if _u.mutation.CampaignIDCleared() {
 		_spec.ClearField(contentdraft.FieldCampaignID, field.TypeString)
+	}
+	if _u.mutation.ReleaseIDCleared() {
+		_spec.ClearField(contentdraft.FieldReleaseID, field.TypeString)
+	}
+	if _u.mutation.CampaignPostIDCleared() {
+		_spec.ClearField(contentdraft.FieldCampaignPostID, field.TypeString)
 	}
 	if value, ok := _u.mutation.CollabGeneration(); ok {
 		_spec.SetField(contentdraft.FieldCollabGeneration, field.TypeInt, value)

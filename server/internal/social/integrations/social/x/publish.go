@@ -604,6 +604,11 @@ func (p *Provider) finalizeArticle(ctx context.Context, accessToken string, pend
 		} `json:"data"`
 	}
 	if err := c.mutationJSON(ctx, v2("articles/"+pending.ArticleDraftID+"/publish"), nil, &receipt); err != nil {
+		if kind := temporalx.FailureType(err); kind == temporalx.TypeRateLimited || kind == temporalx.TypeDailyLimit {
+			// The draft is saved on X: a whole-post retry would create another,
+			// so a person publishes it there or settles the post.
+			return nil, temporalx.UnknownDelivery(identifier, "X limited publishing the Article; its draft is saved on X. Publish it from X, then mark this post.")
+		}
 		return nil, err
 	}
 	if !socialidentity.XAccountID(receipt.Data.PostID) {

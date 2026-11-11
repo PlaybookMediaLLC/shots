@@ -308,10 +308,6 @@ export function WriteComposer({
     nextDraftRef,
     showSaved,
   } = useWrite()
-  const services = React.useMemo(
-    () => platformEditorServices(trpcClient, aiEnabled),
-    [trpcClient, aiEnabled]
-  )
   const {
     conflict,
     discardConflict,
@@ -475,6 +471,11 @@ export function WriteComposer({
   const channels = tabChannels(accounts, enabled, primary)
   // A switched-off platform keeps its tab, so it can be read and switched back on.
   const active = allChannels(accounts, primary).includes(tab) ? tab : primary
+  // The editor's AI writes in this draft's voice for the platform on screen.
+  const services = React.useMemo(
+    () => platformEditorServices(trpcClient, aiEnabled, { channel: active, draftId: initial.id }),
+    [trpcClient, aiEnabled, active, initial.id]
+  )
   const versionOfTab = versionFor(document.versions, active)
   const draftFields = {
     article: document.article,

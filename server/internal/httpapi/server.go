@@ -64,6 +64,8 @@ type WorkflowScheduler interface {
 
 type ConfigurationStore interface {
 	PlanAnalyzeStore
+	VoiceStore
+	VoiceCommandStore
 	ProjectStore
 	CreativeSetStore
 	ContentDraftStore
@@ -351,6 +353,8 @@ func NewWithOnboarding(store Store, scheduler WorkflowScheduler, verifier Destin
 		s.registerLibrary(mux)
 		s.registerSharing(mux)
 		s.registerPlanAnalyze(mux)
+		s.registerVoice(mux)
+		s.registerVoiceCommands(mux)
 		s.registerNotifications(mux)
 		s.registerOnboarding(mux)
 	}
@@ -469,12 +473,25 @@ func (s *Server) authenticateWithOptions(next http.Handler, organizationRequired
 			writeError(w, http.StatusUnauthorized, "a signed-in session is required")
 			return
 		}
+		ctx := r.Context()
+		// Founder Hub names its workspace per request; its live grant, checked here, replaces the browser's active one.
+		if client := r.Header.Get("X-Principal-Client"); client != "" {
+			if client != "shots-founder-hub" || !actor.IsSession() || s.configuration == nil {
+				writeError(w, http.StatusUnauthorized, "unauthorized")
+				return
+			}
+			if _, err := s.configuration.AuthorizeFounderHubSession(ctx, actor); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			ctx = publishing.ForDelegatedSession(ctx)
+		}
 		var memo publishing.AuthorizationMemo
-		if err := authorize(publishing.RecordAuthorization(r.Context(), &memo), actor); err != nil {
+		if err := authorize(publishing.RecordAuthorization(ctx, &memo), actor); err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(publishing.ReplayAuthorization(r.Context(), &memo)))
+		next.ServeHTTP(w, r.WithContext(publishing.ReplayAuthorization(ctx, &memo)))
 	})
 }
 
@@ -643,8 +660,8 @@ func (s *Server) createScheduledPost(w http.ResponseWriter, r *http.Request) {
 	}
 	input.Caption = strings.TrimSpace(input.Caption)
 	input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
-	if input.Caption == "" || len([]rune(input.Caption)) > 3000 || input.ChannelConnectionID == "" || input.IdempotencyKey == "" || input.ScheduledFor.IsZero() {
-		writeError(w, http.StatusBadRequest, "caption, channelConnectionId, idempotencyKey, and scheduledFor are required")
+	if input.Caption == "" || len([]rune(input.Caption)) > 3000 || input.ChannelConnectionID == "" || input.ScheduledFor.IsZero() {
+		writeError(w, http.StatusBadRequest, "caption, channelConnectionId, and scheduledFor are required")
 		return
 	}
 	if (input.VariantID == "") == (input.ContentDraftID == "") {

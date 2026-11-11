@@ -3,6 +3,8 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
+import { releaseSummary } from '@/lib/launch/release-summary'
+import { getWorkingSpec } from '@/lib/launch/store'
 import { createRelease, getRelease, listReleases, updateRelease } from '@/lib/tenant/releases'
 import {
   releaseCreateSchema,
@@ -30,6 +32,24 @@ export const releaseRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Release not found.' })
       }
       return { release }
+    }),
+  /**
+   * The summary a release's posts are written from (its approved spec's,
+   * newest spec's, or its brief) and whether a person verified it; null
+   * when the release has no text to write from.
+   */
+  summary: tenantProcedure({ apiKeyScope: 'artifact:read', permission: 'artifact:read' })
+    .input(z.object({ releaseId: releaseIdSchema }))
+    .query(async ({ ctx, input }) => {
+      // The spec read is scoped to the workspace, so it can run beside the release's.
+      const [release, spec] = await Promise.all([
+        getRelease(ctx.tenant, input.releaseId),
+        getWorkingSpec(ctx.tenant, input.releaseId),
+      ])
+      if (!release) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Release not found.' })
+      }
+      return releaseSummary({ benefitStatement: release.benefitStatement, spec })
     }),
   create: tenantProcedure({ apiKeyScope: 'release:create', permission: 'release:create' })
     .input(releaseCreateSchema.extend({ idempotencyKey: idempotencyKeySchema }))

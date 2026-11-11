@@ -209,14 +209,144 @@ func TestContainerErrorDisconnects(t *testing.T) {
 
 func TestPublishErrorClassified(t *testing.T) {
 	mux := http.NewServeMux()
+	requests := 0
 	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		requests++
 		w.WriteHeader(400)
 		w.Write([]byte(`{"error":{"error_subcode":2207042}}`))
 	})
 	p := setup(t, mux)
 	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"single","containers":["c1"],"message":""}`), &ent.Integration{InternalID: "ig1"})
-	if temporalx.FailureType(err) != temporalx.TypeBadBody || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" {
+	// The daily cap is a definite refusal with its reason, sent once.
+	if temporalx.FailureType(err) != temporalx.TypeDailyLimit || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" || requests != 1 {
+		t.Fatalf("got %v after %d requests", err, requests)
+	}
+}
+
+// Once one story is live, any later failure leaves the outcome unknown: a
+// resend would post that story again.
+func TestStoriesFailingAfterTheFirstAreUnknown(t *testing.T) {
+	for _, test := range []struct{ name, failing string }{
+		{"second publish rate limited", "POST /v25.0/ig1/media_publish"},
+		{"second status read rate limited", "GET /v25.0/s2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			published := map[string]int{}
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /v25.0/{id}", func(w http.ResponseWriter, r *http.Request) {
+				if test.failing == "GET /v25.0/"+r.PathValue("id") {
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.Write([]byte(`{"status_code":"FINISHED"}`))
+			})
+			mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("creation_id")
+				if id == "s2" && test.failing == "POST /v25.0/ig1/media_publish" {
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				published[id]++
+				w.Write([]byte(`{"id":"m-` + id + `"}`))
+			})
+			p := setup(t, mux)
+			_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["s1","s2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+			if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || published["s1"] != 1 || published["s2"] != 0 {
+				t.Fatalf("err=%v published=%v", err, published)
+			}
+		})
+	}
+}
+
+// The comment is live once its POST answers: a rate limit on reading the
+// parent's permalink must not fail it, or the publication would be resent.
+func TestCommentPublishedWhenPermalinkIsRateLimited(t *testing.T) {
+	comments := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v25.0/media1/comments", func(w http.ResponseWriter, r *http.Request) {
+		comments++
+		w.Write([]byte(`{"id":"c9"}`))
+	})
+	mux.HandleFunc("GET /v25.0/media1", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+	p := setup(t, mux)
+	profile := "me"
+	got, err := p.Comment(context.Background(), "ig1", "media1", "", "tok", []integrations.PostDetails{{ID: "reply", Message: "more"}}, &ent.Integration{Profile: &profile})
+	if err != nil || comments != 1 || len(got) != 1 || got[0].PostID != "c9" || got[0].ReleaseURL != "https://www.instagram.com/me" {
+		t.Fatalf("got=%+v err=%v comments=%d", got, err, comments)
+	}
+}
+
+// A story that fails after an earlier story went live leaves the post partly
+// published: a whole-post retry would post the first story again.
+func TestLaterStoryFailureAfterALiveStoryIsUnknown(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v25.0/{container}", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status_code":"FINISHED"}`))
+	})
+	published := 0
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		if published++; published == 1 {
+			w.Write([]byte(`{"id":"story-1"}`))
+			return
+		}
+		w.WriteHeader(400)
+		w.Write([]byte(`{"error":{"error_subcode":2207042}}`))
+	})
+	p := setup(t, mux)
+	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["c1","c2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || published != 2 {
+		t.Fatalf("got %v after %d publish requests", err, published)
+	}
+}
+
+// A status read that fails after an earlier story went live is as ambiguous
+// as a failed publish: a definite outcome would invite posting it again.
+func TestStatusFailureAfterALiveStoryIsUnknown(t *testing.T) {
+	mux := http.NewServeMux()
+	reads := 0
+	mux.HandleFunc("GET /v25.0/{container}", func(w http.ResponseWriter, r *http.Request) {
+		if reads++; reads == 1 {
+			w.Write([]byte(`{"status_code":"FINISHED"}`))
+			return
+		}
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error":{"message":"session has been invalidated"}}`))
+	})
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"id":"story-1"}`))
+	})
+	p := setup(t, mux)
+	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["c1","c2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// A container stays invisible until media_publish, so only it may be sent
+// again after a server error; media_publish is sent once.
+func TestOnlyContainersAreResentAfterAServerError(t *testing.T) {
+	mux := http.NewServeMux()
+	containers, publishes := 0, 0
+	mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+		if containers++; containers == 1 {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write([]byte(`{"id":"c1"}`))
+	})
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		publishes++
+		w.WriteHeader(500)
+	})
+	p := setup(t, mux)
+	if id, err := p.postID(context.Background(), origin("")+"/v25.0/ig1/media?image_url=x&access_token=tok"); err != nil || id != "c1" || containers != 2 {
+		t.Fatalf("container id=%q err=%v requests=%d", id, err, containers)
+	}
+	_, err := p.postID(context.Background(), origin("")+"/v25.0/ig1/media_publish?creation_id=c1&access_token=tok")
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || publishes != 1 {
+		t.Fatalf("media_publish err=%v requests=%d", err, publishes)
 	}
 }
 

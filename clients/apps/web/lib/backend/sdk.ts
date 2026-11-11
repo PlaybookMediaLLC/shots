@@ -23,6 +23,7 @@ function principalScope(principal: Principal): PrincipalScope {
   switch (principal.kind) {
     case 'session':
       return {
+        client: principal.client,
         display: principal.display,
         kind: 'session',
         sessionId: principal.sessionId,

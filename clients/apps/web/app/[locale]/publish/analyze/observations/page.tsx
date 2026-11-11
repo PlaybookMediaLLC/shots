@@ -21,7 +21,7 @@ export default async function AnalyzePage({
   const { locale } = await params
   const access = await requireDraftsPageAccess(locale, '/publish/analyze')
   const query = await searchParams
-  const data = await loadWrite(access.tenant, query)
+  const data = await loadWrite(access.tenant, query, access.hasAdvancedScheduling)
   let range = analyticsRange()
   let rangeError: string | undefined
   try {

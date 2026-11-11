@@ -230,7 +230,7 @@ func (s redacted) Events() []sdktrace.Event {
 
 func (s redacted) Status() sdktrace.Status {
 	status := s.ReadOnlySpan.Status()
-	status.Description = scrub(status.Description)
+	status.Description = Scrub(status.Description)
 	return status
 }
 
@@ -247,7 +247,7 @@ func redact(attributes []attribute.KeyValue) []attribute.KeyValue {
 			continue
 		}
 		if kv.Value.Type() == attribute.STRING {
-			kv.Value = attribute.StringValue(scrub(kv.Value.AsString()))
+			kv.Value = attribute.StringValue(Scrub(kv.Value.AsString()))
 		}
 		safe = append(safe, kv)
 	}
@@ -263,10 +263,13 @@ var secrets = []struct {
 	{regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://[^\s?#"'<>]*)\?[^\s#"'<>]*`), "${1}?REDACTED"},
 	{regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.-]*://)[^/\s@"'<>]+@`), "${1}REDACTED@"},
 	{regexp.MustCompile(`(?i)\b(bearer|basic)\s+[a-z0-9._~+/=-]+`), "${1} REDACTED"},
-	{regexp.MustCompile(`(?i)\b(access_token|refresh_token|id_token|client_secret|password|api_?key|token|secret)=[^&\s"']+`), "${1}=REDACTED"},
+	{regexp.MustCompile(`(?i)\b([a-z0-9_]*(?:token|secret|password|api_?key|signature))=[^&\s"']+`), "${1}=REDACTED"},
+	{regexp.MustCompile(`(?i)"([a-z0-9_]*(?:token|secret|password|api_?key))"\s*:\s*"[^"]*"`), `"${1}":"REDACTED"`},
 }
 
-func scrub(text string) string {
+// Scrub removes credentials from free text: query strings, URL user info,
+// authorization header values and credential key=value pairs.
+func Scrub(text string) string {
 	for _, secret := range secrets {
 		text = secret.pattern.ReplaceAllString(text, secret.replacement)
 	}

@@ -154,9 +154,24 @@ func SourceDraftID(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldSourceDraftID, v))
 }
 
+// SourceVoiceRevisionID applies equality check predicate on the "source_voice_revision_id" field. It's identical to SourceVoiceRevisionIDEQ.
+func SourceVoiceRevisionID(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldSourceVoiceRevisionID, v))
+}
+
 // CampaignID applies equality check predicate on the "campaign_id" field. It's identical to CampaignIDEQ.
 func CampaignID(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignID, v))
+}
+
+// ReleaseID applies equality check predicate on the "release_id" field. It's identical to ReleaseIDEQ.
+func ReleaseID(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldReleaseID, v))
+}
+
+// CampaignPostID applies equality check predicate on the "campaign_post_id" field. It's identical to CampaignPostIDEQ.
+func CampaignPostID(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignPostID, v))
 }
 
 // CollabGeneration applies equality check predicate on the "collab_generation" field. It's identical to CollabGenerationEQ.
@@ -1304,6 +1319,81 @@ func SourceDraftIDContainsFold(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldContainsFold(FieldSourceDraftID, v))
 }
 
+// SourceVoiceRevisionIDEQ applies the EQ predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDNEQ applies the NEQ predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDNEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNEQ(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDIn applies the In predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIn(FieldSourceVoiceRevisionID, vs...))
+}
+
+// SourceVoiceRevisionIDNotIn applies the NotIn predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDNotIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotIn(FieldSourceVoiceRevisionID, vs...))
+}
+
+// SourceVoiceRevisionIDGT applies the GT predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDGT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGT(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDGTE applies the GTE predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDGTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGTE(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDLT applies the LT predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDLT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLT(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDLTE applies the LTE predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDLTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLTE(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDContains applies the Contains predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDContains(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContains(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDHasPrefix applies the HasPrefix predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDHasPrefix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasPrefix(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDHasSuffix applies the HasSuffix predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDHasSuffix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasSuffix(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDIsNil applies the IsNil predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDIsNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIsNull(FieldSourceVoiceRevisionID))
+}
+
+// SourceVoiceRevisionIDNotNil applies the NotNil predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDNotNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotNull(FieldSourceVoiceRevisionID))
+}
+
+// SourceVoiceRevisionIDEqualFold applies the EqualFold predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDEqualFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEqualFold(FieldSourceVoiceRevisionID, v))
+}
+
+// SourceVoiceRevisionIDContainsFold applies the ContainsFold predicate on the "source_voice_revision_id" field.
+func SourceVoiceRevisionIDContainsFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContainsFold(FieldSourceVoiceRevisionID, v))
+}
+
 // CampaignIDEQ applies the EQ predicate on the "campaign_id" field.
 func CampaignIDEQ(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignID, v))
@@ -1377,6 +1467,156 @@ func CampaignIDEqualFold(v string) predicate.ContentDraft {
 // CampaignIDContainsFold applies the ContainsFold predicate on the "campaign_id" field.
 func CampaignIDContainsFold(v string) predicate.ContentDraft {
 	return predicate.ContentDraft(sql.FieldContainsFold(FieldCampaignID, v))
+}
+
+// ReleaseIDEQ applies the EQ predicate on the "release_id" field.
+func ReleaseIDEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldReleaseID, v))
+}
+
+// ReleaseIDNEQ applies the NEQ predicate on the "release_id" field.
+func ReleaseIDNEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNEQ(FieldReleaseID, v))
+}
+
+// ReleaseIDIn applies the In predicate on the "release_id" field.
+func ReleaseIDIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIn(FieldReleaseID, vs...))
+}
+
+// ReleaseIDNotIn applies the NotIn predicate on the "release_id" field.
+func ReleaseIDNotIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotIn(FieldReleaseID, vs...))
+}
+
+// ReleaseIDGT applies the GT predicate on the "release_id" field.
+func ReleaseIDGT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGT(FieldReleaseID, v))
+}
+
+// ReleaseIDGTE applies the GTE predicate on the "release_id" field.
+func ReleaseIDGTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGTE(FieldReleaseID, v))
+}
+
+// ReleaseIDLT applies the LT predicate on the "release_id" field.
+func ReleaseIDLT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLT(FieldReleaseID, v))
+}
+
+// ReleaseIDLTE applies the LTE predicate on the "release_id" field.
+func ReleaseIDLTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLTE(FieldReleaseID, v))
+}
+
+// ReleaseIDContains applies the Contains predicate on the "release_id" field.
+func ReleaseIDContains(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContains(FieldReleaseID, v))
+}
+
+// ReleaseIDHasPrefix applies the HasPrefix predicate on the "release_id" field.
+func ReleaseIDHasPrefix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasPrefix(FieldReleaseID, v))
+}
+
+// ReleaseIDHasSuffix applies the HasSuffix predicate on the "release_id" field.
+func ReleaseIDHasSuffix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasSuffix(FieldReleaseID, v))
+}
+
+// ReleaseIDIsNil applies the IsNil predicate on the "release_id" field.
+func ReleaseIDIsNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIsNull(FieldReleaseID))
+}
+
+// ReleaseIDNotNil applies the NotNil predicate on the "release_id" field.
+func ReleaseIDNotNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotNull(FieldReleaseID))
+}
+
+// ReleaseIDEqualFold applies the EqualFold predicate on the "release_id" field.
+func ReleaseIDEqualFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEqualFold(FieldReleaseID, v))
+}
+
+// ReleaseIDContainsFold applies the ContainsFold predicate on the "release_id" field.
+func ReleaseIDContainsFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContainsFold(FieldReleaseID, v))
+}
+
+// CampaignPostIDEQ applies the EQ predicate on the "campaign_post_id" field.
+func CampaignPostIDEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEQ(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDNEQ applies the NEQ predicate on the "campaign_post_id" field.
+func CampaignPostIDNEQ(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNEQ(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDIn applies the In predicate on the "campaign_post_id" field.
+func CampaignPostIDIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIn(FieldCampaignPostID, vs...))
+}
+
+// CampaignPostIDNotIn applies the NotIn predicate on the "campaign_post_id" field.
+func CampaignPostIDNotIn(vs ...string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotIn(FieldCampaignPostID, vs...))
+}
+
+// CampaignPostIDGT applies the GT predicate on the "campaign_post_id" field.
+func CampaignPostIDGT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGT(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDGTE applies the GTE predicate on the "campaign_post_id" field.
+func CampaignPostIDGTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldGTE(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDLT applies the LT predicate on the "campaign_post_id" field.
+func CampaignPostIDLT(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLT(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDLTE applies the LTE predicate on the "campaign_post_id" field.
+func CampaignPostIDLTE(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldLTE(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDContains applies the Contains predicate on the "campaign_post_id" field.
+func CampaignPostIDContains(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContains(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDHasPrefix applies the HasPrefix predicate on the "campaign_post_id" field.
+func CampaignPostIDHasPrefix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasPrefix(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDHasSuffix applies the HasSuffix predicate on the "campaign_post_id" field.
+func CampaignPostIDHasSuffix(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldHasSuffix(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDIsNil applies the IsNil predicate on the "campaign_post_id" field.
+func CampaignPostIDIsNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldIsNull(FieldCampaignPostID))
+}
+
+// CampaignPostIDNotNil applies the NotNil predicate on the "campaign_post_id" field.
+func CampaignPostIDNotNil() predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldNotNull(FieldCampaignPostID))
+}
+
+// CampaignPostIDEqualFold applies the EqualFold predicate on the "campaign_post_id" field.
+func CampaignPostIDEqualFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldEqualFold(FieldCampaignPostID, v))
+}
+
+// CampaignPostIDContainsFold applies the ContainsFold predicate on the "campaign_post_id" field.
+func CampaignPostIDContainsFold(v string) predicate.ContentDraft {
+	return predicate.ContentDraft(sql.FieldContainsFold(FieldCampaignPostID, v))
 }
 
 // CollabGenerationEQ applies the EQ predicate on the "collab_generation" field.

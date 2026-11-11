@@ -78,6 +78,20 @@ func TestWritePublishing(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.exec(t, `UPDATE "Integration" SET "verifiedCapabilities"=$2 WHERE id=$1`, "x-premium-"+w.id, string(proofJSON))
+	// The set list carries each account's standing, read for the X accounts of both sets at once.
+	listed, err := repo.ListSocialSets(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listedPremium := map[string]bool{}
+	for _, set := range listed.Items {
+		for _, account := range set.Accounts {
+			listedPremium[account.ID] = account.Premium
+		}
+	}
+	if !listedPremium[x] || !listedPremium[premium] || listedPremium[linkedin] || listedPremium[premiumLinkedIn] {
+		t.Fatalf("listed standings=%v", listedPremium)
+	}
 	draft := func(input ContentDraftInput) *ContentDraftRecord {
 		t.Helper()
 		created, err := repo.CreateContentDraft(ctx, owner, input)
@@ -318,7 +332,8 @@ func TestWritePublishing(t *testing.T) {
 					targets[0].Options = &postoptions.PublishOptions{ArticleTitle: "Verified eligibility"}
 					allowed = caps.Articles != nil && *caps.Articles
 				}
-				_, err := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Targets: targets, Version: 1})
+				// Each subscription posts the same long text on purpose: a confirmed repeat.
+				_, err := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Targets: targets, Version: 1, ConfirmDuplicate: true})
 				if allowed && err != nil || !allowed && !errors.Is(err, publishing.ErrConflict) {
 					t.Fatalf("%s %s allowed=%v: %v", subscription, kind, allowed, err)
 				}

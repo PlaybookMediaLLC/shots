@@ -176,7 +176,7 @@ func (c *Configuration) SaveCampaignCopy(ctx context.Context, actor Actor, campa
 	if !owned {
 		return publishing.ErrNotFound
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, campaignPostTexts(input.Posts)...); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil, campaignPostTexts(input.Posts)...); err != nil {
 		return err
 	}
 	offset := 0

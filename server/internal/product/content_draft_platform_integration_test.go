@@ -586,10 +586,17 @@ func TestContentDraftPlatform(t *testing.T) {
 			SetThreadProgress(postoptions.ThreadProgress{LastReplyID: "remote-2", Posted: 1, Total: 3}).Save(ctx); err != nil {
 			t.Fatal(err)
 		}
+		exec(`UPDATE scheduled_post SET "scheduledByUserId"='first-scheduler',"approvedByUserId"='thread-approver',"approvedVersion"=$2 WHERE id=$1`, postID, draft.Version)
 		resumed, err := repo.ResumeContentDraftThread(ctx, owner, postID)
 		if err != nil || resumed.Scheduled.Caption != "Three" || resumed.Scheduled.ReplyTo == nil ||
 			*resumed.Scheduled.ReplyTo != "remote-2" || len(resumed.Scheduled.Replies) != 1 {
 			t.Fatalf("resumed=%+v err=%v", resumed, err)
+		}
+		// The rest goes out under the original approval; the person resuming queued it.
+		rest := db.Client.ScheduledPost.GetX(ctx, resumed.Scheduled.ID)
+		if rest.ScheduledByUserID == nil || *rest.ScheduledByUserID != owner.UserID || rest.ApprovedByUserID == nil || *rest.ApprovedByUserID != "thread-approver" ||
+			rest.ApprovedVersion == nil || *rest.ApprovedVersion != draft.Version {
+			t.Fatalf("scheduledBy=%v approvedBy=%v approvedVersion=%v", rest.ScheduledByUserID, rest.ApprovedByUserID, rest.ApprovedVersion)
 		}
 		posts, err := repo.ListContentDraftPosts(ctx, owner, draft.ID)
 		if err != nil || len(posts) != 2 || !strings.HasPrefix(*posts[1].URL, "https://x.com/i/status/remote-1") {

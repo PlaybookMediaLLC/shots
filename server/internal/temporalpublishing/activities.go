@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
@@ -18,7 +19,7 @@ type ActivityStore interface {
 	Claim(context.Context, string, string, time.Time) (bool, error)
 	Complete(context.Context, *ent.ScheduledPost, publishing.Attempt, string, string) error
 	Fail(context.Context, *ent.ScheduledPost, publishing.Attempt, string, *time.Time, string) error
-	FailUnknown(context.Context, string, string, int) error
+	FailUnknown(context.Context, string, string, int, string) error
 	FailUnsent(context.Context, *ent.ScheduledPost, string, string) error
 	LoadPublishJob(context.Context, string, string) (publishing.PublishJob, error)
 	PostScheduledFor(context.Context, string, string) (time.Time, error)
@@ -49,7 +50,18 @@ const LatePublicationWindow = time.Hour
 // errMissedWindow stops a send that would start past LatePublicationWindow.
 var errMissedWindow = errors.New("publication missed its late window")
 
+// errPublishingPaused holds a due post while PUBLISHING_PAUSED=true, set
+// during a database restore (docs/deployment.md). Prepare fails before it
+// claims the post, so nothing is sent and the post stays SCHEDULED for the
+// dispatcher to start again once the pause is cleared.
+var errPublishingPaused = errors.New("publishing is paused")
+
 func (a *Activities) Prepare(ctx context.Context, input PrepareInput) (PreparedPublication, error) {
+	// Read on every call, not cached at startup.
+	if os.Getenv("PUBLISHING_PAUSED") == "true" {
+		slog.WarnContext(ctx, "publication held: publishing is paused", "post", input.PostID)
+		return PreparedPublication{}, errPublishingPaused
+	}
 	now := a.now().UTC()
 	claimed, err := a.store.Claim(ctx, input.PostID, input.RunID, now)
 	if err != nil || !claimed {
@@ -113,11 +125,12 @@ func (a *Activities) Publish(ctx context.Context, input PublishInput) (PublishRe
 	errors.As(publishErr, &providerErr)
 	failureCode := failureCodeFor(ctx, input.Job, publishErr)
 	if providerErr.UnknownDelivery {
-		if err := a.store.FailUnknown(ctx, post.ID, input.RunID, input.AttemptNumber); err != nil {
+		if err := a.store.FailUnknown(ctx, post.ID, input.RunID, input.AttemptNumber, providerMessage(publishErr)); err != nil {
 			return PublishResult{}, err
 		}
 		return PublishResult{FailureCode: failureCode, Outcome: OutcomeFailed}, nil
 	}
+	attempt.ProviderMessage = providerMessage(publishErr)
 	if providerErr.Status == 429 && !providerErr.UnknownDelivery && input.AttemptNumber < input.MaxAttempts {
 		retryAt := a.now().UTC().Add(input.RetryDelay)
 		if err := a.store.Fail(ctx, post, attempt, failureCode, &retryAt, input.RunID); err != nil {
@@ -157,7 +170,7 @@ func (a *Activities) MarkUnknown(ctx context.Context, input MarkUnknownInput) er
 	if err := a.recordProgress(ctx, input.PostID, input.Progress); err != nil {
 		return err
 	}
-	return a.store.FailUnknown(ctx, input.PostID, input.RunID, input.AttemptNumber)
+	return a.store.FailUnknown(ctx, input.PostID, input.RunID, input.AttemptNumber, input.ProviderMessage)
 }
 
 func (a *Activities) Begin(ctx context.Context, input BeginInput) (BeginResult, error) {
@@ -317,13 +330,14 @@ func (a *Activities) Submit(ctx context.Context, input SubmitInput) (PublishResu
 	providerErr := &socialapi.Error{}
 	errors.As(err, &providerErr)
 	failureCode := failureCodeFor(ctx, input.Job, err)
+	message := providerMessage(err)
 	if providerErr.UnknownDelivery {
-		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown, ProviderID: providerID, Progress: progress}, nil
+		return PublishResult{FailureCode: failureCode, Outcome: OutcomeUnknown, ProviderID: providerID, Progress: progress, ProviderMessage: message}, nil
 	}
 	if providerErr.Status == 429 {
-		return PublishResult{FailureCode: failureCode, Outcome: OutcomeRetry}, nil
+		return PublishResult{FailureCode: failureCode, Outcome: OutcomeRetry, RetryAfter: providerErr.RetryAfter, ProviderMessage: message}, nil
 	}
-	return PublishResult{FailureCode: failureCode, Outcome: OutcomeFailed}, nil
+	return PublishResult{FailureCode: failureCode, Outcome: OutcomeFailed, ProviderMessage: message}, nil
 }
 
 func (a *Activities) Check(ctx context.Context, input CheckInput) (PublishResult, error) {
@@ -367,7 +381,22 @@ func (a *Activities) FailV2(ctx context.Context, input FailInput) error {
 	if !input.RetryAt.IsZero() {
 		retryAt = &input.RetryAt
 	}
-	return a.store.Fail(ctx, post, publishing.Attempt{ID: input.AttemptID, Number: input.AttemptNumber}, input.FailureCode, retryAt, input.RunID)
+	return a.store.Fail(ctx, post, publishing.Attempt{ID: input.AttemptID, Number: input.AttemptNumber, ProviderMessage: input.ProviderMessage},
+		input.FailureCode, retryAt, input.RunID)
+}
+
+// providerMessage is the provider's explanation of a failure when the
+// publisher kept one, else the publisher's own message, redacted before it
+// enters workflow history: a transport error's text can carry a token in a URL.
+func providerMessage(err error) string {
+	var providerErr *socialapi.Error
+	if errors.As(err, &providerErr) && providerErr.ProviderMessage != "" {
+		return publishing.RedactProviderMessage(providerErr.ProviderMessage)
+	}
+	if err == nil {
+		return ""
+	}
+	return publishing.RedactProviderMessage(err.Error())
 }
 
 // recordProgress runs inside retryable outcome activities, never resubmitting a post.

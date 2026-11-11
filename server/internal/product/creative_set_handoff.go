@@ -153,7 +153,7 @@ func (c *Configuration) AttachCreativeSetDelivery(ctx context.Context, actor Act
 	if err := requireDesignAssets(ctx, tx, actor.OrganizationID, native); err != nil {
 		return nil, err
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, input.Copy); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil, input.Copy); err != nil {
 		return nil, err
 	}
 	provenance := map[string]any{"setId": setID, "delivery": delivery, "versionId": version.ID, "copy": input.Copy, "channel": input.Channel}

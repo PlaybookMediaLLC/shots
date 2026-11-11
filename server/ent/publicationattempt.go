@@ -34,6 +34,10 @@ type PublicationAttempt struct {
 	ProviderPostID *string `json:"provider_post_id,omitempty"`
 	// FailureCode holds the value of the "failure_code" field.
 	FailureCode *string `json:"failure_code,omitempty"`
+	// ProviderMessage holds the value of the "provider_message" field.
+	ProviderMessage *string `json:"provider_message,omitempty"`
+	// RemoteURL holds the value of the "remote_url" field.
+	RemoteURL *string `json:"remote_url,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PublicationAttemptQuery when eager-loading is set.
 	Edges        PublicationAttemptEdges `json:"edges"`
@@ -67,7 +71,7 @@ func (*PublicationAttempt) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case publicationattempt.FieldAttemptNumber:
 			values[i] = new(sql.NullInt64)
-		case publicationattempt.FieldID, publicationattempt.FieldOrganizationID, publicationattempt.FieldScheduledPostID, publicationattempt.FieldOutcome, publicationattempt.FieldProviderPostID, publicationattempt.FieldFailureCode:
+		case publicationattempt.FieldID, publicationattempt.FieldOrganizationID, publicationattempt.FieldScheduledPostID, publicationattempt.FieldOutcome, publicationattempt.FieldProviderPostID, publicationattempt.FieldFailureCode, publicationattempt.FieldProviderMessage, publicationattempt.FieldRemoteURL:
 			values[i] = new(sql.NullString)
 		case publicationattempt.FieldStartedAt, publicationattempt.FieldCompletedAt:
 			values[i] = new(sql.NullTime)
@@ -144,6 +148,20 @@ func (_m *PublicationAttempt) assignValues(columns []string, values []any) error
 				_m.FailureCode = new(string)
 				*_m.FailureCode = value.String
 			}
+		case publicationattempt.FieldProviderMessage:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field provider_message", values[i])
+			} else if value.Valid {
+				_m.ProviderMessage = new(string)
+				*_m.ProviderMessage = value.String
+			}
+		case publicationattempt.FieldRemoteURL:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field remote_url", values[i])
+			} else if value.Valid {
+				_m.RemoteURL = new(string)
+				*_m.RemoteURL = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -214,6 +232,16 @@ func (_m *PublicationAttempt) String() string {
 	builder.WriteString(", ")
 	if v := _m.FailureCode; v != nil {
 		builder.WriteString("failure_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProviderMessage; v != nil {
+		builder.WriteString("provider_message=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.RemoteURL; v != nil {
+		builder.WriteString("remote_url=")
 		builder.WriteString(*v)
 	}
 	builder.WriteByte(')')

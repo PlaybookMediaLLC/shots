@@ -35,6 +35,8 @@ for earlier designs, not instructions to rebuild superseded architecture.
 
 **Scoped authorization (2026-11-04):** The [post management implementation](../scheduling/post-bridge/post-management/implementation.md) is a second explicit exception to the same deferral, limited to a month day cap and date notes, library filters and the account allowance. It adds no channels, no client connect links and no second post model. No paid-customer evidence is recorded for it, so its outcome metric decides whether it stays.
 
+**Scoped authorization (2026-11-11):** [Voice capture](../plans/voice-capture-and-evidence-plan.md) records a private voice note on iPhone, transcribes it on the device, syncs it, and turns it into a draft or, after a confirming tap, a scheduled post. It reuses content drafts, approval, `ScheduleContentDraft`, the private media store and the Go model client rather than adding a schema, editor or scheduler; [its implementation plan](../plans/voice-capture-implementation.md) records the owner decisions taken. Its outcome metric is weekly active recorders in pilot workspaces and the drafts and scheduled posts made from their notes. Capture hardening, staying signed in and capture at scale (sections 5.5–5.7 of the plan) stay conditional under RFC 007.
+
 ## Build order and exit gates
 
 Each milestone produces usable customer value. Begin assisted pilots now;

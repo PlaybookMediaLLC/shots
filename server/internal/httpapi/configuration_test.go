@@ -25,6 +25,8 @@ type fakeConfiguration struct {
 	brandKit            product.CreateBrandKitInput
 	auditQuery          product.AuditLogQuery
 	releaseUpdate       product.UpdateReleaseInput
+	founderHubError     error
+	founderHubActor     *product.Actor
 }
 
 func (f *fakeConfiguration) Authorize(_ context.Context, actor product.Actor) error {
@@ -40,8 +42,9 @@ func (f *fakeConfiguration) GetFounderHubSession(context.Context, product.Actor)
 	return nil, nil
 }
 
-func (f *fakeConfiguration) AuthorizeFounderHubSession(context.Context, product.Actor) (*product.FounderHubAuthorization, error) {
-	return nil, nil
+func (f *fakeConfiguration) AuthorizeFounderHubSession(_ context.Context, actor product.Actor) (*product.FounderHubAuthorization, error) {
+	f.founderHubActor = &actor
+	return nil, f.founderHubError
 }
 func (f *fakeConfiguration) GetFounderHubSettingsAccount(context.Context, product.Actor) (*product.FounderHubSettingsAccount, error) {
 	return nil, nil

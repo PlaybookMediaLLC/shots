@@ -58,6 +58,7 @@ async function getBackendPageAccess(requestHeaders: Headers, session: SignedInSe
     // the PLATFORM_ONBOARDING_AGENT rollback; without it onboarding is manual.
     onboardingAgentEnabled: Boolean(workspace) && features['onboarding:agent'] === true,
     hasBasicScheduling: features['content:drafts'] === true,
+    hasAdvancedScheduling: features['content:scheduling-advanced'] === true,
     hasPaidPlan: features['workspace:paid'] === true,
     isWorkspaceOperational: Boolean(workspace),
     organization: backendPageOrganization(active, workspace),

@@ -126,8 +126,13 @@ func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinat
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if account == nil || account.ID != destinationID || account.OrganizationID != binding.GoOrganizationID || account.ProviderIdentifier != platform || account.DeletedAt != nil || account.InBetweenSteps || account.Disabled || account.RefreshNeeded || account.Token == "" ||
-		account.TokenExpiration != nil && !account.TokenExpiration.After(p.currentTime()) {
+	expired := account != nil && account.TokenExpiration != nil && !account.TokenExpiration.After(p.currentTime())
+	if account == nil || account.ID != destinationID || account.OrganizationID != binding.GoOrganizationID || account.ProviderIdentifier != platform || account.DeletedAt != nil || account.InBetweenSteps || account.Disabled || account.RefreshNeeded || account.Token == "" || expired {
+		// A lapsed token nothing can renew needs a person; one with a refresh
+		// token is the maintenance refresh's to renew (or to flag when it cannot).
+		if expired && account.ID == destinationID && account.RefreshToken == nil && !account.RefreshNeeded {
+			p.requireReconnect(ctx, account)
+		}
 		return nil, nil, nil, socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials have expired or been disabled")
 	}
 	if integrations.RequireVerifiedIdentity(account) != nil {
@@ -147,6 +152,27 @@ func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinat
 	return account, provider, settings, nil
 }
 
+// appVerifier is a provider that signs requests with Shots' own app keys as
+// well as the account's token, so a refused token may be the app's fault.
+type appVerifier interface {
+	VerifyAppCredentials(ctx context.Context) error
+}
+
+// requireReconnect flags a channel whose credentials the provider refused or
+// that lapsed with nothing to renew them, so the workspace hears of it
+// (integration.reconnect_required, raised by the Integration trigger) rather
+// than only through this post. It uses the refresh's own conditional write: a
+// reconnect or refresh since the account was read wins. A failed flag never
+// changes the post's outcome, which is already decided; it is logged.
+func (p *Publisher) requireReconnect(ctx context.Context, account *socialent.Integration) {
+	if p.refresh == nil || account == nil {
+		return
+	}
+	if err := p.refresh.RequireReconnect(ctx, account); err != nil && !errors.Is(err, socialintegration.ErrRefreshChanged) {
+		slog.WarnContext(ctx, "could not flag a channel for reconnection", "integration_id", account.ID, "error", err)
+	}
+}
+
 // pollDetails rounds positive durations to whole hours for legacy providers.
 // Invalid choices and durations must reach provider validation, not disappear.
 func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
@@ -160,18 +186,41 @@ func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
 	return &integrations.PollDetails{Options: poll.Options, Duration: hours}
 }
 
-// publicationOutcome maps a provider failure: reconnect, or an outcome the
-// remote account must be checked for before any retry.
-func publicationOutcome(err error) error {
-	if temporalx.FailureType(err) == temporalx.TypePublicationRejected {
-		return socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
+// publicationOutcome maps a provider failure: a definite refusal, a rate limit
+// the workflow retries durably, reconnect, or an outcome the remote account
+// must be checked for before any retry. The provider's message rides along
+// for the attempt record.
+func publicationOutcome(err error) *socialapi.Error {
+	var mapped *socialapi.Error
+	switch temporalx.FailureType(err) {
+	case temporalx.TypeRateLimited:
+		mapped = socialapi.NewError(http.StatusTooManyRequests, false, "The platform rate-limited the publication; nothing was created.")
+		mapped.RetryAfter = temporalx.RetryAfter(err)
+	case temporalx.TypeDailyLimit:
+		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureProviderDailyLimit, "The account reached the platform's daily posting limit; nothing was created.")
+	case temporalx.TypePublicationRejected:
+		mapped = socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
+	case temporalx.TypeAppAccess:
+		return appAccessRefused(err)
+	case temporalx.TypeRefreshToken, temporalx.TypeDisconnect:
+		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
+	default:
+		// The provider may have accepted the post before the call failed. A
+		// reconciliation step must inspect the remote account before retrying.
+		mapped = socialapi.NewError(http.StatusBadGateway, true, "social publication outcome is unknown")
 	}
-	if temporalx.FailureType(err) == temporalx.TypeRefreshToken || temporalx.FailureType(err) == temporalx.TypeDisconnect {
-		return socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
-	}
-	// The provider may have accepted the post before the call failed. A
-	// reconciliation step must inspect the remote account before retrying.
-	return socialapi.NewError(http.StatusBadGateway, true, "social publication outcome is unknown")
+	mapped.ProviderMessage = temporalx.FailureMessage(err)
+	return mapped
+}
+
+// appAccessRefused is a definite failure of Shots' own app credentials or
+// access: nothing was created and no account is flagged. The saved message
+// says so before the platform's own words, which may tell a person to reconnect.
+func appAccessRefused(err error) *socialapi.Error {
+	refused := socialapi.NewCodedError(http.StatusServiceUnavailable, publishing.FailurePublisherUnavailable,
+		"The platform refused Shots' app credentials, so nothing was sent. No account needs reconnecting.")
+	refused.ProviderMessage = refused.Error() + " The platform said: " + temporalx.FailureMessage(err)
+	return refused
 }
 
 // PublishThread publishes the post, or answers ReplyTo when it resumes a
@@ -278,6 +327,30 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		response, err = provider.Post(ctx, account.InternalID, account.Token, details, account)
 	}
 	if err != nil {
+		kind := temporalx.FailureType(err)
+		// A provider that signs with Shots' app keys too (X) refuses every
+		// account when the keys are bad: that is not this account's to fix.
+		if verifier, ok := provider.(appVerifier); ok && kind == temporalx.TypeRefreshToken {
+			if appErr := verifier.VerifyAppCredentials(ctx); appErr != nil {
+				if errors.Is(appErr, integrations.ErrAppCredentialsRefused) {
+					slog.ErrorContext(ctx, "provider refused the app credentials; every post to it fails until they are fixed", "platform", input.Platform, "error", appErr)
+					return socialapi.Receipt{}, appAccessRefused(err)
+				}
+				// The check itself failed, so the cause is unknown. The refusal
+				// proves nothing was created, so the post retries durably.
+				slog.WarnContext(ctx, "could not check the provider's app credentials", "platform", input.Platform, "error", appErr)
+				unchecked := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherUnavailable,
+					"The platform refused the request and Shots could not yet tell whether its app credentials or the account's token are at fault. Nothing was sent; it retries.")
+				unchecked.ProviderMessage = unchecked.Error() + " The platform said: " + temporalx.FailureMessage(err)
+				return socialapi.Receipt{}, unchecked
+			}
+		}
+		// A disconnect, or a refused token nothing can renew, needs a person. A
+		// token with a refresh token is the maintenance refresh's to renew, or to
+		// flag when the provider refuses that too.
+		if kind == temporalx.TypeDisconnect || kind == temporalx.TypeRefreshToken && account.RefreshToken == nil {
+			p.requireReconnect(ctx, account)
+		}
 		return socialapi.Receipt{}, publicationOutcome(err)
 	}
 	if len(response) != 1 || response[0].PostID == "" ||

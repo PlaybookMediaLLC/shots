@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/collab"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
@@ -78,7 +81,8 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 				t.Fatal(err)
 			}
-			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
+			// Every role schedules the same text on purpose: a confirmed repeat.
+			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, ConfirmDuplicate: true, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
 			want("schedule approved content", err, publishes)
 		})
 	}
@@ -108,6 +112,146 @@ func TestTeamCollaborationRoles(t *testing.T) {
 		approved, err := repo.ReviewContentDraft(ctx, w.actor("approver"), draft.ID, ContentDraftReviewInput{Action: "approve", Version: edited.Version})
 		if err != nil || approved.ApprovedVersion == nil || *approved.ApprovedVersion != edited.Version {
 			t.Fatalf("re-review=%+v err=%v", approved, err)
+		}
+	})
+	t.Run("the scheduled-posts route refuses drafts, with or without approval", func(t *testing.T) {
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Route", PlainText: "Pending"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = repo.ReviewContentDraft(ctx, w.actor("creator"), draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"}); err != nil {
+			t.Fatal(err)
+		}
+		input := publishing.CreateScheduledPostInput{Caption: "Text no one reviewed", ChannelConnectionID: connection.ID, ContentDraftID: draft.ID,
+			IdempotencyKey: "route-" + w.id, ScheduledFor: time.Now().Add(48 * time.Hour).UTC()}
+		publisher := w.actor("publisher")
+		_, err = repo.CreateScheduledPost(ctx, publisher, input)
+		if !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("approval skipped through the scheduled-posts route: %v", err)
+		}
+		posts, err := repo.ListContentDraftPosts(ctx, w.owner, draft.ID)
+		if err != nil || len(posts) != 0 {
+			t.Fatalf("refused request queued posts=%+v err=%v", posts, err)
+		}
+		// With approval off the route still refuses: it sends the caller's
+		// caption, and a draft posts only its stored text (plan F1), from the
+		// draft's own schedule route. Route posts record their scheduler in
+		// campaign_publish_integration_test.
+		off, on := false, true
+		if _, err = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &off}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &on})
+		})
+		if _, err = repo.CreateScheduledPost(ctx, publisher, input); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("approval off: the route scheduled a draft's caller text: %v", err)
+		}
+		if posts, err := repo.ListContentDraftPosts(ctx, w.owner, draft.ID); err != nil || len(posts) != 0 {
+			t.Fatalf("approval off: refused request queued posts=%+v err=%v", posts, err)
+		}
+	})
+	t.Run("self-approval can be refused; a scheduled post records who scheduled and approved", func(t *testing.T) {
+		settings, err := repo.GetContentDraftSettings(ctx, w.owner)
+		if err != nil || !settings.AllowSelfApproval {
+			t.Fatalf("self-approval is not allowed by default: %+v %v", settings, err)
+		}
+		admin := w.actor("admin")
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Self", PlainText: "Self"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		title := "Admin edit"
+		draft, err = repo.UpdateContentDraft(ctx, admin, draft.ID, ContentDraftUpdate{BaseVersion: draft.Version, Title: &title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A one-person workspace keeps working: by default the last editor approves.
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
+			t.Fatalf("default self-approval: %v", err)
+		}
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"}); err != nil {
+			t.Fatal(err)
+		}
+		off, on := false, true
+		updated, err := repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{AllowSelfApproval: &off})
+		if err != nil || updated.AllowSelfApproval || !updated.RequireApproval {
+			t.Fatalf("settings=%+v err=%v", updated, err)
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{AllowSelfApproval: &on})
+		})
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("last editor approved with self-approval off: %v", err)
+		}
+		approver := w.actor("approver")
+		approved, err := repo.ReviewContentDraft(ctx, approver, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		publisher := w.actor("publisher")
+		result, err := repo.ScheduleContentDraft(ctx, publisher, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(72 * time.Hour).UTC(),
+			Version: approved.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Self", ChannelConnectionID: connection.ID}}})
+		if err != nil || len(result.Posts) != 1 {
+			t.Fatalf("schedule approved draft: %+v %v", result, err)
+		}
+		post, err := w.db.Client.ScheduledPost.Get(ctx, result.Posts[0].ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if post.ScheduledByUserID == nil || *post.ScheduledByUserID != publisher.UserID || post.ApprovedByUserID == nil || *post.ApprovedByUserID != approver.UserID ||
+			post.ApprovedVersion == nil || *post.ApprovedVersion != approved.Version {
+			t.Fatalf("scheduledBy=%v approvedBy=%v approvedVersion=%v", post.ScheduledByUserID, post.ApprovedByUserID, post.ApprovedVersion)
+		}
+	})
+	t.Run("approval switches are an owner's or admin's decision, audited and never lost", func(t *testing.T) {
+		publisher, admin := w.actor("publisher"), w.actor("admin")
+		off, on := false, true
+		// A publisher keeps the queue, and may resend a switch unchanged, but cannot flip one.
+		slots := []schema.QueueSlot{{Weekday: 2, Time: "10:00"}}
+		if _, err := repo.UpdateContentDraftSettings(ctx, publisher, ContentDraftSettingsUpdate{PostingSlots: &slots, RequireApproval: &on}); err != nil {
+			t.Fatalf("publisher queue change: %v", err)
+		}
+		for _, change := range []ContentDraftSettingsUpdate{{RequireApproval: &off}, {AllowSelfApproval: &off}} {
+			if _, err := repo.UpdateContentDraftSettings(ctx, publisher, change); !errors.Is(err, publishing.ErrForbidden) {
+				t.Fatalf("a publisher changed approval: %v", err)
+			}
+		}
+		// Changes to both switches at once both land, each audited with before and after.
+		var wg sync.WaitGroup
+		errs := make(chan error, 2)
+		for _, change := range []ContentDraftSettingsUpdate{{RequireApproval: &off}, {AllowSelfApproval: &off}} {
+			wg.Go(func() {
+				_, err := repo.UpdateContentDraftSettings(ctx, admin, change)
+				errs <- err
+			})
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &on, AllowSelfApproval: &on})
+		})
+		settings, err := repo.GetContentDraftSettings(ctx, w.owner)
+		if err != nil || settings.RequireApproval || settings.AllowSelfApproval || len(settings.PostingSlots) != 1 {
+			t.Fatalf("an update was lost: %+v %v", settings, err)
+		}
+		audits := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.content_draft_settings_updated"),
+			auditlog.ActorUserID(admin.UserID)).AllX(ctx)
+		final := 0
+		for _, audit := range audits {
+			after, _ := audit.Metadata["after"].(map[string]any)
+			before, _ := audit.Metadata["before"].(map[string]any)
+			if after["requireApproval"] == false && after["allowSelfApproval"] == false && (before["requireApproval"] == true) != (before["allowSelfApproval"] == true) {
+				final++
+			}
+		}
+		if len(audits) != 2 || final != 1 {
+			t.Fatalf("audits=%+v", audits)
 		}
 	})
 	writer := w.actor("writer_publisher")
@@ -181,4 +325,86 @@ func TestRequestAuthorizationMemo(t *testing.T) {
 	if err := w.repo.auth.AuthorizePublishing(middleware(viewer), w.org, viewer.UserID, viewer.SessionID); !errors.Is(err, publishing.ErrForbidden) {
 		t.Fatalf("reused viewer published: %v", err)
 	}
+
+	// A session-only middleware's check is reused the same way, and only by a
+	// session check: a role check still reads the session again.
+	var memo publishing.AuthorizationMemo
+	if err := w.repo.AuthorizeSession(publishing.RecordAuthorization(w.ctx, &memo), w.owner); err != nil {
+		t.Fatal(err)
+	}
+	handler = publishing.ReplayAuthorization(w.ctx, &memo)
+	w.exec(t, `UPDATE session SET "expiresAt"=now()-interval '1 hour' WHERE id=$1`, w.owner.SessionID)
+	if err := w.repo.AuthorizeRead(handler, w.owner); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("a role check reused the session check: %v", err)
+	}
+	if err := w.repo.AuthorizeSession(handler, w.owner); err != nil {
+		t.Fatalf("handler's first session check read again: %v", err)
+	}
+	if err := w.repo.AuthorizeSession(handler, w.owner); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("a later session check reused the middleware's: %v", err)
+	}
+}
+
+// One query admits a request only when every check passes; each failed check
+// still refuses with its own error, for both the role and the session check.
+func TestAuthorizationRefusesEachFailedCheck(t *testing.T) {
+	w := newTestWorkspace(t)
+	w.addMember(t, "reader", "viewer")
+	reader, auth := w.actor("reader"), w.repo.auth
+	check := func(t *testing.T, wantRole, wantSession error) {
+		t.Helper()
+		role, err := auth.AuthorizedRole(w.ctx, w.org, reader.UserID, reader.SessionID, readRoles...)
+		if !errors.Is(err, wantRole) || wantRole == nil && role != "viewer" {
+			t.Fatalf("role=%q err=%v, want %v", role, err, wantRole)
+		}
+		current, err := auth.AuthorizeSession(w.ctx, reader.UserID, reader.SessionID)
+		if !errors.Is(err, wantSession) || wantSession == nil && current.ID != reader.SessionID {
+			t.Fatalf("session=%v err=%v, want %v", current, err, wantSession)
+		}
+	}
+	check(t, nil, nil)
+	if _, err := auth.AuthorizedRole(w.ctx, w.org, reader.UserID, reader.SessionID, "owner"); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("a viewer passed an owner check: %v", err)
+	}
+	if _, err := auth.AuthorizedRole(w.ctx, w.org, w.owner.UserID, reader.SessionID, readRoles...); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("another person's session was admitted: %v", err)
+	}
+	for _, scenario := range []struct {
+		name                  string
+		deny                  string
+		denyArgs              []any
+		restore               string
+		restoreArgs           []any
+		wantRole, wantSession error
+	}{
+		{"expired session", `UPDATE session SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, []any{reader.SessionID},
+			`UPDATE session SET "expiresAt"=now()+interval '1 hour' WHERE id=$1`, []any{reader.SessionID}, publishing.ErrUnauthorized, publishing.ErrUnauthorized},
+		{"banned account", `UPDATE "user" SET banned=true WHERE id=$1`, []any{reader.UserID},
+			`UPDATE "user" SET banned=false WHERE id=$1`, []any{reader.UserID}, publishing.ErrForbidden, publishing.ErrForbidden},
+		{"another active workspace", `UPDATE session SET "activeOrganizationId"='other' WHERE id=$1`, []any{reader.SessionID},
+			`UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, []any{reader.SessionID, w.org}, publishing.ErrForbidden, nil},
+		{"no membership", `DELETE FROM member WHERE id=$1`, []any{"member_reader_" + w.id},
+			`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'viewer',now())`,
+			[]any{"member_reader_" + w.id, w.org, reader.UserID}, publishing.ErrForbidden, nil},
+		{"deletion in progress", `INSERT INTO workspace_deletion (id,"organizationId","requestedByUserId","scheduledFor","updatedAt") VALUES ($1,$2,$3,now()+interval '7 days',now())`,
+			[]any{"deletion_" + w.id, w.org, w.owner.UserID}, `DELETE FROM workspace_deletion WHERE id=$1`, []any{"deletion_" + w.id}, publishing.ErrForbidden, nil},
+		{"cancelled deletion", `INSERT INTO workspace_deletion (id,"organizationId","requestedByUserId",status,"scheduledFor","updatedAt") VALUES ($1,$2,$3,'CANCELLED',now(),now())`,
+			[]any{"deletion_" + w.id, w.org, w.owner.UserID}, `DELETE FROM workspace_deletion WHERE id=$1`, []any{"deletion_" + w.id}, nil, nil},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			w.exec(t, scenario.deny, scenario.denyArgs...)
+			t.Cleanup(func() { w.exec(t, scenario.restore, scenario.restoreArgs...) })
+			check(t, scenario.wantRole, scenario.wantSession)
+		})
+	}
+	t.Run("a delegated session acts in a workspace other than the active one", func(t *testing.T) {
+		w.exec(t, `UPDATE session SET "activeOrganizationId"='other' WHERE id=$1`, reader.SessionID)
+		t.Cleanup(func() {
+			w.exec(t, `UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, reader.SessionID, w.org)
+		})
+		role, err := auth.AuthorizedRole(publishing.ForDelegatedSession(w.ctx), w.org, reader.UserID, reader.SessionID, readRoles...)
+		if err != nil || role != "viewer" {
+			t.Fatalf("delegated role=%q err=%v", role, err)
+		}
+	})
 }

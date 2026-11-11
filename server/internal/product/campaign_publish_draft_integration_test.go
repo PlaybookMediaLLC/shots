@@ -41,6 +41,10 @@ func TestCampaignVisualBecomesPublishDraft(t *testing.T) {
 	if draft.CampaignID == nil || *draft.CampaignID != campaign.ID {
 		t.Fatalf("draft lost its campaign: %v", draft.CampaignID)
 	}
+	// The post whose copy it took stays reachable, with its claims and approval.
+	if draft.CampaignPostID == nil || *draft.CampaignPostID != campaign.Posts[0].ID {
+		t.Fatalf("draft lost its campaign post: %v", draft.CampaignPostID)
+	}
 	// The export is attached, so the campaign's asset board shows what was published.
 	link, err := w.db.Client.CampaignAsset.Query().Where(campaignasset.CampaignID(campaign.ID),
 		campaignasset.AssetID(export)).Only(w.ctx)
@@ -133,5 +137,26 @@ func TestCampaignVisualBecomesPublishDraft(t *testing.T) {
 	}
 	if plain.CampaignID != nil {
 		t.Fatalf("a plain draft claimed a campaign: %v", *plain.CampaignID)
+	}
+
+	// A draft made from a release keeps it; another workspace's release is not found.
+	releaseID, foreign := uuid.NewString(), uuid.NewString()
+	w.exec(t, `INSERT INTO release (id,"organizationId",title,"benefitStatement","updatedAt") VALUES ($1,$2,'Views','Named views',now())`, releaseID, w.org)
+	other.exec(t, `INSERT INTO release (id,"organizationId",title,"benefitStatement","updatedAt") VALUES ($1,$2,'Theirs','Not yours',now())`, foreign, other.org)
+	fromRelease, err := w.repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "From the release", ReleaseID: releaseID})
+	if err != nil || fromRelease.ReleaseID == nil || *fromRelease.ReleaseID != releaseID {
+		t.Fatalf("release draft=%+v err=%v", fromRelease, err)
+	}
+	if _, err := w.repo.CreateContentDraft(w.ctx, w.owner, ContentDraftInput{Title: "Not ours", ReleaseID: foreign}); !errors.Is(err, publishing.ErrNotFound) {
+		t.Fatalf("another workspace's release err=%v", err)
+	}
+	// The refused draft left nothing behind, and the kept one's audit names its release.
+	var refused, audited int
+	if err := w.db.SQL.QueryRowContext(w.ctx, `SELECT count(*) FROM content_draft WHERE "organizationId"=$1 AND title='Not ours'`, w.org).Scan(&refused); err != nil || refused != 0 {
+		t.Fatalf("refused drafts=%d err=%v", refused, err)
+	}
+	if err := w.db.SQL.QueryRowContext(w.ctx, `SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND "entityId"=$2 AND metadata::text LIKE '%' || $3 || '%'`,
+		w.org, fromRelease.ID, releaseID).Scan(&audited); err != nil || audited != 1 {
+		t.Fatalf("audit rows naming the release=%d err=%v", audited, err)
 	}
 }

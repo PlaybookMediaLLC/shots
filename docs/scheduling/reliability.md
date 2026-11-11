@@ -84,6 +84,17 @@ failed before it.
   scheduling bumps the draft version, so a deliberate new schedule names the
   new version and replaces the queued posts. Publish now and Reschedule are
   separate, explicit actions.
+- Before posting the same text and media to an account that already has it
+  queued, publishing, published or unconfirmed within a day, a member is
+  asked to confirm (409 `duplicate_content` with the posts; the composer, the
+  schedule dialog, Publish now and the batch dialog offer "Schedule anyway",
+  which sends `confirmDuplicate`). API keys, `createPost` and batch runs skip
+  the question: their callers own their retries.
+- `POST /api/v1/scheduled-posts` and MCP `createScheduledPost` without an
+  `Idempotency-Key` name the request by its content (source, connection,
+  caption, time), so an identical retry returns the first post. A caller's
+  own key returns its first post to any retry, even one that recomputed the
+  time. A content key whose post was cancelled or failed is a 409.
 - A retry of the same version and the same timing replays the original posts
   and charges nothing. The same version with other timing is a 409. A
   request whose keys match only some existing posts is a 409.
@@ -115,7 +126,11 @@ retry or recovery lands on the same instant.
 | Commit succeeds, workflow start fails | 503 saying the schedule is saved; the once-a-minute dispatcher starts the due post (`DispatchDue`, `ListRecoverablePosts`); a retry replays | `TestScheduleContentDraftReportsSavedScheduleWhenWorkflowWakeupFails`, `TestRecoverablePostsAreDueScheduledPostsInsideTheWindow` |
 | Worker stops before the provider call | The post is `PROCESSING` without an open attempt. Once its run has closed, the sweep queues it again and it publishes once | `TestSchedulingThroughTemporal` "vanished before sending" |
 | Provider refuses (4xx, 5xx without ambiguity) | `FAILED` with the provider's status; no automatic retry | `TestSchedulingThroughTemporal` "refusal" |
-| Provider rate-limits (429) | Durable retry after `PUBLISHING_RETRY_DELAY`, up to `PUBLISHING_MAX_ATTEMPTS` | `TestSchedulingThroughTemporal` "rate limit" |
+| Provider rate-limits (429) | A refused write returns a typed rate limit (`temporalx.RateLimited`) after the client's short retries, carrying the provider's retry-after (`Retry-After` or X's `x-rate-limit-reset`). The workflow retries durably after the longer of `PUBLISHING_RETRY_DELAY` and that guidance, capped at an hour, up to `PUBLISHING_MAX_ATTEMPTS`; a limit that does not clear ends `FAILED` with code `429`. A read that follows a committed write (a permalink, a later story) stays ambiguous | `TestSchedulingThroughTemporal` "rate limit", `TestPostWorkflowV2WaitsForTheProviderRetryGuidance`, `TestFetch*` in `social/integrations` |
+| Daily posting cap (Instagram 2207042, X's spent 24-hour allowance) | `FAILED` with `PROVIDER_DAILY_LIMIT`; nothing was sent; the member reschedules | `TestFetchDoesNotRetryADailyLimit`, `TestRateLimitsAndDailyCapsAreDefiniteOutcomes` |
+| Server error (500) on a write | `UNKNOWN_DELIVERY` after one request; never resent. Writes that stay invisible until a later publish call (Instagram and Threads containers, LinkedIn uploads, Mastodon media), Mastodon statuses sent with an `Idempotency-Key`, and reads sent as POST are marked `Retryable` and keep their retries | `TestFetchNeverResendsAWriteAfterAServerError`, `TestStreamedPostIsNotResentAfterAServerError` |
+| Provider refuses the token, or it lapsed with nothing to renew it | `FAILED` with `ACCOUNT_RECONNECT`; the channel is flagged `refreshNeeded`, so the workspace gets `integration.reconnect_required`. After reconnecting, the member retries the post from the draft. A lapsed token with a refresh token stays the maintenance refresh's to renew | `TestRefusedOrLapsedCredentialsAskTheWorkspaceToReconnect` |
+| X refuses a request because Shots' own app keys are bad (OAuth 1.0a signs with both) | Before flagging, the publisher checks the app keys, exactly as the signer sends them, with X's app-only token endpoint. Refused keys: `FAILED` with `PUBLISHER_UNAVAILABLE`, no channel flagged. A check that cannot run (timeout, rate limit, outage): no flag, and the post retries durably (nothing was created). Good keys: the account's token is at fault and is flagged as above. X's `403 client-not-enrolled`/`client-forbidden` (the app lost API access) also fails without flagging | `TestRefusedOrLapsedCredentialsAskTheWorkspaceToReconnect`, `TestAppCredentialsAreCheckedWithAppOnlyAuth`, `TestAppAccessRefusalBlamesNoAccount`, `TestPublishingRechecksCurrentGrantAndSubscription` |
 | Response lost after the provider may have accepted | `UNKNOWN_DELIVERY`; retry refused until a person reconciles it as live (with its URL, clearing the code) or not live (`NOT_LIVE`, retryable) | `TestSchedulingThroughTemporal` "lost response", `TestWritePublishing` |
 | Provider accepted, receipt write fails | The write retries for 24 hours; the provider ID is in the worker log. If the run still closes, the sweep marks the post `UNKNOWN_DELIVERY`. It is never sent again | `TestSchedulingThroughTemporal` "receipt" |
 | Destination or approval becomes ineligible | `CANCELLED` with `ACCOUNT_UNAVAILABLE`, `CHANGES_REQUESTED` (draft), `APPROVAL_REQUIRED` (campaign variant) or `WORKSPACE_INACTIVE`, checked before media; nothing sent | `TestSchedulingThroughTemporal` "withdrawn approval" and "an account revoked after scheduling", `TestContentDraftScheduleReliability`, `TestPrepareSendsOnlyEligibleOnTimePosts` |
@@ -162,6 +177,13 @@ offers no new preview until every such row has an answer. All destinations of a 
 times are not offered.
 
 ## Data and rollout
+
+`20261111090000_publication_attempt_receipt.sql` adds `providerMessage`
+(the provider's explanation, redacted of query strings and credentials, for
+support; members see the code's message) and `remoteUrl` to
+`publication_attempt`. Old attempts keep `NULL`. Deploy the migration and Go
+services before the web: the new web sends an empty key when the caller gave
+none, which an older Go handler refuses.
 
 `20261102130000_scheduled_post_intent.sql` adds two nullable columns to
 `scheduled_post`: `scheduleIntent` and `failureCode`. Existing posts keep

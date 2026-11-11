@@ -10,6 +10,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/brand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/google/uuid"
@@ -42,21 +43,43 @@ func (e *ProhibitedTermsError) Error() string {
 
 func (e *ProhibitedTermsError) Unwrap() error { return publishing.ErrConflict }
 
-// checkProhibited returns the workspace's prohibited terms found in texts.
-func checkProhibited(ctx context.Context, profiles *ent.BrandProfileClient, organizationID string, texts ...string) ([]TermMatch, error) {
-	profile, err := profiles.Query().Where(brandprofile.OrganizationID(organizationID)).Only(ctx)
-	if ent.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
+// checkProhibited returns the prohibited terms found in texts: the
+// workspace's and, when setID names one of its social sets, the phrases that
+// set's voice avoids. A set adds to the brand's list and never lifts a term
+// (mergeWritingContext's rule, which also decides when the set's guide applies).
+func checkProhibited(ctx context.Context, client *ent.Client, organizationID string, setID *string, texts ...string) ([]TermMatch, error) {
+	var terms []brand.ProhibitedTerm
+	profile, err := client.BrandProfile.Query().Where(brandprofile.OrganizationID(organizationID)).Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
-	return brand.Check(profile.ProhibitedTerms, texts...), nil
+	if profile != nil {
+		terms = append(terms, profile.ProhibitedTerms...)
+	}
+	if setID != nil && *setID != "" {
+		set, err := client.SocialSet.Query().Where(socialset.ID(*setID), socialset.OrganizationID(organizationID), socialset.DeletedAtIsNil()).Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return nil, err
+		}
+		if set != nil {
+			listed := map[string]bool{}
+			for _, term := range terms {
+				listed[strings.ToLower(term.Term)] = true
+			}
+			for _, phrase := range mergeWritingContext(nil, set, nil, "").ProhibitedPhrases {
+				if !listed[strings.ToLower(phrase)] {
+					terms = append(terms, brand.ProhibitedTerm{MatchMode: brand.MatchWord, Term: phrase, Reason: set.Name + "'s voice avoids it"})
+				}
+			}
+		}
+	}
+	return brand.Check(terms, texts...), nil
 }
 
-// requireAllowedCopy refuses texts that use a prohibited term.
-func requireAllowedCopy(ctx context.Context, profiles *ent.BrandProfileClient, organizationID string, texts ...string) error {
-	matches, err := checkProhibited(ctx, profiles, organizationID, texts...)
+// requireAllowedCopy refuses texts that use a prohibited term of the
+// workspace or of the social set the copy is for (setID, when known).
+func requireAllowedCopy(ctx context.Context, client *ent.Client, organizationID string, setID *string, texts ...string) error {
+	matches, err := checkProhibited(ctx, client, organizationID, setID, texts...)
 	if err != nil {
 		return err
 	}

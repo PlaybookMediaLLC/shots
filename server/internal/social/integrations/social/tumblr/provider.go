@@ -531,7 +531,7 @@ func (p *Provider) createMultipartPost(ctx context.Context, blogName, accessToke
 	// (with its size from a HEAD request) so files are never held in memory.
 	// RunStreamedUpload rebuilds the whole form per attempt (a consumed stream
 	// can't be replayed) and keeps handleErrors classification.
-	return integrations.RunStreamedUpload(ctx, p.Base, func() (*createPostResponse, error) {
+	return integrations.RunStreamedUpload(ctx, p.Base, false, func() (*createPostResponse, error) {
 		var buf bytes.Buffer
 		w := multipart.NewWriter(&buf)
 		var (

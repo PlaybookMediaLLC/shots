@@ -1,16 +1,21 @@
 package media
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -173,10 +178,42 @@ func (s *S3Store) AbortMultipartUpload(ctx context.Context, key, uploadID string
 	return err
 }
 
+// unhoistedSigner signs every header as a header. The default presigner moves
+// x-amz-* headers such as the checksum into the query string, where storage
+// may not check them.
+var unhoistedSigner = v4.NewSigner(func(o *v4.SignerOptions) {
+	o.DisableURIPathEscaping = true
+	o.DisableHeaderHoisting = true
+})
+
+// SignChecksummedUpload signs a write-once PUT of exactly size bytes whose
+// SHA-256 is digest. The caller sends the returned headers: storage refuses a
+// body of another length or content, and If-None-Match: * refuses to overwrite
+// an object already stored.
+func (s *S3Store) SignChecksummedUpload(ctx context.Context, key, mediaType string, size int64, digest []byte, expires time.Duration) (string, http.Header, error) {
+	request, err := s.signer.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(mediaType),
+		ContentLength: aws.Int64(size), ChecksumSHA256: aws.String(base64.StdEncoding.EncodeToString(digest)),
+		IfNoneMatch: aws.String("*"),
+	}, s3.WithPresignExpires(expires), func(o *s3.PresignOptions) { o.Presigner = unhoistedSigner })
+	if err != nil {
+		return "", nil, fmt.Errorf("sign checksummed upload: %w", err)
+	}
+	headers := request.SignedHeader.Clone()
+	headers.Del("Host") // the HTTP client sets it from the URL
+	return request.URL, headers, nil
+}
+
 func (s *S3Store) SignDownload(ctx context.Context, key string) (string, error) {
+	return s.SignDownloadFor(ctx, key, 2*time.Minute)
+}
+
+// SignDownloadFor signs a GET valid for expires, for media a person plays and
+// seeks through long after the first request.
+func (s *S3Store) SignDownloadFor(ctx context.Context, key string, expires time.Duration) (string, error) {
 	request, err := s.signer.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket), Key: aws.String(key),
-	}, s3.WithPresignExpires(2*time.Minute))
+	}, s3.WithPresignExpires(expires))
 	if err != nil {
 		return "", fmt.Errorf("sign media download: %w", err)
 	}
@@ -200,11 +237,18 @@ func (s *S3Store) Exists(ctx context.Context, key string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	var apiError smithy.APIError
-	if errors.As(err, &apiError) && (apiError.ErrorCode() == "NotFound" || apiError.ErrorCode() == "NoSuchKey") {
+	if missingObject(err) {
 		return false, nil
 	}
 	return false, fmt.Errorf("check media object: %w", err)
+}
+
+// ErrObjectNotFound is what Open returns for a key storage does not hold.
+var ErrObjectNotFound = errors.New("media object not found")
+
+func missingObject(err error) bool {
+	var apiError smithy.APIError
+	return errors.As(err, &apiError) && (apiError.ErrorCode() == "NotFound" || apiError.ErrorCode() == "NoSuchKey")
 }
 
 func (s *S3Store) Delete(ctx context.Context, key string) error {
@@ -212,9 +256,13 @@ func (s *S3Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-// Open streams an object, for reading it back without holding it whole.
+// Open streams an object, for reading it back without holding it whole. A
+// missing object is ErrObjectNotFound.
 func (s *S3Store) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	response, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if missingObject(err) {
+		return nil, fmt.Errorf("%w: %v", ErrObjectNotFound, err)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +285,22 @@ func (s *S3Store) Read(ctx context.Context, key string) ([]byte, error) {
 		return nil, fmt.Errorf("media object exceeds %d bytes", maxMediaBytes)
 	}
 	return content, nil
+}
+
+// List returns the keys under a prefix, in key order.
+func (s *S3Store) List(ctx context.Context, prefix string) ([]string, error) {
+	keys := []string{}
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{Bucket: aws.String(s.bucket), Prefix: aws.String(prefix)})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list media objects: %w", err)
+		}
+		for _, object := range page.Contents {
+			keys = append(keys, aws.ToString(object.Key))
+		}
+	}
+	return keys, nil
 }
 
 func (s *S3Store) Put(ctx context.Context, key, mediaType string, body io.Reader) error {
@@ -302,6 +366,61 @@ func (o *TenantObjects) AbortUpload(ctx context.Context, organizationID, key, up
 		return errors.New("media object is outside the active organization")
 	}
 	return o.store.AbortMultipartUpload(ctx, key, uploadID)
+}
+
+// DeletionLedgerDay is the prefix of the deletion-ledger entries for
+// deletions requested on a UTC day.
+func DeletionLedgerDay(day time.Time) string {
+	return "deletion-ledger/" + day.UTC().Format("2006/01/02") + "/"
+}
+
+// DeletionRecord is one deletion-ledger entry: what was deleted, when its
+// deletion was requested, and the ID that names the entry (the outbox event
+// that carried the request, or one made for a deletion recorded in its own
+// request). It holds IDs only, never content.
+type DeletionRecord struct {
+	Kind           string    `json:"kind"`
+	OrganizationID string    `json:"organizationId"`
+	ID             string    `json:"id"`
+	EventID        string    `json:"eventId"`
+	RequestedAt    time.Time `json:"requestedAt"`
+}
+
+// deletionLedgerKey names an entry by its ID under the UTC day the deletion
+// was requested.
+func deletionLedgerKey(requestedAt time.Time, id string) (string, error) {
+	if !safeSegment(id) {
+		return "", errors.New("deletion ledger entry needs a safe ID")
+	}
+	return DeletionLedgerDay(requestedAt) + id + ".json", nil
+}
+
+// RecordDeletion writes one deletion-ledger entry, named by its request's ID
+// under the UTC day the deletion was requested. The ledger lives outside the
+// database and its backups, so a restore can replay the deletions it undoes
+// (docs/deployment.md).
+func (o *TenantObjects) RecordDeletion(ctx context.Context, requestedAt time.Time, id string, record []byte) error {
+	key, err := deletionLedgerKey(requestedAt, id)
+	if err != nil {
+		return err
+	}
+	return o.store.Put(ctx, key, "application/json", bytes.NewReader(record))
+}
+
+// PutDeletionRecord writes one deletion-ledger entry through a store that
+// puts objects by key, as RecordDeletion files it.
+func PutDeletionRecord(ctx context.Context, store interface {
+	Put(context.Context, string, string, io.Reader) error
+}, record DeletionRecord) error {
+	body, err := json.Marshal(record)
+	if err != nil {
+		return err
+	}
+	key, err := deletionLedgerKey(record.RequestedAt, record.EventID)
+	if err != nil {
+		return err
+	}
+	return store.Put(ctx, key, "application/json", bytes.NewReader(body))
 }
 
 func (o *TenantObjects) SignDelivery(ctx context.Context, organizationID, key string) (string, error) {

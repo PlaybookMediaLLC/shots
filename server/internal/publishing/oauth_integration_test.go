@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialoauthstart"
@@ -152,12 +153,17 @@ func testOAuthSelectionGrant(t *testing.T, provider string) {
 	if _, err := repo.StartAttempt(ctx, post, "run-1", 1); err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.FailUnknown(ctx, post.ID, "run-1", 1); err != nil {
+	if err := repo.FailUnknown(ctx, post.ID, "run-1", 1, "upload to https://media.example/x.png?X-Amz-Signature=secret timed out"); err != nil {
 		t.Fatal(err)
 	}
 	post, err = db.Client.ScheduledPost.Get(ctx, post.ID)
 	if err != nil || post.Status != scheduledpost.StatusUNKNOWN_DELIVERY {
 		t.Fatalf("uncertain post status=%q err=%v", post.Status, err)
+	}
+	// The attempt keeps the provider's message without the signed query string.
+	attempt, err := db.Client.PublicationAttempt.Query().Where(publicationattempt.ScheduledPostID(post.ID)).Only(ctx)
+	if err != nil || attempt.ProviderMessage == nil || *attempt.ProviderMessage != "upload to https://media.example/x.png?REDACTED timed out" {
+		t.Fatalf("attempt=%+v err=%v", attempt, err)
 	}
 	if _, err := repo.CancelScheduledPost(ctx, actor, post.ID); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("uncertain delivery could be cancelled: %v", err)

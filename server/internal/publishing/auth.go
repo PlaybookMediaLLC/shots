@@ -8,10 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/supportaccessgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
@@ -33,17 +35,25 @@ func (r *Repository) AuthorizeConnections(ctx context.Context, organizationID, u
 type recordAuthorizationKey struct{}
 type replayAuthorizationKey struct{}
 
-// AuthorizationMemo carries the role a middleware's check read to the
-// handler's first check of its own, so that check skips the session, user,
-// membership and workspace queries it would repeat.
+// AuthorizationMemo carries the role or session a middleware's check read to
+// the handler's first check of the same kind, so that check skips the session,
+// user, membership and workspace queries it would repeat.
 type AuthorizationMemo struct {
-	last atomic.Pointer[authorizedRole]
+	last    atomic.Pointer[authorizedRole]
+	session atomic.Pointer[authorizedSession]
 }
 
 // authorizedRole is an actor AuthorizeRole admitted, and the client it read with.
 type authorizedRole struct {
 	client                                  *ent.Client
 	organizationID, userID, sessionID, role string
+}
+
+// authorizedSession is a session AuthorizeSession admitted, and the client it read with.
+type authorizedSession struct {
+	client            *ent.Client
+	userID, sessionID string
+	current           *ent.Session
 }
 
 // startedRunKey marks work a person already authorized when they started it.
@@ -58,15 +68,36 @@ func ForStartedRun(ctx context.Context) context.Context {
 	return context.WithValue(ctx, startedRunKey{}, true)
 }
 
-// RecordAuthorization keeps what AuthorizeRole admits under ctx in memo.
+// delegatedSessionKey marks a session acting through an OAuth client whose live grant was checked.
+type delegatedSessionKey struct{}
+
+// ForDelegatedSession is for an OAuth client, such as Founder Hub, acting for a
+// person's live session after the caller verified the client's grant. The client
+// names its workspace on each request, so AuthorizeRole under ctx does not hold
+// it to the browser's active workspace. Every other check still applies: the
+// session is live, the account is active, and it holds the role in a workspace
+// that is not being deleted.
+func ForDelegatedSession(ctx context.Context) context.Context {
+	return context.WithValue(ctx, delegatedSessionKey{}, true)
+}
+
+// IsDelegatedSession reports whether ctx is marked by ForDelegatedSession.
+func IsDelegatedSession(ctx context.Context) bool {
+	delegated, _ := ctx.Value(delegatedSessionKey{}).(bool)
+	return delegated
+}
+
+// RecordAuthorization keeps what AuthorizeRole or AuthorizeSession admits
+// under ctx in memo.
 func RecordAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
 	return context.WithValue(ctx, recordAuthorizationKey{}, memo)
 }
 
-// ReplayAuthorization lets the first AuthorizeRole under ctx reuse memo for
-// the same actor and client. Every later check reads again, so a change the
-// handler makes is always seen, and a transaction's repository has its own
-// client, so a check under a row lock reads again too.
+// ReplayAuthorization lets the first AuthorizeRole, and the first
+// AuthorizeSession, under ctx reuse memo for the same actor and client. Every
+// later check reads again, so a change the handler makes is always seen, and a
+// transaction's repository has its own client, so a check under a row lock
+// reads again too.
 func ReplayAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
 	return context.WithValue(ctx, replayAuthorizationKey{}, memo)
 }
@@ -99,11 +130,24 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			return "", err
 		}
 	} else {
-		current, err := r.AuthorizeSession(ctx, userID, sessionID)
+		// One query admits the usual request. A refusal falls through to the
+		// reads below, so it returns the error each check returns on its own.
+		role, admitted, err := r.admittedRole(ctx, organizationID, userID, sessionID)
 		if err != nil {
 			return "", err
 		}
-		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
+		if admitted {
+			if !workspaceroles.Allows(role, allowedRoles...) {
+				return "", ErrForbidden
+			}
+			r.recordRole(ctx, organizationID, userID, sessionID, role)
+			return role, nil
+		}
+		current, err := r.authorizeSession(ctx, userID, sessionID)
+		if err != nil {
+			return "", err
+		}
+		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID && !IsDelegatedSession(ctx) {
 			return "", ErrForbidden
 		}
 	}
@@ -123,10 +167,40 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 	if err := r.requireOperational(ctx, organizationID); err != nil {
 		return "", err
 	}
+	r.recordRole(ctx, organizationID, userID, sessionID, role)
+	return role, nil
+}
+
+// admittedRole reads in one query what AuthorizedRole checks for a session:
+// a live session of an active account, an active workspace that is this one
+// or none (any, for a delegated session), exactly one membership, and no
+// deletion in progress. It returns the role, or false when any check refuses.
+func (r *Repository) admittedRole(ctx context.Context, organizationID, userID, sessionID string) (string, bool, error) {
+	var roles []string
+	err := r.client.PlatformQuery(ctx, `SELECT m.role FROM session s JOIN "user" u ON u.id=s."userId"
+        JOIN member m ON m."userId"=u.id AND m."organizationId"=$1
+        WHERE s.id=$2 AND s."userId"=$3 AND s."expiresAt">$4 AND coalesce(u.banned,false)=false
+        AND ($5::boolean OR s."activeOrganizationId" IS NULL OR s."activeOrganizationId"=$1)
+        AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=$1 AND d.status<>'CANCELLED')`,
+		[]any{organizationID, sessionID, userID, time.Now().UTC(), IsDelegatedSession(ctx)}, func(row entsql.ColumnScanner) error {
+			var role string
+			if err := row.Scan(&role); err != nil {
+				return err
+			}
+			roles = append(roles, role)
+			return nil
+		})
+	if err != nil || len(roles) != 1 {
+		return "", false, err
+	}
+	return roles[0], true, nil
+}
+
+// recordRole keeps an admitted role for the handler's first check.
+func (r *Repository) recordRole(ctx context.Context, organizationID, userID, sessionID, role string) {
 	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
 		memo.last.Store(&authorizedRole{r.client, organizationID, userID, sessionID, role})
 	}
-	return role, nil
 }
 
 // requireOperational rejects a workspace that is scheduled for deletion.
@@ -144,13 +218,44 @@ func (r *Repository) requireOperational(ctx context.Context, organizationID stri
 }
 
 // AuthorizeSession validates a user session without requiring an active
-// workspace. Workspace creation and switching use this entry point.
+// workspace. Workspace creation and switching use this entry point. Its first
+// call under ReplayAuthorization can return the middleware's session unread.
 func (r *Repository) AuthorizeSession(ctx context.Context, userID, sessionID string) (*ent.Session, error) {
+	if memo, _ := ctx.Value(replayAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		last := memo.session.Swap(nil)
+		if last != nil && last.client == r.client && last.userID == userID && last.sessionID == sessionID {
+			return last.current, nil
+		}
+	}
+	current, err := r.authorizeSession(ctx, userID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		memo.session.Store(&authorizedSession{r.client, userID, sessionID, current})
+	}
+	return current, nil
+}
+
+// authorizeSession reads the session and its account. AuthorizedRole calls it
+// directly, so a role check never records or replays a session check.
+func (r *Repository) authorizeSession(ctx context.Context, userID, sessionID string) (*ent.Session, error) {
 	if userID == "" || sessionID == "" {
 		return nil, ErrUnauthorized
 	}
 	now := time.Now().UTC()
+	// One query admits a live session of an active account. A refusal reads
+	// again step by step below, so it returns the same error as before.
+	activeAccount := predicate.Session(func(s *entsql.Selector) {
+		s.Where(entsql.ExprP(`EXISTS (SELECT 1 FROM "user" u WHERE u.id=` + s.C(session.FieldUserID) + ` AND coalesce(u.banned,false)=false)`))
+	})
 	current, err := r.client.Session.Query().Where(
+		session.ID(sessionID), session.UserID(userID), session.ExpiresAtGT(now), activeAccount,
+	).Only(ctx)
+	if err == nil || !ent.IsNotFound(err) {
+		return current, err
+	}
+	current, err = r.client.Session.Query().Where(
 		session.ID(sessionID), session.UserID(userID), session.ExpiresAtGT(now),
 	).Only(ctx)
 	if ent.IsNotFound(err) {

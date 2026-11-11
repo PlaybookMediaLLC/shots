@@ -14,7 +14,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/asset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/brandprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/campaignpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
@@ -97,6 +99,11 @@ func TestAutomationGenerationNeedsCapableWorkerAndChargesOnce(t *testing.T) {
 	if _, err := f.repo.ActivateReleaseAutomation(f.ctx, f.owner, draft.ID, draft.Revision); !errors.Is(err, publishing.ErrConflict) {
 		t.Fatalf("activated without an AI-capable worker: %v", err)
 	}
+	tagline := "Ship it, show it"
+	if _, err := f.repo.UpsertBrandProfile(f.ctx, f.owner, UpsertBrandProfileInput{Audience: "Engineers", ProductDescription: "Exports",
+		Tone: "Direct", Tagline: &tagline, SocialHandles: map[string]string{"x": "@shots"}}); err != nil {
+		t.Fatal(err)
+	}
 	overview, err := f.repo.ReleaseAutomationOverview(f.ctx, f.owner)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +133,14 @@ func TestAutomationGenerationNeedsCapableWorkerAndChargesOnce(t *testing.T) {
 	}
 	if model.calls != 1 || outputs.CreditsCharged != 5 {
 		t.Fatalf("model calls=%d credits=%d", model.calls, outputs.CreditsCharged)
+	}
+	// The copy is written in the one brand voice, rendered from the merged context.
+	profile, err := f.db.Client.BrandProfile.Query().Where(brandprofile.OrganizationID(f.org)).Only(f.ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		t.Fatal(err)
+	}
+	if want := voicePrompt(WorkspaceVoice(profile)); !strings.Contains(model.prompts[0], want) {
+		t.Fatalf("the automation prompt lacks the brand voice %q:\n%s", want, model.prompts[0])
 	}
 	var charged int64
 	for key, used := range meter.used {
@@ -391,7 +406,7 @@ func TestAutomationTagPushReleasesBundleUnreleasedChanges(t *testing.T) {
 		history, _ := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{Family: automation.Merged})
 		for _, item := range history {
 			if item.Event.Snapshot.Number == number {
-				if err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
+				if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -457,7 +472,7 @@ func TestAutomationMilestoneReleasesTakeAssignedPullRequests(t *testing.T) {
 	}
 	prs, _ := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{Family: automation.Merged})
 	for _, item := range prs {
-		if err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
+		if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -794,7 +809,7 @@ func (f *captureFixture) deploy(t *testing.T, id int, environment string) string
 	if _, err := f.repo.LoadReleaseAutomation(f.ctx, f.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil {
+	if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.repo.SelectReleaseAutomation(f.ctx, f.org, runID, *f.active.ActiveVersionID, 0); err != nil {

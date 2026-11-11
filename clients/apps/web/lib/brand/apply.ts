@@ -20,6 +20,16 @@ export type BrandCategory = z.infer<typeof brandCategorySchema>
 /** Every brand category, in the order the editor lists them. */
 export const BRAND_CATEGORIES = brandCategorySchema.options
 
+/** The categories a kit has values for: a frame, logos and fonts are optional. */
+export function availableBrandCategories(kit: BrandKit): BrandCategory[] {
+  return BRAND_CATEGORIES.filter((category) => {
+    if (category === 'frame') return Boolean(kit.frame)
+    if (category === 'logo') return kit.logos.length > 0
+    if (category === 'typography') return Boolean(kit.primaryFont)
+    return true
+  })
+}
+
 /** The layer id of the logo a brand kit places. */
 export const BRAND_LOGO_ID = 'brand-logo'
 

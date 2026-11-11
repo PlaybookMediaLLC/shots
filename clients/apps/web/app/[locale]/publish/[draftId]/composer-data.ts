@@ -9,7 +9,7 @@ import {
   getContentDraftSettings,
   listContentDraftPosts,
 } from '@/lib/tenant/content-drafts'
-import { isAiEnabled } from '@/lib/trpc/routers/launch'
+import { aiAllowed } from '@/lib/trpc/routers/launch'
 import { requireDraftsPageAccess } from '../../drafts/page-access'
 import { loadWrite } from '../write-data'
 
@@ -33,15 +33,15 @@ export async function loadDraftComposer(
   const collabUrl = process.env.PLATFORM_COLLAB_URL || null
   // Every read starts at once; only the library's draft list waits for the draft's set.
   const loadingDraft = getContentDraft(access.tenant, draftId)
-  const [draft, data, posts, aiEnabled, settings, collabToken] = await Promise.all([
+  const [draft, data, posts, settings, collabToken] = await Promise.all([
     loadingDraft,
     // The library shows the set the draft belongs to, whatever was open before.
     loadWrite(
       access.tenant,
-      loadingDraft.then((loaded) => ({ ...query, set: loaded?.socialSetId ?? undefined }))
+      loadingDraft.then((loaded) => ({ ...query, set: loaded?.socialSetId ?? undefined })),
+      access.hasAdvancedScheduling
     ),
     listContentDraftPosts(access.tenant, draftId),
-    isAiEnabled(access.tenant).catch(() => false),
     getContentDraftSettings(access.tenant),
     // Issued with the page, so the editor connects without waiting for another request.
     collabUrl ? createContentDraftCollabToken(access.tenant, draftId).catch(() => null) : null,
@@ -58,7 +58,8 @@ export async function loadDraftComposer(
       organizationName: access.organization.name,
     },
     composer: {
-      aiEnabled,
+      // The page access already read the plan and the workspace settings.
+      aiEnabled: aiAllowed(access.hasPaidPlan, access.organization.workspaceSettings),
       collabToken,
       collabUrl,
       draft: contentDraftSchema.parse(draft),

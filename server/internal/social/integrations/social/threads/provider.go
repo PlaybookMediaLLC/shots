@@ -92,7 +92,9 @@ func handleErrors(body string, _ int) *integrations.HandledError {
 
 // getJSON is `(await this.fetch(url, {method})).json()`.
 func (p *Provider) getJSON(ctx context.Context, method, rawURL string, body []byte, contentType string, out any) error {
-	req := integrations.Request{Method: method, Body: body}
+	// A container (/threads?) stays invisible until threads_publish, so it may
+	// be resent after a server error; threads_publish may not.
+	req := integrations.Request{Method: method, Body: body, Retryable: strings.Contains(rawURL, "/threads?")}
 	if contentType != "" {
 		req.Headers = map[string]string{"Content-Type": contentType}
 	}
@@ -360,7 +362,7 @@ func (p *Provider) createTextContent(ctx context.Context, userID, accessToken, m
 	return res.ID, nil
 }
 
-func (p *Provider) publishThread(ctx context.Context, userID, accessToken, creationID string) (threadID, permalink string, err error) {
+func (p *Provider) publishThread(ctx context.Context, userID, accessToken, creationID string, integration *ent.Integration) (threadID, permalink string, err error) {
 	if err := p.checkLoaded(ctx, creationID, accessToken); err != nil {
 		return "", "", err
 	}
@@ -368,13 +370,7 @@ func (p *Provider) publishThread(ctx context.Context, userID, accessToken, creat
 	if err := p.getJSON(ctx, http.MethodPost, graphURL+"/v1.0/"+userID+"/threads_publish?creation_id="+creationID+"&access_token="+accessToken, nil, "", &published); err != nil {
 		return "", "", err
 	}
-	var link struct {
-		Permalink string `json:"permalink"`
-	}
-	if err := p.getJSON(ctx, http.MethodGet, graphURL+"/v1.0/"+published.ID+"?fields=id,permalink&access_token="+accessToken, nil, "", &link); err != nil {
-		return "", "", err
-	}
-	return published.ID, link.Permalink, nil
+	return published.ID, p.threadPermalink(ctx, published.ID, accessToken, integration), nil
 }
 
 func (p *Provider) createThreadContent(ctx context.Context, userID, accessToken string, post integrations.PostDetails, replyToID, quoteID string) (string, error) {
@@ -601,7 +597,7 @@ func (p *Provider) Post(ctx context.Context, userID, accessToken string, posts [
 	}
 }
 
-func (p *Provider) Comment(ctx context.Context, userID, postID, lastCommentID, accessToken string, posts []integrations.PostDetails, _ *ent.Integration) ([]integrations.PostResponse, error) {
+func (p *Provider) Comment(ctx context.Context, userID, postID, lastCommentID, accessToken string, posts []integrations.PostDetails, integration *ent.Integration) ([]integrations.PostResponse, error) {
 	if len(posts) == 0 {
 		return []integrations.PostResponse{}, nil
 	}
@@ -618,7 +614,7 @@ func (p *Provider) Comment(ctx context.Context, userID, postID, lastCommentID, a
 	}
 
 	// Publish the reply
-	replyThreadID, permalink, err := p.publishThread(ctx, userID, accessToken, replyContentID)
+	replyThreadID, permalink, err := p.publishThread(ctx, userID, accessToken, replyContentID, integration)
 	if err != nil {
 		return nil, err
 	}

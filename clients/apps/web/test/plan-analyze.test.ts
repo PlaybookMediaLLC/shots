@@ -736,19 +736,58 @@ test('every failure names a cause and an action besides retrying when one exists
     'VIDEO_TOO_LONG',
     'MEDIA_UNSUPPORTED',
     'PROVIDER_PERMISSIONS',
+    'PROVIDER_DAILY_LIMIT',
   ])
     assert.doesNotMatch(postFailureReason(code) ?? '', /\(/, code)
   assert.equal(postFailureFix('ACCOUNT_RECONNECT'), 'reconnect')
   assert.equal(postFailureFix('403'), 'reconnect')
-  assert.equal(postFailureFix('VIDEO_TOO_LONG'), 'edit')
+  assert.equal(postFailureFix('VIDEO_TOO_LONG'), 'edit-media')
+  assert.equal(postFailureFix('POST_OPTIONS'), 'edit')
   assert.equal(postFailureFix('400'), 'edit')
-  assert.equal(postFailureFix('429'), null)
+  assert.equal(postFailureFix('429'), 'reschedule')
+  assert.equal(postFailureFix('PROVIDER_DAILY_LIMIT'), 'reschedule')
+  assert.equal(postFailureFix('UNKNOWN_DELIVERY'), 'check-account')
   assert.equal(postFailureFix(null), null)
   // A retry resends what was scheduled, so a failure the post caused needs an edit first.
   assert.equal(retryCanHelp('POST_OPTIONS'), false)
   assert.equal(retryCanHelp('400'), false)
   assert.equal(retryCanHelp('UNKNOWN'), true)
   assert.equal(retryCanHelp('ACCOUNT_RECONNECT'), true)
+  assert.equal(retryCanHelp('MEDIA_UNSUPPORTED'), false)
+})
+
+test('every failure code the backend records has one message and one next action', () => {
+  // server/internal/publishing/types.go Failure* codes and the statuses a provider leaves.
+  const codes = [
+    'WORKSPACE_INACTIVE',
+    'ACCOUNT_UNAVAILABLE',
+    'APPROVAL_REQUIRED',
+    'CHANGES_REQUESTED',
+    'MEDIA_UNAVAILABLE',
+    'MISSED_WINDOW',
+    'UNKNOWN_DELIVERY',
+    'NOT_LIVE',
+    'ACCOUNT_RECONNECT',
+    'PROVIDER_PERMISSIONS',
+    'POST_OPTIONS',
+    'VIDEO_TOO_LONG',
+    'MEDIA_UNSUPPORTED',
+    'PUBLISHER_UNAVAILABLE',
+    'PUBLISHER_ERROR',
+    'PROVIDER_DAILY_LIMIT',
+    'NETWORK',
+    '429',
+    '401',
+    '403',
+  ]
+  for (const code of codes) {
+    const reason = postFailureReason(code) ?? ''
+    assert.doesNotMatch(reason, /did not publish \(/, `${code} has no message of its own`)
+    // Only an inactive workspace has nothing left to do.
+    assert.equal(postFailureFix(code) === null, code === 'WORKSPACE_INACTIVE', `${code} action`)
+  }
+  assert.match(postFailureReason('PROVIDER_DAILY_LIMIT') ?? '', /daily posting limit.*Reschedule/)
+  assert.match(postFailureReason('429') ?? '', /rate-limiting.*Reschedule/)
 })
 
 test('a draft is called by its title, else its first line of text', () => {

@@ -1,6 +1,7 @@
 package product
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -12,6 +13,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -30,6 +33,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/upload"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceroles"
 	"github.com/lucsky/cuid"
 )
 
@@ -323,6 +327,25 @@ func accountHealth(status channelconnection.Status, exists, deleted, disabled, r
 	return AccountConnected
 }
 
+// socialTablesFound remembers that the social Integration table exists. A
+// database that has it keeps it, so only a found table is remembered; a
+// database without it is asked again on the next call.
+var socialTablesFound atomic.Bool
+
+func socialTablesPresent(ctx context.Context, client *ent.Client) (bool, error) {
+	if socialTablesFound.Load() {
+		return true, nil
+	}
+	var social bool
+	err := client.PlatformQuery(ctx, `SELECT to_regclass('public."Integration"') IS NOT NULL`, nil, func(row entsql.ColumnScanner) error {
+		return row.Scan(&social)
+	})
+	if social {
+		socialTablesFound.Store(true)
+	}
+	return social, err
+}
+
 // connectionHealth requires a provider record in the bound social tenant.
 // An active product row alone is not proof of usable provider credentials.
 // Missing provider tables, bindings, or records leave the account unverified.
@@ -336,10 +359,7 @@ func connectionHealth(ctx context.Context, client *ent.Client, organizationID st
 		ids = append(ids, connection.ID)
 		health[connection.ID] = accountHealth(connection.Status, false, false, false, false, false, nil, time.Now())
 	}
-	var social bool
-	if err := client.PlatformQuery(ctx, `SELECT to_regclass('public."Integration"') IS NOT NULL`, nil, func(row entsql.ColumnScanner) error {
-		return row.Scan(&social)
-	}); err != nil || !social {
+	if social, err := socialTablesPresent(ctx, client); err != nil || !social {
 		return health, err
 	}
 	statuses := make(map[string]channelconnection.Status, len(connections))
@@ -456,6 +476,24 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	for _, set := range sets {
 		ids = append(ids, set.ID)
 	}
+	// The writing samples and the AI switch do not depend on the accounts, so
+	// they are read while the accounts are.
+	samples := map[string]int{}
+	var samplesErr error
+	var aiEnabled bool
+	var side sync.WaitGroup
+	defer side.Wait()
+	if len(ids) > 0 {
+		side.Go(func() {
+			var rows []*ent.SocialSetWritingSample
+			rows, samplesErr = c.client.SocialSetWritingSample.Query().Where(socialsetwritingsample.SocialSetIDIn(ids...),
+				socialsetwritingsample.OrganizationID(actor.OrganizationID)).All(ctx)
+			for _, row := range rows {
+				samples[row.SocialSetID]++
+			}
+		})
+	}
+	side.Go(func() { aiEnabled = c.workspaceAIEnabled(ctx, actor.OrganizationID) })
 	connections, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
 		channelconnection.SocialSetIDIn(ids...), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
 		Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
@@ -466,30 +504,35 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	if err != nil {
 		return nil, err
 	}
+	built := make([]SocialAccount, len(connections))
+	// Each standing reads the account's credentials, and TikTok's asks TikTok,
+	// so the accounts are read together rather than one after another. Five at
+	// a time keep a workspace with many accounts from taking every connection.
+	var standings sync.WaitGroup
+	slots := make(chan struct{}, 5)
+	for i, connection := range connections {
+		built[i] = socialAccount(ctx, connection, health[connection.ID])
+		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && built[i].Health == AccountConnected {
+			standings.Go(func() {
+				slots <- struct{}{}
+				defer func() { <-slots }()
+				standing, account := c.accountStanding(ctx, connection), &built[i]
+				account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
+				account.MastodonQuotes = standing.MastodonQuotes
+				account.XQuotes = standing.XQuotes
+				account.TikTokCreator = standing.TikTokCreator
+			})
+		}
+	}
+	standings.Wait()
 	accounts := map[string][]SocialAccount{}
-	for _, connection := range connections {
-		account := socialAccount(ctx, connection, health[connection.ID])
-		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && account.Health == AccountConnected {
-			standing := c.accountStanding(ctx, connection)
-			account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
-			account.MastodonQuotes = standing.MastodonQuotes
-			account.XQuotes = standing.XQuotes
-			account.TikTokCreator = standing.TikTokCreator
-		}
-		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], account)
+	for i, connection := range connections {
+		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], built[i])
 	}
-	samples := map[string]int{}
-	if len(ids) > 0 {
-		rows, err := c.client.SocialSetWritingSample.Query().Where(socialsetwritingsample.SocialSetIDIn(ids...),
-			socialsetwritingsample.OrganizationID(actor.OrganizationID)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, row := range rows {
-			samples[row.SocialSetID]++
-		}
+	side.Wait()
+	if samplesErr != nil {
+		return nil, samplesErr
 	}
-	aiEnabled := c.workspaceAIEnabled(ctx, actor.OrganizationID)
 	records := make([]SocialSetRecord, 0, len(sets))
 	for _, set := range sets {
 		setAccounts := accounts[set.ID]
@@ -531,7 +574,18 @@ func (c *Configuration) socialSetRecord(ctx context.Context, actor Actor, set *e
 // that belong to no set and, for owners and admins, private sets left behind
 // by people who left the workspace.
 func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*SocialSetList, error) {
-	if err := c.authorizeContentDrafts(ctx, actor, false); err != nil {
+	// A session's one role read gates both the list and, below, the orphaned
+	// sets; a second check would read the session and membership again.
+	var role string
+	var err error
+	if actor.IsSession() {
+		if role, err = c.auth.AuthorizedRole(ctx, actor.OrganizationID, actor.UserID, actor.SessionID, readRoles...); err == nil {
+			err = c.requireWorkspaceFeature(ctx, actor.OrganizationID, contentDraftFeature)
+		}
+	} else {
+		err = c.authorizeContentDrafts(ctx, actor, false)
+	}
+	if err != nil {
 		return nil, err
 	}
 	// Keep legacy unassigned accounts usable without creating an empty brand
@@ -550,32 +604,48 @@ func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*Socia
 	if err != nil {
 		return nil, err
 	}
+	// The unassigned accounts and the orphaned sets do not depend on the sets'
+	// records, so the three are read together. Unassigned accounts exist only
+	// when the check above found some.
+	list := &SocialSetList{Orphaned: []OrphanedSocialSet{}, Unassigned: []SocialAccount{}}
+	var unassignedErr, orphansErr error
+	var parts sync.WaitGroup
+	if legacyAccounts {
+		parts.Go(func() {
+			unassignedErr = c.listUnassigned(ctx, actor.OrganizationID, list)
+		})
+	}
+	if workspaceroles.Allows(role, "owner", "admin") {
+		parts.Go(func() {
+			list.Orphaned, orphansErr = c.orphanedSocialSets(ctx, actor.OrganizationID)
+		})
+	}
 	records, err := c.socialSetRecords(ctx, actor, sets)
-	if err != nil {
+	parts.Wait()
+	// The errors keep the order the reads had when they ran one after another.
+	if err := cmp.Or(err, unassignedErr, orphansErr); err != nil {
 		return nil, err
 	}
-	list := &SocialSetList{Items: records, Orphaned: []OrphanedSocialSet{}, Unassigned: []SocialAccount{}}
-	unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
+	list.Items = records
+	return list, nil
+}
+
+// listUnassigned adds the workspace's active accounts that belong to no set.
+func (c *Configuration) listUnassigned(ctx context.Context, organizationID string, list *SocialSetList) error {
+	unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(organizationID),
 		channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
 		Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	health, err := connectionHealth(ctx, c.client, actor.OrganizationID, unassigned)
+	health, err := connectionHealth(ctx, c.client, organizationID, unassigned)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, connection := range unassigned {
 		list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
 	}
-	if actor.IsSession() && c.authorizeRoles(ctx, actor, "owner", "admin") == nil {
-		orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)
-		if err != nil {
-			return nil, err
-		}
-		list.Orphaned = orphans
-	}
-	return list, nil
+	return nil
 }
 
 func (c *Configuration) orphanedSocialSets(ctx context.Context, organizationID string) ([]OrphanedSocialSet, error) {
@@ -584,13 +654,25 @@ func (c *Configuration) orphanedSocialSets(ctx context.Context, organizationID s
 	if err != nil {
 		return nil, err
 	}
-	orphans := []OrphanedSocialSet{}
+	// One read finds which owners are still members, rather than one per set.
+	owners := make([]string, 0, len(private))
 	for _, set := range private {
-		member, err := c.client.Member.Query().Where(member.OrganizationID(organizationID), member.UserID(*set.OwnerUserID)).Exist(ctx)
+		owners = append(owners, *set.OwnerUserID)
+	}
+	members := map[string]bool{}
+	if len(owners) > 0 {
+		ids, err := c.client.Member.Query().Where(member.OrganizationID(organizationID), member.UserIDIn(owners...)).
+			Select(member.FieldUserID).Strings(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if member {
+		for _, id := range ids {
+			members[id] = true
+		}
+	}
+	orphans := []OrphanedSocialSet{}
+	for _, set := range private {
+		if members[*set.OwnerUserID] {
 			continue
 		}
 		count, err := c.client.ChannelConnection.Query().Where(channelconnection.SocialSetID(set.ID),

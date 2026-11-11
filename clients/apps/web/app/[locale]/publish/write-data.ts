@@ -54,10 +54,12 @@ export const writeExperimentSchema = z.enum(['draft-tags'])
 /**
  * Load the library for a Write page. The query may still be resolving (a draft
  * page learns its set from the draft), so the first reads start without it.
+ * `advancedScheduling` is the page access's `content:scheduling-advanced`.
  */
 export async function loadWrite(
   tenant: OrganizationAccess,
-  rawQuery: Record<string, unknown> | Promise<Record<string, unknown>>
+  rawQuery: Record<string, unknown> | Promise<Record<string, unknown>>,
+  advancedScheduling: boolean
 ) {
   const remembered = (await cookies()).get(SOCIAL_SET_COOKIE)?.value
   const queried = Promise.resolve(rawQuery).then((raw) => writeQuerySchema.parse(raw))
@@ -96,10 +98,9 @@ export async function loadWrite(
     const library = await readLibrary(query, setId, false).catch(() => null)
     return library && { library, setId }
   })
-  const [sets, experimentList, advanced, preferences, query, early] = await Promise.all([
+  const [sets, experimentList, preferences, query, early] = await Promise.all([
     listSocialSets(tenant),
     orNull(backendSDK(tenant).listExperiments()),
-    backendSDK(tenant).getFeatureDecision('content:scheduling-advanced'),
     orNull(backendSDK(tenant).getUserPreferences()),
     queried,
     guessed,
@@ -161,7 +162,7 @@ export async function loadWrite(
   )
   return {
     activeSet: activeSet ?? null,
-    advancedScheduling: advanced.allowed,
+    advancedScheduling,
     experiments,
     failedCount: failedPage.pinned.length + failedPage.items.length,
     library,

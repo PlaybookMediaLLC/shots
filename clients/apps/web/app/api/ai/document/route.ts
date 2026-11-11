@@ -11,11 +11,11 @@ export const maxDuration = 120
 /** The document editor's AI menu: generate, edit or comment on a draft. */
 export const POST = route(documentChatContract, {
   auth: organizationAccess('artifact:edit'),
-  handler: async ({ access, body }) => {
+  handler: async ({ access, body, query }) => {
     if (!isCampaignStudioConfigured()) return errorResponse(503, 'AI is not configured.')
     if (!(await isAiEnabled(access))) {
       return errorResponse(403, 'AI is turned off for this workspace.')
     }
-    return streamDocumentChat(access, body)
+    return streamDocumentChat(access, body, query)
   },
 })

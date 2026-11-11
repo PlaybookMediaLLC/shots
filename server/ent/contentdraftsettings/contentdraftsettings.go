@@ -17,6 +17,8 @@ const (
 	FieldPostingSlots = "postingSlots"
 	// FieldRequireApproval holds the string denoting the require_approval field in the database.
 	FieldRequireApproval = "requireApproval"
+	// FieldAllowSelfApproval holds the string denoting the allow_self_approval field in the database.
+	FieldAllowSelfApproval = "allowSelfApproval"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updatedAt"
 	// Table holds the table name of the contentdraftsettings in the database.
@@ -28,6 +30,7 @@ var Columns = []string{
 	FieldID,
 	FieldPostingSlots,
 	FieldRequireApproval,
+	FieldAllowSelfApproval,
 	FieldUpdatedAt,
 }
 
@@ -44,6 +47,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultRequireApproval holds the default value on creation for the "require_approval" field.
 	DefaultRequireApproval bool
+	// DefaultAllowSelfApproval holds the default value on creation for the "allow_self_approval" field.
+	DefaultAllowSelfApproval bool
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
 	DefaultUpdatedAt func() time.Time
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
@@ -61,6 +66,11 @@ func ByID(opts ...sql.OrderTermOption) OrderOption {
 // ByRequireApproval orders the results by the require_approval field.
 func ByRequireApproval(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRequireApproval, opts...).ToFunc()
+}
+
+// ByAllowSelfApproval orders the results by the allow_self_approval field.
+func ByAllowSelfApproval(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowSelfApproval, opts...).ToFunc()
 }
 
 // ByUpdatedAt orders the results by the updated_at field.

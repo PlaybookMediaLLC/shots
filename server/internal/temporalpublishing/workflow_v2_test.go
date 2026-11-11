@@ -166,6 +166,98 @@ func TestPostWorkflowV2StopsAfterLastRateLimitAttempt(t *testing.T) {
 	}
 }
 
+// A provider's retry guidance lengthens the durable wait, up to the late
+// window; shorter guidance never shortens the configured delay.
+func TestPostWorkflowV2WaitsForTheProviderRetryGuidance(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		retryAfter, delay time.Duration
+	}{
+		{"provider asks for longer", 20 * time.Minute, 20 * time.Minute},
+		{"provider asks for less", time.Second, 5 * time.Minute},
+		{"provider asks within the window", 50 * time.Minute, 50 * time.Minute},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var suite testsuite.WorkflowTestSuite
+			env := suite.NewTestWorkflowEnvironment()
+			submitCalls := 0
+			var failures []FailInput
+			var submitted []time.Time
+			env.RegisterActivityWithOptions(func(context.Context, PrepareInput) (PreparedPublication, error) {
+				return PreparedPublication{PostID: "post-1", OrganizationID: "org-1", Ready: true}, nil
+			}, activity.RegisterOptions{Name: PrepareActivityName})
+			env.RegisterActivityWithOptions(func(_ context.Context, input BeginInput) (BeginResult, error) {
+				return BeginResult{AttemptID: "attempt", AttemptNumber: input.AttemptNumber}, nil
+			}, activity.RegisterOptions{Name: BeginActivityName})
+			env.RegisterActivityWithOptions(func(context.Context, SubmitInput) (PublishResult, error) {
+				submitCalls++
+				submitted = append(submitted, env.Now())
+				if submitCalls == 1 {
+					return PublishResult{FailureCode: "429", Outcome: OutcomeRetry, RetryAfter: tc.retryAfter}, nil
+				}
+				return PublishResult{Outcome: OutcomePublished, ProviderID: "remote-1"}, nil
+			}, activity.RegisterOptions{Name: SubmitActivityName})
+			env.RegisterActivityWithOptions(func(_ context.Context, input FailInput) error {
+				failures = append(failures, input)
+				return nil
+			}, activity.RegisterOptions{Name: FailActivityName})
+			env.RegisterActivityWithOptions(func(context.Context, CompleteInput) error { return nil },
+				activity.RegisterOptions{Name: CompleteActivityName})
+			env.ExecuteWorkflow(PostWorkflowV2, WorkflowInput{
+				ActivityTaskQueue: DefaultActivityQueue, ActivityTimeout: time.Minute,
+				MainTaskQueue: DefaultWorkflowQueue, MaxAttempts: 3, PostID: "post-1",
+				RetryDelay: 5 * time.Minute, ScheduledFor: time.Now(),
+			})
+			var result WorkflowResult
+			if err := env.GetWorkflowResult(&result); err != nil {
+				t.Fatal(err)
+			}
+			if result.Outcome != OutcomePublished || submitCalls != 2 || len(failures) != 1 {
+				t.Fatalf("result=%#v submit=%d failures=%d", result, submitCalls, len(failures))
+			}
+			if waited := submitted[1].Sub(submitted[0]); waited < tc.delay || waited > tc.delay+time.Minute {
+				t.Fatalf("waited %v between attempts, want %v", waited, tc.delay)
+			}
+		})
+	}
+}
+
+// A provider that asks to wait past the late window fails the post now with
+// its rate-limit reason instead of publishing it hours after its moment.
+func TestPostWorkflowV2FailsARetryThatWouldMissTheLateWindow(t *testing.T) {
+	var suite testsuite.WorkflowTestSuite
+	env := suite.NewTestWorkflowEnvironment()
+	submitCalls := 0
+	var failures []FailInput
+	env.RegisterActivityWithOptions(func(context.Context, PrepareInput) (PreparedPublication, error) {
+		return PreparedPublication{PostID: "post-1", OrganizationID: "org-1", Ready: true}, nil
+	}, activity.RegisterOptions{Name: PrepareActivityName})
+	env.RegisterActivityWithOptions(func(_ context.Context, input BeginInput) (BeginResult, error) {
+		return BeginResult{AttemptID: "attempt", AttemptNumber: input.AttemptNumber}, nil
+	}, activity.RegisterOptions{Name: BeginActivityName})
+	env.RegisterActivityWithOptions(func(context.Context, SubmitInput) (PublishResult, error) {
+		submitCalls++
+		return PublishResult{FailureCode: "429", Outcome: OutcomeRetry, RetryAfter: 3 * time.Hour, ProviderMessage: "slow down"}, nil
+	}, activity.RegisterOptions{Name: SubmitActivityName})
+	env.RegisterActivityWithOptions(func(_ context.Context, input FailInput) error {
+		failures = append(failures, input)
+		return nil
+	}, activity.RegisterOptions{Name: FailActivityName})
+	env.ExecuteWorkflow(PostWorkflowV2, WorkflowInput{
+		ActivityTaskQueue: DefaultActivityQueue, ActivityTimeout: time.Minute,
+		MainTaskQueue: DefaultWorkflowQueue, MaxAttempts: 3, PostID: "post-1",
+		RetryDelay: 5 * time.Minute, ScheduledFor: time.Now(),
+	})
+	var result WorkflowResult
+	if err := env.GetWorkflowResult(&result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != OutcomeFailed || result.FailureCode != "429" || submitCalls != 1 || len(failures) != 1 ||
+		!failures[0].RetryAt.IsZero() || failures[0].ProviderMessage != "slow down" {
+		t.Fatalf("result=%#v submit=%d failures=%#v", result, submitCalls, failures)
+	}
+}
+
 // A live post's follow-ups run as planned: each step at its time, and a key
 // settles at its first settled step, so its later checks do not run.
 func TestPostWorkflowV2RunsAutomationsAfterPublishing(t *testing.T) {

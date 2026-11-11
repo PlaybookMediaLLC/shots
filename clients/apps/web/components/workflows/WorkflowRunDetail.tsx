@@ -4,8 +4,9 @@ import { Background, Controls, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { editorHref, type EditorReturn } from '@/lib/platform/editor-handoff'
 import { runHandler } from '@/lib/workflows/history'
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, use, useCallback, useEffect, useState } from 'react'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { Group, Page, Pill, Row, Section } from '@/components/platform-ui'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -40,7 +41,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** One persisted run: its evidence, pinned version, path, receipts, and outputs. */
-export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: string }) {
+export function WorkflowRunDetail({
+  brandKit,
+  canManage,
+  id,
+}: {
+  /** The workspace's active brand kit for the run's capture; null when it could not be read. */
+  brandKit: Promise<{ kitId: string | null } | null>
+  canManage: boolean
+  id: string
+}) {
   const client = useTRPCClient()
   const params = useSearchParams()
   const returnTo = params.get('returnTo') ?? ''
@@ -265,6 +275,33 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
               </ButtonLink>
             </Row>
           ) : null}
+          {run.outputs.captureAssetId ? (
+            <Row
+              description="The product screenshot this run captured. It opens in the editor with the active brand kit; its export becomes a draft."
+              label="Screenshot · captured"
+              layout="inline"
+            >
+              <Suspense
+                fallback={
+                  <Button disabled size="sm" variant="outline">
+                    Open screenshot in the editor
+                  </Button>
+                }
+              >
+                <CaptureEditorLink
+                  assetId={run.outputs.captureAssetId}
+                  brandKit={brandKit}
+                  from={
+                    run.outputs.campaignId
+                      ? { campaignId: run.outputs.campaignId }
+                      : run.outputs.releaseId
+                        ? { releaseId: run.outputs.releaseId }
+                        : {}
+                  }
+                />
+              </Suspense>
+            </Row>
+          ) : null}
           {run.outputs.canvasId ? (
             <Row
               description="Laid out from the release record. Refine it, then export or hand it to a campaign."
@@ -485,5 +522,35 @@ export function WorkflowRunDetail({ canManage, id }: { canManage: boolean; id: s
         ) : null}
       </Section>
     </Page>
+  )
+}
+
+/** The run's captured screenshot, opened in the editor on the active brand kit. */
+function CaptureEditorLink({
+  assetId,
+  brandKit,
+  from,
+}: {
+  assetId: string
+  brandKit: Promise<{ kitId: string | null } | null>
+  from: EditorReturn
+}) {
+  const brand = use(brandKit)
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {brand ? null : (
+        <span className="text-xs text-muted-foreground" role="status">
+          The brand kit could not be read; apply it from Brand in the editor.
+        </span>
+      )}
+      <ButtonLink
+        data-testid="run-open-editor"
+        href={editorHref({ assetId, brandKitId: brand?.kitId ?? undefined }, from)}
+        size="sm"
+        variant="outline"
+      >
+        Open screenshot in the editor
+      </ButtonLink>
+    </span>
   )
 }

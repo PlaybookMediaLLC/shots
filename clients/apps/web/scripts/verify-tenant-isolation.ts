@@ -22,6 +22,25 @@ const approvalListSchema = z.object({
   data: z.array(z.object({ campaign: z.object({ id: z.string() }), post: z.object({ id: z.string() }) })),
 })
 const onboardingRunSchema = z.object({ run: z.object({ id: z.string().min(1) }) })
+const invitationSchema = z.object({ id: z.string().min(1) })
+const voiceSettingsSchema = z.object({ workspace: z.object({ voiceNotes: z.boolean() }) })
+const voiceNoteDetailSchema = z.object({
+  deleted: z.boolean(),
+  id: z.string().min(1),
+  revision: z.number().int(),
+  transcripts: z.array(z.object({ redacted: z.boolean() })),
+})
+const voiceTranscriptResultSchema = z.object({
+  note: z.object({ revision: z.number().int() }),
+  revision: z.object({ id: z.string().min(1) }),
+})
+/** The inbox page and the sync index both list `notes`. */
+const voiceNoteListSchema = z.object({
+  notes: z.array(z.object({ clientNoteId: z.string(), id: z.string() })),
+})
+
+type VoiceNote = { id: string; revision: number; revisionId: string }
+type RouteCall = readonly [path: string, method: string, body?: unknown]
 
 function getLocalBaseUrl(): string {
   const url = new URL(process.env.TENANT_TEST_BASE_URL ?? 'http://localhost:3000')
@@ -83,8 +102,12 @@ async function responseJson(response: Response): Promise<unknown> {
   return response.json()
 }
 
+function tenantEmail(label: string): string {
+  return `tenant-${label}-${testRunId}@example.invalid`
+}
+
 async function createSession(label: string): Promise<SessionClient> {
-  const email = `tenant-${label}-${testRunId}@example.invalid`
+  const email = tenantEmail(label)
   const signUpResponse = await request('/api/auth/sign-up/email', {
     body: JSON.stringify({ email, name: `Tenant ${label}`, password: testPassword }),
     headers: { 'content-type': 'application/json' },
@@ -294,6 +317,24 @@ async function assertSessionIsolation(
     client
   )
   assertStatus(completeResponse, 404)
+
+  // Another workspace's release cannot seed a post's captions or be kept by a draft.
+  const summaryResponse = await request(
+    `/api/trpc/release.summary?input=${encodeURIComponent(JSON.stringify({ json: { releaseId: otherReleaseId } }))}`,
+    {},
+    client
+  )
+  assertStatus(summaryResponse, 404)
+  const draftResponse = await request(
+    '/api/v1/content-drafts',
+    {
+      body: JSON.stringify({ releaseId: otherReleaseId, title: `Isolation ${testRunId}` }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    },
+    client
+  )
+  assertStatus(draftResponse, 404)
 }
 
 async function assertApiKeyIsolation(
@@ -354,17 +395,26 @@ async function assertOnboardingIsolation(
   }
 }
 
+/** Fixture setup the API cannot do, such as a plan or a verified address, in the local database. */
+async function withFixtureDatabase(run: (database: Pool) => Promise<void>): Promise<void> {
+  const connection = process.env.HOST_DATABASE_URL
+  assert(connection, 'HOST_DATABASE_URL is required to prepare the fixture accounts and workspaces.')
+  const url = new URL(connection)
+  url.searchParams.delete('schema')
+  const database = new Pool({ connectionString: url.toString() })
+  try {
+    await run(database)
+  } finally {
+    await database.end()
+  }
+}
+
 /**
  * There is no free plan, so each fixture workspace gets Pro directly in the
  * local database, the same way the e2e framework does.
  */
 async function grantProPlan(organizationIds: string[]): Promise<void> {
-  const connection = process.env.HOST_DATABASE_URL
-  assert(connection, 'HOST_DATABASE_URL is required to give the fixture workspaces a plan.')
-  const url = new URL(connection)
-  url.searchParams.delete('schema')
-  const database = new Pool({ connectionString: url.toString() })
-  try {
+  await withFixtureDatabase(async (database) => {
     for (const organizationId of organizationIds) {
       await database.query(
         `INSERT INTO workspace_entitlement ("organizationId", plan, status, "updatedAt")
@@ -373,9 +423,188 @@ async function grantProPlan(organizationIds: string[]): Promise<void> {
         [organizationId]
       )
     }
-  } finally {
-    await database.end()
+  })
+}
+
+/** A creator its owner invited into `organizationId`, signed in with that workspace active. */
+async function addMember(owner: SessionClient, organizationId: string, label: string): Promise<SessionClient> {
+  const email = tenantEmail(label)
+  const invited = await request(
+    '/api/auth/organization/invite-member',
+    { body: JSON.stringify({ email, organizationId, role: 'creator' }), headers: json, method: 'POST' },
+    owner
+  )
+  assertStatus(invited, 200)
+  const invitation = invitationSchema.parse(await responseJson(invited))
+  const member = await createSession(label)
+  // Accepting needs a verified address, as in production; the e2e framework does the same.
+  await withFixtureDatabase(async (database) => {
+    const verified = await database.query('UPDATE "user" SET "emailVerified" = true WHERE email = $1', [email])
+    assert.equal(verified.rowCount, 1)
+  })
+  const accepted = await request(
+    '/api/auth/organization/accept-invitation',
+    { body: JSON.stringify({ invitationId: invitation.id }), headers: json, method: 'POST' },
+    member
+  )
+  assertStatus(accepted, 200)
+  const active = await request(
+    '/api/auth/organization/set-active',
+    { body: JSON.stringify({ organizationId }), headers: json, method: 'POST' },
+    member
+  )
+  assertStatus(active, 200)
+  return member
+}
+
+const voiceRoot = '/api/v1/voice'
+
+/** Voice notes are off until an owner or admin turns them on (plan 6.9). */
+async function enableVoiceNotes(owner: SessionClient): Promise<void> {
+  const response = await request(
+    `${voiceRoot}/settings/workspace`,
+    { body: JSON.stringify({ voiceNotes: true }), headers: json, method: 'PUT' },
+    owner
+  )
+  assertStatus(response, 200)
+  assert.equal(voiceSettingsSchema.parse(await responseJson(response)).workspace.voiceNotes, true)
+}
+
+/** A note with its on-device transcript, as the phone syncs it. */
+async function createVoiceNote(client: SessionClient, label: string): Promise<VoiceNote> {
+  const created = await request(
+    `${voiceRoot}/notes`,
+    {
+      body: JSON.stringify({
+        clientNoteId: `${testRunId}:${label}`,
+        recordedAt: new Date().toISOString(),
+        recordedTimeZone: 'Europe/Berlin',
+        title: `Voice ${label}`,
+      }),
+      headers: json,
+      method: 'POST',
+    },
+    client
+  )
+  assertStatus(created, 201)
+  const { id } = voiceNoteDetailSchema.parse(await responseJson(created))
+  const transcribed = await request(
+    `${voiceRoot}/notes/${id}/transcripts`,
+    {
+      body: JSON.stringify({
+        clientRevisionId: `${testRunId}:${label}`,
+        origin: 'on_device',
+        segments: [{ endMs: 1_000, startMs: 0, text: `Private ${label}` }],
+        text: `Private ${label}`,
+      }),
+      headers: json,
+      method: 'POST',
+    },
+    client
+  )
+  assertStatus(transcribed, 201)
+  const result = voiceTranscriptResultSchema.parse(await responseJson(transcribed))
+  return { id, revision: result.note.revision, revisionId: result.revision.id }
+}
+
+/** Every voice route that names a note, with a body that passes validation; the delete is last. */
+function voiceNoteRoutes(note: VoiceNote): RouteCall[] {
+  const path = `${voiceRoot}/notes/${note.id}`
+  return [
+    [path, 'GET'],
+    [path, 'PATCH', { expectedRevision: note.revision, title: 'Taken' }],
+    [
+      `${path}/transcripts`,
+      'POST',
+      { clientRevisionId: `${testRunId}:taken`, origin: 'user_edit', segments: [], text: 'Taken' },
+    ],
+    [`${path}/transcripts/${note.revisionId}/redact`, 'POST'],
+    [`${path}/runs/0/upload`, 'POST', { bytes: 44, contentType: 'audio/wav', sha256: 'a'.repeat(64), startOffsetMs: 0 }],
+    [`${path}/runs/0/complete`, 'POST'],
+    [`${path}/runs/0/audio`, 'GET'],
+    [`${path}/audio`, 'DELETE'],
+    [`${path}/draft`, 'POST', { intent: 'saved_idea', transcriptRevisionId: note.revisionId }],
+    [
+      `${path}/command/confirm`,
+      'POST',
+      { channelConnectionId: unknownCuid, localTime: '09:00', text: 'Taken', timeZone: 'Europe/Berlin' },
+    ],
+    [path, 'DELETE'],
+  ]
+}
+
+function routeInit([, method, body]: RouteCall, headers: Record<string, string> = {}): RequestInit {
+  return body === undefined
+    ? { headers, method }
+    : { body: JSON.stringify(body), headers: { ...headers, ...json }, method }
+}
+
+async function voiceNoteIds(client: SessionClient, path: string): Promise<z.infer<typeof voiceNoteListSchema>['notes']> {
+  const response = await request(path, {}, client)
+  assertStatus(response, 200)
+  return voiceNoteListSchema.parse(await responseJson(response)).notes
+}
+
+/**
+ * A voice note is private to the member who recorded it (plan gate 2):
+ * anyone else, an owner of the same workspace or a member of another, gets
+ * 404 from every route that names it and never finds it in the inbox or the
+ * sync index.
+ */
+async function assertVoiceNoteIsolation(client: SessionClient, own: VoiceNote, other: VoiceNote): Promise<void> {
+  for (const path of [`${voiceRoot}/notes`, `${voiceRoot}/notes/index`]) {
+    const ids = (await voiceNoteIds(client, path)).map((note) => note.id)
+    assert(ids.includes(own.id), `${path} lists the member's own note.`)
+    assert(!ids.includes(other.id), `${path} lists someone else's note.`)
   }
+  for (const call of voiceNoteRoutes(other)) {
+    const [path, method] = call
+    const response = await request(path, routeInit(call), client)
+    assert.equal(response.status, 404, `${method} ${path} answered ${response.status}, not 404.`)
+  }
+}
+
+/** Nothing the refused requests sent changed the note: same revision, live, no transcript redacted. */
+async function assertVoiceNoteUnchanged(owner: SessionClient, note: VoiceNote): Promise<void> {
+  const response = await request(`${voiceRoot}/notes/${note.id}`, {}, owner)
+  assertStatus(response, 200)
+  const detail = voiceNoteDetailSchema.parse(await responseJson(response))
+  assert.equal(detail.revision, note.revision)
+  assert.equal(detail.deleted, false)
+  assert(detail.transcripts.every((transcript) => !transcript.redacted))
+}
+
+/**
+ * Every voice route is session-only: a note belongs to a member, and an API
+ * key has none. A valid key of the note's own workspace is refused, and
+ * nothing it sent takes effect.
+ */
+async function assertApiKeyCannotUseVoice(apiKey: string, owner: SessionClient, own: VoiceNote): Promise<void> {
+  const keyNoteId = `${testRunId}:api-key`
+  const calls: RouteCall[] = [
+    [`${voiceRoot}/settings`, 'GET'],
+    [`${voiceRoot}/settings/workspace`, 'PUT', { voiceNotes: false }],
+    [`${voiceRoot}/settings/member`, 'PUT', { remoteTextConsent: true }],
+    [`${voiceRoot}/notes/index`, 'GET'],
+    [`${voiceRoot}/notes`, 'GET'],
+    [
+      `${voiceRoot}/notes`,
+      'POST',
+      { clientNoteId: keyNoteId, recordedAt: new Date().toISOString(), recordedTimeZone: 'Europe/Berlin' },
+    ],
+    ...voiceNoteRoutes(own),
+  ]
+  for (const call of calls) {
+    const [path, method] = call
+    const response = await request(path, routeInit(call, { 'x-api-key': apiKey }))
+    assert.equal(response.status, 403, `${method} ${path} with an API key answered ${response.status}, not 403.`)
+  }
+  const settings = await request(`${voiceRoot}/settings`, {}, owner)
+  assertStatus(settings, 200)
+  assert.equal(voiceSettingsSchema.parse(await responseJson(settings)).workspace.voiceNotes, true)
+  const index = await voiceNoteIds(owner, `${voiceRoot}/notes/index`)
+  assert(!index.some((note) => note.clientNoteId === keyNoteId), 'An API key created a voice note.')
+  await assertVoiceNoteUnchanged(owner, own)
 }
 
 async function main(): Promise<void> {
@@ -399,6 +628,20 @@ async function main(): Promise<void> {
   await assertCampaignIsolation({ headers: { 'x-api-key': apiKeyA.key } }, campaignA.id, campaignB)
   await assertMemberDecisionIsolation(clientA, campaignB)
   await assertApiKeyCannotDecide(apiKeyA.key, campaignA)
+  // Voice notes are private to the member who recorded them, even from the workspace owner.
+  const memberA = await addMember(clientA, organizationA, 'a-member')
+  await enableVoiceNotes(clientA)
+  await enableVoiceNotes(clientB)
+  const voiceA = await createVoiceNote(clientA, 'a')
+  const voiceMemberA = await createVoiceNote(memberA, 'a-member')
+  const voiceB = await createVoiceNote(clientB, 'b')
+  await assertVoiceNoteIsolation(memberA, voiceMemberA, voiceA)
+  await assertVoiceNoteIsolation(clientA, voiceA, voiceMemberA)
+  await assertVoiceNoteIsolation(clientB, voiceB, voiceA)
+  await assertVoiceNoteIsolation(clientA, voiceA, voiceB)
+  await assertApiKeyCannotUseVoice(apiKeyA.key, clientA, voiceA)
+  await assertVoiceNoteUnchanged(memberA, voiceMemberA)
+  await assertVoiceNoteUnchanged(clientB, voiceB)
   await assertApiKeyIsolation(clientA, apiKeyA, releaseA.id, releaseB.id, organizationB, assetB)
   const runA = await createOnboardingRun(clientA, 'a')
   const runB = await createOnboardingRun(clientB, 'b')

@@ -397,8 +397,10 @@ func TestContentDraftScheduleReliability(t *testing.T) {
 
 	t.Run("a racing claim and rejection cannot both succeed", func(t *testing.T) {
 		for attempt := 0; attempt < 8; attempt++ {
-			draft := newDraft("Race review")
-			queued, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets("Race review")})
+			// Each attempt's text differs: an account's identical posts within a day need a confirmation.
+			caption := fmt.Sprintf("Race review %d", attempt)
+			draft := newDraft(caption)
+			queued, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets(caption)})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -543,6 +545,109 @@ func TestContentDraftScheduleReliability(t *testing.T) {
 		post := result.Posts[0]
 		if post.ScheduleTimeZone == nil || *post.ScheduleTimeZone != "Asia/Tokyo" || post.ScheduledFor.In(time.FixedZone("JST", 9*3600)).Format("15:04") != "10:00" {
 			t.Fatalf("post zone=%v at=%v", post.ScheduleTimeZone, post.ScheduledFor)
+		}
+	})
+	t.Run("the same text and media on an account within a day waits for a member's confirmation", func(t *testing.T) {
+		first, second, other, later := newDraft("Repeat me"), newDraft("Repeat me twice"), newDraft("Something else"), newDraft("Repeat me later")
+		at := time.Now().Add(96 * time.Hour).Truncate(time.Minute)
+		scheduled, err := repo.ScheduleContentDraft(ctx, owner, first.ID, ScheduleContentDraftInput{ScheduledFor: at, Version: first.Version, Targets: targets("Repeat   me")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		probe := ScheduleContentDraftInput{ScheduledFor: at.Add(2 * time.Hour), Version: second.Version, Targets: targets("repeat me")}
+		var refusal *DuplicateContentError
+		// A post that may already be live is the likeliest double post; a cancelled one is not a repeat.
+		exec(`UPDATE scheduled_post SET status='UNKNOWN_DELIVERY' WHERE id=$1`, scheduled.Posts[0].ID)
+		if _, err := repo.ScheduleContentDraft(ctx, owner, second.ID, probe); !errors.As(err, &refusal) {
+			t.Fatalf("a repeat of an unconfirmed post err=%v", err)
+		}
+		exec(`UPDATE scheduled_post SET status='CANCELLED' WHERE id=$1`, scheduled.Posts[0].ID)
+		third := newDraft("Repeat me thrice")
+		thirdPosts, err := repo.ScheduleContentDraft(ctx, owner, third.ID, ScheduleContentDraftInput{ScheduledFor: probe.ScheduledFor, Version: third.Version, Targets: targets("repeat me")})
+		if err != nil {
+			t.Fatalf("a repeat of a cancelled post err=%v", err)
+		}
+		exec(`UPDATE scheduled_post SET status='CANCELLED' WHERE id=$1`, thirdPosts.Posts[0].ID)
+		exec(`UPDATE scheduled_post SET status='SCHEDULED' WHERE id=$1`, scheduled.Posts[0].ID)
+		repeat := ScheduleContentDraftInput{ScheduledFor: at.Add(3 * time.Hour), Version: second.Version, Targets: targets("repeat me")}
+		var duplicate *DuplicateContentError
+		if _, err := repo.ScheduleContentDraft(ctx, owner, second.ID, repeat); !errors.As(err, &duplicate) || len(duplicate.Posts) != 1 || duplicate.Posts[0].ChannelConnectionID != xChannel {
+			t.Fatalf("a repeat within a day err=%v", err)
+		}
+		repeat.ConfirmDuplicate = true
+		if confirmed, err := repo.ScheduleContentDraft(ctx, owner, second.ID, repeat); err != nil || len(confirmed.Posts) != 1 {
+			t.Fatalf("a confirmed repeat result=%+v err=%v", confirmed, err)
+		}
+		if _, err := repo.ScheduleContentDraft(ctx, owner, other.ID, ScheduleContentDraftInput{ScheduledFor: at, Version: other.Version, Targets: targets("Something else")}); err != nil {
+			t.Fatalf("other text at the same time err=%v", err)
+		}
+		if _, err := repo.ScheduleContentDraft(ctx, owner, later.ID, ScheduleContentDraftInput{ScheduledFor: at.Add(50 * time.Hour), Version: later.Version, Targets: targets("Repeat me")}); err != nil {
+			t.Fatalf("the same text two days later err=%v", err)
+		}
+	})
+	t.Run("a phrase the social set's voice avoids is refused on every write path", func(t *testing.T) {
+		// Queued before the set's voice avoided the phrase: publishing it now is checked again.
+		queuedDraft := newDraft("Queued synergy")
+		queued, err := repo.ScheduleContentDraft(ctx, owner, queuedDraft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(300 * time.Hour),
+			Version: queuedDraft.Version, Targets: targets("A queued synergy post")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		draft := newDraft("Set voice")
+		row, err := db.Client.ContentDraft.Get(ctx, draft.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		previousSet := db.Client.ChannelConnection.GetX(ctx, xChannel).SocialSetID
+		tx, err := db.Client.Tx(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		set, err := repo.draftSocialSet(ctx, tx, row)
+		_ = tx.Rollback()
+		if err != nil {
+			t.Fatal(err)
+		}
+		voice := schema.WritingAssistant{Status: "configured", StyleGuide: schema.StyleGuide{ProhibitedPhrases: []string{"synergy"}}}
+		if err := db.Client.SocialSet.UpdateOneID(set.ID).SetWritingAssistant(voice).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.Client.ChannelConnection.UpdateOneID(xChannel).SetSocialSetID(set.ID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			_ = db.Client.SocialSet.UpdateOneID(set.ID).SetWritingAssistant(schema.WritingAssistant{}).Exec(ctx)
+			_ = db.Client.ChannelConnection.UpdateOneID(xChannel).SetNillableSocialSetID(previousSet).Exec(ctx)
+		}()
+		refused := func(path string, err error) {
+			t.Helper()
+			var prohibited *ProhibitedTermsError
+			if !errors.As(err, &prohibited) || len(prohibited.Matches) != 1 || prohibited.Matches[0].Term != "synergy" {
+				t.Fatalf("%s err=%v, want the set's phrase refused", path, err)
+			}
+		}
+		input := ScheduleContentDraftInput{ScheduledFor: time.Now().Add(200 * time.Hour), Version: draft.Version, Targets: targets("Our Synergy launch")}
+		_, err = repo.ScheduleContentDraft(ctx, owner, draft.ID, input)
+		refused("schedule", err)
+		refused("validate", repo.ValidateContentDraftSchedule(ctx, owner, draft.ID, input))
+		_, err = repo.CreatePost(ctx, owner, CreatePostInput{ChannelConnectionIDs: []string{xChannel}, IdempotencyKey: "set-voice-" + id,
+			Posts: []PostPart{{Text: "More synergy"}}, ScheduledFor: time.Now().Add(201 * time.Hour)})
+		refused("createPost", err)
+		_, err = repo.PublishQueuedContentDraftPost(ctx, owner, queued.Posts[0].ID)
+		refused("publish now", err)
+		_, err = repo.CreateScheduledPost(ctx, owner, publishing.CreateScheduledPostInput{Caption: "Synergy, approved", ChannelConnectionID: xChannel,
+			IdempotencyKey: "set-voice-variant-" + id, ScheduledFor: time.Now().Add(202 * time.Hour), VariantID: "variant_" + id})
+		refused("scheduled-posts", err)
+		// A content draft goes through its own scheduling, which checks approval and sends the stored text.
+		before, err := db.Client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(org)).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = repo.CreateScheduledPost(ctx, owner, publishing.CreateScheduledPostInput{Caption: "Unreviewed text", ChannelConnectionID: xChannel,
+			IdempotencyKey: "set-voice-draft-" + id, ScheduledFor: time.Now().Add(203 * time.Hour), ContentDraftID: draft.ID})
+		after, countErr := db.Client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(org)).Count(ctx)
+		if !errors.Is(err, publishing.ErrConflict) || countErr != nil || after != before {
+			t.Fatalf("a draft through scheduled-posts err=%v posts %d→%d", err, before, after)
 		}
 	})
 }

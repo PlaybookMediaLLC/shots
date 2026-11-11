@@ -9,7 +9,7 @@ import {
   toApiFailure,
 } from '@/lib/api/platform-errors'
 import { getErrorMessage, requestJson } from '@/components/workspace/settings-client'
-import { DraftRequestError } from '@/lib/content-drafts/client'
+import { DraftRequestError, duplicatePosts } from '@/lib/content-drafts/client'
 import { SettingsRequestError, settingsErrorMessage, settingsRequest } from '@/lib/settings/client'
 import { getDomainTRPCError } from '@/lib/trpc/errors'
 import { WorkspaceError } from '@/lib/workspace/errors'
@@ -113,6 +113,25 @@ test('a taken queue slot is a conflict that names the next free slot', () => {
   assert.equal(failure?.status, 409)
   assert.equal(failure?.code, 'conflict')
   assert.deepEqual(failure?.extra, { nextQueueSlot: '2026-11-02T09:00:00Z' })
+})
+
+test('a repeat of an account post is a conflict that names the posts it repeats', () => {
+  const duplicates = [
+    { at: '2026-11-02T09:00:00Z', channelConnectionId: 'c1', postId: 'p1', status: 'PUBLISHED' },
+  ]
+  const failure = toApiFailure(
+    new BackendSDKError('The same text and media is already queued.', 409, {
+      code: 'duplicate_content',
+      duplicates,
+    })
+  )
+  assert.equal(failure?.status, 409)
+  assert.equal(failure?.code, 'conflict')
+  assert.deepEqual(failure?.extra, { duplicates })
+  // The browser reads the same fields back from the error envelope.
+  const error = new DraftRequestError(failure?.message ?? '', 409, { ...failure?.extra })
+  assert.deepEqual(duplicatePosts(error), duplicates)
+  assert.equal(duplicatePosts(new DraftRequestError('Other conflict.', 409)), null)
 })
 
 test('unknown errors are left for the caller to log as a 500', () => {

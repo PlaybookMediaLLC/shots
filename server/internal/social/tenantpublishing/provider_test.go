@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,8 +16,10 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/instagram"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 )
 
 type fakeBindings struct {
@@ -276,6 +281,35 @@ func TestDirectPublisherRejectsWrongWorkspaceBinding(t *testing.T) {
 	}
 }
 
+// A rate limit in the middle of a thread keeps the live post, the replies
+// already out and the progress, and never resends any of them: the rest wait
+// for the composer's resume.
+func TestThreadRateLimitedMidwayKeepsPostedReplies(t *testing.T) {
+	p, _, fake, input := directFixture()
+	input.Replies = []publishing.PublishReply{{Caption: "two"}, {Caption: "three"}, {Caption: "four"}}
+	limited := &rateLimitedReplies{fakePoster: fake, after: 1}
+	p.resolve = func(string) poster { return limited }
+	receipt, err := p.PublishThread(context.Background(), input)
+	if err != nil || receipt.PostID != "remote-post-1" || fake.calls != 1 || strings.Join(fake.replies, ",") != "two>remote-post-1" ||
+		receipt.Thread.Posted != 1 || receipt.Thread.Total != 3 || receipt.Thread.LastReplyID != "reply-1" || len(receipt.Thread.Receipts) != 1 || limited.refused != 1 {
+		t.Fatalf("receipt=%+v err=%v replies=%v refused=%d", receipt, err, fake.replies, limited.refused)
+	}
+}
+
+// rateLimitedReplies posts the first `after` replies, then is rate limited.
+type rateLimitedReplies struct {
+	*fakePoster
+	after, refused int
+}
+
+func (r *rateLimitedReplies) Comment(ctx context.Context, id, postID, lastCommentID, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
+	if len(r.replies) >= r.after {
+		r.refused++
+		return nil, temporalx.RateLimited("threads", 0, "Rate limited")
+	}
+	return r.fakePoster.Comment(ctx, id, postID, lastCommentID, token, posts, account)
+}
+
 func TestDirectPublisherResumesAThreadAndReportsProgress(t *testing.T) {
 	p, _, poster, input := directFixture()
 	input.ReplyTo = "live-reply-2"
@@ -405,10 +439,102 @@ func TestDirectPublisherPreservesDefiniteRejection(t *testing.T) {
 	}
 }
 
+// A lasting rate limit retries durably with the provider's guidance; a daily
+// cap fails definitely with its own code. Neither is an unknown delivery.
+func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
+	var limited *socialapi.Error
+	err := publicationOutcome(temporalx.RateLimited("x", 7*time.Minute, "slow down"))
+	if !errors.As(err, &limited) || limited.UnknownDelivery || limited.Status != 429 || limited.RetryAfter != 7*time.Minute || limited.ProviderMessage != "slow down" {
+		t.Fatalf("rate limit = %#v", err)
+	}
+	var capped *socialapi.Error
+	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
+	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
+		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// A refusal of Shots' own app access fails definitely and blames no account.
+func TestAppAccessRefusalBlamesNoAccount(t *testing.T) {
+	var refused *socialapi.Error
+	err := publicationOutcome(temporalx.AppAccess("x", "client-not-enrolled"))
+	if !errors.As(err, &refused) || refused.UnknownDelivery || refused.Code != publishing.FailurePublisherUnavailable ||
+		refused.Status != http.StatusServiceUnavailable || !strings.Contains(refused.ProviderMessage, "client-not-enrolled") ||
+		!strings.Contains(refused.ProviderMessage, "No account needs reconnecting") {
+		t.Fatalf("app access = %#v", err)
+	}
+}
+
 func TestLegacyBadBodyCannotProveRejectedDelivery(t *testing.T) {
 	err := publicationOutcome(temporalx.BadBody("linkedin", "{}", "{}", "may already be published"))
 	var providerErr *socialapi.Error
 	if !errors.As(err, &providerErr) || !providerErr.UnknownDelivery {
 		t.Fatalf("unsafe retry enabled: %v", err)
+	}
+}
+
+// basePoster publishes with one POST through the shared provider client.
+type basePoster struct {
+	*integrations.Base
+	url    string
+	client *http.Client
+}
+
+func (p basePoster) Post(ctx context.Context, _, _ string, _ []integrations.PostDetails, _ *socialent.Integration) ([]integrations.PostResponse, error) {
+	res, err := p.Fetch(ctx, p.url, integrations.Request{Method: http.MethodPost, Client: p.client})
+	if err != nil {
+		return nil, err
+	}
+	return []integrations.PostResponse{{PostID: res.Text(), Status: "posted"}}, nil
+}
+
+// dueStore answers the one store call a send makes: the late-window check.
+type dueStore struct {
+	temporalpublishing.ActivityStore
+}
+
+func (dueStore) PostScheduledFor(context.Context, string, string) (time.Time, error) {
+	return time.Now(), nil
+}
+
+// From the platform's answer to the outcome the send activity hands the
+// workflow: a rate limit that lifts publishes once; a lasting one is retried
+// durably (the workflow fails it as 429 after its last attempt), not left
+// unknown; a daily cap fails with its reason; a 500 to the publish is never
+// resent.
+func TestPlatformLimitsReachTheirPublicationOutcome(t *testing.T) {
+	for _, test := range []struct {
+		name, body string
+		// statuses answers each request in turn; the last one repeats.
+		statuses             []int
+		requests             int
+		outcome, failureCode string
+	}{
+		{"429 then success", "remote-post-1", []int{429, 200}, 2, temporalpublishing.OutcomePublished, ""},
+		{"lasting 429", "{}", []int{429}, 4, temporalpublishing.OutcomeRetry, "429"},
+		{"daily cap", `{"error":{"error_subcode":2207042}}`, []int{400}, 1, temporalpublishing.OutcomeFailed, publishing.FailureProviderDailyLimit},
+		{"500 to the publish", "{}", []int{500}, 1, temporalpublishing.OutcomeUnknown, publishing.FailureUnknownDelivery},
+		{"retryable 500 to the publish", `{"error":{"message":"An unknown error occurred"}}`, []int{500}, 1, temporalpublishing.OutcomeUnknown, publishing.FailureUnknownDelivery},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.statuses[min(int(requests.Add(1)), len(test.statuses))-1])
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer srv.Close()
+			p, _, _, input := directFixture()
+			// Instagram's error table names the daily cap.
+			base := integrations.NewBase("instagram", instagram.HandleErrors)
+			base.RetryDelay = 0
+			p.resolve = func(string) poster { return basePoster{Base: base, url: srv.URL, client: srv.Client()} }
+			result, err := temporalpublishing.NewActivities(dueStore{}, p).Submit(context.Background(), temporalpublishing.SubmitInput{Job: temporalpublishing.PreparedPublication{
+				AssetMediaType: input.AssetMediaType, AssetObjectKey: input.AssetObjectKey, Caption: input.Caption, DestinationID: input.DestinationID,
+				OrganizationID: input.OrganizationID, Platform: input.Platform, PostID: input.PostID, SecretReference: input.SecretReference,
+			}})
+			if err != nil || int(requests.Load()) != test.requests || result.Outcome != test.outcome || result.FailureCode != test.failureCode {
+				t.Fatalf("requests=%d result=%+v err=%v", requests.Load(), result, err)
+			}
+		})
 	}
 }

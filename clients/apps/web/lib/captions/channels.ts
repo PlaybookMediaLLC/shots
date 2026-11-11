@@ -67,6 +67,18 @@ export function captionLength(text: string, channel: CaptionChannel): number {
   return [...text.replace(/https?:\/\/\S+/g, 'x'.repeat(X_LINK_LENGTH))].length
 }
 
+/**
+ * The writer's line for one platform: its limit and conventions, then the
+ * social set's guidance for that channel when it has some. Guidance is the
+ * set owner's text, so tags that could close this line or the voice's fences
+ * are removed before it is quoted.
+ */
+export function platformLine(channel: CaptionChannel, guidance?: string): string {
+  const { conventions, limit, name } = CAPTION_CHANNELS[channel]
+  const own = guidance?.replace(/<\/?(?:platform|sample|writing_context)\b[^>]*>/gi, '').trim()
+  return `<platform id="${channel}">${name}: at most ${limit} characters. ${conventions}${own ? ` Voice for this channel: ${own}` : ''}</platform>`
+}
+
 /** Alt text should stay short enough for screen readers to read in one go. */
 export const ALT_TEXT_LIMIT = 250
 

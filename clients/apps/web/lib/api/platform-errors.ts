@@ -191,6 +191,24 @@ const queueSlotTakenSchema = z.object({
   name: z.literal('BackendSDKError'),
 })
 
+/** An account's queued or published post that a schedule would repeat within a day. */
+export const duplicatePostSchema = z.object({
+  at: z.iso.datetime({ offset: true }),
+  channelConnectionId: z.string(),
+  postId: z.string(),
+  status: z.string(),
+})
+
+// An account already has the same text and media queued or published within a day.
+const duplicateContentSchema = z.object({
+  details: z.object({
+    code: z.literal('duplicate_content'),
+    duplicates: z.array(duplicatePostSchema).min(1),
+  }),
+  message: z.string(),
+  name: z.literal('BackendSDKError'),
+})
+
 // Better Auth reports an unreachable backend auth store with this body code.
 const sessionStoreUnavailableSchema = z.object({
   body: z.object({ code: z.literal('FAILED_TO_GET_SESSION') }),
@@ -253,6 +271,16 @@ function getEntitlementFailure(error: unknown): ApiFailure | null {
   }
 }
 
+function getDuplicateContentFailure(error: unknown): ApiFailure | null {
+  const parsed = duplicateContentSchema.safeParse(error)
+  if (!parsed.success) return null
+  const { details, message } = parsed.data
+  return {
+    ...failureForStatus(409, message),
+    extra: { duplicates: details.duplicates },
+  }
+}
+
 function getQueueSlotFailure(error: unknown): ApiFailure | null {
   const parsed = queueSlotTakenSchema.safeParse(error)
   if (!parsed.success) return null
@@ -287,6 +315,7 @@ export function toApiFailure(error: unknown): ApiFailure | null {
     getQuotaFailure(error) ??
     getEntitlementFailure(error) ??
     getQueueSlotFailure(error) ??
+    getDuplicateContentFailure(error) ??
     getNamedFailure(error)
   )
 }

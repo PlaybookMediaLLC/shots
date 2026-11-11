@@ -374,6 +374,20 @@ func (_c *ContentDraftCreate) SetNillableSourceDraftID(v *string) *ContentDraftC
 	return _c
 }
 
+// SetSourceVoiceRevisionID sets the "source_voice_revision_id" field.
+func (_c *ContentDraftCreate) SetSourceVoiceRevisionID(v string) *ContentDraftCreate {
+	_c.mutation.SetSourceVoiceRevisionID(v)
+	return _c
+}
+
+// SetNillableSourceVoiceRevisionID sets the "source_voice_revision_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableSourceVoiceRevisionID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetSourceVoiceRevisionID(*v)
+	}
+	return _c
+}
+
 // SetCampaignID sets the "campaign_id" field.
 func (_c *ContentDraftCreate) SetCampaignID(v string) *ContentDraftCreate {
 	_c.mutation.SetCampaignID(v)
@@ -384,6 +398,34 @@ func (_c *ContentDraftCreate) SetCampaignID(v string) *ContentDraftCreate {
 func (_c *ContentDraftCreate) SetNillableCampaignID(v *string) *ContentDraftCreate {
 	if v != nil {
 		_c.SetCampaignID(*v)
+	}
+	return _c
+}
+
+// SetReleaseID sets the "release_id" field.
+func (_c *ContentDraftCreate) SetReleaseID(v string) *ContentDraftCreate {
+	_c.mutation.SetReleaseID(v)
+	return _c
+}
+
+// SetNillableReleaseID sets the "release_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableReleaseID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetReleaseID(*v)
+	}
+	return _c
+}
+
+// SetCampaignPostID sets the "campaign_post_id" field.
+func (_c *ContentDraftCreate) SetCampaignPostID(v string) *ContentDraftCreate {
+	_c.mutation.SetCampaignPostID(v)
+	return _c
+}
+
+// SetNillableCampaignPostID sets the "campaign_post_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableCampaignPostID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetCampaignPostID(*v)
 	}
 	return _c
 }
@@ -829,9 +871,21 @@ func (_c *ContentDraftCreate) createSpec() (*ContentDraft, *sqlgraph.CreateSpec)
 		_spec.SetField(contentdraft.FieldSourceDraftID, field.TypeString, value)
 		_node.SourceDraftID = &value
 	}
+	if value, ok := _c.mutation.SourceVoiceRevisionID(); ok {
+		_spec.SetField(contentdraft.FieldSourceVoiceRevisionID, field.TypeString, value)
+		_node.SourceVoiceRevisionID = &value
+	}
 	if value, ok := _c.mutation.CampaignID(); ok {
 		_spec.SetField(contentdraft.FieldCampaignID, field.TypeString, value)
 		_node.CampaignID = &value
+	}
+	if value, ok := _c.mutation.ReleaseID(); ok {
+		_spec.SetField(contentdraft.FieldReleaseID, field.TypeString, value)
+		_node.ReleaseID = &value
+	}
+	if value, ok := _c.mutation.CampaignPostID(); ok {
+		_spec.SetField(contentdraft.FieldCampaignPostID, field.TypeString, value)
+		_node.CampaignPostID = &value
 	}
 	if value, ok := _c.mutation.CollabGeneration(); ok {
 		_spec.SetField(contentdraft.FieldCollabGeneration, field.TypeInt, value)

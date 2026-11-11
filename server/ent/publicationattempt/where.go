@@ -100,6 +100,16 @@ func FailureCode(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldEQ(FieldFailureCode, v))
 }
 
+// ProviderMessage applies equality check predicate on the "provider_message" field. It's identical to ProviderMessageEQ.
+func ProviderMessage(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldProviderMessage, v))
+}
+
+// RemoteURL applies equality check predicate on the "remote_url" field. It's identical to RemoteURLEQ.
+func RemoteURL(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldRemoteURL, v))
+}
+
 // OrganizationIDEQ applies the EQ predicate on the "organization_id" field.
 func OrganizationIDEQ(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldEQ(FieldOrganizationID, v))
@@ -538,6 +548,156 @@ func FailureCodeEqualFold(v string) predicate.PublicationAttempt {
 // FailureCodeContainsFold applies the ContainsFold predicate on the "failure_code" field.
 func FailureCodeContainsFold(v string) predicate.PublicationAttempt {
 	return predicate.PublicationAttempt(sql.FieldContainsFold(FieldFailureCode, v))
+}
+
+// ProviderMessageEQ applies the EQ predicate on the "provider_message" field.
+func ProviderMessageEQ(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldProviderMessage, v))
+}
+
+// ProviderMessageNEQ applies the NEQ predicate on the "provider_message" field.
+func ProviderMessageNEQ(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNEQ(FieldProviderMessage, v))
+}
+
+// ProviderMessageIn applies the In predicate on the "provider_message" field.
+func ProviderMessageIn(vs ...string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldIn(FieldProviderMessage, vs...))
+}
+
+// ProviderMessageNotIn applies the NotIn predicate on the "provider_message" field.
+func ProviderMessageNotIn(vs ...string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNotIn(FieldProviderMessage, vs...))
+}
+
+// ProviderMessageGT applies the GT predicate on the "provider_message" field.
+func ProviderMessageGT(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGT(FieldProviderMessage, v))
+}
+
+// ProviderMessageGTE applies the GTE predicate on the "provider_message" field.
+func ProviderMessageGTE(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGTE(FieldProviderMessage, v))
+}
+
+// ProviderMessageLT applies the LT predicate on the "provider_message" field.
+func ProviderMessageLT(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLT(FieldProviderMessage, v))
+}
+
+// ProviderMessageLTE applies the LTE predicate on the "provider_message" field.
+func ProviderMessageLTE(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLTE(FieldProviderMessage, v))
+}
+
+// ProviderMessageContains applies the Contains predicate on the "provider_message" field.
+func ProviderMessageContains(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldContains(FieldProviderMessage, v))
+}
+
+// ProviderMessageHasPrefix applies the HasPrefix predicate on the "provider_message" field.
+func ProviderMessageHasPrefix(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldHasPrefix(FieldProviderMessage, v))
+}
+
+// ProviderMessageHasSuffix applies the HasSuffix predicate on the "provider_message" field.
+func ProviderMessageHasSuffix(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldHasSuffix(FieldProviderMessage, v))
+}
+
+// ProviderMessageIsNil applies the IsNil predicate on the "provider_message" field.
+func ProviderMessageIsNil() predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldIsNull(FieldProviderMessage))
+}
+
+// ProviderMessageNotNil applies the NotNil predicate on the "provider_message" field.
+func ProviderMessageNotNil() predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNotNull(FieldProviderMessage))
+}
+
+// ProviderMessageEqualFold applies the EqualFold predicate on the "provider_message" field.
+func ProviderMessageEqualFold(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEqualFold(FieldProviderMessage, v))
+}
+
+// ProviderMessageContainsFold applies the ContainsFold predicate on the "provider_message" field.
+func ProviderMessageContainsFold(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldContainsFold(FieldProviderMessage, v))
+}
+
+// RemoteURLEQ applies the EQ predicate on the "remote_url" field.
+func RemoteURLEQ(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEQ(FieldRemoteURL, v))
+}
+
+// RemoteURLNEQ applies the NEQ predicate on the "remote_url" field.
+func RemoteURLNEQ(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNEQ(FieldRemoteURL, v))
+}
+
+// RemoteURLIn applies the In predicate on the "remote_url" field.
+func RemoteURLIn(vs ...string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldIn(FieldRemoteURL, vs...))
+}
+
+// RemoteURLNotIn applies the NotIn predicate on the "remote_url" field.
+func RemoteURLNotIn(vs ...string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNotIn(FieldRemoteURL, vs...))
+}
+
+// RemoteURLGT applies the GT predicate on the "remote_url" field.
+func RemoteURLGT(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGT(FieldRemoteURL, v))
+}
+
+// RemoteURLGTE applies the GTE predicate on the "remote_url" field.
+func RemoteURLGTE(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldGTE(FieldRemoteURL, v))
+}
+
+// RemoteURLLT applies the LT predicate on the "remote_url" field.
+func RemoteURLLT(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLT(FieldRemoteURL, v))
+}
+
+// RemoteURLLTE applies the LTE predicate on the "remote_url" field.
+func RemoteURLLTE(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldLTE(FieldRemoteURL, v))
+}
+
+// RemoteURLContains applies the Contains predicate on the "remote_url" field.
+func RemoteURLContains(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldContains(FieldRemoteURL, v))
+}
+
+// RemoteURLHasPrefix applies the HasPrefix predicate on the "remote_url" field.
+func RemoteURLHasPrefix(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldHasPrefix(FieldRemoteURL, v))
+}
+
+// RemoteURLHasSuffix applies the HasSuffix predicate on the "remote_url" field.
+func RemoteURLHasSuffix(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldHasSuffix(FieldRemoteURL, v))
+}
+
+// RemoteURLIsNil applies the IsNil predicate on the "remote_url" field.
+func RemoteURLIsNil() predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldIsNull(FieldRemoteURL))
+}
+
+// RemoteURLNotNil applies the NotNil predicate on the "remote_url" field.
+func RemoteURLNotNil() predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldNotNull(FieldRemoteURL))
+}
+
+// RemoteURLEqualFold applies the EqualFold predicate on the "remote_url" field.
+func RemoteURLEqualFold(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldEqualFold(FieldRemoteURL, v))
+}
+
+// RemoteURLContainsFold applies the ContainsFold predicate on the "remote_url" field.
+func RemoteURLContainsFold(v string) predicate.PublicationAttempt {
+	return predicate.PublicationAttempt(sql.FieldContainsFold(FieldRemoteURL, v))
 }
 
 // HasScheduledPost applies the HasEdge predicate on the "scheduled_post" edge.

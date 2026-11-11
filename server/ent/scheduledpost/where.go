@@ -160,6 +160,21 @@ func FailureCode(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldFailureCode, v))
 }
 
+// ScheduledByUserID applies equality check predicate on the "scheduled_by_user_id" field. It's identical to ScheduledByUserIDEQ.
+func ScheduledByUserID(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldScheduledByUserID, v))
+}
+
+// ApprovedByUserID applies equality check predicate on the "approved_by_user_id" field. It's identical to ApprovedByUserIDEQ.
+func ApprovedByUserID(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedByUserID, v))
+}
+
+// ApprovedVersion applies equality check predicate on the "approved_version" field. It's identical to ApprovedVersionEQ.
+func ApprovedVersion(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedVersion, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldEQ(FieldCreatedAt, v))
@@ -1538,6 +1553,206 @@ func FailureCodeEqualFold(v string) predicate.ScheduledPost {
 // FailureCodeContainsFold applies the ContainsFold predicate on the "failure_code" field.
 func FailureCodeContainsFold(v string) predicate.ScheduledPost {
 	return predicate.ScheduledPost(sql.FieldContainsFold(FieldFailureCode, v))
+}
+
+// ScheduledByUserIDEQ applies the EQ predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDNEQ applies the NEQ predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDNEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDIn applies the In predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldScheduledByUserID, vs...))
+}
+
+// ScheduledByUserIDNotIn applies the NotIn predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDNotIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldScheduledByUserID, vs...))
+}
+
+// ScheduledByUserIDGT applies the GT predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDGT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDGTE applies the GTE predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDGTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDLT applies the LT predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDLT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDLTE applies the LTE predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDLTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDContains applies the Contains predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDContains(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContains(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDHasPrefix applies the HasPrefix predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDHasPrefix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasPrefix(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDHasSuffix applies the HasSuffix predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDHasSuffix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasSuffix(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDIsNil applies the IsNil predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDIsNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIsNull(FieldScheduledByUserID))
+}
+
+// ScheduledByUserIDNotNil applies the NotNil predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDNotNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotNull(FieldScheduledByUserID))
+}
+
+// ScheduledByUserIDEqualFold applies the EqualFold predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDEqualFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEqualFold(FieldScheduledByUserID, v))
+}
+
+// ScheduledByUserIDContainsFold applies the ContainsFold predicate on the "scheduled_by_user_id" field.
+func ScheduledByUserIDContainsFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContainsFold(FieldScheduledByUserID, v))
+}
+
+// ApprovedByUserIDEQ applies the EQ predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDNEQ applies the NEQ predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDNEQ(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDIn applies the In predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldApprovedByUserID, vs...))
+}
+
+// ApprovedByUserIDNotIn applies the NotIn predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDNotIn(vs ...string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldApprovedByUserID, vs...))
+}
+
+// ApprovedByUserIDGT applies the GT predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDGT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDGTE applies the GTE predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDGTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDLT applies the LT predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDLT(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDLTE applies the LTE predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDLTE(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDContains applies the Contains predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDContains(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContains(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDHasPrefix applies the HasPrefix predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDHasPrefix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasPrefix(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDHasSuffix applies the HasSuffix predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDHasSuffix(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldHasSuffix(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDIsNil applies the IsNil predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDIsNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIsNull(FieldApprovedByUserID))
+}
+
+// ApprovedByUserIDNotNil applies the NotNil predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDNotNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotNull(FieldApprovedByUserID))
+}
+
+// ApprovedByUserIDEqualFold applies the EqualFold predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDEqualFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEqualFold(FieldApprovedByUserID, v))
+}
+
+// ApprovedByUserIDContainsFold applies the ContainsFold predicate on the "approved_by_user_id" field.
+func ApprovedByUserIDContainsFold(v string) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldContainsFold(FieldApprovedByUserID, v))
+}
+
+// ApprovedVersionEQ applies the EQ predicate on the "approved_version" field.
+func ApprovedVersionEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldEQ(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionNEQ applies the NEQ predicate on the "approved_version" field.
+func ApprovedVersionNEQ(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNEQ(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionIn applies the In predicate on the "approved_version" field.
+func ApprovedVersionIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIn(FieldApprovedVersion, vs...))
+}
+
+// ApprovedVersionNotIn applies the NotIn predicate on the "approved_version" field.
+func ApprovedVersionNotIn(vs ...int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotIn(FieldApprovedVersion, vs...))
+}
+
+// ApprovedVersionGT applies the GT predicate on the "approved_version" field.
+func ApprovedVersionGT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGT(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionGTE applies the GTE predicate on the "approved_version" field.
+func ApprovedVersionGTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldGTE(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionLT applies the LT predicate on the "approved_version" field.
+func ApprovedVersionLT(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLT(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionLTE applies the LTE predicate on the "approved_version" field.
+func ApprovedVersionLTE(v int) predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldLTE(FieldApprovedVersion, v))
+}
+
+// ApprovedVersionIsNil applies the IsNil predicate on the "approved_version" field.
+func ApprovedVersionIsNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldIsNull(FieldApprovedVersion))
+}
+
+// ApprovedVersionNotNil applies the NotNil predicate on the "approved_version" field.
+func ApprovedVersionNotNil() predicate.ScheduledPost {
+	return predicate.ScheduledPost(sql.FieldNotNull(FieldApprovedVersion))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

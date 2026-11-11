@@ -48,31 +48,6 @@ export function formatBrandKit(kit: BrandKitValues | null): string | null {
     .join('\n')
 }
 
-export function formatBrandVoice(brand: ActiveBrand): string | null {
-  const profile = brand.profile
-  if (!profile) return null
-  const handles =
-    profile.socialHandles && typeof profile.socialHandles === 'object'
-      ? Object.entries(profile.socialHandles as Record<string, string>)
-          .map(([network, handle]) => `${network} ${handle}`)
-          .join(', ')
-      : ''
-  return [
-    '<brand_voice>',
-    line('Product', profile.productDescription),
-    line('Audience', profile.audience),
-    line('Tone', profile.tone),
-    line('Tagline', profile.tagline),
-    line('Call-to-action conventions', profile.ctaConventions),
-    line('Never use', prohibitedTermList(profile.prohibitedTerms)),
-    line('Preferred styles', Array.isArray(profile.preferredStyles) ? profile.preferredStyles : []),
-    line('Social handles', handles),
-    '</brand_voice>',
-  ]
-    .filter(Boolean)
-    .join('\n')
-}
-
 /** The confirmed product profile: what the product is, for whom, and what it can claim. */
 export function formatProductProfile(profile: StoredProductProfile | null): string | null {
   if (!profile) return null

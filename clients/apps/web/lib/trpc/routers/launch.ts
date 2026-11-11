@@ -61,14 +61,25 @@ const campaignInput = z.object({ campaignId: z.string().cuid() })
  * Refuses an AI action when AI is not configured, the workspace turned AI
  * off, the workspace is rate limited, or out of credits.
  */
+/**
+ * The AI rule from values a caller already holds, such as a page's access:
+ * configured, a paid plan, and not turned off by the workspace.
+ */
+export function aiAllowed(
+  paidPlan: boolean,
+  settings: { aiAgentEnabled: boolean } | null | undefined
+): boolean {
+  // No settings row is the default: on.
+  return isCampaignStudioConfigured() && paidPlan && settings?.aiAgentEnabled !== false
+}
+
 /** True when AI is configured and the workspace has not turned it off. */
 export async function isAiEnabled(access: OrganizationAccess): Promise<boolean> {
   if (!isCampaignStudioConfigured()) return false
   const sdk = backendSDK(access)
   if (!(await sdk.getFeatureDecision('workspace:paid')).allowed) return false
   const { workspace } = await sdk.getWorkspace()
-  // No settings row is the default: on.
-  return workspace?.workspaceSettings?.aiAgentEnabled !== false
+  return aiAllowed(true, workspace?.workspaceSettings)
 }
 
 /** Refuse when AI is not configured or the workspace turned it off (the kill switch). */

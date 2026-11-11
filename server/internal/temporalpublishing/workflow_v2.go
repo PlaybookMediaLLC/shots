@@ -86,31 +86,45 @@ func PostWorkflowV2(ctx workflow.Context, input WorkflowInput) (WorkflowResult, 
 
 		var submitted PublishResult
 		if err := workflow.ExecuteActivity(mutationCtx, SubmitActivityName, SubmitInput{Job: job}).Get(ctx, &submitted); err != nil {
-			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, nil)
+			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, nil, "")
 		}
 		switch submitted.Outcome {
 		case OutcomeRetry:
 			if attemptNumber >= input.MaxAttempts {
-				if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, time.Time{}); err != nil {
+				if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, time.Time{}, submitted.ProviderMessage); err != nil {
 					return WorkflowResult{}, err
 				}
 				return WorkflowResult{FailureCode: submitted.FailureCode, Outcome: OutcomeFailed}, nil
 			}
-			retryAt := workflow.Now(ctx).Add(input.RetryDelay)
-			if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, retryAt); err != nil {
+			delay := input.RetryDelay
+			if workflow.GetVersion(ctx, "provider-retry-after", workflow.DefaultVersion, 1) == 1 {
+				// At least the configured delay and as long as the provider asked.
+				delay = max(input.RetryDelay, submitted.RetryAfter)
+				// A provider wait that would end past the late window, counted from
+				// the post's own time, fails now with the rate-limit reason rather
+				// than holding the post and publishing it hours after its moment.
+				if submitted.RetryAfter > input.RetryDelay && workflow.Now(ctx).Add(delay).Sub(input.ScheduledFor) > LatePublicationWindow {
+					if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, time.Time{}, submitted.ProviderMessage); err != nil {
+						return WorkflowResult{}, err
+					}
+					return WorkflowResult{FailureCode: submitted.FailureCode, Outcome: OutcomeFailed}, nil
+				}
+			}
+			retryAt := workflow.Now(ctx).Add(delay)
+			if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, retryAt, submitted.ProviderMessage); err != nil {
 				return WorkflowResult{}, err
 			}
-			if waitForCancelAndDrainPoke(ctx, cancelSignal, pokeSignal, input.RetryDelay) {
+			if waitForCancelAndDrainPoke(ctx, cancelSignal, pokeSignal, delay) {
 				return WorkflowResult{Outcome: OutcomeCancelled}, nil
 			}
 			continue
 		case OutcomeFailed:
-			if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, time.Time{}); err != nil {
+			if err := failAttempt(ctx, recordCtx, attempt, job, runID, submitted.FailureCode, time.Time{}, submitted.ProviderMessage); err != nil {
 				return WorkflowResult{}, err
 			}
 			return WorkflowResult{FailureCode: submitted.FailureCode, Outcome: OutcomeFailed}, nil
 		case OutcomeUnknown:
-			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, submitted.Progress)
+			return markUnknown(ctx, recordCtx, job.PostID, runID, attemptNumber, submitted.Progress, submitted.ProviderMessage)
 		case OutcomePublished:
 			if err := completeAttempt(ctx, recordCtx, attempt, job, runID, submitted.ProviderID, submitted.Progress); err != nil {
 				return WorkflowResult{}, err
@@ -146,7 +160,7 @@ func awaitSocialConfirmation(
 		if err != nil {
 			consecutiveFailures++
 			if consecutiveFailures >= maxStatusCheckFailures {
-				return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil)
+				return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil, "")
 			}
 		} else {
 			consecutiveFailures = 0
@@ -161,7 +175,7 @@ func awaitSocialConfirmation(
 				}
 				return WorkflowResult{Outcome: OutcomePublished, ProviderID: providerID}, nil
 			case OutcomeFailed:
-				if err := failAttempt(ctx, recordCtx, attempt, job, runID, status.FailureCode, time.Time{}); err != nil {
+				if err := failAttempt(ctx, recordCtx, attempt, job, runID, status.FailureCode, time.Time{}, ""); err != nil {
 					return WorkflowResult{}, err
 				}
 				return WorkflowResult{FailureCode: status.FailureCode, Outcome: OutcomeFailed}, nil
@@ -173,7 +187,7 @@ func awaitSocialConfirmation(
 			}
 		}
 	}
-	return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil)
+	return markUnknown(ctx, recordCtx, job.PostID, runID, attempt.AttemptNumber, nil, "")
 }
 
 func completeAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job PreparedPublication, runID, providerID string, progress *postoptions.ThreadProgress) error {
@@ -182,16 +196,16 @@ func completeAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job
 	}).Get(ctx, nil)
 }
 
-func failAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job PreparedPublication, runID, failureCode string, retryAt time.Time) error {
+func failAttempt(ctx, activityCtx workflow.Context, attempt BeginResult, job PreparedPublication, runID, failureCode string, retryAt time.Time, providerMessage string) error {
 	return workflow.ExecuteActivity(activityCtx, FailActivityName, FailInput{
 		AttemptID: attempt.AttemptID, AttemptNumber: attempt.AttemptNumber,
-		FailureCode: failureCode, Job: job, RetryAt: retryAt, RunID: runID,
+		FailureCode: failureCode, Job: job, RetryAt: retryAt, RunID: runID, ProviderMessage: providerMessage,
 	}).Get(ctx, nil)
 }
 
-func markUnknown(ctx, activityCtx workflow.Context, postID, runID string, attemptNumber int, progress *postoptions.ThreadProgress) (WorkflowResult, error) {
+func markUnknown(ctx, activityCtx workflow.Context, postID, runID string, attemptNumber int, progress *postoptions.ThreadProgress, providerMessage string) (WorkflowResult, error) {
 	err := workflow.ExecuteActivity(activityCtx, MarkUnknownActivityName, MarkUnknownInput{
-		AttemptNumber: attemptNumber, PostID: postID, RunID: runID, Progress: progress,
+		AttemptNumber: attemptNumber, PostID: postID, RunID: runID, Progress: progress, ProviderMessage: providerMessage,
 	}).Get(ctx, nil)
 	if err != nil {
 		return WorkflowResult{}, err

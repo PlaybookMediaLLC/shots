@@ -76,10 +76,19 @@ func (ContentDraft) Fields() []ent.Field {
 		field.String("plan_time_zone").StorageKey("planTimeZone").Optional().Nillable(),
 		// The draft this one was duplicated, copied or recovered from.
 		field.String("source_draft_id").StorageKey("sourceDraftId").Optional().Nillable().Immutable(),
+		// The voice transcript revision this draft was made from. No foreign
+		// key: the draft keeps its text after the note is deleted, and the
+		// source then reads as removed (voice plan, V5 and K15).
+		field.String("source_voice_revision_id").StorageKey("sourceVoiceRevisionId").Optional().Nillable().Immutable(),
 		// The campaign an edited campaign visual was published from
 		// (campaign_publish_draft.go). The draft publishes through Publish
 		// like any other; this only keeps the campaign it came from reachable.
 		field.String("campaign_id").StorageKey("campaignId").Optional().Nillable().Immutable(),
+		// The release a draft was made from (its screenshots and summary) and
+		// the campaign post whose copy it took, kept so approval and claim
+		// evidence stay reachable from the draft.
+		field.String("release_id").StorageKey("releaseId").Optional().Nillable().Immutable(),
+		field.String("campaign_post_id").StorageKey("campaignPostId").Optional().Nillable().Immutable(),
 		// Yjs document state, written only by the collaboration service.
 		// External body replacements invalidate cached rooms and projections.
 		field.Int("collab_generation").StorageKey("collabGeneration").Default(0).NonNegative(),

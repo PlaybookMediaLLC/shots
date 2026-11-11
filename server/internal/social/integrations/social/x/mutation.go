@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ssrf"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 )
@@ -66,10 +67,15 @@ func (c *client) mutationJSON(ctx context.Context, endpoint string, body, out an
 		if res.StatusCode == http.StatusUnauthorized || handled != nil && handled.Type == "refresh-token" {
 			return temporalx.RefreshToken(identifier, "{}", "{}", "X rejected this authorization. Reconnect the account.")
 		}
-		message := "X rejected this publication request. Review it before trying again."
 		if res.StatusCode == http.StatusTooManyRequests || res.StatusCode == 420 {
-			message = "X rejected this request because of a rate limit. Reschedule it after the limit resets."
-		} else if handled != nil && handled.Value != "" {
+			// X refused before creating anything, so a later attempt is safe.
+			if res.Header.Get("x-user-limit-24hour-remaining") == "0" || res.Header.Get("x-app-limit-24hour-remaining") == "0" {
+				return temporalx.DailyLimit(identifier, "X's daily posting limit was reached. Reschedule it after the limit resets.")
+			}
+			return temporalx.RateLimited(identifier, time.Until(integrations.RetryAt(res.Header, time.Now())), "X rate-limited this request.")
+		}
+		message := "X rejected this publication request. Review it before trying again."
+		if handled != nil && handled.Value != "" {
 			message = handled.Value
 		}
 		return publishRejected(message)

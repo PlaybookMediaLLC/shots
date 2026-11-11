@@ -119,6 +119,14 @@ const SECTIONS = [
     title: 'Roles',
   },
   {
+    description: 'Voice notes from the Shots app, audio upload, drafts from notes, and voice commands.',
+    group: 'workspace',
+    id: 'voice',
+    keywords: 'microphone recording transcript dictation',
+    slug: 'voice-notes',
+    title: 'Voice notes',
+  },
+  {
     description: 'Start a separate workspace for a team, project, or client.',
     group: 'workspace',
     id: 'new-team',

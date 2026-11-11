@@ -1,5 +1,6 @@
 // The id rule's own module: the full draft contract pulls the backend SDK and
 // the OpenAPI helpers, and this runs in the editor's bundle.
+import { z } from 'zod'
 import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
 
 /**
@@ -13,8 +14,12 @@ import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
 /** The editor's canonical route; `/` still redirects to it with its query. */
 export const EDITOR_PATH = '/editor'
 
-/** What the editor should open: a flat image asset, or a saved design. */
-export type EditorSource = { assetId: string } | { designId: string }
+/**
+ * What the editor should open: a flat image asset, or a saved design. A
+ * screenshot handed over from a release or campaign names the workspace's
+ * active brand kit, which the editor applies when the image opens.
+ */
+export type EditorSource = { assetId: string; brandKitId?: string } | { designId: string }
 
 /** Where an export made in the editor belongs when the editor is left. */
 export type EditorReturn = {
@@ -22,10 +27,16 @@ export type EditorReturn = {
   draftId?: string
   /** The campaign whose visual is being edited; its copy seeds the post. */
   campaignId?: string
+  /** The release whose screenshot is being edited; its summary seeds the post. */
+  releaseId?: string
 }
 
 const id = (value: string | null): string | undefined =>
   value && contentDraftIdSchema.safeParse(value).success ? value : undefined
+
+// Releases are named by UUID, checked as the draft contract checks them.
+const uuid = (value: string | null): string | undefined =>
+  value && z.uuid().safeParse(value).success ? value : undefined
 
 /**
  * The return target carried in an editor URL. Unrecognized or malformed ids
@@ -35,7 +46,17 @@ export function readEditorReturn(search: string): EditorReturn {
   const params = new URLSearchParams(search)
   const draftId = id(params.get('fromDraft'))
   const campaignId = id(params.get('fromCampaign'))
-  return { ...(draftId ? { draftId } : {}), ...(campaignId ? { campaignId } : {}) }
+  const releaseId = uuid(params.get('fromRelease'))
+  return {
+    ...(draftId ? { draftId } : {}),
+    ...(campaignId ? { campaignId } : {}),
+    ...(releaseId ? { releaseId } : {}),
+  }
+}
+
+/** The brand kit a handed-over screenshot opens with, if any. */
+export function readEditorBrandKit(search: string): string | undefined {
+  return id(new URLSearchParams(search).get('kit'))
 }
 
 /** Open the editor on a source, remembering where its export belongs. */
@@ -43,8 +64,10 @@ export function editorHref(source: EditorSource, from: EditorReturn = {}): strin
   const query = new URLSearchParams(
     'assetId' in source ? { asset: source.assetId } : { design: source.designId }
   )
+  if ('assetId' in source && source.brandKitId) query.set('kit', source.brandKitId)
   if (from.draftId) query.set('fromDraft', from.draftId)
   if (from.campaignId) query.set('fromCampaign', from.campaignId)
+  if (from.releaseId) query.set('fromRelease', from.releaseId)
   return `${EDITOR_PATH}?${query}`
 }
 

@@ -147,6 +147,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdeliveryattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -310,6 +316,12 @@ const (
 	TypeSurfaceCapture                  = "SurfaceCapture"
 	TypeUser                            = "User"
 	TypeUserPreference                  = "UserPreference"
+	TypeVoiceAudioRun                   = "VoiceAudioRun"
+	TypeVoiceCommand                    = "VoiceCommand"
+	TypeVoiceMemberSettings             = "VoiceMemberSettings"
+	TypeVoiceNote                       = "VoiceNote"
+	TypeVoiceSettings                   = "VoiceSettings"
+	TypeVoiceTranscriptRevision         = "VoiceTranscriptRevision"
 	TypeWebhookDelivery                 = "WebhookDelivery"
 	TypeWebhookDeliveryAttempt          = "WebhookDeliveryAttempt"
 	TypeWebhookSubscription             = "WebhookSubscription"
@@ -33304,7 +33316,10 @@ type ContentDraftMutation struct {
 	pinned_at                    *time.Time
 	plan_time_zone               *string
 	source_draft_id              *string
+	source_voice_revision_id     *string
 	campaign_id                  *string
+	release_id                   *string
+	campaign_post_id             *string
 	collab_generation            *int
 	addcollab_generation         *int
 	collab_state                 *[]byte
@@ -34866,6 +34881,55 @@ func (m *ContentDraftMutation) ResetSourceDraftID() {
 	delete(m.clearedFields, contentdraft.FieldSourceDraftID)
 }
 
+// SetSourceVoiceRevisionID sets the "source_voice_revision_id" field.
+func (m *ContentDraftMutation) SetSourceVoiceRevisionID(s string) {
+	m.source_voice_revision_id = &s
+}
+
+// SourceVoiceRevisionID returns the value of the "source_voice_revision_id" field in the mutation.
+func (m *ContentDraftMutation) SourceVoiceRevisionID() (r string, exists bool) {
+	v := m.source_voice_revision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceVoiceRevisionID returns the old "source_voice_revision_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldSourceVoiceRevisionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceVoiceRevisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceVoiceRevisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceVoiceRevisionID: %w", err)
+	}
+	return oldValue.SourceVoiceRevisionID, nil
+}
+
+// ClearSourceVoiceRevisionID clears the value of the "source_voice_revision_id" field.
+func (m *ContentDraftMutation) ClearSourceVoiceRevisionID() {
+	m.source_voice_revision_id = nil
+	m.clearedFields[contentdraft.FieldSourceVoiceRevisionID] = struct{}{}
+}
+
+// SourceVoiceRevisionIDCleared returns if the "source_voice_revision_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) SourceVoiceRevisionIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldSourceVoiceRevisionID]
+	return ok
+}
+
+// ResetSourceVoiceRevisionID resets all changes to the "source_voice_revision_id" field.
+func (m *ContentDraftMutation) ResetSourceVoiceRevisionID() {
+	m.source_voice_revision_id = nil
+	delete(m.clearedFields, contentdraft.FieldSourceVoiceRevisionID)
+}
+
 // SetCampaignID sets the "campaign_id" field.
 func (m *ContentDraftMutation) SetCampaignID(s string) {
 	m.campaign_id = &s
@@ -34913,6 +34977,104 @@ func (m *ContentDraftMutation) CampaignIDCleared() bool {
 func (m *ContentDraftMutation) ResetCampaignID() {
 	m.campaign_id = nil
 	delete(m.clearedFields, contentdraft.FieldCampaignID)
+}
+
+// SetReleaseID sets the "release_id" field.
+func (m *ContentDraftMutation) SetReleaseID(s string) {
+	m.release_id = &s
+}
+
+// ReleaseID returns the value of the "release_id" field in the mutation.
+func (m *ContentDraftMutation) ReleaseID() (r string, exists bool) {
+	v := m.release_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReleaseID returns the old "release_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldReleaseID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReleaseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReleaseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReleaseID: %w", err)
+	}
+	return oldValue.ReleaseID, nil
+}
+
+// ClearReleaseID clears the value of the "release_id" field.
+func (m *ContentDraftMutation) ClearReleaseID() {
+	m.release_id = nil
+	m.clearedFields[contentdraft.FieldReleaseID] = struct{}{}
+}
+
+// ReleaseIDCleared returns if the "release_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) ReleaseIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldReleaseID]
+	return ok
+}
+
+// ResetReleaseID resets all changes to the "release_id" field.
+func (m *ContentDraftMutation) ResetReleaseID() {
+	m.release_id = nil
+	delete(m.clearedFields, contentdraft.FieldReleaseID)
+}
+
+// SetCampaignPostID sets the "campaign_post_id" field.
+func (m *ContentDraftMutation) SetCampaignPostID(s string) {
+	m.campaign_post_id = &s
+}
+
+// CampaignPostID returns the value of the "campaign_post_id" field in the mutation.
+func (m *ContentDraftMutation) CampaignPostID() (r string, exists bool) {
+	v := m.campaign_post_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCampaignPostID returns the old "campaign_post_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldCampaignPostID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCampaignPostID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCampaignPostID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCampaignPostID: %w", err)
+	}
+	return oldValue.CampaignPostID, nil
+}
+
+// ClearCampaignPostID clears the value of the "campaign_post_id" field.
+func (m *ContentDraftMutation) ClearCampaignPostID() {
+	m.campaign_post_id = nil
+	m.clearedFields[contentdraft.FieldCampaignPostID] = struct{}{}
+}
+
+// CampaignPostIDCleared returns if the "campaign_post_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) CampaignPostIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldCampaignPostID]
+	return ok
+}
+
+// ResetCampaignPostID resets all changes to the "campaign_post_id" field.
+func (m *ContentDraftMutation) ResetCampaignPostID() {
+	m.campaign_post_id = nil
+	delete(m.clearedFields, contentdraft.FieldCampaignPostID)
 }
 
 // SetCollabGeneration sets the "collab_generation" field.
@@ -35224,7 +35386,7 @@ func (m *ContentDraftMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentDraftMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 42)
 	if m.organization_id != nil {
 		fields = append(fields, contentdraft.FieldOrganizationID)
 	}
@@ -35321,8 +35483,17 @@ func (m *ContentDraftMutation) Fields() []string {
 	if m.source_draft_id != nil {
 		fields = append(fields, contentdraft.FieldSourceDraftID)
 	}
+	if m.source_voice_revision_id != nil {
+		fields = append(fields, contentdraft.FieldSourceVoiceRevisionID)
+	}
 	if m.campaign_id != nil {
 		fields = append(fields, contentdraft.FieldCampaignID)
+	}
+	if m.release_id != nil {
+		fields = append(fields, contentdraft.FieldReleaseID)
+	}
+	if m.campaign_post_id != nil {
+		fields = append(fields, contentdraft.FieldCampaignPostID)
 	}
 	if m.collab_generation != nil {
 		fields = append(fields, contentdraft.FieldCollabGeneration)
@@ -35414,8 +35585,14 @@ func (m *ContentDraftMutation) Field(name string) (ent.Value, bool) {
 		return m.PlanTimeZone()
 	case contentdraft.FieldSourceDraftID:
 		return m.SourceDraftID()
+	case contentdraft.FieldSourceVoiceRevisionID:
+		return m.SourceVoiceRevisionID()
 	case contentdraft.FieldCampaignID:
 		return m.CampaignID()
+	case contentdraft.FieldReleaseID:
+		return m.ReleaseID()
+	case contentdraft.FieldCampaignPostID:
+		return m.CampaignPostID()
 	case contentdraft.FieldCollabGeneration:
 		return m.CollabGeneration()
 	case contentdraft.FieldCollabState:
@@ -35501,8 +35678,14 @@ func (m *ContentDraftMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldPlanTimeZone(ctx)
 	case contentdraft.FieldSourceDraftID:
 		return m.OldSourceDraftID(ctx)
+	case contentdraft.FieldSourceVoiceRevisionID:
+		return m.OldSourceVoiceRevisionID(ctx)
 	case contentdraft.FieldCampaignID:
 		return m.OldCampaignID(ctx)
+	case contentdraft.FieldReleaseID:
+		return m.OldReleaseID(ctx)
+	case contentdraft.FieldCampaignPostID:
+		return m.OldCampaignPostID(ctx)
 	case contentdraft.FieldCollabGeneration:
 		return m.OldCollabGeneration(ctx)
 	case contentdraft.FieldCollabState:
@@ -35748,12 +35931,33 @@ func (m *ContentDraftMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSourceDraftID(v)
 		return nil
+	case contentdraft.FieldSourceVoiceRevisionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceVoiceRevisionID(v)
+		return nil
 	case contentdraft.FieldCampaignID:
 		v, ok := value.(string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCampaignID(v)
+		return nil
+	case contentdraft.FieldReleaseID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReleaseID(v)
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCampaignPostID(v)
 		return nil
 	case contentdraft.FieldCollabGeneration:
 		v, ok := value.(int)
@@ -35914,8 +36118,17 @@ func (m *ContentDraftMutation) ClearedFields() []string {
 	if m.FieldCleared(contentdraft.FieldSourceDraftID) {
 		fields = append(fields, contentdraft.FieldSourceDraftID)
 	}
+	if m.FieldCleared(contentdraft.FieldSourceVoiceRevisionID) {
+		fields = append(fields, contentdraft.FieldSourceVoiceRevisionID)
+	}
 	if m.FieldCleared(contentdraft.FieldCampaignID) {
 		fields = append(fields, contentdraft.FieldCampaignID)
+	}
+	if m.FieldCleared(contentdraft.FieldReleaseID) {
+		fields = append(fields, contentdraft.FieldReleaseID)
+	}
+	if m.FieldCleared(contentdraft.FieldCampaignPostID) {
+		fields = append(fields, contentdraft.FieldCampaignPostID)
 	}
 	if m.FieldCleared(contentdraft.FieldCollabState) {
 		fields = append(fields, contentdraft.FieldCollabState)
@@ -35976,8 +36189,17 @@ func (m *ContentDraftMutation) ClearField(name string) error {
 	case contentdraft.FieldSourceDraftID:
 		m.ClearSourceDraftID()
 		return nil
+	case contentdraft.FieldSourceVoiceRevisionID:
+		m.ClearSourceVoiceRevisionID()
+		return nil
 	case contentdraft.FieldCampaignID:
 		m.ClearCampaignID()
+		return nil
+	case contentdraft.FieldReleaseID:
+		m.ClearReleaseID()
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		m.ClearCampaignPostID()
 		return nil
 	case contentdraft.FieldCollabState:
 		m.ClearCollabState()
@@ -36092,8 +36314,17 @@ func (m *ContentDraftMutation) ResetField(name string) error {
 	case contentdraft.FieldSourceDraftID:
 		m.ResetSourceDraftID()
 		return nil
+	case contentdraft.FieldSourceVoiceRevisionID:
+		m.ResetSourceVoiceRevisionID()
+		return nil
 	case contentdraft.FieldCampaignID:
 		m.ResetCampaignID()
+		return nil
+	case contentdraft.FieldReleaseID:
+		m.ResetReleaseID()
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		m.ResetCampaignPostID()
 		return nil
 	case contentdraft.FieldCollabGeneration:
 		m.ResetCollabGeneration()
@@ -37814,6 +38045,7 @@ type ContentDraftSettingsMutation struct {
 	posting_slots       *[]schema.QueueSlot
 	appendposting_slots []schema.QueueSlot
 	require_approval    *bool
+	allow_self_approval *bool
 	updated_at          *time.Time
 	clearedFields       map[string]struct{}
 	done                bool
@@ -38012,6 +38244,42 @@ func (m *ContentDraftSettingsMutation) ResetRequireApproval() {
 	m.require_approval = nil
 }
 
+// SetAllowSelfApproval sets the "allow_self_approval" field.
+func (m *ContentDraftSettingsMutation) SetAllowSelfApproval(b bool) {
+	m.allow_self_approval = &b
+}
+
+// AllowSelfApproval returns the value of the "allow_self_approval" field in the mutation.
+func (m *ContentDraftSettingsMutation) AllowSelfApproval() (r bool, exists bool) {
+	v := m.allow_self_approval
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowSelfApproval returns the old "allow_self_approval" field's value of the ContentDraftSettings entity.
+// If the ContentDraftSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftSettingsMutation) OldAllowSelfApproval(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowSelfApproval is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowSelfApproval requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowSelfApproval: %w", err)
+	}
+	return oldValue.AllowSelfApproval, nil
+}
+
+// ResetAllowSelfApproval resets all changes to the "allow_self_approval" field.
+func (m *ContentDraftSettingsMutation) ResetAllowSelfApproval() {
+	m.allow_self_approval = nil
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (m *ContentDraftSettingsMutation) SetUpdatedAt(t time.Time) {
 	m.updated_at = &t
@@ -38082,12 +38350,15 @@ func (m *ContentDraftSettingsMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentDraftSettingsMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.posting_slots != nil {
 		fields = append(fields, contentdraftsettings.FieldPostingSlots)
 	}
 	if m.require_approval != nil {
 		fields = append(fields, contentdraftsettings.FieldRequireApproval)
+	}
+	if m.allow_self_approval != nil {
+		fields = append(fields, contentdraftsettings.FieldAllowSelfApproval)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, contentdraftsettings.FieldUpdatedAt)
@@ -38104,6 +38375,8 @@ func (m *ContentDraftSettingsMutation) Field(name string) (ent.Value, bool) {
 		return m.PostingSlots()
 	case contentdraftsettings.FieldRequireApproval:
 		return m.RequireApproval()
+	case contentdraftsettings.FieldAllowSelfApproval:
+		return m.AllowSelfApproval()
 	case contentdraftsettings.FieldUpdatedAt:
 		return m.UpdatedAt()
 	}
@@ -38119,6 +38392,8 @@ func (m *ContentDraftSettingsMutation) OldField(ctx context.Context, name string
 		return m.OldPostingSlots(ctx)
 	case contentdraftsettings.FieldRequireApproval:
 		return m.OldRequireApproval(ctx)
+	case contentdraftsettings.FieldAllowSelfApproval:
+		return m.OldAllowSelfApproval(ctx)
 	case contentdraftsettings.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
 	}
@@ -38143,6 +38418,13 @@ func (m *ContentDraftSettingsMutation) SetField(name string, value ent.Value) er
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRequireApproval(v)
+		return nil
+	case contentdraftsettings.FieldAllowSelfApproval:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowSelfApproval(v)
 		return nil
 	case contentdraftsettings.FieldUpdatedAt:
 		v, ok := value.(time.Time)
@@ -38205,6 +38487,9 @@ func (m *ContentDraftSettingsMutation) ResetField(name string) error {
 		return nil
 	case contentdraftsettings.FieldRequireApproval:
 		m.ResetRequireApproval()
+		return nil
+	case contentdraftsettings.FieldAllowSelfApproval:
+		m.ResetAllowSelfApproval()
 		return nil
 	case contentdraftsettings.FieldUpdatedAt:
 		m.ResetUpdatedAt()
@@ -43355,6 +43640,8 @@ type DeploymentEventMutation struct {
 	failure_code    *string
 	asset_ids       *[]string
 	appendasset_ids []string
+	kind            *deploymentevent.Kind
+	deployed_at     *time.Time
 	created_at      *time.Time
 	updated_at      *time.Time
 	clearedFields   map[string]struct{}
@@ -43845,6 +44132,78 @@ func (m *DeploymentEventMutation) ResetAssetIds() {
 	m.appendasset_ids = nil
 }
 
+// SetKind sets the "kind" field.
+func (m *DeploymentEventMutation) SetKind(d deploymentevent.Kind) {
+	m.kind = &d
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *DeploymentEventMutation) Kind() (r deploymentevent.Kind, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the DeploymentEvent entity.
+// If the DeploymentEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentEventMutation) OldKind(ctx context.Context) (v deploymentevent.Kind, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *DeploymentEventMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetDeployedAt sets the "deployed_at" field.
+func (m *DeploymentEventMutation) SetDeployedAt(t time.Time) {
+	m.deployed_at = &t
+}
+
+// DeployedAt returns the value of the "deployed_at" field in the mutation.
+func (m *DeploymentEventMutation) DeployedAt() (r time.Time, exists bool) {
+	v := m.deployed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeployedAt returns the old "deployed_at" field's value of the DeploymentEvent entity.
+// If the DeploymentEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentEventMutation) OldDeployedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeployedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeployedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeployedAt: %w", err)
+	}
+	return oldValue.DeployedAt, nil
+}
+
+// ResetDeployedAt resets all changes to the "deployed_at" field.
+func (m *DeploymentEventMutation) ResetDeployedAt() {
+	m.deployed_at = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *DeploymentEventMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -43951,7 +44310,7 @@ func (m *DeploymentEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeploymentEventMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 13)
 	if m.organization_id != nil {
 		fields = append(fields, deploymentevent.FieldOrganizationID)
 	}
@@ -43978,6 +44337,12 @@ func (m *DeploymentEventMutation) Fields() []string {
 	}
 	if m.asset_ids != nil {
 		fields = append(fields, deploymentevent.FieldAssetIds)
+	}
+	if m.kind != nil {
+		fields = append(fields, deploymentevent.FieldKind)
+	}
+	if m.deployed_at != nil {
+		fields = append(fields, deploymentevent.FieldDeployedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, deploymentevent.FieldCreatedAt)
@@ -44011,6 +44376,10 @@ func (m *DeploymentEventMutation) Field(name string) (ent.Value, bool) {
 		return m.FailureCode()
 	case deploymentevent.FieldAssetIds:
 		return m.AssetIds()
+	case deploymentevent.FieldKind:
+		return m.Kind()
+	case deploymentevent.FieldDeployedAt:
+		return m.DeployedAt()
 	case deploymentevent.FieldCreatedAt:
 		return m.CreatedAt()
 	case deploymentevent.FieldUpdatedAt:
@@ -44042,6 +44411,10 @@ func (m *DeploymentEventMutation) OldField(ctx context.Context, name string) (en
 		return m.OldFailureCode(ctx)
 	case deploymentevent.FieldAssetIds:
 		return m.OldAssetIds(ctx)
+	case deploymentevent.FieldKind:
+		return m.OldKind(ctx)
+	case deploymentevent.FieldDeployedAt:
+		return m.OldDeployedAt(ctx)
 	case deploymentevent.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case deploymentevent.FieldUpdatedAt:
@@ -44117,6 +44490,20 @@ func (m *DeploymentEventMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAssetIds(v)
+		return nil
+	case deploymentevent.FieldKind:
+		v, ok := value.(deploymentevent.Kind)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case deploymentevent.FieldDeployedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeployedAt(v)
 		return nil
 	case deploymentevent.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -44228,6 +44615,12 @@ func (m *DeploymentEventMutation) ResetField(name string) error {
 		return nil
 	case deploymentevent.FieldAssetIds:
 		m.ResetAssetIds()
+		return nil
+	case deploymentevent.FieldKind:
+		m.ResetKind()
+		return nil
+	case deploymentevent.FieldDeployedAt:
+		m.ResetDeployedAt()
 		return nil
 	case deploymentevent.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -97130,6 +97523,8 @@ type PublicationAttemptMutation struct {
 	outcome               *publicationattempt.Outcome
 	provider_post_id      *string
 	failure_code          *string
+	provider_message      *string
+	remote_url            *string
 	clearedFields         map[string]struct{}
 	scheduled_post        *string
 	clearedscheduled_post bool
@@ -97602,6 +97997,104 @@ func (m *PublicationAttemptMutation) ResetFailureCode() {
 	delete(m.clearedFields, publicationattempt.FieldFailureCode)
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (m *PublicationAttemptMutation) SetProviderMessage(s string) {
+	m.provider_message = &s
+}
+
+// ProviderMessage returns the value of the "provider_message" field in the mutation.
+func (m *PublicationAttemptMutation) ProviderMessage() (r string, exists bool) {
+	v := m.provider_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderMessage returns the old "provider_message" field's value of the PublicationAttempt entity.
+// If the PublicationAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublicationAttemptMutation) OldProviderMessage(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderMessage: %w", err)
+	}
+	return oldValue.ProviderMessage, nil
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (m *PublicationAttemptMutation) ClearProviderMessage() {
+	m.provider_message = nil
+	m.clearedFields[publicationattempt.FieldProviderMessage] = struct{}{}
+}
+
+// ProviderMessageCleared returns if the "provider_message" field was cleared in this mutation.
+func (m *PublicationAttemptMutation) ProviderMessageCleared() bool {
+	_, ok := m.clearedFields[publicationattempt.FieldProviderMessage]
+	return ok
+}
+
+// ResetProviderMessage resets all changes to the "provider_message" field.
+func (m *PublicationAttemptMutation) ResetProviderMessage() {
+	m.provider_message = nil
+	delete(m.clearedFields, publicationattempt.FieldProviderMessage)
+}
+
+// SetRemoteURL sets the "remote_url" field.
+func (m *PublicationAttemptMutation) SetRemoteURL(s string) {
+	m.remote_url = &s
+}
+
+// RemoteURL returns the value of the "remote_url" field in the mutation.
+func (m *PublicationAttemptMutation) RemoteURL() (r string, exists bool) {
+	v := m.remote_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteURL returns the old "remote_url" field's value of the PublicationAttempt entity.
+// If the PublicationAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublicationAttemptMutation) OldRemoteURL(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteURL: %w", err)
+	}
+	return oldValue.RemoteURL, nil
+}
+
+// ClearRemoteURL clears the value of the "remote_url" field.
+func (m *PublicationAttemptMutation) ClearRemoteURL() {
+	m.remote_url = nil
+	m.clearedFields[publicationattempt.FieldRemoteURL] = struct{}{}
+}
+
+// RemoteURLCleared returns if the "remote_url" field was cleared in this mutation.
+func (m *PublicationAttemptMutation) RemoteURLCleared() bool {
+	_, ok := m.clearedFields[publicationattempt.FieldRemoteURL]
+	return ok
+}
+
+// ResetRemoteURL resets all changes to the "remote_url" field.
+func (m *PublicationAttemptMutation) ResetRemoteURL() {
+	m.remote_url = nil
+	delete(m.clearedFields, publicationattempt.FieldRemoteURL)
+}
+
 // ClearScheduledPost clears the "scheduled_post" edge to the ScheduledPost entity.
 func (m *PublicationAttemptMutation) ClearScheduledPost() {
 	m.clearedscheduled_post = true
@@ -97663,7 +98156,7 @@ func (m *PublicationAttemptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PublicationAttemptMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.organization_id != nil {
 		fields = append(fields, publicationattempt.FieldOrganizationID)
 	}
@@ -97687,6 +98180,12 @@ func (m *PublicationAttemptMutation) Fields() []string {
 	}
 	if m.failure_code != nil {
 		fields = append(fields, publicationattempt.FieldFailureCode)
+	}
+	if m.provider_message != nil {
+		fields = append(fields, publicationattempt.FieldProviderMessage)
+	}
+	if m.remote_url != nil {
+		fields = append(fields, publicationattempt.FieldRemoteURL)
 	}
 	return fields
 }
@@ -97712,6 +98211,10 @@ func (m *PublicationAttemptMutation) Field(name string) (ent.Value, bool) {
 		return m.ProviderPostID()
 	case publicationattempt.FieldFailureCode:
 		return m.FailureCode()
+	case publicationattempt.FieldProviderMessage:
+		return m.ProviderMessage()
+	case publicationattempt.FieldRemoteURL:
+		return m.RemoteURL()
 	}
 	return nil, false
 }
@@ -97737,6 +98240,10 @@ func (m *PublicationAttemptMutation) OldField(ctx context.Context, name string) 
 		return m.OldProviderPostID(ctx)
 	case publicationattempt.FieldFailureCode:
 		return m.OldFailureCode(ctx)
+	case publicationattempt.FieldProviderMessage:
+		return m.OldProviderMessage(ctx)
+	case publicationattempt.FieldRemoteURL:
+		return m.OldRemoteURL(ctx)
 	}
 	return nil, fmt.Errorf("unknown PublicationAttempt field %s", name)
 }
@@ -97802,6 +98309,20 @@ func (m *PublicationAttemptMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetFailureCode(v)
 		return nil
+	case publicationattempt.FieldProviderMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderMessage(v)
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteURL(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt field %s", name)
 }
@@ -97859,6 +98380,12 @@ func (m *PublicationAttemptMutation) ClearedFields() []string {
 	if m.FieldCleared(publicationattempt.FieldFailureCode) {
 		fields = append(fields, publicationattempt.FieldFailureCode)
 	}
+	if m.FieldCleared(publicationattempt.FieldProviderMessage) {
+		fields = append(fields, publicationattempt.FieldProviderMessage)
+	}
+	if m.FieldCleared(publicationattempt.FieldRemoteURL) {
+		fields = append(fields, publicationattempt.FieldRemoteURL)
+	}
 	return fields
 }
 
@@ -97884,6 +98411,12 @@ func (m *PublicationAttemptMutation) ClearField(name string) error {
 		return nil
 	case publicationattempt.FieldFailureCode:
 		m.ClearFailureCode()
+		return nil
+	case publicationattempt.FieldProviderMessage:
+		m.ClearProviderMessage()
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		m.ClearRemoteURL()
 		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt nullable field %s", name)
@@ -97916,6 +98449,12 @@ func (m *PublicationAttemptMutation) ResetField(name string) error {
 		return nil
 	case publicationattempt.FieldFailureCode:
 		m.ResetFailureCode()
+		return nil
+	case publicationattempt.FieldProviderMessage:
+		m.ResetProviderMessage()
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		m.ResetRemoteURL()
 		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt field %s", name)
@@ -107069,6 +107608,10 @@ type ScheduledPostMutation struct {
 	schedule_time_zone        *string
 	schedule_intent           *string
 	failure_code              *string
+	scheduled_by_user_id      *string
+	approved_by_user_id       *string
+	approved_version          *int
+	addapproved_version       *int
 	created_at                *time.Time
 	updated_at                *time.Time
 	clearedFields             map[string]struct{}
@@ -108533,6 +109076,174 @@ func (m *ScheduledPostMutation) ResetFailureCode() {
 	delete(m.clearedFields, scheduledpost.FieldFailureCode)
 }
 
+// SetScheduledByUserID sets the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) SetScheduledByUserID(s string) {
+	m.scheduled_by_user_id = &s
+}
+
+// ScheduledByUserID returns the value of the "scheduled_by_user_id" field in the mutation.
+func (m *ScheduledPostMutation) ScheduledByUserID() (r string, exists bool) {
+	v := m.scheduled_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScheduledByUserID returns the old "scheduled_by_user_id" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldScheduledByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScheduledByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScheduledByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScheduledByUserID: %w", err)
+	}
+	return oldValue.ScheduledByUserID, nil
+}
+
+// ClearScheduledByUserID clears the value of the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) ClearScheduledByUserID() {
+	m.scheduled_by_user_id = nil
+	m.clearedFields[scheduledpost.FieldScheduledByUserID] = struct{}{}
+}
+
+// ScheduledByUserIDCleared returns if the "scheduled_by_user_id" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ScheduledByUserIDCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldScheduledByUserID]
+	return ok
+}
+
+// ResetScheduledByUserID resets all changes to the "scheduled_by_user_id" field.
+func (m *ScheduledPostMutation) ResetScheduledByUserID() {
+	m.scheduled_by_user_id = nil
+	delete(m.clearedFields, scheduledpost.FieldScheduledByUserID)
+}
+
+// SetApprovedByUserID sets the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) SetApprovedByUserID(s string) {
+	m.approved_by_user_id = &s
+}
+
+// ApprovedByUserID returns the value of the "approved_by_user_id" field in the mutation.
+func (m *ScheduledPostMutation) ApprovedByUserID() (r string, exists bool) {
+	v := m.approved_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedByUserID returns the old "approved_by_user_id" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldApprovedByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedByUserID: %w", err)
+	}
+	return oldValue.ApprovedByUserID, nil
+}
+
+// ClearApprovedByUserID clears the value of the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) ClearApprovedByUserID() {
+	m.approved_by_user_id = nil
+	m.clearedFields[scheduledpost.FieldApprovedByUserID] = struct{}{}
+}
+
+// ApprovedByUserIDCleared returns if the "approved_by_user_id" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ApprovedByUserIDCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldApprovedByUserID]
+	return ok
+}
+
+// ResetApprovedByUserID resets all changes to the "approved_by_user_id" field.
+func (m *ScheduledPostMutation) ResetApprovedByUserID() {
+	m.approved_by_user_id = nil
+	delete(m.clearedFields, scheduledpost.FieldApprovedByUserID)
+}
+
+// SetApprovedVersion sets the "approved_version" field.
+func (m *ScheduledPostMutation) SetApprovedVersion(i int) {
+	m.approved_version = &i
+	m.addapproved_version = nil
+}
+
+// ApprovedVersion returns the value of the "approved_version" field in the mutation.
+func (m *ScheduledPostMutation) ApprovedVersion() (r int, exists bool) {
+	v := m.approved_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedVersion returns the old "approved_version" field's value of the ScheduledPost entity.
+// If the ScheduledPost object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ScheduledPostMutation) OldApprovedVersion(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedVersion: %w", err)
+	}
+	return oldValue.ApprovedVersion, nil
+}
+
+// AddApprovedVersion adds i to the "approved_version" field.
+func (m *ScheduledPostMutation) AddApprovedVersion(i int) {
+	if m.addapproved_version != nil {
+		*m.addapproved_version += i
+	} else {
+		m.addapproved_version = &i
+	}
+}
+
+// AddedApprovedVersion returns the value that was added to the "approved_version" field in this mutation.
+func (m *ScheduledPostMutation) AddedApprovedVersion() (r int, exists bool) {
+	v := m.addapproved_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearApprovedVersion clears the value of the "approved_version" field.
+func (m *ScheduledPostMutation) ClearApprovedVersion() {
+	m.approved_version = nil
+	m.addapproved_version = nil
+	m.clearedFields[scheduledpost.FieldApprovedVersion] = struct{}{}
+}
+
+// ApprovedVersionCleared returns if the "approved_version" field was cleared in this mutation.
+func (m *ScheduledPostMutation) ApprovedVersionCleared() bool {
+	_, ok := m.clearedFields[scheduledpost.FieldApprovedVersion]
+	return ok
+}
+
+// ResetApprovedVersion resets all changes to the "approved_version" field.
+func (m *ScheduledPostMutation) ResetApprovedVersion() {
+	m.approved_version = nil
+	m.addapproved_version = nil
+	delete(m.clearedFields, scheduledpost.FieldApprovedVersion)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ScheduledPostMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -108720,7 +109431,7 @@ func (m *ScheduledPostMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ScheduledPostMutation) Fields() []string {
-	fields := make([]string, 0, 30)
+	fields := make([]string, 0, 33)
 	if m.organization_id != nil {
 		fields = append(fields, scheduledpost.FieldOrganizationID)
 	}
@@ -108805,6 +109516,15 @@ func (m *ScheduledPostMutation) Fields() []string {
 	if m.failure_code != nil {
 		fields = append(fields, scheduledpost.FieldFailureCode)
 	}
+	if m.scheduled_by_user_id != nil {
+		fields = append(fields, scheduledpost.FieldScheduledByUserID)
+	}
+	if m.approved_by_user_id != nil {
+		fields = append(fields, scheduledpost.FieldApprovedByUserID)
+	}
+	if m.approved_version != nil {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
+	}
 	if m.created_at != nil {
 		fields = append(fields, scheduledpost.FieldCreatedAt)
 	}
@@ -108875,6 +109595,12 @@ func (m *ScheduledPostMutation) Field(name string) (ent.Value, bool) {
 		return m.ScheduleIntent()
 	case scheduledpost.FieldFailureCode:
 		return m.FailureCode()
+	case scheduledpost.FieldScheduledByUserID:
+		return m.ScheduledByUserID()
+	case scheduledpost.FieldApprovedByUserID:
+		return m.ApprovedByUserID()
+	case scheduledpost.FieldApprovedVersion:
+		return m.ApprovedVersion()
 	case scheduledpost.FieldCreatedAt:
 		return m.CreatedAt()
 	case scheduledpost.FieldUpdatedAt:
@@ -108944,6 +109670,12 @@ func (m *ScheduledPostMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldScheduleIntent(ctx)
 	case scheduledpost.FieldFailureCode:
 		return m.OldFailureCode(ctx)
+	case scheduledpost.FieldScheduledByUserID:
+		return m.OldScheduledByUserID(ctx)
+	case scheduledpost.FieldApprovedByUserID:
+		return m.OldApprovedByUserID(ctx)
+	case scheduledpost.FieldApprovedVersion:
+		return m.OldApprovedVersion(ctx)
 	case scheduledpost.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case scheduledpost.FieldUpdatedAt:
@@ -109153,6 +109885,27 @@ func (m *ScheduledPostMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFailureCode(v)
 		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScheduledByUserID(v)
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedByUserID(v)
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedVersion(v)
+		return nil
 	case scheduledpost.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -109178,6 +109931,9 @@ func (m *ScheduledPostMutation) AddedFields() []string {
 	if m.addnatural_offset_seconds != nil {
 		fields = append(fields, scheduledpost.FieldNaturalOffsetSeconds)
 	}
+	if m.addapproved_version != nil {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
+	}
 	return fields
 }
 
@@ -109188,6 +109944,8 @@ func (m *ScheduledPostMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case scheduledpost.FieldNaturalOffsetSeconds:
 		return m.AddedNaturalOffsetSeconds()
+	case scheduledpost.FieldApprovedVersion:
+		return m.AddedApprovedVersion()
 	}
 	return nil, false
 }
@@ -109203,6 +109961,13 @@ func (m *ScheduledPostMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddNaturalOffsetSeconds(v)
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddApprovedVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown ScheduledPost numeric field %s", name)
@@ -109277,6 +110042,15 @@ func (m *ScheduledPostMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(scheduledpost.FieldFailureCode) {
 		fields = append(fields, scheduledpost.FieldFailureCode)
+	}
+	if m.FieldCleared(scheduledpost.FieldScheduledByUserID) {
+		fields = append(fields, scheduledpost.FieldScheduledByUserID)
+	}
+	if m.FieldCleared(scheduledpost.FieldApprovedByUserID) {
+		fields = append(fields, scheduledpost.FieldApprovedByUserID)
+	}
+	if m.FieldCleared(scheduledpost.FieldApprovedVersion) {
+		fields = append(fields, scheduledpost.FieldApprovedVersion)
 	}
 	return fields
 }
@@ -109357,6 +110131,15 @@ func (m *ScheduledPostMutation) ClearField(name string) error {
 		return nil
 	case scheduledpost.FieldFailureCode:
 		m.ClearFailureCode()
+		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		m.ClearScheduledByUserID()
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		m.ClearApprovedByUserID()
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		m.ClearApprovedVersion()
 		return nil
 	}
 	return fmt.Errorf("unknown ScheduledPost nullable field %s", name)
@@ -109449,6 +110232,15 @@ func (m *ScheduledPostMutation) ResetField(name string) error {
 		return nil
 	case scheduledpost.FieldFailureCode:
 		m.ResetFailureCode()
+		return nil
+	case scheduledpost.FieldScheduledByUserID:
+		m.ResetScheduledByUserID()
+		return nil
+	case scheduledpost.FieldApprovedByUserID:
+		m.ResetApprovedByUserID()
+		return nil
+	case scheduledpost.FieldApprovedVersion:
+		m.ResetApprovedVersion()
 		return nil
 	case scheduledpost.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -124752,6 +125544,6994 @@ func (m *UserPreferenceMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *UserPreferenceMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown UserPreference edge %s", name)
+}
+
+// VoiceAudioRunMutation represents an operation that mutates the VoiceAudioRun nodes in the graph.
+type VoiceAudioRunMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *string
+	organization_id       *string
+	note_id               *string
+	run_index             *int
+	addrun_index          *int
+	start_offset_ms       *int
+	addstart_offset_ms    *int
+	client_duration_ms    *int
+	addclient_duration_ms *int
+	duration_ms           *int
+	addduration_ms        *int
+	sample_rate_hz        *int
+	addsample_rate_hz     *int
+	content_type          *string
+	bytes                 *int64
+	addbytes              *int64
+	sha256                *string
+	object_key            *string
+	status                *voiceaudiorun.Status
+	failure_reason        *string
+	object_purged_at      *time.Time
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	done                  bool
+	oldValue              func(context.Context) (*VoiceAudioRun, error)
+	predicates            []predicate.VoiceAudioRun
+}
+
+var _ ent.Mutation = (*VoiceAudioRunMutation)(nil)
+
+// voiceaudiorunOption allows management of the mutation configuration using functional options.
+type voiceaudiorunOption func(*VoiceAudioRunMutation)
+
+// newVoiceAudioRunMutation creates new mutation for the VoiceAudioRun entity.
+func newVoiceAudioRunMutation(c config, op Op, opts ...voiceaudiorunOption) *VoiceAudioRunMutation {
+	m := &VoiceAudioRunMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceAudioRun,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceAudioRunID sets the ID field of the mutation.
+func withVoiceAudioRunID(id string) voiceaudiorunOption {
+	return func(m *VoiceAudioRunMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceAudioRun
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceAudioRun, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceAudioRun.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceAudioRun sets the old VoiceAudioRun of the mutation.
+func withVoiceAudioRun(node *VoiceAudioRun) voiceaudiorunOption {
+	return func(m *VoiceAudioRunMutation) {
+		m.oldValue = func(context.Context) (*VoiceAudioRun, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceAudioRunMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceAudioRunMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceAudioRun entities.
+func (m *VoiceAudioRunMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceAudioRunMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceAudioRunMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceAudioRun.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *VoiceAudioRunMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *VoiceAudioRunMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *VoiceAudioRunMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetNoteID sets the "note_id" field.
+func (m *VoiceAudioRunMutation) SetNoteID(s string) {
+	m.note_id = &s
+}
+
+// NoteID returns the value of the "note_id" field in the mutation.
+func (m *VoiceAudioRunMutation) NoteID() (r string, exists bool) {
+	v := m.note_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNoteID returns the old "note_id" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldNoteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNoteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNoteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNoteID: %w", err)
+	}
+	return oldValue.NoteID, nil
+}
+
+// ResetNoteID resets all changes to the "note_id" field.
+func (m *VoiceAudioRunMutation) ResetNoteID() {
+	m.note_id = nil
+}
+
+// SetRunIndex sets the "run_index" field.
+func (m *VoiceAudioRunMutation) SetRunIndex(i int) {
+	m.run_index = &i
+	m.addrun_index = nil
+}
+
+// RunIndex returns the value of the "run_index" field in the mutation.
+func (m *VoiceAudioRunMutation) RunIndex() (r int, exists bool) {
+	v := m.run_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRunIndex returns the old "run_index" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldRunIndex(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRunIndex is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRunIndex requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRunIndex: %w", err)
+	}
+	return oldValue.RunIndex, nil
+}
+
+// AddRunIndex adds i to the "run_index" field.
+func (m *VoiceAudioRunMutation) AddRunIndex(i int) {
+	if m.addrun_index != nil {
+		*m.addrun_index += i
+	} else {
+		m.addrun_index = &i
+	}
+}
+
+// AddedRunIndex returns the value that was added to the "run_index" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedRunIndex() (r int, exists bool) {
+	v := m.addrun_index
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRunIndex resets all changes to the "run_index" field.
+func (m *VoiceAudioRunMutation) ResetRunIndex() {
+	m.run_index = nil
+	m.addrun_index = nil
+}
+
+// SetStartOffsetMs sets the "start_offset_ms" field.
+func (m *VoiceAudioRunMutation) SetStartOffsetMs(i int) {
+	m.start_offset_ms = &i
+	m.addstart_offset_ms = nil
+}
+
+// StartOffsetMs returns the value of the "start_offset_ms" field in the mutation.
+func (m *VoiceAudioRunMutation) StartOffsetMs() (r int, exists bool) {
+	v := m.start_offset_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartOffsetMs returns the old "start_offset_ms" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldStartOffsetMs(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartOffsetMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartOffsetMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartOffsetMs: %w", err)
+	}
+	return oldValue.StartOffsetMs, nil
+}
+
+// AddStartOffsetMs adds i to the "start_offset_ms" field.
+func (m *VoiceAudioRunMutation) AddStartOffsetMs(i int) {
+	if m.addstart_offset_ms != nil {
+		*m.addstart_offset_ms += i
+	} else {
+		m.addstart_offset_ms = &i
+	}
+}
+
+// AddedStartOffsetMs returns the value that was added to the "start_offset_ms" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedStartOffsetMs() (r int, exists bool) {
+	v := m.addstart_offset_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStartOffsetMs resets all changes to the "start_offset_ms" field.
+func (m *VoiceAudioRunMutation) ResetStartOffsetMs() {
+	m.start_offset_ms = nil
+	m.addstart_offset_ms = nil
+}
+
+// SetClientDurationMs sets the "client_duration_ms" field.
+func (m *VoiceAudioRunMutation) SetClientDurationMs(i int) {
+	m.client_duration_ms = &i
+	m.addclient_duration_ms = nil
+}
+
+// ClientDurationMs returns the value of the "client_duration_ms" field in the mutation.
+func (m *VoiceAudioRunMutation) ClientDurationMs() (r int, exists bool) {
+	v := m.client_duration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientDurationMs returns the old "client_duration_ms" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldClientDurationMs(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientDurationMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientDurationMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientDurationMs: %w", err)
+	}
+	return oldValue.ClientDurationMs, nil
+}
+
+// AddClientDurationMs adds i to the "client_duration_ms" field.
+func (m *VoiceAudioRunMutation) AddClientDurationMs(i int) {
+	if m.addclient_duration_ms != nil {
+		*m.addclient_duration_ms += i
+	} else {
+		m.addclient_duration_ms = &i
+	}
+}
+
+// AddedClientDurationMs returns the value that was added to the "client_duration_ms" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedClientDurationMs() (r int, exists bool) {
+	v := m.addclient_duration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearClientDurationMs clears the value of the "client_duration_ms" field.
+func (m *VoiceAudioRunMutation) ClearClientDurationMs() {
+	m.client_duration_ms = nil
+	m.addclient_duration_ms = nil
+	m.clearedFields[voiceaudiorun.FieldClientDurationMs] = struct{}{}
+}
+
+// ClientDurationMsCleared returns if the "client_duration_ms" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) ClientDurationMsCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldClientDurationMs]
+	return ok
+}
+
+// ResetClientDurationMs resets all changes to the "client_duration_ms" field.
+func (m *VoiceAudioRunMutation) ResetClientDurationMs() {
+	m.client_duration_ms = nil
+	m.addclient_duration_ms = nil
+	delete(m.clearedFields, voiceaudiorun.FieldClientDurationMs)
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (m *VoiceAudioRunMutation) SetDurationMs(i int) {
+	m.duration_ms = &i
+	m.addduration_ms = nil
+}
+
+// DurationMs returns the value of the "duration_ms" field in the mutation.
+func (m *VoiceAudioRunMutation) DurationMs() (r int, exists bool) {
+	v := m.duration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDurationMs returns the old "duration_ms" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldDurationMs(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDurationMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDurationMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDurationMs: %w", err)
+	}
+	return oldValue.DurationMs, nil
+}
+
+// AddDurationMs adds i to the "duration_ms" field.
+func (m *VoiceAudioRunMutation) AddDurationMs(i int) {
+	if m.addduration_ms != nil {
+		*m.addduration_ms += i
+	} else {
+		m.addduration_ms = &i
+	}
+}
+
+// AddedDurationMs returns the value that was added to the "duration_ms" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedDurationMs() (r int, exists bool) {
+	v := m.addduration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDurationMs clears the value of the "duration_ms" field.
+func (m *VoiceAudioRunMutation) ClearDurationMs() {
+	m.duration_ms = nil
+	m.addduration_ms = nil
+	m.clearedFields[voiceaudiorun.FieldDurationMs] = struct{}{}
+}
+
+// DurationMsCleared returns if the "duration_ms" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) DurationMsCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldDurationMs]
+	return ok
+}
+
+// ResetDurationMs resets all changes to the "duration_ms" field.
+func (m *VoiceAudioRunMutation) ResetDurationMs() {
+	m.duration_ms = nil
+	m.addduration_ms = nil
+	delete(m.clearedFields, voiceaudiorun.FieldDurationMs)
+}
+
+// SetSampleRateHz sets the "sample_rate_hz" field.
+func (m *VoiceAudioRunMutation) SetSampleRateHz(i int) {
+	m.sample_rate_hz = &i
+	m.addsample_rate_hz = nil
+}
+
+// SampleRateHz returns the value of the "sample_rate_hz" field in the mutation.
+func (m *VoiceAudioRunMutation) SampleRateHz() (r int, exists bool) {
+	v := m.sample_rate_hz
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSampleRateHz returns the old "sample_rate_hz" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldSampleRateHz(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSampleRateHz is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSampleRateHz requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSampleRateHz: %w", err)
+	}
+	return oldValue.SampleRateHz, nil
+}
+
+// AddSampleRateHz adds i to the "sample_rate_hz" field.
+func (m *VoiceAudioRunMutation) AddSampleRateHz(i int) {
+	if m.addsample_rate_hz != nil {
+		*m.addsample_rate_hz += i
+	} else {
+		m.addsample_rate_hz = &i
+	}
+}
+
+// AddedSampleRateHz returns the value that was added to the "sample_rate_hz" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedSampleRateHz() (r int, exists bool) {
+	v := m.addsample_rate_hz
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSampleRateHz clears the value of the "sample_rate_hz" field.
+func (m *VoiceAudioRunMutation) ClearSampleRateHz() {
+	m.sample_rate_hz = nil
+	m.addsample_rate_hz = nil
+	m.clearedFields[voiceaudiorun.FieldSampleRateHz] = struct{}{}
+}
+
+// SampleRateHzCleared returns if the "sample_rate_hz" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) SampleRateHzCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldSampleRateHz]
+	return ok
+}
+
+// ResetSampleRateHz resets all changes to the "sample_rate_hz" field.
+func (m *VoiceAudioRunMutation) ResetSampleRateHz() {
+	m.sample_rate_hz = nil
+	m.addsample_rate_hz = nil
+	delete(m.clearedFields, voiceaudiorun.FieldSampleRateHz)
+}
+
+// SetContentType sets the "content_type" field.
+func (m *VoiceAudioRunMutation) SetContentType(s string) {
+	m.content_type = &s
+}
+
+// ContentType returns the value of the "content_type" field in the mutation.
+func (m *VoiceAudioRunMutation) ContentType() (r string, exists bool) {
+	v := m.content_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentType returns the old "content_type" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldContentType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentType: %w", err)
+	}
+	return oldValue.ContentType, nil
+}
+
+// ResetContentType resets all changes to the "content_type" field.
+func (m *VoiceAudioRunMutation) ResetContentType() {
+	m.content_type = nil
+}
+
+// SetBytes sets the "bytes" field.
+func (m *VoiceAudioRunMutation) SetBytes(i int64) {
+	m.bytes = &i
+	m.addbytes = nil
+}
+
+// Bytes returns the value of the "bytes" field in the mutation.
+func (m *VoiceAudioRunMutation) Bytes() (r int64, exists bool) {
+	v := m.bytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBytes returns the old "bytes" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldBytes(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBytes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBytes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBytes: %w", err)
+	}
+	return oldValue.Bytes, nil
+}
+
+// AddBytes adds i to the "bytes" field.
+func (m *VoiceAudioRunMutation) AddBytes(i int64) {
+	if m.addbytes != nil {
+		*m.addbytes += i
+	} else {
+		m.addbytes = &i
+	}
+}
+
+// AddedBytes returns the value that was added to the "bytes" field in this mutation.
+func (m *VoiceAudioRunMutation) AddedBytes() (r int64, exists bool) {
+	v := m.addbytes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBytes resets all changes to the "bytes" field.
+func (m *VoiceAudioRunMutation) ResetBytes() {
+	m.bytes = nil
+	m.addbytes = nil
+}
+
+// SetSha256 sets the "sha256" field.
+func (m *VoiceAudioRunMutation) SetSha256(s string) {
+	m.sha256 = &s
+}
+
+// Sha256 returns the value of the "sha256" field in the mutation.
+func (m *VoiceAudioRunMutation) Sha256() (r string, exists bool) {
+	v := m.sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSha256 returns the old "sha256" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSha256: %w", err)
+	}
+	return oldValue.Sha256, nil
+}
+
+// ResetSha256 resets all changes to the "sha256" field.
+func (m *VoiceAudioRunMutation) ResetSha256() {
+	m.sha256 = nil
+}
+
+// SetObjectKey sets the "object_key" field.
+func (m *VoiceAudioRunMutation) SetObjectKey(s string) {
+	m.object_key = &s
+}
+
+// ObjectKey returns the value of the "object_key" field in the mutation.
+func (m *VoiceAudioRunMutation) ObjectKey() (r string, exists bool) {
+	v := m.object_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjectKey returns the old "object_key" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldObjectKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjectKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjectKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjectKey: %w", err)
+	}
+	return oldValue.ObjectKey, nil
+}
+
+// ResetObjectKey resets all changes to the "object_key" field.
+func (m *VoiceAudioRunMutation) ResetObjectKey() {
+	m.object_key = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *VoiceAudioRunMutation) SetStatus(v voiceaudiorun.Status) {
+	m.status = &v
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *VoiceAudioRunMutation) Status() (r voiceaudiorun.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldStatus(ctx context.Context) (v voiceaudiorun.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *VoiceAudioRunMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFailureReason sets the "failure_reason" field.
+func (m *VoiceAudioRunMutation) SetFailureReason(s string) {
+	m.failure_reason = &s
+}
+
+// FailureReason returns the value of the "failure_reason" field in the mutation.
+func (m *VoiceAudioRunMutation) FailureReason() (r string, exists bool) {
+	v := m.failure_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureReason returns the old "failure_reason" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldFailureReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureReason: %w", err)
+	}
+	return oldValue.FailureReason, nil
+}
+
+// ClearFailureReason clears the value of the "failure_reason" field.
+func (m *VoiceAudioRunMutation) ClearFailureReason() {
+	m.failure_reason = nil
+	m.clearedFields[voiceaudiorun.FieldFailureReason] = struct{}{}
+}
+
+// FailureReasonCleared returns if the "failure_reason" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) FailureReasonCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldFailureReason]
+	return ok
+}
+
+// ResetFailureReason resets all changes to the "failure_reason" field.
+func (m *VoiceAudioRunMutation) ResetFailureReason() {
+	m.failure_reason = nil
+	delete(m.clearedFields, voiceaudiorun.FieldFailureReason)
+}
+
+// SetObjectPurgedAt sets the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) SetObjectPurgedAt(t time.Time) {
+	m.object_purged_at = &t
+}
+
+// ObjectPurgedAt returns the value of the "object_purged_at" field in the mutation.
+func (m *VoiceAudioRunMutation) ObjectPurgedAt() (r time.Time, exists bool) {
+	v := m.object_purged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjectPurgedAt returns the old "object_purged_at" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldObjectPurgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjectPurgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjectPurgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjectPurgedAt: %w", err)
+	}
+	return oldValue.ObjectPurgedAt, nil
+}
+
+// ClearObjectPurgedAt clears the value of the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) ClearObjectPurgedAt() {
+	m.object_purged_at = nil
+	m.clearedFields[voiceaudiorun.FieldObjectPurgedAt] = struct{}{}
+}
+
+// ObjectPurgedAtCleared returns if the "object_purged_at" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) ObjectPurgedAtCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldObjectPurgedAt]
+	return ok
+}
+
+// ResetObjectPurgedAt resets all changes to the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) ResetObjectPurgedAt() {
+	m.object_purged_at = nil
+	delete(m.clearedFields, voiceaudiorun.FieldObjectPurgedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *VoiceAudioRunMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *VoiceAudioRunMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *VoiceAudioRunMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *VoiceAudioRunMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *VoiceAudioRunMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *VoiceAudioRunMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the VoiceAudioRunMutation builder.
+func (m *VoiceAudioRunMutation) Where(ps ...predicate.VoiceAudioRun) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceAudioRunMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceAudioRunMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceAudioRun, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceAudioRunMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceAudioRunMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceAudioRun).
+func (m *VoiceAudioRunMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceAudioRunMutation) Fields() []string {
+	fields := make([]string, 0, 16)
+	if m.organization_id != nil {
+		fields = append(fields, voiceaudiorun.FieldOrganizationID)
+	}
+	if m.note_id != nil {
+		fields = append(fields, voiceaudiorun.FieldNoteID)
+	}
+	if m.run_index != nil {
+		fields = append(fields, voiceaudiorun.FieldRunIndex)
+	}
+	if m.start_offset_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldStartOffsetMs)
+	}
+	if m.client_duration_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldClientDurationMs)
+	}
+	if m.duration_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldDurationMs)
+	}
+	if m.sample_rate_hz != nil {
+		fields = append(fields, voiceaudiorun.FieldSampleRateHz)
+	}
+	if m.content_type != nil {
+		fields = append(fields, voiceaudiorun.FieldContentType)
+	}
+	if m.bytes != nil {
+		fields = append(fields, voiceaudiorun.FieldBytes)
+	}
+	if m.sha256 != nil {
+		fields = append(fields, voiceaudiorun.FieldSha256)
+	}
+	if m.object_key != nil {
+		fields = append(fields, voiceaudiorun.FieldObjectKey)
+	}
+	if m.status != nil {
+		fields = append(fields, voiceaudiorun.FieldStatus)
+	}
+	if m.failure_reason != nil {
+		fields = append(fields, voiceaudiorun.FieldFailureReason)
+	}
+	if m.object_purged_at != nil {
+		fields = append(fields, voiceaudiorun.FieldObjectPurgedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, voiceaudiorun.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, voiceaudiorun.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceAudioRunMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voiceaudiorun.FieldOrganizationID:
+		return m.OrganizationID()
+	case voiceaudiorun.FieldNoteID:
+		return m.NoteID()
+	case voiceaudiorun.FieldRunIndex:
+		return m.RunIndex()
+	case voiceaudiorun.FieldStartOffsetMs:
+		return m.StartOffsetMs()
+	case voiceaudiorun.FieldClientDurationMs:
+		return m.ClientDurationMs()
+	case voiceaudiorun.FieldDurationMs:
+		return m.DurationMs()
+	case voiceaudiorun.FieldSampleRateHz:
+		return m.SampleRateHz()
+	case voiceaudiorun.FieldContentType:
+		return m.ContentType()
+	case voiceaudiorun.FieldBytes:
+		return m.Bytes()
+	case voiceaudiorun.FieldSha256:
+		return m.Sha256()
+	case voiceaudiorun.FieldObjectKey:
+		return m.ObjectKey()
+	case voiceaudiorun.FieldStatus:
+		return m.Status()
+	case voiceaudiorun.FieldFailureReason:
+		return m.FailureReason()
+	case voiceaudiorun.FieldObjectPurgedAt:
+		return m.ObjectPurgedAt()
+	case voiceaudiorun.FieldCreatedAt:
+		return m.CreatedAt()
+	case voiceaudiorun.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceAudioRunMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voiceaudiorun.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case voiceaudiorun.FieldNoteID:
+		return m.OldNoteID(ctx)
+	case voiceaudiorun.FieldRunIndex:
+		return m.OldRunIndex(ctx)
+	case voiceaudiorun.FieldStartOffsetMs:
+		return m.OldStartOffsetMs(ctx)
+	case voiceaudiorun.FieldClientDurationMs:
+		return m.OldClientDurationMs(ctx)
+	case voiceaudiorun.FieldDurationMs:
+		return m.OldDurationMs(ctx)
+	case voiceaudiorun.FieldSampleRateHz:
+		return m.OldSampleRateHz(ctx)
+	case voiceaudiorun.FieldContentType:
+		return m.OldContentType(ctx)
+	case voiceaudiorun.FieldBytes:
+		return m.OldBytes(ctx)
+	case voiceaudiorun.FieldSha256:
+		return m.OldSha256(ctx)
+	case voiceaudiorun.FieldObjectKey:
+		return m.OldObjectKey(ctx)
+	case voiceaudiorun.FieldStatus:
+		return m.OldStatus(ctx)
+	case voiceaudiorun.FieldFailureReason:
+		return m.OldFailureReason(ctx)
+	case voiceaudiorun.FieldObjectPurgedAt:
+		return m.OldObjectPurgedAt(ctx)
+	case voiceaudiorun.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case voiceaudiorun.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceAudioRun field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceAudioRunMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voiceaudiorun.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case voiceaudiorun.FieldNoteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNoteID(v)
+		return nil
+	case voiceaudiorun.FieldRunIndex:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRunIndex(v)
+		return nil
+	case voiceaudiorun.FieldStartOffsetMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartOffsetMs(v)
+		return nil
+	case voiceaudiorun.FieldClientDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientDurationMs(v)
+		return nil
+	case voiceaudiorun.FieldDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDurationMs(v)
+		return nil
+	case voiceaudiorun.FieldSampleRateHz:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSampleRateHz(v)
+		return nil
+	case voiceaudiorun.FieldContentType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentType(v)
+		return nil
+	case voiceaudiorun.FieldBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBytes(v)
+		return nil
+	case voiceaudiorun.FieldSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSha256(v)
+		return nil
+	case voiceaudiorun.FieldObjectKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjectKey(v)
+		return nil
+	case voiceaudiorun.FieldStatus:
+		v, ok := value.(voiceaudiorun.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case voiceaudiorun.FieldFailureReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureReason(v)
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjectPurgedAt(v)
+		return nil
+	case voiceaudiorun.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case voiceaudiorun.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceAudioRun field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceAudioRunMutation) AddedFields() []string {
+	var fields []string
+	if m.addrun_index != nil {
+		fields = append(fields, voiceaudiorun.FieldRunIndex)
+	}
+	if m.addstart_offset_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldStartOffsetMs)
+	}
+	if m.addclient_duration_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldClientDurationMs)
+	}
+	if m.addduration_ms != nil {
+		fields = append(fields, voiceaudiorun.FieldDurationMs)
+	}
+	if m.addsample_rate_hz != nil {
+		fields = append(fields, voiceaudiorun.FieldSampleRateHz)
+	}
+	if m.addbytes != nil {
+		fields = append(fields, voiceaudiorun.FieldBytes)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceAudioRunMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case voiceaudiorun.FieldRunIndex:
+		return m.AddedRunIndex()
+	case voiceaudiorun.FieldStartOffsetMs:
+		return m.AddedStartOffsetMs()
+	case voiceaudiorun.FieldClientDurationMs:
+		return m.AddedClientDurationMs()
+	case voiceaudiorun.FieldDurationMs:
+		return m.AddedDurationMs()
+	case voiceaudiorun.FieldSampleRateHz:
+		return m.AddedSampleRateHz()
+	case voiceaudiorun.FieldBytes:
+		return m.AddedBytes()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceAudioRunMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case voiceaudiorun.FieldRunIndex:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRunIndex(v)
+		return nil
+	case voiceaudiorun.FieldStartOffsetMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStartOffsetMs(v)
+		return nil
+	case voiceaudiorun.FieldClientDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddClientDurationMs(v)
+		return nil
+	case voiceaudiorun.FieldDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDurationMs(v)
+		return nil
+	case voiceaudiorun.FieldSampleRateHz:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSampleRateHz(v)
+		return nil
+	case voiceaudiorun.FieldBytes:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBytes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceAudioRun numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceAudioRunMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voiceaudiorun.FieldClientDurationMs) {
+		fields = append(fields, voiceaudiorun.FieldClientDurationMs)
+	}
+	if m.FieldCleared(voiceaudiorun.FieldDurationMs) {
+		fields = append(fields, voiceaudiorun.FieldDurationMs)
+	}
+	if m.FieldCleared(voiceaudiorun.FieldSampleRateHz) {
+		fields = append(fields, voiceaudiorun.FieldSampleRateHz)
+	}
+	if m.FieldCleared(voiceaudiorun.FieldFailureReason) {
+		fields = append(fields, voiceaudiorun.FieldFailureReason)
+	}
+	if m.FieldCleared(voiceaudiorun.FieldObjectPurgedAt) {
+		fields = append(fields, voiceaudiorun.FieldObjectPurgedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceAudioRunMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceAudioRunMutation) ClearField(name string) error {
+	switch name {
+	case voiceaudiorun.FieldClientDurationMs:
+		m.ClearClientDurationMs()
+		return nil
+	case voiceaudiorun.FieldDurationMs:
+		m.ClearDurationMs()
+		return nil
+	case voiceaudiorun.FieldSampleRateHz:
+		m.ClearSampleRateHz()
+		return nil
+	case voiceaudiorun.FieldFailureReason:
+		m.ClearFailureReason()
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		m.ClearObjectPurgedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceAudioRun nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceAudioRunMutation) ResetField(name string) error {
+	switch name {
+	case voiceaudiorun.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case voiceaudiorun.FieldNoteID:
+		m.ResetNoteID()
+		return nil
+	case voiceaudiorun.FieldRunIndex:
+		m.ResetRunIndex()
+		return nil
+	case voiceaudiorun.FieldStartOffsetMs:
+		m.ResetStartOffsetMs()
+		return nil
+	case voiceaudiorun.FieldClientDurationMs:
+		m.ResetClientDurationMs()
+		return nil
+	case voiceaudiorun.FieldDurationMs:
+		m.ResetDurationMs()
+		return nil
+	case voiceaudiorun.FieldSampleRateHz:
+		m.ResetSampleRateHz()
+		return nil
+	case voiceaudiorun.FieldContentType:
+		m.ResetContentType()
+		return nil
+	case voiceaudiorun.FieldBytes:
+		m.ResetBytes()
+		return nil
+	case voiceaudiorun.FieldSha256:
+		m.ResetSha256()
+		return nil
+	case voiceaudiorun.FieldObjectKey:
+		m.ResetObjectKey()
+		return nil
+	case voiceaudiorun.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case voiceaudiorun.FieldFailureReason:
+		m.ResetFailureReason()
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		m.ResetObjectPurgedAt()
+		return nil
+	case voiceaudiorun.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case voiceaudiorun.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceAudioRun field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceAudioRunMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceAudioRunMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceAudioRunMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceAudioRunMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceAudioRunMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceAudioRunMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceAudioRunMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceAudioRun unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceAudioRunMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceAudioRun edge %s", name)
+}
+
+// VoiceCommandMutation represents an operation that mutates the VoiceCommand nodes in the graph.
+type VoiceCommandMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *string
+	organization_id        *string
+	owner_user_id          *string
+	note_id                *string
+	transcript_revision_id *string
+	status                 *voicecommand.Status
+	action                 *voicecommand.Action
+	platform               *string
+	text                   *string
+	local_time             *string
+	time_zone              *string
+	scheduled_for          *time.Time
+	channel_connection_id  *string
+	guessed                *[]string
+	appendguessed          []string
+	flags                  *[]string
+	appendflags            []string
+	notice                 *string
+	attempts               *int
+	addattempts            *int
+	next_attempt_at        *time.Time
+	expires_at             *time.Time
+	content_draft_id       *string
+	scheduled_post_id      *string
+	failure_reason         *string
+	outcome                *voicecommand.Outcome
+	parsed_at              *time.Time
+	created_at             *time.Time
+	updated_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*VoiceCommand, error)
+	predicates             []predicate.VoiceCommand
+}
+
+var _ ent.Mutation = (*VoiceCommandMutation)(nil)
+
+// voicecommandOption allows management of the mutation configuration using functional options.
+type voicecommandOption func(*VoiceCommandMutation)
+
+// newVoiceCommandMutation creates new mutation for the VoiceCommand entity.
+func newVoiceCommandMutation(c config, op Op, opts ...voicecommandOption) *VoiceCommandMutation {
+	m := &VoiceCommandMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceCommand,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceCommandID sets the ID field of the mutation.
+func withVoiceCommandID(id string) voicecommandOption {
+	return func(m *VoiceCommandMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceCommand
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceCommand, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceCommand.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceCommand sets the old VoiceCommand of the mutation.
+func withVoiceCommand(node *VoiceCommand) voicecommandOption {
+	return func(m *VoiceCommandMutation) {
+		m.oldValue = func(context.Context) (*VoiceCommand, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceCommandMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceCommandMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceCommand entities.
+func (m *VoiceCommandMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceCommandMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceCommandMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceCommand.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *VoiceCommandMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *VoiceCommandMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *VoiceCommandMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetOwnerUserID sets the "owner_user_id" field.
+func (m *VoiceCommandMutation) SetOwnerUserID(s string) {
+	m.owner_user_id = &s
+}
+
+// OwnerUserID returns the value of the "owner_user_id" field in the mutation.
+func (m *VoiceCommandMutation) OwnerUserID() (r string, exists bool) {
+	v := m.owner_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerUserID returns the old "owner_user_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldOwnerUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerUserID: %w", err)
+	}
+	return oldValue.OwnerUserID, nil
+}
+
+// ResetOwnerUserID resets all changes to the "owner_user_id" field.
+func (m *VoiceCommandMutation) ResetOwnerUserID() {
+	m.owner_user_id = nil
+}
+
+// SetNoteID sets the "note_id" field.
+func (m *VoiceCommandMutation) SetNoteID(s string) {
+	m.note_id = &s
+}
+
+// NoteID returns the value of the "note_id" field in the mutation.
+func (m *VoiceCommandMutation) NoteID() (r string, exists bool) {
+	v := m.note_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNoteID returns the old "note_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldNoteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNoteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNoteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNoteID: %w", err)
+	}
+	return oldValue.NoteID, nil
+}
+
+// ResetNoteID resets all changes to the "note_id" field.
+func (m *VoiceCommandMutation) ResetNoteID() {
+	m.note_id = nil
+}
+
+// SetTranscriptRevisionID sets the "transcript_revision_id" field.
+func (m *VoiceCommandMutation) SetTranscriptRevisionID(s string) {
+	m.transcript_revision_id = &s
+}
+
+// TranscriptRevisionID returns the value of the "transcript_revision_id" field in the mutation.
+func (m *VoiceCommandMutation) TranscriptRevisionID() (r string, exists bool) {
+	v := m.transcript_revision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTranscriptRevisionID returns the old "transcript_revision_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldTranscriptRevisionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTranscriptRevisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTranscriptRevisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTranscriptRevisionID: %w", err)
+	}
+	return oldValue.TranscriptRevisionID, nil
+}
+
+// ResetTranscriptRevisionID resets all changes to the "transcript_revision_id" field.
+func (m *VoiceCommandMutation) ResetTranscriptRevisionID() {
+	m.transcript_revision_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *VoiceCommandMutation) SetStatus(v voicecommand.Status) {
+	m.status = &v
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *VoiceCommandMutation) Status() (r voicecommand.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldStatus(ctx context.Context) (v voicecommand.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *VoiceCommandMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetAction sets the "action" field.
+func (m *VoiceCommandMutation) SetAction(v voicecommand.Action) {
+	m.action = &v
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *VoiceCommandMutation) Action() (r voicecommand.Action, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldAction(ctx context.Context) (v voicecommand.Action, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *VoiceCommandMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetPlatform sets the "platform" field.
+func (m *VoiceCommandMutation) SetPlatform(s string) {
+	m.platform = &s
+}
+
+// Platform returns the value of the "platform" field in the mutation.
+func (m *VoiceCommandMutation) Platform() (r string, exists bool) {
+	v := m.platform
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPlatform returns the old "platform" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldPlatform(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPlatform is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPlatform requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPlatform: %w", err)
+	}
+	return oldValue.Platform, nil
+}
+
+// ClearPlatform clears the value of the "platform" field.
+func (m *VoiceCommandMutation) ClearPlatform() {
+	m.platform = nil
+	m.clearedFields[voicecommand.FieldPlatform] = struct{}{}
+}
+
+// PlatformCleared returns if the "platform" field was cleared in this mutation.
+func (m *VoiceCommandMutation) PlatformCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldPlatform]
+	return ok
+}
+
+// ResetPlatform resets all changes to the "platform" field.
+func (m *VoiceCommandMutation) ResetPlatform() {
+	m.platform = nil
+	delete(m.clearedFields, voicecommand.FieldPlatform)
+}
+
+// SetText sets the "text" field.
+func (m *VoiceCommandMutation) SetText(s string) {
+	m.text = &s
+}
+
+// Text returns the value of the "text" field in the mutation.
+func (m *VoiceCommandMutation) Text() (r string, exists bool) {
+	v := m.text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldText returns the old "text" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldText(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldText: %w", err)
+	}
+	return oldValue.Text, nil
+}
+
+// ClearText clears the value of the "text" field.
+func (m *VoiceCommandMutation) ClearText() {
+	m.text = nil
+	m.clearedFields[voicecommand.FieldText] = struct{}{}
+}
+
+// TextCleared returns if the "text" field was cleared in this mutation.
+func (m *VoiceCommandMutation) TextCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldText]
+	return ok
+}
+
+// ResetText resets all changes to the "text" field.
+func (m *VoiceCommandMutation) ResetText() {
+	m.text = nil
+	delete(m.clearedFields, voicecommand.FieldText)
+}
+
+// SetLocalTime sets the "local_time" field.
+func (m *VoiceCommandMutation) SetLocalTime(s string) {
+	m.local_time = &s
+}
+
+// LocalTime returns the value of the "local_time" field in the mutation.
+func (m *VoiceCommandMutation) LocalTime() (r string, exists bool) {
+	v := m.local_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLocalTime returns the old "local_time" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldLocalTime(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLocalTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLocalTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLocalTime: %w", err)
+	}
+	return oldValue.LocalTime, nil
+}
+
+// ClearLocalTime clears the value of the "local_time" field.
+func (m *VoiceCommandMutation) ClearLocalTime() {
+	m.local_time = nil
+	m.clearedFields[voicecommand.FieldLocalTime] = struct{}{}
+}
+
+// LocalTimeCleared returns if the "local_time" field was cleared in this mutation.
+func (m *VoiceCommandMutation) LocalTimeCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldLocalTime]
+	return ok
+}
+
+// ResetLocalTime resets all changes to the "local_time" field.
+func (m *VoiceCommandMutation) ResetLocalTime() {
+	m.local_time = nil
+	delete(m.clearedFields, voicecommand.FieldLocalTime)
+}
+
+// SetTimeZone sets the "time_zone" field.
+func (m *VoiceCommandMutation) SetTimeZone(s string) {
+	m.time_zone = &s
+}
+
+// TimeZone returns the value of the "time_zone" field in the mutation.
+func (m *VoiceCommandMutation) TimeZone() (r string, exists bool) {
+	v := m.time_zone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTimeZone returns the old "time_zone" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldTimeZone(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTimeZone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTimeZone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTimeZone: %w", err)
+	}
+	return oldValue.TimeZone, nil
+}
+
+// ResetTimeZone resets all changes to the "time_zone" field.
+func (m *VoiceCommandMutation) ResetTimeZone() {
+	m.time_zone = nil
+}
+
+// SetScheduledFor sets the "scheduled_for" field.
+func (m *VoiceCommandMutation) SetScheduledFor(t time.Time) {
+	m.scheduled_for = &t
+}
+
+// ScheduledFor returns the value of the "scheduled_for" field in the mutation.
+func (m *VoiceCommandMutation) ScheduledFor() (r time.Time, exists bool) {
+	v := m.scheduled_for
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScheduledFor returns the old "scheduled_for" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldScheduledFor(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScheduledFor is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScheduledFor requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScheduledFor: %w", err)
+	}
+	return oldValue.ScheduledFor, nil
+}
+
+// ClearScheduledFor clears the value of the "scheduled_for" field.
+func (m *VoiceCommandMutation) ClearScheduledFor() {
+	m.scheduled_for = nil
+	m.clearedFields[voicecommand.FieldScheduledFor] = struct{}{}
+}
+
+// ScheduledForCleared returns if the "scheduled_for" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ScheduledForCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldScheduledFor]
+	return ok
+}
+
+// ResetScheduledFor resets all changes to the "scheduled_for" field.
+func (m *VoiceCommandMutation) ResetScheduledFor() {
+	m.scheduled_for = nil
+	delete(m.clearedFields, voicecommand.FieldScheduledFor)
+}
+
+// SetChannelConnectionID sets the "channel_connection_id" field.
+func (m *VoiceCommandMutation) SetChannelConnectionID(s string) {
+	m.channel_connection_id = &s
+}
+
+// ChannelConnectionID returns the value of the "channel_connection_id" field in the mutation.
+func (m *VoiceCommandMutation) ChannelConnectionID() (r string, exists bool) {
+	v := m.channel_connection_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChannelConnectionID returns the old "channel_connection_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldChannelConnectionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChannelConnectionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChannelConnectionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChannelConnectionID: %w", err)
+	}
+	return oldValue.ChannelConnectionID, nil
+}
+
+// ClearChannelConnectionID clears the value of the "channel_connection_id" field.
+func (m *VoiceCommandMutation) ClearChannelConnectionID() {
+	m.channel_connection_id = nil
+	m.clearedFields[voicecommand.FieldChannelConnectionID] = struct{}{}
+}
+
+// ChannelConnectionIDCleared returns if the "channel_connection_id" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ChannelConnectionIDCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldChannelConnectionID]
+	return ok
+}
+
+// ResetChannelConnectionID resets all changes to the "channel_connection_id" field.
+func (m *VoiceCommandMutation) ResetChannelConnectionID() {
+	m.channel_connection_id = nil
+	delete(m.clearedFields, voicecommand.FieldChannelConnectionID)
+}
+
+// SetGuessed sets the "guessed" field.
+func (m *VoiceCommandMutation) SetGuessed(s []string) {
+	m.guessed = &s
+	m.appendguessed = nil
+}
+
+// Guessed returns the value of the "guessed" field in the mutation.
+func (m *VoiceCommandMutation) Guessed() (r []string, exists bool) {
+	v := m.guessed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGuessed returns the old "guessed" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldGuessed(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGuessed is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGuessed requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGuessed: %w", err)
+	}
+	return oldValue.Guessed, nil
+}
+
+// AppendGuessed adds s to the "guessed" field.
+func (m *VoiceCommandMutation) AppendGuessed(s []string) {
+	m.appendguessed = append(m.appendguessed, s...)
+}
+
+// AppendedGuessed returns the list of values that were appended to the "guessed" field in this mutation.
+func (m *VoiceCommandMutation) AppendedGuessed() ([]string, bool) {
+	if len(m.appendguessed) == 0 {
+		return nil, false
+	}
+	return m.appendguessed, true
+}
+
+// ResetGuessed resets all changes to the "guessed" field.
+func (m *VoiceCommandMutation) ResetGuessed() {
+	m.guessed = nil
+	m.appendguessed = nil
+}
+
+// SetFlags sets the "flags" field.
+func (m *VoiceCommandMutation) SetFlags(s []string) {
+	m.flags = &s
+	m.appendflags = nil
+}
+
+// Flags returns the value of the "flags" field in the mutation.
+func (m *VoiceCommandMutation) Flags() (r []string, exists bool) {
+	v := m.flags
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFlags returns the old "flags" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldFlags(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFlags is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFlags requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFlags: %w", err)
+	}
+	return oldValue.Flags, nil
+}
+
+// AppendFlags adds s to the "flags" field.
+func (m *VoiceCommandMutation) AppendFlags(s []string) {
+	m.appendflags = append(m.appendflags, s...)
+}
+
+// AppendedFlags returns the list of values that were appended to the "flags" field in this mutation.
+func (m *VoiceCommandMutation) AppendedFlags() ([]string, bool) {
+	if len(m.appendflags) == 0 {
+		return nil, false
+	}
+	return m.appendflags, true
+}
+
+// ResetFlags resets all changes to the "flags" field.
+func (m *VoiceCommandMutation) ResetFlags() {
+	m.flags = nil
+	m.appendflags = nil
+}
+
+// SetNotice sets the "notice" field.
+func (m *VoiceCommandMutation) SetNotice(s string) {
+	m.notice = &s
+}
+
+// Notice returns the value of the "notice" field in the mutation.
+func (m *VoiceCommandMutation) Notice() (r string, exists bool) {
+	v := m.notice
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotice returns the old "notice" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldNotice(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotice: %w", err)
+	}
+	return oldValue.Notice, nil
+}
+
+// ClearNotice clears the value of the "notice" field.
+func (m *VoiceCommandMutation) ClearNotice() {
+	m.notice = nil
+	m.clearedFields[voicecommand.FieldNotice] = struct{}{}
+}
+
+// NoticeCleared returns if the "notice" field was cleared in this mutation.
+func (m *VoiceCommandMutation) NoticeCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldNotice]
+	return ok
+}
+
+// ResetNotice resets all changes to the "notice" field.
+func (m *VoiceCommandMutation) ResetNotice() {
+	m.notice = nil
+	delete(m.clearedFields, voicecommand.FieldNotice)
+}
+
+// SetAttempts sets the "attempts" field.
+func (m *VoiceCommandMutation) SetAttempts(i int) {
+	m.attempts = &i
+	m.addattempts = nil
+}
+
+// Attempts returns the value of the "attempts" field in the mutation.
+func (m *VoiceCommandMutation) Attempts() (r int, exists bool) {
+	v := m.attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttempts returns the old "attempts" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttempts: %w", err)
+	}
+	return oldValue.Attempts, nil
+}
+
+// AddAttempts adds i to the "attempts" field.
+func (m *VoiceCommandMutation) AddAttempts(i int) {
+	if m.addattempts != nil {
+		*m.addattempts += i
+	} else {
+		m.addattempts = &i
+	}
+}
+
+// AddedAttempts returns the value that was added to the "attempts" field in this mutation.
+func (m *VoiceCommandMutation) AddedAttempts() (r int, exists bool) {
+	v := m.addattempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttempts resets all changes to the "attempts" field.
+func (m *VoiceCommandMutation) ResetAttempts() {
+	m.attempts = nil
+	m.addattempts = nil
+}
+
+// SetNextAttemptAt sets the "next_attempt_at" field.
+func (m *VoiceCommandMutation) SetNextAttemptAt(t time.Time) {
+	m.next_attempt_at = &t
+}
+
+// NextAttemptAt returns the value of the "next_attempt_at" field in the mutation.
+func (m *VoiceCommandMutation) NextAttemptAt() (r time.Time, exists bool) {
+	v := m.next_attempt_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNextAttemptAt returns the old "next_attempt_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldNextAttemptAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNextAttemptAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNextAttemptAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNextAttemptAt: %w", err)
+	}
+	return oldValue.NextAttemptAt, nil
+}
+
+// ClearNextAttemptAt clears the value of the "next_attempt_at" field.
+func (m *VoiceCommandMutation) ClearNextAttemptAt() {
+	m.next_attempt_at = nil
+	m.clearedFields[voicecommand.FieldNextAttemptAt] = struct{}{}
+}
+
+// NextAttemptAtCleared returns if the "next_attempt_at" field was cleared in this mutation.
+func (m *VoiceCommandMutation) NextAttemptAtCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldNextAttemptAt]
+	return ok
+}
+
+// ResetNextAttemptAt resets all changes to the "next_attempt_at" field.
+func (m *VoiceCommandMutation) ResetNextAttemptAt() {
+	m.next_attempt_at = nil
+	delete(m.clearedFields, voicecommand.FieldNextAttemptAt)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *VoiceCommandMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *VoiceCommandMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *VoiceCommandMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[voicecommand.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *VoiceCommandMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, voicecommand.FieldExpiresAt)
+}
+
+// SetContentDraftID sets the "content_draft_id" field.
+func (m *VoiceCommandMutation) SetContentDraftID(s string) {
+	m.content_draft_id = &s
+}
+
+// ContentDraftID returns the value of the "content_draft_id" field in the mutation.
+func (m *VoiceCommandMutation) ContentDraftID() (r string, exists bool) {
+	v := m.content_draft_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentDraftID returns the old "content_draft_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldContentDraftID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentDraftID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentDraftID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentDraftID: %w", err)
+	}
+	return oldValue.ContentDraftID, nil
+}
+
+// ClearContentDraftID clears the value of the "content_draft_id" field.
+func (m *VoiceCommandMutation) ClearContentDraftID() {
+	m.content_draft_id = nil
+	m.clearedFields[voicecommand.FieldContentDraftID] = struct{}{}
+}
+
+// ContentDraftIDCleared returns if the "content_draft_id" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ContentDraftIDCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldContentDraftID]
+	return ok
+}
+
+// ResetContentDraftID resets all changes to the "content_draft_id" field.
+func (m *VoiceCommandMutation) ResetContentDraftID() {
+	m.content_draft_id = nil
+	delete(m.clearedFields, voicecommand.FieldContentDraftID)
+}
+
+// SetScheduledPostID sets the "scheduled_post_id" field.
+func (m *VoiceCommandMutation) SetScheduledPostID(s string) {
+	m.scheduled_post_id = &s
+}
+
+// ScheduledPostID returns the value of the "scheduled_post_id" field in the mutation.
+func (m *VoiceCommandMutation) ScheduledPostID() (r string, exists bool) {
+	v := m.scheduled_post_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScheduledPostID returns the old "scheduled_post_id" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldScheduledPostID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScheduledPostID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScheduledPostID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScheduledPostID: %w", err)
+	}
+	return oldValue.ScheduledPostID, nil
+}
+
+// ClearScheduledPostID clears the value of the "scheduled_post_id" field.
+func (m *VoiceCommandMutation) ClearScheduledPostID() {
+	m.scheduled_post_id = nil
+	m.clearedFields[voicecommand.FieldScheduledPostID] = struct{}{}
+}
+
+// ScheduledPostIDCleared returns if the "scheduled_post_id" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ScheduledPostIDCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldScheduledPostID]
+	return ok
+}
+
+// ResetScheduledPostID resets all changes to the "scheduled_post_id" field.
+func (m *VoiceCommandMutation) ResetScheduledPostID() {
+	m.scheduled_post_id = nil
+	delete(m.clearedFields, voicecommand.FieldScheduledPostID)
+}
+
+// SetFailureReason sets the "failure_reason" field.
+func (m *VoiceCommandMutation) SetFailureReason(s string) {
+	m.failure_reason = &s
+}
+
+// FailureReason returns the value of the "failure_reason" field in the mutation.
+func (m *VoiceCommandMutation) FailureReason() (r string, exists bool) {
+	v := m.failure_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureReason returns the old "failure_reason" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldFailureReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureReason: %w", err)
+	}
+	return oldValue.FailureReason, nil
+}
+
+// ClearFailureReason clears the value of the "failure_reason" field.
+func (m *VoiceCommandMutation) ClearFailureReason() {
+	m.failure_reason = nil
+	m.clearedFields[voicecommand.FieldFailureReason] = struct{}{}
+}
+
+// FailureReasonCleared returns if the "failure_reason" field was cleared in this mutation.
+func (m *VoiceCommandMutation) FailureReasonCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldFailureReason]
+	return ok
+}
+
+// ResetFailureReason resets all changes to the "failure_reason" field.
+func (m *VoiceCommandMutation) ResetFailureReason() {
+	m.failure_reason = nil
+	delete(m.clearedFields, voicecommand.FieldFailureReason)
+}
+
+// SetOutcome sets the "outcome" field.
+func (m *VoiceCommandMutation) SetOutcome(v voicecommand.Outcome) {
+	m.outcome = &v
+}
+
+// Outcome returns the value of the "outcome" field in the mutation.
+func (m *VoiceCommandMutation) Outcome() (r voicecommand.Outcome, exists bool) {
+	v := m.outcome
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutcome returns the old "outcome" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldOutcome(ctx context.Context) (v *voicecommand.Outcome, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutcome is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutcome requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutcome: %w", err)
+	}
+	return oldValue.Outcome, nil
+}
+
+// ClearOutcome clears the value of the "outcome" field.
+func (m *VoiceCommandMutation) ClearOutcome() {
+	m.outcome = nil
+	m.clearedFields[voicecommand.FieldOutcome] = struct{}{}
+}
+
+// OutcomeCleared returns if the "outcome" field was cleared in this mutation.
+func (m *VoiceCommandMutation) OutcomeCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldOutcome]
+	return ok
+}
+
+// ResetOutcome resets all changes to the "outcome" field.
+func (m *VoiceCommandMutation) ResetOutcome() {
+	m.outcome = nil
+	delete(m.clearedFields, voicecommand.FieldOutcome)
+}
+
+// SetParsedAt sets the "parsed_at" field.
+func (m *VoiceCommandMutation) SetParsedAt(t time.Time) {
+	m.parsed_at = &t
+}
+
+// ParsedAt returns the value of the "parsed_at" field in the mutation.
+func (m *VoiceCommandMutation) ParsedAt() (r time.Time, exists bool) {
+	v := m.parsed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParsedAt returns the old "parsed_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldParsedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParsedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParsedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParsedAt: %w", err)
+	}
+	return oldValue.ParsedAt, nil
+}
+
+// ClearParsedAt clears the value of the "parsed_at" field.
+func (m *VoiceCommandMutation) ClearParsedAt() {
+	m.parsed_at = nil
+	m.clearedFields[voicecommand.FieldParsedAt] = struct{}{}
+}
+
+// ParsedAtCleared returns if the "parsed_at" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ParsedAtCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldParsedAt]
+	return ok
+}
+
+// ResetParsedAt resets all changes to the "parsed_at" field.
+func (m *VoiceCommandMutation) ResetParsedAt() {
+	m.parsed_at = nil
+	delete(m.clearedFields, voicecommand.FieldParsedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *VoiceCommandMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *VoiceCommandMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *VoiceCommandMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *VoiceCommandMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *VoiceCommandMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *VoiceCommandMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the VoiceCommandMutation builder.
+func (m *VoiceCommandMutation) Where(ps ...predicate.VoiceCommand) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceCommandMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceCommandMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceCommand, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceCommandMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceCommandMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceCommand).
+func (m *VoiceCommandMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceCommandMutation) Fields() []string {
+	fields := make([]string, 0, 25)
+	if m.organization_id != nil {
+		fields = append(fields, voicecommand.FieldOrganizationID)
+	}
+	if m.owner_user_id != nil {
+		fields = append(fields, voicecommand.FieldOwnerUserID)
+	}
+	if m.note_id != nil {
+		fields = append(fields, voicecommand.FieldNoteID)
+	}
+	if m.transcript_revision_id != nil {
+		fields = append(fields, voicecommand.FieldTranscriptRevisionID)
+	}
+	if m.status != nil {
+		fields = append(fields, voicecommand.FieldStatus)
+	}
+	if m.action != nil {
+		fields = append(fields, voicecommand.FieldAction)
+	}
+	if m.platform != nil {
+		fields = append(fields, voicecommand.FieldPlatform)
+	}
+	if m.text != nil {
+		fields = append(fields, voicecommand.FieldText)
+	}
+	if m.local_time != nil {
+		fields = append(fields, voicecommand.FieldLocalTime)
+	}
+	if m.time_zone != nil {
+		fields = append(fields, voicecommand.FieldTimeZone)
+	}
+	if m.scheduled_for != nil {
+		fields = append(fields, voicecommand.FieldScheduledFor)
+	}
+	if m.channel_connection_id != nil {
+		fields = append(fields, voicecommand.FieldChannelConnectionID)
+	}
+	if m.guessed != nil {
+		fields = append(fields, voicecommand.FieldGuessed)
+	}
+	if m.flags != nil {
+		fields = append(fields, voicecommand.FieldFlags)
+	}
+	if m.notice != nil {
+		fields = append(fields, voicecommand.FieldNotice)
+	}
+	if m.attempts != nil {
+		fields = append(fields, voicecommand.FieldAttempts)
+	}
+	if m.next_attempt_at != nil {
+		fields = append(fields, voicecommand.FieldNextAttemptAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, voicecommand.FieldExpiresAt)
+	}
+	if m.content_draft_id != nil {
+		fields = append(fields, voicecommand.FieldContentDraftID)
+	}
+	if m.scheduled_post_id != nil {
+		fields = append(fields, voicecommand.FieldScheduledPostID)
+	}
+	if m.failure_reason != nil {
+		fields = append(fields, voicecommand.FieldFailureReason)
+	}
+	if m.outcome != nil {
+		fields = append(fields, voicecommand.FieldOutcome)
+	}
+	if m.parsed_at != nil {
+		fields = append(fields, voicecommand.FieldParsedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, voicecommand.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, voicecommand.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceCommandMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voicecommand.FieldOrganizationID:
+		return m.OrganizationID()
+	case voicecommand.FieldOwnerUserID:
+		return m.OwnerUserID()
+	case voicecommand.FieldNoteID:
+		return m.NoteID()
+	case voicecommand.FieldTranscriptRevisionID:
+		return m.TranscriptRevisionID()
+	case voicecommand.FieldStatus:
+		return m.Status()
+	case voicecommand.FieldAction:
+		return m.Action()
+	case voicecommand.FieldPlatform:
+		return m.Platform()
+	case voicecommand.FieldText:
+		return m.Text()
+	case voicecommand.FieldLocalTime:
+		return m.LocalTime()
+	case voicecommand.FieldTimeZone:
+		return m.TimeZone()
+	case voicecommand.FieldScheduledFor:
+		return m.ScheduledFor()
+	case voicecommand.FieldChannelConnectionID:
+		return m.ChannelConnectionID()
+	case voicecommand.FieldGuessed:
+		return m.Guessed()
+	case voicecommand.FieldFlags:
+		return m.Flags()
+	case voicecommand.FieldNotice:
+		return m.Notice()
+	case voicecommand.FieldAttempts:
+		return m.Attempts()
+	case voicecommand.FieldNextAttemptAt:
+		return m.NextAttemptAt()
+	case voicecommand.FieldExpiresAt:
+		return m.ExpiresAt()
+	case voicecommand.FieldContentDraftID:
+		return m.ContentDraftID()
+	case voicecommand.FieldScheduledPostID:
+		return m.ScheduledPostID()
+	case voicecommand.FieldFailureReason:
+		return m.FailureReason()
+	case voicecommand.FieldOutcome:
+		return m.Outcome()
+	case voicecommand.FieldParsedAt:
+		return m.ParsedAt()
+	case voicecommand.FieldCreatedAt:
+		return m.CreatedAt()
+	case voicecommand.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceCommandMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voicecommand.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case voicecommand.FieldOwnerUserID:
+		return m.OldOwnerUserID(ctx)
+	case voicecommand.FieldNoteID:
+		return m.OldNoteID(ctx)
+	case voicecommand.FieldTranscriptRevisionID:
+		return m.OldTranscriptRevisionID(ctx)
+	case voicecommand.FieldStatus:
+		return m.OldStatus(ctx)
+	case voicecommand.FieldAction:
+		return m.OldAction(ctx)
+	case voicecommand.FieldPlatform:
+		return m.OldPlatform(ctx)
+	case voicecommand.FieldText:
+		return m.OldText(ctx)
+	case voicecommand.FieldLocalTime:
+		return m.OldLocalTime(ctx)
+	case voicecommand.FieldTimeZone:
+		return m.OldTimeZone(ctx)
+	case voicecommand.FieldScheduledFor:
+		return m.OldScheduledFor(ctx)
+	case voicecommand.FieldChannelConnectionID:
+		return m.OldChannelConnectionID(ctx)
+	case voicecommand.FieldGuessed:
+		return m.OldGuessed(ctx)
+	case voicecommand.FieldFlags:
+		return m.OldFlags(ctx)
+	case voicecommand.FieldNotice:
+		return m.OldNotice(ctx)
+	case voicecommand.FieldAttempts:
+		return m.OldAttempts(ctx)
+	case voicecommand.FieldNextAttemptAt:
+		return m.OldNextAttemptAt(ctx)
+	case voicecommand.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case voicecommand.FieldContentDraftID:
+		return m.OldContentDraftID(ctx)
+	case voicecommand.FieldScheduledPostID:
+		return m.OldScheduledPostID(ctx)
+	case voicecommand.FieldFailureReason:
+		return m.OldFailureReason(ctx)
+	case voicecommand.FieldOutcome:
+		return m.OldOutcome(ctx)
+	case voicecommand.FieldParsedAt:
+		return m.OldParsedAt(ctx)
+	case voicecommand.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case voicecommand.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceCommand field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceCommandMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voicecommand.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case voicecommand.FieldOwnerUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerUserID(v)
+		return nil
+	case voicecommand.FieldNoteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNoteID(v)
+		return nil
+	case voicecommand.FieldTranscriptRevisionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTranscriptRevisionID(v)
+		return nil
+	case voicecommand.FieldStatus:
+		v, ok := value.(voicecommand.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case voicecommand.FieldAction:
+		v, ok := value.(voicecommand.Action)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case voicecommand.FieldPlatform:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPlatform(v)
+		return nil
+	case voicecommand.FieldText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetText(v)
+		return nil
+	case voicecommand.FieldLocalTime:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLocalTime(v)
+		return nil
+	case voicecommand.FieldTimeZone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTimeZone(v)
+		return nil
+	case voicecommand.FieldScheduledFor:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScheduledFor(v)
+		return nil
+	case voicecommand.FieldChannelConnectionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChannelConnectionID(v)
+		return nil
+	case voicecommand.FieldGuessed:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGuessed(v)
+		return nil
+	case voicecommand.FieldFlags:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFlags(v)
+		return nil
+	case voicecommand.FieldNotice:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotice(v)
+		return nil
+	case voicecommand.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttempts(v)
+		return nil
+	case voicecommand.FieldNextAttemptAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNextAttemptAt(v)
+		return nil
+	case voicecommand.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case voicecommand.FieldContentDraftID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentDraftID(v)
+		return nil
+	case voicecommand.FieldScheduledPostID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScheduledPostID(v)
+		return nil
+	case voicecommand.FieldFailureReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureReason(v)
+		return nil
+	case voicecommand.FieldOutcome:
+		v, ok := value.(voicecommand.Outcome)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutcome(v)
+		return nil
+	case voicecommand.FieldParsedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParsedAt(v)
+		return nil
+	case voicecommand.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case voicecommand.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceCommand field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceCommandMutation) AddedFields() []string {
+	var fields []string
+	if m.addattempts != nil {
+		fields = append(fields, voicecommand.FieldAttempts)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceCommandMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case voicecommand.FieldAttempts:
+		return m.AddedAttempts()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceCommandMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case voicecommand.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttempts(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceCommand numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceCommandMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voicecommand.FieldPlatform) {
+		fields = append(fields, voicecommand.FieldPlatform)
+	}
+	if m.FieldCleared(voicecommand.FieldText) {
+		fields = append(fields, voicecommand.FieldText)
+	}
+	if m.FieldCleared(voicecommand.FieldLocalTime) {
+		fields = append(fields, voicecommand.FieldLocalTime)
+	}
+	if m.FieldCleared(voicecommand.FieldScheduledFor) {
+		fields = append(fields, voicecommand.FieldScheduledFor)
+	}
+	if m.FieldCleared(voicecommand.FieldChannelConnectionID) {
+		fields = append(fields, voicecommand.FieldChannelConnectionID)
+	}
+	if m.FieldCleared(voicecommand.FieldNotice) {
+		fields = append(fields, voicecommand.FieldNotice)
+	}
+	if m.FieldCleared(voicecommand.FieldNextAttemptAt) {
+		fields = append(fields, voicecommand.FieldNextAttemptAt)
+	}
+	if m.FieldCleared(voicecommand.FieldExpiresAt) {
+		fields = append(fields, voicecommand.FieldExpiresAt)
+	}
+	if m.FieldCleared(voicecommand.FieldContentDraftID) {
+		fields = append(fields, voicecommand.FieldContentDraftID)
+	}
+	if m.FieldCleared(voicecommand.FieldScheduledPostID) {
+		fields = append(fields, voicecommand.FieldScheduledPostID)
+	}
+	if m.FieldCleared(voicecommand.FieldFailureReason) {
+		fields = append(fields, voicecommand.FieldFailureReason)
+	}
+	if m.FieldCleared(voicecommand.FieldOutcome) {
+		fields = append(fields, voicecommand.FieldOutcome)
+	}
+	if m.FieldCleared(voicecommand.FieldParsedAt) {
+		fields = append(fields, voicecommand.FieldParsedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceCommandMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceCommandMutation) ClearField(name string) error {
+	switch name {
+	case voicecommand.FieldPlatform:
+		m.ClearPlatform()
+		return nil
+	case voicecommand.FieldText:
+		m.ClearText()
+		return nil
+	case voicecommand.FieldLocalTime:
+		m.ClearLocalTime()
+		return nil
+	case voicecommand.FieldScheduledFor:
+		m.ClearScheduledFor()
+		return nil
+	case voicecommand.FieldChannelConnectionID:
+		m.ClearChannelConnectionID()
+		return nil
+	case voicecommand.FieldNotice:
+		m.ClearNotice()
+		return nil
+	case voicecommand.FieldNextAttemptAt:
+		m.ClearNextAttemptAt()
+		return nil
+	case voicecommand.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	case voicecommand.FieldContentDraftID:
+		m.ClearContentDraftID()
+		return nil
+	case voicecommand.FieldScheduledPostID:
+		m.ClearScheduledPostID()
+		return nil
+	case voicecommand.FieldFailureReason:
+		m.ClearFailureReason()
+		return nil
+	case voicecommand.FieldOutcome:
+		m.ClearOutcome()
+		return nil
+	case voicecommand.FieldParsedAt:
+		m.ClearParsedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceCommand nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceCommandMutation) ResetField(name string) error {
+	switch name {
+	case voicecommand.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case voicecommand.FieldOwnerUserID:
+		m.ResetOwnerUserID()
+		return nil
+	case voicecommand.FieldNoteID:
+		m.ResetNoteID()
+		return nil
+	case voicecommand.FieldTranscriptRevisionID:
+		m.ResetTranscriptRevisionID()
+		return nil
+	case voicecommand.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case voicecommand.FieldAction:
+		m.ResetAction()
+		return nil
+	case voicecommand.FieldPlatform:
+		m.ResetPlatform()
+		return nil
+	case voicecommand.FieldText:
+		m.ResetText()
+		return nil
+	case voicecommand.FieldLocalTime:
+		m.ResetLocalTime()
+		return nil
+	case voicecommand.FieldTimeZone:
+		m.ResetTimeZone()
+		return nil
+	case voicecommand.FieldScheduledFor:
+		m.ResetScheduledFor()
+		return nil
+	case voicecommand.FieldChannelConnectionID:
+		m.ResetChannelConnectionID()
+		return nil
+	case voicecommand.FieldGuessed:
+		m.ResetGuessed()
+		return nil
+	case voicecommand.FieldFlags:
+		m.ResetFlags()
+		return nil
+	case voicecommand.FieldNotice:
+		m.ResetNotice()
+		return nil
+	case voicecommand.FieldAttempts:
+		m.ResetAttempts()
+		return nil
+	case voicecommand.FieldNextAttemptAt:
+		m.ResetNextAttemptAt()
+		return nil
+	case voicecommand.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case voicecommand.FieldContentDraftID:
+		m.ResetContentDraftID()
+		return nil
+	case voicecommand.FieldScheduledPostID:
+		m.ResetScheduledPostID()
+		return nil
+	case voicecommand.FieldFailureReason:
+		m.ResetFailureReason()
+		return nil
+	case voicecommand.FieldOutcome:
+		m.ResetOutcome()
+		return nil
+	case voicecommand.FieldParsedAt:
+		m.ResetParsedAt()
+		return nil
+	case voicecommand.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case voicecommand.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceCommand field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceCommandMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceCommandMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceCommandMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceCommandMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceCommandMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceCommandMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceCommandMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceCommand unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceCommandMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceCommand edge %s", name)
+}
+
+// VoiceMemberSettingsMutation represents an operation that mutates the VoiceMemberSettings nodes in the graph.
+type VoiceMemberSettingsMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *string
+	organization_id        *string
+	user_id                *string
+	remote_text_consent_at *time.Time
+	voice_commands         *bool
+	updated_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*VoiceMemberSettings, error)
+	predicates             []predicate.VoiceMemberSettings
+}
+
+var _ ent.Mutation = (*VoiceMemberSettingsMutation)(nil)
+
+// voicemembersettingsOption allows management of the mutation configuration using functional options.
+type voicemembersettingsOption func(*VoiceMemberSettingsMutation)
+
+// newVoiceMemberSettingsMutation creates new mutation for the VoiceMemberSettings entity.
+func newVoiceMemberSettingsMutation(c config, op Op, opts ...voicemembersettingsOption) *VoiceMemberSettingsMutation {
+	m := &VoiceMemberSettingsMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceMemberSettings,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceMemberSettingsID sets the ID field of the mutation.
+func withVoiceMemberSettingsID(id string) voicemembersettingsOption {
+	return func(m *VoiceMemberSettingsMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceMemberSettings
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceMemberSettings, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceMemberSettings.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceMemberSettings sets the old VoiceMemberSettings of the mutation.
+func withVoiceMemberSettings(node *VoiceMemberSettings) voicemembersettingsOption {
+	return func(m *VoiceMemberSettingsMutation) {
+		m.oldValue = func(context.Context) (*VoiceMemberSettings, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceMemberSettingsMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceMemberSettingsMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceMemberSettings entities.
+func (m *VoiceMemberSettingsMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceMemberSettingsMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceMemberSettingsMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceMemberSettings.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *VoiceMemberSettingsMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *VoiceMemberSettingsMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the VoiceMemberSettings entity.
+// If the VoiceMemberSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceMemberSettingsMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *VoiceMemberSettingsMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *VoiceMemberSettingsMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *VoiceMemberSettingsMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the VoiceMemberSettings entity.
+// If the VoiceMemberSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceMemberSettingsMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *VoiceMemberSettingsMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetRemoteTextConsentAt sets the "remote_text_consent_at" field.
+func (m *VoiceMemberSettingsMutation) SetRemoteTextConsentAt(t time.Time) {
+	m.remote_text_consent_at = &t
+}
+
+// RemoteTextConsentAt returns the value of the "remote_text_consent_at" field in the mutation.
+func (m *VoiceMemberSettingsMutation) RemoteTextConsentAt() (r time.Time, exists bool) {
+	v := m.remote_text_consent_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteTextConsentAt returns the old "remote_text_consent_at" field's value of the VoiceMemberSettings entity.
+// If the VoiceMemberSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceMemberSettingsMutation) OldRemoteTextConsentAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteTextConsentAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteTextConsentAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteTextConsentAt: %w", err)
+	}
+	return oldValue.RemoteTextConsentAt, nil
+}
+
+// ClearRemoteTextConsentAt clears the value of the "remote_text_consent_at" field.
+func (m *VoiceMemberSettingsMutation) ClearRemoteTextConsentAt() {
+	m.remote_text_consent_at = nil
+	m.clearedFields[voicemembersettings.FieldRemoteTextConsentAt] = struct{}{}
+}
+
+// RemoteTextConsentAtCleared returns if the "remote_text_consent_at" field was cleared in this mutation.
+func (m *VoiceMemberSettingsMutation) RemoteTextConsentAtCleared() bool {
+	_, ok := m.clearedFields[voicemembersettings.FieldRemoteTextConsentAt]
+	return ok
+}
+
+// ResetRemoteTextConsentAt resets all changes to the "remote_text_consent_at" field.
+func (m *VoiceMemberSettingsMutation) ResetRemoteTextConsentAt() {
+	m.remote_text_consent_at = nil
+	delete(m.clearedFields, voicemembersettings.FieldRemoteTextConsentAt)
+}
+
+// SetVoiceCommands sets the "voice_commands" field.
+func (m *VoiceMemberSettingsMutation) SetVoiceCommands(b bool) {
+	m.voice_commands = &b
+}
+
+// VoiceCommands returns the value of the "voice_commands" field in the mutation.
+func (m *VoiceMemberSettingsMutation) VoiceCommands() (r bool, exists bool) {
+	v := m.voice_commands
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVoiceCommands returns the old "voice_commands" field's value of the VoiceMemberSettings entity.
+// If the VoiceMemberSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceMemberSettingsMutation) OldVoiceCommands(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVoiceCommands is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVoiceCommands requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVoiceCommands: %w", err)
+	}
+	return oldValue.VoiceCommands, nil
+}
+
+// ResetVoiceCommands resets all changes to the "voice_commands" field.
+func (m *VoiceMemberSettingsMutation) ResetVoiceCommands() {
+	m.voice_commands = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *VoiceMemberSettingsMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *VoiceMemberSettingsMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the VoiceMemberSettings entity.
+// If the VoiceMemberSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceMemberSettingsMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *VoiceMemberSettingsMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the VoiceMemberSettingsMutation builder.
+func (m *VoiceMemberSettingsMutation) Where(ps ...predicate.VoiceMemberSettings) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceMemberSettingsMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceMemberSettingsMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceMemberSettings, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceMemberSettingsMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceMemberSettingsMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceMemberSettings).
+func (m *VoiceMemberSettingsMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceMemberSettingsMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.organization_id != nil {
+		fields = append(fields, voicemembersettings.FieldOrganizationID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, voicemembersettings.FieldUserID)
+	}
+	if m.remote_text_consent_at != nil {
+		fields = append(fields, voicemembersettings.FieldRemoteTextConsentAt)
+	}
+	if m.voice_commands != nil {
+		fields = append(fields, voicemembersettings.FieldVoiceCommands)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, voicemembersettings.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceMemberSettingsMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voicemembersettings.FieldOrganizationID:
+		return m.OrganizationID()
+	case voicemembersettings.FieldUserID:
+		return m.UserID()
+	case voicemembersettings.FieldRemoteTextConsentAt:
+		return m.RemoteTextConsentAt()
+	case voicemembersettings.FieldVoiceCommands:
+		return m.VoiceCommands()
+	case voicemembersettings.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceMemberSettingsMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voicemembersettings.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case voicemembersettings.FieldUserID:
+		return m.OldUserID(ctx)
+	case voicemembersettings.FieldRemoteTextConsentAt:
+		return m.OldRemoteTextConsentAt(ctx)
+	case voicemembersettings.FieldVoiceCommands:
+		return m.OldVoiceCommands(ctx)
+	case voicemembersettings.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceMemberSettings field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceMemberSettingsMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voicemembersettings.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case voicemembersettings.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case voicemembersettings.FieldRemoteTextConsentAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteTextConsentAt(v)
+		return nil
+	case voicemembersettings.FieldVoiceCommands:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVoiceCommands(v)
+		return nil
+	case voicemembersettings.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceMemberSettings field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceMemberSettingsMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceMemberSettingsMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceMemberSettingsMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown VoiceMemberSettings numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceMemberSettingsMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voicemembersettings.FieldRemoteTextConsentAt) {
+		fields = append(fields, voicemembersettings.FieldRemoteTextConsentAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceMemberSettingsMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceMemberSettingsMutation) ClearField(name string) error {
+	switch name {
+	case voicemembersettings.FieldRemoteTextConsentAt:
+		m.ClearRemoteTextConsentAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceMemberSettings nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceMemberSettingsMutation) ResetField(name string) error {
+	switch name {
+	case voicemembersettings.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case voicemembersettings.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case voicemembersettings.FieldRemoteTextConsentAt:
+		m.ResetRemoteTextConsentAt()
+		return nil
+	case voicemembersettings.FieldVoiceCommands:
+		m.ResetVoiceCommands()
+		return nil
+	case voicemembersettings.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceMemberSettings field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceMemberSettingsMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceMemberSettingsMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceMemberSettingsMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceMemberSettingsMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceMemberSettingsMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceMemberSettingsMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceMemberSettingsMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceMemberSettings unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceMemberSettingsMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceMemberSettings edge %s", name)
+}
+
+// VoiceNoteMutation represents an operation that mutates the VoiceNote nodes in the graph.
+type VoiceNoteMutation struct {
+	config
+	op                             Op
+	typ                            string
+	id                             *string
+	organization_id                *string
+	owner_user_id                  *string
+	client_note_id                 *string
+	title                          *string
+	project_id                     *string
+	recorded_at                    *time.Time
+	recorded_time_zone             *string
+	received_at                    *time.Time
+	locale                         *string
+	duration_ms                    *int
+	addduration_ms                 *int
+	audio_upload_consent           *bool
+	revision                       *int
+	addrevision                    *int
+	current_transcript_revision_id *string
+	deleted_at                     *time.Time
+	owner_removed_at               *time.Time
+	created_at                     *time.Time
+	updated_at                     *time.Time
+	clearedFields                  map[string]struct{}
+	done                           bool
+	oldValue                       func(context.Context) (*VoiceNote, error)
+	predicates                     []predicate.VoiceNote
+}
+
+var _ ent.Mutation = (*VoiceNoteMutation)(nil)
+
+// voicenoteOption allows management of the mutation configuration using functional options.
+type voicenoteOption func(*VoiceNoteMutation)
+
+// newVoiceNoteMutation creates new mutation for the VoiceNote entity.
+func newVoiceNoteMutation(c config, op Op, opts ...voicenoteOption) *VoiceNoteMutation {
+	m := &VoiceNoteMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceNote,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceNoteID sets the ID field of the mutation.
+func withVoiceNoteID(id string) voicenoteOption {
+	return func(m *VoiceNoteMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceNote
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceNote, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceNote.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceNote sets the old VoiceNote of the mutation.
+func withVoiceNote(node *VoiceNote) voicenoteOption {
+	return func(m *VoiceNoteMutation) {
+		m.oldValue = func(context.Context) (*VoiceNote, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceNoteMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceNoteMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceNote entities.
+func (m *VoiceNoteMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceNoteMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceNoteMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceNote.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *VoiceNoteMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *VoiceNoteMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *VoiceNoteMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetOwnerUserID sets the "owner_user_id" field.
+func (m *VoiceNoteMutation) SetOwnerUserID(s string) {
+	m.owner_user_id = &s
+}
+
+// OwnerUserID returns the value of the "owner_user_id" field in the mutation.
+func (m *VoiceNoteMutation) OwnerUserID() (r string, exists bool) {
+	v := m.owner_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerUserID returns the old "owner_user_id" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldOwnerUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerUserID: %w", err)
+	}
+	return oldValue.OwnerUserID, nil
+}
+
+// ResetOwnerUserID resets all changes to the "owner_user_id" field.
+func (m *VoiceNoteMutation) ResetOwnerUserID() {
+	m.owner_user_id = nil
+}
+
+// SetClientNoteID sets the "client_note_id" field.
+func (m *VoiceNoteMutation) SetClientNoteID(s string) {
+	m.client_note_id = &s
+}
+
+// ClientNoteID returns the value of the "client_note_id" field in the mutation.
+func (m *VoiceNoteMutation) ClientNoteID() (r string, exists bool) {
+	v := m.client_note_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientNoteID returns the old "client_note_id" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldClientNoteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientNoteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientNoteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientNoteID: %w", err)
+	}
+	return oldValue.ClientNoteID, nil
+}
+
+// ResetClientNoteID resets all changes to the "client_note_id" field.
+func (m *VoiceNoteMutation) ResetClientNoteID() {
+	m.client_note_id = nil
+}
+
+// SetTitle sets the "title" field.
+func (m *VoiceNoteMutation) SetTitle(s string) {
+	m.title = &s
+}
+
+// Title returns the value of the "title" field in the mutation.
+func (m *VoiceNoteMutation) Title() (r string, exists bool) {
+	v := m.title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTitle returns the old "title" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTitle: %w", err)
+	}
+	return oldValue.Title, nil
+}
+
+// ResetTitle resets all changes to the "title" field.
+func (m *VoiceNoteMutation) ResetTitle() {
+	m.title = nil
+}
+
+// SetProjectID sets the "project_id" field.
+func (m *VoiceNoteMutation) SetProjectID(s string) {
+	m.project_id = &s
+}
+
+// ProjectID returns the value of the "project_id" field in the mutation.
+func (m *VoiceNoteMutation) ProjectID() (r string, exists bool) {
+	v := m.project_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProjectID returns the old "project_id" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldProjectID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProjectID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProjectID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProjectID: %w", err)
+	}
+	return oldValue.ProjectID, nil
+}
+
+// ClearProjectID clears the value of the "project_id" field.
+func (m *VoiceNoteMutation) ClearProjectID() {
+	m.project_id = nil
+	m.clearedFields[voicenote.FieldProjectID] = struct{}{}
+}
+
+// ProjectIDCleared returns if the "project_id" field was cleared in this mutation.
+func (m *VoiceNoteMutation) ProjectIDCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldProjectID]
+	return ok
+}
+
+// ResetProjectID resets all changes to the "project_id" field.
+func (m *VoiceNoteMutation) ResetProjectID() {
+	m.project_id = nil
+	delete(m.clearedFields, voicenote.FieldProjectID)
+}
+
+// SetRecordedAt sets the "recorded_at" field.
+func (m *VoiceNoteMutation) SetRecordedAt(t time.Time) {
+	m.recorded_at = &t
+}
+
+// RecordedAt returns the value of the "recorded_at" field in the mutation.
+func (m *VoiceNoteMutation) RecordedAt() (r time.Time, exists bool) {
+	v := m.recorded_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecordedAt returns the old "recorded_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldRecordedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecordedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecordedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecordedAt: %w", err)
+	}
+	return oldValue.RecordedAt, nil
+}
+
+// ResetRecordedAt resets all changes to the "recorded_at" field.
+func (m *VoiceNoteMutation) ResetRecordedAt() {
+	m.recorded_at = nil
+}
+
+// SetRecordedTimeZone sets the "recorded_time_zone" field.
+func (m *VoiceNoteMutation) SetRecordedTimeZone(s string) {
+	m.recorded_time_zone = &s
+}
+
+// RecordedTimeZone returns the value of the "recorded_time_zone" field in the mutation.
+func (m *VoiceNoteMutation) RecordedTimeZone() (r string, exists bool) {
+	v := m.recorded_time_zone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecordedTimeZone returns the old "recorded_time_zone" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldRecordedTimeZone(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecordedTimeZone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecordedTimeZone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecordedTimeZone: %w", err)
+	}
+	return oldValue.RecordedTimeZone, nil
+}
+
+// ResetRecordedTimeZone resets all changes to the "recorded_time_zone" field.
+func (m *VoiceNoteMutation) ResetRecordedTimeZone() {
+	m.recorded_time_zone = nil
+}
+
+// SetReceivedAt sets the "received_at" field.
+func (m *VoiceNoteMutation) SetReceivedAt(t time.Time) {
+	m.received_at = &t
+}
+
+// ReceivedAt returns the value of the "received_at" field in the mutation.
+func (m *VoiceNoteMutation) ReceivedAt() (r time.Time, exists bool) {
+	v := m.received_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceivedAt returns the old "received_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldReceivedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceivedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceivedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceivedAt: %w", err)
+	}
+	return oldValue.ReceivedAt, nil
+}
+
+// ResetReceivedAt resets all changes to the "received_at" field.
+func (m *VoiceNoteMutation) ResetReceivedAt() {
+	m.received_at = nil
+}
+
+// SetLocale sets the "locale" field.
+func (m *VoiceNoteMutation) SetLocale(s string) {
+	m.locale = &s
+}
+
+// Locale returns the value of the "locale" field in the mutation.
+func (m *VoiceNoteMutation) Locale() (r string, exists bool) {
+	v := m.locale
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLocale returns the old "locale" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldLocale(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLocale is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLocale requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLocale: %w", err)
+	}
+	return oldValue.Locale, nil
+}
+
+// ClearLocale clears the value of the "locale" field.
+func (m *VoiceNoteMutation) ClearLocale() {
+	m.locale = nil
+	m.clearedFields[voicenote.FieldLocale] = struct{}{}
+}
+
+// LocaleCleared returns if the "locale" field was cleared in this mutation.
+func (m *VoiceNoteMutation) LocaleCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldLocale]
+	return ok
+}
+
+// ResetLocale resets all changes to the "locale" field.
+func (m *VoiceNoteMutation) ResetLocale() {
+	m.locale = nil
+	delete(m.clearedFields, voicenote.FieldLocale)
+}
+
+// SetDurationMs sets the "duration_ms" field.
+func (m *VoiceNoteMutation) SetDurationMs(i int) {
+	m.duration_ms = &i
+	m.addduration_ms = nil
+}
+
+// DurationMs returns the value of the "duration_ms" field in the mutation.
+func (m *VoiceNoteMutation) DurationMs() (r int, exists bool) {
+	v := m.duration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDurationMs returns the old "duration_ms" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldDurationMs(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDurationMs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDurationMs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDurationMs: %w", err)
+	}
+	return oldValue.DurationMs, nil
+}
+
+// AddDurationMs adds i to the "duration_ms" field.
+func (m *VoiceNoteMutation) AddDurationMs(i int) {
+	if m.addduration_ms != nil {
+		*m.addduration_ms += i
+	} else {
+		m.addduration_ms = &i
+	}
+}
+
+// AddedDurationMs returns the value that was added to the "duration_ms" field in this mutation.
+func (m *VoiceNoteMutation) AddedDurationMs() (r int, exists bool) {
+	v := m.addduration_ms
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDurationMs clears the value of the "duration_ms" field.
+func (m *VoiceNoteMutation) ClearDurationMs() {
+	m.duration_ms = nil
+	m.addduration_ms = nil
+	m.clearedFields[voicenote.FieldDurationMs] = struct{}{}
+}
+
+// DurationMsCleared returns if the "duration_ms" field was cleared in this mutation.
+func (m *VoiceNoteMutation) DurationMsCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldDurationMs]
+	return ok
+}
+
+// ResetDurationMs resets all changes to the "duration_ms" field.
+func (m *VoiceNoteMutation) ResetDurationMs() {
+	m.duration_ms = nil
+	m.addduration_ms = nil
+	delete(m.clearedFields, voicenote.FieldDurationMs)
+}
+
+// SetAudioUploadConsent sets the "audio_upload_consent" field.
+func (m *VoiceNoteMutation) SetAudioUploadConsent(b bool) {
+	m.audio_upload_consent = &b
+}
+
+// AudioUploadConsent returns the value of the "audio_upload_consent" field in the mutation.
+func (m *VoiceNoteMutation) AudioUploadConsent() (r bool, exists bool) {
+	v := m.audio_upload_consent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAudioUploadConsent returns the old "audio_upload_consent" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldAudioUploadConsent(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAudioUploadConsent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAudioUploadConsent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAudioUploadConsent: %w", err)
+	}
+	return oldValue.AudioUploadConsent, nil
+}
+
+// ResetAudioUploadConsent resets all changes to the "audio_upload_consent" field.
+func (m *VoiceNoteMutation) ResetAudioUploadConsent() {
+	m.audio_upload_consent = nil
+}
+
+// SetRevision sets the "revision" field.
+func (m *VoiceNoteMutation) SetRevision(i int) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *VoiceNoteMutation) Revision() (r int, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldRevision(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *VoiceNoteMutation) AddRevision(i int) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *VoiceNoteMutation) AddedRevision() (r int, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *VoiceNoteMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// SetCurrentTranscriptRevisionID sets the "current_transcript_revision_id" field.
+func (m *VoiceNoteMutation) SetCurrentTranscriptRevisionID(s string) {
+	m.current_transcript_revision_id = &s
+}
+
+// CurrentTranscriptRevisionID returns the value of the "current_transcript_revision_id" field in the mutation.
+func (m *VoiceNoteMutation) CurrentTranscriptRevisionID() (r string, exists bool) {
+	v := m.current_transcript_revision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrentTranscriptRevisionID returns the old "current_transcript_revision_id" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldCurrentTranscriptRevisionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrentTranscriptRevisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrentTranscriptRevisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrentTranscriptRevisionID: %w", err)
+	}
+	return oldValue.CurrentTranscriptRevisionID, nil
+}
+
+// ClearCurrentTranscriptRevisionID clears the value of the "current_transcript_revision_id" field.
+func (m *VoiceNoteMutation) ClearCurrentTranscriptRevisionID() {
+	m.current_transcript_revision_id = nil
+	m.clearedFields[voicenote.FieldCurrentTranscriptRevisionID] = struct{}{}
+}
+
+// CurrentTranscriptRevisionIDCleared returns if the "current_transcript_revision_id" field was cleared in this mutation.
+func (m *VoiceNoteMutation) CurrentTranscriptRevisionIDCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldCurrentTranscriptRevisionID]
+	return ok
+}
+
+// ResetCurrentTranscriptRevisionID resets all changes to the "current_transcript_revision_id" field.
+func (m *VoiceNoteMutation) ResetCurrentTranscriptRevisionID() {
+	m.current_transcript_revision_id = nil
+	delete(m.clearedFields, voicenote.FieldCurrentTranscriptRevisionID)
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (m *VoiceNoteMutation) SetDeletedAt(t time.Time) {
+	m.deleted_at = &t
+}
+
+// DeletedAt returns the value of the "deleted_at" field in the mutation.
+func (m *VoiceNoteMutation) DeletedAt() (r time.Time, exists bool) {
+	v := m.deleted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletedAt returns the old "deleted_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
+	}
+	return oldValue.DeletedAt, nil
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (m *VoiceNoteMutation) ClearDeletedAt() {
+	m.deleted_at = nil
+	m.clearedFields[voicenote.FieldDeletedAt] = struct{}{}
+}
+
+// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
+func (m *VoiceNoteMutation) DeletedAtCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldDeletedAt]
+	return ok
+}
+
+// ResetDeletedAt resets all changes to the "deleted_at" field.
+func (m *VoiceNoteMutation) ResetDeletedAt() {
+	m.deleted_at = nil
+	delete(m.clearedFields, voicenote.FieldDeletedAt)
+}
+
+// SetOwnerRemovedAt sets the "owner_removed_at" field.
+func (m *VoiceNoteMutation) SetOwnerRemovedAt(t time.Time) {
+	m.owner_removed_at = &t
+}
+
+// OwnerRemovedAt returns the value of the "owner_removed_at" field in the mutation.
+func (m *VoiceNoteMutation) OwnerRemovedAt() (r time.Time, exists bool) {
+	v := m.owner_removed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerRemovedAt returns the old "owner_removed_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldOwnerRemovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerRemovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerRemovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerRemovedAt: %w", err)
+	}
+	return oldValue.OwnerRemovedAt, nil
+}
+
+// ClearOwnerRemovedAt clears the value of the "owner_removed_at" field.
+func (m *VoiceNoteMutation) ClearOwnerRemovedAt() {
+	m.owner_removed_at = nil
+	m.clearedFields[voicenote.FieldOwnerRemovedAt] = struct{}{}
+}
+
+// OwnerRemovedAtCleared returns if the "owner_removed_at" field was cleared in this mutation.
+func (m *VoiceNoteMutation) OwnerRemovedAtCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldOwnerRemovedAt]
+	return ok
+}
+
+// ResetOwnerRemovedAt resets all changes to the "owner_removed_at" field.
+func (m *VoiceNoteMutation) ResetOwnerRemovedAt() {
+	m.owner_removed_at = nil
+	delete(m.clearedFields, voicenote.FieldOwnerRemovedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *VoiceNoteMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *VoiceNoteMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *VoiceNoteMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *VoiceNoteMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *VoiceNoteMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *VoiceNoteMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the VoiceNoteMutation builder.
+func (m *VoiceNoteMutation) Where(ps ...predicate.VoiceNote) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceNoteMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceNoteMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceNote, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceNoteMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceNoteMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceNote).
+func (m *VoiceNoteMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceNoteMutation) Fields() []string {
+	fields := make([]string, 0, 17)
+	if m.organization_id != nil {
+		fields = append(fields, voicenote.FieldOrganizationID)
+	}
+	if m.owner_user_id != nil {
+		fields = append(fields, voicenote.FieldOwnerUserID)
+	}
+	if m.client_note_id != nil {
+		fields = append(fields, voicenote.FieldClientNoteID)
+	}
+	if m.title != nil {
+		fields = append(fields, voicenote.FieldTitle)
+	}
+	if m.project_id != nil {
+		fields = append(fields, voicenote.FieldProjectID)
+	}
+	if m.recorded_at != nil {
+		fields = append(fields, voicenote.FieldRecordedAt)
+	}
+	if m.recorded_time_zone != nil {
+		fields = append(fields, voicenote.FieldRecordedTimeZone)
+	}
+	if m.received_at != nil {
+		fields = append(fields, voicenote.FieldReceivedAt)
+	}
+	if m.locale != nil {
+		fields = append(fields, voicenote.FieldLocale)
+	}
+	if m.duration_ms != nil {
+		fields = append(fields, voicenote.FieldDurationMs)
+	}
+	if m.audio_upload_consent != nil {
+		fields = append(fields, voicenote.FieldAudioUploadConsent)
+	}
+	if m.revision != nil {
+		fields = append(fields, voicenote.FieldRevision)
+	}
+	if m.current_transcript_revision_id != nil {
+		fields = append(fields, voicenote.FieldCurrentTranscriptRevisionID)
+	}
+	if m.deleted_at != nil {
+		fields = append(fields, voicenote.FieldDeletedAt)
+	}
+	if m.owner_removed_at != nil {
+		fields = append(fields, voicenote.FieldOwnerRemovedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, voicenote.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, voicenote.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceNoteMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voicenote.FieldOrganizationID:
+		return m.OrganizationID()
+	case voicenote.FieldOwnerUserID:
+		return m.OwnerUserID()
+	case voicenote.FieldClientNoteID:
+		return m.ClientNoteID()
+	case voicenote.FieldTitle:
+		return m.Title()
+	case voicenote.FieldProjectID:
+		return m.ProjectID()
+	case voicenote.FieldRecordedAt:
+		return m.RecordedAt()
+	case voicenote.FieldRecordedTimeZone:
+		return m.RecordedTimeZone()
+	case voicenote.FieldReceivedAt:
+		return m.ReceivedAt()
+	case voicenote.FieldLocale:
+		return m.Locale()
+	case voicenote.FieldDurationMs:
+		return m.DurationMs()
+	case voicenote.FieldAudioUploadConsent:
+		return m.AudioUploadConsent()
+	case voicenote.FieldRevision:
+		return m.Revision()
+	case voicenote.FieldCurrentTranscriptRevisionID:
+		return m.CurrentTranscriptRevisionID()
+	case voicenote.FieldDeletedAt:
+		return m.DeletedAt()
+	case voicenote.FieldOwnerRemovedAt:
+		return m.OwnerRemovedAt()
+	case voicenote.FieldCreatedAt:
+		return m.CreatedAt()
+	case voicenote.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceNoteMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voicenote.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case voicenote.FieldOwnerUserID:
+		return m.OldOwnerUserID(ctx)
+	case voicenote.FieldClientNoteID:
+		return m.OldClientNoteID(ctx)
+	case voicenote.FieldTitle:
+		return m.OldTitle(ctx)
+	case voicenote.FieldProjectID:
+		return m.OldProjectID(ctx)
+	case voicenote.FieldRecordedAt:
+		return m.OldRecordedAt(ctx)
+	case voicenote.FieldRecordedTimeZone:
+		return m.OldRecordedTimeZone(ctx)
+	case voicenote.FieldReceivedAt:
+		return m.OldReceivedAt(ctx)
+	case voicenote.FieldLocale:
+		return m.OldLocale(ctx)
+	case voicenote.FieldDurationMs:
+		return m.OldDurationMs(ctx)
+	case voicenote.FieldAudioUploadConsent:
+		return m.OldAudioUploadConsent(ctx)
+	case voicenote.FieldRevision:
+		return m.OldRevision(ctx)
+	case voicenote.FieldCurrentTranscriptRevisionID:
+		return m.OldCurrentTranscriptRevisionID(ctx)
+	case voicenote.FieldDeletedAt:
+		return m.OldDeletedAt(ctx)
+	case voicenote.FieldOwnerRemovedAt:
+		return m.OldOwnerRemovedAt(ctx)
+	case voicenote.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case voicenote.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceNote field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceNoteMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voicenote.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case voicenote.FieldOwnerUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerUserID(v)
+		return nil
+	case voicenote.FieldClientNoteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientNoteID(v)
+		return nil
+	case voicenote.FieldTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTitle(v)
+		return nil
+	case voicenote.FieldProjectID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProjectID(v)
+		return nil
+	case voicenote.FieldRecordedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecordedAt(v)
+		return nil
+	case voicenote.FieldRecordedTimeZone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecordedTimeZone(v)
+		return nil
+	case voicenote.FieldReceivedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceivedAt(v)
+		return nil
+	case voicenote.FieldLocale:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLocale(v)
+		return nil
+	case voicenote.FieldDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDurationMs(v)
+		return nil
+	case voicenote.FieldAudioUploadConsent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAudioUploadConsent(v)
+		return nil
+	case voicenote.FieldRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	case voicenote.FieldCurrentTranscriptRevisionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrentTranscriptRevisionID(v)
+		return nil
+	case voicenote.FieldDeletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletedAt(v)
+		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerRemovedAt(v)
+		return nil
+	case voicenote.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case voicenote.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceNote field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceNoteMutation) AddedFields() []string {
+	var fields []string
+	if m.addduration_ms != nil {
+		fields = append(fields, voicenote.FieldDurationMs)
+	}
+	if m.addrevision != nil {
+		fields = append(fields, voicenote.FieldRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceNoteMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case voicenote.FieldDurationMs:
+		return m.AddedDurationMs()
+	case voicenote.FieldRevision:
+		return m.AddedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceNoteMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case voicenote.FieldDurationMs:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDurationMs(v)
+		return nil
+	case voicenote.FieldRevision:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceNote numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceNoteMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voicenote.FieldProjectID) {
+		fields = append(fields, voicenote.FieldProjectID)
+	}
+	if m.FieldCleared(voicenote.FieldLocale) {
+		fields = append(fields, voicenote.FieldLocale)
+	}
+	if m.FieldCleared(voicenote.FieldDurationMs) {
+		fields = append(fields, voicenote.FieldDurationMs)
+	}
+	if m.FieldCleared(voicenote.FieldCurrentTranscriptRevisionID) {
+		fields = append(fields, voicenote.FieldCurrentTranscriptRevisionID)
+	}
+	if m.FieldCleared(voicenote.FieldDeletedAt) {
+		fields = append(fields, voicenote.FieldDeletedAt)
+	}
+	if m.FieldCleared(voicenote.FieldOwnerRemovedAt) {
+		fields = append(fields, voicenote.FieldOwnerRemovedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceNoteMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceNoteMutation) ClearField(name string) error {
+	switch name {
+	case voicenote.FieldProjectID:
+		m.ClearProjectID()
+		return nil
+	case voicenote.FieldLocale:
+		m.ClearLocale()
+		return nil
+	case voicenote.FieldDurationMs:
+		m.ClearDurationMs()
+		return nil
+	case voicenote.FieldCurrentTranscriptRevisionID:
+		m.ClearCurrentTranscriptRevisionID()
+		return nil
+	case voicenote.FieldDeletedAt:
+		m.ClearDeletedAt()
+		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		m.ClearOwnerRemovedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceNote nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceNoteMutation) ResetField(name string) error {
+	switch name {
+	case voicenote.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case voicenote.FieldOwnerUserID:
+		m.ResetOwnerUserID()
+		return nil
+	case voicenote.FieldClientNoteID:
+		m.ResetClientNoteID()
+		return nil
+	case voicenote.FieldTitle:
+		m.ResetTitle()
+		return nil
+	case voicenote.FieldProjectID:
+		m.ResetProjectID()
+		return nil
+	case voicenote.FieldRecordedAt:
+		m.ResetRecordedAt()
+		return nil
+	case voicenote.FieldRecordedTimeZone:
+		m.ResetRecordedTimeZone()
+		return nil
+	case voicenote.FieldReceivedAt:
+		m.ResetReceivedAt()
+		return nil
+	case voicenote.FieldLocale:
+		m.ResetLocale()
+		return nil
+	case voicenote.FieldDurationMs:
+		m.ResetDurationMs()
+		return nil
+	case voicenote.FieldAudioUploadConsent:
+		m.ResetAudioUploadConsent()
+		return nil
+	case voicenote.FieldRevision:
+		m.ResetRevision()
+		return nil
+	case voicenote.FieldCurrentTranscriptRevisionID:
+		m.ResetCurrentTranscriptRevisionID()
+		return nil
+	case voicenote.FieldDeletedAt:
+		m.ResetDeletedAt()
+		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		m.ResetOwnerRemovedAt()
+		return nil
+	case voicenote.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case voicenote.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceNote field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceNoteMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceNoteMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceNoteMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceNoteMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceNoteMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceNoteMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceNoteMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceNote unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceNoteMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceNote edge %s", name)
+}
+
+// VoiceSettingsMutation represents an operation that mutates the VoiceSettings nodes in the graph.
+type VoiceSettingsMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *string
+	voice_notes        *bool
+	audio_upload       *bool
+	draft_generation   *bool
+	voice_commands     *bool
+	updated_by_user_id *string
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*VoiceSettings, error)
+	predicates         []predicate.VoiceSettings
+}
+
+var _ ent.Mutation = (*VoiceSettingsMutation)(nil)
+
+// voicesettingsOption allows management of the mutation configuration using functional options.
+type voicesettingsOption func(*VoiceSettingsMutation)
+
+// newVoiceSettingsMutation creates new mutation for the VoiceSettings entity.
+func newVoiceSettingsMutation(c config, op Op, opts ...voicesettingsOption) *VoiceSettingsMutation {
+	m := &VoiceSettingsMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceSettings,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceSettingsID sets the ID field of the mutation.
+func withVoiceSettingsID(id string) voicesettingsOption {
+	return func(m *VoiceSettingsMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceSettings
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceSettings, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceSettings.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceSettings sets the old VoiceSettings of the mutation.
+func withVoiceSettings(node *VoiceSettings) voicesettingsOption {
+	return func(m *VoiceSettingsMutation) {
+		m.oldValue = func(context.Context) (*VoiceSettings, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceSettingsMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceSettingsMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceSettings entities.
+func (m *VoiceSettingsMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceSettingsMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceSettingsMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceSettings.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetVoiceNotes sets the "voice_notes" field.
+func (m *VoiceSettingsMutation) SetVoiceNotes(b bool) {
+	m.voice_notes = &b
+}
+
+// VoiceNotes returns the value of the "voice_notes" field in the mutation.
+func (m *VoiceSettingsMutation) VoiceNotes() (r bool, exists bool) {
+	v := m.voice_notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVoiceNotes returns the old "voice_notes" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldVoiceNotes(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVoiceNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVoiceNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVoiceNotes: %w", err)
+	}
+	return oldValue.VoiceNotes, nil
+}
+
+// ResetVoiceNotes resets all changes to the "voice_notes" field.
+func (m *VoiceSettingsMutation) ResetVoiceNotes() {
+	m.voice_notes = nil
+}
+
+// SetAudioUpload sets the "audio_upload" field.
+func (m *VoiceSettingsMutation) SetAudioUpload(b bool) {
+	m.audio_upload = &b
+}
+
+// AudioUpload returns the value of the "audio_upload" field in the mutation.
+func (m *VoiceSettingsMutation) AudioUpload() (r bool, exists bool) {
+	v := m.audio_upload
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAudioUpload returns the old "audio_upload" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldAudioUpload(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAudioUpload is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAudioUpload requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAudioUpload: %w", err)
+	}
+	return oldValue.AudioUpload, nil
+}
+
+// ResetAudioUpload resets all changes to the "audio_upload" field.
+func (m *VoiceSettingsMutation) ResetAudioUpload() {
+	m.audio_upload = nil
+}
+
+// SetDraftGeneration sets the "draft_generation" field.
+func (m *VoiceSettingsMutation) SetDraftGeneration(b bool) {
+	m.draft_generation = &b
+}
+
+// DraftGeneration returns the value of the "draft_generation" field in the mutation.
+func (m *VoiceSettingsMutation) DraftGeneration() (r bool, exists bool) {
+	v := m.draft_generation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDraftGeneration returns the old "draft_generation" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldDraftGeneration(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDraftGeneration is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDraftGeneration requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDraftGeneration: %w", err)
+	}
+	return oldValue.DraftGeneration, nil
+}
+
+// ResetDraftGeneration resets all changes to the "draft_generation" field.
+func (m *VoiceSettingsMutation) ResetDraftGeneration() {
+	m.draft_generation = nil
+}
+
+// SetVoiceCommands sets the "voice_commands" field.
+func (m *VoiceSettingsMutation) SetVoiceCommands(b bool) {
+	m.voice_commands = &b
+}
+
+// VoiceCommands returns the value of the "voice_commands" field in the mutation.
+func (m *VoiceSettingsMutation) VoiceCommands() (r bool, exists bool) {
+	v := m.voice_commands
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVoiceCommands returns the old "voice_commands" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldVoiceCommands(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVoiceCommands is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVoiceCommands requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVoiceCommands: %w", err)
+	}
+	return oldValue.VoiceCommands, nil
+}
+
+// ResetVoiceCommands resets all changes to the "voice_commands" field.
+func (m *VoiceSettingsMutation) ResetVoiceCommands() {
+	m.voice_commands = nil
+}
+
+// SetUpdatedByUserID sets the "updated_by_user_id" field.
+func (m *VoiceSettingsMutation) SetUpdatedByUserID(s string) {
+	m.updated_by_user_id = &s
+}
+
+// UpdatedByUserID returns the value of the "updated_by_user_id" field in the mutation.
+func (m *VoiceSettingsMutation) UpdatedByUserID() (r string, exists bool) {
+	v := m.updated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedByUserID returns the old "updated_by_user_id" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldUpdatedByUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedByUserID: %w", err)
+	}
+	return oldValue.UpdatedByUserID, nil
+}
+
+// ClearUpdatedByUserID clears the value of the "updated_by_user_id" field.
+func (m *VoiceSettingsMutation) ClearUpdatedByUserID() {
+	m.updated_by_user_id = nil
+	m.clearedFields[voicesettings.FieldUpdatedByUserID] = struct{}{}
+}
+
+// UpdatedByUserIDCleared returns if the "updated_by_user_id" field was cleared in this mutation.
+func (m *VoiceSettingsMutation) UpdatedByUserIDCleared() bool {
+	_, ok := m.clearedFields[voicesettings.FieldUpdatedByUserID]
+	return ok
+}
+
+// ResetUpdatedByUserID resets all changes to the "updated_by_user_id" field.
+func (m *VoiceSettingsMutation) ResetUpdatedByUserID() {
+	m.updated_by_user_id = nil
+	delete(m.clearedFields, voicesettings.FieldUpdatedByUserID)
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *VoiceSettingsMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *VoiceSettingsMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the VoiceSettings entity.
+// If the VoiceSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceSettingsMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *VoiceSettingsMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the VoiceSettingsMutation builder.
+func (m *VoiceSettingsMutation) Where(ps ...predicate.VoiceSettings) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceSettingsMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceSettingsMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceSettings, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceSettingsMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceSettingsMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceSettings).
+func (m *VoiceSettingsMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceSettingsMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.voice_notes != nil {
+		fields = append(fields, voicesettings.FieldVoiceNotes)
+	}
+	if m.audio_upload != nil {
+		fields = append(fields, voicesettings.FieldAudioUpload)
+	}
+	if m.draft_generation != nil {
+		fields = append(fields, voicesettings.FieldDraftGeneration)
+	}
+	if m.voice_commands != nil {
+		fields = append(fields, voicesettings.FieldVoiceCommands)
+	}
+	if m.updated_by_user_id != nil {
+		fields = append(fields, voicesettings.FieldUpdatedByUserID)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, voicesettings.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceSettingsMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voicesettings.FieldVoiceNotes:
+		return m.VoiceNotes()
+	case voicesettings.FieldAudioUpload:
+		return m.AudioUpload()
+	case voicesettings.FieldDraftGeneration:
+		return m.DraftGeneration()
+	case voicesettings.FieldVoiceCommands:
+		return m.VoiceCommands()
+	case voicesettings.FieldUpdatedByUserID:
+		return m.UpdatedByUserID()
+	case voicesettings.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceSettingsMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voicesettings.FieldVoiceNotes:
+		return m.OldVoiceNotes(ctx)
+	case voicesettings.FieldAudioUpload:
+		return m.OldAudioUpload(ctx)
+	case voicesettings.FieldDraftGeneration:
+		return m.OldDraftGeneration(ctx)
+	case voicesettings.FieldVoiceCommands:
+		return m.OldVoiceCommands(ctx)
+	case voicesettings.FieldUpdatedByUserID:
+		return m.OldUpdatedByUserID(ctx)
+	case voicesettings.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceSettings field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceSettingsMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voicesettings.FieldVoiceNotes:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVoiceNotes(v)
+		return nil
+	case voicesettings.FieldAudioUpload:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAudioUpload(v)
+		return nil
+	case voicesettings.FieldDraftGeneration:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDraftGeneration(v)
+		return nil
+	case voicesettings.FieldVoiceCommands:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVoiceCommands(v)
+		return nil
+	case voicesettings.FieldUpdatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedByUserID(v)
+		return nil
+	case voicesettings.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceSettings field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceSettingsMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceSettingsMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceSettingsMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown VoiceSettings numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceSettingsMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voicesettings.FieldUpdatedByUserID) {
+		fields = append(fields, voicesettings.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceSettingsMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceSettingsMutation) ClearField(name string) error {
+	switch name {
+	case voicesettings.FieldUpdatedByUserID:
+		m.ClearUpdatedByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceSettings nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceSettingsMutation) ResetField(name string) error {
+	switch name {
+	case voicesettings.FieldVoiceNotes:
+		m.ResetVoiceNotes()
+		return nil
+	case voicesettings.FieldAudioUpload:
+		m.ResetAudioUpload()
+		return nil
+	case voicesettings.FieldDraftGeneration:
+		m.ResetDraftGeneration()
+		return nil
+	case voicesettings.FieldVoiceCommands:
+		m.ResetVoiceCommands()
+		return nil
+	case voicesettings.FieldUpdatedByUserID:
+		m.ResetUpdatedByUserID()
+		return nil
+	case voicesettings.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceSettings field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceSettingsMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceSettingsMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceSettingsMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceSettingsMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceSettingsMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceSettingsMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceSettingsMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceSettings unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceSettingsMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceSettings edge %s", name)
+}
+
+// VoiceTranscriptRevisionMutation represents an operation that mutates the VoiceTranscriptRevision nodes in the graph.
+type VoiceTranscriptRevisionMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *string
+	organization_id    *string
+	note_id            *string
+	client_revision_id *string
+	parent_id          *string
+	origin             *voicetranscriptrevision.Origin
+	locale             *string
+	engine             *string
+	text               *string
+	segments           *[]schema.VoiceSegment
+	appendsegments     []schema.VoiceSegment
+	redacted_at        *time.Time
+	created_by_user_id *string
+	created_at         *time.Time
+	clearedFields      map[string]struct{}
+	done               bool
+	oldValue           func(context.Context) (*VoiceTranscriptRevision, error)
+	predicates         []predicate.VoiceTranscriptRevision
+}
+
+var _ ent.Mutation = (*VoiceTranscriptRevisionMutation)(nil)
+
+// voicetranscriptrevisionOption allows management of the mutation configuration using functional options.
+type voicetranscriptrevisionOption func(*VoiceTranscriptRevisionMutation)
+
+// newVoiceTranscriptRevisionMutation creates new mutation for the VoiceTranscriptRevision entity.
+func newVoiceTranscriptRevisionMutation(c config, op Op, opts ...voicetranscriptrevisionOption) *VoiceTranscriptRevisionMutation {
+	m := &VoiceTranscriptRevisionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeVoiceTranscriptRevision,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withVoiceTranscriptRevisionID sets the ID field of the mutation.
+func withVoiceTranscriptRevisionID(id string) voicetranscriptrevisionOption {
+	return func(m *VoiceTranscriptRevisionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *VoiceTranscriptRevision
+		)
+		m.oldValue = func(ctx context.Context) (*VoiceTranscriptRevision, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().VoiceTranscriptRevision.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withVoiceTranscriptRevision sets the old VoiceTranscriptRevision of the mutation.
+func withVoiceTranscriptRevision(node *VoiceTranscriptRevision) voicetranscriptrevisionOption {
+	return func(m *VoiceTranscriptRevisionMutation) {
+		m.oldValue = func(context.Context) (*VoiceTranscriptRevision, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m VoiceTranscriptRevisionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m VoiceTranscriptRevisionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of VoiceTranscriptRevision entities.
+func (m *VoiceTranscriptRevisionMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *VoiceTranscriptRevisionMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *VoiceTranscriptRevisionMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().VoiceTranscriptRevision.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *VoiceTranscriptRevisionMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *VoiceTranscriptRevisionMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetNoteID sets the "note_id" field.
+func (m *VoiceTranscriptRevisionMutation) SetNoteID(s string) {
+	m.note_id = &s
+}
+
+// NoteID returns the value of the "note_id" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) NoteID() (r string, exists bool) {
+	v := m.note_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNoteID returns the old "note_id" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldNoteID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNoteID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNoteID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNoteID: %w", err)
+	}
+	return oldValue.NoteID, nil
+}
+
+// ResetNoteID resets all changes to the "note_id" field.
+func (m *VoiceTranscriptRevisionMutation) ResetNoteID() {
+	m.note_id = nil
+}
+
+// SetClientRevisionID sets the "client_revision_id" field.
+func (m *VoiceTranscriptRevisionMutation) SetClientRevisionID(s string) {
+	m.client_revision_id = &s
+}
+
+// ClientRevisionID returns the value of the "client_revision_id" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) ClientRevisionID() (r string, exists bool) {
+	v := m.client_revision_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientRevisionID returns the old "client_revision_id" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldClientRevisionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientRevisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientRevisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientRevisionID: %w", err)
+	}
+	return oldValue.ClientRevisionID, nil
+}
+
+// ResetClientRevisionID resets all changes to the "client_revision_id" field.
+func (m *VoiceTranscriptRevisionMutation) ResetClientRevisionID() {
+	m.client_revision_id = nil
+}
+
+// SetParentID sets the "parent_id" field.
+func (m *VoiceTranscriptRevisionMutation) SetParentID(s string) {
+	m.parent_id = &s
+}
+
+// ParentID returns the value of the "parent_id" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) ParentID() (r string, exists bool) {
+	v := m.parent_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParentID returns the old "parent_id" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldParentID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParentID: %w", err)
+	}
+	return oldValue.ParentID, nil
+}
+
+// ClearParentID clears the value of the "parent_id" field.
+func (m *VoiceTranscriptRevisionMutation) ClearParentID() {
+	m.parent_id = nil
+	m.clearedFields[voicetranscriptrevision.FieldParentID] = struct{}{}
+}
+
+// ParentIDCleared returns if the "parent_id" field was cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) ParentIDCleared() bool {
+	_, ok := m.clearedFields[voicetranscriptrevision.FieldParentID]
+	return ok
+}
+
+// ResetParentID resets all changes to the "parent_id" field.
+func (m *VoiceTranscriptRevisionMutation) ResetParentID() {
+	m.parent_id = nil
+	delete(m.clearedFields, voicetranscriptrevision.FieldParentID)
+}
+
+// SetOrigin sets the "origin" field.
+func (m *VoiceTranscriptRevisionMutation) SetOrigin(v voicetranscriptrevision.Origin) {
+	m.origin = &v
+}
+
+// Origin returns the value of the "origin" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) Origin() (r voicetranscriptrevision.Origin, exists bool) {
+	v := m.origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrigin returns the old "origin" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldOrigin(ctx context.Context) (v voicetranscriptrevision.Origin, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrigin: %w", err)
+	}
+	return oldValue.Origin, nil
+}
+
+// ResetOrigin resets all changes to the "origin" field.
+func (m *VoiceTranscriptRevisionMutation) ResetOrigin() {
+	m.origin = nil
+}
+
+// SetLocale sets the "locale" field.
+func (m *VoiceTranscriptRevisionMutation) SetLocale(s string) {
+	m.locale = &s
+}
+
+// Locale returns the value of the "locale" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) Locale() (r string, exists bool) {
+	v := m.locale
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLocale returns the old "locale" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldLocale(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLocale is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLocale requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLocale: %w", err)
+	}
+	return oldValue.Locale, nil
+}
+
+// ClearLocale clears the value of the "locale" field.
+func (m *VoiceTranscriptRevisionMutation) ClearLocale() {
+	m.locale = nil
+	m.clearedFields[voicetranscriptrevision.FieldLocale] = struct{}{}
+}
+
+// LocaleCleared returns if the "locale" field was cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) LocaleCleared() bool {
+	_, ok := m.clearedFields[voicetranscriptrevision.FieldLocale]
+	return ok
+}
+
+// ResetLocale resets all changes to the "locale" field.
+func (m *VoiceTranscriptRevisionMutation) ResetLocale() {
+	m.locale = nil
+	delete(m.clearedFields, voicetranscriptrevision.FieldLocale)
+}
+
+// SetEngine sets the "engine" field.
+func (m *VoiceTranscriptRevisionMutation) SetEngine(s string) {
+	m.engine = &s
+}
+
+// Engine returns the value of the "engine" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) Engine() (r string, exists bool) {
+	v := m.engine
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEngine returns the old "engine" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldEngine(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEngine is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEngine requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEngine: %w", err)
+	}
+	return oldValue.Engine, nil
+}
+
+// ClearEngine clears the value of the "engine" field.
+func (m *VoiceTranscriptRevisionMutation) ClearEngine() {
+	m.engine = nil
+	m.clearedFields[voicetranscriptrevision.FieldEngine] = struct{}{}
+}
+
+// EngineCleared returns if the "engine" field was cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) EngineCleared() bool {
+	_, ok := m.clearedFields[voicetranscriptrevision.FieldEngine]
+	return ok
+}
+
+// ResetEngine resets all changes to the "engine" field.
+func (m *VoiceTranscriptRevisionMutation) ResetEngine() {
+	m.engine = nil
+	delete(m.clearedFields, voicetranscriptrevision.FieldEngine)
+}
+
+// SetText sets the "text" field.
+func (m *VoiceTranscriptRevisionMutation) SetText(s string) {
+	m.text = &s
+}
+
+// Text returns the value of the "text" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) Text() (r string, exists bool) {
+	v := m.text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldText returns the old "text" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldText(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldText: %w", err)
+	}
+	return oldValue.Text, nil
+}
+
+// ResetText resets all changes to the "text" field.
+func (m *VoiceTranscriptRevisionMutation) ResetText() {
+	m.text = nil
+}
+
+// SetSegments sets the "segments" field.
+func (m *VoiceTranscriptRevisionMutation) SetSegments(ss []schema.VoiceSegment) {
+	m.segments = &ss
+	m.appendsegments = nil
+}
+
+// Segments returns the value of the "segments" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) Segments() (r []schema.VoiceSegment, exists bool) {
+	v := m.segments
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSegments returns the old "segments" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldSegments(ctx context.Context) (v []schema.VoiceSegment, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSegments is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSegments requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSegments: %w", err)
+	}
+	return oldValue.Segments, nil
+}
+
+// AppendSegments adds ss to the "segments" field.
+func (m *VoiceTranscriptRevisionMutation) AppendSegments(ss []schema.VoiceSegment) {
+	m.appendsegments = append(m.appendsegments, ss...)
+}
+
+// AppendedSegments returns the list of values that were appended to the "segments" field in this mutation.
+func (m *VoiceTranscriptRevisionMutation) AppendedSegments() ([]schema.VoiceSegment, bool) {
+	if len(m.appendsegments) == 0 {
+		return nil, false
+	}
+	return m.appendsegments, true
+}
+
+// ResetSegments resets all changes to the "segments" field.
+func (m *VoiceTranscriptRevisionMutation) ResetSegments() {
+	m.segments = nil
+	m.appendsegments = nil
+}
+
+// SetRedactedAt sets the "redacted_at" field.
+func (m *VoiceTranscriptRevisionMutation) SetRedactedAt(t time.Time) {
+	m.redacted_at = &t
+}
+
+// RedactedAt returns the value of the "redacted_at" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) RedactedAt() (r time.Time, exists bool) {
+	v := m.redacted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRedactedAt returns the old "redacted_at" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldRedactedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRedactedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRedactedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRedactedAt: %w", err)
+	}
+	return oldValue.RedactedAt, nil
+}
+
+// ClearRedactedAt clears the value of the "redacted_at" field.
+func (m *VoiceTranscriptRevisionMutation) ClearRedactedAt() {
+	m.redacted_at = nil
+	m.clearedFields[voicetranscriptrevision.FieldRedactedAt] = struct{}{}
+}
+
+// RedactedAtCleared returns if the "redacted_at" field was cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) RedactedAtCleared() bool {
+	_, ok := m.clearedFields[voicetranscriptrevision.FieldRedactedAt]
+	return ok
+}
+
+// ResetRedactedAt resets all changes to the "redacted_at" field.
+func (m *VoiceTranscriptRevisionMutation) ResetRedactedAt() {
+	m.redacted_at = nil
+	delete(m.clearedFields, voicetranscriptrevision.FieldRedactedAt)
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *VoiceTranscriptRevisionMutation) SetCreatedByUserID(s string) {
+	m.created_by_user_id = &s
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) CreatedByUserID() (r string, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldCreatedByUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *VoiceTranscriptRevisionMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *VoiceTranscriptRevisionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *VoiceTranscriptRevisionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the VoiceTranscriptRevision entity.
+// If the VoiceTranscriptRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceTranscriptRevisionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *VoiceTranscriptRevisionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the VoiceTranscriptRevisionMutation builder.
+func (m *VoiceTranscriptRevisionMutation) Where(ps ...predicate.VoiceTranscriptRevision) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the VoiceTranscriptRevisionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *VoiceTranscriptRevisionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.VoiceTranscriptRevision, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *VoiceTranscriptRevisionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *VoiceTranscriptRevisionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (VoiceTranscriptRevision).
+func (m *VoiceTranscriptRevisionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *VoiceTranscriptRevisionMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.organization_id != nil {
+		fields = append(fields, voicetranscriptrevision.FieldOrganizationID)
+	}
+	if m.note_id != nil {
+		fields = append(fields, voicetranscriptrevision.FieldNoteID)
+	}
+	if m.client_revision_id != nil {
+		fields = append(fields, voicetranscriptrevision.FieldClientRevisionID)
+	}
+	if m.parent_id != nil {
+		fields = append(fields, voicetranscriptrevision.FieldParentID)
+	}
+	if m.origin != nil {
+		fields = append(fields, voicetranscriptrevision.FieldOrigin)
+	}
+	if m.locale != nil {
+		fields = append(fields, voicetranscriptrevision.FieldLocale)
+	}
+	if m.engine != nil {
+		fields = append(fields, voicetranscriptrevision.FieldEngine)
+	}
+	if m.text != nil {
+		fields = append(fields, voicetranscriptrevision.FieldText)
+	}
+	if m.segments != nil {
+		fields = append(fields, voicetranscriptrevision.FieldSegments)
+	}
+	if m.redacted_at != nil {
+		fields = append(fields, voicetranscriptrevision.FieldRedactedAt)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, voicetranscriptrevision.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, voicetranscriptrevision.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *VoiceTranscriptRevisionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case voicetranscriptrevision.FieldOrganizationID:
+		return m.OrganizationID()
+	case voicetranscriptrevision.FieldNoteID:
+		return m.NoteID()
+	case voicetranscriptrevision.FieldClientRevisionID:
+		return m.ClientRevisionID()
+	case voicetranscriptrevision.FieldParentID:
+		return m.ParentID()
+	case voicetranscriptrevision.FieldOrigin:
+		return m.Origin()
+	case voicetranscriptrevision.FieldLocale:
+		return m.Locale()
+	case voicetranscriptrevision.FieldEngine:
+		return m.Engine()
+	case voicetranscriptrevision.FieldText:
+		return m.Text()
+	case voicetranscriptrevision.FieldSegments:
+		return m.Segments()
+	case voicetranscriptrevision.FieldRedactedAt:
+		return m.RedactedAt()
+	case voicetranscriptrevision.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case voicetranscriptrevision.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *VoiceTranscriptRevisionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case voicetranscriptrevision.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case voicetranscriptrevision.FieldNoteID:
+		return m.OldNoteID(ctx)
+	case voicetranscriptrevision.FieldClientRevisionID:
+		return m.OldClientRevisionID(ctx)
+	case voicetranscriptrevision.FieldParentID:
+		return m.OldParentID(ctx)
+	case voicetranscriptrevision.FieldOrigin:
+		return m.OldOrigin(ctx)
+	case voicetranscriptrevision.FieldLocale:
+		return m.OldLocale(ctx)
+	case voicetranscriptrevision.FieldEngine:
+		return m.OldEngine(ctx)
+	case voicetranscriptrevision.FieldText:
+		return m.OldText(ctx)
+	case voicetranscriptrevision.FieldSegments:
+		return m.OldSegments(ctx)
+	case voicetranscriptrevision.FieldRedactedAt:
+		return m.OldRedactedAt(ctx)
+	case voicetranscriptrevision.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case voicetranscriptrevision.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown VoiceTranscriptRevision field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceTranscriptRevisionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case voicetranscriptrevision.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case voicetranscriptrevision.FieldNoteID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNoteID(v)
+		return nil
+	case voicetranscriptrevision.FieldClientRevisionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientRevisionID(v)
+		return nil
+	case voicetranscriptrevision.FieldParentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParentID(v)
+		return nil
+	case voicetranscriptrevision.FieldOrigin:
+		v, ok := value.(voicetranscriptrevision.Origin)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrigin(v)
+		return nil
+	case voicetranscriptrevision.FieldLocale:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLocale(v)
+		return nil
+	case voicetranscriptrevision.FieldEngine:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEngine(v)
+		return nil
+	case voicetranscriptrevision.FieldText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetText(v)
+		return nil
+	case voicetranscriptrevision.FieldSegments:
+		v, ok := value.([]schema.VoiceSegment)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSegments(v)
+		return nil
+	case voicetranscriptrevision.FieldRedactedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRedactedAt(v)
+		return nil
+	case voicetranscriptrevision.FieldCreatedByUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case voicetranscriptrevision.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceTranscriptRevision field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *VoiceTranscriptRevisionMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *VoiceTranscriptRevisionMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *VoiceTranscriptRevisionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown VoiceTranscriptRevision numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *VoiceTranscriptRevisionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(voicetranscriptrevision.FieldParentID) {
+		fields = append(fields, voicetranscriptrevision.FieldParentID)
+	}
+	if m.FieldCleared(voicetranscriptrevision.FieldLocale) {
+		fields = append(fields, voicetranscriptrevision.FieldLocale)
+	}
+	if m.FieldCleared(voicetranscriptrevision.FieldEngine) {
+		fields = append(fields, voicetranscriptrevision.FieldEngine)
+	}
+	if m.FieldCleared(voicetranscriptrevision.FieldRedactedAt) {
+		fields = append(fields, voicetranscriptrevision.FieldRedactedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *VoiceTranscriptRevisionMutation) ClearField(name string) error {
+	switch name {
+	case voicetranscriptrevision.FieldParentID:
+		m.ClearParentID()
+		return nil
+	case voicetranscriptrevision.FieldLocale:
+		m.ClearLocale()
+		return nil
+	case voicetranscriptrevision.FieldEngine:
+		m.ClearEngine()
+		return nil
+	case voicetranscriptrevision.FieldRedactedAt:
+		m.ClearRedactedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceTranscriptRevision nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *VoiceTranscriptRevisionMutation) ResetField(name string) error {
+	switch name {
+	case voicetranscriptrevision.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case voicetranscriptrevision.FieldNoteID:
+		m.ResetNoteID()
+		return nil
+	case voicetranscriptrevision.FieldClientRevisionID:
+		m.ResetClientRevisionID()
+		return nil
+	case voicetranscriptrevision.FieldParentID:
+		m.ResetParentID()
+		return nil
+	case voicetranscriptrevision.FieldOrigin:
+		m.ResetOrigin()
+		return nil
+	case voicetranscriptrevision.FieldLocale:
+		m.ResetLocale()
+		return nil
+	case voicetranscriptrevision.FieldEngine:
+		m.ResetEngine()
+		return nil
+	case voicetranscriptrevision.FieldText:
+		m.ResetText()
+		return nil
+	case voicetranscriptrevision.FieldSegments:
+		m.ResetSegments()
+		return nil
+	case voicetranscriptrevision.FieldRedactedAt:
+		m.ResetRedactedAt()
+		return nil
+	case voicetranscriptrevision.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case voicetranscriptrevision.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown VoiceTranscriptRevision field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *VoiceTranscriptRevisionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *VoiceTranscriptRevisionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *VoiceTranscriptRevisionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *VoiceTranscriptRevisionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *VoiceTranscriptRevisionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *VoiceTranscriptRevisionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown VoiceTranscriptRevision unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *VoiceTranscriptRevisionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown VoiceTranscriptRevision edge %s", name)
 }
 
 // WebhookDeliveryMutation represents an operation that mutates the WebhookDelivery nodes in the graph.

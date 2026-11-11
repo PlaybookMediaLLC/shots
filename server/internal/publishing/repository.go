@@ -2,8 +2,11 @@ package publishing
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -24,6 +27,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialtenantbinding"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceplan"
 	"github.com/lucsky/cuid"
 )
@@ -128,7 +132,7 @@ func (r *Repository) CreateScheduledPost(ctx context.Context, actor Actor, input
 		scheduledpost.IdempotencyKey(input.IdempotencyKey),
 	).Only(ctx)
 	if err == nil {
-		return CreateScheduledPostResult{Created: false, Post: existing}, nil
+		return replayScheduledPost(existing, input)
 	}
 	if !ent.IsNotFound(err) {
 		return CreateScheduledPostResult{}, err
@@ -184,6 +188,7 @@ func (r *Repository) CreateScheduledPost(ctx context.Context, actor Actor, input
 		SetStatus(scheduledpost.StatusSCHEDULED).
 		SetCaption(input.Caption).
 		SetIdempotencyKey(input.IdempotencyKey).
+		SetNillableScheduledByUserID(input.ScheduledBy).
 		Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
@@ -192,7 +197,7 @@ func (r *Repository) CreateScheduledPost(ctx context.Context, actor Actor, input
 				scheduledpost.IdempotencyKey(input.IdempotencyKey),
 			).Only(ctx)
 			if findErr == nil {
-				return CreateScheduledPostResult{Created: false, Post: existing}, nil
+				return replayScheduledPost(existing, input)
 			}
 			return CreateScheduledPostResult{}, ErrConflict
 		}
@@ -210,6 +215,48 @@ func (r *Repository) CreateScheduledPost(ctx context.Context, actor Actor, input
 	return CreateScheduledPostResult{Created: true, Post: post.Unwrap()}, nil
 }
 
+// replayScheduledPost returns the post a key first scheduled. A caller's key
+// names its request, so a retry gets the first post even when it recomputed
+// the time or edited the caption (it never posts twice).
+func replayScheduledPost(post *ent.ScheduledPost, input CreateScheduledPostInput) (CreateScheduledPostResult, error) {
+	// A content key names a request, not a post: once that post was cancelled
+	// or failed, answering with it would queue nothing. The caller sends a key.
+	settled := post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusFAILED
+	if settled && strings.HasPrefix(input.IdempotencyKey, "content:") {
+		return CreateScheduledPostResult{}, ErrConflict
+	}
+	return CreateScheduledPostResult{Created: false, Post: post}, nil
+}
+
+// platformOf is a loaded post's platform, or empty when its connection is gone.
+func platformOf(post *ent.ScheduledPost) string {
+	if post.Edges.ChannelConnection == nil {
+		return ""
+	}
+	return post.Edges.ChannelConnection.Platform
+}
+
+const maxMessageLen = 500
+
+// RedactProviderMessage keeps a provider's failure message for support while
+// dropping what must not be stored (telemetry.Scrub: signed URLs, tokens,
+// credentials), bounded in size. It is never shown raw to members.
+func RedactProviderMessage(message string) string {
+	message = strings.Join(strings.Fields(telemetry.Scrub(message)), " ")
+	if runes := []rune(message); len(runes) > maxMessageLen {
+		message = string(runes[:maxMessageLen]) + "…"
+	}
+	return message
+}
+
+// ContentIdempotencyKey names a schedule request by its content, so a retry
+// sent without an Idempotency-Key replays instead of posting twice.
+func ContentIdempotencyKey(input CreateScheduledPostInput) string {
+	sum := sha256.Sum256([]byte(strings.Join([]string{input.VariantID, input.ContentDraftID, input.ChannelConnectionID,
+		strings.TrimSpace(input.Caption), input.ScheduledFor.UTC().Truncate(time.Millisecond).Format(time.RFC3339Nano)}, "\x00")))
+	return "content:" + hex.EncodeToString(sum[:])
+}
+
 func nonEmpty(value string) *string {
 	if value == "" {
 		return nil
@@ -218,8 +265,8 @@ func nonEmpty(value string) *string {
 }
 
 // isEligible checks the destination is active and, for a variant post, that
-// the variant is approved. A content draft needs no approval (RFC 013): the
-// person scheduling it holds publish:manage.
+// the variant is approved. A content draft's approval is the product layer's:
+// where a workspace requires one, drafts schedule only through its check.
 func (r *Repository) isEligible(ctx context.Context, organizationID, variantID, connectionID string) (bool, error) {
 	connectionExists, err := r.client.ChannelConnection.Query().Where(
 		channelconnection.ID(connectionID),
@@ -641,7 +688,7 @@ func (r *Repository) StartAttempt(ctx context.Context, post *ent.ScheduledPost, 
 
 // FailUnknown records that the provider may have published the post. It
 // closes the post's open attempt, whose number may follow an earlier run's.
-func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ int) error {
+func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ int, providerMessage string) error {
 	tx, err := r.client.Tx(ctx)
 	if err != nil {
 		return err
@@ -671,7 +718,8 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	updatedAttempts, err := tx.PublicationAttempt.Update().Where(
 		publicationattempt.ScheduledPostID(postID),
 		publicationattempt.CompletedAtIsNil(),
-	).SetCompletedAt(time.Now().UTC()).SetOutcome(publicationattempt.OutcomeFAILED).SetFailureCode("UNKNOWN_DELIVERY").Save(ctx)
+	).SetCompletedAt(time.Now().UTC()).SetOutcome(publicationattempt.OutcomeFAILED).SetFailureCode("UNKNOWN_DELIVERY").
+		SetNillableProviderMessage(nonEmpty(RedactProviderMessage(providerMessage))).Save(ctx)
 	if err != nil || updatedAttempts != 1 {
 		if err == nil {
 			err = ErrInvalidState
@@ -723,8 +771,17 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		}
 		return ErrInvalidState
 	}
+	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).
+		Select(scheduledpost.FieldID, scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
+		WithChannelConnection(func(q *ent.ChannelConnectionQuery) {
+			q.Select(channelconnection.FieldID, channelconnection.FieldPlatform)
+		}).Only(ctx)
+	if err != nil {
+		return err
+	}
 	if _, err = tx.PublicationAttempt.UpdateOneID(attempt.ID).
-		SetCompletedAt(time.Now()).SetOutcome(publicationattempt.OutcomeSUCCEEDED).SetProviderPostID(providerPostID).Save(ctx); err != nil {
+		SetCompletedAt(time.Now()).SetOutcome(publicationattempt.OutcomeSUCCEEDED).SetProviderPostID(providerPostID).
+		SetNillableRemoteURL(postoptions.PostURL(platformOf(live), &providerPostID, live.ThreadProgress)).Save(ctx); err != nil {
 		return err
 	}
 	if err := recordPostActivity(ctx, tx, "post.published", auditInput{
@@ -787,7 +844,8 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 		return ErrInvalidState
 	}
 	if _, err = tx.PublicationAttempt.UpdateOneID(attempt.ID).
-		SetCompletedAt(time.Now()).SetOutcome(publicationattempt.OutcomeFAILED).SetFailureCode(failureCode).Save(ctx); err != nil {
+		SetCompletedAt(time.Now()).SetOutcome(publicationattempt.OutcomeFAILED).SetFailureCode(failureCode).
+		SetNillableProviderMessage(nonEmpty(RedactProviderMessage(attempt.ProviderMessage))).Save(ctx); err != nil {
 		return err
 	}
 	if err := recordPostActivity(ctx, tx, "post.publish_failed", auditInput{

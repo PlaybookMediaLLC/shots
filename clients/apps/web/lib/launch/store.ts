@@ -5,6 +5,7 @@ import type {
   BackendLaunchRevision,
   BackendLaunchSpec,
   BrandProfile,
+  WritingContext,
 } from 'screenshot-studio-backend-sdk'
 import { type AuditMetadata, sanitizeAuditMetadata } from '@/lib/audit/metadata'
 import type { TenantContext } from '@/lib/auth/access'
@@ -77,19 +78,33 @@ export function releaseSourceUrls(campaign: LaunchCampaign): string[] {
 
 export type ActiveBrand = {
   kit: BrandKitValues | null
+  /** The active kit's id, for handing a screenshot to the editor on brand. */
+  kitId: string | null
   /** When the kit last changed; visuals made before it are off-brand. */
   kitUpdatedAt: Date | null
   profile: BrandProfile | null
+  /** The workspace voice: the brand's WritingContext, for copy no social set owns. */
+  voice: WritingContext | null
 }
 
 /** The newest active brand kit and the workspace's brand voice. */
 export async function getActiveBrand(tenant: TenantContext): Promise<ActiveBrand> {
-  const { kit, profile } = await backendSDK(tenant).getLaunchBrand()
+  const { kit, profile, voice } = await backendSDK(tenant).getLaunchBrand()
   return {
     kit: kit ? parseBrandKit(kit.name, kit.definition) : null,
+    kitId: kit?.id ?? null,
     kitUpdatedAt: kit ? new Date(kit.updatedAt) : null,
     profile,
+    voice: voice ?? null,
   }
+}
+
+/**
+ * The workspace voice for a surface that writes public copy outside a draft or
+ * set; null when the workspace has no brand profile. Any member may read it.
+ */
+export async function getWorkspaceVoice(tenant: TenantContext): Promise<WritingContext | null> {
+  return (await backendSDK(tenant).getLaunchBrand()).voice ?? null
 }
 
 // --------------------------------------------------------------- specs --

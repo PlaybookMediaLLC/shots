@@ -80,8 +80,14 @@ const (
 	FieldPlanTimeZone = "planTimeZone"
 	// FieldSourceDraftID holds the string denoting the source_draft_id field in the database.
 	FieldSourceDraftID = "sourceDraftId"
+	// FieldSourceVoiceRevisionID holds the string denoting the source_voice_revision_id field in the database.
+	FieldSourceVoiceRevisionID = "sourceVoiceRevisionId"
 	// FieldCampaignID holds the string denoting the campaign_id field in the database.
 	FieldCampaignID = "campaignId"
+	// FieldReleaseID holds the string denoting the release_id field in the database.
+	FieldReleaseID = "releaseId"
+	// FieldCampaignPostID holds the string denoting the campaign_post_id field in the database.
+	FieldCampaignPostID = "campaignPostId"
 	// FieldCollabGeneration holds the string denoting the collab_generation field in the database.
 	FieldCollabGeneration = "collabGeneration"
 	// FieldCollabState holds the string denoting the collab_state field in the database.
@@ -133,7 +139,10 @@ var Columns = []string{
 	FieldPinnedAt,
 	FieldPlanTimeZone,
 	FieldSourceDraftID,
+	FieldSourceVoiceRevisionID,
 	FieldCampaignID,
+	FieldReleaseID,
+	FieldCampaignPostID,
 	FieldCollabGeneration,
 	FieldCollabState,
 	FieldCreatedByUserID,
@@ -384,9 +393,24 @@ func BySourceDraftID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceDraftID, opts...).ToFunc()
 }
 
+// BySourceVoiceRevisionID orders the results by the source_voice_revision_id field.
+func BySourceVoiceRevisionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceVoiceRevisionID, opts...).ToFunc()
+}
+
 // ByCampaignID orders the results by the campaign_id field.
 func ByCampaignID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCampaignID, opts...).ToFunc()
+}
+
+// ByReleaseID orders the results by the release_id field.
+func ByReleaseID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReleaseID, opts...).ToFunc()
+}
+
+// ByCampaignPostID orders the results by the campaign_post_id field.
+func ByCampaignPostID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCampaignPostID, opts...).ToFunc()
 }
 
 // ByCollabGeneration orders the results by the collab_generation field.
