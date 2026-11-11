@@ -1,7 +1,10 @@
 import { FAMILY_NAMES } from './workflow-canvas'
 import type { WorkflowTemplate } from '@/lib/workflows/templates'
 
-/** What sets a template apart, in words: what starts it, its rule, and what you get. */
+/**
+ * What sets a template apart, in words: what starts it, its rule, and what you get.
+ * Inside a grid that gives it three rows, its rows line up with its neighbors'.
+ */
 export function WorkflowTemplatePreview({ template }: { template: WorkflowTemplate }) {
   const steps = [
     ['When', FAMILY_NAMES[template.family]],
@@ -9,7 +12,7 @@ export function WorkflowTemplatePreview({ template }: { template: WorkflowTempla
     ['You get', template.result],
   ]
   return (
-    <dl className="grid w-full gap-2 text-left text-sm">
+    <dl className="row-span-3 grid w-full grid-rows-subgrid gap-2 text-left text-sm">
       {steps.map(([label, text]) => (
         <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2" key={label}>
           <dt className="text-muted-foreground">{label}</dt>
@@ -20,10 +23,13 @@ export function WorkflowTemplatePreview({ template }: { template: WorkflowTempla
   )
 }
 
-/** A made-up draft in the shape a run produces: its channel, its words, and who decides. */
+/**
+ * A made-up draft in the shape a run produces: its channel, its words, and who decides.
+ * On its card's hover it takes the page color, as the card's hover fill matches its own.
+ */
 export function WorkflowTemplateSample({ template }: { template: WorkflowTemplate }) {
   return (
-    <div className="grid w-full gap-1.5 rounded-lg bg-muted/60 p-3 text-left text-sm font-normal">
+    <div className="grid w-full grid-rows-[auto_1fr_auto] gap-1.5 rounded-lg bg-muted/60 p-3 text-left text-sm font-normal transition-colors group-hover:bg-background/70">
       <span className="text-xs text-muted-foreground">
         Example draft for {template.sample.channel}
       </span>
