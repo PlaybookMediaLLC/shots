@@ -1,7 +1,7 @@
 'use client'
 
 import { z } from 'zod'
-import { draftHref } from '@/components/write/write-context'
+import { draftHref } from '@/lib/write/library'
 import { listedStatus } from '@/lib/content-drafts/post-status'
 import { draftName } from '@/lib/write/library'
 import type { DesignDocument } from '@/lib/design/document'

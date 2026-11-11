@@ -12,7 +12,7 @@ import type { z } from 'zod'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
-import { draftHref } from '@/components/write/write-context'
+import { draftHref } from '@/lib/write/library'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
