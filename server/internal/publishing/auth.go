@@ -8,10 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/supportaccessgrant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
@@ -104,6 +106,21 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			return last.role, nil
 		}
 	}
+	if !startedRun {
+		// One query admits the usual request. A refusal falls through to the
+		// reads below, so it returns the error each check returns on its own.
+		role, admitted, err := r.admittedRole(ctx, organizationID, userID, sessionID)
+		if err != nil {
+			return "", err
+		}
+		if admitted {
+			if !workspaceroles.Allows(role, allowedRoles...) {
+				return "", ErrForbidden
+			}
+			r.recordRole(ctx, organizationID, userID, sessionID, role)
+			return role, nil
+		}
+	}
 	if startedRun {
 		if err := r.requireActivePerson(ctx, userID); err != nil {
 			return "", err
@@ -133,10 +150,40 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 	if err := r.requireOperational(ctx, organizationID); err != nil {
 		return "", err
 	}
+	r.recordRole(ctx, organizationID, userID, sessionID, role)
+	return role, nil
+}
+
+// admittedRole reads in one query what AuthorizedRole checks for a session:
+// a live session of an active account, an active workspace that is this one
+// or none, exactly one membership, and no deletion in progress. It returns
+// the role, or false when any check refuses.
+func (r *Repository) admittedRole(ctx context.Context, organizationID, userID, sessionID string) (string, bool, error) {
+	var roles []string
+	err := r.client.PlatformQuery(ctx, `SELECT m.role FROM session s JOIN "user" u ON u.id=s."userId"
+        JOIN member m ON m."userId"=u.id AND m."organizationId"=$1
+        WHERE s.id=$2 AND s."userId"=$3 AND s."expiresAt">$4 AND coalesce(u.banned,false)=false
+        AND (s."activeOrganizationId" IS NULL OR s."activeOrganizationId"=$1)
+        AND NOT EXISTS (SELECT 1 FROM workspace_deletion d WHERE d."organizationId"=$1 AND d.status<>'CANCELLED')`,
+		[]any{organizationID, sessionID, userID, time.Now().UTC()}, func(row entsql.ColumnScanner) error {
+			var role string
+			if err := row.Scan(&role); err != nil {
+				return err
+			}
+			roles = append(roles, role)
+			return nil
+		})
+	if err != nil || len(roles) != 1 {
+		return "", false, err
+	}
+	return roles[0], true, nil
+}
+
+// recordRole keeps an admitted role for the handler's first check.
+func (r *Repository) recordRole(ctx context.Context, organizationID, userID, sessionID, role string) {
 	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
 		memo.last.Store(&authorizedRole{r.client, organizationID, userID, sessionID, role})
 	}
-	return role, nil
 }
 
 // requireOperational rejects a workspace that is scheduled for deletion.
@@ -180,7 +227,18 @@ func (r *Repository) authorizeSession(ctx context.Context, userID, sessionID str
 		return nil, ErrUnauthorized
 	}
 	now := time.Now().UTC()
+	// One query admits a live session of an active account. A refusal reads
+	// again step by step below, so it returns the same error as before.
+	activeAccount := predicate.Session(func(s *entsql.Selector) {
+		s.Where(entsql.ExprP(`EXISTS (SELECT 1 FROM "user" u WHERE u.id=` + s.C(session.FieldUserID) + ` AND coalesce(u.banned,false)=false)`))
+	})
 	current, err := r.client.Session.Query().Where(
+		session.ID(sessionID), session.UserID(userID), session.ExpiresAtGT(now), activeAccount,
+	).Only(ctx)
+	if err == nil || !ent.IsNotFound(err) {
+		return current, err
+	}
+	current, err = r.client.Session.Query().Where(
 		session.ID(sessionID), session.UserID(userID), session.ExpiresAtGT(now),
 	).Only(ctx)
 	if ent.IsNotFound(err) {

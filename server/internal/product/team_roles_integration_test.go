@@ -200,3 +200,57 @@ func TestRequestAuthorizationMemo(t *testing.T) {
 		t.Fatalf("a later session check reused the middleware's: %v", err)
 	}
 }
+
+// One query admits a request only when every check passes; each failed check
+// still refuses with its own error, for both the role and the session check.
+func TestAuthorizationRefusesEachFailedCheck(t *testing.T) {
+	w := newTestWorkspace(t)
+	w.addMember(t, "reader", "viewer")
+	reader, auth := w.actor("reader"), w.repo.auth
+	check := func(t *testing.T, wantRole, wantSession error) {
+		t.Helper()
+		role, err := auth.AuthorizedRole(w.ctx, w.org, reader.UserID, reader.SessionID, readRoles...)
+		if !errors.Is(err, wantRole) || wantRole == nil && role != "viewer" {
+			t.Fatalf("role=%q err=%v, want %v", role, err, wantRole)
+		}
+		current, err := auth.AuthorizeSession(w.ctx, reader.UserID, reader.SessionID)
+		if !errors.Is(err, wantSession) || wantSession == nil && current.ID != reader.SessionID {
+			t.Fatalf("session=%v err=%v, want %v", current, err, wantSession)
+		}
+	}
+	check(t, nil, nil)
+	if _, err := auth.AuthorizedRole(w.ctx, w.org, reader.UserID, reader.SessionID, "owner"); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("a viewer passed an owner check: %v", err)
+	}
+	if _, err := auth.AuthorizedRole(w.ctx, w.org, w.owner.UserID, reader.SessionID, readRoles...); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("another person's session was admitted: %v", err)
+	}
+	for _, scenario := range []struct {
+		name                  string
+		deny                  string
+		denyArgs              []any
+		restore               string
+		restoreArgs           []any
+		wantRole, wantSession error
+	}{
+		{"expired session", `UPDATE session SET "expiresAt"=now()-interval '1 minute' WHERE id=$1`, []any{reader.SessionID},
+			`UPDATE session SET "expiresAt"=now()+interval '1 hour' WHERE id=$1`, []any{reader.SessionID}, publishing.ErrUnauthorized, publishing.ErrUnauthorized},
+		{"banned account", `UPDATE "user" SET banned=true WHERE id=$1`, []any{reader.UserID},
+			`UPDATE "user" SET banned=false WHERE id=$1`, []any{reader.UserID}, publishing.ErrForbidden, publishing.ErrForbidden},
+		{"another active workspace", `UPDATE session SET "activeOrganizationId"='other' WHERE id=$1`, []any{reader.SessionID},
+			`UPDATE session SET "activeOrganizationId"=$2 WHERE id=$1`, []any{reader.SessionID, w.org}, publishing.ErrForbidden, nil},
+		{"no membership", `DELETE FROM member WHERE id=$1`, []any{"member_reader_" + w.id},
+			`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'viewer',now())`,
+			[]any{"member_reader_" + w.id, w.org, reader.UserID}, publishing.ErrForbidden, nil},
+		{"deletion in progress", `INSERT INTO workspace_deletion (id,"organizationId","requestedByUserId","scheduledFor","updatedAt") VALUES ($1,$2,$3,now()+interval '7 days',now())`,
+			[]any{"deletion_" + w.id, w.org, w.owner.UserID}, `DELETE FROM workspace_deletion WHERE id=$1`, []any{"deletion_" + w.id}, publishing.ErrForbidden, nil},
+		{"cancelled deletion", `INSERT INTO workspace_deletion (id,"organizationId","requestedByUserId",status,"scheduledFor","updatedAt") VALUES ($1,$2,$3,'CANCELLED',now(),now())`,
+			[]any{"deletion_" + w.id, w.org, w.owner.UserID}, `DELETE FROM workspace_deletion WHERE id=$1`, []any{"deletion_" + w.id}, nil, nil},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			w.exec(t, scenario.deny, scenario.denyArgs...)
+			t.Cleanup(func() { w.exec(t, scenario.restore, scenario.restoreArgs...) })
+			check(t, scenario.wantRole, scenario.wantSession)
+		})
+	}
+}
