@@ -52,9 +52,9 @@ func (m *fakeVoiceModel) count() int {
 	return m.calls
 }
 
-// voiceFixture is a workspace with an X account, an owner and a creator, and
+// voiceCommandFixture is a workspace with an X account, an owner and a creator, and
 // voice notes written straight to the tables the notes domain owns.
-type voiceFixture struct {
+type voiceCommandFixture struct {
 	t                  *testing.T
 	ctx                context.Context
 	db                 *database.Database
@@ -69,7 +69,7 @@ type voiceFixture struct {
 	when string
 }
 
-func newVoiceFixture(t *testing.T) *voiceFixture {
+func newVoiceCommandFixture(t *testing.T) *voiceCommandFixture {
 	t.Helper()
 	url := os.Getenv("PUBLISHING_TEST_DATABASE_URL")
 	if url == "" {
@@ -86,7 +86,7 @@ func newVoiceFixture(t *testing.T) *voiceFixture {
 		t.Fatalf("refusing database %q: %v", name, err)
 	}
 	id := cuid.New()
-	f := &voiceFixture{t: t, ctx: ctx, db: db, model: &fakeVoiceModel{}, meter: &recordingMonthlyMeter{}, org: "org_" + id, other: "other_" + id,
+	f := &voiceCommandFixture{t: t, ctx: ctx, db: db, model: &fakeVoiceModel{}, meter: &recordingMonthlyMeter{}, org: "org_" + id, other: "other_" + id,
 		when: time.Now().UTC().Add(48*time.Hour).Format("2006-01-02") + "T10:00"}
 	f.repo = NewConfiguration(db.Client).WithMonthlyMeter(f.meter).WithAutomationModel(f.model)
 	f.model.set(f.tweet)
@@ -116,14 +116,14 @@ func newVoiceFixture(t *testing.T) *voiceFixture {
 	return f
 }
 
-func (f *voiceFixture) exec(query string, args ...any) {
+func (f *voiceCommandFixture) exec(query string, args ...any) {
 	f.t.Helper()
 	if _, err := f.db.SQL.ExecContext(f.ctx, query, args...); err != nil {
 		f.t.Fatalf("%v\n%s", err, query)
 	}
 }
 
-func (f *voiceFixture) member(org, label, role string) Actor {
+func (f *voiceCommandFixture) member(org, label, role string) Actor {
 	userID := "user_" + label + "_" + org
 	f.exec(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Person',$2,true,now(),now())`, userID, userID+"@example.test")
 	f.exec(`INSERT INTO session (id,"expiresAt",token,"createdAt","updatedAt","userId","activeOrganizationId") VALUES ($1,now()+interval '1 hour',$1,now(),now(),$2,$3)`,
@@ -135,7 +135,7 @@ func (f *voiceFixture) member(org, label, role string) Actor {
 
 // enable turns voice commands and draft generation on for the workspace and
 // the member, with the remote-text consent the member switch needs.
-func (f *voiceFixture) enable(actor Actor, workspace, member bool) {
+func (f *voiceCommandFixture) enable(actor Actor, workspace, member bool) {
 	f.t.Helper()
 	f.exec(`DELETE FROM voice_settings WHERE "organizationId"=$1`, actor.OrganizationID)
 	f.exec(`DELETE FROM voice_member_settings WHERE "organizationId"=$1 AND "userId"=$2`, actor.OrganizationID, actor.UserID)
@@ -150,7 +150,7 @@ func (f *voiceFixture) enable(actor Actor, workspace, member bool) {
 }
 
 // note writes a note with one current transcript revision.
-func (f *voiceFixture) note(actor Actor, transcript string) (string, string) {
+func (f *voiceCommandFixture) note(actor Actor, transcript string) (string, string) {
 	f.t.Helper()
 	noteID, revisionID := cuid.New(), cuid.New()
 	if _, err := f.db.Client.VoiceNote.Create().SetID(noteID).SetOrganizationID(actor.OrganizationID).SetOwnerUserID(actor.UserID).
@@ -162,7 +162,7 @@ func (f *voiceFixture) note(actor Actor, transcript string) (string, string) {
 }
 
 // revise adds a revision and makes it the note's current one.
-func (f *voiceFixture) revise(actor Actor, noteID, revisionID, transcript string) {
+func (f *voiceCommandFixture) revise(actor Actor, noteID, revisionID, transcript string) {
 	f.t.Helper()
 	if _, err := f.db.Client.VoiceTranscriptRevision.Create().SetID(revisionID).SetOrganizationID(actor.OrganizationID).SetNoteID(noteID).
 		SetClientRevisionID(revisionID).SetOrigin("user_edit").SetText(transcript).SetCreatedByUserID(actor.UserID).Save(f.ctx); err != nil {
@@ -173,12 +173,12 @@ func (f *voiceFixture) revise(actor Actor, noteID, revisionID, transcript string
 
 const voiceTweet = "Shots, post the following tweet at 10 am on Friday: entrepreneurship is hard."
 
-func (f *voiceFixture) tweet(platformai.Request) (string, error) {
+func (f *voiceCommandFixture) tweet(platformai.Request) (string, error) {
 	return `{"action":"schedule_post","platform":"x","text":"Entrepreneurship is hard.","local_time":"` + f.when +
 		`","guessed":[],"second_request":false,"unsupported":null}`, nil
 }
 
-func (f *voiceFixture) command(noteID string) *ent.VoiceCommand {
+func (f *voiceCommandFixture) command(noteID string) *ent.VoiceCommand {
 	f.t.Helper()
 	row, err := f.db.Client.VoiceCommand.Query().Where(voicecommand.NoteID(noteID)).Only(f.ctx)
 	if err != nil {
@@ -187,7 +187,7 @@ func (f *voiceFixture) command(noteID string) *ent.VoiceCommand {
 	return row
 }
 
-func (f *voiceFixture) propose(actor Actor, noteID, revisionID string) *VoiceCommand {
+func (f *voiceCommandFixture) propose(actor Actor, noteID, revisionID string) *VoiceCommand {
 	f.t.Helper()
 	command, err := f.repo.proposeVoiceCommand(f.ctx, actor, noteID, revisionID)
 	if err != nil {
@@ -196,11 +196,11 @@ func (f *voiceFixture) propose(actor Actor, noteID, revisionID string) *VoiceCom
 	return command
 }
 
-func (f *voiceFixture) confirmInput() VoiceCommandConfirmInput {
+func (f *voiceCommandFixture) confirmInput() VoiceCommandConfirmInput {
 	return VoiceCommandConfirmInput{Text: "Entrepreneurship is hard.", ChannelConnectionID: f.xChannel, LocalTime: f.when, TimeZone: "UTC"}
 }
 
-func (f *voiceFixture) drafts(revisionID string) []*ent.ContentDraft {
+func (f *voiceCommandFixture) drafts(revisionID string) []*ent.ContentDraft {
 	f.t.Helper()
 	rows, err := f.db.Client.ContentDraft.Query().Where(contentdraft.SourceVoiceRevisionID(revisionID)).All(f.ctx)
 	if err != nil {
@@ -209,7 +209,7 @@ func (f *voiceFixture) drafts(revisionID string) []*ent.ContentDraft {
 	return rows
 }
 
-func (f *voiceFixture) posts(draftID string) int {
+func (f *voiceCommandFixture) posts(draftID string) int {
 	f.t.Helper()
 	n, err := f.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(draftID), scheduledpost.StatusNEQ(scheduledpost.StatusCANCELLED)).Count(f.ctx)
 	if err != nil {
@@ -219,7 +219,7 @@ func (f *voiceFixture) posts(draftID string) int {
 }
 
 func TestVoiceCommandProposals(t *testing.T) {
-	f := newVoiceFixture(t)
+	f := newVoiceCommandFixture(t)
 
 	t.Run("no proposal unless the workspace and the member both have commands on", func(t *testing.T) {
 		noteID, revisionID := f.note(f.owner, voiceTweet)
@@ -364,7 +364,7 @@ func TestVoiceCommandProposals(t *testing.T) {
 }
 
 func TestVoiceCommandConfirm(t *testing.T) {
-	f := newVoiceFixture(t)
+	f := newVoiceCommandFixture(t)
 	f.enable(f.owner, true, true)
 	f.enable(f.creator, true, true)
 

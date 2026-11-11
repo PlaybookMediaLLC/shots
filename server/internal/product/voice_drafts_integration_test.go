@@ -11,7 +11,7 @@ import (
 )
 
 func TestVoiceDraft(t *testing.T) {
-	f := newVoiceFixture(t)
+	f := newVoiceCommandFixture(t)
 	const written = `{"title":"Faster exports","text":"Exports now finish in 3 seconds.","claims":["Exports finish in 3 seconds."],"checks":["3 seconds"]}`
 	writer := func(platformai.Request) (string, error) { return written, nil }
 	input := func(revisionID string) VoiceDraftInput {

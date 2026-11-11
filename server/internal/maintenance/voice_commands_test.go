@@ -7,18 +7,18 @@ import (
 	"testing"
 )
 
-type voiceSweeper struct {
+type voiceCommandSweeper struct {
 	reviewEvents
 	swept int
 }
 
-func (s *voiceSweeper) SweepVoiceCommands(context.Context) (int, error) {
+func (s *voiceCommandSweeper) SweepVoiceCommands(context.Context) (int, error) {
 	s.swept++
 	return 3, nil
 }
 
 func TestVoiceCommandsJobRunsTheProductSweep(t *testing.T) {
-	sweeper := &voiceSweeper{}
+	sweeper := &voiceCommandSweeper{}
 	if n, err := (&Store{Events: sweeper}).VoiceCommands(context.Background()); err != nil || n != 3 || sweeper.swept != 1 {
 		t.Fatalf("n=%d err=%v swept=%d", n, err, sweeper.swept)
 	}
