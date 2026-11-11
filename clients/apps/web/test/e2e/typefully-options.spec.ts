@@ -17,6 +17,10 @@ test(
     await dialog.getByRole('button', { name: /^Tomorrow 9:00/ }).click()
     await expect(dialog.getByLabel('Open a new draft after scheduling')).toBeChecked()
     await dialog.getByRole('button', { name: /^Confirm schedule/ }).click()
+    // The fresh post opens in place and becomes a draft at its first word.
+    await expect(page.getByRole('region', { name: 'New post' })).toBeVisible()
+    await page.getByRole('textbox', { name: 'New draft text' }).click()
+    await page.keyboard.type('The fresh draft.')
     await page.waitForURL(
       (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(original)
     )
