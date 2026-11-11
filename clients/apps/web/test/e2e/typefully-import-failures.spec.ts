@@ -65,7 +65,7 @@ test(
     ).toEqual([`/publish/${first}`, `/publish/${acceptedId}`])
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
     const persisted = await apiRequest(page, `/api/v1/content-drafts/${acceptedId}`)
     expect((persisted.body as { plainText: string }).plainText).toBe('Response lost')
     const corrected = await apiRequest(page, `/api/v1/content-drafts/${first}`)
@@ -117,7 +117,7 @@ test(
     await expect(item).toContainText('Waiting for its file to be selected again')
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
     await page.getByLabel('Select the files again').setInputFiles(file)
     await expect(item).toContainText('PNG · 1×1', { timeout: 60_000 })
     const [id] = await saveBatchDrafts(page)

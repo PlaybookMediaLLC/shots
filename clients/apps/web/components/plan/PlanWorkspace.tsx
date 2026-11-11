@@ -5,7 +5,15 @@ import { readWire } from '@/lib/plan/wire'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/ssr/ArrowLeft'
+import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
+import { CaretLeftIcon } from '@phosphor-icons/react/dist/ssr/CaretLeft'
+import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
 import { CheckCircleIcon } from '@phosphor-icons/react/dist/ssr/CheckCircle'
+import { ClockIcon } from '@phosphor-icons/react/dist/ssr/Clock'
+import { FunnelSimpleIcon } from '@phosphor-icons/react/dist/ssr/FunnelSimple'
+import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/ssr/SlidersHorizontal'
 import { NoteIcon } from '@phosphor-icons/react/dist/ssr/Note'
 import { WarningIcon } from '@phosphor-icons/react/dist/ssr/Warning'
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/ssr/WarningCircle'
@@ -127,6 +135,92 @@ function StatusWord({ status }: { status: string }) {
       {Icon ? <Icon aria-hidden className="size-3 shrink-0" /> : null}
       {status}
     </span>
+  )
+}
+
+/** Cards a calendar day shows before the rest scroll inside it. */
+const DAY_VISIBLE = 4
+/** Pixels of padding (p-1.5) around a day's cards, for the focus outline. */
+const FOCUS_ROOM = 6
+
+/** A day list's cards whose middle is past its visible bottom. */
+const belowFold = (element: HTMLElement) =>
+  ([...element.children] as HTMLElement[]).filter(
+    (card) => card.offsetTop + card.offsetHeight / 2 > element.scrollTop + element.clientHeight
+  )
+
+/**
+ * A day's cards. Past the fourth they scroll inside the day, so a day with a
+ * hundred posts never stretches its week, and "N more" counts those below.
+ * `ids` re-measures when the cards change; resizes re-measure on their own.
+ */
+function DayList({ children, ids }: { children: React.ReactNode; ids: string }) {
+  const list = React.useRef<HTMLDivElement>(null)
+  const [limit, setLimit] = React.useState<number>()
+  const [below, setBelow] = React.useState(0)
+  const measure = React.useCallback(() => {
+    const element = list.current
+    if (!element) return
+    const last = element.children[DAY_VISIBLE - 1] as HTMLElement | undefined
+    // The list's padding is the room a focused card's outline needs inside the scroll box.
+    setLimit(
+      element.children.length > DAY_VISIBLE && last
+        ? last.offsetTop + last.offsetHeight + FOCUS_ROOM
+        : undefined
+    )
+    setBelow(belowFold(element).length)
+  }, [])
+  React.useLayoutEffect(() => {
+    const element = list.current
+    if (!element) return
+    // Four or fewer never scroll, so a quiet day keeps no observer.
+    if (element.children.length <= DAY_VISIBLE) {
+      setLimit(undefined)
+      setBelow(0)
+      return
+    }
+    measure()
+    // Width, density and wrapping change card heights, so the cards are watched too.
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    for (const card of element.children) observer.observe(card)
+    return () => observer.disconnect()
+  }, [measure, ids])
+  return (
+    <>
+      <div
+        className={`relative -m-1.5 grid gap-2 p-1.5 ${limit === undefined ? '' : 'overflow-y-auto'}`}
+        data-testid="calendar-day-list"
+        onScroll={measure}
+        ref={list}
+        style={{ maxHeight: limit }}
+      >
+        {children}
+      </div>
+      {below > 0 ? (
+        <Button
+          aria-label={`Scroll to ${below} more ${below === 1 ? 'post' : 'posts'}`}
+          className="h-auto justify-start gap-1 px-1 py-0.5 text-xs font-normal text-muted-foreground"
+          onClick={() => {
+            const element = list.current
+            if (!element) return
+            // Focus moves to the first revealed card: this button goes once nothing is below.
+            belowFold(element)[0]?.focus({ preventScroll: true })
+            element.scrollBy({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? 'auto'
+                : 'smooth',
+              top: element.clientHeight,
+            })
+          }}
+          size={null}
+          variant="ghost"
+        >
+          <CaretDownIcon aria-hidden className="size-3" />
+          {below} more
+        </Button>
+      ) : null}
+    </>
   )
 }
 
@@ -562,7 +656,11 @@ export function PlanWorkspace({
     const { visible, hidden } = capped ? visibleDayItems(onDay) : { visible: onDay, hidden: 0 }
     return (
       <div className="grid gap-2">
-        {(open ? onDay : visible).map((item) => card(item))}
+        {/* Every view scrolls past four, so no day grows with its posts: an opened month
+            day, or one full of posts that need attention, too. */}
+        <DayList ids={(open ? onDay : visible).map((item) => item.id).join()}>
+          {(open ? onDay : visible).map((item) => card(item))}
+        </DayList>
         {hidden > 0 ? (
           <Button
             aria-expanded={open}
@@ -654,7 +752,8 @@ export function PlanWorkspace({
           {sidebar ? (
             <>
               <Button variant="ghost" onClick={() => setSidebar(null)}>
-                ← Back to profiles
+                <ArrowLeftIcon aria-hidden />
+                Back to profiles
               </Button>
               <h2 className="my-2 font-medium">{sets.find((s) => s.id === sidebar)?.name}</h2>
               <div className="flex gap-2">
@@ -787,10 +886,10 @@ export function PlanWorkspace({
           )}
         </aside>
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center gap-2 border-b p-3">
-            <h1 className="mr-auto font-semibold">
+          <header className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+            <h1 className="mr-auto flex min-w-0 items-baseline gap-2 text-ui-lg font-semibold">
               Calendar{' '}
-              <span className="font-normal text-muted-foreground">
+              <span className="truncate text-ui font-normal text-muted-foreground">
                 {prefs.view === 'month'
                   ? readable(anchor, { month: 'long', year: 'numeric' })
                   : `${readable(days[0])} – ${readable(days.at(-1)!)}`}
@@ -802,12 +901,14 @@ export function PlanWorkspace({
                 size="sm"
                 variant="outline"
               >
+                <ClockIcon aria-hidden />
                 Edit schedule
               </Button>
             ) : null}
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
+                  <FunnelSimpleIcon aria-hidden />
                   Filters
                 </Button>
               </PopoverTrigger>
@@ -881,6 +982,7 @@ export function PlanWorkspace({
             <Popover>
               <PopoverTrigger asChild>
                 <Button size="sm" variant="outline">
+                  <SlidersHorizontalIcon aria-hidden />
                   Display
                 </Button>
               </PopoverTrigger>
@@ -968,25 +1070,37 @@ export function PlanWorkspace({
                 {prefs.showAll ? 'Showing all posts' : 'Show all posts'}
               </Button>
             ) : null}
-            <div aria-label="Change period" className="flex shrink-0 gap-1" role="group">
+            {/* One joined control, as the period moves and returns to today together. */}
+            <div
+              aria-label="Change period"
+              className="flex h-8 shrink-0 items-stretch rounded-md border border-border"
+              role="group"
+            >
               <Button
-                variant="outline"
-                size="sm"
                 aria-label={`Previous ${prefs.view === 'month' ? 'month' : 'period'}`}
+                className="grid w-8 rounded-l-md place-items-center text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
                 onClick={() => changePeriod(-1)}
+                size={null}
+                variant="custom"
               >
-                ←
+                <CaretLeftIcon aria-hidden className="size-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setAnchor(today)}>
+              <Button
+                className="border-x border-border px-3 text-ui font-medium transition-colors hover:bg-foreground/[0.04]"
+                onClick={() => setAnchor(today)}
+                size={null}
+                variant="custom"
+              >
                 Today
               </Button>
               <Button
-                variant="outline"
-                size="sm"
                 aria-label={`Next ${prefs.view === 'month' ? 'month' : 'period'}`}
+                className="grid w-8 rounded-r-md place-items-center text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
                 onClick={() => changePeriod(1)}
+                size={null}
+                variant="custom"
               >
-                →
+                <CaretRightIcon aria-hidden className="size-4" />
               </Button>
             </div>
           </header>
@@ -1133,7 +1247,7 @@ export function PlanWorkspace({
                           size="icon-sm"
                           variant="ghost"
                         >
-                          ＋
+                          <PlusIcon aria-hidden />
                         </Button>
                       ) : null}
                     </span>

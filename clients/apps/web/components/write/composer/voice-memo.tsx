@@ -38,7 +38,7 @@ export function VoiceMemo({draftId,channel,onInsert,onUse}: {draftId:string;chan
       setTranscript(result.transcript)
     } catch (cause) {setError(cause instanceof Error ? cause.message : 'Transcription failed. Your draft is unchanged.')} finally {setBusy(false)}
   }
-  return <Disclosure className="rounded-lg border border-border p-3">
+  return <Disclosure className="px-3 py-2.5">
     <DisclosureTrigger>Voice memo</DisclosureTrigger>
     <DisclosureContent>
     <p className="my-2 text-xs text-muted-foreground">Upload up to 10 MB of audio. Transcription uses workspace AI credits. Review the text before sending it to the assistant.</p>

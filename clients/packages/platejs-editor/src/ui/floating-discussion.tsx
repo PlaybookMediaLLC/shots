@@ -631,7 +631,7 @@ function FloatingDiscussionContent() {
       {/* Unsubmit comment */}
       {commentingNode && (
         <div
-          className="absolute right-[80px] w-[288px] cursor-pointer rounded-md border bg-popover p-3 transition-transform duration-200"
+          className="absolute right-[80px] w-[288px] cursor-pointer rounded-xl border border-border bg-popover p-3 transition-transform duration-200"
           ref={(el) => {
             domRef.current[getDraftCommentKey()] = el;
           }}

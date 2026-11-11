@@ -77,3 +77,27 @@ func TestSpreadTimes(t *testing.T) {
 		t.Fatal("non-five-minute shift accepted")
 	}
 }
+
+// The Bulk tools hourly preset is a spread of one post an hour inside a day's
+// window: 09:00–17:00 is nine a day, and the tenth starts the next day at 09:00
+// local time, across the clocks going back.
+func TestHourlyWindowSpreadAcrossFallBack(t *testing.T) {
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	got, err := spreadTimes(DraftBatchTimesInput{Count: 10, LocalTime: "2026-10-31T09:00", PostsPerDay: 9, SpacingMinutes: 60, Seed: "a-stable-batch-seed"}, "America/New_York", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zone, _ := time.LoadLocation("America/New_York")
+	for i, at := range got[:9] {
+		if local := at.In(zone); local.Day() != 31 || local.Hour() != 9+i || local.Minute() != 0 {
+			t.Fatalf("post %d at %v", i+1, local)
+		}
+	}
+	tenth := got[9].In(zone)
+	if tenth.Month() != time.November || tenth.Day() != 1 || tenth.Hour() != 9 || got[9].UTC().Hour() != 14 {
+		t.Fatalf("overflow post at %v (%v UTC); want Nov 1 09:00 EST", tenth, got[9].UTC())
+	}
+	if got[0].UTC().Hour() != 13 {
+		t.Fatalf("first post at %v UTC; want 13:00 (09:00 EDT)", got[0].UTC())
+	}
+}

@@ -484,7 +484,7 @@ test(
     ).toEqual(ids.map((id) => `/publish/${id}`))
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
     expect(uploads).toBe(2)
     await page.screenshot({ path: '.context/shots/typefully-import-resumed.png' })
 
