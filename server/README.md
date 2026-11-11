@@ -244,6 +244,16 @@ session endpoint. Keep it server-side and separate from
 `PUBLISHING_SERVICE_TOKEN`. A user OAuth token alone cannot read the private
 workspace authority snapshot.
 
+The Founder Hub phone app reaches the voice API through the gateway at
+`/api/founder-hub/voice/<suffix>`, with the methods, bodies and responses of
+`/api/v1/voice/<suffix>`; changing the workspace switches stays browser-only.
+The gateway sends its service token, the person's Founder Hub access token and
+the Founder Hub workspace id in `X-Shots-Organization-Id`. The web maps that id
+to one of the person's organizations and forwards the session with
+`X-Principal-Client: shots-founder-hub`; the backend checks that client's live
+grant itself and holds the session to the named workspace's membership instead
+of the browser's active workspace.
+
 For hosted connectors, set `FOUNDER_HUB_MCP_URL` on both the Shots web server and
 Founder Hub sync API to the exact public HTTPS `/mcp` URL (loopback HTTP is
 supported locally). Shots then exposes OAuth discovery and public PKCE client
