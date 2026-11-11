@@ -71,7 +71,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: PlaybookMediaLLC/shots-founder-hub
-          ref: ${{ inputs.counterpart_ref || 'develop' }}
+          ref: ${{ inputs.counterpart_ref || 'fix/shots-central-auth' }}
           path: shots-founder-hub-central-auth
       - uses: actions/setup-go@v5
         with:
@@ -135,7 +135,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: PlaybookMediaLLC/shots-founder-hub
-          ref: ${{ inputs.counterpart_ref || 'develop' }}
+          ref: ${{ inputs.counterpart_ref || 'fix/shots-central-auth' }}
           path: shots-founder-hub-central-auth
       - uses: actions/setup-go@v5
         with:
