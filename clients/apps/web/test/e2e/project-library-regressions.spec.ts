@@ -1,4 +1,4 @@
-import { expect, test, trpcMutation, trpcQuery } from './framework'
+import { db, expect, test, trpcMutation, trpcQuery } from './framework'
 
 test.use({ workspaceOptions: { plan: 'pro' } })
 
@@ -157,4 +157,36 @@ test('gateway errors retry automatically and persistent HTML failures have a use
   await page.unroute('**/_next/static/chunks/**')
   await page.getByRole('button', { name: 'Reload page', exact: true }).click()
   await expect(page.getByText('No projects yet')).toBeVisible()
+})
+
+test('the story import picker reaches projects beyond the first hundred and searches across pages', async ({
+  app,
+  page,
+  workspace,
+}) => {
+  await db.query(
+    `UPDATE workspace_entitlement SET "featureOverrides" = $2::jsonb WHERE "organizationId" = $1`,
+    [workspace.id, JSON.stringify({ 'creative-sets:create': true })]
+  )
+  await db.query(
+    `INSERT INTO project (id, "organizationId", name, document, "documentVersion", "updatedAt")
+    SELECT 'c' || substr(md5($1 || n::text), 1, 24), $1, 'Archive project ' || lpad(n::text, 3, '0'), $2::jsonb, 2, now() - n * interval '1 minute'
+    FROM generate_series(1, 105) n`,
+    [workspace.id, JSON.stringify(empty)]
+  )
+  await app.open('/creative-sets')
+  await page.getByRole('button', { name: 'Copy from Projects', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Copy an existing project' })
+  await expect(dialog.getByRole('button', { name: /^Archive project / })).toHaveCount(50)
+  await dialog.getByRole('button', { name: 'Load more projects', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: /^Archive project / })).toHaveCount(100)
+  await dialog.getByRole('button', { name: 'Load more projects', exact: true }).click()
+  await expect(dialog.getByRole('button', { name: /^Archive project / })).toHaveCount(105)
+  await expect(
+    dialog.getByRole('button', { name: 'Archive project 105', exact: true })
+  ).toBeVisible()
+  await dialog.getByLabel('Search saved projects', { exact: true }).fill('105')
+  await expect(dialog.getByRole('button', { name: /^Archive project / })).toHaveCount(1)
+  await dialog.getByRole('button', { name: 'Archive project 105', exact: true }).click()
+  await expect(dialog.getByRole('alert')).toContainText('This project needs a screenshot')
 })

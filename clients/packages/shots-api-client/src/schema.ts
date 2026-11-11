@@ -1608,6 +1608,298 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/voice/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read voice settings
+         * @description The workspace's voice switches, the member's choices, limits and server-side switches.
+         */
+        get: operations["getVoiceSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/settings/workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change voice workspace switches
+         * @description Turns voice features on or off for the workspace.
+         */
+        put: operations["updateVoiceWorkspaceSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/settings/member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Change your voice choices
+         * @description Records consent to send transcript text to a model provider, and voice commands, which need it.
+         */
+        put: operations["updateVoiceMemberSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your note revisions for sync
+         * @description Every one of the member's notes in this workspace, deleted ones included, with its revision.
+         */
+        get: operations["listVoiceNoteIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List your voice notes
+         * @description The member's live notes, newest received first.
+         */
+        get: operations["listVoiceNotes"];
+        put?: never;
+        /**
+         * Create a voice note
+         * @description Creates a note once per client note id; a replay returns it.
+         */
+        post: operations["createVoiceNote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a voice note
+         * @description A note with its transcripts, audio runs and proposal.
+         */
+        get: operations["getVoiceNote"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a voice note
+         * @description Deletes the audio, redacts the transcripts and keeps a tombstone; a replay succeeds.
+         */
+        delete: operations["deleteVoiceNote"];
+        options?: never;
+        head?: never;
+        /**
+         * Rename a voice note
+         * @description Changes a note's title or project; the last writer wins.
+         */
+        patch: operations["updateVoiceNote"];
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/transcripts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a transcript revision
+         * @description Adds an insert-only revision once per client revision id; a user edit becomes current.
+         */
+        post: operations["addVoiceTranscript"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/transcripts/{revisionId}/redact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redact a transcript revision
+         * @description Clears a revision's text and segments, and audits it.
+         */
+        post: operations["redactVoiceTranscript"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/runs/{runIndex}/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign an audio run upload
+         * @description A signed URL for one run's file, with its length and checksum signed in.
+         */
+        post: operations["createVoiceRunUpload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/runs/{runIndex}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check an uploaded audio run
+         * @description Checks the stored file's size, checksum and audio before the run becomes available.
+         */
+        post: operations["completeVoiceRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/runs/{runIndex}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign an audio run read
+         * @description A short-lived signed URL to play an available run.
+         */
+        get: operations["getVoiceRunAudio"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/audio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a note's audio
+         * @description Deletes every run's file; the transcripts stay.
+         */
+        delete: operations["deleteVoiceAudio"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a draft from a voice note
+         * @description Sends one transcript revision to the model provider, with the member's consent, and saves a draft.
+         */
+        post: operations["createVoiceDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/voice/notes/{id}/command/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a spoken scheduling command
+         * @description Re-runs every check, then schedules the confirmed text as the member; a replay returns the outcome.
+         */
+        post: operations["confirmVoiceCommand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/openapi.json": {
         parameters: {
             query?: never;
@@ -1745,6 +2037,8 @@ export interface components {
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
                 campaignId: string | null;
+                /** @default null */
+                sourceVoiceRevisionId: string | null;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -2851,6 +3145,8 @@ export interface components {
                 /** @default null */
                 campaignId: string | null;
                 /** @default null */
+                sourceVoiceRevisionId: string | null;
+                /** @default null */
                 plannedFor: string | null;
                 /** @default null */
                 primaryPlatform: string | null;
@@ -3052,6 +3348,8 @@ export interface components {
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
                 campaignId: string | null;
+                /** @default null */
+                sourceVoiceRevisionId: string | null;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -3386,6 +3684,8 @@ export interface components {
             suppressSlackOnPublish?: boolean;
             /** @default null */
             campaignId: string | null;
+            /** @default null */
+            sourceVoiceRevisionId: string | null;
             /** @default null */
             plannedFor: string | null;
             /** @default null */
@@ -3832,6 +4132,8 @@ export interface components {
                 /** @default null */
                 campaignId: string | null;
                 /** @default null */
+                sourceVoiceRevisionId: string | null;
+                /** @default null */
                 plannedFor: string | null;
                 /** @default null */
                 primaryPlatform: string | null;
@@ -4154,6 +4456,183 @@ export interface components {
             discussions: {
                 [key: string]: unknown;
             };
+        };
+        VoiceSettings: {
+            workspace: {
+                voiceNotes: boolean;
+                audioUpload: boolean;
+                draftGeneration: boolean;
+                voiceCommands: boolean;
+            };
+            member: {
+                remoteTextConsentAt: string | null;
+                voiceCommands: boolean;
+            };
+            canManage: boolean;
+            minAppVersion: string | null;
+            limits: {
+                maxNoteMs: number;
+                warnAtMs: number;
+                minNoteMs: number;
+                maxTranscriptChars: number;
+                maxCommandChars: number;
+            };
+            switches: {
+                notes: boolean;
+                audioUpload: boolean;
+                drafts: boolean;
+                parse: boolean;
+                confirm: boolean;
+            };
+        };
+        VoiceNoteDetail: {
+            id: string;
+            clientNoteId: string;
+            title: string;
+            projectId: string | null;
+            /** Format: date-time */
+            recordedAt: string;
+            recordedTimeZone: string;
+            /** Format: date-time */
+            receivedAt: string;
+            locale: string | null;
+            durationMs: number | null;
+            audioUploadConsent: boolean;
+            revision: number;
+            deleted: boolean;
+            deletedAt: string | null;
+            currentTranscriptRevisionId: string | null;
+            transcriptConflict: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            transcripts: {
+                id: string;
+                clientRevisionId: string;
+                parentId: string | null;
+                /** @enum {string} */
+                origin: "on_device" | "remote" | "user_edit";
+                locale: string | null;
+                engine: string | null;
+                text: string;
+                segments: {
+                    startMs: number;
+                    endMs: number;
+                    text: string;
+                    approximate?: boolean;
+                }[];
+                redacted: boolean;
+                createdByUserId: string;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+            runs: {
+                runIndex: number;
+                startOffsetMs: number;
+                durationMs: number | null;
+                sampleRateHz: number | null;
+                contentType: string;
+                bytes: number;
+                sha256: string;
+                /** @enum {string} */
+                status: "pending" | "available" | "failed" | "deleted";
+            }[];
+            command: {
+                id: string;
+                transcriptRevisionId: string;
+                status: string;
+                action: string;
+                platform: string | null;
+                text: string | null;
+                localTime: string | null;
+                timeZone: string;
+                scheduledFor: string | null;
+                channelConnectionId: string | null;
+                candidates: {
+                    channelConnectionId: string;
+                    platform: string;
+                    name: string;
+                }[];
+                guessed: string[];
+                flags: string[];
+                addedWords: string[];
+                notice: string | null;
+                contentDraftId: string | null;
+                scheduledPostId: string | null;
+                failureReason: string | null;
+                expiresAt: string | null;
+            } | null;
+        };
+        VoiceTranscriptResult: {
+            revision: {
+                id: string;
+                clientRevisionId: string;
+                parentId: string | null;
+                /** @enum {string} */
+                origin: "on_device" | "remote" | "user_edit";
+                locale: string | null;
+                engine: string | null;
+                text: string;
+                segments: {
+                    startMs: number;
+                    endMs: number;
+                    text: string;
+                    approximate?: boolean;
+                }[];
+                redacted: boolean;
+                createdByUserId: string;
+                /** Format: date-time */
+                createdAt: string;
+            };
+            note: {
+                id: string;
+                clientNoteId: string;
+                title: string;
+                projectId: string | null;
+                /** Format: date-time */
+                recordedAt: string;
+                recordedTimeZone: string;
+                /** Format: date-time */
+                receivedAt: string;
+                locale: string | null;
+                durationMs: number | null;
+                audioUploadConsent: boolean;
+                revision: number;
+                deleted: boolean;
+                deletedAt: string | null;
+                currentTranscriptRevisionId: string | null;
+                transcriptConflict: boolean;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            };
+            command: {
+                id: string;
+                transcriptRevisionId: string;
+                status: string;
+                action: string;
+                platform: string | null;
+                text: string | null;
+                localTime: string | null;
+                timeZone: string;
+                scheduledFor: string | null;
+                channelConnectionId: string | null;
+                candidates: {
+                    channelConnectionId: string;
+                    platform: string;
+                    name: string;
+                }[];
+                guessed: string[];
+                flags: string[];
+                addedWords: string[];
+                notice: string | null;
+                contentDraftId: string | null;
+                scheduledPostId: string | null;
+                failureReason: string | null;
+                expiresAt: string | null;
+            } | null;
         };
         /** @description Every failing request returns this envelope. `code` is stable and safe to branch on; `error` and `message` carry the same human-readable text. */
         Error: {
@@ -9787,6 +10266,8 @@ export interface operations {
                             /** @default null */
                             campaignId: string | null;
                             /** @default null */
+                            sourceVoiceRevisionId: string | null;
+                            /** @default null */
                             plannedFor: string | null;
                             /** @default null */
                             primaryPlatform: string | null;
@@ -10059,6 +10540,8 @@ export interface operations {
                             suppressSlackOnPublish?: boolean;
                             /** @default null */
                             campaignId: string | null;
+                            /** @default null */
+                            sourceVoiceRevisionId: string | null;
                             /** @default null */
                             plannedFor: string | null;
                             /** @default null */
@@ -12358,6 +12841,1267 @@ export interface operations {
                 };
             };
             /** @description The comment service is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getVoiceSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSettings"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateVoiceWorkspaceSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    voiceNotes?: boolean;
+                    audioUpload?: boolean;
+                    draftGeneration?: boolean;
+                    voiceCommands?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSettings"];
+                };
+            };
+            /** @description The switches are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateVoiceMemberSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    remoteTextConsent?: boolean;
+                    voiceCommands?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceSettings"];
+                };
+            };
+            /** @description The choices are invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listVoiceNoteIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The index. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        notes: {
+                            id: string;
+                            clientNoteId: string;
+                            revision: number;
+                            deleted: boolean;
+                        }[];
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listVoiceNotes: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of notes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        notes: {
+                            id: string;
+                            clientNoteId: string;
+                            title: string;
+                            projectId: string | null;
+                            /** Format: date-time */
+                            recordedAt: string;
+                            recordedTimeZone: string;
+                            /** Format: date-time */
+                            receivedAt: string;
+                            locale: string | null;
+                            durationMs: number | null;
+                            audioUploadConsent: boolean;
+                            revision: number;
+                            deleted: boolean;
+                            deletedAt: string | null;
+                            currentTranscriptRevisionId: string | null;
+                            transcriptConflict: boolean;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                            excerpt: string;
+                        }[];
+                        nextCursor: string | null;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    clientNoteId: string;
+                    title?: string;
+                    projectId?: string | null;
+                    /** Format: date-time */
+                    recordedAt: string;
+                    recordedTimeZone: string;
+                    locale?: string | null;
+                    durationMs?: number | null;
+                    audioUploadConsent?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The note already existed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceNoteDetail"];
+                };
+            };
+            /** @description The note. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceNoteDetail"];
+                };
+            };
+            /** @description The note is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceNoteDetail"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    updateVoiceNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    expectedRevision: number;
+                    title?: string;
+                    projectId?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The note. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceNoteDetail"];
+                };
+            };
+            /** @description The change is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    addVoiceTranscript: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    clientRevisionId: string;
+                    parentId?: string | null;
+                    /** @enum {string} */
+                    origin: "on_device" | "remote" | "user_edit";
+                    locale?: string | null;
+                    engine?: string | null;
+                    text: string;
+                    segments: {
+                        startMs: number;
+                        endMs: number;
+                        text: string;
+                        approximate?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The revision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptResult"];
+                };
+            };
+            /** @description The new revision. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VoiceTranscriptResult"];
+                };
+            };
+            /** @description The revision is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    redactVoiceTranscript: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                revisionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The redacted revision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        clientRevisionId: string;
+                        parentId: string | null;
+                        /** @enum {string} */
+                        origin: "on_device" | "remote" | "user_edit";
+                        locale: string | null;
+                        engine: string | null;
+                        text: string;
+                        segments: {
+                            startMs: number;
+                            endMs: number;
+                            text: string;
+                            approximate?: boolean;
+                        }[];
+                        redacted: boolean;
+                        createdByUserId: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createVoiceRunUpload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                runIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    contentType: string;
+                    bytes: number;
+                    sha256: string;
+                    startOffsetMs: number;
+                    durationMs?: number | null;
+                    sampleRateHz?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The upload URL. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                        /** @constant */
+                        method: "PUT";
+                        headers: {
+                            [key: string]: string;
+                        };
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description The run is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is deleted, or the run was uploaded with another checksum. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    completeVoiceRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                runIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        runIndex: number;
+                        startOffsetMs: number;
+                        durationMs: number | null;
+                        sampleRateHz: number | null;
+                        contentType: string;
+                        bytes: number;
+                        sha256: string;
+                        /** @enum {string} */
+                        status: "pending" | "available" | "failed" | "deleted";
+                    };
+                };
+            };
+            /** @description The file is missing or is not the declared audio; upload it again. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getVoiceRunAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                runIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The audio URL. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uri */
+                        url: string;
+                        /** Format: date-time */
+                        expiresAt: string;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    deleteVoiceAudio: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    createVoiceDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    transcriptRevisionId: string;
+                    /** @enum {string} */
+                    intent: "launch_post" | "documentation_outline" | "onboarding_explanation" | "saved_idea";
+                    assetIds?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        contentDraftId: string;
+                    };
+                };
+            };
+            /** @description The request is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    confirmVoiceCommand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    text: string;
+                    channelConnectionId: string;
+                    localTime: string;
+                    timeZone: string;
+                };
+            };
+        };
+        responses: {
+            /** @description What the confirmation did. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        command: {
+                            id: string;
+                            transcriptRevisionId: string;
+                            status: string;
+                            action: string;
+                            platform: string | null;
+                            text: string | null;
+                            localTime: string | null;
+                            timeZone: string;
+                            scheduledFor: string | null;
+                            channelConnectionId: string | null;
+                            candidates: {
+                                channelConnectionId: string;
+                                platform: string;
+                                name: string;
+                            }[];
+                            guessed: string[];
+                            flags: string[];
+                            addedWords: string[];
+                            notice: string | null;
+                            contentDraftId: string | null;
+                            scheduledPostId: string | null;
+                            failureReason: string | null;
+                            expiresAt: string | null;
+                        };
+                        /** @enum {string} */
+                        outcome: "scheduled" | "pending_approval" | "draft";
+                        contentDraftId: string | null;
+                        scheduledPostId: string | null;
+                    };
+                };
+            };
+            /** @description The confirmation is invalid. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The note is not one of yours in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The proposal can no longer be confirmed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;

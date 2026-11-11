@@ -3,7 +3,7 @@
 import type { ChannelConnection } from 'screenshot-studio-backend-sdk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { type FormEvent, useEffect, useId, useState } from 'react'
+import { type FormEvent, useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -15,7 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { getErrorMessage } from '@/components/workspace/settings-client'
-import { connectionsForChannel } from '@/lib/launch/schedule'
+import { connectionsForChannel, customScheduleTime } from '@/lib/launch/schedule'
+import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
+import { browserTimeZone } from '@/lib/time-zones'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { Label } from '@/components/ui/label'
 import {
@@ -108,8 +110,10 @@ export function ScheduleDialog({
   )
   const [day, setDay] = useState('')
   const [clock, setClock] = useState('')
-  // A datetime-local value, empty until both halves are set.
-  const time = day && clock ? `${day}T${clock}` : ''
+  const [zone, setZone] = useState('UTC')
+  const formRef = useRef<HTMLFormElement>(null)
+  const timeErrorId = useId()
+  const [timeError, setTimeError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const usable = connections ? (connectionsForChannel(post.channel, connections) ?? []) : null
@@ -127,6 +131,16 @@ export function ScheduleDialog({
   }, [connections, open, post.channel, trpcClient])
 
   async function schedule(skipLinkCheck: boolean) {
+    if (busy || !formRef.current?.reportValidity()) return
+    let scheduledAt: string | undefined
+    try {
+      scheduledAt = customScheduleTime(day, clock, zone)
+      setTimeError(null)
+    } catch (failure) {
+      setTimeError(getErrorMessage(failure))
+      document.getElementById(ids.time)?.focus()
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -135,7 +149,7 @@ export function ScheduleDialog({
         channelConnectionId: connectionId,
         ...(variantId ? { creativeVariantId: variantId } : {}),
         postId: post.id,
-        ...(time ? { scheduledAt: new Date(time).toISOString() } : {}),
+        ...(scheduledAt ? { scheduledAt } : {}),
         skipLinkCheck,
       })
       toast.success(reschedule ? 'Post rescheduled' : 'Post scheduled')
@@ -157,7 +171,10 @@ export function ScheduleDialog({
     <>
       <Button
         className="h-8 rounded-lg text-xs"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setZone(browserTimeZone())
+          setOpen(true)
+        }}
         size="sm"
         type="button"
       >
@@ -171,7 +188,7 @@ export function ScheduleDialog({
               The {channelLabel} post publishes with the visual you pick, to the account you pick.
             </DialogDescription>
           </DialogHeader>
-          <form className="flex flex-col gap-4" onSubmit={submit}>
+          <form className="flex flex-col gap-4" onSubmit={submit} ref={formRef}>
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-medium text-foreground/65" htmlFor={ids.visual}>
                 Visual
@@ -251,6 +268,7 @@ export function ScheduleDialog({
               <div className="grid grid-cols-[1fr_8rem] gap-2">
                 <DatePicker
                   aria-label="Publish day"
+                  aria-describedby={timeError ? timeErrorId : undefined}
                   className="h-10 w-full rounded-lg"
                   id={ids.time}
                   onChange={setDay}
@@ -258,11 +276,23 @@ export function ScheduleDialog({
                 />
                 <TimePicker
                   aria-label="Publish time"
+                  aria-describedby={timeError ? timeErrorId : undefined}
                   className="w-full"
                   onChange={setClock}
                   value={clock}
                 />
               </div>
+              <TimeZonePicker
+                label="Custom publish time zone"
+                onChange={setZone}
+                value={zone}
+                disabled={busy}
+              />
+              {timeError ? (
+                <p className="text-xs text-destructive" id={timeErrorId} role="alert">
+                  {timeError}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 Leave empty to publish at the workspace&apos;s next default publish time.
               </p>

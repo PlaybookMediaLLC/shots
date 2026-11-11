@@ -153,6 +153,12 @@ export const CREATE_LINKS = [
   { href: '/create?view=templates', label: 'Templates' },
   { href: '/create?view=tools', label: 'Tools' },
 ]
+/** The member's own notes from the Shots app. */
+export const VOICE_NOTES = { href: '/create/voice', label: 'Voice notes' } as const
+/** Create's pages; Voice notes is listed while the workspace has voice notes on. */
+export function createLinks(voiceNotes: boolean): AreaLink[] {
+  return voiceNotes ? [...CREATE_LINKS, VOICE_NOTES] : CREATE_LINKS
+}
 
 /** Campaigns' pages; Deliveries lists posts, so it needs content drafts (PLATFORM_CONTENT_DRAFTS). */
 export function campaignLinks(draftsEnabled: boolean): AreaLink[] {

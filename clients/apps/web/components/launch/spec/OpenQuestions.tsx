@@ -1,7 +1,6 @@
 'use client'
 
-import { useUnsavedCampaignChanges } from '@/components/campaigns/useUnsavedCampaignChanges'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Group, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
 import { type ReleaseSpecContent, SPEC_SECTION_LABELS } from '@/lib/launch/spec-schema'
@@ -15,10 +14,14 @@ type Question = ReleaseSpecContent['openQuestions'][number]
  */
 export function OpenQuestions({
   editable,
+  disabled,
+  onDirtyChange,
   onSave,
   questions,
 }: {
   editable: boolean
+  disabled: boolean
+  onDirtyChange: (dirty: boolean) => void
   onSave: (questions: Question[]) => Promise<void>
   questions: Question[]
 }) {
@@ -27,9 +30,13 @@ export function OpenQuestions({
   const [error, setError] = useState<string | null>(null)
   const changed = answers.some((answer, position) => answer.trim() !== questions[position]?.answer)
 
-  useUnsavedCampaignChanges(changed && !saving)
+  useEffect(() => {
+    onDirtyChange(changed)
+    return () => onDirtyChange(false)
+  }, [changed, onDirtyChange])
 
   async function save() {
+    if (disabled || saving) return
     setSaving(true)
     setError(null)
     try {
@@ -74,6 +81,7 @@ export function OpenQuestions({
                 <Textarea
                   aria-label={`Answer: ${question.question}`}
                   className="mt-1 min-h-10 w-full rounded-lg bg-foreground/[0.03] px-3 py-2 text-sm text-foreground ring-1 ring-foreground/[0.08] outline-none [field-sizing:content] placeholder:text-muted-foreground/75 focus:ring-foreground/25"
+                  disabled={disabled || saving}
                   maxLength={1_000}
                   onChange={(event) =>
                     setAnswers(
@@ -100,8 +108,17 @@ export function OpenQuestions({
               Saving creates a new version. Redraft to use your answers.
             </p>
             <Button
+              disabled={!changed || saving || disabled}
+              onClick={() => setAnswers(questions.map((question) => question.answer))}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
+              Discard answers
+            </Button>
+            <Button
               className="shrink-0 rounded-lg"
-              disabled={!changed || saving}
+              disabled={!changed || saving || disabled}
               onClick={() => void save()}
               size="sm"
               type="button"

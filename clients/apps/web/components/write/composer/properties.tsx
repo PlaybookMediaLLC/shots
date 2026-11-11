@@ -313,6 +313,13 @@ export function PropertiesPanel({
             </dd>
           </>
         ) : null}
+        {draft.sourceVoiceRevisionId ? (
+          <>
+            <dt className="text-muted-foreground">Source</dt>
+            {/* The note stays private to whoever recorded it, so there is no link. */}
+            <dd data-testid="properties-voice-source">From a voice note</dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Created</dt>
         <dd>
           <LocalTime value={draft.createdAt} />

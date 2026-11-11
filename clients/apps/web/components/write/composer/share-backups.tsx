@@ -3,6 +3,7 @@
 import { useWriteRouter } from '@/components/write/write-context'
 
 import * as React from 'react'
+import { lineDiff as diffRows } from '@/lib/line-diff'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -170,32 +171,11 @@ export function lineDiff(
 ): { kind: 'same' | 'removed' | 'added'; text: string }[] {
   const a = before.split('\n')
   const b = after.split('\n')
-  const table = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0))
-  for (let i = a.length - 1; i >= 0; i -= 1) {
-    for (let j = b.length - 1; j >= 0; j -= 1) {
-      table[i][j] =
-        a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1])
-    }
-  }
-  const out: { kind: 'same' | 'removed' | 'added'; text: string }[] = []
-  let i = 0
-  let j = 0
-  while (i < a.length && j < b.length) {
-    if (a[i] === b[j]) {
-      out.push({ kind: 'same', text: a[i] })
-      i += 1
-      j += 1
-    } else if (table[i + 1][j] >= table[i][j + 1]) {
-      out.push({ kind: 'removed', text: a[i] })
-      i += 1
-    } else {
-      out.push({ kind: 'added', text: b[j] })
-      j += 1
-    }
-  }
-  while (i < a.length) out.push({ kind: 'removed', text: a[i++] })
-  while (j < b.length) out.push({ kind: 'added', text: b[j++] })
-  return out
+  return diffRows(before, after).map((row) =>
+    row.kind === 'add'
+      ? { kind: 'added', text: b[row.after - 1] }
+      : { kind: row.kind === 'del' ? 'removed' : 'same', text: a[row.before - 1] }
+  )
 }
 
 /** Why a backup was kept, as a person reads it. */
@@ -231,7 +211,9 @@ export function BackupsBrowser({
   const { data } = useWrite()
   const [items, setItems] = React.useState<RevisionWire[] | null>(null)
   const [index, setIndex] = React.useState(0)
-  const [revision, setRevision] = React.useState<RevisionWire | null>(null)
+  const [loaded, setRevision] = React.useState<RevisionWire | null>(null)
+  const [loadError, setLoadError] = React.useState<{ id: string; message: string } | null>(null)
+  const [retry, setRetry] = React.useState(0)
   const [channel, setChannel] = React.useState<DraftChannel>(channels[0] ?? 'x')
   const [compare, setCompare] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -245,24 +227,50 @@ export function BackupsBrowser({
       })
   }, [draftId])
   const id = items?.[index]?.id
+  const revision = loaded?.id === id ? loaded : null
   React.useEffect(() => {
-    if (!id) return setRevision(null)
+    setRevision(null)
+    setLoadError(null)
+    if (!id) return
     let live = true
-    void draftsApi.revision(draftId, id).then((found) => live && setRevision(found))
+    void draftsApi
+      .revision(draftId, id)
+      .then((found) => {
+        if (live) setRevision(found)
+      })
+      .catch((error: unknown) => {
+        if (live)
+          setLoadError({
+            id,
+            message: error instanceof Error ? error.message : 'This backup could not be read.',
+          })
+      })
     return () => {
       live = false
     }
-  }, [draftId, id])
+  }, [draftId, id, retry])
   const body = revision
     ? bodyFor((revision.body ?? []) as PlateBody, readVersions(revision.platformVersions), channel)
     : []
   const then = serializeDraft(body, channel).caption
   const now = serializeDraft(current, channel).caption
+  // Group adjacent lines so a large fallback does not mount tens of thousands of spans.
+  const comparison = React.useMemo(() => {
+    if (!compare || !revision) return []
+    const groups: { kind: 'same' | 'removed' | 'added'; lines: string[] }[] = []
+    for (const line of lineDiff(then, now)) {
+      const text = `${line.kind === 'removed' ? '− ' : line.kind === 'added' ? '+ ' : '  '}${line.text || ' '}`
+      const last = groups[groups.length - 1]
+      if (last?.kind === line.kind) last.lines.push(text)
+      else groups.push({ kind: line.kind, lines: [text] })
+    }
+    return groups.map(({ kind, lines }) => ({ kind, text: lines.join('\n') }))
+  }, [compare, revision, then, now])
   const recover = async () => {
-    if (!id) return
+    if (!revision || busy) return
     setBusy(true)
     try {
-      const result = await writeApi.recover(draftId, id)
+      const result = await writeApi.recover(draftId, revision.id)
       toast.success('Recovered as a new draft. The original is unchanged.')
       router.push(draftHref(result.draft.id, data.activeSet?.id))
     } catch (error) {
@@ -292,7 +300,7 @@ export function BackupsBrowser({
           <>
             <div className="flex items-center justify-between gap-2 text-sm">
               <Button
-                disabled={index >= items.length - 1}
+                disabled={busy || index >= items.length - 1}
                 onClick={() => setIndex(index + 1)}
                 size="sm"
                 type="button"
@@ -308,7 +316,7 @@ export function BackupsBrowser({
                 </span>
               </span>
               <Button
-                disabled={index === 0}
+                disabled={busy || index === 0}
                 onClick={() => setIndex(index - 1)}
                 size="sm"
                 type="button"
@@ -352,7 +360,7 @@ export function BackupsBrowser({
                   className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg bg-foreground/[0.03] p-3 font-sans text-sm"
                   data-testid="backup-diff"
                 >
-                  {lineDiff(then, now).map((line, at) => (
+                  {comparison.map((line, at) => (
                     <span
                       className={cn(
                         'block',
@@ -363,8 +371,7 @@ export function BackupsBrowser({
                       )}
                       key={at}
                     >
-                      {line.kind === 'removed' ? '− ' : line.kind === 'added' ? '+ ' : '  '}
-                      {line.text || ' '}
+                      {line.text}
                     </span>
                   ))}
                 </pre>
@@ -376,6 +383,13 @@ export function BackupsBrowser({
                   {then || 'Empty'}
                 </pre>
               )
+            ) : loadError && loadError.id === id ? (
+              <div role="alert" className="text-sm">
+                <p>{loadError.message}</p>
+                <Button onClick={() => setRetry((value) => value + 1)} variant="outline" size="sm">
+                  Retry loading version
+                </Button>
+              </div>
             ) : (
               <p className="text-sm text-muted-foreground">Loading this version…</p>
             )}
@@ -385,7 +399,7 @@ export function BackupsBrowser({
           <Button onClick={onClose} type="button" variant="ghost">
             Close
           </Button>
-          <Button disabled={!id || busy} onClick={() => void recover()} type="button">
+          <Button disabled={!revision || busy} onClick={() => void recover()} type="button">
             Create new draft from this version
           </Button>
         </DialogFooter>

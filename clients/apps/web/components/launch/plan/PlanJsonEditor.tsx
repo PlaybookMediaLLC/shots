@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useId, useState, useTransition } from 'react'
+import { useEffect, useId, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { useUnsavedCampaignChanges } from '@/components/campaigns/useUnsavedCampaignChanges'
 import { Button } from '@/components/ui/button'
 import { type CampaignPlanContent, campaignPlanSchema } from '@/lib/launch/spec-schema'
 import { useTRPCClient } from '@/lib/trpc/react'
@@ -20,10 +21,14 @@ export function PlanJsonEditor({
   campaignId,
   content,
   planId,
+  disabled,
+  onBlockedChange,
 }: {
   campaignId: string
   content: CampaignPlanContent
   planId: string
+  disabled: boolean
+  onBlockedChange: (blocked: boolean) => void
 }) {
   const trpcClient = useTRPCClient()
   const router = useRouter()
@@ -32,9 +37,17 @@ export function PlanJsonEditor({
   const [text, setText] = useState(original)
   const [errors, setErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
-  const [, startRefresh] = useTransition()
+  const [refreshing, startRefresh] = useTransition()
+  const pending = saving || refreshing
+  const blocked = text !== original || pending
+  useUnsavedCampaignChanges(blocked)
+  useEffect(() => {
+    onBlockedChange(blocked)
+    return () => onBlockedChange(false)
+  }, [blocked, onBlockedChange])
 
   async function save() {
+    if (pending || disabled) return
     let parsed: unknown
     try {
       parsed = JSON.parse(text)
@@ -64,7 +77,6 @@ export function PlanJsonEditor({
       startRefresh(() => router.refresh())
     } catch (error) {
       setErrors([error instanceof Error ? error.message : 'The plan could not be saved.'])
-    } finally {
       setSaving(false)
     }
   }
@@ -94,6 +106,7 @@ export function PlanJsonEditor({
               aria-describedby={`${id}-help`}
               aria-invalid={errors.length > 0 || undefined}
               className="h-[28rem] w-full resize-y rounded-lg bg-black/20 px-3 py-2 font-mono text-xs leading-5 text-foreground ring-1 ring-foreground/[0.08] outline-none focus:ring-foreground/25 aria-invalid:ring-red-500/40"
+              disabled={pending || disabled}
               id={id}
               onChange={(event) => setText(event.target.value)}
               spellCheck={false}
@@ -114,7 +127,7 @@ export function PlanJsonEditor({
             <div className="flex justify-end gap-2">
               <Button
                 className="rounded-lg"
-                disabled={text === original || saving}
+                disabled={text === original || pending || disabled}
                 onClick={() => {
                   setText(original)
                   setErrors([])
@@ -127,7 +140,7 @@ export function PlanJsonEditor({
               </Button>
               <Button
                 className="rounded-lg"
-                disabled={text === original || saving}
+                disabled={text === original || pending || disabled}
                 onClick={() => void save()}
                 size="sm"
                 type="button"

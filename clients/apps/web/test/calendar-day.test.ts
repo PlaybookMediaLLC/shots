@@ -25,3 +25,8 @@ test('text that is not a day parses to null', () => {
   for (const input of ['', 'someday', '13/45/2026', '2026-02-30', 'Nov 40'])
     assert.equal(parseDayInput(input, now), null, input)
 })
+test('prototype property names are unsupported dates, not relative days', () => {
+  for (const text of ['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty']) {
+    assert.equal(parseDayInput(text), null)
+  }
+})

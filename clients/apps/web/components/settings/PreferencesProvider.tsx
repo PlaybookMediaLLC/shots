@@ -10,6 +10,7 @@ import {
   useEffect,
   useEffectEvent,
   useState,
+  useRef,
 } from 'react'
 import type { z } from 'zod'
 import { FormatPreferencesProvider } from '@/components/ui/format-preferences'
@@ -50,6 +51,28 @@ function rememberNavigation(value: Preferences['navigation']) {
   document.cookie = `${NAVIGATION_COOKIE}=${value}; path=/; max-age=31536000; samesite=lax`
 }
 
+/** Apply pending field intent over the last confirmed server snapshot. */
+function applyPreferenceUpdate(previous: Preferences, update: PreferencesUpdate): Preferences {
+  return {
+    ...previous,
+    ...(update.accentColor === undefined ? {} : { accentColor: update.accentColor }),
+    ...(update.theme ? { theme: update.theme } : {}),
+    ...(update.navigation ? { navigation: update.navigation } : {}),
+    ...(update.weekStart ? { weekStart: update.weekStart } : {}),
+    ...(update.timeFormat ? { timeFormat: update.timeFormat } : {}),
+    ...(update.textDirection ? { textDirection: update.textDirection } : {}),
+    ...(update.showScrollbars === undefined ? {} : { showScrollbars: update.showScrollbars }),
+    ...(update.developerMode === undefined ? {} : { developerMode: update.developerMode }),
+    ...(update.emailNotifications === undefined
+      ? {}
+      : { emailNotifications: update.emailNotifications }),
+    ...(update.experiments
+      ? { experiments: { ...previous.experiments, ...update.experiments } }
+      : {}),
+    ...(update.timeZone === undefined ? {} : { timeZone: update.timeZone || null }),
+  }
+}
+
 /**
  * Loads the signed-in person's preferences (RFC 024) and applies the ones
  * that change the page: theme and the navigation cookie. A change
@@ -66,12 +89,14 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     staleTime: 5 * 60 * 1000,
   })
   const [pending, setPending] = useState<Preferences | null>(null)
+  const updates = useRef<PreferencesUpdate[]>([])
+  const queue = useRef<Promise<unknown>>(Promise.resolve())
   const preferences = pending ?? query.data ?? null
 
   // Another device may have changed the theme: the saved one wins on load.
   // next-themes makes a new setTheme each time the theme changes; depending on
   // it here put the old theme back over an optimistic switch until the save landed.
-  const savedTheme = query.data?.theme
+  const savedTheme = preferences?.theme
   const applySavedTheme = useEffectEvent((theme: Preferences['theme']) => setTheme(theme))
   useEffect(() => {
     if (savedTheme) applySavedTheme(savedTheme)
@@ -100,7 +125,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, [accent])
 
-  const savedNavigation = query.data?.navigation
+  const savedNavigation = preferences?.navigation
   useEffect(() => {
     if (savedNavigation) rememberNavigation(savedNavigation)
   }, [savedNavigation])
@@ -108,43 +133,37 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => installDebugErrorHandlers(), [])
 
   const save = useCallback(
-    async (update: PreferencesUpdate): Promise<SaveResult> => {
+    (update: PreferencesUpdate): Promise<SaveResult> => {
       const previous = queryClient.getQueryData<Preferences>(PREFERENCES_KEY)
-      if (!previous) return { error: 'Your preferences are still loading.', ok: false }
-      const optimistic: Preferences = {
-        ...previous,
-        ...(update.accentColor === undefined ? {} : { accentColor: update.accentColor }),
-        ...(update.theme ? { theme: update.theme } : {}),
-        ...(update.navigation ? { navigation: update.navigation } : {}),
-        ...(update.weekStart ? { weekStart: update.weekStart } : {}),
-        ...(update.timeFormat ? { timeFormat: update.timeFormat } : {}),
-        ...(update.textDirection ? { textDirection: update.textDirection } : {}),
-        ...(update.showScrollbars === undefined ? {} : { showScrollbars: update.showScrollbars }),
-        ...(update.developerMode === undefined ? {} : { developerMode: update.developerMode }),
-        ...(update.emailNotifications === undefined
-          ? {}
-          : { emailNotifications: update.emailNotifications }),
-        ...(update.timeZone === undefined ? {} : { timeZone: update.timeZone || null }),
-      }
-      setPending(optimistic)
-      if (update.theme) setTheme(update.theme)
-      if (update.navigation) rememberNavigation(update.navigation)
-      try {
-        const saved = await settingsRequest('/api/v1/me/preferences', userPreferencesSchema, {
-          body: update,
-          method: 'PATCH',
-        })
-        queryClient.setQueryData(PREFERENCES_KEY, saved)
-        return { ok: true }
-      } catch (error) {
-        setTheme(previous.theme)
-        rememberNavigation(previous.navigation)
-        return { error: settingsErrorMessage(error), ok: false }
-      } finally {
-        setPending(null)
-      }
+      if (!previous)
+        return Promise.resolve({ error: 'Your preferences are still loading.', ok: false })
+      updates.current.push(update)
+      setPending(updates.current.reduce(applyPreferenceUpdate, previous))
+      const run = queue.current.then(async (): Promise<SaveResult> => {
+        try {
+          // Each response becomes the base for all still-pending user choices.
+          const saved = await settingsRequest('/api/v1/me/preferences', userPreferencesSchema, {
+            body: update,
+            method: 'PATCH',
+          })
+          queryClient.setQueryData(PREFERENCES_KEY, saved)
+          return { ok: true }
+        } catch (error) {
+          return { error: settingsErrorMessage(error), ok: false }
+        } finally {
+          updates.current.shift()
+          const confirmed = queryClient.getQueryData<Preferences>(PREFERENCES_KEY)
+          setPending(
+            confirmed && updates.current.length
+              ? updates.current.reduce(applyPreferenceUpdate, confirmed)
+              : null
+          )
+        }
+      })
+      queue.current = run.catch(() => undefined)
+      return run
     },
-    [queryClient, setTheme]
+    [queryClient]
   )
 
   return (
@@ -157,9 +176,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
     >
       <FormatPreferencesProvider
         timeFormat={preferences?.timeFormat ?? 'auto'}
-        weekStartsOn={
-          preferences ? (preferences.weekStart === 'sunday' ? 0 : 1) : undefined
-        }
+        weekStartsOn={preferences ? (preferences.weekStart === 'sunday' ? 0 : 1) : undefined}
       >
         {children}
       </FormatPreferencesProvider>

@@ -96,11 +96,12 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
   const { resetResults } = queue;
   const updateSettings = React.useCallback(
     (updates: Partial<ToolSettings>) => {
+      if (queue.isRunning) return
       setSettings((previous) => ({ ...previous, ...updates }));
       // Results produced under the old settings would download as stale files.
       resetResults();
     },
-    [resetResults]
+    [resetResults, queue.isRunning]
   );
 
   const handleRun = React.useCallback(() => {
@@ -142,7 +143,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
     queue.hasResults &&
     queue.items.every((item) => item.status === "done" || item.status === "error");
   const totalSaved = savingsPercent(
-    queue.totalInputBytes,
+    queue.successfulInputBytes,
     queue.totalOutputBytes
   );
 
@@ -199,6 +200,7 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
           "flex flex-col gap-5 p-5 lg:sticky lg:top-24",
         )}
       >
+        <fieldset disabled={queue.isRunning} inert={queue.isRunning} className="contents">
         <Panel
           settings={settings}
           onChange={updateSettings}
@@ -207,12 +209,18 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
           outputFormats={outputFormats}
           sourceFormats={sourceFormats}
         />
+        </fieldset>
+        {queue.isRunning ? (
+          <p role="status" className="text-xs text-muted-foreground">
+            Settings are locked while processing.
+          </p>
+        ) : null}
 
         <div className="flex flex-col gap-2 border-t border-border pt-5">
           {finished && !queue.isRunning ? (
             <div className="mb-2 flex items-center justify-between rounded-xl bg-foreground/[0.04] px-3.5 py-3 text-sm">
               <span className="text-muted-foreground">
-                {formatBytes(queue.totalInputBytes)} →{" "}
+                {formatBytes(queue.successfulInputBytes)} →{" "}
                 <span className="text-foreground">
                   {formatBytes(queue.totalOutputBytes)}
                 </span>
@@ -229,6 +237,13 @@ export function ToolWorkspace({ tool }: ToolWorkspaceProps) {
                 <span className="text-muted-foreground">Same size</span>
               )}
             </div>
+          ) : null}
+
+          {queue.failedCount > 0 ? (
+            <p className="text-xs text-destructive">
+              {queue.failedCount} failed {queue.failedCount === 1 ? 'image is' : 'images are'}{' '}
+              excluded from savings and downloads.
+            </p>
           ) : null}
 
           {queue.isRunning ? (

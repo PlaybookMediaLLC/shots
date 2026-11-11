@@ -614,10 +614,10 @@ func replayDraftSchedule(ctx context.Context, tx *ent.Tx, draft *ent.ContentDraf
 	return existing, nil
 }
 
-// cancelLiveDraftPosts cancels the draft's queued posts so a reschedule
-// replaces them. A post already publishing, or that may be live, blocks it.
-func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID string) ([]string, error) {
-	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(draftID), scheduledpost.StatusIn(
+// cancelLiveDraftPosts withdraws queued commitments for a reschedule or review.
+// A post already publishing, or that may be live, blocks the transaction.
+func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID, reason string) ([]string, error) {
+	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(draftID), scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(
 		scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING,
 		scheduledpost.StatusUNKNOWN_DELIVERY)).All(ctx)
 	if err != nil {
@@ -626,10 +626,14 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID 
 	cancelled := make([]string, 0, len(live))
 	for _, post := range live {
 		if post.Status == scheduledpost.StatusPROCESSING || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
-			return nil, conflict("A post from this draft is publishing or may already be live. Check the channel before rescheduling.")
+			return nil, conflict("A post from this draft is publishing or may already be live. Check the channel before changing its schedule or review.")
 		}
-		count, err := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
-			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED).Save(ctx)
+		update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.OrganizationID(actor.OrganizationID), scheduledpost.StatusIn(
+			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED)
+		if reason == publishing.FailureChangesRequested {
+			update.SetFailureCode(reason)
+		}
+		count, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -637,7 +641,7 @@ func cancelLiveDraftPosts(ctx context.Context, tx *ent.Tx, actor Actor, draftID 
 			return nil, publishing.ErrConflict
 		}
 		if err := recordProductActivity(ctx, tx, actor, "post.cancelled", "post.cancelled", "scheduled_post", post.ID,
-			map[string]any{"contentDraftId": draftID, "reason": "rescheduled"}); err != nil {
+			map[string]any{"contentDraftId": draftID, "reason": reason}); err != nil {
 			return nil, err
 		}
 		cancelled = append(cancelled, post.ID)
@@ -793,6 +797,9 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err != nil {
 		return nil, err
 	}
+	// shortcut: captions come from the request (the web serializes the draft), so
+	// approval binds the version, not the text; upgrade to a Go serializer shared by
+	// every schedule path, or check captions against a snapshot serialized at approval.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)
@@ -803,11 +810,17 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
 		return nil, err
 	}
+	// Who approved the version these posts carry, if anyone did.
+	var approvedBy *string
+	var approvedVersion *int
+	if draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version {
+		approvedBy, approvedVersion = draft.ReviewedByUserID, draft.ApprovedVersion
+	}
 	var cancelled, kept []string
 	if input.Add {
 		kept, err = liveDraftChannels(ctx, tx, draft.ID, input.Targets)
 	} else {
-		cancelled, err = cancelLiveDraftPosts(ctx, tx, actor, draft.ID)
+		cancelled, err = cancelLiveDraftPosts(ctx, tx, actor, draft.ID, "rescheduled")
 	}
 	if err != nil {
 		return nil, err
@@ -855,6 +868,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			SetNaturalOffsetSeconds(placement.offset).SetScheduleTimeZone(placement.zone).SetScheduleIntent(intent).
 			SetScheduledFor(placement.at).SetStatus(scheduledpost.StatusSCHEDULED).
 			SetCaption(strings.TrimSpace(target.Caption)).
+			SetNillableScheduledByUserID(schedulerID(actor)).
+			SetNillableApprovedByUserID(approvedBy).SetNillableApprovedVersion(approvedVersion).
 			SetIdempotencyKey(contentDraftPostKey(draft.ID, target.ChannelConnectionID, input.Version)).Save(ctx)
 		if err != nil {
 			if ent.IsConstraintError(err) {

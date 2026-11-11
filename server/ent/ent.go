@@ -146,6 +146,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/user"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/userpreference"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhookdeliveryattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -347,6 +353,12 @@ func checkColumn(t, c string) error {
 			surfacecapture.Table:                  surfacecapture.ValidColumn,
 			user.Table:                            user.ValidColumn,
 			userpreference.Table:                  userpreference.ValidColumn,
+			voiceaudiorun.Table:                   voiceaudiorun.ValidColumn,
+			voicecommand.Table:                    voicecommand.ValidColumn,
+			voicemembersettings.Table:             voicemembersettings.ValidColumn,
+			voicenote.Table:                       voicenote.ValidColumn,
+			voicesettings.Table:                   voicesettings.ValidColumn,
+			voicetranscriptrevision.Table:         voicetranscriptrevision.ValidColumn,
 			webhookdelivery.Table:                 webhookdelivery.ValidColumn,
 			webhookdeliveryattempt.Table:          webhookdeliveryattempt.ValidColumn,
 			webhooksubscription.Table:             webhooksubscription.ValidColumn,

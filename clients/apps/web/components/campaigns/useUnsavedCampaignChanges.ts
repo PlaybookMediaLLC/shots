@@ -1,39 +1,32 @@
 'use client'
 
 import { useEffect } from 'react'
+import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
+import { guardWorkflowNavigation } from '@/lib/workflows/navigation-guard'
 
-/** Confirm before leaving a form with unsaved work, including campaign tabs. */
+let activeEditors = 0
+let removeListeners: (() => void) | undefined
+
+/** Protect campaign drafts across links, history, reloads and guarded router actions. */
 export function useUnsavedCampaignChanges(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return
-    const unload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
-    const navigate = (event: MouseEvent) => {
-      const link = event.target instanceof Element ? event.target.closest('a[href]') : null
-      if (
-        !(link instanceof HTMLAnchorElement) ||
-        link.target === '_blank' ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey
-      )
-        return
-      const destination = new URL(link.href)
-      if (destination.pathname === location.pathname && destination.search === location.search)
-        return
-      if (!window.confirm('Leave without saving your changes?')) {
-        event.preventDefault()
-        event.stopPropagation()
+    activeEditors++
+    if (activeEditors === 1) {
+      const confirm = () => window.confirm('Leave without saving your changes?')
+      const removeGuard = registerNavigationGuard(() => {
+        if (!confirm()) throw new Error('Save or discard your changes before leaving.')
+      }, true)
+      const removeNavigation = guardWorkflowNavigation((leave) => {
+        if (confirm()) leave()
+      })
+      removeListeners = () => {
+        removeGuard()
+        removeNavigation()
       }
     }
-    window.addEventListener('beforeunload', unload)
-    document.addEventListener('click', navigate, true)
     return () => {
-      window.removeEventListener('beforeunload', unload)
-      document.removeEventListener('click', navigate, true)
+      if (--activeEditors === 0) removeListeners?.()
     }
   }, [dirty])
 }

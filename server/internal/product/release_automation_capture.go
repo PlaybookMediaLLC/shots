@@ -32,6 +32,9 @@ var (
 	ErrCaptureNeedsAuth = errors.New("the app connection needs a person to sign in again")
 	// ErrCapturePending is retryable: the durable job has not finished yet.
 	ErrCapturePending = errors.New("the capture job has not finished")
+	// ErrCaptureSuperseded ends the run: a newer deployment replaced this one
+	// before its capture ran, and the newer one captures for itself.
+	ErrCaptureSuperseded = errors.New("a newer deployment superseded this capture")
 )
 
 // automationCaptureProduct gives a run the capture of its own deployment, so
@@ -56,7 +59,7 @@ func (c *Configuration) automationCaptureProduct(ctx context.Context, org string
 	if err != nil {
 		return automation.Outputs{}, err
 	}
-	deployment, err := c.automationDeployment(ctx, org, event)
+	deployment, err := c.automationDeployment(ctx, org, event, "")
 	if err != nil {
 		return automation.Outputs{}, err
 	}
@@ -86,8 +89,9 @@ func (c *Configuration) automationCaptureProduct(ctx context.Context, org string
 // other deployment has no record to bind to. A published release names only a
 // tag, and can arrive before its code is live: the tag resolves to an immutable
 // commit, and the run waits for a deployment of that commit. A release's
-// target_commitish is not immutable, and a delay proves nothing.
-func (c *Configuration) automationDeployment(ctx context.Context, org string, event *ent.ReleaseSourceEvent) (*ent.DeploymentEvent, error) {
+// target_commitish is not immutable, and a delay proves nothing. A non-empty
+// environment limits a release to that environment's deployments.
+func (c *Configuration) automationDeployment(ctx context.Context, org string, event *ent.ReleaseSourceEvent, environment string) (*ent.DeploymentEvent, error) {
 	e := event.Snapshot
 	query := c.client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(org), deploymentevent.SourceAppID(event.SourceAppID))
 	switch e.Family {
@@ -117,6 +121,9 @@ func (c *Configuration) automationDeployment(ctx context.Context, org string, ev
 		if sha == "" {
 			return nil, ErrDeploymentUnverified
 		}
+		if environment != "" {
+			query.Where(deploymentevent.Environment(environment))
+		}
 		row, err := query.Where(deploymentevent.Sha(sha)).Order(ent.Desc(deploymentevent.FieldCreatedAt), ent.Desc(deploymentevent.FieldID)).First(ctx)
 		if ent.IsNotFound(err) {
 			return nil, ErrDeploymentNotLive
@@ -133,23 +140,14 @@ func (c *Configuration) automationAuthenticatedCapture(ctx context.Context, org 
 	if !c.CaptureAvailable() {
 		return automation.Outputs{}, ErrAuthenticatedCaptureUnavailable
 	}
-	deployment, err := c.automationDeployment(ctx, org, event)
-	if err != nil {
-		return automation.Outputs{}, err
-	}
-	tx, err := c.client.Tx(ctx)
-	if err != nil {
-		return automation.Outputs{}, err
-	}
-	defer tx.Rollback()
-	recipe, err := activeRecipeVersion(ctx, tx.CaptureRecipe, org, action.RecipeID)
+	recipe, err := activeRecipeVersion(ctx, c.client.CaptureRecipe, org, action.RecipeID)
 	if ent.IsNotFound(err) {
 		return automation.Outputs{}, ErrCaptureRefused
 	}
 	if err != nil {
 		return automation.Outputs{}, err
 	}
-	connection, err := tx.PlatformAppConnection.Query().Where(platformappconnection.ID(*recipe.AppConnectionID), platformappconnection.OrganizationID(org)).Only(ctx)
+	connection, err := c.client.PlatformAppConnection.Query().Where(platformappconnection.ID(*recipe.AppConnectionID), platformappconnection.OrganizationID(org)).Only(ctx)
 	if err != nil {
 		return automation.Outputs{}, err
 	}
@@ -162,6 +160,19 @@ func (c *Configuration) automationAuthenticatedCapture(ctx context.Context, org 
 		(definition.Version == nil && !action.CurrentState) {
 		return automation.Outputs{}, ErrCaptureRefused
 	}
+	deployment, err := c.automationDeployment(ctx, org, event, connection.Environment)
+	if err != nil {
+		return automation.Outputs{}, err
+	}
+	// And to one environment: a staging session never captures production.
+	if deployment.Environment != connection.Environment {
+		return automation.Outputs{}, ErrCaptureRefused
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return automation.Outputs{}, err
+	}
+	defer tx.Rollback()
 	// Older jobs for this deployment and recipe count: a reconnect raises the
 	// generation in the key, and repins the unfinished job rather than losing it.
 	job, err := tx.CaptureJob.Query().Where(capturejob.OrganizationID(org), capturejob.DeploymentEventID(deployment.ID), capturejob.RecipeID(recipe.ID)).Order(ent.Desc(capturejob.FieldCreatedAt)).First(ctx)
@@ -190,6 +201,9 @@ func (c *Configuration) automationAuthenticatedCapture(ctx context.Context, org 
 	case capturejob.PhaseNEEDS_AUTH:
 		return automation.Outputs{}, ErrCaptureNeedsAuth
 	case capturejob.PhaseFAILED, capturejob.PhaseCANCELLED:
+		if job.FailureCode != nil && *job.FailureCode == captureSuperseded {
+			return automation.Outputs{}, ErrCaptureSuperseded
+		}
 		return automation.Outputs{}, ErrCaptureRefused
 	}
 	return automation.Outputs{}, ErrCapturePending

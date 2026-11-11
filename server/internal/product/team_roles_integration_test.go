@@ -69,19 +69,135 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			if (token.Access == collab.AccessWrite) != writes {
 				t.Fatalf("collab capability differs: %s", token.Access)
 			}
-			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Action: "request"})
+			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"})
 			want("request review", err, writes)
-			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Action: "approve"})
+			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"})
 			want("approve", err, approves)
 			want("manage accounts", repo.auth.AuthorizeConnections(ctx, w.org, actor.UserID, actor.SessionID), manages)
 			want("manage sets", repo.AuthorizeSocialSetConnection(ctx, actor, setID), manages)
-			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 				t.Fatal(err)
 			}
 			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
 			want("schedule approved content", err, publishes)
 		})
 	}
+	t.Run("a stale reviewer cannot approve another writer's unseen content", func(t *testing.T) {
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Seen by reviewer", PlainText: "Seen"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		title := "Unseen writer edit"
+		edited, err := repo.UpdateContentDraft(ctx, w.actor("writer_publisher"), draft.ID, ContentDraftUpdate{BaseVersion: draft.Version, Title: &title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, version := range []int{0, draft.Version} {
+			_, err = repo.ReviewContentDraft(ctx, w.actor("approver"), draft.ID, ContentDraftReviewInput{Action: "approve", Version: version})
+			if err == nil {
+				t.Fatalf("accepted approval of version %d", version)
+			}
+			if version > 0 && (!errors.Is(err, publishing.ErrConflict) || !strings.Contains(err.Error(), "review the current content")) {
+				t.Fatalf("stale review err=%v", err)
+			}
+		}
+		current, err := repo.GetContentDraft(ctx, w.owner, draft.ID)
+		if err != nil || current.ApprovedVersion != nil {
+			t.Fatalf("stale approval persisted: %+v %v", current, err)
+		}
+		approved, err := repo.ReviewContentDraft(ctx, w.actor("approver"), draft.ID, ContentDraftReviewInput{Action: "approve", Version: edited.Version})
+		if err != nil || approved.ApprovedVersion == nil || *approved.ApprovedVersion != edited.Version {
+			t.Fatalf("re-review=%+v err=%v", approved, err)
+		}
+	})
+	t.Run("the scheduled-posts route refuses drafts where approval is required", func(t *testing.T) {
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Route", PlainText: "Pending"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = repo.ReviewContentDraft(ctx, w.actor("creator"), draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"}); err != nil {
+			t.Fatal(err)
+		}
+		input := publishing.CreateScheduledPostInput{Caption: "Text no one reviewed", ChannelConnectionID: connection.ID, ContentDraftID: draft.ID,
+			IdempotencyKey: "route-" + w.id, ScheduledFor: time.Now().Add(48 * time.Hour).UTC()}
+		publisher := w.actor("publisher")
+		_, err = repo.CreateScheduledPost(ctx, publisher, input)
+		if !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("approval skipped through the scheduled-posts route: %v", err)
+		}
+		posts, err := repo.ListContentDraftPosts(ctx, w.owner, draft.ID)
+		if err != nil || len(posts) != 0 {
+			t.Fatalf("refused request queued posts=%+v err=%v", posts, err)
+		}
+		// With approval off the route schedules the draft as before.
+		off, on := false, true
+		if _, err = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &off}); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &on})
+		})
+		created, err := repo.CreateScheduledPost(ctx, publisher, input)
+		if err != nil || !created.Created || created.Post.ContentDraftID == nil || *created.Post.ContentDraftID != draft.ID {
+			t.Fatalf("approval off: created=%+v err=%v", created, err)
+		}
+		if by := created.Post.ScheduledByUserID; by == nil || *by != publisher.UserID || created.Post.ApprovedByUserID != nil {
+			t.Fatalf("route post accountability: scheduledBy=%v approvedBy=%v", by, created.Post.ApprovedByUserID)
+		}
+	})
+	t.Run("self-approval can be refused; a scheduled post records who scheduled and approved", func(t *testing.T) {
+		settings, err := repo.GetContentDraftSettings(ctx, w.owner)
+		if err != nil || !settings.AllowSelfApproval {
+			t.Fatalf("self-approval is not allowed by default: %+v %v", settings, err)
+		}
+		admin := w.actor("admin")
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Self", PlainText: "Self"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		title := "Admin edit"
+		draft, err = repo.UpdateContentDraft(ctx, admin, draft.ID, ContentDraftUpdate{BaseVersion: draft.Version, Title: &title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A one-person workspace keeps working: by default the last editor approves.
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
+			t.Fatalf("default self-approval: %v", err)
+		}
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"}); err != nil {
+			t.Fatal(err)
+		}
+		off, on := false, true
+		updated, err := repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{AllowSelfApproval: &off})
+		if err != nil || updated.AllowSelfApproval || !updated.RequireApproval {
+			t.Fatalf("settings=%+v err=%v", updated, err)
+		}
+		t.Cleanup(func() {
+			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{AllowSelfApproval: &on})
+		})
+		if _, err = repo.ReviewContentDraft(ctx, admin, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("last editor approved with self-approval off: %v", err)
+		}
+		approver := w.actor("approver")
+		approved, err := repo.ReviewContentDraft(ctx, approver, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		publisher := w.actor("publisher")
+		result, err := repo.ScheduleContentDraft(ctx, publisher, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(72 * time.Hour).UTC(),
+			Version: approved.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Self", ChannelConnectionID: connection.ID}}})
+		if err != nil || len(result.Posts) != 1 {
+			t.Fatalf("schedule approved draft: %+v %v", result, err)
+		}
+		post, err := w.db.Client.ScheduledPost.Get(ctx, result.Posts[0].ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if post.ScheduledByUserID == nil || *post.ScheduledByUserID != publisher.UserID || post.ApprovedByUserID == nil || *post.ApprovedByUserID != approver.UserID ||
+			post.ApprovedVersion == nil || *post.ApprovedVersion != approved.Version {
+			t.Fatalf("scheduledBy=%v approvedBy=%v approvedVersion=%v", post.ScheduledByUserID, post.ApprovedByUserID, post.ApprovedVersion)
+		}
+	})
 	writer := w.actor("writer_publisher")
 	draft, err := repo.CreateContentDraft(ctx, writer, ContentDraftInput{Title: "Demotion", PlainText: "Unapproved"})
 	if err != nil {

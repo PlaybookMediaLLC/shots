@@ -92,7 +92,10 @@ test(
         'In review'
       )
       await writer.keyboard.press('Escape')
-      expect((await requestJson(writer, `${path}/review`, { action: 'approve' })).status).toBe(403)
+      expect(
+        (await requestJson(writer, `${path}/review`, { action: 'approve', version: draft.version }))
+          .status
+      ).toBe(403)
       expect(draftStateSchema.parse((await browserRequest(writer, path)).body).reviewStatus).toBe(
         'pending'
       )
@@ -106,6 +109,23 @@ test(
       await expect(
         approver.getByRole('button', { name: 'Ask for review', exact: true })
       ).toHaveCount(0)
+      // The reviewer has inspected the old version while a separate writer saves.
+      await writer.getByRole('textbox', { name: 'Draft title' }).fill('Unseen writer edit')
+      await expectSaved(writer)
+      const staleApproval = approver.waitForResponse((response) =>
+        response.url().endsWith(`${path}/review`)
+      )
+      await approver.getByRole('button', { name: 'Approve', exact: true }).click()
+      expect((await staleApproval).status()).toBe(409)
+      await expect(approver.getByText(/Reload and review the current content/)).toBeVisible()
+      expect(
+        draftStateSchema.parse((await browserRequest(approver, path)).body).approvedVersion
+      ).toBeNull()
+      await approver.reload()
+      await expect(approver.getByRole('textbox', { name: 'Draft title' })).toHaveValue(
+        'Unseen writer edit'
+      )
+      await approver.getByRole('button', { name: 'Review', exact: true }).click()
       await approver.getByRole('button', { name: 'Approve', exact: true }).click()
       await expect(approver.getByRole('button', { name: 'Review', exact: true })).toContainText(
         'Approved'
@@ -124,9 +144,14 @@ test(
           })
         ).status
       ).toBe(403)
-      expect((await requestJson(approver, `${path}/review`, { action: 'request' })).status).toBe(
-        403
-      )
+      expect(
+        (
+          await requestJson(approver, `${path}/review`, {
+            action: 'request',
+            version: draft.version,
+          })
+        ).status
+      ).toBe(403)
       await testInfo.attach('approver-can-approve-without-writing', {
         body: await approver.screenshot({ path: testInfo.outputPath('approver-permissions.png') }),
         contentType: 'image/png',
@@ -157,13 +182,16 @@ test(
         .fill('Rejected stale editor change')
       expect((await failedSave).status()).toBe(403)
       expect(draftStateSchema.parse((await browserRequest(page, path)).body).title).toBe(
-        'Edited by writer'
+        'Unseen writer edit'
       )
-      expect((await requestJson(writer, `${path}/review`, { action: 'request' })).status).toBe(403)
+      expect(
+        (await requestJson(writer, `${path}/review`, { action: 'request', version: draft.version }))
+          .status
+      ).toBe(403)
       await writer.reload()
       await expect(writer.getByRole('textbox', { name: 'Draft title' })).toBeDisabled()
       await expect(writer.getByRole('textbox', { name: 'Draft title' })).toHaveValue(
-        'Edited by writer'
+        'Unseen writer edit'
       )
 
       await openWorkspaceSetting(writer, 'Billing')

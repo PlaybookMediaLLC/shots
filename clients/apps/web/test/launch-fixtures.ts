@@ -1,4 +1,9 @@
-import { type ReleaseSpecContent, releaseSpecSchema } from '@/lib/launch/spec-schema'
+import {
+  type ReleaseSpecContent,
+  releaseSpecSchema,
+  type CampaignPlanContent,
+  campaignPlanSchema,
+} from '@/lib/launch/spec-schema'
 
 /** A small valid spec citing brief, S1, and S2, shared by the launch tests. */
 export function sampleSpec(): ReleaseSpecContent {
@@ -50,5 +55,39 @@ export function sampleSpec(): ReleaseSpecContent {
       text: 'Ledgerly now sends recurring invoices automatically.',
     },
     whatChanged: [{ sources: ['S1'], text: 'Invoices can repeat monthly' }],
+  })
+}
+
+/** A plan whose references resolve against sampleSpec, shared with browser editing tests. */
+export function samplePlan(): CampaignPlanContent {
+  return campaignPlanSchema.parse({
+    angles: [
+      {
+        hook: 'Stop chasing invoices',
+        key: 'G1',
+        pillar: 'Hands-off billing',
+        specRefs: ['capabilities.0'],
+        title: 'Time back',
+      },
+    ],
+    assets: [
+      {
+        angleKey: 'G1',
+        capability: 'Recurring invoices',
+        captureHint: { device: 'desktop', focus: 'The schedule picker', url: '' },
+        format: '16:9',
+        headline: 'Invoices that send themselves',
+        key: 'A1',
+        kind: 'hero',
+        variants: 2,
+      },
+    ],
+    channels: [
+      { cadence: 'Launch day plus one follow-up', channel: 'linkedin', role: 'Reach buyers' },
+    ],
+    summary: 'Lead with time saved.',
+    timeline: [
+      { angleKey: 'G1', assetKeys: ['A1'], channel: 'linkedin', day: 0, note: '', phase: 'launch' },
+    ],
   })
 }

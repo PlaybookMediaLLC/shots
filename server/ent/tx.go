@@ -278,6 +278,18 @@ type Tx struct {
 	User *UserClient
 	// UserPreference is the client for interacting with the UserPreference builders.
 	UserPreference *UserPreferenceClient
+	// VoiceAudioRun is the client for interacting with the VoiceAudioRun builders.
+	VoiceAudioRun *VoiceAudioRunClient
+	// VoiceCommand is the client for interacting with the VoiceCommand builders.
+	VoiceCommand *VoiceCommandClient
+	// VoiceMemberSettings is the client for interacting with the VoiceMemberSettings builders.
+	VoiceMemberSettings *VoiceMemberSettingsClient
+	// VoiceNote is the client for interacting with the VoiceNote builders.
+	VoiceNote *VoiceNoteClient
+	// VoiceSettings is the client for interacting with the VoiceSettings builders.
+	VoiceSettings *VoiceSettingsClient
+	// VoiceTranscriptRevision is the client for interacting with the VoiceTranscriptRevision builders.
+	VoiceTranscriptRevision *VoiceTranscriptRevisionClient
 	// WebhookDelivery is the client for interacting with the WebhookDelivery builders.
 	WebhookDelivery *WebhookDeliveryClient
 	// WebhookDeliveryAttempt is the client for interacting with the WebhookDeliveryAttempt builders.
@@ -558,6 +570,12 @@ func (tx *Tx) init() {
 	tx.SurfaceCapture = NewSurfaceCaptureClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.UserPreference = NewUserPreferenceClient(tx.config)
+	tx.VoiceAudioRun = NewVoiceAudioRunClient(tx.config)
+	tx.VoiceCommand = NewVoiceCommandClient(tx.config)
+	tx.VoiceMemberSettings = NewVoiceMemberSettingsClient(tx.config)
+	tx.VoiceNote = NewVoiceNoteClient(tx.config)
+	tx.VoiceSettings = NewVoiceSettingsClient(tx.config)
+	tx.VoiceTranscriptRevision = NewVoiceTranscriptRevisionClient(tx.config)
 	tx.WebhookDelivery = NewWebhookDeliveryClient(tx.config)
 	tx.WebhookDeliveryAttempt = NewWebhookDeliveryAttemptClient(tx.config)
 	tx.WebhookSubscription = NewWebhookSubscriptionClient(tx.config)

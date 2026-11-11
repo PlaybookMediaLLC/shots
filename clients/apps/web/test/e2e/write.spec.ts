@@ -1,3 +1,6 @@
+import { serializeDraft } from '../../lib/content-drafts/serialize'
+import { bodyFor, readVersions } from '../../lib/write/versions'
+import type { RevisionWire } from '../../lib/content-drafts/client'
 import {
   apiRequest,
   db,
@@ -209,11 +212,67 @@ test(
       /When scheduled|When planned|While editing/
     )
     await snap(page, 'write-backups')
+    await expect(backups.getByTestId('backup-content')).toBeVisible()
+    const revisions = (await apiRequest(page, `/api/v1/content-drafts/${draftId}/revisions`))
+      .body as { items: { id: string }[] }
+    expect(revisions.items.length).toBeGreaterThan(1)
+    const olderUrl = `/api/v1/content-drafts/${draftId}/revisions/${revisions.items[1].id}`
+    const older = (await apiRequest(page, olderUrl)).body as RevisionWire
+    expect(older.body).toBeDefined()
+    const olderCaption = serializeDraft(
+      bodyFor(older.body ?? [], readVersions(older.platformVersions), 'x'),
+      'x'
+    ).caption
+    const olderPath = `**${olderUrl}`
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    await page.route(olderPath, async (route) => {
+      // Delay the real authorized read, then simulate a transport failure.
+      await route.fetch()
+      await held
+      await route.abort('failed')
+    })
+    try {
+      await backups.getByRole('button', { name: '← Prev' }).click()
+      await expect(backups.getByTestId('backup-content')).toHaveCount(0)
+      await expect(
+        backups.getByRole('button', { name: 'Create new draft from this version' })
+      ).toBeDisabled()
+      await backups.getByRole('button', { name: 'Next →' }).click()
+      await expect(backups.getByTestId('backup-content')).toBeVisible()
+      await backups.getByRole('button', { name: '← Prev' }).click()
+      await expect(backups.getByTestId('backup-content')).toHaveCount(0)
+      release()
+      await expect(backups.getByRole('button', { name: 'Retry loading version' })).toBeVisible()
+      await expect(
+        backups.getByRole('button', { name: 'Create new draft from this version' })
+      ).toBeDisabled()
+    } finally {
+      release()
+      await page.unroute(olderPath)
+    }
+    await backups.getByRole('button', { name: 'Retry loading version' }).click()
+    await expect(backups.getByTestId('backup-content')).toBeVisible()
+    await expect(
+      backups.getByRole('button', { name: 'Create new draft from this version' })
+    ).toBeEnabled()
+    await expect(backups.getByTestId('backup-content')).toHaveText(olderCaption || 'Empty')
+    const recoveryRequest = page.waitForRequest(
+      (request) => request.method() === 'POST' && request.url().includes('/recover')
+    )
+
     await backups.getByRole('button', { name: 'Create new draft from this version' }).click()
     await page.waitForURL(
       (url) => !url.pathname.endsWith(draftId) && /\/publish\/[a-z0-9]+/.test(url.pathname)
     )
     await expect(draftEditor(page)).toContainText('Launch day is here.', { timeout: 60_000 })
+    expect(new URL((await recoveryRequest).url()).pathname).toBe(`${olderUrl}/recover`)
+    const recovered = (
+      await apiRequest(page, `/api/v1/content-drafts/${page.url().split('/').pop()}`)
+    ).body as { body: unknown }
+    expect(recovered.body).toEqual(older.body)
     expect(await draftPosts(draftId)).toHaveLength(2)
 
     // Sharing: copying the internal link never turns the public one on.

@@ -209,14 +209,17 @@ func TestContainerErrorDisconnects(t *testing.T) {
 
 func TestPublishErrorClassified(t *testing.T) {
 	mux := http.NewServeMux()
+	requests := 0
 	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		requests++
 		w.WriteHeader(400)
 		w.Write([]byte(`{"error":{"error_subcode":2207042}}`))
 	})
 	p := setup(t, mux)
 	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"single","containers":["c1"],"message":""}`), &ent.Integration{InternalID: "ig1"})
-	if temporalx.FailureType(err) != temporalx.TypeBadBody || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" {
-		t.Fatalf("got %v", err)
+	// The daily cap is a definite refusal with its reason, sent once.
+	if temporalx.FailureType(err) != temporalx.TypeDailyLimit || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" || requests != 1 {
+		t.Fatalf("got %v after %d requests", err, requests)
 	}
 }
 
