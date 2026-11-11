@@ -123,6 +123,12 @@ spec:
                   name: {{ . }}
                   key: SOURCE_WEBHOOK_SIGNING_KEY
                   optional: true
+            - name: SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS
+                  optional: true
             - name: AUDIT_DRAIN_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
