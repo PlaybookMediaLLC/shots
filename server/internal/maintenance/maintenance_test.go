@@ -16,11 +16,32 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-type objects struct{ deleted, aborted []string }
+type objects struct {
+	deleted, aborted []string
+	// ledger holds each deletion-ledger entry by its day prefix and ID.
+	ledger    map[string]DeletionRecord
+	ledgerErr error
+}
+
+func (o *objects) RecordDeletion(_ context.Context, requestedAt time.Time, id string, record []byte) error {
+	if o.ledgerErr != nil {
+		return o.ledgerErr
+	}
+	var entry DeletionRecord
+	if err := json.Unmarshal(record, &entry); err != nil {
+		return err
+	}
+	if o.ledger == nil {
+		o.ledger = map[string]DeletionRecord{}
+	}
+	o.ledger[requestedAt.UTC().Format("2006/01/02")+"/"+id] = entry
+	return nil
+}
 
 func (o *objects) AbortUpload(_ context.Context, org, key, uploadID string) error {
 	o.aborted = append(o.aborted, org+"/"+key+"#"+uploadID)
@@ -115,6 +136,91 @@ func TestOutboxTenantClaimsDeadLettersAndPausedWorkspaces(t *testing.T) {
 	expect(t, s.DB, "true", `SELECT "deadLetteredAt" IS NOT NULL FROM outbox_event WHERE id='wrong'`)
 	expect(t, s.DB, 1, `SELECT count(*) FROM audit_log WHERE action='product.outbox_dead_lettered' AND "entityId"='wrong'`)
 }
+
+// Each asset deletion is written to the deletion ledger, under the day it was
+// requested, before its bytes go. A ledger write that fails leaves the bytes
+// and the event, which retries and dead-letters like any other failure.
+func TestOutboxRecordsAssetDeletionsInTheLedgerFirst(t *testing.T) {
+	s, o := setup(t)
+	asset(t, s, "gone", "a", "DELETED")
+	event(t, s, "delete-gone", "a", "gone", "asset.deleted")
+	exec(t, s.DB, `UPDATE outbox_event SET "createdAt"='2026-11-10 23:59:00' WHERE id='delete-gone'`)
+	o.ledgerErr = fmt.Errorf("storage unavailable")
+	if n := run(t, s, "tenant-outbox"); n != 0 || len(o.deleted) != 0 {
+		t.Fatalf("completed %d, deleted %v without a ledger entry", n, o.deleted)
+	}
+	expect(t, s.DB, "DISPATCH_FAILED", `SELECT "lastError" FROM outbox_event WHERE id='delete-gone' AND "deliveredAt" IS NULL`)
+	o.ledgerErr = nil
+	if n := run(t, s, "tenant-outbox"); n != 1 || len(o.deleted) != 1 || o.deleted[0] != "org/a/gone" {
+		t.Fatalf("completed %d, deleted %v", n, o.deleted)
+	}
+	entry := o.ledger["2026/11/10/delete-gone"]
+	requested := time.Date(2026, 11, 10, 23, 59, 0, 0, time.UTC)
+	if !entry.RequestedAt.Equal(requested) || entry.Kind != "asset" || entry.OrganizationID != "a" || entry.ID != "gone" || entry.EventID != "delete-gone" {
+		t.Fatalf("ledger: %#v", o.ledger)
+	}
+}
+
+// Retention deletes delivered work events past 30 days, in batches. Recent,
+// undelivered, dead-lettered and not yet fanned-out events stay, and so do
+// activity and domain events, which notifications and idempotent intake read.
+func TestOutboxRetentionDeletesOnlyOldDeliveredWorkEvents(t *testing.T) {
+	s, _ := setup(t)
+	row := func(id, kind string, delivered, deadLettered any, fanned bool) {
+		exec(t, s.DB, `INSERT INTO outbox_event(id,"organizationId",type,"aggregateType","aggregateId",payload,"idempotencyKey","createdAt","deliveredAt","deadLetteredAt",notification_version,notification_fanned) VALUES($1,'a',$2,'test',$1,'{}',$1,now()-interval '60 days',now()-$3::interval,now()-$4::interval,1,$5)`, id, kind, delivered, deadLettered, fanned)
+	}
+	row("old-webhook", "webhook.post.published", "31 days", nil, true)
+	row("old-observation", "github.observation", "40 days", nil, true)
+	row("old-asset-deletion", "asset.deleted", "31 days", nil, true)
+	row("recent-webhook", "webhook.post.published", "29 days", nil, true)
+	row("undelivered", "capture_job.dispatch", nil, nil, true)
+	row("dead-lettered", "release_automation.dispatch", nil, "40 days", true)
+	row("unfanned", "webhook.post.published", "40 days", nil, false)
+	row("activity", "activity.post.published", "40 days", nil, true)
+	row("release", "release.ingested", "40 days", nil, true)
+	exec(t, s.DB, `INSERT INTO outbox_event(id,"organizationId",type,"aggregateType","aggregateId",payload,"idempotencyKey","deliveredAt",notification_fanned) SELECT 'bulk-'||g,'a','webhook.post.published','test','bulk','{}','bulk-'||g,now()-interval '35 days',true FROM generate_series(1,1001) g`)
+	if n := run(t, s, "outbox-retention"); n != 1004 {
+		t.Fatalf("deleted %d", n)
+	}
+	expect(t, s.DB, "activity,dead-lettered,recent-webhook,release,undelivered,unfanned", `SELECT string_agg(id, ',' ORDER BY id) FROM outbox_event`)
+	if n := run(t, s, "outbox-retention"); n != 0 {
+		t.Fatalf("second run deleted %d", n)
+	}
+}
+
+// A restore brings back records deleted after its restore point. Replaying
+// the ledger deletes each again once, through the outbox, in its own
+// workspace only; earlier, missing and already deleted records are left.
+func TestReplayDeletionsDeletesAgainWhatARestoreBroughtBack(t *testing.T) {
+	s, o := setup(t)
+	ctx := context.Background()
+	restoredTo := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
+	asset(t, s, "restored", "a", "UPLOADED")
+	asset(t, s, "before", "a", "UPLOADED")
+	asset(t, s, "already", "b", "DELETED")
+	records := []DeletionRecord{
+		{Kind: "asset", OrganizationID: "a", ID: "restored", EventID: "e1", RequestedAt: restoredTo.Add(time.Minute)},
+		{Kind: "asset", OrganizationID: "a", ID: "before", EventID: "e2", RequestedAt: restoredTo},
+		{Kind: "asset", OrganizationID: "b", ID: "already", EventID: "e3", RequestedAt: restoredTo.Add(time.Hour)},
+		{Kind: "asset", OrganizationID: "a", ID: "never-restored", EventID: "e4", RequestedAt: restoredTo.Add(time.Hour)},
+		{Kind: "asset", OrganizationID: "b", ID: "before", EventID: "e5", RequestedAt: restoredTo.Add(time.Hour)},
+	}
+	for attempt, want := range []int{1, 0} {
+		if n, err := s.ReplayDeletions(ctx, records, restoredTo); err != nil || n != want {
+			t.Fatalf("replay %d: replayed %d err=%v", attempt, n, err)
+		}
+	}
+	expect(t, s.DB, "before:UPLOADED,restored:DELETED", `SELECT string_agg(id||':'||status, ',' ORDER BY id) FROM asset WHERE "organizationId"='a'`)
+	expect(t, s.DB, 1, `SELECT count(*) FROM outbox_event WHERE type='asset.deleted' AND "aggregateId"='restored'`)
+	expect(t, s.DB, 1, `SELECT count(*) FROM audit_log WHERE action='product.asset_deletion_replayed' AND "entityId"='restored'`)
+	if n := run(t, s, "tenant-outbox"); n != 1 || len(o.deleted) != 1 || o.deleted[0] != "org/a/restored" || len(o.ledger) != 1 {
+		t.Fatalf("outbox completed %d, deleted %v, ledger %v", n, o.deleted, o.ledger)
+	}
+	if _, err := s.ReplayDeletions(ctx, []DeletionRecord{{Kind: "unknown", RequestedAt: restoredTo.Add(time.Hour)}}, restoredTo); err == nil {
+		t.Fatal("an unknown ledger kind was skipped silently")
+	}
+}
+
 func TestRetentionHonorsLegalHoldAndDefaultPolicy(t *testing.T) {
 	s, _ := setup(t)
 	exec(t, s.DB, `DO $$ BEGIN CREATE ROLE maintenance_retention_test LOGIN PASSWORD 'local-test-only'; EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
@@ -360,6 +466,10 @@ func TestDrainRejectsPrivateAddresses(t *testing.T) {
 }
 
 type blockingObjects struct{ started, release chan struct{} }
+
+func (o *blockingObjects) RecordDeletion(context.Context, time.Time, string, []byte) error {
+	return nil
+}
 
 func (o *blockingObjects) Delete(ctx context.Context, org, key string) error {
 	close(o.started)
