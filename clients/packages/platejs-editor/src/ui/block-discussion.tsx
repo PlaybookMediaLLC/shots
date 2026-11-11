@@ -148,7 +148,7 @@ function renderDiscussionPopoverBody({
   >;
 }): ReactNode {
   if (isCommenting) {
-    return <CommentCreateForm className="p-4" focusOnMount />;
+    return <CommentCreateForm className="p-3" focusOnMount />;
   }
 
   if (noneActive) {
@@ -311,7 +311,9 @@ const BlockCommentsContent = ({
 
         <PopoverContent
           align="center"
-          className="max-h-[min(50dvh,calc(-24px+var(--radix-popper-available-height)))] w-[380px] min-w-[130px] max-w-[calc(100vw-24px)] overflow-y-auto p-0 data-[state=closed]:opacity-0"
+          // Flat, with a hairline: it reads as part of the editor, not a layer over it.
+          // The host app's popover rule is unlayered, so only an important utility removes its shadow.
+          className="max-h-[min(50dvh,calc(-24px+var(--radix-popper-available-height)))] w-[380px] min-w-[130px] max-w-[calc(100vw-24px)] overflow-y-auto p-0 shadow-none! data-[state=closed]:opacity-0"
           onCloseAutoFocus={(e) => e.preventDefault()}
           onOpenAutoFocus={(e) => e.preventDefault()}
           side="bottom"
