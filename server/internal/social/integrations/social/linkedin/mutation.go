@@ -51,6 +51,9 @@ func (p *Provider) mutate(ctx context.Context, endpoint, token string, body []by
 		if response.StatusCode == http.StatusUnauthorized {
 			return nil, temporalx.RefreshToken(p.identifier, "{}", "{}", "Reconnect LinkedIn before retrying this rejected request.")
 		}
+		if response.StatusCode == http.StatusTooManyRequests {
+			return nil, temporalx.RateLimited(p.identifier, time.Until(integrations.RetryAt(response.Header, time.Now())), "LinkedIn rate-limited this request.")
+		}
 		return nil, temporalx.BadBody(p.identifier, "{}", "{}", "LinkedIn rejected this request. Check permissions, content and account limits before retrying.")
 	}
 	return unknown()

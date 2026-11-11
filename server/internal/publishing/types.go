@@ -127,6 +127,8 @@ const (
 	FailurePublisherUnavailable = "PUBLISHER_UNAVAILABLE"
 	// Shots failed before the handoff, with no provider status.
 	FailurePublisherError = "PUBLISHER_ERROR"
+	// The account reached the platform's daily posting cap; nothing was sent.
+	FailureProviderDailyLimit = "PROVIDER_DAILY_LIMIT"
 )
 
 // StalledPost is a claimed post that has made no progress for a while.
@@ -139,6 +141,8 @@ type StalledPost struct {
 type Attempt struct {
 	ID     string
 	Number int
+	// ProviderMessage is why a failed attempt failed, redacted (RedactProviderMessage).
+	ProviderMessage string
 }
 
 type RecoverablePost struct {

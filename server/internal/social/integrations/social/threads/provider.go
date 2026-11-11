@@ -92,7 +92,9 @@ func handleErrors(body string, _ int) *integrations.HandledError {
 
 // getJSON is `(await this.fetch(url, {method})).json()`.
 func (p *Provider) getJSON(ctx context.Context, method, rawURL string, body []byte, contentType string, out any) error {
-	req := integrations.Request{Method: method, Body: body}
+	// A container (/threads?) stays invisible until threads_publish, so it may
+	// be resent after a server error; threads_publish may not.
+	req := integrations.Request{Method: method, Body: body, Retryable: strings.Contains(rawURL, "/threads?")}
 	if contentType != "" {
 		req.Headers = map[string]string{"Content-Type": contentType}
 	}

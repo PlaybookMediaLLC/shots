@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { TRPCClientError } from '@trpc/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,13 @@ import {
 import { usePublishSets, useRecommendedTimes } from '@/lib/editor/use-publish-targets'
 import type { DesignDocument } from '@/lib/design/document'
 import { exportDesignDocument } from '@/lib/design/export'
+import { type CaptionChannel, captionChannelSchema } from '@/lib/captions/channels'
+import { writeDesignCaptions } from '@/lib/captions/write'
+import {
+  releaseCaptionNotes,
+  releaseClaimsNote,
+  type ReleaseSummary,
+} from '@/lib/launch/release-summary'
 import { adaptDocumentToSize, canvasSizeOf, documentCanvasSize } from '@/lib/export/adapt'
 import { imageAspectOf } from '@/lib/export/export-design'
 import type { ExportTarget } from '@/lib/export/sizes'
@@ -208,6 +216,21 @@ export function PrepareScreenshotPost({
     () => (open && !exports ? readEditorReturn(window.location.search).campaignId : undefined),
     [exports, open]
   )
+  // A screenshot opened from a release: its summary seeds the captions and
+  // the draft keeps the release, so its evidence stays reachable.
+  const releaseId = React.useMemo(
+    () => (open && !exports ? readEditorReturn(window.location.search).releaseId : undefined),
+    [exports, open]
+  )
+  const [release, setRelease] = React.useState<ReleaseSummary | null>(null)
+  // Until the summary settles, a draft would be made without its claims note.
+  const [releaseState, setReleaseState] = React.useState<'loading' | 'linked' | 'unlinked'>(
+    'loading'
+  )
+  const [releaseNotice, setReleaseNotice] = React.useState('')
+  const [writingFromRelease, setWritingFromRelease] = React.useState(false)
+  // Unverified claims stay marked on the draft, for whoever reviews it.
+  const releaseNotes = releaseClaimsNote(release)
 
   // Profiles and their accounts. A failure here leaves the draft path
   // working: the backend resolves the default profile and platforms itself.
@@ -292,6 +315,35 @@ export function PrepareScreenshotPost({
       live = false
     }
   }, [campaignId, open, trpcClient])
+
+  React.useEffect(() => {
+    if (!open || !releaseId) return
+    let live = true
+    setReleaseState('loading')
+    void trpcClient.release.summary
+      .query({ releaseId })
+      .then((summary) => {
+        if (!live) return
+        setRelease(summary)
+        setReleaseState('linked')
+      })
+      .catch((failure: unknown) => {
+        if (!live) return
+        // A release this workspace cannot read would refuse the draft, so
+        // it is left off; any other failure loses only the summary.
+        const code = failure instanceof TRPCClientError ? failure.data?.code : undefined
+        const unlinked = code === 'NOT_FOUND' || code === 'BAD_REQUEST'
+        setReleaseState(unlinked ? 'unlinked' : 'linked')
+        setReleaseNotice(
+          unlinked
+            ? 'This release is not in this workspace, so the draft will not keep it.'
+            : `The release summary could not load${failure instanceof Error ? `: ${failure.message}` : '.'} The draft still keeps the release.`
+        )
+      })
+    return () => {
+      live = false
+    }
+  }, [open, releaseId, trpcClient])
 
   const accounts = set?.accounts ?? []
   const chosen = accounts.filter((account) => selected.includes(account.id))
@@ -396,7 +448,11 @@ export function PrepareScreenshotPost({
           // there; a draft has no such step before it exists.
           destination === 'draft' && mediaWarnings.length > 0
           ? 'Choose other accounts, or change the design, before making the draft.'
-          : ''
+          : releaseId && releaseState === 'loading'
+            ? 'Loading the release summary…'
+            : destination === 'batch' && releaseNotes
+              ? 'A batch item cannot carry the claims to verify from this release. Make a draft.'
+              : ''
 
   /** The designs to post, as the handoff stores them. */
   function designs(): HandoffDesign[] {
@@ -456,6 +512,32 @@ export function PrepareScreenshotPost({
     return exportDesignDocument({ keepLocalSources: true })
   }
 
+  /**
+   * The X and LinkedIn captions (and any other chosen platform's) written from
+   * the release summary in the brand voice, through the editor's captions so
+   * they can be edited here and in the Captions panel.
+   */
+  async function writeFromRelease() {
+    if (!release) return
+    setWritingFromRelease(true)
+    try {
+      await writeDesignCaptions(trpcClient, {
+        channels: [...new Set(['x', 'linkedin', ...channels])].filter(
+          (item): item is CaptionChannel => captionChannelSchema.safeParse(item).success
+        ),
+        notes: releaseCaptionNotes(release),
+        socialSetId: setId || undefined,
+      })
+      setCaption(null)
+    } catch (failure) {
+      toast.error('Could not write captions from the release', {
+        description: failure instanceof Error ? failure.message : undefined,
+      })
+    } finally {
+      setWritingFromRelease(false)
+    }
+  }
+
   /** One design's draft, everything but its request key. */
   function draftFor(
     asset: { assetId: string; mediaType: string },
@@ -497,6 +579,8 @@ export function PrepareScreenshotPost({
       ...(platformVersions ? { platformVersions } : {}),
       ...(setId ? { socialSetId: setId } : {}),
       ...(title ? { title: title.slice(0, 200) } : {}),
+      ...(releaseId && releaseState === 'linked' ? { releaseId } : {}),
+      ...(releaseNotes ? { scratchpad: releaseNotes.slice(0, 20_000) } : {}),
     }
   }
 
@@ -588,6 +672,8 @@ export function PrepareScreenshotPost({
             campaignId,
             campaign?.name,
             campaignPostId,
+            releaseId,
+            releaseNotes,
             count,
             Object.entries(platformMedia).map(([platform, media]) => [platform, media.assetId]),
           ],
@@ -672,6 +758,34 @@ export function PrepareScreenshotPost({
                 </span>
               </span>
             </Label>
+          ) : null}
+          {releaseNotice ? (
+            <p className="text-xs text-muted-foreground" role="status">
+              {releaseNotice}
+            </p>
+          ) : null}
+          {release ? (
+            <div className="grid gap-2 rounded-lg border border-border px-3 py-2.5 text-sm" data-testid="release-summary">
+              <p className="text-xs text-muted-foreground">
+                From the release {release.source === 'spec' ? 'launch spec summary' : 'brief'}:
+              </p>
+              <p className="line-clamp-3">{release.text}</p>
+              {release.verified ? null : (
+                <p className="text-xs text-amber-700 dark:text-amber-300" role="status">
+                  No person has verified this summary yet; the draft lists it to check.
+                </p>
+              )}
+              <Button
+                className="w-fit"
+                disabled={writingFromRelease}
+                onClick={() => void writeFromRelease()}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {writingFromRelease ? 'Writing…' : 'Write X and LinkedIn captions from the release'}
+              </Button>
+            </div>
           ) : null}
           {campaignNotice ? (
             <p className="text-xs text-muted-foreground" role="status">
@@ -914,13 +1028,18 @@ export function PrepareScreenshotPost({
                 </span>
               </Label>
               <Label className="items-start gap-2 font-normal">
-                <RadioGroupItem value="batch" />
+                <RadioGroupItem disabled={Boolean(releaseNotes)} value="batch" />
                 <span className="grid gap-0.5">
                   <span>A bulk batch</span>
                   <span className="text-xs text-muted-foreground">
                     Prepare a day of screenshots, then set destinations, times and intervals once
                     and schedule them together.
                     {campaign ? ' A batch item is not linked back to the campaign.' : ''}
+                    {releaseNotes
+                      ? ' Unavailable: a batch item cannot carry the claims to verify from this release.'
+                      : releaseId
+                        ? ' A batch item is not linked back to the release.'
+                        : ''}
                   </span>
                 </span>
               </Label>

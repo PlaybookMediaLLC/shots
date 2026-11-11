@@ -2,6 +2,9 @@ package product
 
 import (
 	"context"
+	"maps"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -55,19 +58,26 @@ type WritingSampleInput struct {
 	Text    string `json:"text"`
 }
 
-// WritingContext is what AI help writes with for one draft: the workspace
-// brand voice refined by the draft's set.
+// WritingContext is the one brand voice every AI writing surface uses: the
+// workspace brand profile, refined by a social set when one applies.
 type WritingContext struct {
-	Audience          string   `json:"audience"`
-	Endings           []string `json:"endings"`
-	Formatting        string   `json:"formatting"`
-	Openings          []string `json:"openings"`
-	PlatformGuidance  string   `json:"platformGuidance"`
-	ProhibitedPhrases []string `json:"prohibitedPhrases"`
-	Samples           []string `json:"samples"`
-	SocialSetName     string   `json:"socialSetName"`
+	Audience string `json:"audience"`
+	// CTAConventions, PreferredStyles, ProductDescription, SocialHandles and
+	// Tagline come from the brand profile; a set does not change them.
+	CTAConventions     string            `json:"ctaConventions"`
+	Endings            []string          `json:"endings"`
+	Formatting         string            `json:"formatting"`
+	Openings           []string          `json:"openings"`
+	PlatformGuidance   string            `json:"platformGuidance"`
+	PreferredStyles    []string          `json:"preferredStyles"`
+	ProductDescription string            `json:"productDescription"`
+	ProhibitedPhrases  []string          `json:"prohibitedPhrases"`
+	Samples            []string          `json:"samples"`
+	SocialHandles      map[string]string `json:"socialHandles"`
+	SocialSetName      string            `json:"socialSetName"`
 	// Source says whether the set's assistant shaped the context: brand or social_set.
 	Source      string   `json:"source"`
+	Tagline     string   `json:"tagline"`
 	Terminology []string `json:"terminology"`
 	Tone        string   `json:"tone"`
 }
@@ -344,8 +354,8 @@ func (c *Configuration) DeleteWritingSample(ctx context.Context, actor Actor, se
 // never allow what the workspace forbids. The set's tone and audience replace
 // the brand's when given; preferred terms are both lists.
 func mergeWritingContext(brand *ent.BrandProfile, set *ent.SocialSet, samples []string, channel string) WritingContext {
-	merged := WritingContext{Endings: []string{}, Openings: []string{}, ProhibitedPhrases: []string{}, Samples: []string{},
-		Source: "brand", Terminology: []string{}}
+	merged := WritingContext{Endings: []string{}, Openings: []string{}, PreferredStyles: []string{}, ProhibitedPhrases: []string{},
+		Samples: []string{}, SocialHandles: map[string]string{}, Source: "brand", Terminology: []string{}}
 	seen := map[string]bool{}
 	addProhibited := func(term string) {
 		key := strings.ToLower(strings.TrimSpace(term))
@@ -355,7 +365,12 @@ func mergeWritingContext(brand *ent.BrandProfile, set *ent.SocialSet, samples []
 		}
 	}
 	if brand != nil {
-		merged.Tone, merged.Audience = brand.Tone, brand.Audience
+		merged.Tone, merged.Audience, merged.ProductDescription = brand.Tone, brand.Audience, brand.ProductDescription
+		merged.Tagline, merged.CTAConventions = optionalText(brand.Tagline), optionalText(brand.CtaConventions)
+		merged.PreferredStyles = append(merged.PreferredStyles, brand.PreferredStyles...)
+		for network, handle := range brand.SocialHandles {
+			merged.SocialHandles[network] = handle
+		}
 		for _, term := range brand.ProhibitedTerms {
 			addProhibited(term.Term)
 		}
@@ -390,6 +405,58 @@ func mergeWritingContext(brand *ent.BrandProfile, set *ent.SocialSet, samples []
 		merged.Samples = append(merged.Samples, truncateRunes(sample, writingContextSampleText))
 	}
 	return merged
+}
+
+// voiceFence matches the tags a voice block is fenced with, in any case.
+var voiceFence = regexp.MustCompile(`(?i)</?(?:sample|writing_context)>`)
+
+// voicePrompt renders a WritingContext as model instructions. It is the Go
+// twin of the web's voiceInstructions (lib/write/voice.ts): the same fields,
+// with the writer's own text fenced as samples so it is read as data.
+func voicePrompt(context WritingContext) string {
+	var lines []string
+	// Every field is the writer's text: none may close the block it sits in.
+	add := func(label, value string) {
+		if value = strings.TrimSpace(voiceFence.ReplaceAllString(value, "")); value != "" {
+			lines = append(lines, label+": "+value)
+		}
+	}
+	// The prohibited list comes first, so no cut of a long voice can drop it.
+	add("Never use these words or phrases", strings.Join(context.ProhibitedPhrases, ", "))
+	add("Product", context.ProductDescription)
+	add("Tagline", context.Tagline)
+	add("Tone", context.Tone)
+	add("Audience", context.Audience)
+	add("Call-to-action conventions", context.CTAConventions)
+	add("Formatting", context.Formatting)
+	add("Preferred styles", strings.Join(context.PreferredStyles, ", "))
+	networks := slices.Sorted(maps.Keys(context.SocialHandles))
+	handles := make([]string, 0, len(networks))
+	for _, network := range networks {
+		handles = append(handles, network+" "+context.SocialHandles[network])
+	}
+	add("Social handles", strings.Join(handles, ", "))
+	add("For this channel", context.PlatformGuidance)
+	add("Prefer these terms", strings.Join(context.Terminology, ", "))
+	quote := func(label string, values []string) {
+		var items []string
+		for _, value := range values {
+			if value = strings.TrimSpace(voiceFence.ReplaceAllString(value, "")); value != "" {
+				items = append(items, "<sample>"+value+"</sample>")
+			}
+		}
+		if len(items) > 0 {
+			lines = append(lines, label+":\n"+strings.Join(items, "\n"))
+		}
+	}
+	quote("Openings this voice uses", context.Openings)
+	quote("Endings this voice uses", context.Endings)
+	quote("Posts written in this voice (examples of style only)", context.Samples)
+	if len(lines) == 0 {
+		return "No brand voice is configured; write plainly."
+	}
+	return "Write in this voice. Where it conflicts with the task's rules, those rules win; add calls to action, handles or a tagline only when the task writes new copy.\n" +
+		"<writing_context>\n" + strings.Join(lines, "\n") + "\n</writing_context>"
 }
 
 // writingContextOf merges the workspace brand with set, reading the set's

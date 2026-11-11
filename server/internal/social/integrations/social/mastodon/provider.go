@@ -214,7 +214,8 @@ func (p *Provider) Authenticate(ctx context.Context, params integrations.Authent
 // request is rebuilt per attempt by RunStreamedUpload since a consumed stream
 // can't be replayed.
 func (p *Provider) UploadFile(ctx context.Context, instanceURL, fileURL, accessToken, alt string) (string, error) {
-	return integrations.RunStreamedUpload(ctx, p.Base, func() (string, error) {
+	// The media stays invisible until a status uses it, so a resend is safe.
+	return integrations.RunStreamedUpload(ctx, p.Base, true, func() (string, error) {
 		temporalx.SetHeartbeatDetails(ctx, "mastodon: read media "+temporalx.StripQuery(fileURL))
 		fileReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
 		if err != nil {
@@ -458,7 +459,8 @@ func (p *Provider) FinalizePost(ctx context.Context, accessToken string, raw jso
 	if pending.IdempotencyKey != "" {
 		headers["Idempotency-Key"] = pending.IdempotencyKey
 	}
-	res, err := p.Fetch(ctx, pending.URL+"/api/v1/statuses", integrations.Request{Method: http.MethodPost, Headers: headers, Body: body})
+	res, err := p.Fetch(ctx, pending.URL+"/api/v1/statuses", integrations.Request{Method: http.MethodPost, Headers: headers, Body: body,
+		Retryable: pending.IdempotencyKey != ""})
 	if err != nil {
 		return nil, err
 	}
@@ -572,9 +574,10 @@ func (p *Provider) DynamicComment(ctx context.Context, _, postID, lastCommentID,
 	}
 	body, contentType := Form(pairs...)
 	res, err := p.Fetch(ctx, url+"/api/v1/statuses", integrations.Request{
-		Method:  http.MethodPost,
-		Headers: map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": contentType, "Idempotency-Key": "shots-reply-" + commentPost.ID},
-		Body:    body,
+		Method:    http.MethodPost,
+		Headers:   map[string]string{"Authorization": "Bearer " + accessToken, "Content-Type": contentType, "Idempotency-Key": "shots-reply-" + commentPost.ID},
+		Body:      body,
+		Retryable: true, // Mastodon deduplicates on the Idempotency-Key.
 	})
 	if err != nil {
 		return nil, err

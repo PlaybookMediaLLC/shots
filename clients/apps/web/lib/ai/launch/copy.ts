@@ -15,7 +15,6 @@ import {
 } from '@/lib/launch/store'
 import { getProductProfile } from '@/lib/tenant/product-profile'
 import {
-  formatBrandVoice,
   formatPlanForStages,
   formatProductProfile,
   formatSpecForStages,
@@ -23,6 +22,7 @@ import {
 } from './context'
 import { COPY_INSTRUCTIONS } from './prompts'
 import { runSubmitStage } from './run'
+import { voiceInstructions } from '@/lib/write/voice'
 
 const copySchema = z.object({ posts: z.array(launchPostSchema).min(1).max(8) })
 
@@ -79,7 +79,7 @@ export async function writeLaunchCopy(
     formatSpecForStages(input.spec.content, input.spec.version),
     formatPlanForStages(input.plan.content, input.plan.version),
     formatProductProfile(product),
-    formatBrandVoice(input.brand),
+    voiceInstructions(input.brand.voice),
     `Links may only use these hosts: ${[...context.allowedHosts].join(', ') || 'none (do not include links)'}.`,
     formatTeamPreferences(input.examples),
   ]

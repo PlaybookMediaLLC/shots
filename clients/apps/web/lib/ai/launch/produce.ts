@@ -29,6 +29,7 @@ import { writeLaunchCopy } from './copy'
 import { critiqueRender } from './critique'
 import { planCaptureUrls } from './plan'
 import { VISUALS_FALLBACK_INSTRUCTIONS, VISUALS_INSTRUCTIONS } from './prompts'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /**
  * Produce the campaign from its plan: on-brand visuals (rendered in the
@@ -111,6 +112,8 @@ export async function produceCampaign(
     formatPlanForStages(plan.content, plan.version),
     formatBrandKit(brand.kit) ??
       'No brand kit is set. Choose one background family and text color and keep them across the set.',
+    // Headlines and captions on the visuals are public copy in the brand voice.
+    voiceInstructions(brand.voice),
     !designMode && brand.kit
       ? `Product shot colors: background gradient from ${brand.kit.background} to ${brand.kit.accent} (${brandGradient(brand.kit)}), text ${brand.kit.foreground}.`
       : null,

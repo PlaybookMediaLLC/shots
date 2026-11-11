@@ -308,9 +308,9 @@ export function DraftPosts({
                         <Link href={socialSetHref(post.socialSetId)}>Reconnect the account</Link>
                       </Button>
                     ) : null}
-                    {!history && fix === 'edit' && onEdit ? (
+                    {!history && (fix === 'edit' || fix === 'edit-media') && onEdit ? (
                       <Button onClick={() => onEdit(post.platform)} size="sm" variant="outline">
-                        Edit the {label} post
+                        {fix === 'edit-media' ? `Replace the ${label} media` : `Edit the ${label} post`}
                       </Button>
                     ) : null}
                     {/* A retry resends what was scheduled, so it waits until it could work. */}

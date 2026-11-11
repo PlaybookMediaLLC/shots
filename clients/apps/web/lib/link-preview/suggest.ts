@@ -1,5 +1,6 @@
 import 'server-only'
 
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import { runSubmitStage } from '@/lib/ai/launch/run'
 import {
@@ -12,6 +13,7 @@ import { detectInjection, fenceSource, htmlToText } from '@/lib/launch/sanitize'
 import { LaunchError } from '@/lib/launch/store'
 import { userAgentFor } from '@/lib/link-preview/crawlers'
 import { parseLinkPreview } from '@/lib/link-preview/metadata'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /** The submission the model makes: exactly three options. */
 const submissionSchema = z.object({ variants: z.array(linkCopyVariantSchema).length(3) })
@@ -56,7 +58,8 @@ function lengthIssues(variants: LinkCopyVariant[]): string[] {
  */
 export async function suggestLinkCopy(
   url: string,
-  agent: LinkPreviewAgent
+  agent: LinkPreviewAgent,
+  voice: WritingContext | null
 ): Promise<LinkCopyVariant[]> {
   const page = await safeFetchText(url, {
     allowedPrivateHosts: allowedTestHosts(),
@@ -95,7 +98,8 @@ export async function suggestLinkCopy(
     prompt,
     role: 'drafting',
     schema: submissionSchema,
-    system: INSTRUCTIONS,
+    // The page is the brand's own: its share copy speaks in the brand voice.
+    system: INSTRUCTIONS + voiceInstructions(voice),
     toolName: 'submitLinkCopy',
     validate: (submission) => lengthIssues(submission.variants),
   })

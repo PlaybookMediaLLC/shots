@@ -561,10 +561,6 @@ func createScheduledPost(ctx context.Context, s *Server, actor product.Actor, ar
 	if err := decode(args, &input); err != nil {
 		return nil, failWith(http.StatusBadRequest, "The scheduled post input is invalid.")
 	}
-	// Like POST /api/v1/scheduled-posts, a call without a key gets a fresh one.
-	if input.IdempotencyKey == "" {
-		input.IdempotencyKey = uuid.NewString()
-	}
 	if !input.ScheduledFor.After(time.Now()) {
 		return nil, failWith(http.StatusBadRequest, "Scheduled time must be in the future.")
 	}

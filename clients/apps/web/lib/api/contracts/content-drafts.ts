@@ -81,6 +81,10 @@ export const contentDraftSchema = z.object({
    * campaign handoff sets it; a draft cannot claim a campaign on its own.
    */
   campaignId: z.string().nullable().default(null),
+  /** The campaign post whose copy the draft took (the campaign handoff only). */
+  campaignPostId: z.string().nullable().default(null),
+  /** The release the draft was made from: its screenshots and summary. */
+  releaseId: z.string().nullable().default(null),
   /** A calendar placement without scheduling, as an ISO 8601 instant. */
   plannedFor: timestampSchema.nullable().default(null),
   primaryPlatform: z.string().nullable().default(null),
@@ -112,6 +116,8 @@ export const contentDraftCreateSchema = contentDraftFieldsSchema.extend({
   kind: draftKindSchema.optional(),
   /** The platform the body is written for; the set's primary platform when omitted. */
   primaryPlatform: draftChannelSchema.optional(),
+  /** The workspace release the draft is made from, so its evidence stays reachable. */
+  releaseId: z.uuid().optional(),
   scratchpad: z.string().max(20_000).optional(),
   socialSetId: contentDraftIdSchema.optional(),
   /** Tags of the draft's set (an experiment). */
@@ -173,12 +179,12 @@ export const createContentDraftContract = defineContract({
   docs: workspaceDocs({
     bodyName: 'ContentDraftCreateRequest',
     description:
-      'Creates a content draft: a post written in the document editor, kept until it is scheduled. Every attached asset and channel must belong to the workspace. Requires the `draft:write` scope and the content drafts entitlement.',
+      'Creates a content draft: a post written in the document editor, kept until it is scheduled. Every attached asset and channel, and the release it is made from, must belong to the workspace. Requires the `draft:write` scope and the content drafts entitlement.',
     extensions: entitlement,
     tag: 'Workspace',
     operationId: 'createContentDraft',
     outputName: 'ContentDraft',
-    responses: { '201': 'Draft created.', '400': 'The draft is invalid.' },
+    responses: { '201': 'Draft created.', '400': 'The draft is invalid.', '404': 'Not found.' },
   }),
   method: 'POST',
   name: 'content-drafts.create',
@@ -333,6 +339,11 @@ export const contentDraftScheduleSchema = scheduleTimingSchema.extend({
    * replacing them; an account that already has a post is refused.
    */
   add: z.boolean().optional(),
+  /**
+   * The member's answer to a `duplicate_content` conflict: schedule the same
+   * text and media to an account again within a day.
+   */
+  confirmDuplicate: z.boolean().optional(),
   /** Overrides the draft's natural posting time for this schedule (±4 minutes). */
   naturalPostingTime: z.boolean().optional(),
   scheduledFor: z.coerce

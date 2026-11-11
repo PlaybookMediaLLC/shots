@@ -233,9 +233,9 @@ func HandleErrors(body string, status int) *integrations.HandledError {
 	case has("2207009"):
 		return h("bad-body", "Aspect ratio not supported, must be between 4:5 to 1.91:1")
 	case has("Page request limit reached"):
-		return h("bad-body", "Page posting for today is limited, please try again tomorrow")
+		return h("limit", "Page posting for today is limited, please try again tomorrow")
 	case has("2207042"):
-		return h("bad-body", "You have reached the maximum of 25 posts per day, allowed for your account")
+		return h("limit", "You have reached the maximum of 25 posts per day, allowed for your account")
 	case has("(#200)"):
 		return h("bad-body", "Facebook rejected the post due to missing permissions. Make sure your Facebook account has full content access to the Page linked to this Instagram account, then reconnect the channel.")
 	case has("Not enough permissions to post"):
@@ -561,8 +561,18 @@ func (p *Provider) igPermalink(ctx context.Context, mediaID, checkToken, host st
 	return body.Permalink
 }
 
+// partlyPublishedStories ends a stories post that failed after an earlier
+// story went live: a whole-post retry would post that story again.
+func partlyPublishedStories() error {
+	return temporalx.UnknownDelivery("instagram", "Some stories were published before Instagram refused the rest. Check the account before sending again.")
+}
+
+// postID POSTs and returns the created object's id. A container (/media)
+// stays invisible until media_publish, so only it may be resent after a
+// server error; media_publish and comments may not.
 func (p *Provider) postID(ctx context.Context, rawURL string) (string, error) {
-	res, err := p.Fetch(ctx, rawURL, integrations.Request{Method: http.MethodPost})
+	container := strings.Contains(rawURL, "/media?")
+	res, err := p.Fetch(ctx, rawURL, integrations.Request{Method: http.MethodPost, Retryable: container})
 	if err != nil {
 		return "", err
 	}
@@ -779,6 +789,9 @@ func (p *Provider) FinalizePost(ctx context.Context, token string, raw json.RawM
 		lastMediaID := ""
 		for _, mediaCreationID := range pending.Containers {
 			status, err := p.igContainerStatus(ctx, mediaCreationID, checkToken, pending.Type)
+			if err != nil && lastMediaID != "" {
+				return nil, partlyPublishedStories()
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -786,6 +799,9 @@ func (p *Provider) FinalizePost(ctx context.Context, token string, raw json.RawM
 				continue
 			}
 			mediaID, err := p.postID(ctx, base+"/"+igID+"/media_publish?creation_id="+mediaCreationID+"&access_token="+accessToken+"&field=id")
+			if err != nil && lastMediaID != "" {
+				return nil, partlyPublishedStories()
+			}
 			if err != nil {
 				return nil, err
 			}

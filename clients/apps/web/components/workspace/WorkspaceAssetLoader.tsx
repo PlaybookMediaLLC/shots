@@ -2,6 +2,10 @@
 
 import * as React from 'react'
 import { toast } from 'sonner'
+import { availableBrandCategories } from '@/lib/brand/apply'
+import { type BrandKit, brandKitById, storedBrandKitSchema } from '@/lib/brand/kit'
+import { applyBrandKitToEditor } from '@/lib/brand/library'
+import { readEditorBrandKit } from '@/lib/platform/editor-handoff'
 import { useImageStore } from '@/lib/store'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { buildExportFileName } from '@/lib/workspace/save-export'
@@ -27,6 +31,11 @@ export function WorkspaceAssetLoader() {
     startedRef.current = true
 
     async function load(id: string): Promise<void> {
+      // The kit is read beside the download, so the brand follows the image at once.
+      const kitId = readEditorBrandKit(window.location.search)
+      const kit = kitId ? handoffKit(kitId) : null
+      // Its failure is reported where it is awaited, after the image opens.
+      kit?.catch(() => undefined)
       const { downloadUrl } = await trpcClient.asset.signDownload.query({ assetId: id })
       const response = await fetch(downloadUrl)
       if (!response.ok) {
@@ -43,11 +52,45 @@ export function WorkspaceAssetLoader() {
       // setImage writes the global store, so a strict-mode remount
       // between the fetch and this call is harmless.
       useImageStore.getState().setImage(file)
-      // Drop the parameter so a refresh keeps later edits instead of
-      // reloading the original asset over them.
+      // A screenshot handed over from a release or campaign opens on brand:
+      // the workspace's active kit, applied as one undoable step.
+      if (kit) await applyHandoffKit(kit)
+      // Drop the parameters so a refresh keeps later edits instead of
+      // reloading the original asset (and kit) over them.
       const url = new URL(window.location.href)
       url.searchParams.delete('asset')
+      url.searchParams.delete('kit')
       window.history.replaceState(null, '', url)
+    }
+
+    // The exact version handed over, looked up among every stored version: a
+    // newer draft of the kit must not hide the active one.
+    async function handoffKit(kitId: string): Promise<BrandKit> {
+      const { brandKits } = await trpcClient.brandKit.list.query()
+      const kit = brandKitById(
+        brandKits.flatMap((item) => {
+          const parsed = storedBrandKitSchema.safeParse(item)
+          return parsed.success ? [parsed.data] : []
+        }),
+        kitId
+      )
+      if (!kit) throw new Error('The brand kit could not be found in this workspace.')
+      return kit
+    }
+
+    async function applyHandoffKit(pending: Promise<BrandKit>): Promise<void> {
+      const progress = toast.loading('Applying the brand kit…')
+      try {
+        const kit = await pending
+        await applyBrandKitToEditor(trpcClient, kit, availableBrandCategories(kit))
+        toast.success(`Applied ${kit.name}`, { id: progress })
+      } catch (error) {
+        // The screenshot is open; only the kit is missing, and Brand can apply one.
+        toast.error('Could not apply the brand kit', {
+          description: error instanceof Error ? error.message : undefined,
+          id: progress,
+        })
+      }
     }
 
     load(assetId).catch(() => {

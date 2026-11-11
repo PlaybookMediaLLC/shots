@@ -8,6 +8,9 @@ import { editorCopilotContract, editorMessageRoleSchema } from '@/lib/api/contra
 import { errorResponse, route } from '@/lib/api/route'
 import { organizationAccess } from '@/lib/api/route-auth'
 import { isAiEnabled } from '@/lib/trpc/routers/launch'
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
+import { getWorkspaceVoice } from '@/lib/launch/store'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /** The model loop can run several tool steps; give it room on serverless hosts. */
 export const maxDuration = 120
@@ -55,13 +58,18 @@ function trimSnapshots(messages: ModelMessage[]): ModelMessage[] {
     .reverse()
 }
 
-async function runTurn(messages: ModelMessage[], selection: string | null) {
+async function runTurn(
+  messages: ModelMessage[],
+  selection: string | null,
+  voice: WritingContext | null
+) {
   const result = await generateText({
     messages: trimSnapshots(messages),
     // Sonnet: each round trip re-sends the canvas snapshot and tool schemas.
     model: models.languageModel('drafting'),
     stopWhen: stepCountIs(4),
-    system: EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(selection),
+    // Text the copilot writes onto the canvas is public copy in the brand voice.
+    system: EDITOR_COPILOT_INSTRUCTIONS + scopeInstructions(selection) + voiceInstructions(voice),
     tools: createEditorCopilotTools(),
   })
   const clientTools = new Set<string>(editorClientToolNames)
@@ -104,6 +112,7 @@ export const POST = route(editorCopilotContract, {
       }
     }
     // Every round trip is charged AI credits for what its model calls cost.
-    return withAiCredits(access, () => runTurn(messages, body.selection))
+    const voice = await getWorkspaceVoice(access)
+    return withAiCredits(access, () => runTurn(messages, body.selection, voice))
   },
 })

@@ -68,7 +68,7 @@ func (s *activityStore) Fail(_ context.Context, _ *ent.ScheduledPost, _ publishi
 	s.retryAt, s.failed = retryAt, code
 	return nil
 }
-func (s *activityStore) FailUnknown(context.Context, string, string, int) error {
+func (s *activityStore) FailUnknown(context.Context, string, string, int, string) error {
 	s.unknown = true
 	return nil
 }
@@ -90,7 +90,7 @@ func (s *activityStore) StartAttempt(context.Context, *ent.ScheduledPost, string
 type rateLimitedProvider struct{}
 
 func (rateLimitedProvider) Publish(context.Context, socialapi.PublishInput) (string, error) {
-	return "", &socialapi.Error{Status: 429}
+	return "", &socialapi.Error{Status: 429, RetryAfter: 7 * time.Minute, ProviderMessage: "Too many requests"}
 }
 
 type uncertainProvider struct{}
@@ -158,7 +158,8 @@ func TestSubmitActivityLeavesRateLimitRetryToWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Outcome != OutcomeRetry || result.FailureCode != "429" {
+	// The provider's retry guidance and message reach the workflow and the attempt.
+	if result.Outcome != OutcomeRetry || result.FailureCode != "429" || result.RetryAfter != 7*time.Minute || result.ProviderMessage != "Too many requests" {
 		t.Fatalf("result=%#v", result)
 	}
 }

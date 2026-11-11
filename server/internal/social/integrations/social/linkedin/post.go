@@ -125,8 +125,9 @@ func (p *Provider) uploadPicture(ctx context.Context, fileName, accessToken, per
 		request["uploadThumbnail"] = false
 	}
 	body, _ := json.Marshal(map[string]any{"initializeUploadRequest": request})
+	// Uploads stay invisible until a post references them, so a resend is safe.
 	res, err := p.Fetch(ctx, APIURL+"/rest/"+endpoint+"?action=initializeUpload", integrations.Request{
-		Method: http.MethodPost, Headers: Headers(accessToken, "application/json"), Body: body,
+		Method: http.MethodPost, Headers: Headers(accessToken, "application/json"), Body: body, Retryable: true,
 	})
 	if err != nil {
 		return nil, err
@@ -173,7 +174,7 @@ func (p *Provider) uploadPicture(ctx context.Context, fileName, accessToken, per
 				return nil, err
 			}
 			upload, err := p.Fetch(ctx, sendURL, integrations.Request{
-				Method: http.MethodPut, Headers: Headers(accessToken, "application/octet-stream"), Body: chunk,
+				Method: http.MethodPut, Headers: Headers(accessToken, "application/octet-stream"), Body: chunk, Retryable: true,
 			})
 			if err != nil {
 				return nil, err
@@ -194,7 +195,7 @@ func (p *Provider) uploadPicture(ctx context.Context, fileName, accessToken, per
 			contentType = "application/pdf"
 		}
 		if _, err := p.Fetch(ctx, sendURL, integrations.Request{
-			Method: http.MethodPut, Headers: Headers(accessToken, contentType), Body: data,
+			Method: http.MethodPut, Headers: Headers(accessToken, contentType), Body: data, Retryable: true,
 		}); err != nil {
 			return nil, err
 		}
@@ -205,7 +206,7 @@ func (p *Provider) uploadPicture(ctx context.Context, fileName, accessToken, per
 			"video": value.Video, "uploadToken": "", "uploadedPartIds": etags,
 		}})
 		if _, err := p.Fetch(ctx, APIURL+"/rest/videos?action=finalizeUpload", integrations.Request{
-			Method: http.MethodPost, Headers: Headers(accessToken, "application/json"), Body: body,
+			Method: http.MethodPost, Headers: Headers(accessToken, "application/json"), Body: body, Retryable: true,
 		}); err != nil {
 			return nil, err
 		}

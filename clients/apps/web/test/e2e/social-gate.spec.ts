@@ -203,25 +203,41 @@ test('the backend worker publishes once through Go, retries, honors cancellation
       new Set(['post.connection_created', 'post.scheduled', 'post.cancelled', 'post.published'])
     )
 
-    // A throttled or failing provider is retried into exactly one remote post.
-    for (const mode of ['throttle-once', 'server-error-once'] as const) {
-      await resetFake(mode)
-      const retry = await createScheduledPost(
-        page,
-        connectionId,
-        `social-gate-${mode}`,
-        variantId,
-        soon()
-      )
-      await expect.poll(async () => (await fakeState()).posts.length, { timeout: 180_000 }).toBe(1)
-      await awaitStatus(retry.scheduledPost.id, 'PUBLISHED')
-      const retried = await fakeState()
-      expect(retried.requests).toBe(2)
-      expect(retried.posts).toHaveLength(1)
-      expect(
-        (await attemptsOf(retry.scheduledPost.id)).filter((item) => item.outcome === 'SUCCEEDED')
-      ).toHaveLength(1)
-    }
+    // A throttled provider refused the post, so it is retried into exactly one remote post.
+    await resetFake('throttle-once')
+    const retry = await createScheduledPost(
+      page,
+      connectionId,
+      'social-gate-throttle-once',
+      variantId,
+      soon()
+    )
+    await expect.poll(async () => (await fakeState()).posts.length, { timeout: 180_000 }).toBe(1)
+    await awaitStatus(retry.scheduledPost.id, 'PUBLISHED')
+    const retried = await fakeState()
+    expect(retried.requests).toBe(2)
+    expect(retried.posts).toHaveLength(1)
+    expect(
+      (await attemptsOf(retry.scheduledPost.id)).filter((item) => item.outcome === 'SUCCEEDED')
+    ).toHaveLength(1)
+
+    // A server error may have published: the post is never resent and waits
+    // as UNKNOWN_DELIVERY for a person to check the account.
+    await resetFake('server-error-once')
+    const ambiguous = await createScheduledPost(
+      page,
+      connectionId,
+      'social-gate-server-error-once',
+      variantId,
+      soon()
+    )
+    await awaitStatus(ambiguous.scheduledPost.id, 'UNKNOWN_DELIVERY')
+    const unresolved = await fakeState()
+    expect(unresolved.requests).toBe(1)
+    expect(unresolved.posts).toHaveLength(0)
+    expect((await attemptsOf(ambiguous.scheduledPost.id)).map((item) => item.outcome)).toEqual([
+      'FAILED',
+    ])
 
     // An expired provider credential fails the post without publishing.
     await resetFake('normal')

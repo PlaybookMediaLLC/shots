@@ -147,5 +147,7 @@ func (c *Configuration) ValidateContentDraftSchedule(ctx context.Context, actor 
 			captions = append(captions, reply.Caption)
 		}
 	}
-	return requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...)
+	// The draft's own set: validation writes nothing, so a legacy draft is not
+	// given the default set here (scheduling does that, and checks it then).
+	return requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, draft.SocialSetID, captions...)
 }

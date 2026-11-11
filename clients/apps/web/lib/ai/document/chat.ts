@@ -20,6 +20,8 @@ import type {
   documentChatRequestSchema,
   documentCopilotRequestSchema,
 } from '@/lib/api/contracts/ai'
+import { getWorkspaceVoice } from '@/lib/launch/store'
+import { voiceInstructions } from '@/lib/write/voice'
 
 type DocumentChatRequest = z.infer<typeof documentChatRequestSchema>
 
@@ -34,6 +36,9 @@ export function streamDocumentChat(
   body: DocumentChatRequest
 ): Promise<Response> {
   const toolName = body.ctx?.toolName ?? 'generate'
+  // The voice loads while the credits are checked; it is awaited below.
+  const voice = getWorkspaceVoice(access)
+  voice.catch(() => undefined)
   return new Promise<Response>((resolve, reject) => {
     withAiCredits(access, async () => {
       const messages = await convertToModelMessages(body.messages as unknown as UIMessage[])
@@ -46,7 +51,9 @@ export function streamDocumentChat(
           ...messages,
         ],
         model: models.languageModel('drafting'),
-        system: DOCUMENT_EDITOR_INSTRUCTIONS,
+        // The request carries no draft, so the workspace voice; a draft's set
+        // voice reaches Refine and the writing assistant instead.
+        system: DOCUMENT_EDITOR_INSTRUCTIONS + voiceInstructions(await voice),
       })
       const stream = createUIMessageStream({
         execute: ({ writer }) => {
@@ -65,11 +72,14 @@ export function completeDocumentText(
   access: OrganizationAccess,
   body: z.infer<typeof documentCopilotRequestSchema>
 ): Promise<{ text: string }> {
+  // The voice loads while the credits are checked; it is awaited below.
+  const voice = getWorkspaceVoice(access)
+  voice.catch(() => undefined)
   return withAiCredits(access, async () => {
     const { text } = await generateText({
       model: models.languageModel('fast'),
       prompt: body.prompt,
-      system: DOCUMENT_COPILOT_INSTRUCTIONS,
+      system: DOCUMENT_COPILOT_INSTRUCTIONS + voiceInstructions(await voice),
     })
     return { text: text.trim() || '0' }
   })

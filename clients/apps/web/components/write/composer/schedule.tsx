@@ -35,6 +35,8 @@ import {
   type DraftPostWire,
   type DraftWire,
   draftsApi,
+  duplicatePosts,
+  type DuplicatePost,
 } from '@/lib/content-drafts/client'
 import { type BlockImages, channelForPlatform } from '@/lib/content-drafts/serialize'
 import { followUpLines } from '@/lib/write/automation'
@@ -196,6 +198,8 @@ async function commitSchedule(
     /** The brand this run belongs to, resolved the same way everywhere its memory is read. */
     setId: string | null
     zone: string
+    /** The member confirmed repeating an account's post from the last day. */
+    confirmDuplicate?: boolean
   }
 ): Promise<void> {
   const prepared = await preparePublication(context)
@@ -207,6 +211,7 @@ async function commitSchedule(
     ...timing,
     naturalPostingTime: options.naturalPostingTime,
     baseCalendarVersion: context.draft.calendarVersion,
+    confirmDuplicate: options.confirmDuplicate,
   })
   // What the next draft in this run opens on: these accounts, a gap after this time.
   const committed = result.posts
@@ -320,7 +325,7 @@ export function ScheduleDock({
   const instant = resolution.kind === 'exact' ? resolution.at : null
   const rescheduling = (context.scheduled ?? []).length > 0
   const past = instant !== null && instant.getTime() <= Date.now()
-  const schedule = async (andNext: boolean) => {
+  const schedule = async (andNext: boolean, confirmDuplicate = false) => {
     if (!timeValid) return
     setBusy(andNext ? 'next' : 'schedule')
     try {
@@ -332,10 +337,17 @@ export function ScheduleDock({
           newDraft: andNext,
           setId: setId ?? null,
           zone,
+          confirmDuplicate,
         }
       )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The draft could not be scheduled.')
+      if (duplicatePosts(error))
+        // A repeat waits for the writer: nothing is queued until they confirm.
+        toast.warning(duplicateMessage, {
+          action: { label: 'Schedule anyway', onClick: () => void schedule(andNext, true) },
+          duration: 20_000,
+        })
+      else toast.error(error instanceof Error ? error.message : 'The draft could not be scheduled.')
     } finally {
       setBusy(null)
     }
@@ -525,6 +537,8 @@ export function ScheduleDialog({
   // Which button is working, so only that one says so.
   const [action, setAction] = React.useState<'clear' | 'plan' | 'schedule' | null>(null)
   const [error, setError] = React.useState('')
+  // A repeat the backend found, kept with the timing it was found for: a new time asks again.
+  const [repeat, setRepeat] = React.useState<{ key: string; posts: DuplicatePost[] } | null>(null)
   const busy = action !== null
   React.useEffect(() => {
     if (!data.advancedScheduling) return
@@ -558,6 +572,8 @@ export function ScheduleDialog({
     }
   }, [setId, data.advancedScheduling, slotRequest])
   const local = `${day}T${time}`
+  const timingKey = queue ? `queue:${queueSlot ?? ''}` : `${local} ${zone}`
+  const duplicates = repeat?.key === timingKey ? repeat.posts : null
   const resolution = resolveLocalTime(local, zone)
   const instant =
     resolution.kind === 'exact'
@@ -599,12 +615,21 @@ export function ScheduleDialog({
         queue
           ? { queue: true, expectedQueueSlot: queueSlot ?? undefined }
           : { disambiguation: disambiguation ?? undefined, localTime: local, timeZone: zone },
-        { naturalPostingTime: natural, newDraft: continueWriting, setId: setId ?? null, zone }
+        {
+          naturalPostingTime: natural,
+          newDraft: continueWriting,
+          setId: setId ?? null,
+          zone,
+          confirmDuplicate: duplicates !== null,
+        }
       )
       onClose()
     } catch (error) {
       const next = error instanceof DraftRequestError ? error.details.nextQueueSlot : undefined
-      if (queue && typeof next === 'string') {
+      const repeats = duplicatePosts(error)
+      if (repeats) {
+        setRepeat({ key: timingKey, posts: repeats })
+      } else if (queue && typeof next === 'string') {
         // Another schedule took the reviewed slot: show the next one; never move silently.
         setQueueSlot(next)
         setSlotNotice(
@@ -967,6 +992,7 @@ export function ScheduleDialog({
         </MoreOptions>
         <ReplacedPosts context={context} timeZone={zone} />
         <Problems context={context} problems={problems} />
+        <DuplicateWarning context={context} duplicates={duplicates} timeZone={zone} />
         <ActionError message={error} />
         {planBlocked ? (
           <p className="text-xs text-muted-foreground" role="status">
@@ -1024,13 +1050,15 @@ export function ScheduleDialog({
             >
               {action === 'schedule'
                 ? 'Scheduling…'
-                : queue
-                  ? rescheduling
-                    ? 'Reschedule to next free slot'
-                    : 'Add to queue'
-                  : rescheduling
-                    ? 'Confirm reschedule'
-                    : 'Confirm schedule'}
+                : duplicates
+                  ? 'Schedule anyway'
+                  : queue
+                    ? rescheduling
+                      ? 'Reschedule to next free slot'
+                      : 'Add to queue'
+                    : rescheduling
+                      ? 'Confirm reschedule'
+                      : 'Confirm schedule'}
             </Button>
           </div>
         </div>
@@ -1250,6 +1278,53 @@ function ReplacedPosts({
   )
 }
 
+const duplicateMessage =
+  'This repeats a post an account has queued or published within a day. Platforms can treat repeats as spam.'
+
+/**
+ * The account posts this schedule would repeat within a day. Nothing is
+ * queued until the writer confirms again ("Schedule anyway").
+ */
+function DuplicateWarning({
+  context,
+  duplicates,
+  timeZone,
+}: {
+  context: ScheduleContext
+  duplicates: DuplicatePost[] | null
+  timeZone: string
+}) {
+  if (!duplicates) return null
+  const accounts = new Map(context.items.map((item) => [item.account.id, item.account] as const))
+  return (
+    <div
+      className="grid gap-2 rounded-lg border border-amber-400/40 bg-amber-500/[0.04] px-4 py-3 text-xs"
+      data-testid="duplicate-warning"
+      role="alert"
+    >
+      <p className="text-foreground">{duplicateMessage}</p>
+      <ul className="grid gap-1">
+        {duplicates.map((post) => {
+          const account = accounts.get(post.channelConnectionId)
+          return (
+            <li className="flex flex-wrap items-center gap-1.5" key={post.postId}>
+              {account ? <ChannelIcon channel={account.channel} className="size-3.5" /> : null}
+              {account
+                ? (account.displayName ?? CHANNEL_META[account.channel].label)
+                : 'An account'}
+              <span className="text-muted-foreground">
+                · {post.status === 'PUBLISHED' ? 'published' : 'queued'}{' '}
+                <LocalTime value={post.at} zone={timeZone} />
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="text-muted-foreground">Confirm again to post it anyway.</p>
+    </div>
+  )
+}
+
 /** A list of blocking problems, or nothing; a failed save can be retried from here. */
 function Problems({ context, problems }: { context: ScheduleContext; problems: string[] }) {
   if (problems.length === 0) return null
@@ -1313,6 +1388,7 @@ export function PublishReview({
   const { data } = useWrite()
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState('')
+  const [duplicates, setDuplicates] = React.useState<DuplicatePost[] | null>(null)
   const problems = blocking(context)
   const set = data.sets.find(
     (item) =>
@@ -1335,6 +1411,7 @@ export function PublishReview({
         ...prepared,
         channelConnectionIds: context.items.map((item) => item.account.id),
         publishNow: true,
+        confirmDuplicate: duplicates !== null,
       })
       context.onDone(result)
       toast.success(
@@ -1344,7 +1421,9 @@ export function PublishReview({
       )
       onClose()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'The draft could not be published.')
+      const repeats = duplicatePosts(error)
+      if (repeats) setDuplicates(repeats)
+      else setError(error instanceof Error ? error.message : 'The draft could not be published.')
     } finally {
       setBusy(false)
     }
@@ -1437,6 +1516,11 @@ export function PublishReview({
         ) : null}
         <ReplacedPosts context={context} publishNow timeZone={context.setTimeZone ?? 'UTC'} />
         <Problems context={context} problems={problems} />
+        <DuplicateWarning
+          context={context}
+          duplicates={duplicates}
+          timeZone={context.setTimeZone ?? 'UTC'}
+        />
         <ActionError message={error} />
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
           <p className="mr-auto text-xs text-muted-foreground">
@@ -1459,7 +1543,7 @@ export function PublishReview({
             onClick={() => void publish()}
             type="button"
           >
-            {busy ? 'Publishing…' : 'Publish now'}
+            {busy ? 'Publishing…' : duplicates ? 'Publish anyway' : 'Publish now'}
           </Button>
         </div>
       </DialogContent>

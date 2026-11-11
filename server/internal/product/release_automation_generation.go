@@ -219,15 +219,8 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, err
 	}
-	workspace := "No brand profile is configured; write plainly."
-	if profile != nil {
-		terms := []string{}
-		for _, term := range profile.ProhibitedTerms {
-			terms = append(terms, term.Term)
-		}
-		workspace = fmt.Sprintf("Product: %s\nAudience: %s\nVoice: %s\nCall-to-action conventions: %s\nProhibited terms: %s",
-			profile.ProductDescription, profile.Audience, profile.Tone, optionalText(profile.CtaConventions), strings.Join(terms, ", "))
-	}
+	// The one voice format: campaigns belong to no social set, so the brand's.
+	workspace := voicePrompt(WorkspaceVoice(profile))
 	requests := []string{}
 	for _, post := range posts {
 		requests = append(requests, fmt.Sprintf("- postId %s: %s, at most %d characters", post.ID, post.Channel, channelLimit(post.Channel)))
@@ -235,7 +228,7 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 	// Fence delimiters inside untrusted text cannot close the fence.
 	fence := strings.NewReplacer("<source", "‹source", "</source", "‹/source")
 	prompt := fmt.Sprintf("<workspace trust=\"trusted\">\n%s\n</workspace>\n\nPosts to write:\n%s\n\n<source trust=\"untrusted\">\n%s\n\n%s\n</source>",
-		releasenotes.Clean(workspace, 4000), strings.Join(requests, "\n"), fence.Replace(source.Title), fence.Replace(releasenotes.Clean(source.Notes, 12000)))
+		releasenotes.Clean(workspace, 32000), strings.Join(requests, "\n"), fence.Replace(source.Title), fence.Replace(releasenotes.Clean(source.Notes, 12000)))
 	var reply struct {
 		Posts []automation.GeneratedPost `json:"posts"`
 	}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -13,13 +14,17 @@ import (
 
 func TestMutationsDoNotRetryAmbiguousResponses(t *testing.T) {
 	for _, action := range []string{"post", "comment", "repost"} {
-		for _, status := range []int{201, 408, 500, 503, 403} {
+		for _, status := range []int{201, 408, 500, 503, 403, 429} {
 			t.Run(action+http.StatusText(status), func(t *testing.T) {
 				endpoint := "/rest/posts"
 				if action == "comment" {
 					endpoint = "/rest/socialActions/urn:li:share:42/comments"
 				}
-				f, _ := newFake(t, map[string]http.HandlerFunc{"POST " + endpoint: func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status); _, _ = w.Write([]byte(`{}`)) }})
+				f, _ := newFake(t, map[string]http.HandlerFunc{"POST " + endpoint: func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Retry-After", "60")
+					w.WriteHeader(status)
+					_, _ = w.Write([]byte(`{}`))
+				}})
 				var err error
 				switch action {
 				case "post":
@@ -32,6 +37,13 @@ func TestMutationsDoNotRetryAmbiguousResponses(t *testing.T) {
 				want := temporalx.TypeUnknownDelivery
 				if status == 403 {
 					want = temporalx.TypeBadBody
+				}
+				// A 429 created nothing: the workflow retries it durably, after LinkedIn's guidance.
+				if status == 429 {
+					want = temporalx.TypeRateLimited
+					if after := temporalx.RetryAfter(err); after < 50*time.Second || after > time.Minute {
+						t.Fatalf("retry after = %v", after)
+					}
 				}
 				if temporalx.FailureType(err) != want || len(f.find("POST", endpoint)) != 1 {
 					t.Fatalf("error=%v requests=%d", err, len(f.find("POST", endpoint)))

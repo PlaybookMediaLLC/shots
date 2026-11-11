@@ -322,4 +322,21 @@ func TestCampaignPublishing(t *testing.T) {
 	if used := meter.used[monthlyMeterKey(QuotaPosts, org, time.Now().UTC())] - before; used != 1 {
 		t.Fatalf("posts charged=%d, want 1", used)
 	}
+	// Without a key the request is named by its content, so a retry replays.
+	// A caller's key keeps naming its first post, even for a recomputed time.
+	keyless := direct
+	keyless.IdempotencyKey, keyless.ScheduledFor = "", at.Add(time.Minute)
+	keyFirst, err := repo.CreateScheduledPost(ctx, key(scheduler), keyless)
+	if err != nil || !keyFirst.Created {
+		t.Fatalf("keyless=%+v err=%v", keyFirst, err)
+	}
+	keyAgain, err := repo.CreateScheduledPost(ctx, key(scheduler), keyless)
+	if err != nil || keyAgain.Created || keyAgain.Post.ID != keyFirst.Post.ID {
+		t.Fatalf("keyless retry=%+v err=%v", keyAgain, err)
+	}
+	moved := direct
+	moved.ScheduledFor = at.Add(time.Hour)
+	if again, err := repo.CreateScheduledPost(ctx, key(scheduler), moved); err != nil || again.Created || again.Post.ID != created.Post.ID {
+		t.Fatalf("a retry with a recomputed time=%+v err=%v", again, err)
+	}
 }

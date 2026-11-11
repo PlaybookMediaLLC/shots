@@ -158,3 +158,34 @@ func TestScheduleContentDraftNamesNextFreeSlotOnConflict(t *testing.T) {
 		t.Fatalf("status=%d body=%+v", response.Code, body)
 	}
 }
+
+type duplicateFake struct {
+	fakeConfiguration
+	input product.ScheduleContentDraftInput
+}
+
+func (f *duplicateFake) ScheduleContentDraft(_ context.Context, _ product.Actor, _ string, input product.ScheduleContentDraftInput) (*product.ScheduleContentDraftResult, error) {
+	f.input = input
+	return nil, &product.DuplicateContentError{Posts: []product.DuplicatePost{{
+		At: time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC), ChannelConnectionID: "c123456789012345678901235", PostID: "p1", Status: "PUBLISHED",
+	}}}
+}
+
+// A repeat on an account answers 409 with the posts it repeats, and the
+// member's confirmation reaches the domain.
+func TestScheduleContentDraftNamesTheDuplicatesItFound(t *testing.T) {
+	fake := &duplicateFake{}
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", fake)
+	response := configurationRequest(handler, http.MethodPost, "/v1/content-drafts/c123456789012345678901234/schedule",
+		`{"confirmDuplicate":true,"scheduledFor":"2026-11-02T10:00:00Z","targets":[{"caption":"Hi","channelConnectionId":"c123456789012345678901235"}],"version":2}`)
+	var body struct {
+		Code       string                  `json:"code"`
+		Duplicates []product.DuplicatePost `json:"duplicates"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusConflict || body.Code != "duplicate_content" || len(body.Duplicates) != 1 || body.Duplicates[0].PostID != "p1" || !fake.input.ConfirmDuplicate {
+		t.Fatalf("status=%d body=%+v confirm=%v", response.Code, body, fake.input.ConfirmDuplicate)
+	}
+}

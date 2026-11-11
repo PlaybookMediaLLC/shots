@@ -405,6 +405,21 @@ func TestDirectPublisherPreservesDefiniteRejection(t *testing.T) {
 	}
 }
 
+// A lasting rate limit retries durably with the provider's guidance; a daily
+// cap fails definitely with its own code. Neither is an unknown delivery.
+func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
+	var limited *socialapi.Error
+	err := publicationOutcome(temporalx.RateLimited("x", 7*time.Minute, "slow down"))
+	if !errors.As(err, &limited) || limited.UnknownDelivery || limited.Status != 429 || limited.RetryAfter != 7*time.Minute || limited.ProviderMessage != "slow down" {
+		t.Fatalf("rate limit = %#v", err)
+	}
+	var capped *socialapi.Error
+	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
+	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
+		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
 func TestLegacyBadBodyCannotProveRejectedDelivery(t *testing.T) {
 	err := publicationOutcome(temporalx.BadBody("linkedin", "{}", "{}", "may already be published"))
 	var providerErr *socialapi.Error

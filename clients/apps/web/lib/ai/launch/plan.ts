@@ -25,13 +25,13 @@ import { getProductProfile } from '@/lib/tenant/product-profile'
 import {
   captureUrlsFor,
   formatBrandKit,
-  formatBrandVoice,
   formatCaptureTargets,
   formatProductProfile,
   formatSpecForStages,
 } from './context'
 import { PLAN_INSTRUCTIONS, planTargetLine } from './prompts'
 import { runSubmitStage, stageMetadata } from './run'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /** Capabilities looked up against the workspace's product surfaces. */
 const MATCHED_FEATURES = 3
@@ -115,7 +115,7 @@ export async function draftCampaignPlan(
       .join('\n'),
     formatProductProfile(product),
     formatCaptureTargets(captureUrls, spec.sources),
-    formatBrandVoice(brand),
+    voiceInstructions(brand.voice),
     formatBrandKit(brand.kit),
     formatTeamPreferences(examples),
     target ? planTargetLine(target) : null,

@@ -57,6 +57,11 @@ func writeContentDraftError(w http.ResponseWriter, err error) {
 		})
 		return
 	}
+	var duplicate *product.DuplicateContentError
+	if errors.As(err, &duplicate) {
+		writeJSON(w, http.StatusConflict, map[string]any{"code": "duplicate_content", "duplicates": duplicate.Posts, "error": err.Error()})
+		return
+	}
 	var taken *product.QueueSlotTakenError
 	if errors.As(err, &taken) {
 		writeJSON(w, http.StatusConflict, map[string]any{

@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useHydratedSession } from '@/lib/auth/client'
-import { BRAND_CATEGORIES, type BrandCategory } from '@/lib/brand/apply'
+import { availableBrandCategories, BRAND_CATEGORIES, type BrandCategory } from '@/lib/brand/apply'
 import { type BrandKit, fontName } from '@/lib/brand/kit'
 import {
   applyBrandKitToEditor,
@@ -45,10 +45,7 @@ const CATEGORY_LABELS: Record<BrandCategory, string> = {
 }
 
 function available(kit: BrandKit, category: BrandCategory): boolean {
-  if (category === 'frame') return Boolean(kit.frame)
-  if (category === 'logo') return kit.logos.length > 0
-  if (category === 'typography') return Boolean(kit.primaryFont)
-  return true
+  return availableBrandCategories(kit).includes(category)
 }
 
 function errorMessage(error: unknown): string {

@@ -27,7 +27,7 @@ import (
 // HandledError is a provider's classification of a failed response
 // (SocialAbstract.handleErrors).
 type HandledError struct {
-	Type  string // refresh-token | bad-body | retry | disconnect
+	Type  string // refresh-token | bad-body | retry | disconnect | limit
 	Value string
 }
 
@@ -116,6 +116,10 @@ type Request struct {
 	// Client overrides the SSRF-safe client (for providers with fixed hosts
 	// that need a custom transport).
 	Client *http.Client
+	// Retryable marks a write that is safe to resend after a server error: a
+	// read sent as POST, a write the provider deduplicates (Idempotency-Key),
+	// or a step that stays invisible until a later publish call.
+	Retryable bool
 }
 
 // Response is a fully read response.
@@ -132,14 +136,20 @@ func (r *Response) JSON(v any) error { return json.Unmarshal(r.Body, v) }
 func (r *Response) Text() string { return string(r.Body) }
 
 // Fetch is SocialAbstract.fetch: it returns 200/201 responses and otherwise
-// retries 429, unclassified 500s, rate-limit bodies and `retry`
-// classifications up to three times, then maps the failure to Disconnect,
-// RefreshToken or BadBody. A transport error is returned as-is.
+// retries 429, rate-limit bodies and `retry` classifications up to three
+// times, then maps the failure to Disconnect, RefreshToken, DailyLimit,
+// RateLimited or BadBody. RateLimited and DailyLimit (nothing was created)
+// come only from a refused write; a read's failures stay BadBody, since a
+// read may follow a write that committed. An unclassified 500 is retried for
+// reads and Retryable writes; on any other write it is UnknownDelivery after
+// one request. A transport error is returned as-is and never resent.
 func (b *Base) Fetch(ctx context.Context, url string, req Request) (*Response, error) {
-	return b.fetch(ctx, url, req, 0, "")
+	return b.fetch(ctx, url, req, 0, "", false)
 }
 
-func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, message string) (*Response, error) {
+// fetch sends req; resent says an earlier send of this write may have
+// committed (a 500 or a `retry` answer), so a later limit proves nothing.
+func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, message string, resent bool) (*Response, error) {
 	temporalx.SetHeartbeatDetails(ctx, "fetch "+temporalx.StripQuery(url))
 	method := req.Method
 	if method == "" {
@@ -180,23 +190,59 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 	if requestBody == "" {
 		requestBody = "{}"
 	}
+	handled := b.handleErrors(text, res.StatusCode)
+	// A refused write created nothing, so its limits are definite. A read may
+	// follow a write that already committed, so its failures stay ambiguous.
+	write := method != http.MethodGet && method != http.MethodHead
+	if handled != nil && handled.Type == "limit" && !write {
+		handled = &HandledError{Type: "bad-body", Value: handled.Value}
+	}
+	serverError := res.StatusCode == http.StatusInternalServerError && handled == nil
+	if res.StatusCode == http.StatusInternalServerError && write && !req.Retryable {
+		// A write may have committed before the server failed: never resend it.
+		return nil, temporalx.UnknownDelivery(b.identifier, "The platform failed while handling this request and may have accepted it. Check the account before sending again.")
+	}
+	if handled != nil && handled.Type == "limit" {
+		if resent {
+			return nil, ambiguousResend(b.identifier)
+		}
+		// A daily cap does not clear by retrying.
+		return nil, b.classify(text, requestBody, res.StatusCode, handled)
+	}
+	rateLimited := rateLimitedResponse(res.StatusCode, text)
 	if retries > 2 {
+		if rateLimited && write && resent {
+			return nil, ambiguousResend(b.identifier)
+		}
+		if rateLimited && write {
+			retryAt := RetryAt(res.Header, time.Now())
+			return nil, temporalx.RateLimited(b.identifier, time.Until(retryAt), message)
+		}
 		return nil, temporalx.BadBody(b.identifier, text, requestBody, message)
 	}
-	handled := b.handleErrors(text, res.StatusCode)
 	value := "Unknown Error"
 	if handled != nil && handled.Value != "" {
 		value = handled.Value
 	}
-	if res.StatusCode == http.StatusTooManyRequests || (res.StatusCode == http.StatusInternalServerError && handled == nil) ||
-		strings.Contains(text, "rate_limit_exceeded") || strings.Contains(text, "Rate limit") ||
-		(handled != nil && handled.Type == "retry") {
+	if rateLimited || serverError || (handled != nil && handled.Type == "retry") {
 		if err := b.Sleep(ctx, b.RetryDelay); err != nil {
 			return nil, err
 		}
-		return b.fetch(ctx, url, req, retries+1, value)
+		ambiguous := write && (serverError || handled != nil && handled.Type == "retry")
+		return b.fetch(ctx, url, req, retries+1, value, resent || ambiguous)
 	}
 	return nil, b.classify(text, requestBody, res.StatusCode, handled)
+}
+
+// ambiguousResend ends a write resent after an answer that may have followed a
+// commit: the limit that stopped the resend says nothing about the first send.
+func ambiguousResend(identifier string) error {
+	return temporalx.UnknownDelivery(identifier, "The platform may have accepted an earlier attempt before limiting the retry. Check the account before sending again.")
+}
+
+// rateLimitedResponse is a provider asking to slow down, by status or by body.
+func rateLimitedResponse(status int, text string) bool {
+	return status == http.StatusTooManyRequests || strings.Contains(text, "rate_limit_exceeded") || strings.Contains(text, "Rate limit")
 }
 
 func (b *Base) classify(text, requestBody string, status int, handled *HandledError) error {
@@ -206,6 +252,9 @@ func (b *Base) classify(text, requestBody string, status int, handled *HandledEr
 	}
 	if handled != nil && handled.Type == "disconnect" {
 		return temporalx.Disconnect(b.identifier, text, requestBody, handledValue)
+	}
+	if handled != nil && handled.Type == "limit" {
+		return temporalx.DailyLimit(b.identifier, handledValue)
 	}
 	if (status == http.StatusUnauthorized && (handled == nil || handled.Type == "refresh-token")) ||
 		(handled != nil && handled.Type == "refresh-token") {
@@ -259,8 +308,10 @@ func Do(req *http.Request) (*Response, error) {
 
 // RunStreamedUpload is SocialAbstract.runStreamedUpload: fn rebuilds the
 // streamed request on every attempt; ResponseErrors are retried and
-// classified like Fetch, other errors are returned untouched.
-func RunStreamedUpload[T any](ctx context.Context, b *Base, fn func() (T, error)) (T, error) {
+// classified like a Fetch write, other errors are returned untouched.
+// retryable is Request.Retryable: an upload that stays invisible until a
+// later publish call may be resent after a server error; a post may not.
+func RunStreamedUpload[T any](ctx context.Context, b *Base, retryable bool, fn func() (T, error)) (T, error) {
 	for retries := 0; ; retries++ {
 		value, err := fn()
 		var respErr *ResponseError
@@ -276,12 +327,23 @@ func RunStreamedUpload[T any](ctx context.Context, b *Base, fn func() (T, error)
 			text = "{}"
 		}
 		handled := b.handleErrors(text, status)
-		if retries <= 2 && (status == 429 || (status == 500 && handled == nil) || (handled != nil && handled.Type == "retry") ||
-			strings.Contains(text, "rate_limit_exceeded") || strings.Contains(text, "Rate limit")) {
+		if status == 500 && !retryable {
+			// A server error may follow a committed post: never resend it.
+			return value, temporalx.UnknownDelivery(b.identifier, "The platform failed while handling this upload and may have accepted it. Check the account before sending again.")
+		}
+		if handled != nil && handled.Type == "limit" {
+			return value, b.classify(text, "{}", status, handled)
+		}
+		rateLimited := rateLimitedResponse(status, text)
+		serverError := status == 500 && handled == nil
+		if retries <= 2 && (rateLimited || serverError || (handled != nil && handled.Type == "retry")) {
 			if err := b.Sleep(ctx, b.RetryDelay); err != nil {
 				return value, err
 			}
 			continue
+		}
+		if rateLimited {
+			return value, temporalx.RateLimited(b.identifier, 0, "Rate limited")
 		}
 		return value, b.classify(text, "{}", status, handled)
 	}

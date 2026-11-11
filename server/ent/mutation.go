@@ -33279,6 +33279,8 @@ type ContentDraftMutation struct {
 	plan_time_zone               *string
 	source_draft_id              *string
 	campaign_id                  *string
+	release_id                   *string
+	campaign_post_id             *string
 	collab_generation            *int
 	addcollab_generation         *int
 	collab_state                 *[]byte
@@ -34889,6 +34891,104 @@ func (m *ContentDraftMutation) ResetCampaignID() {
 	delete(m.clearedFields, contentdraft.FieldCampaignID)
 }
 
+// SetReleaseID sets the "release_id" field.
+func (m *ContentDraftMutation) SetReleaseID(s string) {
+	m.release_id = &s
+}
+
+// ReleaseID returns the value of the "release_id" field in the mutation.
+func (m *ContentDraftMutation) ReleaseID() (r string, exists bool) {
+	v := m.release_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReleaseID returns the old "release_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldReleaseID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReleaseID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReleaseID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReleaseID: %w", err)
+	}
+	return oldValue.ReleaseID, nil
+}
+
+// ClearReleaseID clears the value of the "release_id" field.
+func (m *ContentDraftMutation) ClearReleaseID() {
+	m.release_id = nil
+	m.clearedFields[contentdraft.FieldReleaseID] = struct{}{}
+}
+
+// ReleaseIDCleared returns if the "release_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) ReleaseIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldReleaseID]
+	return ok
+}
+
+// ResetReleaseID resets all changes to the "release_id" field.
+func (m *ContentDraftMutation) ResetReleaseID() {
+	m.release_id = nil
+	delete(m.clearedFields, contentdraft.FieldReleaseID)
+}
+
+// SetCampaignPostID sets the "campaign_post_id" field.
+func (m *ContentDraftMutation) SetCampaignPostID(s string) {
+	m.campaign_post_id = &s
+}
+
+// CampaignPostID returns the value of the "campaign_post_id" field in the mutation.
+func (m *ContentDraftMutation) CampaignPostID() (r string, exists bool) {
+	v := m.campaign_post_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCampaignPostID returns the old "campaign_post_id" field's value of the ContentDraft entity.
+// If the ContentDraft object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentDraftMutation) OldCampaignPostID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCampaignPostID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCampaignPostID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCampaignPostID: %w", err)
+	}
+	return oldValue.CampaignPostID, nil
+}
+
+// ClearCampaignPostID clears the value of the "campaign_post_id" field.
+func (m *ContentDraftMutation) ClearCampaignPostID() {
+	m.campaign_post_id = nil
+	m.clearedFields[contentdraft.FieldCampaignPostID] = struct{}{}
+}
+
+// CampaignPostIDCleared returns if the "campaign_post_id" field was cleared in this mutation.
+func (m *ContentDraftMutation) CampaignPostIDCleared() bool {
+	_, ok := m.clearedFields[contentdraft.FieldCampaignPostID]
+	return ok
+}
+
+// ResetCampaignPostID resets all changes to the "campaign_post_id" field.
+func (m *ContentDraftMutation) ResetCampaignPostID() {
+	m.campaign_post_id = nil
+	delete(m.clearedFields, contentdraft.FieldCampaignPostID)
+}
+
 // SetCollabGeneration sets the "collab_generation" field.
 func (m *ContentDraftMutation) SetCollabGeneration(i int) {
 	m.collab_generation = &i
@@ -35198,7 +35298,7 @@ func (m *ContentDraftMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentDraftMutation) Fields() []string {
-	fields := make([]string, 0, 39)
+	fields := make([]string, 0, 41)
 	if m.organization_id != nil {
 		fields = append(fields, contentdraft.FieldOrganizationID)
 	}
@@ -35298,6 +35398,12 @@ func (m *ContentDraftMutation) Fields() []string {
 	if m.campaign_id != nil {
 		fields = append(fields, contentdraft.FieldCampaignID)
 	}
+	if m.release_id != nil {
+		fields = append(fields, contentdraft.FieldReleaseID)
+	}
+	if m.campaign_post_id != nil {
+		fields = append(fields, contentdraft.FieldCampaignPostID)
+	}
 	if m.collab_generation != nil {
 		fields = append(fields, contentdraft.FieldCollabGeneration)
 	}
@@ -35390,6 +35496,10 @@ func (m *ContentDraftMutation) Field(name string) (ent.Value, bool) {
 		return m.SourceDraftID()
 	case contentdraft.FieldCampaignID:
 		return m.CampaignID()
+	case contentdraft.FieldReleaseID:
+		return m.ReleaseID()
+	case contentdraft.FieldCampaignPostID:
+		return m.CampaignPostID()
 	case contentdraft.FieldCollabGeneration:
 		return m.CollabGeneration()
 	case contentdraft.FieldCollabState:
@@ -35477,6 +35587,10 @@ func (m *ContentDraftMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldSourceDraftID(ctx)
 	case contentdraft.FieldCampaignID:
 		return m.OldCampaignID(ctx)
+	case contentdraft.FieldReleaseID:
+		return m.OldReleaseID(ctx)
+	case contentdraft.FieldCampaignPostID:
+		return m.OldCampaignPostID(ctx)
 	case contentdraft.FieldCollabGeneration:
 		return m.OldCollabGeneration(ctx)
 	case contentdraft.FieldCollabState:
@@ -35729,6 +35843,20 @@ func (m *ContentDraftMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCampaignID(v)
 		return nil
+	case contentdraft.FieldReleaseID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReleaseID(v)
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCampaignPostID(v)
+		return nil
 	case contentdraft.FieldCollabGeneration:
 		v, ok := value.(int)
 		if !ok {
@@ -35891,6 +36019,12 @@ func (m *ContentDraftMutation) ClearedFields() []string {
 	if m.FieldCleared(contentdraft.FieldCampaignID) {
 		fields = append(fields, contentdraft.FieldCampaignID)
 	}
+	if m.FieldCleared(contentdraft.FieldReleaseID) {
+		fields = append(fields, contentdraft.FieldReleaseID)
+	}
+	if m.FieldCleared(contentdraft.FieldCampaignPostID) {
+		fields = append(fields, contentdraft.FieldCampaignPostID)
+	}
 	if m.FieldCleared(contentdraft.FieldCollabState) {
 		fields = append(fields, contentdraft.FieldCollabState)
 	}
@@ -35952,6 +36086,12 @@ func (m *ContentDraftMutation) ClearField(name string) error {
 		return nil
 	case contentdraft.FieldCampaignID:
 		m.ClearCampaignID()
+		return nil
+	case contentdraft.FieldReleaseID:
+		m.ClearReleaseID()
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		m.ClearCampaignPostID()
 		return nil
 	case contentdraft.FieldCollabState:
 		m.ClearCollabState()
@@ -36068,6 +36208,12 @@ func (m *ContentDraftMutation) ResetField(name string) error {
 		return nil
 	case contentdraft.FieldCampaignID:
 		m.ResetCampaignID()
+		return nil
+	case contentdraft.FieldReleaseID:
+		m.ResetReleaseID()
+		return nil
+	case contentdraft.FieldCampaignPostID:
+		m.ResetCampaignPostID()
 		return nil
 	case contentdraft.FieldCollabGeneration:
 		m.ResetCollabGeneration()
@@ -87956,6 +88102,8 @@ type PublicationAttemptMutation struct {
 	outcome               *publicationattempt.Outcome
 	provider_post_id      *string
 	failure_code          *string
+	provider_message      *string
+	remote_url            *string
 	clearedFields         map[string]struct{}
 	scheduled_post        *string
 	clearedscheduled_post bool
@@ -88428,6 +88576,104 @@ func (m *PublicationAttemptMutation) ResetFailureCode() {
 	delete(m.clearedFields, publicationattempt.FieldFailureCode)
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (m *PublicationAttemptMutation) SetProviderMessage(s string) {
+	m.provider_message = &s
+}
+
+// ProviderMessage returns the value of the "provider_message" field in the mutation.
+func (m *PublicationAttemptMutation) ProviderMessage() (r string, exists bool) {
+	v := m.provider_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderMessage returns the old "provider_message" field's value of the PublicationAttempt entity.
+// If the PublicationAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublicationAttemptMutation) OldProviderMessage(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderMessage: %w", err)
+	}
+	return oldValue.ProviderMessage, nil
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (m *PublicationAttemptMutation) ClearProviderMessage() {
+	m.provider_message = nil
+	m.clearedFields[publicationattempt.FieldProviderMessage] = struct{}{}
+}
+
+// ProviderMessageCleared returns if the "provider_message" field was cleared in this mutation.
+func (m *PublicationAttemptMutation) ProviderMessageCleared() bool {
+	_, ok := m.clearedFields[publicationattempt.FieldProviderMessage]
+	return ok
+}
+
+// ResetProviderMessage resets all changes to the "provider_message" field.
+func (m *PublicationAttemptMutation) ResetProviderMessage() {
+	m.provider_message = nil
+	delete(m.clearedFields, publicationattempt.FieldProviderMessage)
+}
+
+// SetRemoteURL sets the "remote_url" field.
+func (m *PublicationAttemptMutation) SetRemoteURL(s string) {
+	m.remote_url = &s
+}
+
+// RemoteURL returns the value of the "remote_url" field in the mutation.
+func (m *PublicationAttemptMutation) RemoteURL() (r string, exists bool) {
+	v := m.remote_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRemoteURL returns the old "remote_url" field's value of the PublicationAttempt entity.
+// If the PublicationAttempt object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublicationAttemptMutation) OldRemoteURL(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRemoteURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRemoteURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRemoteURL: %w", err)
+	}
+	return oldValue.RemoteURL, nil
+}
+
+// ClearRemoteURL clears the value of the "remote_url" field.
+func (m *PublicationAttemptMutation) ClearRemoteURL() {
+	m.remote_url = nil
+	m.clearedFields[publicationattempt.FieldRemoteURL] = struct{}{}
+}
+
+// RemoteURLCleared returns if the "remote_url" field was cleared in this mutation.
+func (m *PublicationAttemptMutation) RemoteURLCleared() bool {
+	_, ok := m.clearedFields[publicationattempt.FieldRemoteURL]
+	return ok
+}
+
+// ResetRemoteURL resets all changes to the "remote_url" field.
+func (m *PublicationAttemptMutation) ResetRemoteURL() {
+	m.remote_url = nil
+	delete(m.clearedFields, publicationattempt.FieldRemoteURL)
+}
+
 // ClearScheduledPost clears the "scheduled_post" edge to the ScheduledPost entity.
 func (m *PublicationAttemptMutation) ClearScheduledPost() {
 	m.clearedscheduled_post = true
@@ -88489,7 +88735,7 @@ func (m *PublicationAttemptMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PublicationAttemptMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.organization_id != nil {
 		fields = append(fields, publicationattempt.FieldOrganizationID)
 	}
@@ -88513,6 +88759,12 @@ func (m *PublicationAttemptMutation) Fields() []string {
 	}
 	if m.failure_code != nil {
 		fields = append(fields, publicationattempt.FieldFailureCode)
+	}
+	if m.provider_message != nil {
+		fields = append(fields, publicationattempt.FieldProviderMessage)
+	}
+	if m.remote_url != nil {
+		fields = append(fields, publicationattempt.FieldRemoteURL)
 	}
 	return fields
 }
@@ -88538,6 +88790,10 @@ func (m *PublicationAttemptMutation) Field(name string) (ent.Value, bool) {
 		return m.ProviderPostID()
 	case publicationattempt.FieldFailureCode:
 		return m.FailureCode()
+	case publicationattempt.FieldProviderMessage:
+		return m.ProviderMessage()
+	case publicationattempt.FieldRemoteURL:
+		return m.RemoteURL()
 	}
 	return nil, false
 }
@@ -88563,6 +88819,10 @@ func (m *PublicationAttemptMutation) OldField(ctx context.Context, name string) 
 		return m.OldProviderPostID(ctx)
 	case publicationattempt.FieldFailureCode:
 		return m.OldFailureCode(ctx)
+	case publicationattempt.FieldProviderMessage:
+		return m.OldProviderMessage(ctx)
+	case publicationattempt.FieldRemoteURL:
+		return m.OldRemoteURL(ctx)
 	}
 	return nil, fmt.Errorf("unknown PublicationAttempt field %s", name)
 }
@@ -88628,6 +88888,20 @@ func (m *PublicationAttemptMutation) SetField(name string, value ent.Value) erro
 		}
 		m.SetFailureCode(v)
 		return nil
+	case publicationattempt.FieldProviderMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderMessage(v)
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRemoteURL(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt field %s", name)
 }
@@ -88685,6 +88959,12 @@ func (m *PublicationAttemptMutation) ClearedFields() []string {
 	if m.FieldCleared(publicationattempt.FieldFailureCode) {
 		fields = append(fields, publicationattempt.FieldFailureCode)
 	}
+	if m.FieldCleared(publicationattempt.FieldProviderMessage) {
+		fields = append(fields, publicationattempt.FieldProviderMessage)
+	}
+	if m.FieldCleared(publicationattempt.FieldRemoteURL) {
+		fields = append(fields, publicationattempt.FieldRemoteURL)
+	}
 	return fields
 }
 
@@ -88710,6 +88990,12 @@ func (m *PublicationAttemptMutation) ClearField(name string) error {
 		return nil
 	case publicationattempt.FieldFailureCode:
 		m.ClearFailureCode()
+		return nil
+	case publicationattempt.FieldProviderMessage:
+		m.ClearProviderMessage()
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		m.ClearRemoteURL()
 		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt nullable field %s", name)
@@ -88742,6 +89028,12 @@ func (m *PublicationAttemptMutation) ResetField(name string) error {
 		return nil
 	case publicationattempt.FieldFailureCode:
 		m.ResetFailureCode()
+		return nil
+	case publicationattempt.FieldProviderMessage:
+		m.ResetProviderMessage()
+		return nil
+	case publicationattempt.FieldRemoteURL:
+		m.ResetRemoteURL()
 		return nil
 	}
 	return fmt.Errorf("unknown PublicationAttempt field %s", name)

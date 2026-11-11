@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { call, DraftRequestError, draftsApi } from '@/lib/content-drafts/client'
+import { call, DraftRequestError, draftsApi, duplicatePosts } from '@/lib/content-drafts/client'
 import type { contentDraftScheduleSchema } from '@/lib/api/contracts/content-drafts'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import { readComposing } from '@/lib/write/composing-session'
@@ -37,7 +37,8 @@ type Row = {
   /** The accounts this draft publishes to, as the person knows them. */
   destinations: string[]
   input: z.input<typeof contentDraftScheduleSchema>
-  status: 'Blocked' | 'Ready' | 'Scheduled' | 'Retry same request'
+  /** Repeat: an account already has this post within a day; scheduling again confirms it. */
+  status: 'Blocked' | 'Ready' | 'Repeat' | 'Scheduled' | 'Retry same request'
   error?: string
 }
 
@@ -180,11 +181,25 @@ export function BulkScheduleDialog({
     setBusy(true)
     const next = [...rows]
     for (const [index, row] of next.entries()) {
-      if (row.status !== 'Ready' && row.status !== 'Retry same request') continue
+      if (row.status !== 'Ready' && row.status !== 'Retry same request' && row.status !== 'Repeat')
+        continue
       try {
-        await draftsApi.schedule(row.id, row.input)
+        await draftsApi.schedule(
+          row.id,
+          row.status === 'Repeat' ? { ...row.input, confirmDuplicate: true } : row.input
+        )
         next[index] = { ...row, status: 'Scheduled', error: undefined }
       } catch (error) {
+        if (row.status !== 'Repeat' && duplicatePosts(error)) {
+          next[index] = {
+            ...row,
+            status: 'Repeat',
+            error:
+              'This repeats a post an account has queued or published within a day. Schedule again to post it anyway.',
+          }
+          setRows([...next])
+          continue
+        }
         // A refusal needs a correction and a new preview; only an unanswered
         // request is retried as is, which replays instead of duplicating.
         const refused = error instanceof DraftRequestError && error.status < 500
@@ -204,7 +219,10 @@ export function BulkScheduleDialog({
   const blocked = rows?.filter((row) => row.status === 'Blocked').length ?? 0
   const unconfirmed = rows?.some((row) => row.status === 'Retry same request') ?? false
   const submittable =
-    rows?.filter((row) => row.status === 'Ready' || row.status === 'Retry same request').length ?? 0
+    rows?.filter(
+      (row) =>
+        row.status === 'Ready' || row.status === 'Retry same request' || row.status === 'Repeat'
+    ).length ?? 0
   return (
     <Dialog open onOpenChange={(open) => !open && !busy && onClose()}>
       <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
@@ -340,7 +358,9 @@ export function BulkScheduleDialog({
                   ? 'Scheduling…'
                   : rows.some((row) => row.status === 'Retry same request')
                     ? 'Retry unconfirmed rows'
-                    : `Schedule valid drafts (${submittable})`}
+                    : rows.some((row) => row.status === 'Repeat')
+                      ? `Schedule anyway (${submittable})`
+                      : `Schedule valid drafts (${submittable})`}
               </Button>
               {blocked > 0 && !unconfirmed ? (
                 <Button disabled={busy} onClick={() => void preview()} variant="outline">

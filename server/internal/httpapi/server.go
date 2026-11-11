@@ -617,8 +617,8 @@ func (s *Server) createScheduledPost(w http.ResponseWriter, r *http.Request) {
 	}
 	input.Caption = strings.TrimSpace(input.Caption)
 	input.IdempotencyKey = strings.TrimSpace(input.IdempotencyKey)
-	if input.Caption == "" || len([]rune(input.Caption)) > 3000 || input.ChannelConnectionID == "" || input.IdempotencyKey == "" || input.ScheduledFor.IsZero() {
-		writeError(w, http.StatusBadRequest, "caption, channelConnectionId, idempotencyKey, and scheduledFor are required")
+	if input.Caption == "" || len([]rune(input.Caption)) > 3000 || input.ChannelConnectionID == "" || input.ScheduledFor.IsZero() {
+		writeError(w, http.StatusBadRequest, "caption, channelConnectionId, and scheduledFor are required")
 		return
 	}
 	if (input.VariantID == "") == (input.ContentDraftID == "") {

@@ -250,10 +250,14 @@ func TestMediaScheduling(t *testing.T) {
 		if _, err := repo.ScheduleContentDraft(ctx, owner, d.ID, later); err == nil || !strings.Contains(err.Error(), "another time") {
 			t.Fatalf("reused version with another time: %v", err)
 		}
-		// Identical content in a second draft is an intentional second post.
+		// Identical content in a second draft waits for the member to confirm the repeat.
 		twin := draft("Once", photo)
-		if _, err := schedule(twin, ScheduleContentDraftInput{ScheduledFor: at, Targets: input.Targets}); err != nil || len(posts(twin.ID)) != 2 {
-			t.Fatalf("second post with identical content: %v %v", err, posts(twin.ID))
+		var duplicate *DuplicateContentError
+		if _, err := schedule(twin, ScheduleContentDraftInput{ScheduledFor: at, Targets: input.Targets}); !errors.As(err, &duplicate) || len(posts(twin.ID)) != 0 {
+			t.Fatalf("unconfirmed second post with identical content: %v %v", err, posts(twin.ID))
+		}
+		if _, err := schedule(twin, ScheduleContentDraftInput{ScheduledFor: at, Targets: input.Targets, ConfirmDuplicate: true}); err != nil || len(posts(twin.ID)) != 2 {
+			t.Fatalf("confirmed second post with identical content: %v %v", err, posts(twin.ID))
 		}
 	})
 

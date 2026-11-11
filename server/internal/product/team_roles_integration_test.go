@@ -78,7 +78,8 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 				t.Fatal(err)
 			}
-			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
+			// Every role schedules the same text on purpose: a confirmed repeat.
+			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, ConfirmDuplicate: true, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
 			want("schedule approved content", err, publishes)
 		})
 	}

@@ -20,6 +20,8 @@ import {
 import { type CampaignStudioRecord, createCampaignStudioTools } from '../tools/campaign-studio'
 import { createDesignStudioTools } from '../tools/design-studio'
 import { createToolRun, flushToolRun, isRunStopped } from '../tools/executor'
+import { getWorkspaceVoice } from '@/lib/launch/store'
+import { voiceInstructions } from '@/lib/write/voice'
 
 const MAX_STEPS = 14
 /** Design runs explore templates and variants, so they get more steps. */
@@ -110,7 +112,9 @@ export async function runCampaignStudio(
       title: campaign.release.title,
     }),
     stopWhen: [stepCountIs(designMode ? MAX_DESIGN_STEPS : MAX_STEPS), isRunStopped(run)],
-    system: designMode ? DESIGN_STUDIO_INSTRUCTIONS : CAMPAIGN_STUDIO_INSTRUCTIONS,
+    system:
+      (designMode ? DESIGN_STUDIO_INSTRUCTIONS : CAMPAIGN_STUDIO_INSTRUCTIONS) +
+      voiceInstructions(await getWorkspaceVoice(tenant)),
     tools,
   }).finally(async () => {
     if (renderer) await (await renderer).close().catch(() => undefined)

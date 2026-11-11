@@ -5,9 +5,12 @@ import { notFound } from 'next/navigation'
 import { z } from 'zod'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
 import { Page, Section } from '@/components/platform-ui'
+import { Button } from '@/components/ui/button'
 import { requireActiveOrganizationPermission } from '@/lib/auth/access'
 import { requirePaidPageAccess } from '@/lib/auth/page-access'
 import { accessAllows } from '@/lib/auth/permissions'
+import { getActiveBrand } from '@/lib/launch/store'
+import { editorHref } from '@/lib/platform/editor-handoff'
 import { getRelease } from '@/lib/tenant/releases'
 
 export const metadata: Metadata = { title: 'Release' }
@@ -25,6 +28,18 @@ export default async function ReleasePage({
   const tenant = await requireActiveOrganizationPermission(requestHeaders, 'artifact:read')
   const release = await getRelease(tenant, releaseId)
   if (!release) notFound()
+  const screenshots = release.screenshotAssetIds ?? []
+  // Each screenshot opens in the editor with the workspace's active brand kit,
+  // and its post starts from the release summary (PrepareScreenshotPost).
+  // A kit that cannot be read leaves the links working, and the page says so.
+  const brand = screenshots.length
+    ? await getActiveBrand(tenant).then(
+        ({ kitId }) => ({ kitId }),
+        () => null
+      )
+    : { kitId: null }
+  const editScreenshot = (assetId: string) =>
+    editorHref({ assetId, brandKitId: brand?.kitId ?? undefined }, { releaseId: release.id })
 
   return (
     <PlatformShell
@@ -84,13 +99,32 @@ export default async function ReleasePage({
             </ul>
           </Section>
         ) : null}
-        {release.screenshotAssetIds?.length ? (
-          <p className="text-sm">
-            {release.screenshotAssetIds.length} screenshot asset(s) retained.{' '}
-            <Link className="underline" href="/library?view=assets">
-              Open workspace assets
-            </Link>
-          </p>
+        {screenshots.length ? (
+          <Section
+            title="Screenshots"
+            description="Open a screenshot in the editor on brand, then post it to X and LinkedIn with captions written from this release."
+          >
+            {brand ? null : (
+              <p className="text-sm text-muted-foreground" role="status">
+                The brand kit could not be read, so screenshots open without it. Apply it from
+                Brand in the editor.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              {screenshots.map((assetId, index) => (
+                <Button asChild key={assetId} size="sm" variant="outline">
+                  <Link data-testid="release-open-editor" href={editScreenshot(assetId)}>
+                    {screenshots.length === 1
+                      ? 'Open screenshot in the editor'
+                      : `Open screenshot ${index + 1} in the editor`}
+                  </Link>
+                </Button>
+              ))}
+              <Link className="underline" href="/library?view=assets">
+                Workspace assets
+              </Link>
+            </div>
+          </Section>
         ) : null}
       </Page>
     </PlatformShell>

@@ -423,6 +423,25 @@ func TestCreateScheduledPost(t *testing.T) {
 	}
 }
 
+// A request without an Idempotency-Key reaches the domain, which names it by
+// its content (product.CreateScheduledPost), instead of being refused.
+func TestCreateScheduledPostWithoutAKeyReachesTheDomain(t *testing.T) {
+	store := &fakeStore{}
+	handler := New(store, &fakeScheduler{}, &fakeVerifier{}, "secret")
+	scheduledFor := time.Now().UTC().Add(24 * time.Hour).Truncate(time.Second)
+	body := fmt.Sprintf(`{"caption":"hello","channelConnectionId":"connection-1","scheduledFor":%q,"variantId":"variant-1"}`, scheduledFor.Format(time.RFC3339))
+	request := httptest.NewRequest(http.MethodPost, "/v1/scheduled-posts", strings.NewReader(body))
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org-1")
+	request.Header.Set("X-User-ID", "user-1")
+	request.Header.Set("X-Session-ID", "session-1")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || store.scheduled.Caption != "hello" || store.scheduled.IdempotencyKey != "" {
+		t.Fatalf("status=%d input=%+v", response.Code, store.scheduled)
+	}
+}
+
 func TestCreateConnectionAppliesSocialDefaults(t *testing.T) {
 	store := &fakeStore{}
 	verifier := &fakeVerifier{}
