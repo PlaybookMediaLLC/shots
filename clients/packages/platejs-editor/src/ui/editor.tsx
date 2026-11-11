@@ -22,8 +22,8 @@ const editorContainerVariants = cva(
       variant: {
         comment: cn(
           "flex flex-wrap justify-between gap-1 px-1 py-0.5 text-sm",
+          // No focus ring: the comment field sits in the editor's own surface, as text does.
           "rounded-md border-[1.5px] border-transparent bg-transparent",
-          "has-[[data-slate-editor]:focus]:border-primary/50 has-[[data-slate-editor]:focus]:ring-2 has-[[data-slate-editor]:focus]:ring-primary/30",
           "has-aria-disabled:border-input has-aria-disabled:bg-muted",
         ),
         default: "h-full",
@@ -92,7 +92,8 @@ const editorVariants = cva(
         ai: "px-0 text-base md:text-sm",
         aiChat:
           "max-h-[min(70vh,320px)] max-w-[700px] overflow-y-auto px-3 py-2 text-base md:text-sm",
-        comment: cn("rounded-md border-none bg-transparent text-sm"),
+        // The caret marks focus; the host app's fallback focus outline is unlayered, hence important.
+        comment: cn("rounded-md border-none bg-transparent text-sm focus-visible:outline-hidden!"),
         default:
           "min-h-full px-[100px] pb-72 text-base sm:px-[max(100px,calc(50%-350px))]",
         demo: "h-full px-[100px] pt-4 pb-72 text-base sm:px-[max(100px,calc(50%-350px))]",
