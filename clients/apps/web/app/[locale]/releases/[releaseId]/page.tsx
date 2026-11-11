@@ -30,7 +30,7 @@ const STATUS: Record<z.infer<typeof releaseStatusSchema>, { label: string; tone:
 function sourceParts(url: string): { host: string; rest: string } {
   try {
     const parsed = new URL(url)
-    return { host: parsed.hostname.replace(/^www\./, ''), rest: parsed.pathname + parsed.search }
+    return { host: parsed.host.replace(/^www\./, ''), rest: parsed.pathname + parsed.search }
   } catch {
     return { host: url, rest: '' }
   }
@@ -147,12 +147,12 @@ export default async function ReleasePage({
         <Section title="Brief">
           <Group>
             <Row>
-              <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground">
+              <p className="text-body leading-relaxed whitespace-pre-wrap text-foreground [overflow-wrap:anywhere]">
                 {release.benefitStatement || 'No brief yet.'}
               </p>
             </Row>
             {release.audience ? (
-              <Row label="Audience" layout="inline">
+              <Row label="Audience">
                 <span className="text-ui text-muted-foreground">{release.audience}</span>
               </Row>
             ) : null}
@@ -162,16 +162,24 @@ export default async function ReleasePage({
         {release.features?.length ? (
           <Section title="Changes">
             <Group>
-              {release.features.map((feature, index) => (
-                <Row key={index} layout="inline" label={feature.title}>
-                  <span className="flex items-center gap-2 text-ui text-muted-foreground">
-                    {feature.number ? (
-                      <span className="tabular-nums">#{feature.number}</span>
-                    ) : null}
-                    <Pill>{feature.kind}</Pill>
-                  </span>
-                </Row>
-              ))}
+              <ul className="divide-y divide-[var(--divider,var(--border))]">
+                {release.features.map((feature, index) => (
+                  <li
+                    className="flex min-w-0 items-center justify-between gap-4 px-4 py-3"
+                    key={index}
+                  >
+                    <span className="min-w-0 text-ui-lg text-foreground [overflow-wrap:anywhere]">
+                      {feature.title}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-ui text-muted-foreground">
+                      {feature.number ? (
+                        <span className="tabular-nums">#{feature.number}</span>
+                      ) : null}
+                      <Pill>{feature.kind}</Pill>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </Group>
           </Section>
         ) : null}
@@ -188,6 +196,7 @@ export default async function ReleasePage({
                     key={url}
                     rel="noopener noreferrer"
                     target="_blank"
+                    title={url}
                   >
                     <span className="min-w-0 truncate text-ui">
                       <span className="text-foreground">{host}</span>

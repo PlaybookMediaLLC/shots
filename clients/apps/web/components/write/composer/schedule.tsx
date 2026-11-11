@@ -641,9 +641,7 @@ export function ScheduleDialog({
       } else if (queue && typeof next === 'string') {
         // Another schedule took the reviewed slot: show the next one; never move silently.
         setQueueSlot(next)
-        setSlotNotice(
-          'That slot was just taken. Review the next free slot above and confirm again.'
-        )
+        setSlotNotice('That slot was just taken. Review the next free slot and confirm again.')
       } else {
         setError(error instanceof Error ? error.message : 'The draft could not be scheduled.')
       }
@@ -700,9 +698,9 @@ export function ScheduleDialog({
     { at: atNine(nextMondayOffset(zone), zone), label: 'Monday 9:00' },
   ]
   return (
-    <Sheet onOpenChange={(open) => !open && onClose()} open>
+    <Sheet onOpenChange={(open) => !open && !busy && onClose()} open>
       <SheetContent
-        className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[44rem]"
+        className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[min(44rem,100vw)]"
         data-testid="schedule-dialog"
         side="right"
         onKeyDown={(event) => {
@@ -993,15 +991,17 @@ export function ScheduleDialog({
             </div>
 
             {/* What confirming does: the time, anything in the way, and where it goes. */}
-            <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 @min-[46rem]:border-l @min-[46rem]:border-border @min-[46rem]:pl-8">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 @min-[46rem]:border-l @min-[46rem]:border-border @min-[46rem]:pl-8">
               <div
                 className="grid gap-1 rounded-xl border border-border bg-gradient-to-b from-foreground/[0.04] to-transparent p-4"
                 data-testid="schedule-summary"
               >
-                <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                  <CalendarBlankIcon aria-hidden="true" className="size-3.5" />
-                  {queue ? 'Next free slot' : 'Posts at'}
-                </p>
+                {chosen ? (
+                  <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
+                    <CalendarBlankIcon aria-hidden="true" className="size-3.5" />
+                    {queue ? 'Next free slot' : 'Posts at'}
+                  </p>
+                ) : null}
                 <p className="text-ui-lg font-medium text-pretty text-foreground">{headline}</p>
                 {chosen ? (
                   <p className="text-caption text-muted-foreground">
@@ -1015,6 +1015,16 @@ export function ScheduleDialog({
                   </p>
                 ) : null}
               </div>
+              <Destinations context={context} />
+              <ReplacedPosts context={context} timeZone={zone} />
+            </div>
+          </div>
+        </div>
+
+        <SheetFooter className="mt-0 gap-3 border-t border-border px-6 py-4">
+          {/* What blocks or changes the confirm stays beside it, however far the body scrolls. */}
+          {problems.length > 0 || duplicates || error || planBlocked ? (
+            <div className="grid max-h-[40dvh] gap-3 overflow-y-auto">
               <Problems context={context} problems={problems} />
               <DuplicateWarning context={context} duplicates={duplicates} timeZone={zone} />
               <ActionError message={error} />
@@ -1023,67 +1033,69 @@ export function ScheduleDialog({
                   {planBlocked}
                 </p>
               ) : null}
-              <Destinations context={context} />
-              <ReplacedPosts context={context} timeZone={zone} />
-            </aside>
-          </div>
-        </div>
-
-        <SheetFooter className="mt-0 gap-3 border-t border-border px-6 py-4 sm:flex-row sm:flex-wrap sm:items-center">
-          <Label className="mr-auto flex w-fit items-center gap-2 text-xs font-normal text-muted-foreground">
-            <Checkbox
-              checked={continueWriting}
-              onCheckedChange={(checked) => setContinueWriting(checked === true)}
-            />
-            Open a new draft after scheduling
-          </Label>
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {context.draft.plannedFor ? (
-              <Button disabled={busy} onClick={() => void plan(true)} type="button" variant="ghost">
-                Clear planned time
+            </div>
+          ) : null}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <Label className="mr-auto flex w-fit items-center gap-2 text-xs font-normal text-muted-foreground">
+              <Checkbox
+                checked={continueWriting}
+                onCheckedChange={(checked) => setContinueWriting(checked === true)}
+              />
+              Open a new draft after scheduling
+            </Label>
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {context.draft.plannedFor ? (
+                <Button
+                  disabled={busy}
+                  onClick={() => void plan(true)}
+                  type="button"
+                  variant="ghost"
+                >
+                  Clear planned time
+                </Button>
+              ) : null}
+              {onPreview ? (
+                <Button onClick={onPreview} type="button" variant="ghost">
+                  Preview
+                </Button>
+              ) : null}
+              <Button
+                disabled={
+                  busy ||
+                  !timeValid ||
+                  context.draft.status === 'archived' ||
+                  queue ||
+                  !instant ||
+                  past ||
+                  Boolean(planBlocked)
+                }
+                onClick={() => void plan()}
+                title="Keeps it on the calendar without publishing"
+                type="button"
+                variant="outline"
+              >
+                {action === 'plan' ? 'Saving…' : 'Save as planned'}
               </Button>
-            ) : null}
-            {onPreview ? (
-              <Button onClick={onPreview} type="button" variant="ghost">
-                Preview
+              <Button
+                className="w-full sm:w-auto"
+                disabled={!confirmable}
+                onClick={() => void schedule()}
+                title="Confirm (⌘↵)"
+                type="button"
+              >
+                {action === 'schedule'
+                  ? 'Scheduling…'
+                  : duplicates
+                    ? 'Schedule anyway'
+                    : queue
+                      ? rescheduling
+                        ? 'Reschedule to next free slot'
+                        : 'Add to queue'
+                      : rescheduling
+                        ? 'Confirm reschedule'
+                        : 'Confirm schedule'}
               </Button>
-            ) : null}
-            <Button
-              disabled={
-                busy ||
-                !timeValid ||
-                context.draft.status === 'archived' ||
-                queue ||
-                !instant ||
-                past ||
-                Boolean(planBlocked)
-              }
-              onClick={() => void plan()}
-              title="Keeps it on the calendar without publishing"
-              type="button"
-              variant="outline"
-            >
-              {action === 'plan' ? 'Saving…' : 'Save as planned'}
-            </Button>
-            <Button
-              className="w-full sm:w-auto"
-              disabled={!confirmable}
-              onClick={() => void schedule()}
-              title="Confirm (⌘↵)"
-              type="button"
-            >
-              {action === 'schedule'
-                ? 'Scheduling…'
-                : duplicates
-                  ? 'Schedule anyway'
-                  : queue
-                    ? rescheduling
-                      ? 'Reschedule to next free slot'
-                      : 'Add to queue'
-                    : rescheduling
-                      ? 'Confirm reschedule'
-                      : 'Confirm schedule'}
-            </Button>
+            </div>
           </div>
         </SheetFooter>
       </SheetContent>
