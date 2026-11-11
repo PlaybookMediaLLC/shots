@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -131,8 +132,9 @@ func LoadOrchestrator() (Orchestrator, error) {
 			return Orchestrator{}, fmt.Errorf("RESEND_API_KEY, AUTH_EMAIL_FROM and BETTER_AUTH_SECRET are required for maintenance")
 		}
 		u, err := url.Parse(cfg.AuthBaseURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" {
-			return Orchestrator{}, fmt.Errorf("BETTER_AUTH_URL must be HTTPS for maintenance")
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" ||
+			(u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || net.ParseIP(u.Hostname()).IsLoopback()))) {
+			return Orchestrator{}, fmt.Errorf("BETTER_AUTH_URL must be HTTPS or a local loopback origin for maintenance")
 		}
 	}
 	if cfg.ActivityConcurrency < 1 || cfg.ActivityConcurrency > 1000 {

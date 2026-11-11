@@ -1,0 +1,2 @@
+CREATE INDEX stripe_invoices_customer_idx ON "founder_hub_billing"."invoices" USING btree (customer);
+CREATE INDEX stripe_invoices_subscription_idx ON "founder_hub_billing"."invoices" USING btree (subscription);

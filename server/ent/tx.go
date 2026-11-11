@@ -166,6 +166,20 @@ type Tx struct {
 	PlatformCreativeSetVersion *PlatformCreativeSetVersionClient
 	// PlatformDraftImport is the client for interacting with the PlatformDraftImport builders.
 	PlatformDraftImport *PlatformDraftImportClient
+	// PlatformFounderHubDevice is the client for interacting with the PlatformFounderHubDevice builders.
+	PlatformFounderHubDevice *PlatformFounderHubDeviceClient
+	// PlatformFounderHubDeviceCommand is the client for interacting with the PlatformFounderHubDeviceCommand builders.
+	PlatformFounderHubDeviceCommand *PlatformFounderHubDeviceCommandClient
+	// PlatformFounderHubRevision is the client for interacting with the PlatformFounderHubRevision builders.
+	PlatformFounderHubRevision *PlatformFounderHubRevisionClient
+	// PlatformFounderHubSettings is the client for interacting with the PlatformFounderHubSettings builders.
+	PlatformFounderHubSettings *PlatformFounderHubSettingsClient
+	// PlatformFounderHubTemplate is the client for interacting with the PlatformFounderHubTemplate builders.
+	PlatformFounderHubTemplate *PlatformFounderHubTemplateClient
+	// PlatformFounderHubUser is the client for interacting with the PlatformFounderHubUser builders.
+	PlatformFounderHubUser *PlatformFounderHubUserClient
+	// PlatformFounderHubWorkspace is the client for interacting with the PlatformFounderHubWorkspace builders.
+	PlatformFounderHubWorkspace *PlatformFounderHubWorkspaceClient
 	// PlatformNotificationDelivery is the client for interacting with the PlatformNotificationDelivery builders.
 	PlatformNotificationDelivery *PlatformNotificationDeliveryClient
 	// PlatformNotificationInbox is the client for interacting with the PlatformNotificationInbox builders.
@@ -176,6 +190,16 @@ type Tx struct {
 	PlatformNotificationPreference *PlatformNotificationPreferenceClient
 	// PlatformNotificationSeenAction is the client for interacting with the PlatformNotificationSeenAction builders.
 	PlatformNotificationSeenAction *PlatformNotificationSeenActionClient
+	// PlatformOAuthAccessToken is the client for interacting with the PlatformOAuthAccessToken builders.
+	PlatformOAuthAccessToken *PlatformOAuthAccessTokenClient
+	// PlatformOAuthClient is the client for interacting with the PlatformOAuthClient builders.
+	PlatformOAuthClient *PlatformOAuthClientClient
+	// PlatformOAuthConsent is the client for interacting with the PlatformOAuthConsent builders.
+	PlatformOAuthConsent *PlatformOAuthConsentClient
+	// PlatformOAuthJWK is the client for interacting with the PlatformOAuthJWK builders.
+	PlatformOAuthJWK *PlatformOAuthJWKClient
+	// PlatformOAuthRefreshToken is the client for interacting with the PlatformOAuthRefreshToken builders.
+	PlatformOAuthRefreshToken *PlatformOAuthRefreshTokenClient
 	// PlatformSlackConnection is the client for interacting with the PlatformSlackConnection builders.
 	PlatformSlackConnection *PlatformSlackConnectionClient
 	// PlatformSlackInstallation is the client for interacting with the PlatformSlackInstallation builders.
@@ -478,11 +502,23 @@ func (tx *Tx) init() {
 	tx.PlatformCreativeSet = NewPlatformCreativeSetClient(tx.config)
 	tx.PlatformCreativeSetVersion = NewPlatformCreativeSetVersionClient(tx.config)
 	tx.PlatformDraftImport = NewPlatformDraftImportClient(tx.config)
+	tx.PlatformFounderHubDevice = NewPlatformFounderHubDeviceClient(tx.config)
+	tx.PlatformFounderHubDeviceCommand = NewPlatformFounderHubDeviceCommandClient(tx.config)
+	tx.PlatformFounderHubRevision = NewPlatformFounderHubRevisionClient(tx.config)
+	tx.PlatformFounderHubSettings = NewPlatformFounderHubSettingsClient(tx.config)
+	tx.PlatformFounderHubTemplate = NewPlatformFounderHubTemplateClient(tx.config)
+	tx.PlatformFounderHubUser = NewPlatformFounderHubUserClient(tx.config)
+	tx.PlatformFounderHubWorkspace = NewPlatformFounderHubWorkspaceClient(tx.config)
 	tx.PlatformNotificationDelivery = NewPlatformNotificationDeliveryClient(tx.config)
 	tx.PlatformNotificationInbox = NewPlatformNotificationInboxClient(tx.config)
 	tx.PlatformNotificationPolicy = NewPlatformNotificationPolicyClient(tx.config)
 	tx.PlatformNotificationPreference = NewPlatformNotificationPreferenceClient(tx.config)
 	tx.PlatformNotificationSeenAction = NewPlatformNotificationSeenActionClient(tx.config)
+	tx.PlatformOAuthAccessToken = NewPlatformOAuthAccessTokenClient(tx.config)
+	tx.PlatformOAuthClient = NewPlatformOAuthClientClient(tx.config)
+	tx.PlatformOAuthConsent = NewPlatformOAuthConsentClient(tx.config)
+	tx.PlatformOAuthJWK = NewPlatformOAuthJWKClient(tx.config)
+	tx.PlatformOAuthRefreshToken = NewPlatformOAuthRefreshTokenClient(tx.config)
 	tx.PlatformSlackConnection = NewPlatformSlackConnectionClient(tx.config)
 	tx.PlatformSlackInstallation = NewPlatformSlackInstallationClient(tx.config)
 	tx.PlatformSlackPacing = NewPlatformSlackPacingClient(tx.config)

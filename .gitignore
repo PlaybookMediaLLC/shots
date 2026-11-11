@@ -22,6 +22,8 @@ node_modules/
 
 # next.js
 /clients/apps/web/.next/
+/clients/apps/web/.next-founder-hub-*/
+/clients/apps/web/tsconfig.local-*.json
 /clients/apps/web/out/
 
 # production

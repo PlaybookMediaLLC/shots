@@ -182,6 +182,13 @@ export async function requireSessionAccess(headers: Headers): Promise<SessionAcc
   return { principal, requestId: getRequestId(headers) }
 }
 
+/** A fresh, second-factor-verified session without requiring a workspace. */
+export async function requireSensitiveSessionAccess(headers: Headers): Promise<SessionAccess> {
+  const session = await requireAuthSession(headers)
+  await assertFreshTwoFactorSession(headers, session)
+  return requireSessionAccess(headers)
+}
+
 type AuthSessionResult = NonNullable<Awaited<ReturnType<typeof auth.api.getSession>>>
 
 async function requireAuthSession(headers: Headers): Promise<AuthSessionResult> {

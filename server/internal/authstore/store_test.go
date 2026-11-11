@@ -28,6 +28,43 @@ func TestAuthStoreRunsBetterAuthOperations(t *testing.T) {
 		t.Fatalf("refusing database %q: %v", name, err)
 	}
 	store := New(db.SQL)
+	t.Run("fixed Founder Hub registration preserves security flags and replaces old web origins", func(t *testing.T) {
+		for _, invalid := range []string{"http://example.com", "https://user:pass@example.com", "https://example.com/path", "https://example.com?", "https://example.com?q=1", "https://example.com#fragment", "https://*.example.com"} {
+			if err := ConfigureFounderHubWeb(ctx, nil, invalid); err == nil {
+				t.Fatalf("accepted untrusted origin %q", invalid)
+			}
+		}
+		tx, err := db.SQL.BeginTx(ctx, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback()
+		if _, err := tx.ExecContext(ctx, `UPDATE "oauthClient" SET disabled=true WHERE id='platform-founder-hub'`); err != nil {
+			t.Fatal(err)
+		}
+		for _, origin := range []string{"https://hub.example", "http://localhost:3029", "http://localhost:3029", ""} {
+			if err := ConfigureFounderHubWeb(ctx, tx, origin); err != nil {
+				t.Fatal(err)
+			}
+			var redirects string
+			var disabled, pkce bool
+			if err := tx.QueryRowContext(ctx, `SELECT "redirectUris", disabled, "requirePKCE" FROM "oauthClient" WHERE id='platform-founder-hub'`).Scan(&redirects, &disabled, &pkce); err != nil {
+				t.Fatal(err)
+			}
+			if !disabled || !pkce || !strings.Contains(redirects, "anarlog-dev://auth/callback") {
+				t.Fatalf("client security flags changed: %s", redirects)
+			}
+			if origin != "https://hub.example" && strings.Contains(redirects, "hub.example") {
+				t.Fatalf("stale redirect remained: %s", redirects)
+			}
+			if origin != "" && !strings.Contains(redirects, origin+"/callback/shots/") {
+				t.Fatalf("web callback missing: %s", redirects)
+			}
+			if origin == "" && strings.Contains(redirects, "/callback/shots/") {
+				t.Fatalf("web callback remained while disabled: %s", redirects)
+			}
+		}
+	})
 	id := cuid.New()
 	run := func(request Request) *Result {
 		t.Helper()

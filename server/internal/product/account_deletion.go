@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/accountdeletionrequest"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
@@ -93,12 +94,22 @@ func accountDeletionBlockers(ctx context.Context, client *ent.Client, userID str
 		blockers = append(blockers, AccountDeletionBlocker{Code: "owns_workspace", WorkspaceID: membership.OrganizationID,
 			WorkspaceName: workspace.Name, Message: "You own " + workspace.Name + ". Delete it or make someone else its owner."})
 	}
+	if err := client.PlatformQuery(ctx, `SELECT workspace_id, workspace_name FROM platform_account_attachment_blockers($1)`, []any{userID}, func(row entsql.ColumnScanner) error {
+		blocker := AccountDeletionBlocker{Code: "shared_attachments", Message: "This workspace has shared attachments stored under your account. They must be transferred or removed before your account can be deleted."}
+		if err := row.Scan(&blocker.WorkspaceID, &blocker.WorkspaceName); err != nil {
+			return err
+		}
+		blockers = append(blockers, blocker)
+		return nil
+	}); err != nil {
+		return nil, err
+	}
 	return blockers, nil
 }
 
 func (c *Configuration) openAccountDeletion(ctx context.Context, userID string) (*ent.AccountDeletionRequest, error) {
 	row, err := c.client.AccountDeletionRequest.Query().Where(accountdeletionrequest.UserID(userID),
-		accountdeletionrequest.StatusEQ(accountdeletionrequest.StatusREQUESTED)).Only(ctx)
+		accountdeletionrequest.StatusIn(accountdeletionrequest.StatusREQUESTED, accountdeletionrequest.StatusPROCESSING)).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, nil
 	}
@@ -107,7 +118,7 @@ func (c *Configuration) openAccountDeletion(ctx context.Context, userID string) 
 
 // GetAccountDeletion reports the person's open deletion request and blockers.
 func (c *Configuration) GetAccountDeletion(ctx context.Context, actor Actor) (*AccountDeletionStatus, error) {
-	if err := c.authorizePerson(ctx, actor); err != nil {
+	if err := c.AuthorizeSession(ctx, actor); err != nil {
 		return nil, err
 	}
 	blockers, err := accountDeletionBlockers(ctx, c.client, actor.UserID)
@@ -125,7 +136,7 @@ func (c *Configuration) GetAccountDeletion(ctx context.Context, actor Actor) (*A
 // confirmation must be their sign-in email, the session must be fresh, and no
 // owned workspace may remain. A repeat returns the open request.
 func (c *Configuration) RequestAccountDeletion(ctx context.Context, actor Actor, confirmation string) (*AccountDeletionStatus, error) {
-	if err := c.authorizePerson(ctx, actor); err != nil {
+	if err := c.AuthorizeSession(ctx, actor); err != nil {
 		return nil, err
 	}
 	user, err := c.client.User.Get(ctx, actor.UserID)
@@ -170,7 +181,7 @@ func (c *Configuration) RequestAccountDeletion(ctx context.Context, actor Actor,
 		if err != nil {
 			return nil, err
 		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.account_deletion_requested", "account_deletion_request", open.ID,
+		if err := appendAccountDeletionAudit(ctx, tx, actor, "product.account_deletion_requested", open.ID,
 			map[string]any{"executeAfter": open.ExecuteAfter}); err != nil {
 			return nil, err
 		}
@@ -183,7 +194,7 @@ func (c *Configuration) RequestAccountDeletion(ctx context.Context, actor Actor,
 
 // CancelAccountDeletion withdraws the person's open request.
 func (c *Configuration) CancelAccountDeletion(ctx context.Context, actor Actor) (*AccountDeletionStatus, error) {
-	if err := c.authorizePerson(ctx, actor); err != nil {
+	if err := c.AuthorizeSession(ctx, actor); err != nil {
 		return nil, err
 	}
 	open, err := c.openAccountDeletion(ctx, actor.UserID)
@@ -207,11 +218,27 @@ func (c *Configuration) CancelAccountDeletion(ctx context.Context, actor Actor) 
 	if count != 1 {
 		return nil, conflict("Your account deletion changed. Reload and try again.")
 	}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.account_deletion_cancelled", "account_deletion_request", open.ID); err != nil {
+	if err := appendAccountDeletionAudit(ctx, tx, actor, "product.account_deletion_cancelled", open.ID); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return c.GetAccountDeletion(ctx, actor)
+}
+
+func appendAccountDeletionAudit(ctx context.Context, tx *ent.Tx, actor Actor, action, requestID string, metadata ...map[string]any) error {
+	memberships, err := tx.Member.Query().Where(member.UserID(actor.UserID)).All(ctx)
+	if err != nil {
+		return err
+	}
+	// With no memberships, the retained request and its timestamps are the person's audit record.
+	for _, membership := range memberships {
+		scoped := actor
+		scoped.OrganizationID = membership.OrganizationID
+		if err := appendConfigurationAudit(ctx, tx, scoped, action, "account_deletion_request", requestID, metadata...); err != nil {
+			return err
+		}
+	}
+	return nil
 }

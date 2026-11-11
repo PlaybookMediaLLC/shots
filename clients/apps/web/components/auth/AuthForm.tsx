@@ -8,6 +8,7 @@ import { usePathname, useSearchParams } from 'next/navigation'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth/client'
+import { authPageSearch, authRedirect } from '@/lib/auth/oauth-navigation'
 import type { SocialProvider } from '@/lib/auth/methods'
 import { getAuthErrorMessage } from './error-message'
 import { AuthField, Divider, FormAlert, SubmitButton } from './fields'
@@ -51,7 +52,9 @@ export function AuthForm({ mode, passwordAuthEnabled, socialProviders }: AuthFor
   const [message, setMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const isSignUp = mode === 'sign-up'
-  const callbackURL = platformHref(pathname, getCallbackUrl(searchParams.get('callbackURL')))
+  const callbackURL = searchParams.has('sig')
+    ? platformHref(pathname, `/sign-in?${searchParams.toString()}`)
+    : platformHref(pathname, getCallbackUrl(searchParams.get('callbackURL')))
   const hasSocialProviders = socialProviders.length > 0
 
   useEffect(() => {
@@ -77,8 +80,13 @@ export function AuthForm({ mode, passwordAuthEnabled, socialProviders }: AuthFor
           throw new Error(
             result.error.message || 'Account creation is unavailable. Please try again.'
           )
-        if (result.data?.token) {
-          window.location.assign(!searchParams.get('callbackURL') ? '/onboarding' : callbackURL)
+        if (result.data?.token || (result.data && 'redirect' in result.data)) {
+          window.location.assign(
+            authRedirect(
+              result.data,
+              !searchParams.get('callbackURL') ? '/onboarding' : callbackURL
+            )
+          )
           return
         }
         setMessage('Check your email to verify your account, then sign in.')
@@ -94,7 +102,7 @@ export function AuthForm({ mode, passwordAuthEnabled, socialProviders }: AuthFor
           throw new Error(result.error.message || 'Sign-in is unavailable. Please try again.')
         if (result.data && 'twoFactorRedirect' in result.data && result.data.twoFactorRedirect)
           return
-        window.location.assign(callbackURL)
+        window.location.assign(authRedirect(result.data, callbackURL))
       }
     } catch (requestError) {
       setError(getAuthErrorMessage(requestError, 'Authentication failed. Please try again.'))
@@ -182,7 +190,7 @@ export function AuthForm({ mode, passwordAuthEnabled, socialProviders }: AuthFor
           {isSignUp ? 'Already have an account?' : 'New to Shots?'}{' '}
           <Link
             className="font-medium text-foreground underline-offset-4 hover:underline"
-            href={`${isSignUp ? '/sign-in' : '/sign-up'}?callbackURL=${encodeURIComponent(callbackURL)}`}
+            href={`${isSignUp ? '/sign-in' : '/sign-up'}?${authPageSearch(searchParams.toString(), callbackURL)}`}
           >
             {isSignUp ? 'Sign in' : 'Create an account'}
           </Link>

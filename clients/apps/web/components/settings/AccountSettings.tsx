@@ -2,7 +2,7 @@
 
 import { UserAvatar } from '@/components/auth/UserAvatar'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -14,6 +14,7 @@ import { SaveStatus, useSaveState } from '@/components/settings/controls'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { accountDeletionStatusSchema } from '@/lib/api/contracts/settings-platform'
 import { authClient, useHydratedSession } from '@/lib/auth/client'
 import { settingsErrorMessage, settingsRequest } from '@/lib/settings/client'
@@ -98,20 +99,101 @@ function SignInMethods() {
     queryKey: ['auth', 'accounts'],
   })
   return (
-    <Row description="The ways you can sign in to this account." label="Sign-in methods">
-      <div className="flex flex-wrap gap-2">
-        {accounts.isPending ? (
-          <span className="text-sm text-muted-foreground">Loading…</span>
+    <>
+      <Row description="The ways you can sign in to this account." label="Sign-in methods">
+        <div className="flex flex-wrap gap-2">
+          {accounts.isPending ? (
+            <span className="text-sm text-muted-foreground">Loading…</span>
+          ) : null}
+          {accounts.isError ? (
+            <span className="text-sm text-red-700 dark:text-red-300">
+              {settingsErrorMessage(accounts.error)}
+            </span>
+          ) : null}
+          {accounts.data?.map((account) => (
+            <Pill key={account.id}>{PROVIDER_NAMES[account.providerId] ?? account.providerId}</Pill>
+          ))}
+        </div>
+      </Row>
+      {accounts.data?.some((account) => account.providerId === 'credential') ? (
+        <PasswordSettings />
+      ) : null}
+    </>
+  )
+}
+
+function PasswordSettings() {
+  const change = useMutation({
+    mutationFn: async (form: HTMLFormElement) => {
+      const data = new FormData(form)
+      const password = z
+        .object({
+          currentPassword: z.string().min(1, 'Enter your current password.'),
+          newPassword: z.string().min(12, 'Use at least 12 characters.').max(128),
+          confirmation: z.string(),
+        })
+        .refine(
+          (value) => value.newPassword === value.confirmation,
+          'The new passwords must match.'
+        )
+        .safeParse(Object.fromEntries(data))
+      if (!password.success) throw new Error(password.error.issues[0].message)
+      const result = await authClient.changePassword({
+        currentPassword: password.data.currentPassword,
+        newPassword: password.data.newPassword,
+        revokeOtherSessions: true,
+      })
+      if (result.error) throw new Error(result.error.message ?? 'Could not change your password.')
+      form.reset()
+    },
+  })
+  return (
+    <Row
+      label="Password"
+      description="Changing your password signs out your other devices, including Founder Hub."
+      layout="stacked"
+    >
+      <form
+        className="grid max-w-sm gap-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          change.mutate(event.currentTarget)
+        }}
+      >
+        <Label>
+          Current password
+          <Input name="currentPassword" type="password" autoComplete="current-password" required />
+        </Label>
+        <Label>
+          New password
+          <Input
+            name="newPassword"
+            type="password"
+            autoComplete="new-password"
+            minLength={12}
+            maxLength={128}
+            required
+          />
+        </Label>
+        <Label>
+          Confirm new password
+          <Input
+            name="confirmation"
+            type="password"
+            autoComplete="new-password"
+            minLength={12}
+            maxLength={128}
+            required
+          />
+        </Label>
+        <Button type="submit" variant="outline" disabled={change.isPending}>
+          Change password
+        </Button>
+        {change.error ? <p role="alert">{change.error.message}</p> : null}
+        {change.isSuccess ? (
+          <p role="status">Password changed. Your other devices are signed out.</p>
         ) : null}
-        {accounts.isError ? (
-          <span className="text-sm text-red-700 dark:text-red-300">
-            {settingsErrorMessage(accounts.error)}
-          </span>
-        ) : null}
-        {accounts.data?.map((account) => (
-          <Pill key={account.id}>{PROVIDER_NAMES[account.providerId] ?? account.providerId}</Pill>
-        ))}
-      </div>
+      </form>
     </Row>
   )
 }
@@ -172,13 +254,24 @@ function Sessions() {
   return (
     <>
       <Row description="Devices signed in to your account." label="Sessions" layout="stacked">
-        {!requested ? <Button variant="outline" onClick={() => setRequested(true)}>View signed-in devices</Button> : null}
+        {!requested ? (
+          <Button variant="outline" onClick={() => setRequested(true)}>
+            View signed-in devices
+          </Button>
+        ) : null}
         {requested && sessions.isPending ? (
           <p className="text-sm text-muted-foreground">Loading sessions…</p>
         ) : null}
         {sessions.isError ? (
           <div className="grid gap-2">
-            <p className={'code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH' ? 'text-sm text-muted-foreground' : 'text-sm text-red-700 dark:text-red-300'} role="status">
+            <p
+              className={
+                'code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH'
+                  ? 'text-sm text-muted-foreground'
+                  : 'text-sm text-red-700 dark:text-red-300'
+              }
+              role="status"
+            >
               {'code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH'
                 ? 'Confirm your sign-in to view and manage your sessions.'
                 : settingsErrorMessage(sessions.error)}
@@ -189,14 +282,16 @@ function Sessions() {
                   Verify identity
                 </Link>
               </Button>
-              {!('code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH') ? <Button
-                disabled={sessions.isFetching}
-                onClick={() => void sessions.refetch()}
-                type="button"
-                variant="outline"
-              >
-                Retry
-              </Button> : null}
+              {!('code' in sessions.error && sessions.error.code === 'SESSION_NOT_FRESH') ? (
+                <Button
+                  disabled={sessions.isFetching}
+                  onClick={() => void sessions.refetch()}
+                  type="button"
+                  variant="outline"
+                >
+                  Retry
+                </Button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -334,9 +429,11 @@ function AccountDeletion({ email }: { email: string }) {
   return (
     <Row
       description={
-        request
-          ? `Your account is scheduled for deletion on ${new Date(request.executeAfter).toLocaleDateString()}. Until then you can cancel. After that, you are signed out everywhere, your sign-in methods and memberships are removed, and your name and email are erased; workspaces keep their content and audit history.`
-          : 'Deleting your account signs you out everywhere, removes your sign-in methods and memberships, and erases your name and email after a 14-day grace period. Workspaces you belong to keep their content.'
+        request?.status === 'PROCESSING'
+          ? 'Account deletion has started. Your encrypted Founder Hub data and attachments are being removed. This can no longer be cancelled.'
+          : request
+            ? `Your account is scheduled for deletion on ${new Date(request.executeAfter).toLocaleDateString()}. Until then you can cancel. After that, you are signed out everywhere, your sign-in methods and memberships are removed, and your name and email are erased; workspaces keep their content and audit history.`
+            : 'Deleting your account signs you out everywhere, removes your sign-in methods and memberships, and erases your name and email after a 14-day grace period. Workspaces you belong to keep their content.'
       }
       label="Delete account"
       layout="stacked"
@@ -355,7 +452,12 @@ function AccountDeletion({ email }: { email: string }) {
       ) : null}
       <div>
         {request ? (
-          <Button onClick={() => void cancel()} type="button" variant="outline">
+          <Button
+            disabled={request.status !== 'REQUESTED'}
+            onClick={() => void cancel()}
+            type="button"
+            variant="outline"
+          >
             Cancel deletion
           </Button>
         ) : (
