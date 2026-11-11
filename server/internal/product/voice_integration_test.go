@@ -257,7 +257,7 @@ func TestVoiceSettingsAndGates(t *testing.T) {
 	f := newVoiceFixture(t)
 	ctx, on, off := f.ctx, true, false
 	settings, err := f.repo.GetVoiceSettings(ctx, f.creator)
-	if err != nil || settings.Workspace != (VoiceWorkspaceFlags{}) || settings.CanManage || settings.MinAppVersion != "1.0.0" ||
+	if err != nil || settings.Workspace != (VoiceWorkspaceFlags{}) || settings.CanManage || settings.MinAppVersion != "0.0.0" ||
 		settings.Limits != (VoiceLimits{MaxNoteMs: 1800000, WarnAtMs: 1500000, MinNoteMs: 1000, MaxTranscriptChars: 100000, MaxCommandChars: 2000}) ||
 		settings.Switches != (VoiceSwitches{Notes: true, AudioUpload: true, Drafts: true, Parse: true, Confirm: true}) {
 		t.Fatalf("defaults=%+v err=%v", settings, err)

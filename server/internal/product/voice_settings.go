@@ -18,7 +18,8 @@ type VoiceSettings struct {
 	Workspace VoiceWorkspaceFlags `json:"workspace"`
 	Member    VoiceMemberChoices  `json:"member"`
 	CanManage bool                `json:"canManage"`
-	// MinAppVersion is the oldest app that may sync; the app enforces it (S17).
+	// MinAppVersion is the oldest app that may sync, 0.0.0 when the server sets
+	// none; the app enforces it (S17).
 	MinAppVersion string        `json:"minAppVersion"`
 	Limits        VoiceLimits   `json:"limits"`
 	Switches      VoiceSwitches `json:"switches"`
@@ -78,7 +79,7 @@ func (c *Configuration) GetVoiceSettings(ctx context.Context, actor Actor) (*Voi
 	}
 	minimum := os.Getenv("VOICE_MIN_APP_VERSION")
 	if minimum == "" {
-		minimum = "1.0.0"
+		minimum = "0.0.0"
 	}
 	return &VoiceSettings{Workspace: flags, Member: choices, CanManage: canManage, MinAppVersion: minimum, Limits: voiceNoteLimits,
 		Switches: VoiceSwitches{Notes: !voiceSwitchedOff(voiceSwitchAll), AudioUpload: !voiceSwitchedOff(voiceSwitchAudioUpload),
