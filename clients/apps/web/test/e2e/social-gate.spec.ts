@@ -203,25 +203,41 @@ test('the backend worker publishes once through Go, retries, honors cancellation
       new Set(['post.connection_created', 'post.scheduled', 'post.cancelled', 'post.published'])
     )
 
-    // A throttled or failing provider is retried into exactly one remote post.
-    for (const mode of ['throttle-once', 'server-error-once'] as const) {
-      await resetFake(mode)
-      const retry = await createScheduledPost(
-        page,
-        connectionId,
-        `social-gate-${mode}`,
-        variantId,
-        soon()
-      )
-      await expect.poll(async () => (await fakeState()).posts.length, { timeout: 180_000 }).toBe(1)
-      await awaitStatus(retry.scheduledPost.id, 'PUBLISHED')
-      const retried = await fakeState()
-      expect(retried.requests).toBe(2)
-      expect(retried.posts).toHaveLength(1)
-      expect(
-        (await attemptsOf(retry.scheduledPost.id)).filter((item) => item.outcome === 'SUCCEEDED')
-      ).toHaveLength(1)
-    }
+    // A throttled provider accepted nothing, so it is retried into exactly one remote post.
+    await resetFake('throttle-once')
+    const retry = await createScheduledPost(
+      page,
+      connectionId,
+      'social-gate-throttle-once',
+      variantId,
+      soon()
+    )
+    await expect.poll(async () => (await fakeState()).posts.length, { timeout: 180_000 }).toBe(1)
+    await awaitStatus(retry.scheduledPost.id, 'PUBLISHED')
+    const retried = await fakeState()
+    expect(retried.requests).toBe(2)
+    expect(retried.posts).toHaveLength(1)
+    expect(
+      (await attemptsOf(retry.scheduledPost.id)).filter((item) => item.outcome === 'SUCCEEDED')
+    ).toHaveLength(1)
+
+    // A server error after the publish request may hide an accepted post, so it is
+    // never resent: one request, and the outcome is unknown until a person checks.
+    await resetFake('server-error-once')
+    const failed = await createScheduledPost(
+      page,
+      connectionId,
+      'social-gate-server-error-once',
+      variantId,
+      soon()
+    )
+    await awaitStatus(failed.scheduledPost.id, 'UNKNOWN_DELIVERY')
+    // eslint-disable-next-line no-restricted-syntax -- Proves no durable retry resends the post later; an absence needs a window.
+    await page.waitForTimeout(30_000)
+    expect(await statusOf(failed.scheduledPost.id)).toBe('UNKNOWN_DELIVERY')
+    const unresent = await fakeState()
+    expect(unresent.requests).toBe(1)
+    expect(unresent.posts).toHaveLength(0)
 
     // An expired provider credential fails the post without publishing.
     await resetFake('normal')
