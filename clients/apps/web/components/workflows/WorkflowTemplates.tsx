@@ -1,5 +1,7 @@
 'use client'
 
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/ssr/ArrowRight'
+import { PlusIcon } from '@phosphor-icons/react/dist/ssr/Plus'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -43,7 +45,11 @@ import {
 } from '@/lib/workflows/templates'
 import { AutomateBreadcrumb } from './workflow-ui'
 import { WorkflowEditor } from './WorkflowEditor'
-import { WorkflowTemplatePreview, WorkflowTemplateSample } from './WorkflowTemplatePreview'
+import {
+  WorkflowTemplateDiagram,
+  WorkflowTemplatePreview,
+  WorkflowTemplateSample,
+} from './WorkflowTemplatePreview'
 import { FAMILY_NAMES } from './workflow-canvas'
 
 /** A workflow the editor holds until it is saved, so a look at a template leaves nothing behind. */
@@ -177,52 +183,72 @@ function TemplatePicker() {
       />
     )
   return (
-    <Page
-      description="Turn shipped code into ready-to-review campaigns."
-      title="New workflow"
-      width="md"
-    >
+    <Page description="Turn shipped code into ready-to-review campaigns." title="New workflow">
       <AutomateBreadcrumb current="New" trail={[{ href: '/workflows', label: 'Workflows' }]} />
-      <Section title="Choose a template">
-        <ul className="grid gap-4 md:grid-cols-2" data-tour-id="automate-templates">
+      <Section
+        description="Each one opens as a draft you can edit. Nothing runs until you activate it."
+        title="Choose a template"
+      >
+        {/* Each card spans seven shared rows (picture, name, When, Rule, You get, sample, action), so they line up across a row. */}
+        <ul className="grid gap-4 lg:grid-cols-2" data-tour-id="automate-templates">
           {WORKFLOW_TEMPLATES.map((candidate) => (
-            <li key={candidate.id}>
+            <li className="row-span-7 grid grid-rows-subgrid" key={candidate.id}>
               <ButtonLink
                 aria-describedby={`template-${candidate.id}`}
                 aria-labelledby={`template-${candidate.id}-name`}
-                className="group flex h-full w-full flex-col items-start justify-start gap-3 rounded-xl p-5 text-left whitespace-normal"
+                className="group row-span-7 grid grid-cols-[minmax(0,1fr)] grid-rows-subgrid gap-3 rounded-xl border border-border bg-card p-4 text-left transition-[border-color,box-shadow] duration-200 hover:border-foreground/20 hover:shadow-[0_6px_20px_-12px_rgb(0_0_0/0.25)] motion-reduce:transition-none"
                 href={`/workflows/new?template=${candidate.id}`}
-                variant="outline"
+                size={null}
+                variant="custom"
               >
+                <WorkflowTemplateDiagram template={candidate} />
                 <span
-                  className="text-ui-lg font-medium text-foreground"
+                  className="mt-1 text-ui-lg font-medium text-pretty text-foreground"
                   id={`template-${candidate.id}-name`}
                 >
                   {candidate.name}
                 </span>
-                <span className="grid w-full gap-3" id={`template-${candidate.id}`}>
+                <div className="row-span-4 grid grid-rows-subgrid" id={`template-${candidate.id}`}>
                   <WorkflowTemplatePreview template={candidate} />
                   <WorkflowTemplateSample template={candidate} />
-                </span>
+                </div>
                 <span
                   aria-hidden="true"
-                  className="mt-auto text-sm font-medium text-foreground group-hover:underline"
+                  className="flex items-center gap-1.5 pt-1 text-sm font-medium text-foreground"
                 >
-                  Use this template →
+                  Use this template
+                  <ArrowRightIcon className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none" />
                 </span>
               </ButtonLink>
             </li>
           ))}
+          <li className="row-span-7 grid">
+            <Button
+              aria-describedby="template-blank"
+              aria-labelledby="template-blank-name"
+              className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/20 p-5 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted/40 hover:text-foreground"
+              onClick={() => setBlank(true)}
+              size={null}
+              type="button"
+              variant="custom"
+            >
+              <span className="mb-1 grid size-9 place-items-center rounded-[10px] bg-background text-foreground shadow-xs ring-1 ring-border ring-inset transition-transform duration-200 group-hover:scale-105 motion-reduce:transition-none">
+                <PlusIcon aria-hidden="true" className="size-4" />
+              </span>
+              <span className="text-ui-lg font-medium text-foreground" id="template-blank-name">
+                Start with a blank workflow
+              </span>
+              <span id="template-blank">Choose a trigger, then build each step yourself.</span>
+            </Button>
+          </li>
         </ul>
       </Section>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <Button onClick={() => setBlank(true)} type="button" variant="outline">
-          Start with a blank workflow
-        </Button>
-        <Link className="text-sm underline" href="/campaigns/new">
-          Or build a campaign by hand
+      <p className="text-sm text-muted-foreground">
+        Rather write the posts yourself?{' '}
+        <Link className="text-foreground underline underline-offset-4" href="/campaigns/new">
+          Build a campaign by hand
         </Link>
-      </div>
+      </p>
       <BlankWorkflowDialog onOpenChange={setBlank} onStart={setBlankDraft} open={blank} />
     </Page>
   )
