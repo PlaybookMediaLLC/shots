@@ -106,6 +106,34 @@ func (_c *DeploymentEventCreate) SetAssetIds(v []string) *DeploymentEventCreate 
 	return _c
 }
 
+// SetKind sets the "kind" field.
+func (_c *DeploymentEventCreate) SetKind(v deploymentevent.Kind) *DeploymentEventCreate {
+	_c.mutation.SetKind(v)
+	return _c
+}
+
+// SetNillableKind sets the "kind" field if the given value is not nil.
+func (_c *DeploymentEventCreate) SetNillableKind(v *deploymentevent.Kind) *DeploymentEventCreate {
+	if v != nil {
+		_c.SetKind(*v)
+	}
+	return _c
+}
+
+// SetDeployedAt sets the "deployed_at" field.
+func (_c *DeploymentEventCreate) SetDeployedAt(v time.Time) *DeploymentEventCreate {
+	_c.mutation.SetDeployedAt(v)
+	return _c
+}
+
+// SetNillableDeployedAt sets the "deployed_at" field if the given value is not nil.
+func (_c *DeploymentEventCreate) SetNillableDeployedAt(v *time.Time) *DeploymentEventCreate {
+	if v != nil {
+		_c.SetDeployedAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *DeploymentEventCreate) SetCreatedAt(v time.Time) *DeploymentEventCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -183,6 +211,14 @@ func (_c *DeploymentEventCreate) defaults() {
 		v := deploymentevent.DefaultAssetIds
 		_c.mutation.SetAssetIds(v)
 	}
+	if _, ok := _c.mutation.Kind(); !ok {
+		v := deploymentevent.DefaultKind
+		_c.mutation.SetKind(v)
+	}
+	if _, ok := _c.mutation.DeployedAt(); !ok {
+		v := deploymentevent.DefaultDeployedAt()
+		_c.mutation.SetDeployedAt(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := deploymentevent.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -217,6 +253,17 @@ func (_c *DeploymentEventCreate) check() error {
 	}
 	if _, ok := _c.mutation.AssetIds(); !ok {
 		return &ValidationError{Name: "asset_ids", err: errors.New(`ent: missing required field "DeploymentEvent.asset_ids"`)}
+	}
+	if _, ok := _c.mutation.Kind(); !ok {
+		return &ValidationError{Name: "kind", err: errors.New(`ent: missing required field "DeploymentEvent.kind"`)}
+	}
+	if v, ok := _c.mutation.Kind(); ok {
+		if err := deploymentevent.KindValidator(v); err != nil {
+			return &ValidationError{Name: "kind", err: fmt.Errorf(`ent: validator failed for field "DeploymentEvent.kind": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.DeployedAt(); !ok {
+		return &ValidationError{Name: "deployed_at", err: errors.New(`ent: missing required field "DeploymentEvent.deployed_at"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "DeploymentEvent.created_at"`)}
@@ -294,6 +341,14 @@ func (_c *DeploymentEventCreate) createSpec() (*DeploymentEvent, *sqlgraph.Creat
 	if value, ok := _c.mutation.AssetIds(); ok {
 		_spec.SetField(deploymentevent.FieldAssetIds, field.TypeJSON, value)
 		_node.AssetIds = value
+	}
+	if value, ok := _c.mutation.Kind(); ok {
+		_spec.SetField(deploymentevent.FieldKind, field.TypeEnum, value)
+		_node.Kind = value
+	}
+	if value, ok := _c.mutation.DeployedAt(); ok {
+		_spec.SetField(deploymentevent.FieldDeployedAt, field.TypeTime, value)
+		_node.DeployedAt = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(deploymentevent.FieldCreatedAt, field.TypeTime, value)

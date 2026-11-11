@@ -383,15 +383,20 @@ type IngestDeploymentInput struct {
 	SHA         *string `json:"sha"`
 	SourceAppID string  `json:"sourceAppId"`
 	URL         *string `json:"url"`
+	// DeployedAt is the provider's deployment time from a normalized event. A
+	// hand-made webhook has none and is ordered by arrival.
+	DeployedAt time.Time `json:"-"`
 }
 
 type DeploymentIngest struct {
 	Created      bool   `json:"created"`
 	DeploymentID string `json:"deploymentId"`
+	Kind         string `json:"kind"`
 }
 
-// IngestDeployment records a production deployment once; capturing the
-// product it shipped is the worker's job.
+// IngestDeployment records a production deployment once, with how its commit
+// compares to what the source ran before; capturing the product it shipped
+// is the worker's job.
 func (c *Configuration) IngestDeployment(ctx context.Context, actor Actor, input IngestDeploymentInput) (*DeploymentIngest, error) {
 	if actor.Kind != "webhook" {
 		return nil, publishing.ErrForbidden
@@ -409,42 +414,67 @@ func (c *Configuration) IngestDeployment(ctx context.Context, actor Actor, input
 		return nil, err
 	}
 	defer tx.Rollback()
-	active, err := tx.SourceApp.Query().Where(sourceapp.ID(input.SourceAppID),
-		sourceapp.OrganizationID(actor.OrganizationID), sourceapp.StatusEQ(sourceapp.StatusACTIVE)).Exist(ctx)
+	// The source lock orders one source's deployments, so each compares with every earlier one.
+	source, err := lockAutomationSource(ctx, tx, actor.OrganizationID, input.SourceAppID)
 	if err != nil {
 		return nil, err
 	}
-	if !active {
+	if source.Status != sourceapp.StatusACTIVE {
 		return nil, publishing.ErrNotFound
 	}
-	id := cuid.New()
-	created, err := tx.DeploymentEvent.Create().SetID(id).SetOrganizationID(actor.OrganizationID).
-		SetSourceAppID(input.SourceAppID).SetExternalID(input.ExternalID).SetEnvironment(input.Environment).
-		SetNillableURL(input.URL).SetNillableSha(input.SHA).Save(ctx)
-	if ent.IsConstraintError(err) {
-		row, findErr := c.client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(actor.OrganizationID),
-			deploymentevent.SourceAppID(input.SourceAppID), deploymentevent.ExternalID(input.ExternalID)).Only(ctx)
-		if findErr != nil {
-			return nil, findErr
-		}
-		return &DeploymentIngest{Created: false, DeploymentID: row.ID}, nil
+	deployedAt := time.Now()
+	if !input.DeployedAt.IsZero() {
+		deployedAt = input.DeployedAt
 	}
+	// Stored at PostgreSQL's precision, so a redelivery compares equal.
+	deployedAt = deployedAt.UTC().Truncate(time.Millisecond)
+	externalID := input.ExternalID
+	find := func() (*ent.DeploymentEvent, error) {
+		row, err := tx.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(actor.OrganizationID),
+			deploymentevent.SourceAppID(input.SourceAppID), deploymentevent.ExternalID(externalID)).Only(ctx)
+		if ent.IsNotFound(err) {
+			return nil, nil
+		}
+		return row, err
+	}
+	prior, err := find()
+	if err != nil {
+		return nil, err
+	}
+	// A provider activating a deployment it reported before (a rollback on
+	// Vercel, Netlify or Pages) is a deployment of its own; a redelivery is not.
+	if prior != nil && !input.DeployedAt.IsZero() && deployedAt.After(prior.DeployedAt) {
+		externalID = input.ExternalID + "@" + deployedAt.Format(time.RFC3339Nano)
+		if prior, err = find(); err != nil {
+			return nil, err
+		}
+	}
+	if prior != nil {
+		return &DeploymentIngest{Created: false, DeploymentID: prior.ID, Kind: string(prior.Kind)}, nil
+	}
+	kind, err := deploymentKind(ctx, tx, source, input.Environment, input.SHA, input.ExternalID, deployedAt)
+	if err != nil {
+		return nil, err
+	}
+	created, err := tx.DeploymentEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
+		SetSourceAppID(input.SourceAppID).SetExternalID(externalID).SetEnvironment(input.Environment).
+		SetNillableURL(input.URL).SetNillableSha(input.SHA).SetKind(kind).SetDeployedAt(deployedAt).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if _, err = tx.OutboxEvent.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
 		SetType("deployment.succeeded").SetAggregateType("deployment_event").SetAggregateID(created.ID).
 		SetPayload(map[string]any{"deploymentId": created.ID, "sourceAppId": input.SourceAppID, "actorUserId": actor.UserID}).
-		SetIdempotencyKey("deployment:" + input.SourceAppID + ":" + input.ExternalID).Save(ctx); err != nil {
+		SetIdempotencyKey("deployment:" + input.SourceAppID + ":" + externalID).Save(ctx); err != nil {
 		return nil, err
 	}
-	if err := appendConfigurationAudit(ctx, tx, actor, "product.deployment_received", "deployment_event", created.ID); err != nil {
+	if err := appendConfigurationAudit(ctx, tx, actor, "product.deployment_received", "deployment_event", created.ID, map[string]any{"kind": string(kind)}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return &DeploymentIngest{Created: true, DeploymentID: created.ID}, nil
+	return &DeploymentIngest{Created: true, DeploymentID: created.ID, Kind: string(kind)}, nil
 }
 
 // validDeploymentURL accepts an HTTPS address without credentials. A private

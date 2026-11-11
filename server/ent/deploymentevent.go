@@ -36,6 +36,10 @@ type DeploymentEvent struct {
 	FailureCode *string `json:"failure_code,omitempty"`
 	// AssetIds holds the value of the "asset_ids" field.
 	AssetIds []string `json:"asset_ids,omitempty"`
+	// Kind holds the value of the "kind" field.
+	Kind deploymentevent.Kind `json:"kind,omitempty"`
+	// DeployedAt holds the value of the "deployed_at" field.
+	DeployedAt time.Time `json:"deployed_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -50,9 +54,9 @@ func (*DeploymentEvent) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case deploymentevent.FieldAssetIds:
 			values[i] = new([]byte)
-		case deploymentevent.FieldID, deploymentevent.FieldOrganizationID, deploymentevent.FieldSourceAppID, deploymentevent.FieldExternalID, deploymentevent.FieldEnvironment, deploymentevent.FieldURL, deploymentevent.FieldSha, deploymentevent.FieldStatus, deploymentevent.FieldFailureCode:
+		case deploymentevent.FieldID, deploymentevent.FieldOrganizationID, deploymentevent.FieldSourceAppID, deploymentevent.FieldExternalID, deploymentevent.FieldEnvironment, deploymentevent.FieldURL, deploymentevent.FieldSha, deploymentevent.FieldStatus, deploymentevent.FieldFailureCode, deploymentevent.FieldKind:
 			values[i] = new(sql.NullString)
-		case deploymentevent.FieldCreatedAt, deploymentevent.FieldUpdatedAt:
+		case deploymentevent.FieldDeployedAt, deploymentevent.FieldCreatedAt, deploymentevent.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -134,6 +138,18 @@ func (_m *DeploymentEvent) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field asset_ids: %w", err)
 				}
 			}
+		case deploymentevent.FieldKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field kind", values[i])
+			} else if value.Valid {
+				_m.Kind = deploymentevent.Kind(value.String)
+			}
+		case deploymentevent.FieldDeployedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field deployed_at", values[i])
+			} else if value.Valid {
+				_m.DeployedAt = value.Time
+			}
 		case deploymentevent.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -214,6 +230,12 @@ func (_m *DeploymentEvent) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("asset_ids=")
 	builder.WriteString(fmt.Sprintf("%v", _m.AssetIds))
+	builder.WriteString(", ")
+	builder.WriteString("kind=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Kind))
+	builder.WriteString(", ")
+	builder.WriteString("deployed_at=")
+	builder.WriteString(_m.DeployedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

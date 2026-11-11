@@ -149,7 +149,8 @@ func recordCapture(ctx context.Context, tx *ent.Tx, actor Actor, surface *ent.Pr
 
 // newestDeploymentCapture reports whether a deployment's capture may become
 // the surface's current image: an older deployment that finishes late never
-// replaces a newer deployment's. Deployments are ordered as Shots received them.
+// replaces a newer deployment's. Deployments are ordered by the provider's
+// deployment time, then as Shots received them.
 func newestDeploymentCapture(ctx context.Context, tx *ent.Tx, surfaceID, deploymentID string) (bool, error) {
 	current, err := tx.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(surfaceID), surfacecapture.SupersededAtIsNil(),
 		surfacecapture.SourceEQ(surfacecapture.SourceDeployment), surfacecapture.SourceIDNotNil()).Only(ctx)
@@ -173,6 +174,9 @@ func newestDeploymentCapture(ctx context.Context, tx *ent.Tx, surfaceID, deploym
 	}
 	if mine == nil || theirs == nil {
 		return true, nil
+	}
+	if !theirs.DeployedAt.Equal(mine.DeployedAt) {
+		return theirs.DeployedAt.Before(mine.DeployedAt), nil
 	}
 	return !theirs.CreatedAt.After(mine.CreatedAt) && (theirs.CreatedAt.Before(mine.CreatedAt) || theirs.ID < mine.ID), nil
 }

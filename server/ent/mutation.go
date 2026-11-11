@@ -43414,6 +43414,8 @@ type DeploymentEventMutation struct {
 	failure_code    *string
 	asset_ids       *[]string
 	appendasset_ids []string
+	kind            *deploymentevent.Kind
+	deployed_at     *time.Time
 	created_at      *time.Time
 	updated_at      *time.Time
 	clearedFields   map[string]struct{}
@@ -43904,6 +43906,78 @@ func (m *DeploymentEventMutation) ResetAssetIds() {
 	m.appendasset_ids = nil
 }
 
+// SetKind sets the "kind" field.
+func (m *DeploymentEventMutation) SetKind(d deploymentevent.Kind) {
+	m.kind = &d
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *DeploymentEventMutation) Kind() (r deploymentevent.Kind, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the DeploymentEvent entity.
+// If the DeploymentEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentEventMutation) OldKind(ctx context.Context) (v deploymentevent.Kind, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *DeploymentEventMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetDeployedAt sets the "deployed_at" field.
+func (m *DeploymentEventMutation) SetDeployedAt(t time.Time) {
+	m.deployed_at = &t
+}
+
+// DeployedAt returns the value of the "deployed_at" field in the mutation.
+func (m *DeploymentEventMutation) DeployedAt() (r time.Time, exists bool) {
+	v := m.deployed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeployedAt returns the old "deployed_at" field's value of the DeploymentEvent entity.
+// If the DeploymentEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DeploymentEventMutation) OldDeployedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeployedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeployedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeployedAt: %w", err)
+	}
+	return oldValue.DeployedAt, nil
+}
+
+// ResetDeployedAt resets all changes to the "deployed_at" field.
+func (m *DeploymentEventMutation) ResetDeployedAt() {
+	m.deployed_at = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *DeploymentEventMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -44010,7 +44084,7 @@ func (m *DeploymentEventMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DeploymentEventMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 13)
 	if m.organization_id != nil {
 		fields = append(fields, deploymentevent.FieldOrganizationID)
 	}
@@ -44037,6 +44111,12 @@ func (m *DeploymentEventMutation) Fields() []string {
 	}
 	if m.asset_ids != nil {
 		fields = append(fields, deploymentevent.FieldAssetIds)
+	}
+	if m.kind != nil {
+		fields = append(fields, deploymentevent.FieldKind)
+	}
+	if m.deployed_at != nil {
+		fields = append(fields, deploymentevent.FieldDeployedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, deploymentevent.FieldCreatedAt)
@@ -44070,6 +44150,10 @@ func (m *DeploymentEventMutation) Field(name string) (ent.Value, bool) {
 		return m.FailureCode()
 	case deploymentevent.FieldAssetIds:
 		return m.AssetIds()
+	case deploymentevent.FieldKind:
+		return m.Kind()
+	case deploymentevent.FieldDeployedAt:
+		return m.DeployedAt()
 	case deploymentevent.FieldCreatedAt:
 		return m.CreatedAt()
 	case deploymentevent.FieldUpdatedAt:
@@ -44101,6 +44185,10 @@ func (m *DeploymentEventMutation) OldField(ctx context.Context, name string) (en
 		return m.OldFailureCode(ctx)
 	case deploymentevent.FieldAssetIds:
 		return m.OldAssetIds(ctx)
+	case deploymentevent.FieldKind:
+		return m.OldKind(ctx)
+	case deploymentevent.FieldDeployedAt:
+		return m.OldDeployedAt(ctx)
 	case deploymentevent.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case deploymentevent.FieldUpdatedAt:
@@ -44176,6 +44264,20 @@ func (m *DeploymentEventMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAssetIds(v)
+		return nil
+	case deploymentevent.FieldKind:
+		v, ok := value.(deploymentevent.Kind)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case deploymentevent.FieldDeployedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeployedAt(v)
 		return nil
 	case deploymentevent.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -44287,6 +44389,12 @@ func (m *DeploymentEventMutation) ResetField(name string) error {
 		return nil
 	case deploymentevent.FieldAssetIds:
 		m.ResetAssetIds()
+		return nil
+	case deploymentevent.FieldKind:
+		m.ResetKind()
+		return nil
+	case deploymentevent.FieldDeployedAt:
+		m.ResetDeployedAt()
 		return nil
 	case deploymentevent.FieldCreatedAt:
 		m.ResetCreatedAt()

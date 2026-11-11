@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"slices"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/githubinstallstart"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacegithubinstallation"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/activity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
@@ -393,9 +395,9 @@ func (c *Configuration) SetGitHubInstallationStatus(ctx context.Context, install
 	if _, err := row.Update().SetStatus(githubinstallation.Status(status)).Save(ctx); err != nil {
 		return 0, err
 	}
-	archived := 0
+	var archived []*ent.SourceApp
 	if status == GitHubInstallationDeleted {
-		archived, err = archiveGitHubSources(ctx, tx, row.ID, nil)
+		archived, err = archiveGitHubSources(ctx, tx, row.ID, nil, "github_access_removed")
 		if err != nil {
 			return 0, err
 		}
@@ -409,9 +411,12 @@ func (c *Configuration) SetGitHubInstallationStatus(ctx context.Context, install
 			if err := cancelAutomationRuns(ctx, tx, source.OrganizationID, source.ID, nil); err != nil {
 				return 0, err
 			}
+			if err := cancelSuspendedCaptureJobs(ctx, tx, source.OrganizationID, source.ID); err != nil {
+				return 0, err
+			}
 		}
 	}
-	return archived, tx.Commit()
+	return len(archived), tx.Commit()
 }
 
 // RemoveGitHubRepositories archives every workspace's sources for repositories
@@ -432,36 +437,106 @@ func (c *Configuration) RemoveGitHubRepositories(ctx context.Context, installati
 	if err != nil {
 		return 0, err
 	}
-	archived, err := archiveGitHubSources(ctx, tx, row.ID, repositoryIDs)
+	archived, err := archiveGitHubSources(ctx, tx, row.ID, repositoryIDs, "github_access_removed")
 	if err != nil {
 		return 0, err
 	}
-	return archived, tx.Commit()
+	return len(archived), tx.Commit()
 }
 
-func archiveGitHubSources(ctx context.Context, tx *ent.Tx, installationRowID string, repositoryIDs []string) (int, error) {
+// transferGitHubRepository handles a repository moving to another account.
+// GitHub sends the event only to the new owner's installation, so a source
+// still bound to the old one would stop hearing from it without a sign. Such
+// sources are archived for a person to reconnect, which the workspace is told.
+func (c *Configuration) transferGitHubRepository(ctx context.Context, delivery string, body []byte) (*GitHubEventAcceptance, error) {
+	var payload struct {
+		Action       string `json:"action"`
+		Installation struct {
+			ID int64 `json:"id"`
+		} `json:"installation"`
+		Repository struct {
+			ID int64 `json:"id"`
+		} `json:"repository"`
+	}
+	if json.Unmarshal(body, &payload) != nil || payload.Repository.ID <= 0 {
+		return nil, ErrInvalidInput
+	}
+	result := &GitHubEventAcceptance{}
+	if payload.Action != "transferred" {
+		return result, nil
+	}
+	repository := strconv.FormatInt(payload.Repository.ID, 10)
+	installations, err := c.client.SourceApp.Query().Where(sourceapp.Provider("github"), sourceapp.ExternalID(repository), sourceapp.StatusEQ(sourceapp.StatusACTIVE),
+		sourceapp.GithubInstallationIDNotNil()).Unique(true).Select(sourceapp.FieldGithubInstallationID).Strings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range installations {
+		row, err := c.client.GitHubInstallation.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if row.InstallationID == payload.Installation.ID {
+			continue
+		}
+		// The signature does not date the event: GitHub, not a replay, decides.
+		// An old installation that still reads the repository keeps it.
+		if reader, ok := c.github.(GitHubReader); ok && row.Status == githubinstallation.StatusACTIVE {
+			if _, err := reader.Repository(ctx, row.InstallationID, repository); err == nil {
+				continue
+			}
+		}
+		handled, err := func() (int, error) {
+			tx, err := c.client.Tx(ctx)
+			if err != nil {
+				return 0, err
+			}
+			defer tx.Rollback()
+			archived, err := archiveGitHubSources(ctx, tx, row.ID, []string{repository}, "repository_transferred")
+			if err != nil {
+				return 0, err
+			}
+			for _, source := range archived {
+				if err := activity.Emit(ctx, tx, source.OrganizationID, "integration.reconnect_required", "source_app", source.ID, "", delivery+":"+source.ID,
+					map[string]any{"reason": "repository_transferred"}); err != nil {
+					return 0, err
+				}
+			}
+			return len(archived), tx.Commit()
+		}()
+		if err != nil {
+			return nil, err
+		}
+		result.Handled += handled
+	}
+	return result, nil
+}
+
+// archiveGitHubSources archives an installation's active sources, all of them
+// or those for repositoryIDs, and stops their runs; reason goes to the audit.
+func archiveGitHubSources(ctx context.Context, tx *ent.Tx, installationRowID string, repositoryIDs []string, reason string) ([]*ent.SourceApp, error) {
 	query := tx.SourceApp.Query().Where(sourceapp.GithubInstallationID(installationRowID), sourceapp.StatusEQ(sourceapp.StatusACTIVE))
 	if repositoryIDs != nil {
 		query.Where(sourceapp.ExternalIDIn(repositoryIDs...))
 	}
 	sources, err := query.All(ctx)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	for _, source := range sources {
 		if _, err := source.Update().SetStatus(sourceapp.StatusARCHIVED).Save(ctx); err != nil {
-			return 0, err
+			return nil, err
 		}
 		if err := cancelAutomationRuns(ctx, tx, source.OrganizationID, source.ID, nil); err != nil {
-			return 0, err
+			return nil, err
 		}
 		actor := Actor{OrganizationID: source.OrganizationID, Kind: "service", Display: "github"}
 		if err := appendConfigurationAudit(ctx, tx, actor, "product.source_app_archived", "source_app", source.ID,
-			map[string]any{"reason": "github_access_removed"}); err != nil {
-			return 0, err
+			map[string]any{"reason": reason}); err != nil {
+			return nil, err
 		}
 	}
-	return len(sources), nil
+	return sources, nil
 }
 
 // GitHubSources lists every workspace's active source for a repository that

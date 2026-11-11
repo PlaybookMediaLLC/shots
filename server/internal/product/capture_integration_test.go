@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/png"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,9 +22,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releasesourceevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/browser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/capture/sessionstate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/go-rod/rod/lib/proto"
@@ -219,6 +223,16 @@ func (w *captureWorld) run(t *testing.T, id string) *CaptureJobOutcome {
 		t.Fatal(err)
 	}
 	return outcome
+}
+
+// request asks for a capture now, as a person does; no deployment supersedes it.
+func (w *captureWorld) request(t *testing.T, recipeID string) *CaptureJobRecord {
+	t.Helper()
+	record, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipeID, CaptureJobRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return record
 }
 
 func TestCaptureConnectJourneyProvesAFreshSession(t *testing.T) {
@@ -548,7 +562,7 @@ func TestCaptureExpiredSessionParksTheJobUntilAPersonReconnects(t *testing.T) {
 	}
 	// State past its retention is deleted on sight, and the job asks for a person.
 	w.exec(t, `UPDATE platform_app_connection SET "stateExpiresAt"=now()-interval '1 minute' WHERE id=$1`, connection.ID)
-	next := w.deployment(t, "auth-2", "abcdef1234567890")
+	next := w.deployment(t, "auth-2", "fedcba0987654321")
 	runs = w.browser.runs.Load()
 	if outcome := w.run(t, next.ID); !outcome.Done || w.browser.runs.Load() != runs || w.job(t, next.ID).Phase != "NEEDS_AUTH" {
 		t.Fatalf("expired state ran: %+v", outcome)
@@ -560,8 +574,8 @@ func TestCaptureExpiredSessionParksTheJobUntilAPersonReconnects(t *testing.T) {
 
 func TestCaptureRevocationStopsQueuedAndInFlightWork(t *testing.T) {
 	w := newCaptureWorld(t)
-	connection, _ := w.ready(t)
-	queued := w.deployment(t, "revoke-1", "abcdef1234567890")
+	connection, recipe := w.ready(t)
+	queued := w.request(t, recipe.ID)
 	flying := w.deployment(t, "revoke-2", "abcdef1234567890")
 	// Revocation lands while the browser is running: the result cannot commit,
 	// and the provider session closes.
@@ -804,28 +818,57 @@ func TestCaptureCrashesReconcileToOneResult(t *testing.T) {
 func TestCaptureOutOfOrderDeploymentsKeepTheNewerImage(t *testing.T) {
 	w := newCaptureWorld(t)
 	w.ready(t)
+	// The newer deployment lands while the older one's attempt is in the browser:
+	// a running attempt is never superseded, and each keeps its own receipt.
 	older := w.deployment(t, "order-1", "1111111111111111")
-	newer := w.deployment(t, "order-2", "2222222222222222")
-	w.run(t, newer.ID)
+	var newer *CaptureJobRecord
+	w.browser.during = func() {
+		w.browser.during = nil
+		newer = w.deployment(t, "order-2", "2222222222222222")
+	}
 	w.run(t, older.ID)
+	w.run(t, newer.ID)
 	first, second := w.job(t, older.ID), w.job(t, newer.ID)
 	if first.AssetID == nil || second.AssetID == nil || *first.AssetID == *second.AssetID {
 		t.Fatalf("older=%+v newer=%+v", first, second)
 	}
 	current := w.db.Client.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(w.surface), surfacecapture.SupersededAtIsNil()).OnlyX(w.ctx)
 	if current.ID != *second.SurfaceCaptureID {
-		t.Fatalf("the older deployment replaced the newer image: %+v", current)
+		t.Fatalf("the older deployment kept the current image: %+v", current)
 	}
-	// Each deployment keeps its own receipt.
 	if row := w.db.Client.SurfaceCapture.GetX(w.ctx, *first.SurfaceCaptureID); row.SupersededAt == nil {
 		t.Fatalf("older=%+v", row)
+	}
+	// A deployment the provider made before both, delivered last, is ordered by
+	// the provider's time: its image is history, never the current one.
+	sha := "0000000000000000"
+	late, err := w.repo.IngestDeployment(w.ctx, Actor{OrganizationID: w.org, Kind: "webhook", Display: w.source.ID},
+		IngestDeploymentInput{Environment: "production", EventID: "late", ExternalID: "order-0", SourceAppID: w.source.ID, SHA: &sha, DeployedAt: time.Now().Add(-time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx, err := w.db.Client.Tx(w.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	surface := tx.ProductSurface.GetX(w.ctx, w.surface)
+	receipt, err := recordCapture(w.ctx, tx, Actor{OrganizationID: w.org, Kind: "service"}, surface, *first.AssetID, surfacecapture.SourceDeployment, &late.DeploymentID, &sha)
+	if err != nil || receipt.SupersededAt == nil {
+		t.Fatalf("a late older deployment became current: %+v %v", receipt, err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if now := w.db.Client.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(w.surface), surfacecapture.SupersededAtIsNil()).OnlyX(w.ctx); now.ID != current.ID {
+		t.Fatalf("current=%+v", now)
 	}
 }
 
 func TestCaptureProtectsSharedCapacityAndRotatesState(t *testing.T) {
 	w := newCaptureWorld(t)
-	connection, _ := w.ready(t)
-	first, second := w.deployment(t, "cap-1", "abcdef1234567890"), w.deployment(t, "cap-2", "abcdef1234567890")
+	connection, recipe := w.ready(t)
+	first, second := w.request(t, recipe.ID), w.request(t, recipe.ID)
 	// One active capture per workspace: the second retries later and opens nothing.
 	var waited *CaptureJobOutcome
 	var waitErr error
@@ -857,7 +900,7 @@ func TestCaptureProtectsSharedCapacityAndRotatesState(t *testing.T) {
 		t.Fatalf("row revision=%d", row.StateRevision)
 	}
 	w.browser.run = normal
-	third := w.deployment(t, "cap-3", "abcdef1234567890")
+	third := w.deployment(t, "cap-3", "3333333333333333")
 	w.run(t, third.ID)
 	last := w.browser.seenState[len(w.browser.seenState)-1]
 	if last.Cookies[0].Value != "rotated-secret" {
@@ -866,7 +909,7 @@ func TestCaptureProtectsSharedCapacityAndRotatesState(t *testing.T) {
 	// A key rotation re-encrypts on validated use, so the old key can be retired.
 	newest, _ := sessionstate.NewKeys(bytes.Repeat([]byte{8}, 32), bytes.Repeat([]byte{7}, 32))
 	w.repo.WithAuthenticatedCapture(w.browser, newest)
-	fourth := w.deployment(t, "cap-4", "abcdef1234567890")
+	fourth := w.deployment(t, "cap-4", "4444444444444444")
 	w.run(t, fourth.ID)
 	row = w.db.Client.PlatformAppConnection.GetX(w.ctx, connection.ID)
 	onlyNew, _ := sessionstate.NewKeys(bytes.Repeat([]byte{8}, 32))
@@ -876,7 +919,7 @@ func TestCaptureProtectsSharedCapacityAndRotatesState(t *testing.T) {
 	// Unreadable state never falls back to anything: a person signs in again.
 	w.repo.WithAuthenticatedCapture(w.browser, w.keys)
 	w.exec(t, `UPDATE platform_app_connection SET "stateCiphertext"='{"cookies":[]}' WHERE id=$1`, connection.ID)
-	plain := w.deployment(t, "cap-5", "abcdef1234567890")
+	plain := w.deployment(t, "cap-5", "5555555555555555")
 	runs = w.browser.runs.Load()
 	w.run(t, plain.ID)
 	if w.job(t, plain.ID).Phase != "NEEDS_AUTH" || w.browser.runs.Load() != runs {
@@ -972,7 +1015,7 @@ func TestCaptureWorkflowActionWaitsForItsExactResult(t *testing.T) {
 	if _, err := w.repo.LoadReleaseAutomation(w.ctx, w.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := w.repo.CollectAutomationChange(w.ctx, w.org, runID, 0); err != nil {
+	if _, err := w.repo.CollectAutomationChange(w.ctx, w.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.repo.SelectReleaseAutomation(w.ctx, w.org, runID, *active.ActiveVersionID, 0); err != nil {
@@ -1294,11 +1337,390 @@ func TestCaptureSecretsStayOutOfEverythingVisible(t *testing.T) {
 	w.browser.run = func(browser.RunInput) (*browser.RunResult, error) {
 		return nil, errors.New("https://user:" + captureSecret + "@provider/session")
 	}
-	failed := w.deployment(t, "secret-2", "abcdef1234567890")
+	failed := w.deployment(t, "secret-2", "fedcba0987654321")
 	w.run(t, failed.ID)
 	after := w.job(t, failed.ID)
 	if after.FailureCode == nil {
 		t.Fatalf("after=%+v", after)
 	}
 	check("failure code", *after.FailureCode)
+}
+
+// F3: deploy A, deploy B, deploy A again. The third is a rollback: its run
+// starts no workflow (TestInterpreterRedeploysAndRollbacksStartNoWorkflow reads
+// the kind collected here), and its capture is recorded against the rollback as
+// the current image. The live commit deployed again opens no browser once it is
+// captured. Each environment keeps its own history.
+func TestCaptureRedeploysAndRollbacksAreNotReleases(t *testing.T) {
+	w := newCaptureWorld(t)
+	w.ready(t)
+	w.graph.SchemaVersion, w.graph.Family = 3, automation.Deployed
+	w.graph.Qualification = automation.Condition{Field: "deployment.environment", Operator: "eq", Values: []string{"production"}}
+	w.graph.Nodes[1].Condition = &automation.Condition{Field: "deployment.state", Operator: "eq", Values: []string{"success"}}
+	w.activate(t)
+	start := time.Now().Add(-time.Hour)
+	deploy := func(id int, sha string) (string, *ent.DeploymentEvent) {
+		t.Helper()
+		delivery := fmt.Sprintf("kind-%d", id)
+		body := fmt.Sprintf(`{"installation":{"id":%d},"repository":{"id":1001,"full_name":"acme/app"},"deployment":{"id":%d,"sha":%q,"environment":"production"},"deployment_status":{"id":%d,"state":"success","created_at":%q}}`,
+			w.installation, id, sha, id+1000, start.Add(time.Duration(id)*time.Minute).Format(time.RFC3339Nano))
+		if _, err := w.repo.AcceptGitHubEvent(w.ctx, AcceptGitHubEventInput{DeliveryID: delivery, EventName: "deployment_status", Body: []byte(body)}); err != nil {
+			t.Fatal(err)
+		}
+		event := w.db.Client.ReleaseSourceEvent.Query().Where(releasesourceevent.OrganizationID(w.org), releasesourceevent.DeliveryID(delivery)).OnlyX(w.ctx)
+		run := w.db.Client.ReleaseAutomationRun.Query().Where(releaseautomationrun.OrganizationID(w.org), releaseautomationrun.EventID(event.ID)).OnlyX(w.ctx)
+		if _, err := w.repo.LoadReleaseAutomation(w.ctx, w.org, run.ID, 0); err != nil {
+			t.Fatal(err)
+		}
+		kind, err := w.repo.CollectAutomationChange(w.ctx, w.org, run.ID, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		row := w.db.Client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(w.org), deploymentevent.ExternalID(strconv.Itoa(id))).OnlyX(w.ctx)
+		if string(row.Kind) != kind {
+			t.Fatalf("collected %s, stored %+v", kind, row)
+		}
+		if _, err := w.repo.HandleOutboxEvent(w.ctx, "unused", w.org, EventDeploymentSucceeded, row.ID); err != nil {
+			t.Fatal(err)
+		}
+		return kind, row
+	}
+	capture := func(row *ent.DeploymentEvent) *ent.CaptureJob {
+		t.Helper()
+		job := w.db.Client.CaptureJob.Query().Where(capturejob.DeploymentEventID(row.ID)).OnlyX(w.ctx)
+		if outcome := w.run(t, job.ID); !outcome.Done {
+			t.Fatalf("outcome=%+v", outcome)
+		}
+		return w.db.Client.CaptureJob.GetX(w.ctx, job.ID)
+	}
+	shaA, shaB := "aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb"
+	for i, sha := range []string{shaA, shaB} {
+		kind, row := deploy(i+1, sha)
+		if kind != "new" {
+			t.Fatalf("deployment %d=%s", i+1, kind)
+		}
+		capture(row)
+	}
+	kind, back := deploy(3, shaA)
+	if kind != "rollback" {
+		t.Fatalf("third=%s", kind)
+	}
+	rolledBack := capture(back)
+	current := w.db.Client.SurfaceCapture.Query().Where(surfacecapture.SurfaceID(w.surface), surfacecapture.SupersededAtIsNil()).OnlyX(w.ctx)
+	if rolledBack.Phase != capturejob.PhaseSUCCEEDED || current.ID != *rolledBack.SurfaceCaptureID || *current.SourceID != back.ID || *current.ObservedRevision != shaA {
+		t.Fatalf("rollback capture=%+v current=%+v", rolledBack, current)
+	}
+	// The live commit again: every page has its capture, so nothing runs.
+	runs, allocated := w.browser.runs.Load(), len(w.browser.allocated)
+	kind, again := deploy(4, shaA)
+	if kind != "redeploy" {
+		t.Fatalf("fourth=%s", kind)
+	}
+	if n := w.db.Client.CaptureJob.Query().Where(capturejob.DeploymentEventID(again.ID)).CountX(w.ctx); n != 0 || w.browser.runs.Load() != runs || len(w.browser.allocated) != allocated {
+		t.Fatalf("a captured redeploy admitted %d jobs, runs=%d", n, w.browser.runs.Load())
+	}
+	// Another environment of the repository compares only with its own deployments.
+	staging, err := w.repo.IngestDeployment(w.ctx, Actor{OrganizationID: w.org, Kind: "webhook", Display: w.source.ID},
+		IngestDeploymentInput{Environment: "staging", EventID: "staging", ExternalID: "staging-1", SourceAppID: w.source.ID, SHA: &shaA})
+	if err != nil || staging.Kind != "new" {
+		t.Fatalf("staging=%+v err=%v", staging, err)
+	}
+}
+
+// F3 on Vercel, Netlify and Pages: a rollback activates a deployment the
+// provider reported before. Ordered by the provider's time, that activation is a
+// deployment of its own, compared with what was live; a redelivery is not.
+func TestCaptureDeploymentReactivationIsItsOwnDeployment(t *testing.T) {
+	f := newAutomationFixture(t)
+	start := time.Now().Add(-time.Hour)
+	ingest := func(external string, sha *string, minute int) *DeploymentIngest {
+		t.Helper()
+		result, err := f.repo.IngestDeployment(f.ctx, Actor{OrganizationID: f.org, Kind: "webhook", Display: f.source.ID}, IngestDeploymentInput{Environment: "production",
+			EventID: external, ExternalID: external, SourceAppID: f.source.ID, SHA: sha, DeployedAt: start.Add(time.Duration(minute) * time.Minute)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	x, y := "xxxxxxxxxxxxxxxx", "yyyyyyyyyyyyyyyy"
+	first, second, restored := ingest("dpl_1", &x, 1), ingest("dpl_2", &y, 2), ingest("dpl_1", &x, 3)
+	if first.Kind != "new" || second.Kind != "new" || !restored.Created || restored.Kind != "rollback" || restored.DeploymentID == first.DeploymentID {
+		t.Fatalf("first=%+v second=%+v restored=%+v", first, second, restored)
+	}
+	// Redeliveries find their own rows.
+	if again := ingest("dpl_1", &x, 3); again.Created || again.DeploymentID != restored.DeploymentID {
+		t.Fatalf("again=%+v", again)
+	}
+	if original := ingest("dpl_1", &x, 1); original.Created || original.DeploymentID != first.DeploymentID || original.Kind != "new" {
+		t.Fatalf("original=%+v", original)
+	}
+	// Activating the live deployment again is a redeploy.
+	if repeat := ingest("dpl_1", &x, 4); !repeat.Created || repeat.Kind != "redeploy" {
+		t.Fatalf("repeat=%+v", repeat)
+	}
+	// Without commits, the provider's deployment is the version.
+	ingest("dpl_3", nil, 5)
+	ingest("dpl_4", nil, 6)
+	if back := ingest("dpl_3", nil, 7); back.Kind != "rollback" {
+		t.Fatalf("back=%+v", back)
+	}
+}
+
+// F4: a newer deployment cancels the jobs still waiting for an older one, so a
+// burst of deployments leaves one waiting job and opens no browser for the
+// rest. A person's request is never superseded.
+func TestCaptureSupersededDeploymentJobsAreCancelled(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, recipe := w.ready(t)
+	manual := w.request(t, recipe.ID)
+	a := w.deployment(t, "sup-a", "aaaaaaaaaaaaaaaa")
+	b := w.deployment(t, "sup-b", "bbbbbbbbbbbbbbbb")
+	if job := w.job(t, a.ID); job.Phase != "CANCELLED" || *job.FailureCode != "superseded" {
+		t.Fatalf("older=%+v", job)
+	}
+	runs := w.browser.runs.Load()
+	if outcome := w.run(t, a.ID); !outcome.Done || w.browser.runs.Load() != runs || w.job(t, a.ID).Attempts != 0 {
+		t.Fatalf("a superseded job ran: %+v", outcome)
+	}
+	// An attempt that finds a newer deployment's commit live ends at once.
+	w.browser.run = func(browser.RunInput) (*browser.RunResult, error) {
+		return nil, &browser.Failure{Code: browser.WaitingForDeployment}
+	}
+	var c *CaptureJobRecord
+	w.browser.during = func() {
+		w.browser.during = nil
+		c = w.deployment(t, "sup-c", "cccccccccccccccc")
+	}
+	if outcome := w.run(t, b.ID); !outcome.Done {
+		t.Fatalf("outcome=%+v", outcome)
+	}
+	if job := w.job(t, b.ID); job.Phase != "CANCELLED" || *job.FailureCode != "superseded" || job.Attempts != 1 {
+		t.Fatalf("running=%+v", job)
+	}
+	// A job parked for sign-in is cancelled too; the newer one waits in its place.
+	w.browser.run = func(browser.RunInput) (*browser.RunResult, error) {
+		return nil, &browser.Failure{Code: browser.NeedsAuth}
+	}
+	w.run(t, c.ID)
+	if job := w.job(t, c.ID); job.Phase != "NEEDS_AUTH" {
+		t.Fatalf("parked=%+v", job)
+	}
+	d := w.deployment(t, "sup-d", "dddddddddddddddd")
+	if job := w.job(t, c.ID); job.Phase != "CANCELLED" || *job.FailureCode != "superseded" {
+		t.Fatalf("parked=%+v", job)
+	}
+	// A deployment made before the newest, delivered late, is admitted already
+	// superseded and never dispatched.
+	sha := "0000000000000000"
+	late, err := w.repo.IngestDeployment(w.ctx, Actor{OrganizationID: w.org, Kind: "webhook", Display: w.source.ID},
+		IngestDeploymentInput{Environment: "production", EventID: "late", ExternalID: "sup-late", SourceAppID: w.source.ID, SHA: &sha, DeployedAt: time.Now().Add(-time.Hour)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.HandleOutboxEvent(w.ctx, "unused", w.org, EventDeploymentSucceeded, late.DeploymentID); err != nil {
+		t.Fatal(err)
+	}
+	lateJob := w.db.Client.CaptureJob.Query().Where(capturejob.DeploymentEventID(late.DeploymentID)).OnlyX(w.ctx)
+	if lateJob.Phase != capturejob.PhaseCANCELLED || *lateJob.FailureCode != "superseded" {
+		t.Fatalf("late=%+v", lateJob)
+	}
+	if n := w.db.Client.OutboxEvent.Query().Where(outboxevent.Type(EventCaptureJobDispatch), outboxevent.AggregateID(lateJob.ID)).CountX(w.ctx); n != 0 {
+		t.Fatalf("a superseded job was dispatched %d times", n)
+	}
+	if row := w.db.Client.DeploymentEvent.GetX(w.ctx, late.DeploymentID); row.Status != deploymentevent.StatusSKIPPED || *row.FailureCode != "superseded" {
+		t.Fatalf("late deployment=%+v", row)
+	}
+	if job := w.job(t, d.ID); job.Phase != "QUEUED" {
+		t.Fatalf("newest=%+v", job)
+	}
+	if job := w.job(t, manual.ID); job.Phase != "QUEUED" {
+		t.Fatalf("a person's request was superseded: %+v", job)
+	}
+}
+
+// F4: a workflow run waiting on its deployment's job ends as superseded when a
+// newer deployment cancels that job, and when its deployment arrives late.
+func TestCaptureActionEndsWhenItsDeploymentIsSuperseded(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, recipe := w.ready(t)
+	w.deployment(t, "run-1", "1111111111111111")
+	input := automation.Outputs{CampaignID: "campaign"}
+	attempt := func(object string) error {
+		event := &ent.ReleaseSourceEvent{ID: "event-" + object, SourceAppID: w.source.ID, Snapshot: automation.Event{Family: automation.Deployed, ObjectID: object}}
+		_, err := w.repo.automationAuthenticatedCapture(w.ctx, w.org, event, input, &automation.Action{RecipeID: recipe.ID})
+		return err
+	}
+	if err := attempt("run-1"); !errors.Is(err, ErrCapturePending) {
+		t.Fatalf("pending: %v", err)
+	}
+	w.deployment(t, "run-2", "2222222222222222")
+	if err := attempt("run-1"); !errors.Is(err, ErrCaptureSuperseded) || !PermanentAutomationError(err) || automationFailureCode(err) != "superseded" {
+		t.Fatalf("superseded: %v", err)
+	}
+	sha := "0000000000000000"
+	if _, err := w.repo.IngestDeployment(w.ctx, Actor{OrganizationID: w.org, Kind: "webhook", Display: w.source.ID},
+		IngestDeploymentInput{Environment: "production", EventID: "late", ExternalID: "run-0", SourceAppID: w.source.ID, SHA: &sha, DeployedAt: time.Now().Add(-time.Hour)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := attempt("run-0"); !errors.Is(err, ErrCaptureSuperseded) {
+		t.Fatalf("late: %v", err)
+	}
+}
+
+// C5: a connection serves one environment. A staging connection's recipe never
+// captures a production deployment of the same repository, and a release waits
+// for its commit's deployment in the recipe's own environment.
+func TestCaptureActionUsesOnlyItsEnvironmentsConnection(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, production := w.ready(t)
+	source := w.source.ID
+	staging, err := w.repo.CreateCaptureConnection(w.ctx, w.owner, CreateCaptureConnectionInput{Name: "Staging app", SourceAppID: &source, Environment: "staging", Origin: "https://app.example.com",
+		Hosts: []string{"app.example.com"}, ProtectedPath: "/dashboard", IdentitySelector: "[data-testid=account]", ExpectedAccount: "demo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.signIn(t, staging.ID)
+	definition := browser.Recipe{SchemaVersion: 1, Viewport: browser.Viewport{Width: 800, Height: 600}, Steps: []browser.Step{{Kind: browser.StepNavigate, Path: "/dashboard"}},
+		Markers: []string{"[data-testid=ready]"}, Version: &browser.VersionCheck{Path: "/api/version"}}
+	recipe, err := w.repo.CreateCaptureRecipe(w.ctx, w.owner, CreateCaptureRecipeInput{Name: "Staging dashboard", SurfaceID: w.surface, ConnectionID: staging.ID, Definition: definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	test, err := w.repo.RequestCaptureJob(w.ctx, w.owner, recipe.ID, CaptureJobRequest{Test: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.run(t, test.ID)
+	if _, err := w.repo.ActivateCaptureRecipe(w.ctx, w.owner, recipe.ID); err != nil {
+		t.Fatal(err)
+	}
+	sha := "abcdef1234567890abcdef1234567890abcdef12"
+	ingest := func(environment, external string) {
+		t.Helper()
+		if _, err := w.repo.IngestDeployment(w.ctx, Actor{OrganizationID: w.org, Kind: "webhook", Display: w.source.ID},
+			IngestDeploymentInput{Environment: environment, EventID: external, ExternalID: external, SourceAppID: w.source.ID, SHA: &sha}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ingest("production", "env-prod")
+	input := automation.Outputs{CampaignID: "campaign"}
+	attempt := func(snapshot automation.Event, recipeID string) error {
+		event := &ent.ReleaseSourceEvent{ID: "event" + w.id, SourceAppID: w.source.ID, Snapshot: snapshot}
+		_, err := w.repo.automationAuthenticatedCapture(w.ctx, w.org, event, input, &automation.Action{RecipeID: recipeID})
+		return err
+	}
+	deployed := automation.Event{Family: automation.Deployed, ObjectID: "env-prod"}
+	if err := attempt(deployed, recipe.ID); !errors.Is(err, ErrCaptureRefused) {
+		t.Fatalf("staging connection for production: %v", err)
+	}
+	if n := w.db.Client.CaptureJob.Query().Where(capturejob.RecipeID(recipe.ID), capturejob.KindEQ(capturejob.KindDeployment)).CountX(w.ctx); n != 0 {
+		t.Fatalf("a staging job was admitted for production: %d", n)
+	}
+	if err := attempt(deployed, production.ID); !errors.Is(err, ErrCapturePending) {
+		t.Fatalf("production connection: %v", err)
+	}
+	reader := w.repo.github.(fakeReader)
+	reader.commits = map[string]string{"v9": sha}
+	w.repo.WithGitHubApp(reader)
+	released := automation.Event{Family: automation.Published, RepositoryID: "1001", Fields: map[string]automation.Value{"release.tag": automation.StringValue("v9")}}
+	if err := attempt(released, recipe.ID); !errors.Is(err, ErrDeploymentNotLive) {
+		t.Fatalf("before the staging deployment: %v", err)
+	}
+	ingest("staging", "env-staging")
+	if err := attempt(released, recipe.ID); !errors.Is(err, ErrCapturePending) {
+		t.Fatalf("staging release: %v", err)
+	}
+	job := w.db.Client.CaptureJob.Query().Where(capturejob.RecipeID(recipe.ID), capturejob.KindEQ(capturejob.KindDeployment)).OnlyX(w.ctx)
+	if row := w.db.Client.DeploymentEvent.GetX(w.ctx, *job.DeploymentEventID); row.Environment != "staging" {
+		t.Fatalf("job deployment=%+v", row)
+	}
+}
+
+// C11: claims on two connections race for the workspace's one capture slot.
+// However they interleave, one proceeds and the other waits; neither
+// connection's lease could stop that alone.
+func TestCaptureConcurrentClaimsTakeOneWorkspaceSlot(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, recipe := w.ready(t)
+	source := w.source.ID
+	second, err := w.repo.CreateCaptureConnection(w.ctx, w.owner, CreateCaptureConnectionInput{Name: "Other app", SourceAppID: &source, Environment: "staging", Origin: "https://other.example.com",
+		Hosts: []string{"other.example.com"}, ProtectedPath: "/dashboard", IdentitySelector: "#me", ExpectedAccount: "demo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.signIn(t, second.ID)
+	surface := "othersurface" + w.id
+	w.exec(t, `INSERT INTO product_surface (id,"organizationId",name,slug,url,"featureTags","screenshotAssetIds","createdAt","updatedAt") VALUES ($1,$2,'Other','other','https://other.example.com/dashboard','[]','[]',now(),now())`, surface, w.org)
+	definition := browser.Recipe{SchemaVersion: 1, Viewport: browser.Viewport{Width: 800, Height: 600}, Steps: []browser.Step{{Kind: browser.StepNavigate, Path: "/dashboard"}}, Markers: []string{"#ready"}}
+	other, err := w.repo.CreateCaptureRecipe(w.ctx, w.owner, CreateCaptureRecipeInput{Name: "Other", SurfaceID: surface, ConnectionID: second.ID, Definition: definition})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for round := 0; round < 20; round++ {
+		test, err := w.repo.RequestCaptureJob(w.ctx, w.owner, other.ID, CaptureJobRequest{Test: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		jobs := []string{w.request(t, recipe.ID).ID, test.ID}
+		claims, outcomes, errs := make([]*captureClaim, 2), make([]*CaptureJobOutcome, 2), make([]error, 2)
+		start := make(chan struct{})
+		var group sync.WaitGroup
+		for i, id := range jobs {
+			group.Add(1)
+			go func() {
+				defer group.Done()
+				<-start
+				claims[i], outcomes[i], errs[i] = w.repo.claimCaptureJob(w.ctx, w.org, id)
+			}()
+		}
+		close(start)
+		group.Wait()
+		claimed := 0
+		for i := range jobs {
+			switch {
+			case errs[i] != nil:
+				t.Fatal(errs[i])
+			case claims[i] != nil:
+				claimed++
+			case outcomes[i] == nil || outcomes[i].Done || outcomes[i].RetryAfterSeconds <= 0:
+				t.Fatalf("round %d: claim %d neither ran nor waited: %+v", round, i, outcomes[i])
+			}
+		}
+		if claimed != 1 {
+			t.Fatalf("round %d: %d claims took the workspace's one slot", round, claimed)
+		}
+		// End the round: the attempt finishes and both jobs stop.
+		w.db.Client.CaptureAttempt.Update().Where(captureattempt.CaptureJobIDIn(jobs...)).SetStatus(captureattempt.StatusFAILED).ExecX(w.ctx)
+		w.db.Client.CaptureJob.Update().Where(capturejob.IDIn(jobs...)).SetPhase(capturejob.PhaseCANCELLED).SetStatus(capturejob.StatusCANCELLED).ExecX(w.ctx)
+		w.db.Client.PlatformAppConnection.Update().Where(platformappconnection.OrganizationID(w.org)).ClearLeaseJobID().ClearLeaseExpiresAt().ExecX(w.ctx)
+	}
+}
+
+// C6: suspending the GitHub App stops its sources' capture jobs. Waiting
+// deployment jobs are cancelled, and every other job is refused before a
+// browser is allocated.
+func TestCaptureSuspendedInstallationOpensNoBrowser(t *testing.T) {
+	w := newCaptureWorld(t)
+	_, recipe := w.ready(t)
+	deployment := w.deployment(t, "suspend-1", "abcdef1234567890")
+	manual := w.request(t, recipe.ID)
+	w.repo.WithGitHubApp(fakeReader{fakeGitHub: fakeGitHub{installs: map[int64]githubapp.Installation{w.installation: {ID: w.installation, Suspended: true}}}})
+	if _, err := w.repo.SetGitHubInstallationStatus(w.ctx, w.installation, GitHubInstallationSuspended); err != nil {
+		t.Fatal(err)
+	}
+	if job := w.job(t, deployment.ID); job.Phase != "CANCELLED" || *job.FailureCode != "installation_suspended" {
+		t.Fatalf("deployment job=%+v", job)
+	}
+	runs, allocated := w.browser.runs.Load(), len(w.browser.allocated)
+	for _, id := range []string{deployment.ID, manual.ID} {
+		if outcome := w.run(t, id); !outcome.Done {
+			t.Fatalf("outcome=%+v", outcome)
+		}
+	}
+	if job := w.job(t, manual.ID); job.Phase != "CANCELLED" || *job.FailureCode != "installation_suspended" {
+		t.Fatalf("manual job=%+v", job)
+	}
+	if w.browser.runs.Load() != runs || len(w.browser.allocated) != allocated || w.browser.open() != 0 {
+		t.Fatalf("a suspended installation opened a browser: runs=%d allocated=%d", w.browser.runs.Load(), len(w.browser.allocated))
+	}
 }
