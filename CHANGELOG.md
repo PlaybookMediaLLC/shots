@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.48.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.2...v2.48.0) (2026-11-11)
+
+
+### Features
+
+* **automate:** polish the new workflow page and show each template's workflow ([#503](https://github.com/PlaybookMediaLLC/shots/issues/503)) ([8c631e4](https://github.com/PlaybookMediaLLC/shots/commit/8c631e46f73176a20fad841606e3bd741b9360e3))
+* **publish:** draw new posts and batches the way Write draws a post ([1c334f9](https://github.com/PlaybookMediaLLC/shots/commit/1c334f969cb7cc29e242933ee6034c7bddc888fc))
+* **publish:** make writing and scheduling X posts fast ([4a6a7d8](https://github.com/PlaybookMediaLLC/shots/commit/4a6a7d89d2c39c6c76377c198fb18a63293d7b42))
+* **publish:** open new posts in place and simplify text batches ([9c5c498](https://github.com/PlaybookMediaLLC/shots/commit/9c5c498e1e18597e2a8e5c6f4a661c5b6e56b140))
+* **web:** polish the composer's comments, assistant and Schedule, and cap busy calendar days ([#507](https://github.com/PlaybookMediaLLC/shots/issues/507)) ([3362cc1](https://github.com/PlaybookMediaLLC/shots/commit/3362cc1fca873f947501fef4903ac48f5580ec37))
+
+
+### Bug Fixes
+
+* align Founder Hub E2E with single production lane ([a645fb7](https://github.com/PlaybookMediaLLC/shots/commit/a645fb716683676387bf1c3e2d2b2e31ee23f417))
+* align Founder Hub E2E with single production lane ([d5653f4](https://github.com/PlaybookMediaLLC/shots/commit/d5653f49c9a0972c91c56fab1571fa005e471ed9))
+* **server:** grant the runtime role EXECUTE on the attachment blockers function ([#510](https://github.com/PlaybookMediaLLC/shots/issues/510)) ([b41912d](https://github.com/PlaybookMediaLLC/shots/commit/b41912dc16ca2c7cf46382fec86dfc8ccf26fdbf))
+
 ## [2.47.2](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.1...v2.47.2) (2026-11-10)
 
 

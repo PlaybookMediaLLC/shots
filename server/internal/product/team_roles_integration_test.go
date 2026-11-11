@@ -322,4 +322,22 @@ func TestRequestAuthorizationMemo(t *testing.T) {
 	if err := w.repo.auth.AuthorizePublishing(middleware(viewer), w.org, viewer.UserID, viewer.SessionID); !errors.Is(err, publishing.ErrForbidden) {
 		t.Fatalf("reused viewer published: %v", err)
 	}
+
+	// A session-only middleware's check is reused the same way, and only by a
+	// session check: a role check still reads the session again.
+	var memo publishing.AuthorizationMemo
+	if err := w.repo.AuthorizeSession(publishing.RecordAuthorization(w.ctx, &memo), w.owner); err != nil {
+		t.Fatal(err)
+	}
+	handler = publishing.ReplayAuthorization(w.ctx, &memo)
+	w.exec(t, `UPDATE session SET "expiresAt"=now()-interval '1 hour' WHERE id=$1`, w.owner.SessionID)
+	if err := w.repo.AuthorizeRead(handler, w.owner); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("a role check reused the session check: %v", err)
+	}
+	if err := w.repo.AuthorizeSession(handler, w.owner); err != nil {
+		t.Fatalf("handler's first session check read again: %v", err)
+	}
+	if err := w.repo.AuthorizeSession(handler, w.owner); !errors.Is(err, publishing.ErrUnauthorized) {
+		t.Fatalf("a later session check reused the middleware's: %v", err)
+	}
 }

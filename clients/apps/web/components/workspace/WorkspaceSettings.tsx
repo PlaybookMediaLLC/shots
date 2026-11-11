@@ -58,8 +58,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
   }
 
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]!
-  // Founder Hub draws its own desktop-style frame instead of <Page>, but keeps
-  // the page title every section has, in every loading state.
+  // Founder Hub lays out its own sidebar, so it skips Page but keeps the page title.
   if (section === 'founder-hub')
     return (
       <>

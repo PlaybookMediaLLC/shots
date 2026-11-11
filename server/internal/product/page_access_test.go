@@ -29,6 +29,10 @@ func TestPageAccessKeepsSessionWorkspaceAndRecoveryBoundaries(t *testing.T) {
 	if err != nil || snapshot.Active.Role != "viewer" {
 		t.Fatalf("role=%+v err=%v", snapshot, err)
 	}
+	w.exec(t, `UPDATE member SET role='owner,admin' WHERE "userId"=$1`, w.owner.UserID)
+	if _, err := w.repo.PageAccess(w.ctx, w.owner); !errors.Is(err, publishing.ErrForbidden) {
+		t.Fatalf("unknown role=%v", err)
+	}
 	w.exec(t, `UPDATE member SET role='owner' WHERE "userId"=$1`, w.owner.UserID)
 	if _, err := w.repo.RequestDeletion(w.ctx, w.owner, "Workspace"); err != nil {
 		t.Fatal(err)
