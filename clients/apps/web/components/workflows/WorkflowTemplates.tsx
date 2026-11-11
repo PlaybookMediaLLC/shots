@@ -45,7 +45,11 @@ import {
 } from '@/lib/workflows/templates'
 import { AutomateBreadcrumb } from './workflow-ui'
 import { WorkflowEditor } from './WorkflowEditor'
-import { WorkflowTemplatePreview, WorkflowTemplateSample } from './WorkflowTemplatePreview'
+import {
+  WorkflowTemplateDiagram,
+  WorkflowTemplatePreview,
+  WorkflowTemplateSample,
+} from './WorkflowTemplatePreview'
 import { FAMILY_NAMES } from './workflow-canvas'
 
 /** A workflow the editor holds until it is saved, so a look at a template leaves nothing behind. */
@@ -179,37 +183,35 @@ function TemplatePicker() {
       />
     )
   return (
-    <Page
-      description="Turn shipped code into ready-to-review campaigns."
-      title="New workflow"
-      width="md"
-    >
+    <Page description="Turn shipped code into ready-to-review campaigns." title="New workflow">
       <AutomateBreadcrumb current="New" trail={[{ href: '/workflows', label: 'Workflows' }]} />
       <Section
-        description="Each one opens as a draft you can edit. Nothing runs until you turn it on."
+        description="Each one opens as a draft you can edit. Nothing runs until you activate it."
         title="Choose a template"
       >
-        {/* Each card spans six shared rows (name, When, Rule, You get, sample, action), so they line up across a row. */}
+        {/* Each card spans seven shared rows (picture, name, When, Rule, You get, sample, action), so they line up across a row. */}
         <ul className="grid gap-4 md:grid-cols-2" data-tour-id="automate-templates">
           {WORKFLOW_TEMPLATES.map((candidate) => (
-            <li className="row-span-6 grid grid-rows-subgrid" key={candidate.id}>
+            <li className="row-span-7 grid grid-rows-subgrid" key={candidate.id}>
               <ButtonLink
                 aria-describedby={`template-${candidate.id}`}
                 aria-labelledby={`template-${candidate.id}-name`}
-                className="group row-span-6 grid h-auto w-full grid-cols-[minmax(0,1fr)] grid-rows-subgrid items-stretch gap-3 rounded-xl p-5 text-left whitespace-normal"
+                className="group row-span-7 grid grid-cols-[minmax(0,1fr)] grid-rows-subgrid gap-3 rounded-xl border border-border bg-card p-4 text-left transition-[border-color,box-shadow] duration-200 hover:border-foreground/20 hover:shadow-[0_6px_20px_-12px_rgb(0_0_0/0.25)] motion-reduce:transition-none"
                 href={`/workflows/new?template=${candidate.id}`}
-                variant="outline"
+                size={null}
+                variant="custom"
               >
+                <WorkflowTemplateDiagram template={candidate} />
                 <span
-                  className="text-ui-lg font-medium text-pretty text-foreground"
+                  className="mt-1 text-ui-lg font-medium text-pretty text-foreground"
                   id={`template-${candidate.id}-name`}
                 >
                   {candidate.name}
                 </span>
-                <span className="row-span-4 grid grid-rows-subgrid" id={`template-${candidate.id}`}>
+                <div className="row-span-4 grid grid-rows-subgrid" id={`template-${candidate.id}`}>
                   <WorkflowTemplatePreview template={candidate} />
                   <WorkflowTemplateSample template={candidate} />
-                </span>
+                </div>
                 <span
                   aria-hidden="true"
                   className="flex items-center gap-1.5 pt-1 text-sm font-medium text-foreground"
@@ -220,17 +222,19 @@ function TemplatePicker() {
               </ButtonLink>
             </li>
           ))}
-          <li className="row-span-6 grid">
+          <li className="row-span-7 grid">
             <Button
               aria-describedby="template-blank"
               aria-labelledby="template-blank-name"
-              className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/20 p-5 text-center text-sm whitespace-normal text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-accent/40 hover:text-foreground"
+              className="group flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-foreground/20 p-5 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/40 hover:bg-muted/40 hover:text-foreground"
               onClick={() => setBlank(true)}
               size={null}
               type="button"
               variant="custom"
             >
-              <PlusIcon aria-hidden="true" className="size-5" />
+              <span className="mb-1 grid size-9 place-items-center rounded-[10px] bg-background text-foreground shadow-xs ring-1 ring-border ring-inset transition-transform duration-200 group-hover:scale-105 motion-reduce:transition-none">
+                <PlusIcon aria-hidden="true" className="size-4" />
+              </span>
               <span className="text-ui-lg font-medium text-foreground" id="template-blank-name">
                 Start with a blank workflow
               </span>
