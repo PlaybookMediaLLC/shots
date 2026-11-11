@@ -134,6 +134,11 @@ func DeletedAt(v time.Time) predicate.VoiceNote {
 	return predicate.VoiceNote(sql.FieldEQ(FieldDeletedAt, v))
 }
 
+// OwnerRemovedAt applies equality check predicate on the "owner_removed_at" field. It's identical to OwnerRemovedAtEQ.
+func OwnerRemovedAt(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldEQ(FieldOwnerRemovedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.VoiceNote {
 	return predicate.VoiceNote(sql.FieldEQ(FieldCreatedAt, v))
@@ -922,6 +927,56 @@ func DeletedAtIsNil() predicate.VoiceNote {
 // DeletedAtNotNil applies the NotNil predicate on the "deleted_at" field.
 func DeletedAtNotNil() predicate.VoiceNote {
 	return predicate.VoiceNote(sql.FieldNotNull(FieldDeletedAt))
+}
+
+// OwnerRemovedAtEQ applies the EQ predicate on the "owner_removed_at" field.
+func OwnerRemovedAtEQ(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldEQ(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtNEQ applies the NEQ predicate on the "owner_removed_at" field.
+func OwnerRemovedAtNEQ(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldNEQ(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtIn applies the In predicate on the "owner_removed_at" field.
+func OwnerRemovedAtIn(vs ...time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldIn(FieldOwnerRemovedAt, vs...))
+}
+
+// OwnerRemovedAtNotIn applies the NotIn predicate on the "owner_removed_at" field.
+func OwnerRemovedAtNotIn(vs ...time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldNotIn(FieldOwnerRemovedAt, vs...))
+}
+
+// OwnerRemovedAtGT applies the GT predicate on the "owner_removed_at" field.
+func OwnerRemovedAtGT(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldGT(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtGTE applies the GTE predicate on the "owner_removed_at" field.
+func OwnerRemovedAtGTE(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldGTE(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtLT applies the LT predicate on the "owner_removed_at" field.
+func OwnerRemovedAtLT(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldLT(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtLTE applies the LTE predicate on the "owner_removed_at" field.
+func OwnerRemovedAtLTE(v time.Time) predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldLTE(FieldOwnerRemovedAt, v))
+}
+
+// OwnerRemovedAtIsNil applies the IsNil predicate on the "owner_removed_at" field.
+func OwnerRemovedAtIsNil() predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldIsNull(FieldOwnerRemovedAt))
+}
+
+// OwnerRemovedAtNotNil applies the NotNil predicate on the "owner_removed_at" field.
+func OwnerRemovedAtNotNil() predicate.VoiceNote {
+	return predicate.VoiceNote(sql.FieldNotNull(FieldOwnerRemovedAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

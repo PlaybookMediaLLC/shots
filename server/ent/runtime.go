@@ -2083,11 +2083,11 @@ func init() {
 	// voiceaudiorun.BytesValidator is a validator for the "bytes" field. It is called by the builders before save.
 	voiceaudiorun.BytesValidator = voiceaudiorunDescBytes.Validators[0].(func(int64) error)
 	// voiceaudiorunDescCreatedAt is the schema descriptor for created_at field.
-	voiceaudiorunDescCreatedAt := voiceaudiorunFields[14].Descriptor()
+	voiceaudiorunDescCreatedAt := voiceaudiorunFields[15].Descriptor()
 	// voiceaudiorun.DefaultCreatedAt holds the default value on creation for the created_at field.
 	voiceaudiorun.DefaultCreatedAt = voiceaudiorunDescCreatedAt.Default.(func() time.Time)
 	// voiceaudiorunDescUpdatedAt is the schema descriptor for updated_at field.
-	voiceaudiorunDescUpdatedAt := voiceaudiorunFields[15].Descriptor()
+	voiceaudiorunDescUpdatedAt := voiceaudiorunFields[16].Descriptor()
 	// voiceaudiorun.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	voiceaudiorun.DefaultUpdatedAt = voiceaudiorunDescUpdatedAt.Default.(func() time.Time)
 	// voiceaudiorun.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -2149,11 +2149,11 @@ func init() {
 	// voicenote.DefaultRevision holds the default value on creation for the revision field.
 	voicenote.DefaultRevision = voicenoteDescRevision.Default.(int)
 	// voicenoteDescCreatedAt is the schema descriptor for created_at field.
-	voicenoteDescCreatedAt := voicenoteFields[15].Descriptor()
+	voicenoteDescCreatedAt := voicenoteFields[16].Descriptor()
 	// voicenote.DefaultCreatedAt holds the default value on creation for the created_at field.
 	voicenote.DefaultCreatedAt = voicenoteDescCreatedAt.Default.(func() time.Time)
 	// voicenoteDescUpdatedAt is the schema descriptor for updated_at field.
-	voicenoteDescUpdatedAt := voicenoteFields[16].Descriptor()
+	voicenoteDescUpdatedAt := voicenoteFields[17].Descriptor()
 	// voicenote.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	voicenote.DefaultUpdatedAt = voicenoteDescUpdatedAt.Default.(func() time.Time)
 	// voicenote.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

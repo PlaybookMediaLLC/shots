@@ -3782,6 +3782,7 @@ var (
 		{Name: "objectKey", Type: field.TypeString, Unique: true},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "available", "failed", "deleted"}, Default: "pending"},
 		{Name: "failureReason", Type: field.TypeString, Nullable: true},
+		{Name: "objectPurgedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -3870,6 +3871,7 @@ var (
 		{Name: "revision", Type: field.TypeInt, Default: 1},
 		{Name: "currentTranscriptRevisionId", Type: field.TypeString, Nullable: true},
 		{Name: "deletedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "ownerRemovedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}

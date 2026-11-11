@@ -184,6 +184,26 @@ func (_u *VoiceNoteUpdate) ClearDeletedAt() *VoiceNoteUpdate {
 	return _u
 }
 
+// SetOwnerRemovedAt sets the "owner_removed_at" field.
+func (_u *VoiceNoteUpdate) SetOwnerRemovedAt(v time.Time) *VoiceNoteUpdate {
+	_u.mutation.SetOwnerRemovedAt(v)
+	return _u
+}
+
+// SetNillableOwnerRemovedAt sets the "owner_removed_at" field if the given value is not nil.
+func (_u *VoiceNoteUpdate) SetNillableOwnerRemovedAt(v *time.Time) *VoiceNoteUpdate {
+	if v != nil {
+		_u.SetOwnerRemovedAt(*v)
+	}
+	return _u
+}
+
+// ClearOwnerRemovedAt clears the value of the "owner_removed_at" field.
+func (_u *VoiceNoteUpdate) ClearOwnerRemovedAt() *VoiceNoteUpdate {
+	_u.mutation.ClearOwnerRemovedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceNoteUpdate) SetUpdatedAt(v time.Time) *VoiceNoteUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -284,6 +304,12 @@ func (_u *VoiceNoteUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(voicenote.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.OwnerRemovedAt(); ok {
+		_spec.SetField(voicenote.FieldOwnerRemovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.OwnerRemovedAtCleared() {
+		_spec.ClearField(voicenote.FieldOwnerRemovedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voicenote.FieldUpdatedAt, field.TypeTime, value)
@@ -464,6 +490,26 @@ func (_u *VoiceNoteUpdateOne) ClearDeletedAt() *VoiceNoteUpdateOne {
 	return _u
 }
 
+// SetOwnerRemovedAt sets the "owner_removed_at" field.
+func (_u *VoiceNoteUpdateOne) SetOwnerRemovedAt(v time.Time) *VoiceNoteUpdateOne {
+	_u.mutation.SetOwnerRemovedAt(v)
+	return _u
+}
+
+// SetNillableOwnerRemovedAt sets the "owner_removed_at" field if the given value is not nil.
+func (_u *VoiceNoteUpdateOne) SetNillableOwnerRemovedAt(v *time.Time) *VoiceNoteUpdateOne {
+	if v != nil {
+		_u.SetOwnerRemovedAt(*v)
+	}
+	return _u
+}
+
+// ClearOwnerRemovedAt clears the value of the "owner_removed_at" field.
+func (_u *VoiceNoteUpdateOne) ClearOwnerRemovedAt() *VoiceNoteUpdateOne {
+	_u.mutation.ClearOwnerRemovedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceNoteUpdateOne) SetUpdatedAt(v time.Time) *VoiceNoteUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -594,6 +640,12 @@ func (_u *VoiceNoteUpdateOne) sqlSave(ctx context.Context) (_node *VoiceNote, er
 	}
 	if _u.mutation.DeletedAtCleared() {
 		_spec.ClearField(voicenote.FieldDeletedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.OwnerRemovedAt(); ok {
+		_spec.SetField(voicenote.FieldOwnerRemovedAt, field.TypeTime, value)
+	}
+	if _u.mutation.OwnerRemovedAtCleared() {
+		_spec.ClearField(voicenote.FieldOwnerRemovedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voicenote.FieldUpdatedAt, field.TypeTime, value)

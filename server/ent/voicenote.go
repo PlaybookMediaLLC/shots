@@ -45,6 +45,8 @@ type VoiceNote struct {
 	CurrentTranscriptRevisionID *string `json:"current_transcript_revision_id,omitempty"`
 	// DeletedAt holds the value of the "deleted_at" field.
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+	// OwnerRemovedAt holds the value of the "owner_removed_at" field.
+	OwnerRemovedAt *time.Time `json:"owner_removed_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -63,7 +65,7 @@ func (*VoiceNote) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case voicenote.FieldID, voicenote.FieldOrganizationID, voicenote.FieldOwnerUserID, voicenote.FieldClientNoteID, voicenote.FieldTitle, voicenote.FieldProjectID, voicenote.FieldRecordedTimeZone, voicenote.FieldLocale, voicenote.FieldCurrentTranscriptRevisionID:
 			values[i] = new(sql.NullString)
-		case voicenote.FieldRecordedAt, voicenote.FieldReceivedAt, voicenote.FieldDeletedAt, voicenote.FieldCreatedAt, voicenote.FieldUpdatedAt:
+		case voicenote.FieldRecordedAt, voicenote.FieldReceivedAt, voicenote.FieldDeletedAt, voicenote.FieldOwnerRemovedAt, voicenote.FieldCreatedAt, voicenote.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -175,6 +177,13 @@ func (_m *VoiceNote) assignValues(columns []string, values []any) error {
 				_m.DeletedAt = new(time.Time)
 				*_m.DeletedAt = value.Time
 			}
+		case voicenote.FieldOwnerRemovedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field owner_removed_at", values[i])
+			} else if value.Valid {
+				_m.OwnerRemovedAt = new(time.Time)
+				*_m.OwnerRemovedAt = value.Time
+			}
 		case voicenote.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -272,6 +281,11 @@ func (_m *VoiceNote) String() string {
 	builder.WriteString(", ")
 	if v := _m.DeletedAt; v != nil {
 		builder.WriteString("deleted_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.OwnerRemovedAt; v != nil {
+		builder.WriteString("owner_removed_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")

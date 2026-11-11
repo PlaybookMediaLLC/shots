@@ -39,6 +39,9 @@ func (VoiceNote) Fields() []ent.Field {
 		field.Int("revision").Default(1),
 		field.String("current_transcript_revision_id").StorageKey("currentTranscriptRevisionId").Optional().Nillable(),
 		field.Time("deleted_at").StorageKey("deletedAt").Optional().Nillable(),
+		// OwnerRemovedAt is when the sweep first saw the owner gone from the
+		// workspace; live notes are deleted 30 days later (D7).
+		field.Time("owner_removed_at").StorageKey("ownerRemovedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}
@@ -119,6 +122,9 @@ func (VoiceAudioRun) Fields() []ent.Field {
 		field.String("object_key").StorageKey("objectKey").Unique(),
 		field.Enum("status").Values("pending", "available", "failed", "deleted").Default("pending"),
 		field.String("failure_reason").StorageKey("failureReason").Optional().Nillable(),
+		// ObjectPurgedAt is when storage confirmed a deleted or failed run's
+		// object is gone; the sweep retries every such run without it.
+		field.Time("object_purged_at").StorageKey("objectPurgedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

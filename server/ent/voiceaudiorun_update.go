@@ -227,6 +227,26 @@ func (_u *VoiceAudioRunUpdate) ClearFailureReason() *VoiceAudioRunUpdate {
 	return _u
 }
 
+// SetObjectPurgedAt sets the "object_purged_at" field.
+func (_u *VoiceAudioRunUpdate) SetObjectPurgedAt(v time.Time) *VoiceAudioRunUpdate {
+	_u.mutation.SetObjectPurgedAt(v)
+	return _u
+}
+
+// SetNillableObjectPurgedAt sets the "object_purged_at" field if the given value is not nil.
+func (_u *VoiceAudioRunUpdate) SetNillableObjectPurgedAt(v *time.Time) *VoiceAudioRunUpdate {
+	if v != nil {
+		_u.SetObjectPurgedAt(*v)
+	}
+	return _u
+}
+
+// ClearObjectPurgedAt clears the value of the "object_purged_at" field.
+func (_u *VoiceAudioRunUpdate) ClearObjectPurgedAt() *VoiceAudioRunUpdate {
+	_u.mutation.ClearObjectPurgedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceAudioRunUpdate) SetUpdatedAt(v time.Time) *VoiceAudioRunUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -362,6 +382,12 @@ func (_u *VoiceAudioRunUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if _u.mutation.FailureReasonCleared() {
 		_spec.ClearField(voiceaudiorun.FieldFailureReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ObjectPurgedAt(); ok {
+		_spec.SetField(voiceaudiorun.FieldObjectPurgedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ObjectPurgedAtCleared() {
+		_spec.ClearField(voiceaudiorun.FieldObjectPurgedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voiceaudiorun.FieldUpdatedAt, field.TypeTime, value)
@@ -585,6 +611,26 @@ func (_u *VoiceAudioRunUpdateOne) ClearFailureReason() *VoiceAudioRunUpdateOne {
 	return _u
 }
 
+// SetObjectPurgedAt sets the "object_purged_at" field.
+func (_u *VoiceAudioRunUpdateOne) SetObjectPurgedAt(v time.Time) *VoiceAudioRunUpdateOne {
+	_u.mutation.SetObjectPurgedAt(v)
+	return _u
+}
+
+// SetNillableObjectPurgedAt sets the "object_purged_at" field if the given value is not nil.
+func (_u *VoiceAudioRunUpdateOne) SetNillableObjectPurgedAt(v *time.Time) *VoiceAudioRunUpdateOne {
+	if v != nil {
+		_u.SetObjectPurgedAt(*v)
+	}
+	return _u
+}
+
+// ClearObjectPurgedAt clears the value of the "object_purged_at" field.
+func (_u *VoiceAudioRunUpdateOne) ClearObjectPurgedAt() *VoiceAudioRunUpdateOne {
+	_u.mutation.ClearObjectPurgedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceAudioRunUpdateOne) SetUpdatedAt(v time.Time) *VoiceAudioRunUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -750,6 +796,12 @@ func (_u *VoiceAudioRunUpdateOne) sqlSave(ctx context.Context) (_node *VoiceAudi
 	}
 	if _u.mutation.FailureReasonCleared() {
 		_spec.ClearField(voiceaudiorun.FieldFailureReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ObjectPurgedAt(); ok {
+		_spec.SetField(voiceaudiorun.FieldObjectPurgedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ObjectPurgedAtCleared() {
+		_spec.ClearField(voiceaudiorun.FieldObjectPurgedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voiceaudiorun.FieldUpdatedAt, field.TypeTime, value)

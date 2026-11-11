@@ -115690,6 +115690,7 @@ type VoiceAudioRunMutation struct {
 	object_key            *string
 	status                *voiceaudiorun.Status
 	failure_reason        *string
+	object_purged_at      *time.Time
 	created_at            *time.Time
 	updated_at            *time.Time
 	clearedFields         map[string]struct{}
@@ -116445,6 +116446,55 @@ func (m *VoiceAudioRunMutation) ResetFailureReason() {
 	delete(m.clearedFields, voiceaudiorun.FieldFailureReason)
 }
 
+// SetObjectPurgedAt sets the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) SetObjectPurgedAt(t time.Time) {
+	m.object_purged_at = &t
+}
+
+// ObjectPurgedAt returns the value of the "object_purged_at" field in the mutation.
+func (m *VoiceAudioRunMutation) ObjectPurgedAt() (r time.Time, exists bool) {
+	v := m.object_purged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjectPurgedAt returns the old "object_purged_at" field's value of the VoiceAudioRun entity.
+// If the VoiceAudioRun object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceAudioRunMutation) OldObjectPurgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjectPurgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjectPurgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjectPurgedAt: %w", err)
+	}
+	return oldValue.ObjectPurgedAt, nil
+}
+
+// ClearObjectPurgedAt clears the value of the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) ClearObjectPurgedAt() {
+	m.object_purged_at = nil
+	m.clearedFields[voiceaudiorun.FieldObjectPurgedAt] = struct{}{}
+}
+
+// ObjectPurgedAtCleared returns if the "object_purged_at" field was cleared in this mutation.
+func (m *VoiceAudioRunMutation) ObjectPurgedAtCleared() bool {
+	_, ok := m.clearedFields[voiceaudiorun.FieldObjectPurgedAt]
+	return ok
+}
+
+// ResetObjectPurgedAt resets all changes to the "object_purged_at" field.
+func (m *VoiceAudioRunMutation) ResetObjectPurgedAt() {
+	m.object_purged_at = nil
+	delete(m.clearedFields, voiceaudiorun.FieldObjectPurgedAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *VoiceAudioRunMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -116551,7 +116601,7 @@ func (m *VoiceAudioRunMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *VoiceAudioRunMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.organization_id != nil {
 		fields = append(fields, voiceaudiorun.FieldOrganizationID)
 	}
@@ -116590,6 +116640,9 @@ func (m *VoiceAudioRunMutation) Fields() []string {
 	}
 	if m.failure_reason != nil {
 		fields = append(fields, voiceaudiorun.FieldFailureReason)
+	}
+	if m.object_purged_at != nil {
+		fields = append(fields, voiceaudiorun.FieldObjectPurgedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, voiceaudiorun.FieldCreatedAt)
@@ -116631,6 +116684,8 @@ func (m *VoiceAudioRunMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case voiceaudiorun.FieldFailureReason:
 		return m.FailureReason()
+	case voiceaudiorun.FieldObjectPurgedAt:
+		return m.ObjectPurgedAt()
 	case voiceaudiorun.FieldCreatedAt:
 		return m.CreatedAt()
 	case voiceaudiorun.FieldUpdatedAt:
@@ -116670,6 +116725,8 @@ func (m *VoiceAudioRunMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldStatus(ctx)
 	case voiceaudiorun.FieldFailureReason:
 		return m.OldFailureReason(ctx)
+	case voiceaudiorun.FieldObjectPurgedAt:
+		return m.OldObjectPurgedAt(ctx)
 	case voiceaudiorun.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case voiceaudiorun.FieldUpdatedAt:
@@ -116773,6 +116830,13 @@ func (m *VoiceAudioRunMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetFailureReason(v)
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjectPurgedAt(v)
 		return nil
 	case voiceaudiorun.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -116905,6 +116969,9 @@ func (m *VoiceAudioRunMutation) ClearedFields() []string {
 	if m.FieldCleared(voiceaudiorun.FieldFailureReason) {
 		fields = append(fields, voiceaudiorun.FieldFailureReason)
 	}
+	if m.FieldCleared(voiceaudiorun.FieldObjectPurgedAt) {
+		fields = append(fields, voiceaudiorun.FieldObjectPurgedAt)
+	}
 	return fields
 }
 
@@ -116930,6 +116997,9 @@ func (m *VoiceAudioRunMutation) ClearField(name string) error {
 		return nil
 	case voiceaudiorun.FieldFailureReason:
 		m.ClearFailureReason()
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		m.ClearObjectPurgedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown VoiceAudioRun nullable field %s", name)
@@ -116977,6 +117047,9 @@ func (m *VoiceAudioRunMutation) ResetField(name string) error {
 		return nil
 	case voiceaudiorun.FieldFailureReason:
 		m.ResetFailureReason()
+		return nil
+	case voiceaudiorun.FieldObjectPurgedAt:
+		m.ResetObjectPurgedAt()
 		return nil
 	case voiceaudiorun.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -119428,6 +119501,7 @@ type VoiceNoteMutation struct {
 	addrevision                    *int
 	current_transcript_revision_id *string
 	deleted_at                     *time.Time
+	owner_removed_at               *time.Time
 	created_at                     *time.Time
 	updated_at                     *time.Time
 	clearedFields                  map[string]struct{}
@@ -120150,6 +120224,55 @@ func (m *VoiceNoteMutation) ResetDeletedAt() {
 	delete(m.clearedFields, voicenote.FieldDeletedAt)
 }
 
+// SetOwnerRemovedAt sets the "owner_removed_at" field.
+func (m *VoiceNoteMutation) SetOwnerRemovedAt(t time.Time) {
+	m.owner_removed_at = &t
+}
+
+// OwnerRemovedAt returns the value of the "owner_removed_at" field in the mutation.
+func (m *VoiceNoteMutation) OwnerRemovedAt() (r time.Time, exists bool) {
+	v := m.owner_removed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOwnerRemovedAt returns the old "owner_removed_at" field's value of the VoiceNote entity.
+// If the VoiceNote object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceNoteMutation) OldOwnerRemovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOwnerRemovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOwnerRemovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOwnerRemovedAt: %w", err)
+	}
+	return oldValue.OwnerRemovedAt, nil
+}
+
+// ClearOwnerRemovedAt clears the value of the "owner_removed_at" field.
+func (m *VoiceNoteMutation) ClearOwnerRemovedAt() {
+	m.owner_removed_at = nil
+	m.clearedFields[voicenote.FieldOwnerRemovedAt] = struct{}{}
+}
+
+// OwnerRemovedAtCleared returns if the "owner_removed_at" field was cleared in this mutation.
+func (m *VoiceNoteMutation) OwnerRemovedAtCleared() bool {
+	_, ok := m.clearedFields[voicenote.FieldOwnerRemovedAt]
+	return ok
+}
+
+// ResetOwnerRemovedAt resets all changes to the "owner_removed_at" field.
+func (m *VoiceNoteMutation) ResetOwnerRemovedAt() {
+	m.owner_removed_at = nil
+	delete(m.clearedFields, voicenote.FieldOwnerRemovedAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *VoiceNoteMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -120256,7 +120379,7 @@ func (m *VoiceNoteMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *VoiceNoteMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 17)
 	if m.organization_id != nil {
 		fields = append(fields, voicenote.FieldOrganizationID)
 	}
@@ -120298,6 +120421,9 @@ func (m *VoiceNoteMutation) Fields() []string {
 	}
 	if m.deleted_at != nil {
 		fields = append(fields, voicenote.FieldDeletedAt)
+	}
+	if m.owner_removed_at != nil {
+		fields = append(fields, voicenote.FieldOwnerRemovedAt)
 	}
 	if m.created_at != nil {
 		fields = append(fields, voicenote.FieldCreatedAt)
@@ -120341,6 +120467,8 @@ func (m *VoiceNoteMutation) Field(name string) (ent.Value, bool) {
 		return m.CurrentTranscriptRevisionID()
 	case voicenote.FieldDeletedAt:
 		return m.DeletedAt()
+	case voicenote.FieldOwnerRemovedAt:
+		return m.OwnerRemovedAt()
 	case voicenote.FieldCreatedAt:
 		return m.CreatedAt()
 	case voicenote.FieldUpdatedAt:
@@ -120382,6 +120510,8 @@ func (m *VoiceNoteMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldCurrentTranscriptRevisionID(ctx)
 	case voicenote.FieldDeletedAt:
 		return m.OldDeletedAt(ctx)
+	case voicenote.FieldOwnerRemovedAt:
+		return m.OldOwnerRemovedAt(ctx)
 	case voicenote.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case voicenote.FieldUpdatedAt:
@@ -120493,6 +120623,13 @@ func (m *VoiceNoteMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDeletedAt(v)
 		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOwnerRemovedAt(v)
+		return nil
 	case voicenote.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -120579,6 +120716,9 @@ func (m *VoiceNoteMutation) ClearedFields() []string {
 	if m.FieldCleared(voicenote.FieldDeletedAt) {
 		fields = append(fields, voicenote.FieldDeletedAt)
 	}
+	if m.FieldCleared(voicenote.FieldOwnerRemovedAt) {
+		fields = append(fields, voicenote.FieldOwnerRemovedAt)
+	}
 	return fields
 }
 
@@ -120607,6 +120747,9 @@ func (m *VoiceNoteMutation) ClearField(name string) error {
 		return nil
 	case voicenote.FieldDeletedAt:
 		m.ClearDeletedAt()
+		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		m.ClearOwnerRemovedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown VoiceNote nullable field %s", name)
@@ -120657,6 +120800,9 @@ func (m *VoiceNoteMutation) ResetField(name string) error {
 		return nil
 	case voicenote.FieldDeletedAt:
 		m.ResetDeletedAt()
+		return nil
+	case voicenote.FieldOwnerRemovedAt:
+		m.ResetOwnerRemovedAt()
 		return nil
 	case voicenote.FieldCreatedAt:
 		m.ResetCreatedAt()

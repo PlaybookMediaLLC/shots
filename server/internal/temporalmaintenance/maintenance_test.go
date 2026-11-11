@@ -170,7 +170,7 @@ func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 			if o.Spec.TimeZoneName != "UTC" || o.Spec.CronExpressions[0] != "5 3 * * *" {
 				t.Fatal(o.Spec)
 			}
-		} else if id == "platform-maintenance-account-deletions" || id == "platform-maintenance-asset-cleanup" {
+		} else if id == "platform-maintenance-account-deletions" || id == "platform-maintenance-asset-cleanup" || id == "platform-maintenance-voice-cleanup" {
 			// Deletions and abandoned uploads age in hours.
 			if len(o.Spec.Intervals) != 1 || o.Spec.Intervals[0].Every != time.Hour {
 				t.Fatal(o.Spec)
