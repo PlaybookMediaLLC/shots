@@ -197,6 +197,10 @@ func (c *Configuration) RedactVoiceTranscript(ctx context.Context, actor Actor, 
 			voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
 			return nil, err
 		}
+		// A row withdrawn earlier may hold this revision's words under a newer revision's id.
+		if err := scrubVoiceCommand(ctx, tx, noteID); err != nil {
+			return nil, err
+		}
 		if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
 			return nil, err
 		}

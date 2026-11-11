@@ -424,10 +424,19 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 		t.Fatalf("inbox=%+v err=%v", page, err)
 	}
 
-	// Redaction (D1): text and segments cleared, audited once, never shown in the audit.
+	// Redaction (D1): text and segments cleared, audited once, never shown in the
+	// audit, and no unconfirmed command row keeps transcript words.
+	commandWords := func() string {
+		return f.value(`SELECT status || ':' || concat(text, notice, platform, "localTime") FROM voice_command WHERE id=$1`, "command_"+f.id)
+	}
+	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone",text,notice,platform,"localTime")
+		VALUES ($1,$2,$3,$4,$5,'expired','UTC','post the words','words','x','2026-11-12T09:00')`, "command_"+f.id, f.org, f.creator.UserID, note.ID, later.Revision.ID)
 	redacted, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, editA.Revision.ID)
 	if err != nil || !redacted.Redacted || redacted.Text != "" || len(redacted.Segments) != 0 || f.audited("product.voice_transcript_redacted") != 1 {
 		t.Fatalf("redacted=%+v err=%v", redacted, err)
+	}
+	if words := commandWords(); words != "expired:" {
+		t.Fatalf("an expired command kept transcript words after a redaction: %s", words)
 	}
 	if _, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, editA.Revision.ID); err != nil || f.audited("product.voice_transcript_redacted") != 1 {
 		t.Fatalf("redacting again: %v", err)
@@ -435,9 +444,9 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 	_, err = f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, ownersNote.ID)
 	expectVoice(t, err, publishing.ErrNotFound, "redact a revision of no such note")
 
-	// Deletion: a tombstone, every transcript redacted, the proposal withdrawn.
-	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone") VALUES ($1,$2,$3,$4,$5,'proposed','UTC')`,
-		"command_"+f.id, f.org, f.creator.UserID, note.ID, later.Revision.ID)
+	// Deletion: a tombstone, every transcript redacted, the proposal withdrawn
+	// with no transcript words left on it.
+	f.exec(`UPDATE voice_command SET status='proposed',text='post the words',notice='words',platform='x',"localTime"='2026-11-12T09:00' WHERE id=$1`, "command_"+f.id)
 	revision := later.Note.Revision + 1 // the redaction bumped it
 	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
 		t.Fatal(err)
@@ -451,8 +460,8 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 			t.Fatalf("a transcript survived deletion: %+v", transcript)
 		}
 	}
-	if status := f.value(`SELECT status FROM voice_command WHERE id=$1`, "command_"+f.id); status != "withdrawn" {
-		t.Fatalf("command status=%s", status)
+	if words := commandWords(); words != "withdrawn:" {
+		t.Fatalf("command after deletion=%s", words)
 	}
 	if f.audited("product.voice_note_deleted") != 1 {
 		t.Fatal("deletion was not audited")

@@ -525,11 +525,23 @@ func deleteVoiceNoteTx(ctx context.Context, tx *ent.Tx, actor Actor, note *ent.V
 		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
 		return err
 	}
+	if err := scrubVoiceCommand(ctx, tx, note.ID); err != nil {
+		return err
+	}
 	if err := tx.VoiceNote.UpdateOneID(note.ID).SetDeletedAt(now).SetTitle("").ClearProjectID().AddRevision(1).Exec(ctx); err != nil {
 		return err
 	}
 	return appendConfigurationAudit(ctx, tx, actor, "product.voice_note_deleted", "voice_note", note.ID,
 		map[string]any{"reason": reason, "redactedTranscripts": redacted, "deletedRuns": runs})
+}
+
+// scrubVoiceCommand clears the transcript-derived words of the note's
+// command row once it can no longer be confirmed: expired, failed or
+// withdrawn. A confirmed row keeps the text the member confirmed.
+func scrubVoiceCommand(ctx context.Context, tx *ent.Tx, noteID string) error {
+	_, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.StatusIn(voicecommand.StatusExpired,
+		voicecommand.StatusFailed, voicecommand.StatusWithdrawn)).ClearText().ClearNotice().ClearPlatform().ClearLocalTime().Save(ctx)
+	return err
 }
 
 // purgeVoiceObjectsNow purges a note's deleted audio after its commit. A
