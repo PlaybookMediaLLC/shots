@@ -8,11 +8,13 @@ on:
       - 'clients/apps/web/components/settings/FounderHubSettings.tsx'
       - 'clients/apps/web/components/settings/founder-hub/**'
       - 'clients/apps/web/app/api/founder-hub/**'
+      - 'clients/apps/web/app/**/founder-hub/manage/**'
       - 'clients/apps/web/app/api/auth/**'
       - 'clients/apps/web/app/.well-known/**'
       - 'clients/apps/web/lib/auth/**'
       - 'clients/apps/web/lib/api/contracts/founder-hub*.ts'
       - 'clients/apps/web/test/e2e/founder-hub-settings.spec.ts'
+      - 'clients/apps/web/test/e2e/founder-hub-auth.spec.ts'
       - 'clients/apps/web/test/founder-hub-oauth.server.ts'
       - 'clients/packages/screenshot-studio-backend-sdk/src/founder-hub-*.ts'
       - 'clients/apps/web/package.json'
@@ -27,11 +29,13 @@ on:
       - 'clients/apps/web/components/settings/FounderHubSettings.tsx'
       - 'clients/apps/web/components/settings/founder-hub/**'
       - 'clients/apps/web/app/api/founder-hub/**'
+      - 'clients/apps/web/app/**/founder-hub/manage/**'
       - 'clients/apps/web/app/api/auth/**'
       - 'clients/apps/web/app/.well-known/**'
       - 'clients/apps/web/lib/auth/**'
       - 'clients/apps/web/lib/api/contracts/founder-hub*.ts'
       - 'clients/apps/web/test/e2e/founder-hub-settings.spec.ts'
+      - 'clients/apps/web/test/e2e/founder-hub-auth.spec.ts'
       - 'clients/apps/web/test/founder-hub-oauth.server.ts'
       - 'clients/packages/screenshot-studio-backend-sdk/src/founder-hub-*.ts'
       - 'clients/apps/web/package.json'
@@ -151,9 +155,6 @@ jobs:
           version: 11.1.1
       - name: Install central-auth dependencies
         run: pnpm install --frozen-lockfile
-      - uses: ./shots-founder-hub-central-auth/.github/actions/install_desktop_deps
-        with:
-          target: macos
       - name: Read central-auth Rust toolchain
         id: rust-toolchain
         run: |
@@ -167,20 +168,9 @@ jobs:
           toolchain: ${{ steps.rust-toolchain.outputs.channel }}
           targets: aarch64-apple-darwin
           components: ${{ steps.rust-toolchain.outputs.components }}
-      - name: Install process-compose
-        run: go install github.com/f1bonacc1/process-compose@v1.124.0
-      - name: Install Shots dependencies
-        working-directory: shots-founder-hub-backend/clients
-        run: npm ci
-      - name: Install the isolated pair
-        run: pnpm dev:local setup --profile ci --shots-path ../shots-founder-hub-backend --port 4400
-      - name: Install Chromium for authenticated browser tests
-        working-directory: shots-founder-hub-backend/clients
-        run: npx playwright install chromium
-      - name: Start isolated pair
-        run: pnpm dev:local up --profile ci
-      - name: Test both repositories
-        run: pnpm dev:local test --profile ci
+      - uses: ./shots-founder-hub-central-auth/.github/actions/install_desktop_deps
+        with:
+          target: macos
       - name: Build shared UI
         run: pnpm -F @anlg/ui build
       - name: Build the paired desktop automation binary

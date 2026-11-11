@@ -10,7 +10,7 @@ import { auth } from '@/lib/auth/server'
 
 const querySchema = z.object({
   user: z.string().min(1).max(160),
-  section: z.enum(['account', 'members', 'billing', 'security']),
+  section: z.enum(['account', 'members', 'billing', 'security', 'crm', 'referrals']),
 })
 
 export default async function FounderHubManagePage({
@@ -47,6 +47,9 @@ export default async function FounderHubManagePage({
         </Button>
       </AuthShell>
     )
+  }
+  if (parsed.data.section === 'crm' || parsed.data.section === 'referrals') {
+    redirect(getLocalizedPath(locale, `/settings/founder-hub/${parsed.data.section}`))
   }
   const section = findSettingsSection(parsed.data.section)
   if (!section) notFound()

@@ -82,11 +82,12 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   expect(await (await page.request.get(getE2EUrl('/api/founder-hub/devices'))).json()).toEqual([])
   const referrals = await page.request.get(getE2EUrl('/api/founder-hub/referrals'))
   expect(referrals.status()).toBe(200)
+  let referralsEnabled = true
   await page.route('**/api/founder-hub/referrals', (route) =>
     route.fulfill({
       contentType: 'application/json',
       body: JSON.stringify({
-        enabled: true,
+        enabled: referralsEnabled,
         eligible: false,
         code: 'aaaaaaaaaaaaaaaaaaaaaaaa',
         accepted: 0,
@@ -109,6 +110,12 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   await expect(
     page.getByText('This referral code cannot be claimed by this account.', { exact: true })
   ).toBeVisible()
+  referralsEnabled = false
+  await app.reload()
+  await expect(
+    page.getByText('Referrals are not available in this Shots environment yet.', { exact: true })
+  ).toBeVisible()
+  await expect(page.getByLabel('Claim a referral code')).toHaveCount(0)
 
   await app.open('/settings/founder-hub/billing')
   await expect(page.getByText('Plan and credits')).toBeVisible()

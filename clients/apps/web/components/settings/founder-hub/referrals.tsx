@@ -84,21 +84,21 @@ export function SettingsReferrals() {
                   </li>
                 ))}
               </ul>
+              <ReferralClaim
+                onClaim={(code) => {
+                  setClaimResult(undefined)
+                  claim.mutate(code)
+                }}
+                pending={claim.isPending}
+                error={claim.error ? settingsErrorMessage(claim.error) : undefined}
+                result={claimResult}
+              />
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Referral claims are checked by Shots. Enter a code to see whether it can be claimed.
+            <p role="status" className="text-sm text-muted-foreground">
+              Referrals are not available in this Shots environment yet.
             </p>
           )}
-          <ReferralClaim
-            onClaim={(code) => {
-              setClaimResult(undefined)
-              claim.mutate(code)
-            }}
-            pending={claim.isPending}
-            error={claim.error ? settingsErrorMessage(claim.error) : undefined}
-            result={claimResult}
-          />
         </>
       )}
     </div>

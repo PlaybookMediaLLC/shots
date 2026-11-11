@@ -556,6 +556,20 @@ test('Founder Hub signs in through Shots and loses access on sign-out', async ({
     })
     expect(settings.status()).toBe(307)
     expect(settings.headers().location).toBe('/settings/members')
+    const billingManagement = new URLSearchParams({ user: current.user.id, section: 'billing' })
+    const billing = await page.request.get(getE2EUrl(`/founder-hub/manage?${billingManagement}`), {
+      maxRedirects: 0,
+    })
+    expect(billing.status()).toBe(307)
+    expect(billing.headers().location).toBe('/settings/billing')
+    for (const section of ['crm', 'referrals'] as const) {
+      const accountSettings = new URLSearchParams({ user: current.user.id, section })
+      const response = await page.request.get(getE2EUrl(`/founder-hub/manage?${accountSettings}`), {
+        maxRedirects: 0,
+      })
+      expect(response.status()).toBe(307)
+      expect(response.headers().location).toBe(`/settings/founder-hub/${section}`)
+    }
     expect(
       (
         await page.request.get(
