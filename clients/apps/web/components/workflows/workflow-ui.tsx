@@ -112,7 +112,11 @@ export function AutomateBreadcrumb({
         {trail.map((item) => (
           <li className="flex items-center gap-1.5" key={item.href}>
             <span aria-hidden="true">/</span>
-            <Link className="hover:text-foreground hover:underline" href={item.href}>
+            {/* inline-flex centers the text in the 44px touch target phones give links. */}
+            <Link
+              className="inline-flex items-center hover:text-foreground hover:underline"
+              href={item.href}
+            >
               {item.label}
             </Link>
           </li>

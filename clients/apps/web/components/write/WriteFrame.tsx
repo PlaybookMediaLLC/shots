@@ -21,15 +21,14 @@ import {
 } from '@/components/ui/sheet'
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
-import { startBlankDraft } from './pending-draft'
-import { carriedChannels } from '@/lib/write/composing-session'
-import { countingChannelFor } from '@/lib/write/paste-split'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
+import { PendingDraftInput, useBlankDraft } from './pending-draft'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
 import {
   type DraftCommand,
   draftHref,
+  useNewDraft,
   useWrite,
   type WriteLibrary,
   WriteProvider,
@@ -167,7 +166,9 @@ function FrameLayout({
 }) {
   const router = useWriteRouter()
   const keys = useKeys()
-  const { beforeLeaveRef, canEdit, data, draftCommandsRef } = useWrite()
+  const { canEdit, data, draftCommandsRef } = useWrite()
+  // On a phone a new post takes the screen, as an open draft does.
+  const blank = useBlankDraft()
   const [railOpen, setRailOpen] = React.useState(true)
   const [drawer, setDrawer] = React.useState(false)
   const [palette, setPalette] = React.useState(false)
@@ -189,20 +190,12 @@ function FrameLayout({
       viewport.removeEventListener('scroll', resize)
     }
   }, [])
+  const startDraft = useNewDraft()
   const newDraft = async () => {
     if (!canEdit || creating) return
     setCreating(true)
     try {
-      startBlankDraft(
-        {
-          channelConnectionIds: carriedChannels(data.activeSet),
-          socialSetId: data.activeSet?.id,
-          tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
-        },
-        (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined,
-        countingChannelFor(data.activeSet?.accounts)
-      )
+      startDraft()
     } finally {
       setCreating(false)
     }
@@ -364,21 +357,24 @@ function FrameLayout({
             data-write-rail-column
             className={cn(
               'w-full shrink-0 border-border md:w-80 md:border-r',
-              activeId ? 'hidden' : 'block',
+              activeId || blank ? 'hidden' : 'block',
               railOpen ? 'md:block' : 'md:hidden'
             )}
           >
             <WriteRail key={data.activeSet?.id ?? 'none'} />
           </div>
-          <main
-            className={cn(
-              // Focused controls scroll clear of the floating formatting bar.
-              'relative min-w-0 flex-1 scroll-pb-32 overflow-y-auto',
-              !activeId && 'hidden md:block'
-            )}
+          <div
+            className={cn('relative flex min-w-0 flex-1', !activeId && !blank && 'hidden md:flex')}
           >
-            {children}
-          </main>
+            <main
+              // Focused controls scroll clear of the floating formatting bar.
+              className="relative min-w-0 flex-1 scroll-pb-32 overflow-y-auto"
+            >
+              {children}
+            </main>
+            {/* A new post opens here, in the editor's column beside the drafts list. */}
+            <PendingDraftInput variant="write" />
+          </div>
         </div>
       </div>
       {canEdit ? (

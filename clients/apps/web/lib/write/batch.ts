@@ -3,7 +3,7 @@ import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-draft
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import type { AccountStanding } from '@/lib/write/capabilities'
 import type { DraftChannel, VersionOptions } from '@/lib/write/document'
-import { mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { LABELS, mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
 import { analyzeSpintax } from '@/lib/write/spintax'
 import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
@@ -19,6 +19,10 @@ export type BatchAccount = {
   channel: DraftChannel
   id: string
   name: string
+  /** How the account is shown beside a post: its avatar, handle, else its display name. */
+  avatarUrl?: string | null
+  displayName?: string | null
+  handle?: string | null
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
   tiktokCreator?: AccountStanding['tiktokCreator']
@@ -159,6 +163,68 @@ export function batchSummary(items: readonly BatchItem[], zone: string, now = ne
     posts: items.length,
     withoutTime: items.length - instants.length,
   }
+}
+
+/**
+ * Who a batch reaches, counted as people read it: "3 posts to 1 X account",
+ * not three destinations, when three posts go to the same account.
+ */
+export function batchAudience(
+  items: readonly BatchItem[],
+  accounts: readonly Pick<BatchAccount, 'channel' | 'id'>[]
+): string {
+  const ids = [...new Set(items.flatMap(itemAccounts))]
+  const posts = `${items.length} post${items.length === 1 ? '' : 's'}`
+  if (ids.length === 0) return `${posts}, no account chosen`
+  const channel = accounts.find((account) => account.id === ids[0])?.channel
+  if (ids.length === 1) return `${posts} to 1 ${channel ? `${LABELS[channel]} ` : ''}account`
+  const pairs = items.reduce((total, item) => total + itemAccounts(item).length, 0)
+  return `${posts} to ${ids.length} accounts${pairs === items.length ? '' : `, ${pairs} in all`}`
+}
+
+/**
+ * The hourly preset: one post an hour from the window's start to its end
+ * (both "HH:mm"), as the spread planner's posts per day. Posts past the end
+ * go to the next day at the start time. Null unless the end is after the start.
+ */
+export function hourlyWindow(start: string, end: string): number | null {
+  const minutes = (time: string) => {
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time)
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null
+  }
+  const from = minutes(start)
+  const to = minutes(end)
+  if (from === null || to === null || to <= from) return null
+  return Math.min(24, Math.floor((to - from) / 60) + 1)
+}
+
+/**
+ * Whether a draft's body is still the plain single post a batch made: one
+ * post of unformatted paragraphs. Only then can its words be replaced from
+ * the batch without losing a thread, media, formatting or a post's settings.
+ */
+export function plainTextDraft(body: unknown): boolean {
+  if (!Array.isArray(body)) return false
+  const plainNode = (node: unknown, type: string) =>
+    typeof node === 'object' &&
+    node !== null &&
+    (node as { type?: unknown }).type === type &&
+    Object.keys(node).every((key) => key === 'id' || key === 'type' || key === 'children')
+  const plainLeaf = (leaf: unknown) =>
+    typeof leaf === 'object' &&
+    leaf !== null &&
+    typeof (leaf as { text?: unknown }).text === 'string' &&
+    Object.keys(leaf).length === 1
+  return (
+    body.filter((node) => plainNode(node, 'post_break')).length <= 1 &&
+    body.every(
+      (node) =>
+        plainNode(node, 'post_break') ||
+        (plainNode(node, 'p') &&
+          Array.isArray((node as { children?: unknown }).children) &&
+          ((node as { children: unknown[] }).children).every(plainLeaf))
+    )
+  )
 }
 
 /** When an item is meant to go out, or why that cannot be read yet. */

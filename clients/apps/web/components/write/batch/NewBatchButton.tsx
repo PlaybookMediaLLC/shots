@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 const TOOLS = [
   {
     description:
-      'Paste a block of written posts, one per blank line. No files, no CSV: each piece becomes its own post, with its character count and its time.',
+      'Write or paste posts, separated by a line of dashes. No files, no CSV: it opens straight away, and each post becomes its own draft.',
     label: 'Text posts',
     value: 'text',
   },
@@ -55,21 +55,24 @@ export function NewBatchButton({
   // list says what is in it rather than only when it was started.
   const [title, setTitle] = React.useState('')
   const suggested = tool
-    ? `${TOOLS.find((item) => item.value === tool)?.label ?? 'Batch'} · ${new Date().toLocaleDateString()}`
+    ? `${TOOLS.find((item) => item.value === tool)?.label ?? 'Batch'} · ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
     : ''
   const [setId, setSetId] = React.useState(
     defaultSetId && sets.some((set) => set.id === defaultSetId) ? defaultSetId : sets[0]?.id
   )
   const [busy, setBusy] = React.useState(false)
-  const begin = () => {
+  // Radix checks a radio by clicking it as arrow keys move focus; that is not choosing it.
+  const arrowing = React.useRef(false)
+  const begin = (kind = tool, name = title.trim() || suggested) => {
+    if (busy) return
     setBusy(true)
     void call<ContentBatch>('/api/v1/content-batches', {
       method: 'POST',
-      body: { title: title.trim() || suggested, socialSetId: setId },
+      body: { title: name, socialSetId: setId },
     })
       .then((batch) =>
         window.location.assign(
-          `/publish/batches/${batch.id}${tool === 'mixed' ? '' : `?start=${tool}`}`
+          `/publish/batches/${batch.id}${kind === 'mixed' ? '' : `?start=${kind}`}`
         )
       )
       .catch((error: unknown) => {
@@ -92,6 +95,12 @@ export function NewBatchButton({
           className="grid gap-3 sm:grid-cols-2"
           data-testid="bulk-tools"
           disabled={busy}
+          onKeyDown={(event) => {
+            if (event.key.startsWith('Arrow')) arrowing.current = true
+          }}
+          onKeyUp={() => {
+            arrowing.current = false
+          }}
           onValueChange={setTool}
           value={tool}
         >
@@ -103,7 +112,20 @@ export function NewBatchButton({
               )}
               key={item.value}
             >
-              <RadioGroupItem value={item.value} />
+              <RadioGroupItem
+                value={item.value}
+                // Text needs nothing set up first: choosing it (a click, or Space) opens
+                // the writing surface, named for today in the current profile. Arrowing
+                // onto it only moves the choice; Space or Enter then starts it.
+                onClick={
+                  item.value === 'text'
+                    ? () => {
+                        if (!arrowing.current)
+                          begin('text', `Text posts · ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`)
+                      }
+                    : undefined
+                }
+              />
               <span className="grid gap-1">
                 <span className="font-medium">{item.label}</span>
                 <span className="text-xs leading-normal text-muted-foreground">

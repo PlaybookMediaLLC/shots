@@ -615,18 +615,17 @@ export function CommentCreateForm({
             />
 
             <Button
-              className="absolute right-0 bottom-0 ml-auto shrink-0"
+              aria-label="Send comment"
+              className="absolute right-0 bottom-0 ml-auto shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 [&_svg]:size-3.5"
               disabled={commentContent.trim().length === 0}
               onClick={(e) => {
                 e.stopPropagation();
                 onAddComment();
               }}
-              size="icon"
-              variant="ghost"
+              size="menuAction"
+              variant="none"
             >
-              <div className="flex size-6 items-center justify-center rounded-full">
-                <ArrowUpIcon />
-              </div>
+              <ArrowUpIcon weight="bold" />
             </Button>
           </EditorContainer>
         </Plate>

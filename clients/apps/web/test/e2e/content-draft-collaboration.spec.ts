@@ -69,7 +69,7 @@ test('a saved draft stays readable until a failed live connection is retried', a
   await expect(preview).toContainText(saved.plainText)
   await expect(page.getByText('Connecting… Showing the last saved version.')).toBeVisible()
   await expect(page.locator('[contenteditable="true"][aria-label="Draft body"]')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Add post', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Add to thread', exact: true })).toHaveCount(0)
   await preview.click()
   await page.keyboard.insertText('Must not edit while connecting.')
   await expect(preview).not.toContainText('Must not edit while connecting.')
