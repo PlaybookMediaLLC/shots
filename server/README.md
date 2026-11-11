@@ -287,12 +287,14 @@ seconds. Reuse after that window revokes only the affected Shots session,
 including its OAuth grants. If rotation completes but its retry response cannot
 be saved, that session may need to sign in again after a lost response.
 
-`dev/studio e2e` runs the server OAuth integration test locally and on CI's first
-shard. To run it against another local stack, set `FOUNDER_HUB_TEST_API_URL`,
-`BETTER_AUTH_URL`, `PUBLISHING_SERVICE_TOKEN`, and `SHOTS_AUTH_SERVICE_TOKEN`, then
-run `npm run test:founder-hub-auth --workspace screenshot-studio` from `clients/`.
-Set `FOUNDER_HUB_GATEWAY_URL` to the local Hub API's `/cloud` URL to include real
-storage, resumable uploads, and gateway revocation checks.
+The server OAuth integration test (`test/founder-hub-oauth.backend.ts`) needs
+the Founder Hub gateway, so it runs in the paired stack
+(`.github/workflows/founder-hub-integration.yml`), not in `dev/studio e2e`. To
+run it against another local stack, set `FOUNDER_HUB_TEST_API_URL`,
+`BETTER_AUTH_URL`, `PUBLISHING_SERVICE_TOKEN`, `SHOTS_AUTH_SERVICE_TOKEN`, and
+`FOUNDER_HUB_GATEWAY_URL` (the local Hub API's `/cloud` URL, for real storage,
+resumable uploads, and gateway revocation checks), then run
+`npm run test:founder-hub-auth --workspace screenshot-studio` from `clients/`.
 
 ```sh
 SOCIAL_TEST_DATABASE_URL=postgresql://postgres@localhost:55432/social_test?sslmode=disable go test ./internal/social/...

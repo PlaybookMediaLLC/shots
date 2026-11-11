@@ -439,12 +439,7 @@ run_e2e() {
   local app_url
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
-  local argument check_oauth=false
   local report="${E2E_REPORT_LANE:-production}"
-  if [[ "$#" == 0 || "${E2E_SHARD_ID:-}" == 1 ]]; then check_oauth=true; fi
-  for argument in "$@"; do
-    if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
-  done
 
   load_env
   app_url="$(e2e_app_url)"
@@ -456,11 +451,8 @@ run_e2e() {
   fi
   sync_dependencies
   start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
-  if [[ "$test_script" == test:e2e && "$check_oauth" == true ]]; then
-    FOUNDER_HUB_TEST_API_URL="${FOUNDER_HUB_TEST_API_URL:-http://127.0.0.1:8080}" \
-      BETTER_AUTH_URL="${app_url%/}" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
-      e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
-  fi
+  # test:founder-hub-auth is not run here: it needs the Founder Hub gateway,
+  # which only the paired stack (founder-hub-integration.yml) starts.
   E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
   # Keep the server's logs beside the results, which CI uploads.
   mkdir -p "$WEB_DIR/test-results"

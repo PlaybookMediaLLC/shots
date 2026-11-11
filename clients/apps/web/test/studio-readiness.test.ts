@@ -191,14 +191,17 @@ test('dev/studio has no second browser lane left to maintain', () => {
   assert.match(startApp, /PLATFORM_AI_SCRIPTED=1/)
 })
 
-test('the first balanced E2E shard runs the Founder Hub OAuth check', () => {
+// The OAuth check needs the Founder Hub gateway, which only the paired stack
+// (founder-hub-integration.yml) starts; on a Shots-only shard it always failed.
+test('no E2E shard runs the Founder Hub OAuth check the paired stack owns', () => {
   const first = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '1' })
   const later = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '2' })
   try {
-    assert.equal(first.status, 0, first.stderr)
-    assert.ok(first.commands.some((command) => command.includes('test:founder-hub-auth')))
-    assert.equal(later.status, 0, later.stderr)
-    assert.ok(!later.commands.some((command) => command.includes('test:founder-hub-auth')))
+    for (const run of [first, later]) {
+      assert.equal(run.status, 0, run.stderr)
+      assert.ok(run.commands.some((command) => command.includes('run test:e2e')))
+      assert.ok(!run.commands.some((command) => command.includes('test:founder-hub-auth')))
+    }
   } finally {
     rmSync(first.directory, { recursive: true, force: true })
     rmSync(later.directory, { recursive: true, force: true })
