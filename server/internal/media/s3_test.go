@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -232,5 +233,9 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 	download, err := store.SignDownloadFor(context.Background(), key, time.Hour)
 	if err != nil || !strings.Contains(download, "X-Amz-Expires=3600") {
 		t.Fatalf("download=%q err=%v", download, err)
+	}
+	// Completing a run that never arrived reads it once: a missing object is told apart.
+	if _, err := store.Open(context.Background(), "voice/org-1/note-1/1-missing.wav"); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("open a missing object: %v", err)
 	}
 }

@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 )
 
 // voiceFake records which voice operation a route reached and with what.
@@ -23,6 +25,7 @@ type voiceFake struct {
 	runIndex int
 	query    product.VoiceNoteListQuery
 	patch    product.UpdateVoiceNoteInput
+	delay    time.Duration
 }
 
 func (f *voiceFake) record(call string, ids ...string) {
@@ -87,6 +90,7 @@ func (f *voiceFake) SignVoiceRunUpload(_ context.Context, _ product.Actor, id st
 	return &product.VoiceRunUpload{URL: "https://storage.example.test/put", Method: http.MethodPut, Headers: map[string]string{}}, f.err
 }
 func (f *voiceFake) CompleteVoiceRun(_ context.Context, _ product.Actor, id string, runIndex int) (*product.VoiceAudioRun, error) {
+	time.Sleep(f.delay)
 	f.record("complete", id)
 	f.runIndex = runIndex
 	return &product.VoiceAudioRun{Status: "available"}, f.err
@@ -220,5 +224,30 @@ func TestVoiceRouteStatusCodes(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized || fake.call != "" {
 		t.Fatalf("unauthenticated status=%d", response.Code)
+	}
+}
+
+// Complete reads back a whole run in the request, so it extends the write
+// deadline past the server's WriteTimeout, through the telemetry wrappers
+// the API runs behind.
+func TestVoiceCompleteOutlastsTheWriteTimeout(t *testing.T) {
+	fake := &voiceFake{delay: 300 * time.Millisecond}
+	server := httptest.NewUnstartedServer(telemetry.Handler(NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", fake), false))
+	server.Config.WriteTimeout = 100 * time.Millisecond
+	server.Start()
+	defer server.Close()
+	request, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/voice/notes/cmnote0000000000000000001/runs/0/complete", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org")
+	request.Header.Set("X-User-ID", "user")
+	request.Header.Set("X-Session-ID", "session")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("the response was cut off at the write timeout: %v", err)
+	}
+	defer response.Body.Close()
+	var run product.VoiceAudioRun
+	if err := json.NewDecoder(response.Body).Decode(&run); err != nil || response.StatusCode != http.StatusOK || run.Status != "available" {
+		t.Fatalf("status=%d run=%+v err=%v", response.StatusCode, run, err)
 	}
 }

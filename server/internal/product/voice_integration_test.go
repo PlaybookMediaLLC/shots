@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
@@ -56,7 +57,7 @@ func (o *voiceObjects) Read(_ context.Context, key string) ([]byte, error) {
 	defer o.mu.Unlock()
 	data, ok := o.stored[key]
 	if !ok {
-		return nil, errors.New("NoSuchKey")
+		return nil, media.ErrObjectNotFound
 	}
 	return data, nil
 }

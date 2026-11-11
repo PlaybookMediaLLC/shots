@@ -236,11 +236,18 @@ func (s *S3Store) Exists(ctx context.Context, key string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	var apiError smithy.APIError
-	if errors.As(err, &apiError) && (apiError.ErrorCode() == "NotFound" || apiError.ErrorCode() == "NoSuchKey") {
+	if missingObject(err) {
 		return false, nil
 	}
 	return false, fmt.Errorf("check media object: %w", err)
+}
+
+// ErrObjectNotFound is what Open returns for a key storage does not hold.
+var ErrObjectNotFound = errors.New("media object not found")
+
+func missingObject(err error) bool {
+	var apiError smithy.APIError
+	return errors.As(err, &apiError) && (apiError.ErrorCode() == "NotFound" || apiError.ErrorCode() == "NoSuchKey")
 }
 
 func (s *S3Store) Delete(ctx context.Context, key string) error {
@@ -248,9 +255,13 @@ func (s *S3Store) Delete(ctx context.Context, key string) error {
 	return err
 }
 
-// Open streams an object, for reading it back without holding it whole.
+// Open streams an object, for reading it back without holding it whole. A
+// missing object is ErrObjectNotFound.
 func (s *S3Store) Open(ctx context.Context, key string) (io.ReadCloser, error) {
 	response, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if missingObject(err) {
+		return nil, fmt.Errorf("%w: %v", ErrObjectNotFound, err)
+	}
 	if err != nil {
 		return nil, err
 	}

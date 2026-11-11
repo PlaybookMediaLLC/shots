@@ -12,6 +12,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/lucsky/cuid"
 )
 
@@ -212,14 +213,10 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	if c.objects == nil {
 		return nil, ErrStorageUnavailable
 	}
-	exists, err := c.objects.Exists(ctx, run.ObjectKey)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
-	}
-	if !exists {
+	object, err := c.openObject(ctx, run.ObjectKey)
+	if errors.Is(err, media.ErrObjectNotFound) {
 		return nil, ErrObjectMissing
 	}
-	object, err := c.openObject(ctx, run.ObjectKey)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
 	}

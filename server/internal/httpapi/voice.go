@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 )
@@ -200,10 +202,18 @@ func (s *Server) signVoiceRunUpload(w http.ResponseWriter, r *http.Request) {
 	respond(w, http.StatusOK, upload, err)
 }
 
+// voiceCompleteWriteTimeout outlasts the server's 30-second write timeout:
+// complete reads back and decodes a run of up to 200 MB in the request.
+const voiceCompleteWriteTimeout = 5 * time.Minute
+
 func (s *Server) completeVoiceRun(w http.ResponseWriter, r *http.Request) {
 	noteID, runIndex, ok := voiceRun(w, r)
 	if !ok {
 		return
+	}
+	// The telemetry wrappers unwrap to the connection (TestVoiceCompleteOutlastsTheWriteTimeout).
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(voiceCompleteWriteTimeout)); err != nil {
+		slog.WarnContext(r.Context(), "voice run check keeps the server's write deadline", "error", err)
 	}
 	run, err := s.configuration.CompleteVoiceRun(r.Context(), workspaceActor(r), noteID, runIndex)
 	respond(w, http.StatusOK, run, err)
