@@ -3834,6 +3834,8 @@ var (
 		{Name: "contentDraftId", Type: field.TypeString, Nullable: true},
 		{Name: "scheduledPostId", Type: field.TypeString, Nullable: true},
 		{Name: "failureReason", Type: field.TypeString, Nullable: true},
+		{Name: "outcome", Type: field.TypeEnum, Nullable: true, Enums: []string{"scheduled", "pending_approval", "draft"}},
+		{Name: "parsedAt", Type: field.TypeTime, Nullable: true},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}

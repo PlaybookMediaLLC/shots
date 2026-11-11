@@ -21,7 +21,7 @@ const WorkflowName = "platform-maintenance-v1"
 const ActivityName = "platform-maintenance-run-v1"
 const TaskQueue = "platform-maintenance"
 
-var Jobs = []string{"frontend-deployments", "tenant-outbox", "audit-drains", "communications", "workspace-cleanup", "audit-retention", "scheduled-posts", "notifications", "account-deletions", "webhooks", "social-analytics", "social-token-refresh", "asset-cleanup", "outbox-retention", "voice-cleanup"}
+var Jobs = []string{"frontend-deployments", "tenant-outbox", "audit-drains", "communications", "workspace-cleanup", "audit-retention", "scheduled-posts", "notifications", "account-deletions", "webhooks", "social-analytics", "social-token-refresh", "asset-cleanup", "outbox-retention", "voice-cleanup", "voice-commands"}
 
 type Runner interface {
 	Run(context.Context, string) (int, error)

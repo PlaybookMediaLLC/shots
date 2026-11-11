@@ -117554,6 +117554,8 @@ type VoiceCommandMutation struct {
 	content_draft_id       *string
 	scheduled_post_id      *string
 	failure_reason         *string
+	outcome                *voicecommand.Outcome
+	parsed_at              *time.Time
 	created_at             *time.Time
 	updated_at             *time.Time
 	clearedFields          map[string]struct{}
@@ -118615,6 +118617,104 @@ func (m *VoiceCommandMutation) ResetFailureReason() {
 	delete(m.clearedFields, voicecommand.FieldFailureReason)
 }
 
+// SetOutcome sets the "outcome" field.
+func (m *VoiceCommandMutation) SetOutcome(v voicecommand.Outcome) {
+	m.outcome = &v
+}
+
+// Outcome returns the value of the "outcome" field in the mutation.
+func (m *VoiceCommandMutation) Outcome() (r voicecommand.Outcome, exists bool) {
+	v := m.outcome
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOutcome returns the old "outcome" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldOutcome(ctx context.Context) (v *voicecommand.Outcome, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOutcome is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOutcome requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOutcome: %w", err)
+	}
+	return oldValue.Outcome, nil
+}
+
+// ClearOutcome clears the value of the "outcome" field.
+func (m *VoiceCommandMutation) ClearOutcome() {
+	m.outcome = nil
+	m.clearedFields[voicecommand.FieldOutcome] = struct{}{}
+}
+
+// OutcomeCleared returns if the "outcome" field was cleared in this mutation.
+func (m *VoiceCommandMutation) OutcomeCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldOutcome]
+	return ok
+}
+
+// ResetOutcome resets all changes to the "outcome" field.
+func (m *VoiceCommandMutation) ResetOutcome() {
+	m.outcome = nil
+	delete(m.clearedFields, voicecommand.FieldOutcome)
+}
+
+// SetParsedAt sets the "parsed_at" field.
+func (m *VoiceCommandMutation) SetParsedAt(t time.Time) {
+	m.parsed_at = &t
+}
+
+// ParsedAt returns the value of the "parsed_at" field in the mutation.
+func (m *VoiceCommandMutation) ParsedAt() (r time.Time, exists bool) {
+	v := m.parsed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldParsedAt returns the old "parsed_at" field's value of the VoiceCommand entity.
+// If the VoiceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *VoiceCommandMutation) OldParsedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldParsedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldParsedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldParsedAt: %w", err)
+	}
+	return oldValue.ParsedAt, nil
+}
+
+// ClearParsedAt clears the value of the "parsed_at" field.
+func (m *VoiceCommandMutation) ClearParsedAt() {
+	m.parsed_at = nil
+	m.clearedFields[voicecommand.FieldParsedAt] = struct{}{}
+}
+
+// ParsedAtCleared returns if the "parsed_at" field was cleared in this mutation.
+func (m *VoiceCommandMutation) ParsedAtCleared() bool {
+	_, ok := m.clearedFields[voicecommand.FieldParsedAt]
+	return ok
+}
+
+// ResetParsedAt resets all changes to the "parsed_at" field.
+func (m *VoiceCommandMutation) ResetParsedAt() {
+	m.parsed_at = nil
+	delete(m.clearedFields, voicecommand.FieldParsedAt)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *VoiceCommandMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -118721,7 +118821,7 @@ func (m *VoiceCommandMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *VoiceCommandMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 25)
 	if m.organization_id != nil {
 		fields = append(fields, voicecommand.FieldOrganizationID)
 	}
@@ -118785,6 +118885,12 @@ func (m *VoiceCommandMutation) Fields() []string {
 	if m.failure_reason != nil {
 		fields = append(fields, voicecommand.FieldFailureReason)
 	}
+	if m.outcome != nil {
+		fields = append(fields, voicecommand.FieldOutcome)
+	}
+	if m.parsed_at != nil {
+		fields = append(fields, voicecommand.FieldParsedAt)
+	}
 	if m.created_at != nil {
 		fields = append(fields, voicecommand.FieldCreatedAt)
 	}
@@ -118841,6 +118947,10 @@ func (m *VoiceCommandMutation) Field(name string) (ent.Value, bool) {
 		return m.ScheduledPostID()
 	case voicecommand.FieldFailureReason:
 		return m.FailureReason()
+	case voicecommand.FieldOutcome:
+		return m.Outcome()
+	case voicecommand.FieldParsedAt:
+		return m.ParsedAt()
 	case voicecommand.FieldCreatedAt:
 		return m.CreatedAt()
 	case voicecommand.FieldUpdatedAt:
@@ -118896,6 +119006,10 @@ func (m *VoiceCommandMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldScheduledPostID(ctx)
 	case voicecommand.FieldFailureReason:
 		return m.OldFailureReason(ctx)
+	case voicecommand.FieldOutcome:
+		return m.OldOutcome(ctx)
+	case voicecommand.FieldParsedAt:
+		return m.OldParsedAt(ctx)
 	case voicecommand.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case voicecommand.FieldUpdatedAt:
@@ -119056,6 +119170,20 @@ func (m *VoiceCommandMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetFailureReason(v)
 		return nil
+	case voicecommand.FieldOutcome:
+		v, ok := value.(voicecommand.Outcome)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOutcome(v)
+		return nil
+	case voicecommand.FieldParsedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetParsedAt(v)
+		return nil
 	case voicecommand.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -119148,6 +119276,12 @@ func (m *VoiceCommandMutation) ClearedFields() []string {
 	if m.FieldCleared(voicecommand.FieldFailureReason) {
 		fields = append(fields, voicecommand.FieldFailureReason)
 	}
+	if m.FieldCleared(voicecommand.FieldOutcome) {
+		fields = append(fields, voicecommand.FieldOutcome)
+	}
+	if m.FieldCleared(voicecommand.FieldParsedAt) {
+		fields = append(fields, voicecommand.FieldParsedAt)
+	}
 	return fields
 }
 
@@ -119194,6 +119328,12 @@ func (m *VoiceCommandMutation) ClearField(name string) error {
 		return nil
 	case voicecommand.FieldFailureReason:
 		m.ClearFailureReason()
+		return nil
+	case voicecommand.FieldOutcome:
+		m.ClearOutcome()
+		return nil
+	case voicecommand.FieldParsedAt:
+		m.ClearParsedAt()
 		return nil
 	}
 	return fmt.Errorf("unknown VoiceCommand nullable field %s", name)
@@ -119265,6 +119405,12 @@ func (m *VoiceCommandMutation) ResetField(name string) error {
 		return nil
 	case voicecommand.FieldFailureReason:
 		m.ResetFailureReason()
+		return nil
+	case voicecommand.FieldOutcome:
+		m.ResetOutcome()
+		return nil
+	case voicecommand.FieldParsedAt:
+		m.ResetParsedAt()
 		return nil
 	case voicecommand.FieldCreatedAt:
 		m.ResetCreatedAt()

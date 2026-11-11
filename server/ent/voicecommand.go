@@ -60,6 +60,10 @@ type VoiceCommand struct {
 	ScheduledPostID *string `json:"scheduled_post_id,omitempty"`
 	// FailureReason holds the value of the "failure_reason" field.
 	FailureReason *string `json:"failure_reason,omitempty"`
+	// Outcome holds the value of the "outcome" field.
+	Outcome *voicecommand.Outcome `json:"outcome,omitempty"`
+	// ParsedAt holds the value of the "parsed_at" field.
+	ParsedAt *time.Time `json:"parsed_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -76,9 +80,9 @@ func (*VoiceCommand) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case voicecommand.FieldAttempts:
 			values[i] = new(sql.NullInt64)
-		case voicecommand.FieldID, voicecommand.FieldOrganizationID, voicecommand.FieldOwnerUserID, voicecommand.FieldNoteID, voicecommand.FieldTranscriptRevisionID, voicecommand.FieldStatus, voicecommand.FieldAction, voicecommand.FieldPlatform, voicecommand.FieldText, voicecommand.FieldLocalTime, voicecommand.FieldTimeZone, voicecommand.FieldChannelConnectionID, voicecommand.FieldNotice, voicecommand.FieldContentDraftID, voicecommand.FieldScheduledPostID, voicecommand.FieldFailureReason:
+		case voicecommand.FieldID, voicecommand.FieldOrganizationID, voicecommand.FieldOwnerUserID, voicecommand.FieldNoteID, voicecommand.FieldTranscriptRevisionID, voicecommand.FieldStatus, voicecommand.FieldAction, voicecommand.FieldPlatform, voicecommand.FieldText, voicecommand.FieldLocalTime, voicecommand.FieldTimeZone, voicecommand.FieldChannelConnectionID, voicecommand.FieldNotice, voicecommand.FieldContentDraftID, voicecommand.FieldScheduledPostID, voicecommand.FieldFailureReason, voicecommand.FieldOutcome:
 			values[i] = new(sql.NullString)
-		case voicecommand.FieldScheduledFor, voicecommand.FieldNextAttemptAt, voicecommand.FieldExpiresAt, voicecommand.FieldCreatedAt, voicecommand.FieldUpdatedAt:
+		case voicecommand.FieldScheduledFor, voicecommand.FieldNextAttemptAt, voicecommand.FieldExpiresAt, voicecommand.FieldParsedAt, voicecommand.FieldCreatedAt, voicecommand.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -242,6 +246,20 @@ func (_m *VoiceCommand) assignValues(columns []string, values []any) error {
 				_m.FailureReason = new(string)
 				*_m.FailureReason = value.String
 			}
+		case voicecommand.FieldOutcome:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field outcome", values[i])
+			} else if value.Valid {
+				_m.Outcome = new(voicecommand.Outcome)
+				*_m.Outcome = voicecommand.Outcome(value.String)
+			}
+		case voicecommand.FieldParsedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field parsed_at", values[i])
+			} else if value.Valid {
+				_m.ParsedAt = new(time.Time)
+				*_m.ParsedAt = value.Time
+			}
 		case voicecommand.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -373,6 +391,16 @@ func (_m *VoiceCommand) String() string {
 	if v := _m.FailureReason; v != nil {
 		builder.WriteString("failure_reason=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Outcome; v != nil {
+		builder.WriteString("outcome=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ParsedAt; v != nil {
+		builder.WriteString("parsed_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")

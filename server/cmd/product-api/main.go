@@ -166,6 +166,8 @@ func main() {
 	var model onboarding.Model
 	if client := platformai.FromEnvironment(); client != nil {
 		model = client
+		// Voice commands parse inline and voice drafts are written here.
+		configuration.WithAutomationModel(client)
 	}
 	// SOCIAL_API_URL keeps the HTTP social API (the browser e2e suite mocks it);
 	// otherwise channels connect in process.

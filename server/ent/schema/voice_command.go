@@ -42,6 +42,10 @@ func (VoiceCommand) Fields() []ent.Field {
 		field.String("content_draft_id").StorageKey("contentDraftId").Optional().Nillable(),
 		field.String("scheduled_post_id").StorageKey("scheduledPostId").Optional().Nillable(),
 		field.String("failure_reason").StorageKey("failureReason").Optional().Nillable(),
+		// Outcome is what a confirm did, returned again to a resent confirm (K11).
+		field.Enum("outcome").Values("scheduled", "pending_approval", "draft").Optional().Nillable(),
+		// ParsedAt is the last model call, which the per-member parse limit counts.
+		field.Time("parsed_at").StorageKey("parsedAt").Optional().Nillable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

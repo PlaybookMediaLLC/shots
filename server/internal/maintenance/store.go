@@ -83,6 +83,7 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 		"webhooks":          s.DeliverWebhooks,
 		"asset-cleanup":     s.AssetCleanup,
 		"voice-cleanup":     s.VoiceCleanup,
+		"voice-commands":    s.VoiceCommands,
 		"social-analytics": func(ctx context.Context) (int, error) {
 			if s.Analytics == nil {
 				return 0, nil

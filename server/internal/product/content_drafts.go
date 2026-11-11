@@ -113,8 +113,11 @@ type ContentDraftRecord struct {
 	PlatformVersions draftdoc.PlatformVersions `json:"platformVersions"`
 	Scratchpad       string                    `json:"scratchpad"`
 	SourceDraftID    *string                   `json:"sourceDraftId"`
-	TagIDs           []string                  `json:"tagIds"`
-	Target           *draftdoc.Target          `json:"target"`
+	// SourceVoiceRevisionID is the voice transcript revision the draft was
+	// made from; the revision may since have been redacted or deleted.
+	SourceVoiceRevisionID *string          `json:"sourceVoiceRevisionId"`
+	TagIDs                []string         `json:"tagIds"`
+	Target                *draftdoc.Target `json:"target"`
 	// Lists only: posts waiting to go out, the next scheduled one's time, and
 	// posts that failed or whose outcome is unknown, which need attention.
 	AttentionPosts int `json:"attentionPosts"`
@@ -184,6 +187,10 @@ type ContentDraftInput struct {
 	// checking the caller's role on that campaign, so a plain draft create
 	// cannot claim one.
 	campaignID string
+	// sourceVoiceRevisionID is the voice transcript revision the draft is
+	// made from. Unexported for the same reason: only the voice paths set it,
+	// after loading the revision through its owner's note.
+	sourceVoiceRevisionID string
 }
 
 // ContentDraftUpdate changes the fields it sets, based on BaseVersion.
@@ -223,7 +230,7 @@ func contentDraftRecord(row *ent.ContentDraft) ContentDraftRecord {
 		NaturalPostingTime: row.NaturalPostingTime, SuppressSlackOnPublish: row.SuppressSlackOnPublish, PlannedFor: row.PlannedFor, PrimaryPlatform: row.PrimaryPlatform,
 		SocialSetID: row.SocialSetID, Article: row.Article, Kind: string(row.Kind), PinnedAt: row.PinnedAt,
 		PlanTimeZone: row.PlanTimeZone, PlatformVersions: nonNilVersions(row.PlatformVersions), Scratchpad: row.Scratchpad,
-		SourceDraftID: row.SourceDraftID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
+		SourceDraftID: row.SourceDraftID, SourceVoiceRevisionID: row.SourceVoiceRevisionID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
 		CampaignID: row.CampaignID}
 }
 
@@ -695,6 +702,9 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 		SetNillableCreatedByUserID(projectActor(actor)).SetNillableUpdatedByUserID(projectActor(actor))
 	if input.campaignID != "" {
 		create.SetCampaignID(input.campaignID)
+	}
+	if input.sourceVoiceRevisionID != "" {
+		create.SetSourceVoiceRevisionID(input.sourceVoiceRevisionID)
 	}
 	if target != nil {
 		create.SetTarget(target)

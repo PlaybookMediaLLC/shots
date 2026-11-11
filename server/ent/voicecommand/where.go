@@ -149,6 +149,11 @@ func FailureReason(v string) predicate.VoiceCommand {
 	return predicate.VoiceCommand(sql.FieldEQ(FieldFailureReason, v))
 }
 
+// ParsedAt applies equality check predicate on the "parsed_at" field. It's identical to ParsedAtEQ.
+func ParsedAt(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldEQ(FieldParsedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.VoiceCommand {
 	return predicate.VoiceCommand(sql.FieldEQ(FieldCreatedAt, v))
@@ -1312,6 +1317,86 @@ func FailureReasonEqualFold(v string) predicate.VoiceCommand {
 // FailureReasonContainsFold applies the ContainsFold predicate on the "failure_reason" field.
 func FailureReasonContainsFold(v string) predicate.VoiceCommand {
 	return predicate.VoiceCommand(sql.FieldContainsFold(FieldFailureReason, v))
+}
+
+// OutcomeEQ applies the EQ predicate on the "outcome" field.
+func OutcomeEQ(v Outcome) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldEQ(FieldOutcome, v))
+}
+
+// OutcomeNEQ applies the NEQ predicate on the "outcome" field.
+func OutcomeNEQ(v Outcome) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNEQ(FieldOutcome, v))
+}
+
+// OutcomeIn applies the In predicate on the "outcome" field.
+func OutcomeIn(vs ...Outcome) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldIn(FieldOutcome, vs...))
+}
+
+// OutcomeNotIn applies the NotIn predicate on the "outcome" field.
+func OutcomeNotIn(vs ...Outcome) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNotIn(FieldOutcome, vs...))
+}
+
+// OutcomeIsNil applies the IsNil predicate on the "outcome" field.
+func OutcomeIsNil() predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldIsNull(FieldOutcome))
+}
+
+// OutcomeNotNil applies the NotNil predicate on the "outcome" field.
+func OutcomeNotNil() predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNotNull(FieldOutcome))
+}
+
+// ParsedAtEQ applies the EQ predicate on the "parsed_at" field.
+func ParsedAtEQ(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldEQ(FieldParsedAt, v))
+}
+
+// ParsedAtNEQ applies the NEQ predicate on the "parsed_at" field.
+func ParsedAtNEQ(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNEQ(FieldParsedAt, v))
+}
+
+// ParsedAtIn applies the In predicate on the "parsed_at" field.
+func ParsedAtIn(vs ...time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldIn(FieldParsedAt, vs...))
+}
+
+// ParsedAtNotIn applies the NotIn predicate on the "parsed_at" field.
+func ParsedAtNotIn(vs ...time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNotIn(FieldParsedAt, vs...))
+}
+
+// ParsedAtGT applies the GT predicate on the "parsed_at" field.
+func ParsedAtGT(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldGT(FieldParsedAt, v))
+}
+
+// ParsedAtGTE applies the GTE predicate on the "parsed_at" field.
+func ParsedAtGTE(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldGTE(FieldParsedAt, v))
+}
+
+// ParsedAtLT applies the LT predicate on the "parsed_at" field.
+func ParsedAtLT(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldLT(FieldParsedAt, v))
+}
+
+// ParsedAtLTE applies the LTE predicate on the "parsed_at" field.
+func ParsedAtLTE(v time.Time) predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldLTE(FieldParsedAt, v))
+}
+
+// ParsedAtIsNil applies the IsNil predicate on the "parsed_at" field.
+func ParsedAtIsNil() predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldIsNull(FieldParsedAt))
+}
+
+// ParsedAtNotNil applies the NotNil predicate on the "parsed_at" field.
+func ParsedAtNotNil() predicate.VoiceCommand {
+	return predicate.VoiceCommand(sql.FieldNotNull(FieldParsedAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
