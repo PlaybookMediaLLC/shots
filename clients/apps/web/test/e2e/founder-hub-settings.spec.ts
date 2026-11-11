@@ -79,6 +79,13 @@ test('workspace Founder Hub settings and referrals work without a connected desk
   app,
   page,
 }) => {
+  // Referrals and CRM read the founder_hub schema, which only the paired
+  // stack migrates (`platform-migrate -founder-hub apply`); it runs this spec
+  // with its gateway URL set. The Shots-only stack answers them with 503.
+  test.skip(
+    !process.env.FOUNDER_HUB_GATEWAY_URL,
+    'Needs the Founder Hub domain schema; founder-hub-integration.yml runs it.'
+  )
   expect(await (await page.request.get(getE2EUrl('/api/founder-hub/devices'))).json()).toEqual([])
   const referrals = await page.request.get(getE2EUrl('/api/founder-hub/referrals'))
   expect(referrals.status()).toBe(200)
