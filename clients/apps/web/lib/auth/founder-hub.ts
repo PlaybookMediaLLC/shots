@@ -10,7 +10,6 @@ import {
 import { getRequestId } from '@/lib/api/request-context'
 import { backendSDK } from '@/lib/backend/sdk'
 import { consumeWorkspaceQuota, requireWorkspaceFeatures } from '@/lib/tenant/entitlements'
-import { WorkspaceError } from '@/lib/workspace/errors'
 import {
   assertPermission,
   AuthorizationError,
@@ -62,18 +61,21 @@ export async function requireFounderHubMemberAccess(
   const { feature, permission, quota, sensitive } = memberAccessRequirementSchema.parse(requirement)
   // shortcut: reads the whole authority snapshot per call, add a one-workspace lookup if sync latency matters.
   const session = await requireFounderHubAccess(headers)
-  // A missing or malformed workspace id is a bad request (400).
-  const workspaceId = z.uuid().parse(headers.get('x-shots-organization-id'))
-  // Only the person's own workspaces map; any other id is not found, so none leaks.
-  const workspace = session.workspaces.find((item) => item.workspaceId === workspaceId)
-  if (!workspace) throw new WorkspaceError('The workspace was not found.', 404)
+  // A missing or malformed workspace id is a bad request (400). Native UUIDs may be uppercase.
+  const workspaceId = z.uuid().parse(headers.get('x-shots-organization-id')).toLowerCase()
+  // Only the person's own workspaces map. Any other id (never theirs, left, or scheduled for
+  // deletion) is refused, not "not found": the phone reads a 404 as a deleted note.
+  const workspace = session.workspaces.find(
+    (item) => item.workspaceId.toLowerCase() === workspaceId
+  )
+  if (!workspace) throw new AuthorizationError('You are not a member of this workspace.', 403)
   if (sensitive) throw new AuthorizationError('A fresh browser sign-in is required.', 403)
   const access: OrganizationAccess = {
     deniedPermissions: workspace.deniedPermissions,
     organizationId: workspace.organizationId,
     principal: {
       client: 'shots-founder-hub',
-      display: '',
+      display: session.user.email,
       kind: 'session',
       sessionId: session.sessionId,
       userId: session.user.id,

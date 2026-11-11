@@ -392,7 +392,7 @@ const revision = {
   locale: null,
   engine: null,
   text: spoken,
-  segments: null,
+  segments: [],
   redacted: false,
   createdByUserId: 'user_hub',
   createdAt: '2026-11-11T09:01:00Z',
@@ -401,32 +401,33 @@ const command = {
   id: 'ccmd00000000000000000001',
   transcriptRevisionId: revisionId,
   status: 'confirmed',
-  action: 'schedule',
+  action: 'schedule_post',
   platform: null,
   text: spoken,
   localTime: null,
   timeZone: 'UTC',
   scheduledFor: null,
   channelConnectionId: null,
-  candidates: null,
-  guessed: null,
-  flags: null,
-  addedWords: null,
+  candidates: [],
+  guessed: [],
+  flags: [],
+  addedWords: [],
   notice: null,
+  outcome: 'scheduled',
   contentDraftId: null,
   scheduledPostId: null,
   failureReason: null,
   expiresAt: null,
 }
-const detail = { ...note, title: spoken, transcripts: [revision], runs: null, command: null }
+const detail = { ...note, title: spoken, transcripts: [revision], runs: [], command: null }
 const run = {
   runIndex: 2,
   startOffsetMs: 0,
   durationMs: 900,
   sampleRateHz: 44_100,
-  contentType: 'audio/aac',
+  contentType: 'audio/wav',
   bytes: 10,
-  sha256: '00',
+  sha256: '0000000000000000000000000000000000000000000000000000000000000000',
   status: 'available',
 }
 const id = note.id
@@ -501,7 +502,12 @@ const operations: VoiceOperation[] = [
     suffix: `notes/${id}/runs/2/upload`,
     file: 'notes/[id]/runs/[runIndex]/upload',
     params: { id, runIndex: '2' },
-    body: { contentType: 'audio/aac', bytes: 10, sha256: '00', startOffsetMs: 0 },
+    body: {
+      contentType: 'audio/wav',
+      bytes: 10,
+      sha256: '0000000000000000000000000000000000000000000000000000000000000000',
+      startOffsetMs: 0,
+    },
     answer: {
       url: 'https://storage.example.test/put',
       method: 'PUT',
@@ -557,14 +563,14 @@ const operations: VoiceOperation[] = [
 type BackendCall = { body: string | null; headers: Headers; method: string; url: URL }
 
 /** The person's Founder Hub authority snapshot: a creator in one workspace. */
-function founderHubSnapshot(role: string) {
+function founderHubSnapshot(role: string, denied: string[] = []) {
   const identity = {
     emailVerified: true,
     createdAt: '2026-11-01T00:00:00Z',
     user: { id: 'user_hub', email: 'hub@example.test', name: 'Hub', image: null },
     accountUserId: '3d8b1f8e-2c4a-4b6e-9f1d-7a5c3e2b1d40',
   }
-  const member = { ...identity, role, deniedPermissions: [] }
+  const member = { ...identity, role, deniedPermissions: denied }
   return {
     ...identity,
     revision: '1',
@@ -579,7 +585,7 @@ function founderHubSnapshot(role: string) {
         members: [member],
         name: 'Hub',
         role,
-        deniedPermissions: [],
+        deniedPermissions: denied,
         features: {},
       },
     ],
@@ -593,6 +599,8 @@ function founderHubSnapshot(role: string) {
 async function voiceHarness(
   t: test.TestContext,
   options: {
+    denied?: string[]
+    features?: (name: string) => boolean
     role?: string
     session?: () => Response
     voice?: (call: BackendCall) => Response
@@ -641,11 +649,19 @@ async function voiceHarness(
     calls.push(call)
     const path = call.url.pathname
     if (path === '/v1/founder-hub/session')
-      return options.session?.() ?? Response.json(founderHubSnapshot(role))
+      return options.session?.() ?? Response.json(founderHubSnapshot(role, options.denied))
     if (path === '/v1/access')
-      return Response.json({ deniedPermissions: [], organizationId: 'org_hub', role })
+      return Response.json({
+        deniedPermissions: options.denied ?? [],
+        organizationId: 'org_hub',
+        role,
+      })
     if (path.startsWith('/v1/entitlements/features/'))
-      return Response.json({ allowed: true, currentPlan: 'pro', requiredPlan: 'pro' })
+      return Response.json({
+        allowed: options.features?.(decodeURIComponent(path.split('/').pop() ?? '')) ?? true,
+        currentPlan: 'pro',
+        requiredPlan: 'pro',
+      })
     if (path.startsWith('/v1/voice/') && options.voice) return options.voice(call)
     throw new Error(`unexpected backend call ${call.method} ${path}`)
   })
@@ -760,7 +776,7 @@ test('Founder Hub voice routes authenticate the gateway, the token and the works
       400,
     ],
     ['an organization id instead of the workspace id', gateway('good', 'org_hub'), 400],
-    ["another person's workspace", gateway('good', otherWorkspaceId), 404],
+    ["another person's workspace", gateway('good', otherWorkspaceId), 403],
   ]
   for (const operation of [settings, create])
     for (const [name, headers, status] of cases)
@@ -786,6 +802,7 @@ test('a Founder Hub member gets the answers a browser member gets', async (t) =>
   )!
   const index = operations.find((operation) => operation.suffix === 'notes/index')!
   const draft = operations.find((operation) => operation.suffix.endsWith('/draft'))!
+  const confirm = operations.find((operation) => operation.suffix.endsWith('/command/confirm'))!
   // Another member's note is not found, so its existence does not leak.
   const browserNote = await callRoute('v1', get, {})
   assert.equal(browserNote.status, 404)
@@ -795,12 +812,51 @@ test('a Founder Hub member gets the answers a browser member gets', async (t) =>
   const browserIndex = await callRoute('v1', index, {})
   assert.equal(browserIndex.status, 403)
   assert.deepEqual(await callRoute('founder-hub', index, gateway()), browserIndex)
-  // A viewer cannot make a draft on either path, before the voice API is called.
+  // A viewer can neither make a draft nor confirm a command on either path, before the voice
+  // API is called: each route carries its own contract's permission.
   const calls = harness.voiceCalls().length
+  for (const operation of [draft, confirm]) {
+    const browser = await callRoute('v1', operation, {})
+    assert.equal(browser.status, 403, operation.suffix)
+    assert.deepEqual(
+      await callRoute('founder-hub', operation, gateway()),
+      browser,
+      operation.suffix
+    )
+  }
+  assert.equal(harness.voiceCalls().length, calls)
+})
+
+test('Founder Hub routes apply plan features and permission groups like the browser', async (t) => {
+  const draft = operations.find((operation) => operation.suffix.endsWith('/draft'))!
+  const index = operations.find((operation) => operation.suffix === 'notes/index')!
+  // A permission group that denies editing refuses a creator's draft on both paths.
+  const denied = await voiceHarness(t, {
+    denied: ['artifact:edit'],
+    voice: answer.bind(null, draft),
+  })
   const browserDraft = await callRoute('v1', draft, {})
   assert.equal(browserDraft.status, 403)
   assert.deepEqual(await callRoute('founder-hub', draft, gateway()), browserDraft)
-  assert.equal(harness.voiceCalls().length, calls)
+  assert.deepEqual(denied.voiceCalls(), [])
+  t.mock.restoreAll()
+  // A workspace without `workspace:use` is refused the same way on both paths.
+  const unpaid = await voiceHarness(t, {
+    features: (name) => name !== 'workspace:use',
+    voice: answer.bind(null, index),
+  })
+  const browserIndex = await callRoute('v1', index, {})
+  assert.notEqual(browserIndex.status, 200)
+  assert.deepEqual(await callRoute('founder-hub', index, gateway()), browserIndex)
+  assert.deepEqual(unpaid.voiceCalls(), [])
+})
+
+test('a Founder Hub workspace id matches in any letter case', async (t) => {
+  const index = operations.find((operation) => operation.suffix === 'notes/index')!
+  const harness = await voiceHarness(t, { voice: () => answer(index) })
+  const response = await callRoute('founder-hub', index, gateway('good', workspaceId.toUpperCase()))
+  assert.equal(response.status, index.goStatus ?? 200)
+  assert.equal(harness.voiceCalls()[0]?.headers.get('x-organization-id'), 'org_hub')
 })
 
 test('changing the workspace switches is not served to Founder Hub', async () => {
