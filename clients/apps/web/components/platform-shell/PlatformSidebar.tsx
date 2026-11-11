@@ -24,6 +24,7 @@ import {
   type AreaLink,
   areaLocked,
   campaignLinks,
+  createLinks,
   PLATFORM_DESTINATIONS,
   platformArea,
   publishLinks,
@@ -41,6 +42,7 @@ import { AccountMenu } from '@/components/auth/AccountMenu'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useHydratedSession } from '@/lib/auth/client'
+import { useVoiceSettings } from '@/lib/voice/client'
 import { cn } from '@/lib/utils'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -185,8 +187,11 @@ function Navigation({
   role: string
 }) {
   const t = useTranslations('platformNavigation')
+  const area = platformArea(usePathname())
+  // Create lists Voice notes only while it is open, so other pages never ask.
+  const voice = useVoiceSettings(area === 'create' && paidPlan)
   // As in Polar, settings swap the destinations for their own sections.
-  if (platformArea(usePathname()) === 'settings') {
+  if (area === 'settings') {
     return <SettingsNav collapsed={collapsed} onNavigate={onNavigate} />
   }
   const navGroup = (group: NavGroup) => (
@@ -213,7 +218,9 @@ function Navigation({
                   ? campaignLinks(draftsEnabled)
                   : item.key === 'automate'
                     ? automateLinks(accessAllows({ deniedPermissions, role }, 'workspace:update'))
-                    : AREA_LINKS[item.key]
+                    : item.key === 'create'
+                      ? createLinks(voice.data?.workspace.voiceNotes ?? false)
+                      : AREA_LINKS[item.key]
             }
           />
         ))}

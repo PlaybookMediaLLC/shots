@@ -81,6 +81,8 @@ export const contentDraftSchema = z.object({
    * campaign handoff sets it; a draft cannot claim a campaign on its own.
    */
   campaignId: z.string().nullable().default(null),
+  /** The voice transcript revision the draft was made from; only its owner can open the note. */
+  sourceVoiceRevisionId: z.string().nullable().default(null),
   /** A calendar placement without scheduling, as an ISO 8601 instant. */
   plannedFor: timestampSchema.nullable().default(null),
   primaryPlatform: z.string().nullable().default(null),

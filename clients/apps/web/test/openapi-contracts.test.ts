@@ -54,6 +54,8 @@ import * as webhooks from '@/lib/api/contracts/webhooks'
 import * as write from '@/lib/api/contracts/write'
 import * as planAnalyze from '@/lib/api/contracts/plan-analyze'
 import * as calendarNotes from '@/lib/api/contracts/calendar-notes'
+import * as voice from '@/lib/api/contracts/voice'
+import * as voiceActions from '@/lib/api/contracts/voice-actions'
 import { openApiSpec } from '@/lib/api/openapi'
 import { getMinimumPlan } from '@/lib/billing/plans'
 
@@ -111,6 +113,8 @@ const contracts = new Map<string, RouteContract>(
     write,
     planAnalyze,
     calendarNotes,
+    voice,
+    voiceActions,
   ]
     .flatMap((module) => Object.entries(module))
     .filter(([, value]) => routeContractSchema.safeParse(value).success)

@@ -118,6 +118,27 @@ import {
   recoverContentDraftRevisionContract,
   updateDraftPropertiesContract,
 } from '@/lib/api/contracts/write'
+import {
+  addVoiceTranscriptContract,
+  completeVoiceRunContract,
+  confirmVoiceCommandContract,
+  createVoiceDraftContract,
+  createVoiceRunUploadContract,
+  deleteVoiceAudioContract,
+  getVoiceRunAudioContract,
+  redactVoiceTranscriptContract,
+} from '@/lib/api/contracts/voice-actions'
+import {
+  createVoiceNoteContract,
+  deleteVoiceNoteContract,
+  getVoiceNoteContract,
+  getVoiceSettingsContract,
+  listVoiceNoteIndexContract,
+  listVoiceNotesContract,
+  updateVoiceMemberSettingsContract,
+  updateVoiceNoteContract,
+  updateVoiceWorkspaceSettingsContract,
+} from '@/lib/api/contracts/voice'
 
 /** Every contract in the public OpenAPI spec, in the order the spec lists them. */
 export const documentedContracts = [
@@ -209,4 +230,21 @@ export const documentedContracts = [
   activateOrganizationContract,
   mutateDraftCommentContract,
   listDraftCommentsContract,
+  getVoiceSettingsContract,
+  updateVoiceWorkspaceSettingsContract,
+  updateVoiceMemberSettingsContract,
+  listVoiceNoteIndexContract,
+  listVoiceNotesContract,
+  createVoiceNoteContract,
+  getVoiceNoteContract,
+  updateVoiceNoteContract,
+  deleteVoiceNoteContract,
+  addVoiceTranscriptContract,
+  redactVoiceTranscriptContract,
+  createVoiceRunUploadContract,
+  completeVoiceRunContract,
+  getVoiceRunAudioContract,
+  deleteVoiceAudioContract,
+  createVoiceDraftContract,
+  confirmVoiceCommandContract,
 ]

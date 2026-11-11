@@ -322,7 +322,11 @@ export async function getContentDraftSettings(context: TenantContext) {
 /** Save the drafts settings an owner, admin or publisher sets. */
 export async function updateContentDraftSettings(
   context: TenantContext,
-  input: { postingSlots?: { time: string; weekday: number }[]; requireApproval?: boolean }
+  input: {
+    postingSlots?: { time: string; weekday: number }[]
+    requireApproval?: boolean
+    allowSelfApproval?: boolean
+  }
 ) {
   return backendSDK(context).updateContentDraftSettings(input)
 }

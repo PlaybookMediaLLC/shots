@@ -26,6 +26,8 @@ export const queueSlotSchema = z.object({
 export const contentDraftSettingsSchema = z.object({
   postingSlots: z.array(queueSlotSchema),
   requireApproval: z.boolean(),
+  /** When false, the person who last edited a draft cannot approve it. An older backend omits it. */
+  allowSelfApproval: z.boolean().default(true),
   timeZone: z.string(),
 })
 
@@ -43,6 +45,7 @@ export const updateContentDraftSettingsContract = defineContract({
   body: z.object({
     postingSlots: z.array(queueSlotSchema).max(50).optional(),
     requireApproval: z.boolean().optional(),
+    allowSelfApproval: z.boolean().optional(),
   }),
   method: 'PUT',
   name: 'content-drafts.settings-update',

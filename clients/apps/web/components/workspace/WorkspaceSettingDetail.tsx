@@ -10,6 +10,7 @@ import { NewTeamSettings } from '@/components/settings/NewTeamSettings'
 import { SocialSetList } from '@/components/settings/social-sets/SocialSetList'
 import { SocialSetSettings } from '@/components/settings/social-sets/SocialSetSettings'
 import { WebhookSettings } from '@/components/settings/WebhookSettings'
+import { VoiceSettings } from '@/components/voice/VoiceSettings'
 import { ChannelConnections } from './ChannelConnections'
 import { WorkspaceAgentSettings } from './WorkspaceAgentSettings'
 import { WorkspaceAuditSettings } from './WorkspaceAuditSettings'
@@ -70,6 +71,7 @@ const SETTINGS_CONTENT = {
     />
   ),
   roles: () => <WorkspaceRolesSettings />,
+  voice: () => <VoiceSettings />,
   'new-team': ({ email, userId }) => <NewTeamSettings email={email} userId={userId} />,
   brand: ({ can }) => <WorkspaceBrandSettings canManage={can('workspace:update')} />,
   product: ({ can }) => (
