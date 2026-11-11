@@ -3,9 +3,11 @@ import { createUploadedAsset, db, expect, requestJson, test, trpcMutation } from
 
 /**
  * A workflow run's captured screenshot opens in the editor on the workspace's
- * active brand kit, and its export returns to the run's release. The run is
- * recorded as the automation worker records a finished one: the fixture has
- * no GitHub to deliver a release, and the run page reads only these rows.
+ * active brand kit, keeping the run's release for its export. The fixture has
+ * no GitHub to deliver a release, so the test writes a finished run's rows
+ * itself (no pinned version or node receipts: the editor action needs neither).
+ * It is its own file because it runs in the production lane, unlike the
+ * release flow's spec, which needs the dev server's scripted AI.
  */
 
 test.use({ workspaceOptions: { plan: 'pro' } })

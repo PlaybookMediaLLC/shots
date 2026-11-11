@@ -170,7 +170,6 @@ test("the document editor asks for its draft's voice, and the boundary checks wh
     services.ai?.copilot?.api,
     `/api/ai/document/copilot?channel=linkedin&draftId=${draftId}`
   )
-  assert.equal(platformEditorServices({} as never, true).ai?.chat?.api, '/api/ai/document')
   assert.deepEqual(documentVoiceQuerySchema.parse({ channel: 'linkedin', draftId }), {
     channel: 'linkedin',
     draftId,

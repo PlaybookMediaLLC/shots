@@ -33,11 +33,10 @@ type DocumentVoiceQuery = z.infer<typeof documentVoiceQuerySchema>
  * channel being edited) when the caller can see that draft, else the
  * workspace's. It starts loading at once and is awaited inside the credit scope.
  */
-function documentVoice(access: OrganizationAccess, query: DocumentVoiceQuery) {
+export function documentVoice(access: OrganizationAccess, query: DocumentVoiceQuery) {
   const voice = (async () =>
-    (query.draftId && query.channel
-      ? await writingContext(access, query.draftId, query.channel)
-      : null) ?? getWorkspaceVoice(access))()
+    (query.channel ? await writingContext(access, query.draftId, query.channel) : null) ??
+    getWorkspaceVoice(access))()
   voice.catch(() => undefined)
   return voice
 }

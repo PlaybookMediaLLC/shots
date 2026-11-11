@@ -82,6 +82,9 @@ const (
 	TypeRateLimited = "rate_limited"
 	// TypeDailyLimit is a posting cap that will not clear today; nothing was created.
 	TypeDailyLimit = "daily_limit"
+	// TypeAppAccess is a refusal of Shots' own app credentials or access, not
+	// of an account; nothing was created and no account needs reconnecting.
+	TypeAppAccess = "app_access"
 )
 
 // Temporal ships failures through gRPC with a 4MB frame limit, so every
@@ -164,6 +167,11 @@ func RateLimited(identifier string, retryAfter time.Duration, message string) er
 // DailyLimit reports a posting cap that clears only tomorrow; message is shown to users.
 func DailyLimit(identifier, message string) error {
 	return failure(TypeDailyLimit, identifier, "{}", "{}", message)
+}
+
+// AppAccess reports that the provider refused Shots' app credentials or access.
+func AppAccess(identifier, message string) error {
+	return failure(TypeAppAccess, identifier, "{}", "{}", message)
 }
 
 // RetryAfter is a rate-limit failure's retry guidance, or zero.

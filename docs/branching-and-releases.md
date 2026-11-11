@@ -125,6 +125,9 @@ back the web before the backend**:
   backend requires the key.
 - Drafts made from a release (`releaseId`) and a confirmed repeat post
   (`confirmDuplicate`): an older backend does not know the fields.
+- The brand voice in `GET /v1/launch/brand` (`voice`): an older backend does
+  not send it, so AI surfaces outside a social set write with no brand voice,
+  and nothing reports it.
 
 During a rollout the previous web cannot confirm a repeated post: the new
 backend refuses it with its reason until the new web is live.

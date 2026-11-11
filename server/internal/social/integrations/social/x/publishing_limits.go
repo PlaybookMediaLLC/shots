@@ -25,6 +25,9 @@ func publishingLimits(ctx context.Context, token string, in *ent.Integration) (s
 	}
 	identity, err := newClient(token).verifiedIdentity(ctx, in.InternalID)
 	if err != nil {
+		if errors.Is(err, integrations.ErrAppCredentialsRefused) {
+			return socialidentity.XCapabilities{}, temporalx.AppAccess(identifier, "X refused Shots' app access, so nothing was sent. No account needs reconnecting.")
+		}
 		var authErr integrations.AuthMessage
 		if errors.As(err, &authErr) {
 			return socialidentity.XCapabilities{}, temporalx.RefreshToken(identifier, "{}", "{}", string(authErr))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -417,6 +418,17 @@ func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
 	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
 	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
 		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// A refusal of Shots' own app access fails definitely and blames no account.
+func TestAppAccessRefusalBlamesNoAccount(t *testing.T) {
+	var refused *socialapi.Error
+	err := publicationOutcome(temporalx.AppAccess("x", "client-not-enrolled"))
+	if !errors.As(err, &refused) || refused.UnknownDelivery || refused.Code != publishing.FailurePublisherUnavailable ||
+		refused.Status != http.StatusServiceUnavailable || !strings.Contains(refused.ProviderMessage, "client-not-enrolled") ||
+		!strings.Contains(refused.ProviderMessage, "No account needs reconnecting") {
+		t.Fatalf("app access = %#v", err)
 	}
 }
 

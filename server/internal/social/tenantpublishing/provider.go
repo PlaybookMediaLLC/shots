@@ -200,6 +200,8 @@ func publicationOutcome(err error) *socialapi.Error {
 		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureProviderDailyLimit, "The account reached the platform's daily posting limit; nothing was created.")
 	case temporalx.TypePublicationRejected:
 		mapped = socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
+	case temporalx.TypeAppAccess:
+		return appAccessRefused(err)
 	case temporalx.TypeRefreshToken, temporalx.TypeDisconnect:
 		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
 	default:
@@ -209,6 +211,16 @@ func publicationOutcome(err error) *socialapi.Error {
 	}
 	mapped.ProviderMessage = temporalx.FailureMessage(err)
 	return mapped
+}
+
+// appAccessRefused is a definite failure of Shots' own app credentials or
+// access: nothing was created and no account is flagged. The saved message
+// says so before the platform's own words, which may tell a person to reconnect.
+func appAccessRefused(err error) *socialapi.Error {
+	refused := socialapi.NewCodedError(http.StatusServiceUnavailable, publishing.FailurePublisherUnavailable,
+		"The platform refused Shots' app credentials, so nothing was sent. No account needs reconnecting.")
+	refused.ProviderMessage = refused.Error() + " The platform said: " + temporalx.FailureMessage(err)
+	return refused
 }
 
 // PublishThread publishes the post, or answers ReplyTo when it resumes a
@@ -320,11 +332,17 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		// account when the keys are bad: that is not this account's to fix.
 		if verifier, ok := provider.(appVerifier); ok && kind == temporalx.TypeRefreshToken {
 			if appErr := verifier.VerifyAppCredentials(ctx); appErr != nil {
-				slog.WarnContext(ctx, "provider refused the app credentials", "platform", input.Platform, "error", appErr)
-				refused := socialapi.NewCodedError(http.StatusServiceUnavailable, publishing.FailurePublisherUnavailable,
-					"The platform refused Shots' app credentials, so nothing was sent. No account needs reconnecting.")
-				refused.ProviderMessage = temporalx.FailureMessage(err)
-				return socialapi.Receipt{}, refused
+				if errors.Is(appErr, integrations.ErrAppCredentialsRefused) {
+					slog.ErrorContext(ctx, "provider refused the app credentials; every post to it fails until they are fixed", "platform", input.Platform, "error", appErr)
+					return socialapi.Receipt{}, appAccessRefused(err)
+				}
+				// The check itself failed, so the cause is unknown. The refusal
+				// proves nothing was created, so the post retries durably.
+				slog.WarnContext(ctx, "could not check the provider's app credentials", "platform", input.Platform, "error", appErr)
+				unchecked := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherUnavailable,
+					"The platform refused the request and Shots could not yet tell whether its app credentials or the account's token are at fault. Nothing was sent; it retries.")
+				unchecked.ProviderMessage = unchecked.Error() + " The platform said: " + temporalx.FailureMessage(err)
+				return socialapi.Receipt{}, unchecked
 			}
 		}
 		// A disconnect, or a refused token nothing can renew, needs a person. A
