@@ -36,6 +36,9 @@ type VoiceTranscriptResult struct {
 	Command  *VoiceCommand           `json:"command"`
 }
 
+// voiceMaxRevisions bounds a note's transcript history.
+const voiceMaxRevisions = 50
+
 func validVoiceTranscript(input AddVoiceTranscriptInput) error {
 	limit := voiceNoteLimits.MaxTranscriptChars
 	switch {
@@ -106,6 +109,13 @@ func (c *Configuration) AddVoiceTranscript(ctx context.Context, actor Actor, not
 		return nil, false, err
 	}
 	if created {
+		revisions, err := tx.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.NoteID(noteID)).Count(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if revisions >= voiceMaxRevisions {
+			return nil, false, conflict("This note has 50 transcript revisions, the most a note may hold.")
+		}
 		if input.ParentID != nil {
 			exists, err := tx.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(*input.ParentID),
 				voicetranscriptrevision.NoteID(noteID)).Exist(ctx)

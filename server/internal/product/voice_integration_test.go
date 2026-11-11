@@ -543,16 +543,17 @@ func TestVoiceAudioRuns(t *testing.T) {
 	_, err = sign(0, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(other)), SHA256: digestOf(other)})
 	expectVoice(t, err, publishing.ErrConflict, "another file for an uploaded run index")
 	for name, input := range map[string]VoiceRunUploadInput{
-		"another format":  {ContentType: "audio/mpeg", Bytes: 10, SHA256: sum},
-		"AAC":             {ContentType: "audio/aac", Bytes: 10, SHA256: sum},
-		"too large WAV":   {ContentType: "audio/wav", Bytes: 201 << 20, SHA256: sum},
-		"not a checksum":  {ContentType: "audio/wav", Bytes: 10, SHA256: "xyz"},
-		"negative offset": {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
+		"another format":         {ContentType: "audio/mpeg", Bytes: 10, SHA256: sum},
+		"AAC":                    {ContentType: "audio/aac", Bytes: 10, SHA256: sum},
+		"too large WAV":          {ContentType: "audio/wav", Bytes: 201 << 20, SHA256: sum},
+		"not a checksum":         {ContentType: "audio/wav", Bytes: 10, SHA256: "xyz"},
+		"negative offset":        {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
+		"offset past 31 minutes": {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: voiceMaxRunMs + 1},
 	} {
 		_, err := sign(1, input)
 		expectVoice(t, err, ErrInvalidInput, name)
 	}
-	_, err = sign(1000, pcm)
+	_, err = sign(50, pcm)
 	expectVoice(t, err, ErrInvalidInput, "run index out of range")
 	_, err = f.repo.SignVoiceRunUpload(ctx, f.owner, note.ID, 0, pcm)
 	expectVoice(t, err, publishing.ErrNotFound, "another member signs an upload")
@@ -612,6 +613,22 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatalf("wav run=%+v err=%v", wavRun, err)
 	}
 
+	// A note holds at most 31 minutes of audio across its runs.
+	if _, err := sign(4, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(wav)), SHA256: digestOf(wav), StartOffsetMs: 1692}); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/4-"+digestOf(wav)+".wav", wav)
+	f.exec(`UPDATE voice_audio_run SET "durationMs"=$2 WHERE "noteId"=$1 AND "runIndex"=0`, note.ID, voiceMaxRunMs-2999)
+	_, err = complete(4)
+	expectVoice(t, err, publishing.ErrConflict, "a run past the note's 31 minutes")
+	if status(4) != "pending" {
+		t.Fatalf("a refused run status=%s", status(4))
+	}
+	f.exec(`UPDATE voice_audio_run SET "durationMs"=$2 WHERE "noteId"=$1 AND "runIndex"=0`, note.ID, voiceMaxRunMs-3000)
+	if run, err := complete(4); err != nil || run.Status != "available" {
+		t.Fatalf("a run filling the note exactly=%+v err=%v", run, err)
+	}
+
 	// Playback is the owner's alone, and only of an available run.
 	if audio, err := f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0); err != nil || !strings.Contains(audio.URL, key) {
 		t.Fatalf("audio=%+v err=%v", audio, err)
@@ -629,7 +646,7 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	detail, err := f.repo.GetVoiceNote(ctx, f.creator, note.ID)
-	if err != nil || len(detail.Transcripts) != 1 || detail.Transcripts[0].Text != "kept words" || len(detail.Runs) != 3 || f.audited("product.voice_audio_deleted") != 1 {
+	if err != nil || len(detail.Transcripts) != 1 || detail.Transcripts[0].Text != "kept words" || len(detail.Runs) != 4 || f.audited("product.voice_audio_deleted") != 1 {
 		t.Fatalf("after deleting audio=%+v err=%v", detail, err)
 	}
 	for _, run := range detail.Runs {
@@ -781,5 +798,23 @@ func TestVoiceSweeps(t *testing.T) {
 	}
 	if live := f.value(`SELECT ("deletedAt" IS NULL)::text FROM voice_note WHERE id=$1`, note.ID); live != "true" {
 		t.Fatal("the sweep deleted a current member's note")
+	}
+}
+
+// A note holds at most 50 transcript revisions; a replay of a stored one
+// still answers.
+func TestVoiceTranscriptRevisionLimit(t *testing.T) {
+	f := newVoiceFixture(t)
+	f.enable(true, false)
+	note := f.note(f.creator, "many-revisions", false)
+	for i := range voiceMaxRevisions {
+		if _, _, err := f.transcript(f.creator, note.ID, "rev-"+strconv.Itoa(i), nil, "user_edit", "words"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, _, err := f.transcript(f.creator, note.ID, "rev-extra", nil, "user_edit", "words")
+	expectVoice(t, err, publishing.ErrConflict, "a 51st revision")
+	if _, created, err := f.transcript(f.creator, note.ID, "rev-0", nil, "user_edit", "words"); err != nil || created {
+		t.Fatalf("a replay at the limit: created=%v err=%v", created, err)
 	}
 }

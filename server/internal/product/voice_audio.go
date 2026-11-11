@@ -35,7 +35,8 @@ var voiceAudioFormats = map[string]struct {
 }{"audio/wav": {"wav", 200 << 20}}
 
 const (
-	voiceMaxRunIndex    = 999
+	// voiceMaxRunIndex bounds a note to 50 runs.
+	voiceMaxRunIndex    = 49
 	voiceUploadExpiry   = 15 * time.Minute
 	voicePlaybackExpiry = time.Hour
 )
@@ -84,7 +85,7 @@ func (c *Configuration) requireVoiceAudio(ctx context.Context, actor Actor, note
 
 func validVoiceRunIndex(runIndex int) error {
 	if runIndex < 0 || runIndex > voiceMaxRunIndex {
-		return invalid("runIndex must be between 0 and 999.")
+		return invalid("runIndex must be between 0 and 49.")
 	}
 	return nil
 }
@@ -113,8 +114,8 @@ func (c *Configuration) SignVoiceRunUpload(ctx context.Context, actor Actor, not
 		return nil, invalid(fmt.Sprintf("A %s run has 1 to %d bytes.", input.ContentType, format.maxBytes))
 	case digestErr != nil || len(digest) != 32:
 		return nil, invalid("sha256 must be the file's hex SHA-256.")
-	case input.StartOffsetMs < 0 || input.StartOffsetMs > 24*60*60*1000:
-		return nil, invalid("startOffsetMs is out of range.")
+	case input.StartOffsetMs < 0 || input.StartOffsetMs > voiceMaxRunMs:
+		return nil, invalid("startOffsetMs must be within the note's 31 minutes.")
 	case input.DurationMs != nil && (*input.DurationMs < 0 || *input.DurationMs > 24*60*60*1000):
 		return nil, invalid("durationMs is out of range.")
 	case input.SampleRateHz != nil && *input.SampleRateHz <= 0:
@@ -240,6 +241,21 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	defer tx.Rollback()
 	if _, err := lockVoiceNote(ctx, tx, noteID); err != nil {
 		return nil, err
+	}
+	available, err := tx.VoiceAudioRun.Query().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusEQ(voiceaudiorun.StatusAvailable),
+		voiceaudiorun.IDNEQ(run.ID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	total := audio.durationMs
+	for _, other := range available {
+		if other.DurationMs != nil {
+			total += *other.DurationMs
+		}
+	}
+	if total > voiceMaxRunMs {
+		// The run stays pending; the upload sweep removes its object.
+		return nil, conflict("This run would make the note's audio longer than 31 minutes. Start a new note.")
 	}
 	updated, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.ID(run.ID), voiceaudiorun.StatusEQ(voiceaudiorun.StatusPending)).
 		SetStatus(voiceaudiorun.StatusAvailable).SetDurationMs(audio.durationMs).SetSampleRateHz(audio.sampleRateHz).Save(ctx)
