@@ -139,7 +139,7 @@ export type DraftEditorProps = {
   postTools?: PostTools
   /** The empty post's prompt for the platform being edited, such as "What's happening?". */
   placeholder?: string
-  /** The host's buttons after Add post and Image, given the editor's import and export. */
+  /** The host's buttons after Add to thread and Image, given the editor's import and export. */
   toolbarExtras?: (document: DocumentActions) => React.ReactNode
   /** Plugins the host adds, such as social mentions. */
   extraPlugins?: unknown[]
@@ -425,7 +425,7 @@ export type DocumentActions = {
 }
 
 /**
- * The editor's one-row toolbar: Add post and Image, then the host's tools.
+ * The editor's one-row toolbar: Add to thread and Image, then the host's tools.
  * Formatting lives in the selection toolbar; everything else in the host's More.
  */
 function DraftToolbar({
@@ -498,8 +498,8 @@ function DraftToolbar({
       <InsertButton
         editor={editor}
         insert={() => insertPostBreak(editor)}
-        label="Add post"
-        tooltip={`Add post (${keys.label({ key: 'enter', mod: true })})`}
+        label="Add to thread"
+        tooltip={`Add to thread: a reply under the post above (${keys.label({ key: 'enter', mod: true })})`}
       >
         <PlusIcon aria-hidden />
       </InsertButton>

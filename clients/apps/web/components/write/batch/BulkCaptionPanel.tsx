@@ -140,7 +140,7 @@ export function BulkCaptionPanel({
   return (
     <Section
       title="Captions"
-      description="Give every post a caption at once. Posts already saved as drafts keep theirs; edit those in Write."
+      description="Give every post a caption at once. Posts already saved as drafts keep theirs; edit those in their drafts."
     >
       <Group>
         <Row

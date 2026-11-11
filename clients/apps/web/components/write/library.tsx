@@ -70,7 +70,6 @@ import { type QueueRow, queueGroups, queueRuns, queueWarnings } from '@/lib/writ
 import { DraftPostLinks, QueueBulkBar, QueueWarnings, RetryAllFailed } from './queue-tools'
 import { writeApi } from '@/lib/write/client'
 import { carriedChannels } from '@/lib/write/composing-session'
-import { countingChannelFor } from '@/lib/write/paste-split'
 import { queueDays } from '@/lib/write/calendar'
 import { wallTime } from '@/lib/write/zoned-time'
 import { socialSetHref } from '@/components/workspace/settings-sections'
@@ -83,11 +82,12 @@ import {
   draftHref,
   type LibraryDraft,
   since,
+  useNewDraft,
   useWrite,
   type WriteLibrary,
 } from './write-context'
 import { useKeys } from './shortcuts'
-import { createWritingDraft, startBlankDraft } from './pending-draft'
+import { createWritingDraft } from './pending-draft'
 
 /** The drag type a queued post carries, so only a queue row accepts it. */
 const QUEUE_DRAG = 'application/x-shots-queue-post'
@@ -642,12 +642,13 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
       : []),
     { kind: 'repurpose', label: 'Repurpose published content', needs: 'source' },
   ]
+  const startDraft = useNewDraft()
   const create = async (kind: DraftKind, target?: { sourceDraftId?: string; url?: string }) => {
     setCreating(true)
     try {
-      // A plain post waits for its first word; the other kinds carry a choice worth keeping.
-      const start = kind === 'standard' && !target ? startBlankDraft : createWritingDraft
-      await start(
+      // A plain post opens blank and waits for its first word; the other kinds carry a choice worth keeping.
+      if (kind === 'standard' && !target) return startDraft()
+      await createWritingDraft(
         {
           channelConnectionIds: carriedChannels(data.activeSet),
           kind,
@@ -656,8 +657,7 @@ export function NewDraftMenu({ compact = false }: { compact?: boolean }) {
           target,
         },
         (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined,
-        countingChannelFor(data.activeSet?.accounts)
+        beforeLeaveRef.current ?? undefined
       )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The draft could not be created.')

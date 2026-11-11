@@ -6,6 +6,7 @@ import { XIcon } from '@phosphor-icons/react/dist/ssr/X'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { Button } from '@/components/ui/button'
+import { PendingDraftInput } from './pending-draft'
 import { useWrite, type WriteLibrary, WriteProvider } from './write-context'
 
 /**
@@ -162,7 +163,11 @@ function WorkspaceDialog({ children }: { children: React.ReactNode }) {
             </Button>
           </header>
           {/* The composer scrolls its draft and keeps its side column in view within this. */}
-          <main className="relative min-h-0 flex-1 scroll-pb-32 overflow-y-auto">{children}</main>
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <main className="relative min-h-0 flex-1 scroll-pb-32 overflow-y-auto">{children}</main>
+            {/* Save draft & new opens the next post here, over the composer it follows. */}
+            <PendingDraftInput variant="write" />
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

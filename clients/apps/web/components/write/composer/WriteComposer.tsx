@@ -32,7 +32,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -90,9 +89,12 @@ import { platformEditorServices } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import { countingNote } from '@/lib/write/caption-counting'
 import { writeApi } from '@/lib/write/client'
-import { rememberChannels, takeOffNotice } from '@/lib/write/composing-session'
+import {
+  blankDraftContext,
+  rememberChannels,
+  takeOffNotice,
+} from '@/lib/write/composing-session'
 import {
   type DraftChannel,
   type PlateBody,
@@ -117,7 +119,10 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { SetDot } from '../sets'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { DraftsDrawerButton } from '../WriteFrame'
-import { useWrite, type WriteSet } from '../write-context'
+import { DestinationSummary } from '../destination-summary'
+import { PLACEHOLDERS, PostAuthor, PostCount } from './post-identity'
+import { startBlankDraft } from '../pending-draft'
+import { draftHref, useWrite, type WriteSet } from '../write-context'
 import { CommentsPanel } from './comments'
 import { ThreadTools } from './thread-tools'
 import { ArticleTools } from './article-tools'
@@ -299,6 +304,8 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
+    data: library,
+    nextDraftRef,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -701,6 +708,33 @@ export function WriteComposer({
   )
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
+  // Save draft & new: this draft is saved first, and the blank one keeps its
+  // accounts and, while it publishes there, its main platform. Nothing is
+  // scheduled, and no text, media, reply or time is carried over.
+  const startNext = () => {
+    const next = blankDraftContext(set, { channelIds: enabled, primary })
+    startBlankDraft(
+      {
+        channelConnectionIds: next.channelConnectionIds,
+        primaryPlatform: next.primaryPlatform,
+        socialSetId: draftSet ?? undefined,
+        tagIds: library.experiments.tags && library.query.tag ? [library.query.tag] : undefined,
+      },
+      (id) => router.push(draftHref(id, draftSet)),
+      flush,
+      { accounts: next.accounts, channel: next.primaryPlatform }
+    )
+  }
+  // New draft, from the rail, the palette or its shortcut, is this action while the draft is open.
+  React.useEffect(() => {
+    nextDraftRef.current = canEdit ? startNext : null
+  })
+  React.useEffect(
+    () => () => {
+      nextDraftRef.current = null
+    },
+    [nextDraftRef]
+  )
   const context: ScheduleContext = {
     kind: server.kind,
     approved,
@@ -717,20 +751,9 @@ export function WriteComposer({
     onDone: ({ draft, newDraft }) => {
       setServer(draft)
       void refreshPosts()
-      if (newDraft)
-        void draftsApi
-          // The next post in a run starts on the accounts this one went to, not
-          // on the brand's defaults: that is the switch the writer just set.
-          .create({
-            channelConnectionIds: enabled.length ? [...enabled] : undefined,
-            socialSetId: draft.socialSetId ?? undefined,
-          })
-          .then((next) => router.push(`/publish/${next.id}`))
-          .catch(() =>
-            toast.error(
-              'Scheduled successfully, but the next draft could not be opened. Create one from the sidebar.'
-            )
-          )
+      // The next post in a run starts on the accounts this one went to, not
+      // on the brand's defaults: that is the switch the writer just set.
+      if (newDraft) startNext()
     },
     onToggle: toggle,
     // The Calendar's unschedule cancels every queued post in one step and, unlike
@@ -1084,25 +1107,12 @@ export function WriteComposer({
     accounts.find((item) => item.channel === active)
   const author = account?.displayName ?? set?.name ?? user.name
   const postHeader = () => (
-    <div className="flex items-center gap-2 sm:gap-3" data-testid="post-header">
-      <Avatar
-        // Covers the thread line where it meets the avatar.
-        className="relative z-[1] -ms-10 size-8 ring-4 ring-card sm:-ms-12 sm:size-9"
-        data-post-avatar
-      >
-        {account?.avatarUrl ? <AvatarImage alt="" src={account.avatarUrl} /> : null}
-        {/* Also shown when a provider's avatar link has expired. */}
-        <AvatarFallback className="bg-accent text-ui font-medium text-accent-foreground">
-          {initials(author)}
-        </AvatarFallback>
-      </Avatar>
-      <p className="min-w-0 flex-1 truncate text-ui">
-        <span className="font-medium text-foreground">{author}</span>
-        <span className="ml-1.5 text-muted-foreground">
-          {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
-        </span>
-      </p>
-    </div>
+    <PostAuthor
+      avatarUrl={account?.avatarUrl}
+      channel={active}
+      handle={account?.handle}
+      name={author}
+    />
   )
   // Each post's characters over the limit; a platform without threads publishes the
   // posts as one caption, whose overflow is the last post's tail.
@@ -1192,6 +1202,9 @@ export function WriteComposer({
   }
   // A post that is live everywhere does not change with this text, so it is not editable.
   const canEditText = canEdit && !locked
+  // The schedule dock and its fix list show to someone who can publish this post now.
+  const showSchedule =
+    canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
   // A tab that follows the main platform has no editor of its own: its media lives on that tab.
   const ownEditor = active === primary || versionOfTab.mode === 'manual'
   const liveOn = [
@@ -2276,7 +2289,7 @@ export function WriteComposer({
                 float in the middle of the page. */}
             <div className="h-32 shrink-0 grow" />
             {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
-            {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
+            {showSchedule || (canEdit && !focus) ? (
             <div
               className={cn(
                 'sticky bottom-0 z-10 grid gap-2 border-t border-border bg-background pt-3',
@@ -2284,7 +2297,36 @@ export function WriteComposer({
               )}
               data-testid="publish-bar"
             >
-              {blockers.length > 0 ? (
+              {focus ? null : (
+                // Where this post goes and what it is, beside the action that starts the next one.
+                <div className="flex flex-wrap items-center gap-2" data-testid="writing-bar">
+                  <DestinationSummary
+                    accounts={items.map((item) => item.account)}
+                    empty="No account is switched on"
+                  />
+                  {postCount > 1 ? (
+                    <span className="text-label text-muted-foreground" data-testid="thread-label">
+                      <span className="font-medium text-foreground">Thread · {postCount} posts</span>
+                      {' · '}
+                      {CAPABILITIES[primary].thread
+                        ? `${postCount === 2 ? 'post 2 replies' : `posts 2–${postCount} reply in order`} to post 1 on ${CHANNEL_META[primary].label}`
+                        : `published as one ${CHANNEL_META[primary].label} post`}
+                    </span>
+                  ) : null}
+                  {canEdit ? (
+                    <Button
+                      className="ms-auto"
+                      onClick={startNext}
+                      size="sm"
+                      title={`Saves this draft and opens a blank one for the same accounts (${mod}.)`}
+                      variant="outline"
+                    >
+                      {postCount > 1 ? 'New standalone post' : 'Save draft & new'}
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+              {showSchedule && blockers.length > 0 ? (
                 <FixList
                   action={blockedAction}
                   blockers={blockers}
@@ -2301,7 +2343,7 @@ export function WriteComposer({
                   }
                 />
               ) : null}
-              {focus ? null : (
+              {focus || !showSchedule ? null : (
                 <ScheduleDock
                   blocked={blockers.length > 0}
                   context={context}
@@ -2606,92 +2648,6 @@ export function WriteComposer({
 }
 
 /** The empty post's prompt per platform, as each platform asks it. */
-const PLACEHOLDERS: Partial<Record<DraftChannel, string>> = {
-  tiktok: 'Write your TikTok caption…',
-  x: 'What’s happening?',
-}
-
-/** Up to two initials for an avatar without an image. */
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => word[0]?.toUpperCase())
-      .join('') || 'S'
-  )
-}
-
-/**
- * A post's length for the platform being edited: a ring that fills toward
- * the limit, amber from 90%, red past it. It is always readable — a counter
- * you can only see once you are nearly over cannot be written to — and dims
- * on a post that is not in use so the page stays quiet.
- *
- * An account whose platform raised its limit (a verified X account posts up
- * to 25,000) also shows the standard count, because the length that matters
- * to most writers is still the one everyone else sees.
- */
-function PostCount({
-  active,
-  channel,
-  length,
-  limit,
-  number,
-  standard,
-  thread,
-}: {
-  active: boolean
-  channel: DraftChannel
-  length: number
-  limit: number
-  number: number
-  /** The platform's standard limit, when this account's is higher. */
-  standard?: number
-  thread: boolean
-}) {
-  const ratio = length / limit
-  const tone =
-    ratio > 1
-      ? 'text-destructive'
-      : ratio >= 0.9
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-muted-foreground'
-  const overStandard = standard !== undefined && length > standard
-  return (
-    <span
-      className={cn(
-        'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
-        tone,
-        !active && ratio < 0.9 && 'opacity-60'
-      )}
-      // Counted as the platform counts it, which writers cannot check outside the app.
-      title={countingNote(channel)}
-    >
-      <span
-        aria-hidden
-        className="size-4 rounded-full"
-        style={{
-          background: `conic-gradient(currentColor ${Math.min(ratio, 1) * 360}deg, color-mix(in srgb, currentColor 20%, transparent) 0)`,
-          mask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2px))',
-        }}
-      />
-      <span data-testid={`post-length-${number}`}>
-        {length} / {limit}
-      </span>
-      {standard !== undefined ? (
-        <span
-          className={cn(overStandard ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
-          data-testid={`post-standard-length-${number}`}
-        >
-          ({standard} for a standard account)
-        </span>
-      ) : null}
-      {thread ? <span className="text-muted-foreground">#{number}</span> : null}
-    </span>
-  )
-}
 
 /**
  * What stops this draft from publishing, always in view beside the post. Each

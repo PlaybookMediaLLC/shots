@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { measurePieces, pastePieces } from '@/lib/write/paste-split'
+import { measurePieces, pastePieces, readPaste } from '@/lib/write/paste-split'
 import { seriesName, seriesTitle, suggestedSeriesName } from '@/lib/write/series'
 
 test('a blank line between ideas separates posts', () => {
@@ -61,4 +61,33 @@ test('a series is named from the run\u2019s first words, never mid-word', () => 
     'A much longer opening line that runs past the'
   )
   assert.equal(suggestedSeriesName('   '), 'Series')
+})
+
+test('explicit rules split a paste and keep each post’s paragraphs', () => {
+  const ten = Array.from({ length: 10 }, (_, i) => `Post ${i + 1}.\n\nSecond paragraph.`).join(
+    '\n---\n'
+  )
+  const read = readPaste(ten)
+  assert.equal(read.explicit, true)
+  assert.equal(read.pieces.length, 10)
+  assert.equal(read.pieces[3], 'Post 4.\n\nSecond paragraph.')
+  assert.deepEqual(readPaste('---\nOnly one\n---\n').pieces, ['Only one'])
+})
+
+test('without rules, paragraphs are offered as pieces but not marked explicit', () => {
+  const read = readPaste('A first paragraph.\n\nA second one, same post.')
+  assert.equal(read.explicit, false)
+  assert.deepEqual(read.pieces, ['A first paragraph.', 'A second one, same post.'])
+  assert.deepEqual(readPaste('   \n\n  ').pieces, [])
+})
+
+test('separators read the same with Windows line ends and indented dashes', () => {
+  assert.deepEqual(readPaste('One\r\n  ----  \r\nTwo').pieces, ['One', 'Two'])
+})
+
+test('a run of blank lines inside a separated post stays one paragraph break', () => {
+  assert.deepEqual(readPaste('First.\n\n\n\nStill first.\n---\nSecond.').pieces, [
+    'First.\n\nStill first.',
+    'Second.',
+  ])
 })

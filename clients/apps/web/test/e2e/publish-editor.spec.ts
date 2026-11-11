@@ -225,7 +225,7 @@ test(
     await blockers.getByRole('button', { name: /^X: 290 of 280/ }).click()
     await expect(page.getByTestId('platform-tab-x')).toHaveAttribute('aria-pressed', 'true')
 
-    await page.getByRole('button', { name: 'Add post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add to thread', exact: true }).click()
     await expect(page.getByTestId('empty-post-2')).toContainText('Empty, not sent')
     await page.getByRole('button', { name: 'Remove empty post' }).click()
     await expect(page.getByTestId('post-header')).toHaveCount(1)

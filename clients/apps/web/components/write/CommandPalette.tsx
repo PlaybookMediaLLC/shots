@@ -6,8 +6,6 @@ import * as React from 'react'
 import { useTranslations } from 'next-intl'
 import { PLATFORM_DESTINATIONS, STORE_SCREENSHOTS } from '@/lib/platform/navigation'
 import { startBlankDraft } from './pending-draft'
-import { carriedChannels } from '@/lib/write/composing-session'
-import { countingChannelFor } from '@/lib/write/paste-split'
 import { type DraftSearchItem, draftPage } from '@/components/platform-hub/work'
 import { listedStatus } from '@/lib/content-drafts/post-status'
 import { draftName } from '@/lib/write/library'
@@ -24,7 +22,14 @@ import { toast } from 'sonner'
 import { CHANNEL_META } from '@/components/drafts/channel-meta'
 import { writeApi } from '@/lib/write/client'
 import { useKeys } from './shortcuts'
-import { type DraftCommand, draftHref, type EditorCommandEntry, rememberSet, useWrite } from './write-context'
+import {
+  type DraftCommand,
+  draftHref,
+  type EditorCommandEntry,
+  rememberSet,
+  useNewDraft,
+  useWrite,
+} from './write-context'
 
 /**
  * Search and commands (⌘K): the set's drafts by text, its tags, switching
@@ -46,6 +51,7 @@ export default function CommandPalette({
   const t = useTranslations('platformNavigation')
   const keys = useKeys()
   const router = useWriteRouter()
+  const startDraft = useNewDraft()
   const { beforeLeaveRef, openPreviewRef, editorCommandsRef, activeId, canEdit, data, setQuery } =
     useWrite()
   // Read once as the palette opens: the editor's commands for the version being edited.
@@ -195,18 +201,17 @@ export default function CommandPalette({
               <CommandItem
                 key={account.channel}
                 onSelect={() =>
-                  go(
-                    () =>
-                      startBlankDraft(
-                        {
-                          channelConnectionIds: [account.id],
-                          primaryPlatform: account.channel,
-                          socialSetId: data.activeSet?.id,
-                        },
-                        (id) => router.push(draftHref(id, data.activeSet?.id)),
-                        beforeLeaveRef.current ?? undefined,
-                        account.channel
-                      )
+                  go(() =>
+                    startBlankDraft(
+                      {
+                        channelConnectionIds: [account.id],
+                        primaryPlatform: account.channel,
+                        socialSetId: data.activeSet?.id,
+                      },
+                      (id) => router.push(draftHref(id, data.activeSet?.id)),
+                      beforeLeaveRef.current ?? undefined,
+                      { accounts: [account], channel: account.channel }
+                    )
                   )
                 }
                 value={`create ${CHANNEL_META[account.channel].label} draft`}
@@ -244,23 +249,7 @@ export default function CommandPalette({
             </CommandItem>
           ) : null}
           {canEdit ? (
-            <CommandItem
-              value="New draft new post"
-              onSelect={() =>
-                go(
-                  () =>
-                    startBlankDraft(
-                      {
-                        channelConnectionIds: carriedChannels(data.activeSet),
-                        socialSetId: data.activeSet?.id,
-                      },
-                      (id) => router.push(draftHref(id, data.activeSet?.id)),
-                      beforeLeaveRef.current ?? undefined,
-                      countingChannelFor(data.activeSet?.accounts)
-                    )
-                )
-              }
-            >
+            <CommandItem value="New draft new post" onSelect={() => go(startDraft)}>
               New draft
               <CommandShortcut>{keys.label({ key: '.', mod: true })}</CommandShortcut>
             </CommandItem>
