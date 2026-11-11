@@ -1891,7 +1891,7 @@ export interface paths {
         put?: never;
         /**
          * Confirm a spoken scheduling command
-         * @description Re-runs every check, then schedules the confirmed text as the member; a replay returns the outcome.
+         * @description Re-runs every check, then schedules the confirmed text as the member, or saves it as a draft when the account and time are left out; a replay returns the outcome.
          */
         post: operations["confirmVoiceCommand"];
         delete?: never;
@@ -2039,6 +2039,7 @@ export interface components {
                 campaignId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
+                sourceVoiceRemoved?: boolean;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -3146,6 +3147,7 @@ export interface components {
                 campaignId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
+                sourceVoiceRemoved?: boolean;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -3350,6 +3352,7 @@ export interface components {
                 campaignId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
+                sourceVoiceRemoved?: boolean;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -3686,6 +3689,7 @@ export interface components {
             campaignId: string | null;
             /** @default null */
             sourceVoiceRevisionId: string | null;
+            sourceVoiceRemoved?: boolean;
             /** @default null */
             plannedFor: string | null;
             /** @default null */
@@ -4133,6 +4137,7 @@ export interface components {
                 campaignId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
+                sourceVoiceRemoved?: boolean;
                 /** @default null */
                 plannedFor: string | null;
                 /** @default null */
@@ -4469,7 +4474,7 @@ export interface components {
                 voiceCommands: boolean;
             };
             canManage: boolean;
-            minAppVersion: string | null;
+            minAppVersion: string;
             limits: {
                 maxNoteMs: number;
                 warnAtMs: number;
@@ -4558,6 +4563,7 @@ export interface components {
                 flags: string[];
                 addedWords: string[];
                 notice: string | null;
+                outcome: ("scheduled" | "pending_approval" | "draft") | null;
                 contentDraftId: string | null;
                 scheduledPostId: string | null;
                 failureReason: string | null;
@@ -4628,6 +4634,7 @@ export interface components {
                 flags: string[];
                 addedWords: string[];
                 notice: string | null;
+                outcome: ("scheduled" | "pending_approval" | "draft") | null;
                 contentDraftId: string | null;
                 scheduledPostId: string | null;
                 failureReason: string | null;
@@ -10267,6 +10274,7 @@ export interface operations {
                             campaignId: string | null;
                             /** @default null */
                             sourceVoiceRevisionId: string | null;
+                            sourceVoiceRemoved?: boolean;
                             /** @default null */
                             plannedFor: string | null;
                             /** @default null */
@@ -10542,6 +10550,7 @@ export interface operations {
                             campaignId: string | null;
                             /** @default null */
                             sourceVoiceRevisionId: string | null;
+                            sourceVoiceRemoved?: boolean;
                             /** @default null */
                             plannedFor: string | null;
                             /** @default null */
@@ -13636,7 +13645,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    contentType: string;
+                    /** @constant */
+                    contentType: "audio/wav";
                     bytes: number;
                     sha256: string;
                     startOffsetMs: number;
@@ -14010,6 +14020,8 @@ export interface operations {
             content: {
                 "application/json": {
                     text: string;
+                } | {
+                    text: string;
                     channelConnectionId: string;
                     localTime: string;
                     timeZone: string;
@@ -14044,6 +14056,7 @@ export interface operations {
                             flags: string[];
                             addedWords: string[];
                             notice: string | null;
+                            outcome: ("scheduled" | "pending_approval" | "draft") | null;
                             contentDraftId: string | null;
                             scheduledPostId: string | null;
                             failureReason: string | null;

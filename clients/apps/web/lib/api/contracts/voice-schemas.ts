@@ -10,16 +10,9 @@ import { memberDocs, type WorkspaceDocsInput } from './workspace-docs'
  */
 
 const timestamp = z.iso.datetime({ offset: true })
-const clientIdSchema = z.string().min(1).max(128)
-
-/** A Go slice: the backend sends `null` for an empty one, the web sends `[]`. */
-function goList<Item extends z.ZodType>(item: Item) {
-  // Parsed items are valid input again; the casts only restate that for a generic item.
-  return z.codec(z.array(item).nullable(), z.array(item), {
-    decode: (items) => (items ?? []) as z.input<Item>[],
-    encode: (items) => items as z.output<Item>[],
-  })
-}
+// The bounds below are the Go backend's (internal/product/voice_*.go), so the spec states the real limits.
+const clientIdSchema = z.string().min(1).max(100)
+const titleSchema = z.string().max(120)
 
 /** The path of one of the member's notes. */
 export const voiceNoteParamsSchema = z.object({ id: contentDraftIdSchema })
@@ -44,7 +37,7 @@ export const voiceTranscriptRevisionSchema = z.object({
   locale: z.string().nullable(),
   engine: z.string().nullable(),
   text: z.string(),
-  segments: goList(voiceSegmentSchema),
+  segments: z.array(voiceSegmentSchema),
   redacted: z.boolean(),
   createdByUserId: z.string(),
   createdAt: timestamp,
@@ -84,11 +77,13 @@ export const voiceCommandSchema = z.object({
   timeZone: z.string(),
   scheduledFor: timestamp.nullable(),
   channelConnectionId: z.string().nullable(),
-  candidates: goList(voiceCommandCandidateSchema),
-  guessed: goList(z.string()),
-  flags: goList(z.string()),
-  addedWords: goList(z.string()),
+  candidates: z.array(voiceCommandCandidateSchema),
+  guessed: z.array(z.string()),
+  flags: z.array(z.string()),
+  addedWords: z.array(z.string()),
   notice: z.string().nullable(),
+  /** What confirming did; null until the command is confirmed. */
+  outcome: z.enum(['scheduled', 'pending_approval', 'draft']).nullable(),
   contentDraftId: z.string().nullable(),
   scheduledPostId: z.string().nullable(),
   failureReason: z.string().nullable(),
@@ -119,21 +114,21 @@ export const voiceNoteSchema = z.object({
 
 /** A note with its transcript revisions, audio runs and command proposal. */
 export const voiceNoteDetailSchema = voiceNoteSchema.extend({
-  transcripts: goList(voiceTranscriptRevisionSchema),
-  runs: goList(voiceAudioRunSchema),
+  transcripts: z.array(voiceTranscriptRevisionSchema),
+  runs: z.array(voiceAudioRunSchema),
   command: voiceCommandSchema.nullable(),
 })
 
 /** Every note of the member's, tombstones included, for the phone's list comparison. */
 export const voiceNoteIndexSchema = z.object({
-  notes: goList(
+  notes: z.array(
     z.object({ id: z.string(), clientNoteId: z.string(), revision: z.int(), deleted: z.boolean() })
   ),
 })
 
 /** One page of the inbox: live notes, newest received first, each with an excerpt. */
 export const voiceNotePageSchema = z.object({
-  notes: goList(voiceNoteSchema.extend({ excerpt: z.string() })),
+  notes: z.array(voiceNoteSchema.extend({ excerpt: z.string() })),
   nextCursor: z.string().nullable(),
 })
 
@@ -158,7 +153,7 @@ export const voiceSettingsSchema = z.object({
   }),
   /** The member may change the workspace switches (owner or admin). */
   canManage: z.boolean(),
-  minAppVersion: z.string().nullable(),
+  minAppVersion: z.string(),
   limits: z.object({
     maxNoteMs: z.int(),
     warnAtMs: z.int(),
@@ -191,7 +186,7 @@ export const voiceMemberChoicesInputSchema = z.strictObject({
 /** A new note from the phone; a replay of its `clientNoteId` returns the stored note. */
 export const voiceNoteCreateSchema = z.strictObject({
   clientNoteId: clientIdSchema,
-  title: z.string().max(500).optional(),
+  title: titleSchema.optional(),
   projectId: contentDraftIdSchema.nullish(),
   recordedAt: timestamp,
   recordedTimeZone: z.string().min(1).max(64),
@@ -203,7 +198,7 @@ export const voiceNoteCreateSchema = z.strictObject({
 /** A note's labels; the last writer wins. */
 export const voiceNotePatchSchema = z.strictObject({
   expectedRevision: z.int().positive(),
-  title: z.string().max(500).optional(),
+  title: titleSchema.optional(),
   projectId: contentDraftIdSchema.nullish(),
 })
 
@@ -213,8 +208,8 @@ export const voiceTranscriptCreateSchema = z.strictObject({
   parentId: contentDraftIdSchema.nullish(),
   origin: voiceTranscriptOriginSchema,
   locale: z.string().min(1).max(35).nullish(),
-  engine: z.string().min(1).max(100).nullish(),
-  text: z.string().max(200_000),
+  engine: z.string().min(1).max(64).nullish(),
+  text: z.string().max(100_000),
   segments: z.array(voiceSegmentSchema.strict()).max(20_000),
 })
 
@@ -227,9 +222,11 @@ export const voiceTranscriptResultSchema = z.object({
 
 /** One run's file, as the phone declares it before upload. */
 export const voiceRunUploadInputSchema = z.strictObject({
-  contentType: z.string().min(1).max(100),
+  /** PCM WAV, what the phone records. */
+  contentType: z.literal('audio/wav'),
   bytes: z.int().positive(),
-  sha256: z.string().min(1).max(128),
+  /** The file's SHA-256 as lowercase hex. */
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
   startOffsetMs: z.int().nonnegative(),
   durationMs: z.int().nonnegative().nullish(),
   sampleRateHz: z.int().positive().nullish(),
@@ -261,13 +258,22 @@ export const voiceDraftInputSchema = z.strictObject({
   assetIds: z.array(contentDraftIdSchema).max(20).optional(),
 })
 
-/** The confirmed text and account of a spoken scheduling command. */
-export const voiceCommandConfirmSchema = z.strictObject({
-  text: z.string().min(1).max(10_000),
-  channelConnectionId: contentDraftIdSchema,
-  localTime: z.string().min(1).max(64),
-  timeZone: z.string().min(1).max(64),
-})
+const voiceCommandTextSchema = z.string().min(1).max(2_000)
+
+/**
+ * A spoken scheduling command's confirmed text, with its account and time to
+ * schedule it, or the text alone to save it as a draft. The account and time
+ * come together or not at all.
+ */
+export const voiceCommandConfirmSchema = z.union([
+  z.strictObject({ text: voiceCommandTextSchema }),
+  z.strictObject({
+    text: voiceCommandTextSchema,
+    channelConnectionId: contentDraftIdSchema,
+    localTime: z.string().min(1).max(64),
+    timeZone: z.string().min(1).max(64),
+  }),
+])
 
 /** What confirming a command did. */
 export const voiceCommandConfirmationSchema = z.object({

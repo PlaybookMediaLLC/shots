@@ -106,7 +106,7 @@ export const listVoiceNotesContract = defineContract({
   path: '/api/v1/voice/notes',
   query: z.strictObject({
     cursor: z.string().max(500).optional(),
-    limit: z.coerce.number().int().min(1).max(100).optional(),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
   }),
   summary: 'List your voice notes',
   docs: voiceDocs('listVoiceNotes', "The member's live notes, newest received first.", {

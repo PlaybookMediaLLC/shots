@@ -63,11 +63,11 @@ test('every voice route is session-only: API keys are refused, and the spec says
   assert.equal(voiceActions.createVoiceDraftContract.access.feature, 'content:drafts')
 })
 
-test('voice responses take what the Go backend sends, including null slices', () => {
+test('voice responses take what the Go backend sends', () => {
   const detail = voice.voiceNoteDetailSchema.parse({
     ...note,
     command: null,
-    runs: null,
+    runs: [],
     transcripts: [
       {
         id: 'crev0000000000000000000001',
@@ -86,8 +86,33 @@ test('voice responses take what the Go backend sends, including null slices', ()
   })
   assert.deepEqual(detail.runs, [])
   assert.equal(detail.transcripts[0]?.segments[0]?.approximate, undefined)
-  const page = voice.voiceNotePageSchema.parse({ nextCursor: null, notes: null })
+  const page = voice.voiceNotePageSchema.parse({ nextCursor: null, notes: [] })
   assert.deepEqual(page.notes, [])
+  const command = {
+    id: 'ccmd0000000000000000000001',
+    transcriptRevisionId: 'crev0000000000000000000001',
+    status: 'confirmed',
+    action: 'schedule_post',
+    platform: 'x',
+    text: 'Ship it',
+    localTime: '2026-11-12T10:00',
+    timeZone: 'Europe/Berlin',
+    scheduledFor: '2026-11-12T09:00:00Z',
+    channelConnectionId: 'cchan000000000000000000001',
+    candidates: [],
+    guessed: [],
+    flags: [],
+    addedWords: [],
+    notice: null,
+    outcome: 'pending_approval',
+    contentDraftId: 'cdraft00000000000000000001',
+    scheduledPostId: null,
+    failureReason: null,
+    expiresAt: null,
+  }
+  assert.equal(voice.voiceCommandSchema.parse(command).outcome, 'pending_approval')
+  assert.equal(voice.voiceCommandSchema.parse({ ...command, outcome: null }).outcome, null)
+  assert.ok(!voice.voiceCommandSchema.safeParse({ ...command, outcome: 'published' }).success)
   const settings = voice.voiceSettingsSchema.parse({
     canManage: false,
     limits: {
@@ -108,6 +133,7 @@ test('voice responses take what the Go backend sends, including null slices', ()
     },
   })
   assert.equal(settings.workspace.voiceNotes, false)
+  assert.ok(!voice.voiceSettingsSchema.safeParse({ ...settings, minAppVersion: null }).success)
   assert.ok(!voice.voiceNoteSchema.safeParse({ ...note, recordedAt: 'yesterday' }).success)
 })
 
@@ -129,6 +155,51 @@ test('voice request bodies reject unknown fields and invalid values', () => {
   const draft = { intent: 'launch_post', transcriptRevisionId: 'crev0000000000000000000001' }
   assert.ok(voice.voiceDraftInputSchema.safeParse(draft).success)
   assert.ok(!voice.voiceDraftInputSchema.safeParse({ ...draft, intent: 'publish_now' }).success)
+  // The Go backend's bounds, so the spec states the real limits.
+  assert.ok(!voice.voiceNoteCreateSchema.safeParse({ ...create, title: 'x'.repeat(121) }).success)
+  assert.ok(
+    !voice.voiceNoteCreateSchema.safeParse({ ...create, clientNoteId: 'x'.repeat(101) }).success
+  )
+  assert.ok(
+    !voice.voiceTranscriptCreateSchema.safeParse({ ...transcript, engine: 'x'.repeat(65) }).success
+  )
+  assert.ok(
+    !voice.voiceTranscriptCreateSchema.safeParse({ ...transcript, text: 'x'.repeat(100_001) })
+      .success
+  )
+  const listQuery = voiceNotes.listVoiceNotesContract.query
+  assert.equal(listQuery.parse({ limit: '50' }).limit, 50)
+  assert.ok(!listQuery.safeParse({ limit: '51' }).success)
+  assert.ok(!listQuery.safeParse({ limit: '0' }).success)
+  const upload = { bytes: 44, contentType: 'audio/wav', sha256: 'a'.repeat(64), startOffsetMs: 0 }
+  assert.ok(voice.voiceRunUploadInputSchema.safeParse(upload).success)
+  assert.ok(
+    !voice.voiceRunUploadInputSchema.safeParse({ ...upload, contentType: 'audio/aac' }).success
+  )
+  assert.ok(
+    !voice.voiceRunUploadInputSchema.safeParse({ ...upload, sha256: 'A'.repeat(64) }).success
+  )
+  assert.ok(
+    !voice.voiceRunUploadInputSchema.safeParse({ ...upload, sha256: 'a'.repeat(63) }).success
+  )
+  // Confirm: the text alone saves a draft; the account and time come together or not at all.
+  const schedule = {
+    channelConnectionId: 'cchan000000000000000000001',
+    localTime: '2026-11-12T10:00',
+    text: 'Ship it',
+    timeZone: 'Europe/Berlin',
+  }
+  assert.ok(voice.voiceCommandConfirmSchema.safeParse(schedule).success)
+  assert.ok(voice.voiceCommandConfirmSchema.safeParse({ text: 'Ship it' }).success)
+  const { timeZone: _zone, ...partial } = schedule
+  assert.ok(!voice.voiceCommandConfirmSchema.safeParse(partial).success)
+  assert.ok(
+    !voice.voiceCommandConfirmSchema.safeParse({
+      channelConnectionId: schedule.channelConnectionId,
+      text: 'Ship it',
+    }).success
+  )
+  assert.ok(!voice.voiceCommandConfirmSchema.safeParse({ text: 'x'.repeat(2_001) }).success)
   assert.equal(
     voiceActions.getVoiceRunAudioContract.params.parse({ id: note.id, runIndex: '2' }).runIndex,
     2

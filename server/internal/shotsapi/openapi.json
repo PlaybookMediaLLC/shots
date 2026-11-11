@@ -12564,6 +12564,9 @@
                             "null"
                           ]
                         },
+                        "sourceVoiceRemoved": {
+                          "type": "boolean"
+                        },
                         "plannedFor": {
                           "default": null,
                           "type": [
@@ -13764,6 +13767,9 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "sourceVoiceRemoved": {
+                          "type": "boolean"
                         },
                         "plannedFor": {
                           "default": null,
@@ -19869,7 +19875,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 50
             }
           }
         ],
@@ -20075,11 +20081,11 @@
                   "clientNoteId": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 128
+                    "maxLength": 100
                   },
                   "title": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 120
                   },
                   "projectId": {
                     "anyOf": [
@@ -20336,7 +20342,7 @@
                   },
                   "title": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 120
                   },
                   "projectId": {
                     "anyOf": [
@@ -20543,7 +20549,7 @@
                   "clientRevisionId": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 128
+                    "maxLength": 100
                   },
                   "parentId": {
                     "anyOf": [
@@ -20581,7 +20587,7 @@
                       {
                         "type": "string",
                         "minLength": 1,
-                        "maxLength": 100
+                        "maxLength": 64
                       },
                       {
                         "type": "null"
@@ -20590,7 +20596,7 @@
                   },
                   "text": {
                     "type": "string",
-                    "maxLength": 200000
+                    "maxLength": 100000
                   },
                   "segments": {
                     "maxItems": 20000,
@@ -20951,8 +20957,7 @@
                 "properties": {
                   "contentType": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
+                    "const": "audio/wav"
                   },
                   "bytes": {
                     "type": "integer",
@@ -20961,8 +20966,7 @@
                   },
                   "sha256": {
                     "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128
+                    "pattern": "^[0-9a-f]{64}$"
                   },
                   "startOffsetMs": {
                     "type": "integer",
@@ -21616,7 +21620,7 @@
           "feature": "content:drafts",
           "minimumPlan": "pro"
         },
-        "description": "Re-runs every check, then schedules the confirmed text as the member; a replay returns the outcome.",
+        "description": "Re-runs every check, then schedules the confirmed text as the member, or saves it as a draft when the account and time are left out; a replay returns the outcome.",
         "operationId": "confirmVoiceCommand",
         "parameters": [
           {
@@ -21634,35 +21638,53 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "text": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 10000
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      }
+                    },
+                    "required": [
+                      "text"
+                    ],
+                    "additionalProperties": false
                   },
-                  "channelConnectionId": {
-                    "type": "string",
-                    "pattern": "^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
-                  },
-                  "localTime": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
-                  },
-                  "timeZone": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 64
+                  {
+                    "type": "object",
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2000
+                      },
+                      "channelConnectionId": {
+                        "type": "string",
+                        "pattern": "^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+                      },
+                      "localTime": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "timeZone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "text",
+                      "channelConnectionId",
+                      "localTime",
+                      "timeZone"
+                    ],
+                    "additionalProperties": false
                   }
-                },
-                "required": [
-                  "text",
-                  "channelConnectionId",
-                  "localTime",
-                  "timeZone"
-                ],
-                "additionalProperties": false
+                ]
               }
             }
           }
@@ -21776,6 +21798,21 @@
                             "null"
                           ]
                         },
+                        "outcome": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "scheduled",
+                                "pending_approval",
+                                "draft"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "contentDraftId": {
                           "type": [
                             "string",
@@ -21823,6 +21860,7 @@
                         "flags",
                         "addedWords",
                         "notice",
+                        "outcome",
                         "contentDraftId",
                         "scheduledPostId",
                         "failureReason",
@@ -22282,6 +22320,9 @@
                     "string",
                     "null"
                   ]
+                },
+                "sourceVoiceRemoved": {
+                  "type": "boolean"
                 },
                 "plannedFor": {
                   "default": null,
@@ -27264,6 +27305,9 @@
                     "null"
                   ]
                 },
+                "sourceVoiceRemoved": {
+                  "type": "boolean"
+                },
                 "plannedFor": {
                   "default": null,
                   "type": [
@@ -28153,6 +28197,9 @@
                     "string",
                     "null"
                   ]
+                },
+                "sourceVoiceRemoved": {
+                  "type": "boolean"
                 },
                 "plannedFor": {
                   "default": null,
@@ -29626,6 +29673,9 @@
               "string",
               "null"
             ]
+          },
+          "sourceVoiceRemoved": {
+            "type": "boolean"
           },
           "plannedFor": {
             "default": null,
@@ -31623,6 +31673,9 @@
                   "null"
                 ]
               },
+              "sourceVoiceRemoved": {
+                "type": "boolean"
+              },
               "plannedFor": {
                 "default": null,
                 "type": [
@@ -33240,10 +33293,7 @@
             "type": "boolean"
           },
           "minAppVersion": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "limits": {
             "type": "object",
@@ -33688,6 +33738,21 @@
                       "null"
                     ]
                   },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "scheduled",
+                          "pending_approval",
+                          "draft"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "contentDraftId": {
                     "type": [
                       "string",
@@ -33735,6 +33800,7 @@
                   "flags",
                   "addedWords",
                   "notice",
+                  "outcome",
                   "contentDraftId",
                   "scheduledPostId",
                   "failureReason",
@@ -34087,6 +34153,21 @@
                       "null"
                     ]
                   },
+                  "outcome": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "scheduled",
+                          "pending_approval",
+                          "draft"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "contentDraftId": {
                     "type": [
                       "string",
@@ -34134,6 +34215,7 @@
                   "flags",
                   "addedWords",
                   "notice",
+                  "outcome",
                   "contentDraftId",
                   "scheduledPostId",
                   "failureReason",

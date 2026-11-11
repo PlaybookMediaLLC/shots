@@ -978,6 +978,8 @@ export type BackendContentDraft = {
   campaignId?: string | null
   /** The voice transcript revision the draft was made from, if any. */
   sourceVoiceRevisionId?: string | null
+  /** Whether the voice note the draft was made from was deleted since. */
+  sourceVoiceRemoved?: boolean
   /** Write (RFC 025): an article's title and cover, for an article draft. */
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */

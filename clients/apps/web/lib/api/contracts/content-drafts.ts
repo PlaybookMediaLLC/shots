@@ -83,6 +83,8 @@ export const contentDraftSchema = z.object({
   campaignId: z.string().nullable().default(null),
   /** The voice transcript revision the draft was made from; only its owner can open the note. */
   sourceVoiceRevisionId: z.string().nullable().default(null),
+  /** The voice note the draft was made from was deleted since. An older backend omits it. */
+  sourceVoiceRemoved: z.boolean().optional(),
   /** A calendar placement without scheduling, as an ISO 8601 instant. */
   plannedFor: timestampSchema.nullable().default(null),
   primaryPlatform: z.string().nullable().default(null),

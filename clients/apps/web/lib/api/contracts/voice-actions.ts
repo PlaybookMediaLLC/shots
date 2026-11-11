@@ -180,7 +180,7 @@ export const confirmVoiceCommandContract = defineContract({
   summary: 'Confirm a spoken scheduling command',
   docs: voiceDocs(
     'confirmVoiceCommand',
-    'Re-runs every check, then schedules the confirmed text as the member; a replay returns the outcome.',
+    'Re-runs every check, then schedules the confirmed text as the member, or saves it as a draft when the account and time are left out; a replay returns the outcome.',
     {
       '200': 'What the confirmation did.',
       '400': 'The confirmation is invalid.',
