@@ -27,7 +27,7 @@ import (
 // HandledError is a provider's classification of a failed response
 // (SocialAbstract.handleErrors).
 type HandledError struct {
-	Type  string // refresh-token | bad-body | retry | disconnect
+	Type  string // refresh-token | bad-body | retry | disconnect | limit (a daily cap)
 	Value string
 }
 
@@ -132,9 +132,11 @@ func (r *Response) JSON(v any) error { return json.Unmarshal(r.Body, v) }
 func (r *Response) Text() string { return string(r.Body) }
 
 // Fetch is SocialAbstract.fetch: it returns 200/201 responses and otherwise
-// retries 429, unclassified 500s, rate-limit bodies and `retry`
-// classifications up to three times, then maps the failure to Disconnect,
-// RefreshToken or BadBody. A transport error is returned as-is.
+// retries 429, rate-limit bodies, `retry` classifications and unclassified
+// 500s to reads up to three times, then maps the failure to RateLimited,
+// DailyLimit, Disconnect, RefreshToken or BadBody. A 5xx to any other method
+// that is unclassified or classified `retry` is UnknownDelivery at once: the
+// platform may have acted on it. A transport error is returned as-is.
 func (b *Base) Fetch(ctx context.Context, url string, req Request) (*Response, error) {
 	return b.fetch(ctx, url, req, 0, "")
 }
@@ -180,17 +182,27 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 	if requestBody == "" {
 		requestBody = "{}"
 	}
-	if retries > 2 {
+	handled := b.handleErrors(text, res.StatusCode)
+	// A server error can follow a committed write, so a publish is never resent.
+	if method != http.MethodGet && method != http.MethodHead && res.StatusCode >= 500 && (handled == nil || handled.Type == "retry") {
+		return nil, temporalx.UnknownDelivery(b.identifier, "The platform failed after receiving the request, so it may have acted on it. Check the account before resending.")
+	}
+	// A daily cap is not retried: it does not clear within seconds.
+	limit := handled != nil && handled.Type == "limit"
+	throttled := !limit && (res.StatusCode == http.StatusTooManyRequests ||
+		strings.Contains(text, "rate_limit_exceeded") || strings.Contains(text, "Rate limit"))
+	if retries > 2 && !limit {
+		if throttled {
+			return nil, temporalx.RateLimited(b.identifier, text)
+		}
 		return nil, temporalx.BadBody(b.identifier, text, requestBody, message)
 	}
-	handled := b.handleErrors(text, res.StatusCode)
 	value := "Unknown Error"
 	if handled != nil && handled.Value != "" {
 		value = handled.Value
 	}
-	if res.StatusCode == http.StatusTooManyRequests || (res.StatusCode == http.StatusInternalServerError && handled == nil) ||
-		strings.Contains(text, "rate_limit_exceeded") || strings.Contains(text, "Rate limit") ||
-		(handled != nil && handled.Type == "retry") {
+	serverError := res.StatusCode == http.StatusInternalServerError && handled == nil
+	if throttled || serverError || (handled != nil && handled.Type == "retry") {
 		if err := b.Sleep(ctx, b.RetryDelay); err != nil {
 			return nil, err
 		}
@@ -206,6 +218,9 @@ func (b *Base) classify(text, requestBody string, status int, handled *HandledEr
 	}
 	if handled != nil && handled.Type == "disconnect" {
 		return temporalx.Disconnect(b.identifier, text, requestBody, handledValue)
+	}
+	if handled != nil && handled.Type == "limit" {
+		return temporalx.DailyLimit(b.identifier, text, requestBody, handledValue)
 	}
 	if (status == http.StatusUnauthorized && (handled == nil || handled.Type == "refresh-token")) ||
 		(handled != nil && handled.Type == "refresh-token") {

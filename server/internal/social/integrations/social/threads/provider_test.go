@@ -236,6 +236,34 @@ func TestPollContainerAndReplyKeepNativeOptions(t *testing.T) {
 	}
 }
 
+// The reply is live once threads_publish answers: a rate limit on reading its
+// permalink must not fail it, or the publication would be resent.
+func TestReplyPublishedWhenPermalinkIsRateLimited(t *testing.T) {
+	publishes := 0
+	setup(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1.0/u1/threads":
+			w.Write([]byte(`{"id":"c1"}`))
+		case "/v1.0/c1":
+			w.Write([]byte(`{"status":"FINISHED"}`))
+		case "/v1.0/u1/threads_publish":
+			publishes++
+			w.Write([]byte(`{"id":"r1"}`))
+		case "/v1.0/r1":
+			w.WriteHeader(http.StatusTooManyRequests)
+		default:
+			t.Errorf("unexpected request %s", r.URL.Path)
+		}
+	})
+	p := New()
+	p.RetryDelay = 0
+	profile := "me"
+	got, err := p.Comment(context.Background(), "u1", "root", "", "tok", []integrations.PostDetails{{ID: "reply", Message: "more"}}, &ent.Integration{InternalID: "u1", Profile: &profile})
+	if err != nil || publishes != 1 || len(got) != 1 || got[0].PostID != "r1" || got[0].ReleaseURL != "https://www.threads.net/@me" {
+		t.Fatalf("got=%+v err=%v publishes=%d", got, err, publishes)
+	}
+}
+
 func TestPostAnalyticsFailureIsNotEmptySuccess(t *testing.T) {
 	setup(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)

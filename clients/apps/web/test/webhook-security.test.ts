@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
+import { createRequire, Module } from 'node:module'
 import test from 'node:test'
 import { NextRequest } from 'next/server'
 import { metaDataCallbackContract, metaSignedRequest } from '@/lib/api/contracts/webhooks'
@@ -19,6 +20,21 @@ import {
   type WebhookIntent,
   type WebhookSourceRule,
 } from '@/lib/tenant/webhook-security'
+
+// The App and source verifiers live in modules that import 'server-only'; stub it for the plain runner.
+const localRequire = createRequire(__filename)
+const serverOnlyPath = localRequire.resolve('server-only')
+const serverOnlyStub = new Module(serverOnlyPath)
+serverOnlyStub.loaded = true
+localRequire.cache[serverOnlyPath] = serverOnlyStub
+const githubModule = import('@/lib/tenant/github')
+const githubRouteModule = import('@/app/api/webhooks/github/route')
+const sourceWebhooksModule = import('@/lib/tenant/webhooks')
+
+/** GitHub's `X-Hub-Signature-256` for a body signed with a secret. */
+function signed(body: string, secret: string): string {
+  return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`
+}
 
 const defaults = {
   branch: null,
@@ -456,6 +472,122 @@ test('a source without an operator secret gets one derived from the platform key
   )
   const setup = { secret, url: 'https://studio.example/api/webhooks/source/source00001' }
   assert.deepEqual(sourceWebhookSetupSchema.parse(setup), setup)
+})
+
+test('GitHub App deliveries verify with the current secret, and the previous one while it is set', async () => {
+  const { verifyGitHubAppDelivery } = await githubModule
+  const body = JSON.stringify({ zen: 'Keep it logically awesome.' })
+  process.env.GITHUB_APP_WEBHOOK_SECRET = 'new-app-secret'
+  delete process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'new-app-secret')), true)
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'old-app-secret')), false)
+  // Mid-rotation, GitHub may sign with either secret.
+  process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS = 'old-app-secret'
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'new-app-secret')), true)
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'old-app-secret')), true)
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'another-secret')), false)
+  assert.equal(verifyGitHubAppDelivery(body, null), false)
+  // An empty previous secret is ignored: a body signed with an empty key never verifies.
+  process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS = ''
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, '')), false)
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, 'old-app-secret')), false)
+  delete process.env.GITHUB_APP_WEBHOOK_SECRET
+  assert.equal(verifyGitHubAppDelivery(body, signed(body, '')), false)
+})
+
+test('a derived source secret verifies with the previous platform key while it is set', async () => {
+  const { getSourceWebhookSetup, verifyWebhookRequest } = await sourceWebhooksModule
+  const current = 'c'.repeat(32)
+  const previous = 'p'.repeat(32)
+  const source = {
+    ...github,
+    id: 'source00001',
+    organizationId: 'org-1',
+    secretReference: null,
+  }
+  const body = JSON.stringify({ zen: 'Approachable is better than simple.' })
+  const signedWithKey = (key: string) =>
+    verifyWebhookRequest({
+      body,
+      eventId: null,
+      signature: signed(body, deriveSourceWebhookSecret(key, source.id)),
+      source,
+      timestamp: null,
+    })
+  process.env.SOURCE_WEBHOOK_SIGNING_KEY = current
+  delete process.env.SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS
+  assert.equal(signedWithKey(current), true)
+  assert.equal(signedWithKey(previous), false)
+  process.env.SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS = previous
+  assert.equal(signedWithKey(current), true)
+  assert.equal(signedWithKey(previous), true)
+  assert.equal(signedWithKey('o'.repeat(32)), false)
+  // A new source is shown only the current key's secret.
+  assert.equal(getSourceWebhookSetup(source).secret, deriveSourceWebhookSecret(current, source.id))
+  // A previous key shorter than 32 characters is ignored, like a short current one.
+  process.env.SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS = previous.slice(1)
+  assert.equal(signedWithKey(previous.slice(1)), false)
+  process.env.SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS = ''
+  assert.equal(signedWithKey(current), true)
+  // An operator-managed secret is the only one, whatever the platform keys.
+  process.env.SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS = previous
+  process.env.ACME_WEBHOOK_SECRET = 'operator-secret'
+  const managed = { ...source, secretReference: 'ACME_WEBHOOK_SECRET' }
+  const verifyManaged = (secret: string) =>
+    verifyWebhookRequest({
+      body,
+      eventId: null,
+      signature: signed(body, secret),
+      source: managed,
+      timestamp: null,
+    })
+  assert.equal(verifyManaged('operator-secret'), true)
+  assert.equal(verifyManaged(deriveSourceWebhookSecret(previous, source.id)), false)
+})
+
+test('a verified repository delivery is forwarded to the backend, which handles transfers', async (t) => {
+  const { POST } = await githubRouteModule
+  t.mock.method(console, 'info', () => undefined)
+  process.env.GITHUB_APP_WEBHOOK_SECRET = 'new-app-secret'
+  process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS = 'old-app-secret'
+  process.env.PUBLISHING_API_URL = 'https://backend.example'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'service-secret'
+  const forwarded: { body: unknown; path: string }[] = []
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    forwarded.push({ body: JSON.parse(String(init?.body)), path: new URL(String(input)).pathname })
+    return Response.json({ duplicates: 0, handled: 1 })
+  })
+  const payload = {
+    action: 'transferred',
+    installation: { id: 42 },
+    repository: { id: 123 },
+  }
+  const body = JSON.stringify(payload)
+  const deliver = (secret: string) =>
+    POST(
+      new NextRequest('https://shots.test/api/webhooks/github', {
+        body,
+        headers: {
+          'content-type': 'application/json',
+          'x-github-delivery': 'delivery-7',
+          'x-github-event': 'repository',
+          'x-hub-signature-256': signed(body, secret),
+        },
+        method: 'POST',
+      }),
+      { params: Promise.resolve({}) }
+    )
+  const response = await deliver('old-app-secret')
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { handled: 1 })
+  assert.deepEqual(forwarded, [
+    {
+      body: { body: payload, deliveryId: 'delivery-7', eventName: 'repository' },
+      path: '/v1/internal/github/events',
+    },
+  ])
+  assert.equal((await deliver('another-secret')).status, 401)
+  assert.equal(forwarded.length, 1)
 })
 
 function deploymentStatus(

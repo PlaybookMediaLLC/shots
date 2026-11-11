@@ -23,6 +23,9 @@ func activityError(err error) error {
 	if errors.Is(err, product.ErrAutomationStopped) {
 		return temporal.NewNonRetryableApplicationError("Automation access withdrawn", StoppedError, nil)
 	}
+	if errors.Is(err, product.ErrCaptureSuperseded) {
+		return temporal.NewNonRetryableApplicationError("A newer deployment superseded this run", SupersededError, nil)
+	}
 	var github githubapp.StatusError
 	if errors.As(err, &github) && !github.RateLimited && (github.Status == 401 || github.Status == 403 || github.Status == 404) {
 		return temporal.NewNonRetryableApplicationError("Repository access requires attention", PermanentError, nil)
@@ -72,8 +75,9 @@ func (a *Activities) Classify(ctx context.Context, input NodeInput) (automation.
 func (a *Activities) Legacy(ctx context.Context, input Input) error {
 	return activityError(a.Store.RunLegacyReleaseEvent(ctx, input.OrganizationID, input.RunID, input.Attempt))
 }
-func (a *Activities) Collect(ctx context.Context, input Input) error {
-	return activityError(a.Store.CollectAutomationChange(ctx, input.OrganizationID, input.RunID, input.Attempt))
+func (a *Activities) Collect(ctx context.Context, input Input) (string, error) {
+	kind, err := a.Store.CollectAutomationChange(ctx, input.OrganizationID, input.RunID, input.Attempt)
+	return kind, activityError(err)
 }
 func (a *Activities) Finish(ctx context.Context, input Finish) error {
 	return activityError(a.Store.FinishReleaseAutomation(ctx, input.Run.OrganizationID, input.Run.RunID, input.Status, input.Code, input.Reason, input.Run.Attempt))

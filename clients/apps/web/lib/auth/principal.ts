@@ -1,4 +1,6 @@
 export type SessionPrincipal = {
+  /** Set when Founder Hub acts for the session; the backend checks the client's live grant. */
+  client?: 'shots-founder-hub'
   display: string
   kind: 'session'
   sessionId: string

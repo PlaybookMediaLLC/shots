@@ -1,6 +1,6 @@
 # Shots: audited plan for voice capture and evidence capture
 
-**Status:** Proposed. Voice capture is not authorized in the [RFC index](../rfcs/README.md); owner decision 1 in section 8 comes first.
+**Status:** Authorized and in implementation (scoped authorization of 2026-11-11 in the [RFC index](../rfcs/README.md)); see the [implementation plan](voice-capture-implementation.md). Sections 5.5–5.7 stay conditional under RFC 007.
 **Version:** 0.3 · 2026-11-10
 **Replaces:** an external v0.1 architecture proposal (a 23-section design with schema appendices), which is not in this repository. Section references such as "v0.1 §7" point to it.
 **Checked against:** the repository `PlaybookMediaLLC/shots` at `329d1630`, with the approval and scheduling findings re-checked against `develop` at `5285a789` (#497).

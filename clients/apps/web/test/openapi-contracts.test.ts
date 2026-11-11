@@ -34,6 +34,7 @@ import * as founderHub from '@/lib/api/contracts/founder-hub'
 import * as founderHubDevices from '@/lib/api/contracts/founder-hub-devices'
 import * as founderHubResources from '@/lib/api/contracts/founder-hub-resources'
 import * as founderHubTemplates from '@/lib/api/contracts/founder-hub-templates'
+import * as founderHubVoice from '@/lib/api/contracts/founder-hub-voice'
 import * as linkPreview from '@/lib/api/contracts/link-preview'
 import * as notifications from '@/lib/api/contracts/notifications'
 import * as onboardingRuns from '@/lib/api/contracts/onboarding-runs'
@@ -58,6 +59,8 @@ import * as webhooks from '@/lib/api/contracts/webhooks'
 import * as write from '@/lib/api/contracts/write'
 import * as planAnalyze from '@/lib/api/contracts/plan-analyze'
 import * as calendarNotes from '@/lib/api/contracts/calendar-notes'
+import * as voice from '@/lib/api/contracts/voice'
+import * as voiceActions from '@/lib/api/contracts/voice-actions'
 import { openApiSpec } from '@/lib/api/openapi'
 import { getMinimumPlan } from '@/lib/billing/plans'
 
@@ -95,6 +98,7 @@ const contracts = new Map<string, RouteContract>(
     founderHubDevices,
     founderHubResources,
     founderHubTemplates,
+    founderHubVoice,
     linkPreview,
     onboardingRuns,
     outboundWebhooks,
@@ -119,6 +123,8 @@ const contracts = new Map<string, RouteContract>(
     write,
     planAnalyze,
     calendarNotes,
+    voice,
+    voiceActions,
   ]
     .flatMap((module) => Object.entries(module))
     .filter(([, value]) => routeContractSchema.safeParse(value).success)

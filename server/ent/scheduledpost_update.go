@@ -408,6 +408,15 @@ func (_u *ScheduledPostUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(scheduledpost.FieldFailureCode, field.TypeString)
 	}
+	if _u.mutation.ScheduledByUserIDCleared() {
+		_spec.ClearField(scheduledpost.FieldScheduledByUserID, field.TypeString)
+	}
+	if _u.mutation.ApprovedByUserIDCleared() {
+		_spec.ClearField(scheduledpost.FieldApprovedByUserID, field.TypeString)
+	}
+	if _u.mutation.ApprovedVersionCleared() {
+		_spec.ClearField(scheduledpost.FieldApprovedVersion, field.TypeInt)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -883,6 +892,15 @@ func (_u *ScheduledPostUpdateOne) sqlSave(ctx context.Context) (_node *Scheduled
 	}
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(scheduledpost.FieldFailureCode, field.TypeString)
+	}
+	if _u.mutation.ScheduledByUserIDCleared() {
+		_spec.ClearField(scheduledpost.FieldScheduledByUserID, field.TypeString)
+	}
+	if _u.mutation.ApprovedByUserIDCleared() {
+		_spec.ClearField(scheduledpost.FieldApprovedByUserID, field.TypeString)
+	}
+	if _u.mutation.ApprovedVersionCleared() {
+		_spec.ClearField(scheduledpost.FieldApprovedVersion, field.TypeInt)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(scheduledpost.FieldUpdatedAt, field.TypeTime, value)

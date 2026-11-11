@@ -166,7 +166,14 @@ export { socialAccountHealthSchema, socialAccountSchema } from './settings-platf
  * grant's expiry, or a service caller's workspace.
  */
 export type BackendScope = { organizationId: string; requestId: string } & (
-  | { display?: string; kind?: 'session'; sessionId: string; userId: string }
+  | {
+      /** The OAuth client a delegated session acts through; the backend checks its live grant. */
+      client?: string
+      display?: string
+      kind?: 'session'
+      sessionId: string
+      userId: string
+    }
   | { display: string; keyId: string; kind: 'api_key' }
   | { grantId: string; kind: 'support'; userId: string }
   | { display: string; kind: 'service' | 'webhook' }
@@ -250,6 +257,7 @@ function principalHeaders(scope: BackendScope): Record<string, string> {
       return { 'x-principal-display': scope.display, 'x-principal-kind': scope.kind }
     default:
       return {
+        ...(scope.client ? { 'x-principal-client': scope.client } : {}),
         ...(scope.display ? { 'x-principal-display': scope.display } : {}),
         'x-principal-kind': 'session',
         'x-session-id': scope.sessionId,
@@ -1001,6 +1009,10 @@ export type BackendContentDraft = {
   lastPublishedAt?: string | null
   /** The campaign an edited campaign visual was published from, if any. */
   campaignId?: string | null
+  /** The voice transcript revision the draft was made from, if any. */
+  sourceVoiceRevisionId?: string | null
+  /** Whether the voice note the draft was made from was deleted since. */
+  sourceVoiceRemoved?: boolean
   /** Write (RFC 025): an article's title and cover, for an article draft. */
   article: BackendDraftArticle | null
   /** Posts that failed or whose outcome is unknown (lists only). */
@@ -1124,6 +1136,8 @@ export type BackendDraftActivity = {
 export type BackendContentDraftSettings = {
   postingSlots: { time: string; weekday: number }[]
   requireApproval: boolean
+  /** Whether the person who last edited a draft may approve it; an older backend omits it. */
+  allowSelfApproval?: boolean
   timeZone: string
 }
 
@@ -3258,6 +3272,7 @@ export class ScreenshotStudioBackendSDK {
   async updateContentDraftSettings(input: {
     postingSlots?: { time: string; weekday: number }[]
     requireApproval?: boolean
+    allowSelfApproval?: boolean
   }) {
     return this.request<BackendContentDraftSettings>('v1/content-draft-settings', {
       body: input,
@@ -3420,6 +3435,100 @@ export class ScreenshotStudioBackendSDK {
     return this.request<{ deleted: boolean }>(`v1/calendar/notes/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     })
+  }
+  /** The workspace's voice switches, the member's choices, limits and server-side switches. */
+  async getVoiceSettings() {
+    return this.request<unknown>('v1/voice/settings')
+  }
+  async updateVoiceWorkspaceSettings(input: unknown) {
+    return this.request<unknown>('v1/voice/settings/workspace', { body: input, method: 'PUT' })
+  }
+  async updateVoiceMemberSettings(input: unknown) {
+    return this.request<unknown>('v1/voice/settings/member', { body: input, method: 'PUT' })
+  }
+  /** Every note of the member's, tombstones included, for the phone's list comparison. */
+  async listVoiceNoteIndex() {
+    return this.request<unknown>('v1/voice/notes/index')
+  }
+  async listVoiceNotes(query: { cursor?: string; limit?: number }) {
+    const params = new URLSearchParams()
+    if (query.cursor) params.set('cursor', query.cursor)
+    if (query.limit) params.set('limit', String(query.limit))
+    return this.request<unknown>(`v1/voice/notes${params.size ? `?${params}` : ''}`)
+  }
+  /** `created` is false for a replay of the same client note id. */
+  async createVoiceNote(input: unknown) {
+    return this.created('v1/voice/notes', input)
+  }
+  async getVoiceNote(id: string) {
+    return this.request<unknown>(`v1/voice/notes/${encodeURIComponent(id)}`)
+  }
+  async updateVoiceNote(id: string, input: unknown) {
+    return this.request<unknown>(`v1/voice/notes/${encodeURIComponent(id)}`, {
+      body: input,
+      method: 'PATCH',
+    })
+  }
+  async deleteVoiceNote(id: string) {
+    await this.request<Response>(`v1/voice/notes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      responseType: 'response',
+    })
+  }
+  /** `created` is false for a replay of the same client revision id. */
+  async addVoiceTranscript(id: string, input: unknown) {
+    return this.created(`v1/voice/notes/${encodeURIComponent(id)}/transcripts`, input)
+  }
+  async redactVoiceTranscript(id: string, revisionId: string) {
+    return this.request<unknown>(
+      `v1/voice/notes/${encodeURIComponent(id)}/transcripts/${encodeURIComponent(revisionId)}/redact`,
+      { method: 'POST' }
+    )
+  }
+  async createVoiceRunUpload(id: string, runIndex: number, input: unknown) {
+    return this.request<unknown>(
+      `v1/voice/notes/${encodeURIComponent(id)}/runs/${runIndex}/upload`,
+      {
+        body: input,
+        method: 'POST',
+      }
+    )
+  }
+  async completeVoiceRun(id: string, runIndex: number) {
+    return this.request<unknown>(
+      `v1/voice/notes/${encodeURIComponent(id)}/runs/${runIndex}/complete`,
+      { method: 'POST' }
+    )
+  }
+  async getVoiceRunAudio(id: string, runIndex: number) {
+    return this.request<unknown>(`v1/voice/notes/${encodeURIComponent(id)}/runs/${runIndex}/audio`)
+  }
+  async deleteVoiceAudio(id: string) {
+    await this.request<Response>(`v1/voice/notes/${encodeURIComponent(id)}/audio`, {
+      method: 'DELETE',
+      responseType: 'response',
+    })
+  }
+  async createVoiceDraft(id: string, input: unknown) {
+    return this.request<unknown>(`v1/voice/notes/${encodeURIComponent(id)}/draft`, {
+      body: input,
+      method: 'POST',
+    })
+  }
+  async confirmVoiceCommand(id: string, input: unknown) {
+    return this.request<unknown>(`v1/voice/notes/${encodeURIComponent(id)}/command/confirm`, {
+      body: input,
+      method: 'POST',
+    })
+  }
+  /** An idempotent create: the body, and whether the backend answered 201 rather than a replay's 200. */
+  private async created(path: string, input: unknown) {
+    const response = await this.request<Response>(path, {
+      body: input,
+      method: 'POST',
+      responseType: 'response',
+    })
+    return { body: (await response.json()) as unknown, created: response.status === 201 }
   }
   async getAnalytics(id: string, query: Record<string, string | number | undefined>) {
     const params = new URLSearchParams(

@@ -52,9 +52,14 @@ export const webhookIngestResultSchema = z.union([
 /** One of {@link webhookIngestResultSchema}. */
 export type WebhookIngestResult = z.infer<typeof webhookIngestResultSchema>
 
-/** The key that derives secrets for sources without an operator-managed one. */
-function getSourceSigningKey(): string | null {
-  const key = process.env.SOURCE_WEBHOOK_SIGNING_KEY
+/**
+ * A key that derives secrets for sources without an operator-managed one: the
+ * current one, or the previous one during a rotation (docs/deployment.md).
+ */
+function getSourceSigningKey(
+  name: 'SOURCE_WEBHOOK_SIGNING_KEY' | 'SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS'
+): string | null {
+  const key = process.env[name]
   return key && key.length >= 32 ? key : null
 }
 
@@ -63,13 +68,15 @@ function getSourceSigningKey(): string | null {
  * when the source names it, else one derived from the platform key. GitLab
  * generates its own signing token, so a GitLab source needs the operator's.
  */
-function getWebhookSecret(source: Pick<WebhookSource, 'id' | 'provider' | 'secretReference'>) {
+function getWebhookSecret(
+  source: Pick<WebhookSource, 'id' | 'provider' | 'secretReference'>,
+  key = getSourceSigningKey('SOURCE_WEBHOOK_SIGNING_KEY')
+) {
   if (source.secretReference) {
     return secretReferenceSchema.test(source.secretReference)
       ? (process.env[source.secretReference] ?? null)
       : null
   }
-  const key = getSourceSigningKey()
   return key && source.provider !== sourceProviderSchema.enum.gitlab
     ? deriveSourceWebhookSecret(key, source.id)
     : null
@@ -101,6 +108,10 @@ export async function getWebhookSource(sourceAppId: string): Promise<WebhookSour
   return source && webhookSourceSchema.parse(source)
 }
 
+/**
+ * Whether a delivery is signed with the source's secret. A source whose
+ * secret is derived also verifies with the previous platform key's secret.
+ */
 export function verifyWebhookRequest(input: {
   body: string
   eventId: string | null
@@ -108,11 +119,17 @@ export function verifyWebhookRequest(input: {
   source: WebhookSource
   timestamp: string | null
 }): boolean {
-  const secret = getWebhookSecret(input.source)
-  if (!secret) {
-    return false
-  }
+  const secrets = new Set([
+    getWebhookSecret(input.source),
+    getWebhookSecret(input.source, getSourceSigningKey('SOURCE_WEBHOOK_SIGNING_KEY_PREVIOUS')),
+  ])
+  return [...secrets].some((secret) => Boolean(secret) && verifySignedWith(input, secret ?? ''))
+}
 
+function verifySignedWith(
+  input: Parameters<typeof verifyWebhookRequest>[0],
+  secret: string
+): boolean {
   if (input.source.provider === sourceProviderSchema.enum.gitlab) {
     return verifyGitLabWebhookSignature({
       body: input.body,

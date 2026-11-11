@@ -56,6 +56,20 @@ func (_u *ContentDraftSettingsUpdate) SetNillableRequireApproval(v *bool) *Conte
 	return _u
 }
 
+// SetAllowSelfApproval sets the "allow_self_approval" field.
+func (_u *ContentDraftSettingsUpdate) SetAllowSelfApproval(v bool) *ContentDraftSettingsUpdate {
+	_u.mutation.SetAllowSelfApproval(v)
+	return _u
+}
+
+// SetNillableAllowSelfApproval sets the "allow_self_approval" field if the given value is not nil.
+func (_u *ContentDraftSettingsUpdate) SetNillableAllowSelfApproval(v *bool) *ContentDraftSettingsUpdate {
+	if v != nil {
+		_u.SetAllowSelfApproval(*v)
+	}
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ContentDraftSettingsUpdate) SetUpdatedAt(v time.Time) *ContentDraftSettingsUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -123,6 +137,9 @@ func (_u *ContentDraftSettingsUpdate) sqlSave(ctx context.Context) (_node int, e
 	if value, ok := _u.mutation.RequireApproval(); ok {
 		_spec.SetField(contentdraftsettings.FieldRequireApproval, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.AllowSelfApproval(); ok {
+		_spec.SetField(contentdraftsettings.FieldAllowSelfApproval, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentdraftsettings.FieldUpdatedAt, field.TypeTime, value)
 	}
@@ -168,6 +185,20 @@ func (_u *ContentDraftSettingsUpdateOne) SetRequireApproval(v bool) *ContentDraf
 func (_u *ContentDraftSettingsUpdateOne) SetNillableRequireApproval(v *bool) *ContentDraftSettingsUpdateOne {
 	if v != nil {
 		_u.SetRequireApproval(*v)
+	}
+	return _u
+}
+
+// SetAllowSelfApproval sets the "allow_self_approval" field.
+func (_u *ContentDraftSettingsUpdateOne) SetAllowSelfApproval(v bool) *ContentDraftSettingsUpdateOne {
+	_u.mutation.SetAllowSelfApproval(v)
+	return _u
+}
+
+// SetNillableAllowSelfApproval sets the "allow_self_approval" field if the given value is not nil.
+func (_u *ContentDraftSettingsUpdateOne) SetNillableAllowSelfApproval(v *bool) *ContentDraftSettingsUpdateOne {
+	if v != nil {
+		_u.SetAllowSelfApproval(*v)
 	}
 	return _u
 }
@@ -268,6 +299,9 @@ func (_u *ContentDraftSettingsUpdateOne) sqlSave(ctx context.Context) (_node *Co
 	}
 	if value, ok := _u.mutation.RequireApproval(); ok {
 		_spec.SetField(contentdraftsettings.FieldRequireApproval, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AllowSelfApproval(); ok {
+		_spec.SetField(contentdraftsettings.FieldAllowSelfApproval, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentdraftsettings.FieldUpdatedAt, field.TypeTime, value)

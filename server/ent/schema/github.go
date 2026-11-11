@@ -138,6 +138,11 @@ func (DeploymentEvent) Fields() []ent.Field {
 		field.Enum("status").StorageKey("status").Values("RECEIVED", "CAPTURED", "PARTIAL", "SKIPPED", "FAILED").Default("RECEIVED"),
 		field.String("failure_code").StorageKey("failureCode").Optional().Nillable(),
 		field.JSON("asset_ids", []string{}).StorageKey("assetIds").Default([]string{}),
+		// Kind compares the commit with earlier deployments of the same source and
+		// environment: a redeploy or rollback recaptures but starts no workflow.
+		field.Enum("kind").StorageKey("kind").Values("new", "redeploy", "rollback").Default("new").Immutable(),
+		// DeployedAt is the provider's deployment time; it orders deployments, not arrival.
+		field.Time("deployed_at").StorageKey("deployedAt").Default(time.Now).Immutable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}
@@ -147,5 +152,6 @@ func (DeploymentEvent) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("source_app_id", "external_id").Unique(),
 		index.Fields("organization_id", "created_at"),
+		index.Fields("source_app_id", "environment", "deployed_at"),
 	}
 }

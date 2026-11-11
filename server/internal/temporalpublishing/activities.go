@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
@@ -49,7 +50,18 @@ const LatePublicationWindow = time.Hour
 // errMissedWindow stops a send that would start past LatePublicationWindow.
 var errMissedWindow = errors.New("publication missed its late window")
 
+// errPublishingPaused holds a due post while PUBLISHING_PAUSED=true, set
+// during a database restore (docs/deployment.md). Prepare fails before it
+// claims the post, so nothing is sent and the post stays SCHEDULED for the
+// dispatcher to start again once the pause is cleared.
+var errPublishingPaused = errors.New("publishing is paused")
+
 func (a *Activities) Prepare(ctx context.Context, input PrepareInput) (PreparedPublication, error) {
+	// Read on every call, not cached at startup.
+	if os.Getenv("PUBLISHING_PAUSED") == "true" {
+		slog.WarnContext(ctx, "publication held: publishing is paused", "post", input.PostID)
+		return PreparedPublication{}, errPublishingPaused
+	}
 	now := a.now().UTC()
 	claimed, err := a.store.Claim(ctx, input.PostID, input.RunID, now)
 	if err != nil || !claimed {

@@ -71,6 +71,12 @@ const (
 	FieldScheduleIntent = "scheduleIntent"
 	// FieldFailureCode holds the string denoting the failure_code field in the database.
 	FieldFailureCode = "failureCode"
+	// FieldScheduledByUserID holds the string denoting the scheduled_by_user_id field in the database.
+	FieldScheduledByUserID = "scheduledByUserId"
+	// FieldApprovedByUserID holds the string denoting the approved_by_user_id field in the database.
+	FieldApprovedByUserID = "approvedByUserId"
+	// FieldApprovedVersion holds the string denoting the approved_version field in the database.
+	FieldApprovedVersion = "approvedVersion"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -128,6 +134,9 @@ var Columns = []string{
 	FieldScheduleTimeZone,
 	FieldScheduleIntent,
 	FieldFailureCode,
+	FieldScheduledByUserID,
+	FieldApprovedByUserID,
+	FieldApprovedVersion,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -318,6 +327,21 @@ func ByScheduleIntent(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureCode orders the results by the failure_code field.
 func ByFailureCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureCode, opts...).ToFunc()
+}
+
+// ByScheduledByUserID orders the results by the scheduled_by_user_id field.
+func ByScheduledByUserID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldScheduledByUserID, opts...).ToFunc()
+}
+
+// ByApprovedByUserID orders the results by the approved_by_user_id field.
+func ByApprovedByUserID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedByUserID, opts...).ToFunc()
+}
+
+// ByApprovedVersion orders the results by the approved_version field.
+func ByApprovedVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldApprovedVersion, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

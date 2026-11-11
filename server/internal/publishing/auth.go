@@ -66,6 +66,25 @@ func ForStartedRun(ctx context.Context) context.Context {
 	return context.WithValue(ctx, startedRunKey{}, true)
 }
 
+// delegatedSessionKey marks a session acting through an OAuth client whose live grant was checked.
+type delegatedSessionKey struct{}
+
+// ForDelegatedSession is for an OAuth client, such as Founder Hub, acting for a
+// person's live session after the caller verified the client's grant. The client
+// names its workspace on each request, so AuthorizeRole under ctx does not hold
+// it to the browser's active workspace. Every other check still applies: the
+// session is live, the account is active, and it holds the role in a workspace
+// that is not being deleted.
+func ForDelegatedSession(ctx context.Context) context.Context {
+	return context.WithValue(ctx, delegatedSessionKey{}, true)
+}
+
+// IsDelegatedSession reports whether ctx is marked by ForDelegatedSession.
+func IsDelegatedSession(ctx context.Context) bool {
+	delegated, _ := ctx.Value(delegatedSessionKey{}).(bool)
+	return delegated
+}
+
 // RecordAuthorization keeps what AuthorizeRole or AuthorizeSession admits
 // under ctx in memo.
 func RecordAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
@@ -113,7 +132,7 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 		if err != nil {
 			return "", err
 		}
-		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
+		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID && !IsDelegatedSession(ctx) {
 			return "", ErrForbidden
 		}
 	}

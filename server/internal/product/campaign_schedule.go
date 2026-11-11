@@ -232,7 +232,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	scheduled, err := tx.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(actor.OrganizationID).
 		SetVariantID(*variantID).SetChannelConnectionID(input.ChannelConnectionID).
 		SetScheduledFor(scheduledAt).SetStatus(scheduledpost.StatusSCHEDULED).
-		SetCaption(post.Copy).SetIdempotencyKey(key).Save(ctx)
+		SetCaption(post.Copy).SetIdempotencyKey(key).SetNillableScheduledByUserID(schedulerID(actor)).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			return nil, publishing.ErrConflict

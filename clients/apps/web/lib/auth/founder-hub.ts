@@ -3,11 +3,21 @@ import 'server-only'
 import { timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { founderHubSessionSchema } from 'screenshot-studio-backend-sdk'
+import {
+  type MemberAccessRequirement,
+  memberAccessRequirementSchema,
+} from '@/lib/api/access-requirements'
 import { getRequestId } from '@/lib/api/request-context'
 import { backendSDK } from '@/lib/backend/sdk'
-import { AuthorizationError, requireSessionAccess } from './access'
+import { consumeWorkspaceQuota, requireWorkspaceFeatures } from '@/lib/tenant/entitlements'
+import {
+  assertPermission,
+  AuthorizationError,
+  type OrganizationAccess,
+  requireSessionAccess,
+} from './access'
 import { assertAuthEnvironment, getAuthBaseUrl, getFounderHubMcpUrl } from './environment'
-import { getRolePermissions } from './permissions'
+import { getRolePermissions, normalizeOrganizationRole } from './permissions'
 import { auth } from './server'
 
 /** Settings belong to the current person; bearer requests retain the native gateway and grant checks. */
@@ -34,6 +44,49 @@ export async function requireFounderHubDeviceAccess(headers: Headers) {
     requestId: getRequestId(headers),
     principal,
   }
+}
+
+/**
+ * The Founder Hub member of the workspace the gateway names in
+ * `x-shots-organization-id`, held to `requirement` as `memberAccess` holds a
+ * browser member: role, permission groups, plan features and quota. The phone
+ * only knows the Founder Hub workspace id, so it maps to an organization
+ * through the person's authority snapshot; the backend then checks the
+ * client's live grant and the membership again on every call.
+ */
+export async function requireFounderHubMemberAccess(
+  headers: Headers,
+  requirement: MemberAccessRequirement
+): Promise<OrganizationAccess> {
+  const { feature, permission, quota, sensitive } = memberAccessRequirementSchema.parse(requirement)
+  // shortcut: reads the whole authority snapshot per call, add a one-workspace lookup if sync latency matters.
+  const session = await requireFounderHubAccess(headers)
+  // A missing or malformed workspace id is a bad request (400). Native UUIDs may be uppercase.
+  const workspaceId = z.uuid().parse(headers.get('x-shots-organization-id')).toLowerCase()
+  // Only the person's own workspaces map. Any other id (never theirs, left, or scheduled for
+  // deletion) is refused, not "not found": the phone reads a 404 as a deleted note.
+  const workspace = session.workspaces.find(
+    (item) => item.workspaceId.toLowerCase() === workspaceId
+  )
+  if (!workspace) throw new AuthorizationError('You are not a member of this workspace.', 403)
+  if (sensitive) throw new AuthorizationError('A fresh browser sign-in is required.', 403)
+  const access: OrganizationAccess = {
+    deniedPermissions: workspace.deniedPermissions,
+    organizationId: workspace.organizationId,
+    principal: {
+      client: 'shots-founder-hub',
+      display: session.user.email,
+      kind: 'session',
+      sessionId: session.sessionId,
+      userId: session.user.id,
+    },
+    requestId: getRequestId(headers),
+    role: normalizeOrganizationRole(workspace.role),
+  }
+  assertPermission(access, permission)
+  await requireWorkspaceFeatures(access, feature ? ['workspace:use', feature] : ['workspace:use'])
+  if (quota) await consumeWorkspaceQuota(access, quota)
+  return access
 }
 
 function founderHubAudienceSchema(audience: string) {

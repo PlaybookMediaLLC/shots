@@ -5,8 +5,54 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 )
+
+// Fetch resends only what the platform cannot have acted on: a rate limit is
+// retried, then reported as rate limited; a 500 is retried for a read, but a
+// server error, even one the provider calls retryable, never for a publish.
+func TestFetchRetriesOnlyWhatIsSafeToResend(t *testing.T) {
+	t.Setenv("DISABLE_SSRF_PROTECTION", "true")
+	for _, test := range []struct {
+		name, method, body string
+		// statuses answers each request in turn; the last one repeats.
+		statuses     []int
+		wantRequests int
+		wantType     string
+	}{
+		{"429 then success", http.MethodPost, "{}", []int{429, 200}, 2, ""},
+		{"lasting 429", http.MethodPost, "{}", []int{429}, 4, temporalx.TypeRateLimited},
+		{"rate limit text on a 400", http.MethodPost, `{"error":"Rate limit exceeded"}`, []int{400}, 4, temporalx.TypeRateLimited},
+		{"500 to a read", http.MethodGet, "{}", []int{500, 200}, 2, ""},
+		{"500 to a publish", http.MethodPost, "{}", []int{500}, 1, temporalx.TypeUnknownDelivery},
+		{"502 to a publish", http.MethodPost, "{}", []int{502}, 1, temporalx.TypeUnknownDelivery},
+		{"retryable 503 to a publish", http.MethodPost, "retry", []int{503}, 1, temporalx.TypeUnknownDelivery},
+		{"retryable 503 to a read", http.MethodGet, "retry", []int{503, 200}, 2, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var requests atomic.Int32
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(test.statuses[min(int(requests.Add(1)), len(test.statuses))-1])
+				_, _ = w.Write([]byte(test.body))
+			}))
+			defer srv.Close()
+			client := NewBase("linkedin", func(body string, _ int) *HandledError {
+				if body == "retry" {
+					return &HandledError{Type: "retry", Value: "Service Unavailable"}
+				}
+				return nil
+			})
+			client.RetryDelay = 0
+			_, err := client.Fetch(context.Background(), srv.URL, Request{Method: test.method})
+			if int(requests.Load()) != test.wantRequests || temporalx.FailureType(err) != test.wantType || (err == nil) != (test.wantType == "") {
+				t.Fatalf("requests=%d err=%v", requests.Load(), err)
+			}
+		})
+	}
+}
 
 func TestMediaSizeUsesRangedGETForPresignedMedia(t *testing.T) {
 	t.Setenv("DISABLE_SSRF_PROTECTION", "true")

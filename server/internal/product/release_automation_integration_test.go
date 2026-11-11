@@ -99,7 +99,7 @@ func TestAutomationPRAndDeploymentCreateReviewableReleases(t *testing.T) {
 			if err := f.repo.SelectReleaseAutomation(f.ctx, f.org, id, *active.ActiveVersionID, 0); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.repo.CollectAutomationChange(f.ctx, f.org, id, 0); err != nil {
+			if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, id, 0); err != nil {
 				t.Fatal(err)
 			}
 			var output automation.Outputs

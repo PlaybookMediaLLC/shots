@@ -23,6 +23,8 @@ type ContentDraftSettings struct {
 	PostingSlots []schema.QueueSlot `json:"posting_slots,omitempty"`
 	// RequireApproval holds the value of the "require_approval" field.
 	RequireApproval bool `json:"require_approval,omitempty"`
+	// AllowSelfApproval holds the value of the "allow_self_approval" field.
+	AllowSelfApproval bool `json:"allow_self_approval,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt    time.Time `json:"updated_at,omitempty"`
 	selectValues sql.SelectValues
@@ -35,7 +37,7 @@ func (*ContentDraftSettings) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case contentdraftsettings.FieldPostingSlots:
 			values[i] = new([]byte)
-		case contentdraftsettings.FieldRequireApproval:
+		case contentdraftsettings.FieldRequireApproval, contentdraftsettings.FieldAllowSelfApproval:
 			values[i] = new(sql.NullBool)
 		case contentdraftsettings.FieldID:
 			values[i] = new(sql.NullString)
@@ -75,6 +77,12 @@ func (_m *ContentDraftSettings) assignValues(columns []string, values []any) err
 				return fmt.Errorf("unexpected type %T for field require_approval", values[i])
 			} else if value.Valid {
 				_m.RequireApproval = value.Bool
+			}
+		case contentdraftsettings.FieldAllowSelfApproval:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field allow_self_approval", values[i])
+			} else if value.Valid {
+				_m.AllowSelfApproval = value.Bool
 			}
 		case contentdraftsettings.FieldUpdatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -123,6 +131,9 @@ func (_m *ContentDraftSettings) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("require_approval=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequireApproval))
+	builder.WriteString(", ")
+	builder.WriteString("allow_self_approval=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AllowSelfApproval))
 	builder.WriteString(", ")
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))

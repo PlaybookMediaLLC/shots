@@ -1,13 +1,11 @@
 import 'server-only'
 
 import type {
-  BackendAutoActions,
   BackendContentDraft,
   BackendContentDraftPost,
   BackendContentDraftCreate,
   BackendContentDraftListQuery,
   BackendContentDraftUpdate,
-  BackendPoll,
   BackendSharedContentDraft,
 } from 'screenshot-studio-backend-sdk'
 import type { OrganizationAccess, TenantContext } from '@/lib/auth/access'
@@ -139,8 +137,10 @@ function draftChannel(platform: string): DraftChannel | null {
  * payload is built here from the stored draft (its primary body, platform
  * versions, kind and target) with the same function the composer previews
  * with, for the account's own standing; anything that blocks it is refused
- * before anything is queued. Go resolves the time and checks every payload
- * again.
+ * before anything is queued. The caller sends no text, so the posts carry the
+ * stored draft's (F1): the draft read here must not be older than `version`, and Go admits
+ * only this server and creates posts only while `version` is current. Go
+ * checks its approval, resolves the time and checks every payload again.
  */
 export async function prepareContentDraftSchedule(
   context: OrganizationAccess,
@@ -151,8 +151,6 @@ export async function prepareContentDraftSchedule(
     disambiguation?: 'earlier' | 'later'
     localTime?: string
     naturalTiming?: boolean
-    /** Per channel connection: X follow-ups, and a poll from older composers. */
-    options?: Record<string, { autoActions?: BackendAutoActions; poll?: BackendPoll }>
     publishNow?: boolean
     /** When set, the set's next free queue slot, reserved by the backend. */
     queue?: boolean
@@ -172,15 +170,20 @@ export async function prepareContentDraftSchedule(
   }
   const built = await draftTargets(context, id, input.channelConnectionIds, input.blockImages)
   if (!built) return null
+  // Go creates posts only while `version` is current, so text read at an older
+  // version must not be sent under it: a later approval would cover that text.
+  // A newer read passes, so Go can replay a schedule already made at `version`.
+  const read = built[0]?.version
+  if (read !== undefined && read < input.version) {
+    throw new ScheduledPostError(
+      `This draft was saved elsewhere since you opened it; it is now at version ${read}.`,
+      409
+    )
+  }
   const targets = built.map(({ channel, problems, target }) => {
     if (!target) throw new ScheduledPostError('A selected channel cannot take this draft.', 404)
     if (problems.length > 0) throw new ScheduledPostError(`${channel}: ${problems.join(' ')}`, 409)
-    const legacy = input.options?.[target.channelConnectionId]
-    return {
-      ...target,
-      ...(legacy?.autoActions ? { autoActions: legacy.autoActions } : {}),
-      ...(!target.poll && legacy?.poll ? { poll: legacy.poll } : {}),
-    }
+    return target
   })
   return {
     add: input.add,
@@ -322,7 +325,11 @@ export async function getContentDraftSettings(context: TenantContext) {
 /** Save the drafts settings an owner, admin or publisher sets. */
 export async function updateContentDraftSettings(
   context: TenantContext,
-  input: { postingSlots?: { time: string; weekday: number }[]; requireApproval?: boolean }
+  input: {
+    postingSlots?: { time: string; weekday: number }[]
+    requireApproval?: boolean
+    allowSelfApproval?: boolean
+  }
 ) {
   return backendSDK(context).updateContentDraftSettings(input)
 }
