@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.47.2](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.1...v2.47.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* **platform:** protect review, collaboration, and publishing snapshots ([#497](https://github.com/PlaybookMediaLLC/shots/issues/497)) ([5285a78](https://github.com/PlaybookMediaLLC/shots/commit/5285a7890c8d4f8d5a7ec752c97ab788cb547d23))
+* **web:** resolve UI audit regressions and refine textarea focus ([#495](https://github.com/PlaybookMediaLLC/shots/issues/495)) ([329d163](https://github.com/PlaybookMediaLLC/shots/commit/329d163014fc2ef59c1dd9121fff014543764985))
+
 ## [2.47.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.0...v2.47.1) (2026-11-06)
 
 
