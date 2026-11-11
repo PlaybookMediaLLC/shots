@@ -6,8 +6,6 @@ import { createUploadedAsset, db, expect, requestJson, test, trpcMutation } from
  * active brand kit, keeping the run's release for its export. The fixture has
  * no GitHub to deliver a release, so the test writes a finished run's rows
  * itself (no pinned version or node receipts: the editor action needs neither).
- * It is its own file because it runs in the production lane, unlike the
- * release flow's spec, which needs the dev server's scripted AI.
  */
 
 test.use({ workspaceOptions: { plan: 'pro' } })

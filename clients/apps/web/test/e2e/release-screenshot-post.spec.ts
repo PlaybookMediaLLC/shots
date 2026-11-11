@@ -51,8 +51,8 @@ async function cornerOf(page: Page, assetId: string): Promise<number[]> {
 
 test(
   'a release screenshot opens on the brand kit and schedules X and LinkedIn posts written from the release',
-  // The captions come from the scripted AI model, which only the dev server runs.
-  { tag: ['@dev-server', '@journey'] },
+  // The captions come from the scripted AI model (an e2e hook, lib/e2e-hooks.ts).
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
