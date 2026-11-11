@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf8"
 
@@ -328,6 +329,25 @@ func accountHealth(status channelconnection.Status, exists, deleted, disabled, r
 // connectionHealth requires a provider record in the bound social tenant.
 // An active product row alone is not proof of usable provider credentials.
 // Missing provider tables, bindings, or records leave the account unverified.
+// socialTablesFound remembers that the social Integration table exists. A
+// database that has it keeps it, so only a found table is remembered; a
+// database without it is asked again on the next call.
+var socialTablesFound atomic.Bool
+
+func socialTablesPresent(ctx context.Context, client *ent.Client) (bool, error) {
+	if socialTablesFound.Load() {
+		return true, nil
+	}
+	var social bool
+	err := client.PlatformQuery(ctx, `SELECT to_regclass('public."Integration"') IS NOT NULL`, nil, func(row entsql.ColumnScanner) error {
+		return row.Scan(&social)
+	})
+	if social {
+		socialTablesFound.Store(true)
+	}
+	return social, err
+}
+
 func connectionHealth(ctx context.Context, client *ent.Client, organizationID string, connections []*ent.ChannelConnection) (map[string]string, error) {
 	health := make(map[string]string, len(connections))
 	if len(connections) == 0 {
@@ -338,10 +358,7 @@ func connectionHealth(ctx context.Context, client *ent.Client, organizationID st
 		ids = append(ids, connection.ID)
 		health[connection.ID] = accountHealth(connection.Status, false, false, false, false, false, nil, time.Now())
 	}
-	var social bool
-	if err := client.PlatformQuery(ctx, `SELECT to_regclass('public."Integration"') IS NOT NULL`, nil, func(row entsql.ColumnScanner) error {
-		return row.Scan(&social)
-	}); err != nil || !social {
+	if social, err := socialTablesPresent(ctx, client); err != nil || !social {
 		return health, err
 	}
 	statuses := make(map[string]channelconnection.Status, len(connections))
@@ -458,6 +475,24 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	for _, set := range sets {
 		ids = append(ids, set.ID)
 	}
+	// The writing samples and the AI switch do not depend on the accounts, so
+	// they are read while the accounts are.
+	samples := map[string]int{}
+	var samplesErr error
+	var aiEnabled bool
+	var side sync.WaitGroup
+	defer side.Wait()
+	if len(ids) > 0 {
+		side.Go(func() {
+			var rows []*ent.SocialSetWritingSample
+			rows, samplesErr = c.client.SocialSetWritingSample.Query().Where(socialsetwritingsample.SocialSetIDIn(ids...),
+				socialsetwritingsample.OrganizationID(actor.OrganizationID)).All(ctx)
+			for _, row := range rows {
+				samples[row.SocialSetID]++
+			}
+		})
+	}
+	side.Go(func() { aiEnabled = c.workspaceAIEnabled(ctx, actor.OrganizationID) })
 	connections, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
 		channelconnection.SocialSetIDIn(ids...), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
 		Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
@@ -493,18 +528,10 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	for i, connection := range connections {
 		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], built[i])
 	}
-	samples := map[string]int{}
-	if len(ids) > 0 {
-		rows, err := c.client.SocialSetWritingSample.Query().Where(socialsetwritingsample.SocialSetIDIn(ids...),
-			socialsetwritingsample.OrganizationID(actor.OrganizationID)).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, row := range rows {
-			samples[row.SocialSetID]++
-		}
+	side.Wait()
+	if samplesErr != nil {
+		return nil, samplesErr
 	}
-	aiEnabled := c.workspaceAIEnabled(ctx, actor.OrganizationID)
 	records := make([]SocialSetRecord, 0, len(sets))
 	for _, set := range sets {
 		setAccounts := accounts[set.ID]
@@ -576,31 +603,45 @@ func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*Socia
 	if err != nil {
 		return nil, err
 	}
-	records, err := c.socialSetRecords(ctx, actor, sets)
-	if err != nil {
-		return nil, err
-	}
-	list := &SocialSetList{Items: records, Orphaned: []OrphanedSocialSet{}, Unassigned: []SocialAccount{}}
-	unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
-		channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
-		Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	health, err := connectionHealth(ctx, c.client, actor.OrganizationID, unassigned)
-	if err != nil {
-		return nil, err
-	}
-	for _, connection := range unassigned {
-		list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
-	}
+	// The unassigned accounts and the orphaned sets do not depend on the sets'
+	// records, so the three are read together.
+	list := &SocialSetList{Orphaned: []OrphanedSocialSet{}, Unassigned: []SocialAccount{}}
+	var unassignedErr, orphansErr error
+	var parts sync.WaitGroup
+	parts.Go(func() {
+		unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
+			channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
+			Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
+		if err != nil {
+			unassignedErr = err
+			return
+		}
+		health, err := connectionHealth(ctx, c.client, actor.OrganizationID, unassigned)
+		if err != nil {
+			unassignedErr = err
+			return
+		}
+		for _, connection := range unassigned {
+			list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
+		}
+	})
 	if workspaceroles.Allows(role, "owner", "admin") {
-		orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)
+		parts.Go(func() {
+			orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)
+			if orphansErr = err; err == nil {
+				list.Orphaned = orphans
+			}
+		})
+	}
+	records, err := c.socialSetRecords(ctx, actor, sets)
+	parts.Wait()
+	// The errors keep the order the reads had when they ran one after another.
+	for _, err := range []error{err, unassignedErr, orphansErr} {
 		if err != nil {
 			return nil, err
 		}
-		list.Orphaned = orphans
 	}
+	list.Items = records
 	return list, nil
 }
 
