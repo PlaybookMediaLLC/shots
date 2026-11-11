@@ -748,7 +748,7 @@ export function PrepareScreenshotPost({
   return (
     <Sheet open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <SheetContent
-        className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[44rem]"
+        className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[min(44rem,100vw)]"
         side="right"
       >
         <SheetHeader className="gap-1 border-b border-border px-6 py-5 pr-14">
@@ -978,7 +978,7 @@ export function PrepareScreenshotPost({
             </div>
 
             {/* Where and when it goes. */}
-            <aside className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 @min-[46rem]:border-l @min-[46rem]:border-border @min-[46rem]:pl-8">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 @min-[46rem]:border-l @min-[46rem]:border-border @min-[46rem]:pl-8">
               {sets.length > 0 ? (
                 <Label className="grid gap-2 text-ui-lg font-normal leading-normal">
                   Profile
@@ -1205,7 +1205,7 @@ export function PrepareScreenshotPost({
                   )}
                 </div>
               ) : null}
-            </aside>
+            </div>
           </div>
         </div>
 
@@ -1214,7 +1214,7 @@ export function PrepareScreenshotPost({
             {blocked ? <p role="alert">{blocked}</p> : null}
             {error ? <p role="alert">{error}</p> : null}
           </div>
-          <div className="flex shrink-0 justify-end gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
             <Button disabled={Boolean(busy)} onClick={() => onOpenChange(false)} variant="outline">
               Cancel
             </Button>
