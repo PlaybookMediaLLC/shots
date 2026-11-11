@@ -98,6 +98,10 @@ func (c *Configuration) requireKeySchedule(ctx context.Context, actor Actor, inp
 	return forbidden("A key with post:schedule sends only text a person approved: use the approved copy of a campaign post for this visual. To post new text, use createPost, which needs post:publish.")
 }
 
+// schedulerID is who queued a post, as scheduled_post records it: the member,
+// or "api-key:<id>" for a key (the identity comments use); nil for neither.
+func schedulerID(actor Actor) *string { return nonEmptyPointer(commentAuthorID(actor)) }
+
 // requireSharedAccount keeps a key out of a private social set's accounts: not
 // found, the same as another workspace's account. People keep their own access.
 func requireSharedAccount(ctx context.Context, client *ent.Client, actor Actor, connection *ent.ChannelConnection) error {
@@ -171,6 +175,7 @@ func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	if err != nil {
 		return publishing.CreateScheduledPostResult{}, err
 	}
+	input.ScheduledBy = schedulerID(actor)
 	result, err := c.auth.CreateScheduledPost(ctx, actor.auditActor(), input)
 	if err != nil || !result.Created {
 		refund()

@@ -6,7 +6,9 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspaceentitlement"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceroles"
 )
 
 // PageAccessSnapshot contains only what the signed-in page gate needs.
@@ -53,8 +55,10 @@ func (c *Configuration) PageAccess(ctx context.Context, actor Actor) (*PageAcces
 		return result, nil
 	}
 	actor.OrganizationID = result.Active.ID
-	if err := c.AuthorizeRead(ctx, actor); err != nil {
-		return nil, err
+	// The session check and ListWorkspaces already read this request's session,
+	// membership and deletion state, so only AuthorizeRead's role gate remains.
+	if !workspaceroles.Allows(result.Active.Role, readRoles...) {
+		return nil, publishing.ErrForbidden
 	}
 	if result.DeniedPermissions, err = deniedPermissions(ctx, c.client, actor.OrganizationID, actor.UserID, result.Active.Role); err != nil {
 		return nil, err

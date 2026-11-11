@@ -209,14 +209,72 @@ func TestContainerErrorDisconnects(t *testing.T) {
 
 func TestPublishErrorClassified(t *testing.T) {
 	mux := http.NewServeMux()
+	requests := 0
 	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		requests++
 		w.WriteHeader(400)
 		w.Write([]byte(`{"error":{"error_subcode":2207042}}`))
 	})
 	p := setup(t, mux)
 	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"single","containers":["c1"],"message":""}`), &ent.Integration{InternalID: "ig1"})
-	if temporalx.FailureType(err) != temporalx.TypeDailyLimit || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" {
-		t.Fatalf("got %v", err)
+	// The daily cap is a definite refusal with its reason, sent once.
+	if temporalx.FailureType(err) != temporalx.TypeDailyLimit || temporalx.FailureMessage(err) != "You have reached the maximum of 25 posts per day, allowed for your account" || requests != 1 {
+		t.Fatalf("got %v after %d requests", err, requests)
+	}
+}
+
+// Once one story is live, any later failure leaves the outcome unknown: a
+// resend would post that story again.
+func TestStoriesFailingAfterTheFirstAreUnknown(t *testing.T) {
+	for _, test := range []struct{ name, failing string }{
+		{"second publish rate limited", "POST /v25.0/ig1/media_publish"},
+		{"second status read rate limited", "GET /v25.0/s2"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			published := map[string]int{}
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /v25.0/{id}", func(w http.ResponseWriter, r *http.Request) {
+				if test.failing == "GET /v25.0/"+r.PathValue("id") {
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				w.Write([]byte(`{"status_code":"FINISHED"}`))
+			})
+			mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("creation_id")
+				if id == "s2" && test.failing == "POST /v25.0/ig1/media_publish" {
+					w.WriteHeader(http.StatusTooManyRequests)
+					return
+				}
+				published[id]++
+				w.Write([]byte(`{"id":"m-` + id + `"}`))
+			})
+			p := setup(t, mux)
+			_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["s1","s2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+			if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || published["s1"] != 1 || published["s2"] != 0 {
+				t.Fatalf("err=%v published=%v", err, published)
+			}
+		})
+	}
+}
+
+// The comment is live once its POST answers: a rate limit on reading the
+// parent's permalink must not fail it, or the publication would be resent.
+func TestCommentPublishedWhenPermalinkIsRateLimited(t *testing.T) {
+	comments := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v25.0/media1/comments", func(w http.ResponseWriter, r *http.Request) {
+		comments++
+		w.Write([]byte(`{"id":"c9"}`))
+	})
+	mux.HandleFunc("GET /v25.0/media1", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+	})
+	p := setup(t, mux)
+	profile := "me"
+	got, err := p.Comment(context.Background(), "ig1", "media1", "", "tok", []integrations.PostDetails{{ID: "reply", Message: "more"}}, &ent.Integration{Profile: &profile})
+	if err != nil || comments != 1 || len(got) != 1 || got[0].PostID != "c9" || got[0].ReleaseURL != "https://www.instagram.com/me" {
+		t.Fatalf("got=%+v err=%v comments=%d", got, err, comments)
 	}
 }
 

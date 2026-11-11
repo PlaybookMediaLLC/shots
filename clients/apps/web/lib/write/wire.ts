@@ -60,13 +60,6 @@ export const draftEngagementSchema = z
   .object({ autoPlug: draftEngagementRuleSchema, autoRepost: draftEngagementRuleSchema })
   .default({ autoPlug: NO_RULE, autoRepost: NO_RULE })
 
-/** A poll payload envelope; provider-specific limits are checked on schedule. */
-export const pollSchema = z.object({
-  multiple: z.boolean().optional(),
-  durationMinutes: z.number().int().min(0).max(525_600),
-  options: z.array(z.string().min(1).max(5_000)).min(2).max(100),
-})
-
 /** The Write fields a draft is created or updated with. */
 export const draftWriteInputSchema = z.object({
   /** An X article's title and cover, for an article draft. */

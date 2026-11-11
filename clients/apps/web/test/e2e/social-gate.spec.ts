@@ -214,7 +214,7 @@ test('the backend worker publishes once through Go, retries, honors cancellation
       new Set(['post.connection_created', 'post.scheduled', 'post.cancelled', 'post.published'])
     )
 
-    // A throttled provider refused the post, so it is retried into exactly one remote post.
+    // A throttled provider accepted nothing, so it is retried into exactly one remote post.
     await resetFake('throttle-once')
     const retry = await createScheduledPost(
       page,
@@ -232,8 +232,8 @@ test('the backend worker publishes once through Go, retries, honors cancellation
       (await attemptsOf(retry.scheduledPost.id)).filter((item) => item.outcome === 'SUCCEEDED')
     ).toHaveLength(1)
 
-    // A server error may have published: the post is never resent and waits
-    // as UNKNOWN_DELIVERY for a person to check the account.
+    // A server error after the publish request may hide an accepted post, so it is
+    // never resent: one request, and the outcome is unknown until a person checks.
     await resetFake('server-error-once')
     const ambiguous = await createScheduledPost(
       page,
@@ -243,6 +243,9 @@ test('the backend worker publishes once through Go, retries, honors cancellation
       soon()
     )
     await awaitStatus(ambiguous.scheduledPost.id, 'UNKNOWN_DELIVERY')
+    // eslint-disable-next-line no-restricted-syntax -- Proves no durable retry resends the post later; an absence needs a window.
+    await page.waitForTimeout(30_000)
+    expect(await statusOf(ambiguous.scheduledPost.id)).toBe('UNKNOWN_DELIVERY')
     const unresolved = await fakeState()
     expect(unresolved.requests).toBe(1)
     expect(unresolved.posts).toHaveLength(0)

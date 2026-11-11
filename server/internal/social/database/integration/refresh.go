@@ -25,7 +25,9 @@ func NewRefreshIntegrationService(manager *integrations.Manager, service *Servic
 }
 
 // Refresh returns nil (TypeScript's false) when the token could not be
-// refreshed; the channel is then flagged and the user notified.
+// refreshed; the channel is then flagged and the user notified. Every caller
+// (the scheduled job, analytics) shares one lock per account, so a refresh
+// already in flight answers ErrRefreshChanged.
 func (r *RefreshIntegrationService) Refresh(ctx context.Context, integration *ent.Integration, cause string) (*integrations.AuthTokenDetails, error) {
 	if integration == nil {
 		return nil, ErrRefreshChanged
@@ -35,6 +37,11 @@ func (r *RefreshIntegrationService) Refresh(ctx context.Context, integration *en
 		return nil, fmt.Errorf("unknown provider %s", integration.ProviderIdentifier)
 	}
 
+	unlock, err := r.service.repo.lockRefresh(ctx, integration)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	snapshot, err := r.service.repo.prepareRefresh(ctx, integration, provider.Info().OneTimeToken)
 	if err != nil {
 		return nil, err

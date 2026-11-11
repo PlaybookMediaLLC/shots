@@ -197,6 +197,36 @@ func TestPrepareSendsOnlyEligibleOnTimePosts(t *testing.T) {
 	}
 }
 
+// claimRecorder records whether Prepare claimed the post.
+type claimRecorder struct {
+	activityStore
+	claimed bool
+}
+
+func (s *claimRecorder) Claim(context.Context, string, string, time.Time) (bool, error) {
+	s.claimed = true
+	return true, nil
+}
+
+// While publishing is paused, Prepare fails before it claims the post, so
+// the post stays SCHEDULED and nothing goes out; once cleared it sends.
+func TestPrepareHoldsPostsWhilePublishingIsPaused(t *testing.T) {
+	now := time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)
+	store := &claimRecorder{activityStore: activityStore{job: publishing.PublishJob{
+		Post: &ent.ScheduledPost{ID: "p", ScheduledFor: now}, Connection: &ent.ChannelConnection{Platform: "x"}, WorkspaceActive: true,
+	}}}
+	activities := NewActivities(store, directProvider{})
+	activities.now = func() time.Time { return now }
+	t.Setenv("PUBLISHING_PAUSED", "true")
+	if prepared, err := activities.Prepare(context.Background(), PrepareInput{PostID: "p", RunID: "run-1"}); !errors.Is(err, errPublishingPaused) || prepared.Ready || store.claimed {
+		t.Fatalf("paused: prepared=%#v claimed=%v err=%v", prepared, store.claimed, err)
+	}
+	t.Setenv("PUBLISHING_PAUSED", "")
+	if prepared, err := activities.Prepare(context.Background(), PrepareInput{PostID: "p", RunID: "run-1"}); err != nil || !prepared.Ready || !store.claimed {
+		t.Fatalf("resumed: prepared=%#v claimed=%v err=%v", prepared, store.claimed, err)
+	}
+}
+
 // sendCounter counts the publications that reached the provider.
 type sendCounter struct {
 	directProvider

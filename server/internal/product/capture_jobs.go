@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -15,7 +16,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturejob"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/capturerecipe"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/githubinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformappconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/surfacecapture"
@@ -122,7 +125,7 @@ func admitCaptureJob(ctx context.Context, tx *ent.Tx, actor Actor, recipe *ent.C
 	if actor.UserID != "" {
 		create.SetRequestedByUserID(actor.UserID)
 	}
-	unproven := false
+	unproven, superseded := false, false
 	if deployment != nil {
 		create.SetDeploymentEventID(deployment.ID)
 		// A release capture needs the deployed commit to compare the app against.
@@ -133,9 +136,16 @@ func admitCaptureJob(ctx context.Context, tx *ent.Tx, actor Actor, recipe *ent.C
 				create.SetExpectedRevision(*deployment.Sha)
 			}
 		}
+		// A deployment arriving after a newer one is admitted already superseded.
+		if superseded, err = deploymentSuperseded(ctx, tx.Client(), deployment); err != nil {
+			return nil, err
+		}
 	}
-	if unproven {
+	switch {
+	case unproven:
 		create.SetPhase(capturejob.PhaseFAILED).SetStatus(capturejob.StatusFAILED).SetFailureCode(string(browser.DeploymentUnverified))
+	case superseded:
+		create.SetPhase(capturejob.PhaseCANCELLED).SetStatus(capturejob.StatusCANCELLED).SetFailureCode(captureSuperseded)
 	}
 	job, err := create.Save(ctx)
 	if ent.IsConstraintError(err) {
@@ -147,12 +157,53 @@ func admitCaptureJob(ctx context.Context, tx *ent.Tx, actor Actor, recipe *ent.C
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.capture_job_admitted", "capture_job", job.ID, map[string]any{"kind": string(kind), "recipeVersion": recipe.Version}); err != nil {
 		return nil, err
 	}
-	if !unproven {
+	if deployment != nil && !superseded {
+		if err := supersedeCaptureJobs(ctx, tx, recipe, deployment); err != nil {
+			return nil, err
+		}
+	}
+	if !unproven && !superseded {
 		if err := captureOutbox(ctx, tx, actor.OrganizationID, EventCaptureJobDispatch, "capture_job", job.ID, "0"); err != nil {
 			return nil, err
 		}
 	}
 	return job, nil
+}
+
+// supersedeCaptureJobs cancels the recipe's jobs still waiting for an older
+// deployment of the same source and environment, so a burst of deployments
+// leaves one waiting job. A running attempt finishes, and the deployment order
+// keeps its image from replacing a newer one. Only deployment jobs are touched.
+func supersedeCaptureJobs(ctx context.Context, tx *ent.Tx, recipe *ent.CaptureRecipe, deployment *ent.DeploymentEvent) error {
+	versions, err := tx.CaptureRecipe.Query().Where(capturerecipe.OrganizationID(recipe.OrganizationID), capturerecipe.Name(recipe.Name)).IDs(ctx)
+	if err != nil {
+		return err
+	}
+	waiting := []predicate.CaptureJob{capturejob.OrganizationID(recipe.OrganizationID), capturejob.KindEQ(capturejob.KindDeployment), capturejob.RecipeIDIn(versions...),
+		capturejob.PhaseIn(capturejob.PhaseQUEUED, capturejob.PhaseWAITING_DEPLOYMENT, capturejob.PhaseNEEDS_AUTH), capturejob.DeploymentEventIDNEQ(deployment.ID)}
+	deployments, err := tx.CaptureJob.Query().Where(waiting...).Select(capturejob.FieldDeploymentEventID).Strings(ctx)
+	if err != nil || len(deployments) == 0 {
+		return err
+	}
+	older, err := tx.DeploymentEvent.Query().Where(deploymentevent.IDIn(deployments...), deploymentevent.SourceAppID(deployment.SourceAppID),
+		deploymentevent.Environment(deployment.Environment), deploymentevent.DeployedAtLT(deployment.DeployedAt)).IDs(ctx)
+	if err != nil || len(older) == 0 {
+		return err
+	}
+	return tx.CaptureJob.Update().Where(append(waiting, capturejob.DeploymentEventIDIn(older...))...).
+		SetPhase(capturejob.PhaseCANCELLED).SetStatus(capturejob.StatusCANCELLED).SetFailureCode(captureSuperseded).Exec(ctx)
+}
+
+// cancelSuspendedCaptureJobs stops a suspended source's deployment jobs that have not
+// started. Deployment jobs only ever use a connection bound to their source.
+func cancelSuspendedCaptureJobs(ctx context.Context, tx *ent.Tx, org, sourceID string) error {
+	connections, err := tx.PlatformAppConnection.Query().Where(platformappconnection.OrganizationID(org), platformappconnection.SourceAppID(sourceID)).IDs(ctx)
+	if err != nil || len(connections) == 0 {
+		return err
+	}
+	return tx.CaptureJob.Update().Where(capturejob.OrganizationID(org), capturejob.AppConnectionIDIn(connections...), capturejob.KindEQ(capturejob.KindDeployment),
+		capturejob.PhaseIn(capturejob.PhaseQUEUED, capturejob.PhaseWAITING_DEPLOYMENT, capturejob.PhaseNEEDS_AUTH)).
+		SetPhase(capturejob.PhaseCANCELLED).SetStatus(capturejob.StatusCANCELLED).SetFailureCode("installation_suspended").Exec(ctx)
 }
 
 // CaptureJobRequest asks for a capture now. Source and SourceID name an agent
@@ -234,8 +285,9 @@ func activeRecipeVersion(ctx context.Context, recipes *ent.CaptureRecipeClient, 
 
 // admitDeploymentCaptures admits a job for each active recipe bound to the
 // deployment's source and environment. A hostname match is never enough, and
-// the payload's URL is never used. It returns the surfaces the jobs now own.
-func (c *Configuration) admitDeploymentCaptures(ctx context.Context, deployment *ent.DeploymentEvent) (map[string]bool, error) {
+// the payload's URL is never used. A redeploy skips the surfaces in captured.
+// It returns the surfaces the jobs now own.
+func (c *Configuration) admitDeploymentCaptures(ctx context.Context, deployment *ent.DeploymentEvent, captured map[string]bool) (map[string]bool, error) {
 	owned := map[string]bool{}
 	connections, err := c.client.PlatformAppConnection.Query().Where(platformappconnection.OrganizationID(deployment.OrganizationID), platformappconnection.SourceAppID(deployment.SourceAppID),
 		platformappconnection.Environment(deployment.Environment), platformappconnection.StatusNEQ(platformappconnection.StatusREVOKED)).All(ctx)
@@ -249,6 +301,9 @@ func (c *Configuration) admitDeploymentCaptures(ctx context.Context, deployment 
 			return nil, err
 		}
 		for _, recipe := range recipes {
+			if recipe.SurfaceID != nil && captured[*recipe.SurfaceID] {
+				continue
+			}
 			tx, err := c.client.Tx(ctx)
 			if err != nil {
 				return nil, err
@@ -380,6 +435,7 @@ func (c *Configuration) captureEligibility(ctx context.Context, tx *ent.Tx, job 
 	if recipe.Status == capturerecipe.StatusARCHIVED {
 		return "recipe_archived", nil
 	}
+	var sourceID *string
 	if job.DeploymentEventID != nil {
 		deployment, err := tx.DeploymentEvent.Query().Where(deploymentevent.ID(*job.DeploymentEventID), deploymentevent.OrganizationID(job.OrganizationID)).Only(ctx)
 		if ent.IsNotFound(err) {
@@ -395,6 +451,33 @@ func (c *Configuration) captureEligibility(ctx context.Context, tx *ent.Tx, job 
 		if !active {
 			return "source_inactive", nil
 		}
+		sourceID = &deployment.SourceAppID
+	} else if job.AppConnectionID != nil {
+		connection, err := tx.PlatformAppConnection.Query().Where(platformappconnection.ID(*job.AppConnectionID), platformappconnection.OrganizationID(job.OrganizationID)).Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return "", err
+		}
+		if connection != nil {
+			sourceID = connection.SourceAppID
+		}
+	}
+	if sourceID == nil {
+		return "", nil
+	}
+	// Every kind of job stops while the source's GitHub App is suspended or gone.
+	source, err := tx.SourceApp.Query().Where(sourceapp.ID(*sourceID), sourceapp.OrganizationID(job.OrganizationID)).Only(ctx)
+	if err != nil || source.GithubInstallationID == nil {
+		return "", ent.MaskNotFound(err)
+	}
+	installation, err := tx.GitHubInstallation.Get(ctx, *source.GithubInstallationID)
+	if ent.IsNotFound(err) {
+		return "installation_deleted", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if installation.Status != githubinstallation.StatusACTIVE {
+		return "installation_" + strings.ToLower(string(installation.Status)), nil
 	}
 	return "", nil
 }
@@ -487,6 +570,11 @@ func (c *Configuration) claimCaptureJob(ctx context.Context, org, id string) (*c
 	}
 	if connection.LeaseExpiresAt != nil && connection.LeaseExpiresAt.After(now) && connection.LeaseJobID != nil && *connection.LeaseJobID != job.ID {
 		return busy()
+	}
+	// The connection lock does not cover another connection's claim; this
+	// workspace lock does, so the count below cannot miss one in flight.
+	if _, err := tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext('capture-claim:' || $1))`, org); err != nil {
+		return nil, nil, err
 	}
 	running, err := tx.CaptureAttempt.Query().Where(captureattempt.OrganizationID(org), captureattempt.StatusEQ(captureattempt.StatusRUNNING), captureattempt.CaptureJobIDNEQ(job.ID), captureattempt.StartedAtGT(now.Add(-captureLease))).Count(ctx)
 	if err != nil {
@@ -671,8 +759,26 @@ func (c *Configuration) failCapture(ctx context.Context, claim *captureClaim, ca
 			return nil, err
 		}
 	}
+	// The app runs another commit and a newer deployment exists: this one will
+	// never be live again, so waiting for it only holds the workspace's slot.
+	superseded := false
+	if code == browser.WaitingForDeployment && job.DeploymentEventID != nil {
+		deployment, err := tx.DeploymentEvent.Query().Where(deploymentevent.ID(*job.DeploymentEventID), deploymentevent.OrganizationID(job.OrganizationID)).Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return nil, err
+		}
+		if deployment != nil {
+			if superseded, err = deploymentSuperseded(ctx, tx.Client(), deployment); err != nil {
+				return nil, err
+			}
+		}
+	}
 	outcome := captureDone()
 	switch {
+	case superseded:
+		if err := setCaptureJobTerminal(job.Update(), capturejob.PhaseCANCELLED, captureSuperseded).Exec(ctx); err != nil {
+			return nil, err
+		}
 	case code == browser.NeedsAuth:
 		// A sign-in generation is only downgraded by the attempt that used it.
 		if connection.Status == platformappconnection.StatusREADY && connection.Generation == job.ConnectionGeneration {

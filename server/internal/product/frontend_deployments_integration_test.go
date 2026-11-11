@@ -71,6 +71,13 @@ func TestFrontendWorkflowEventSelectsRepositoryAndActionBranches(t *testing.T) {
 			t.Errorf("%s did not select the branch: %+v", c.Field, d)
 		}
 	}
+	// A restored deployment keeps its artifact's time; the event occurs when it
+	// went live again, which is what orders it as a rollback.
+	observed := time.Now().UTC()
+	restored := frontendWorkflowEvent(&ent.FrontendActivation{ID: "restored", Snapshot: fd.Observation{OccurredAt: observed.Add(-24 * time.Hour), ActivationObservedAt: &observed}})
+	if !restored.OccurredAt.Equal(observed) {
+		t.Fatalf("occurred=%s observed=%s", restored.OccurredAt, observed)
+	}
 }
 
 func TestFrontendInactiveWorkflowPreservesEvidenceAndAlerts(t *testing.T) {

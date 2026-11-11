@@ -99,6 +99,11 @@ func FailureCode(v string) predicate.DeploymentEvent {
 	return predicate.DeploymentEvent(sql.FieldEQ(FieldFailureCode, v))
 }
 
+// DeployedAt applies equality check predicate on the "deployed_at" field. It's identical to DeployedAtEQ.
+func DeployedAt(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldEQ(FieldDeployedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.DeploymentEvent {
 	return predicate.DeploymentEvent(sql.FieldEQ(FieldCreatedAt, v))
@@ -612,6 +617,66 @@ func FailureCodeEqualFold(v string) predicate.DeploymentEvent {
 // FailureCodeContainsFold applies the ContainsFold predicate on the "failure_code" field.
 func FailureCodeContainsFold(v string) predicate.DeploymentEvent {
 	return predicate.DeploymentEvent(sql.FieldContainsFold(FieldFailureCode, v))
+}
+
+// KindEQ applies the EQ predicate on the "kind" field.
+func KindEQ(v Kind) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldEQ(FieldKind, v))
+}
+
+// KindNEQ applies the NEQ predicate on the "kind" field.
+func KindNEQ(v Kind) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldNEQ(FieldKind, v))
+}
+
+// KindIn applies the In predicate on the "kind" field.
+func KindIn(vs ...Kind) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldIn(FieldKind, vs...))
+}
+
+// KindNotIn applies the NotIn predicate on the "kind" field.
+func KindNotIn(vs ...Kind) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldNotIn(FieldKind, vs...))
+}
+
+// DeployedAtEQ applies the EQ predicate on the "deployed_at" field.
+func DeployedAtEQ(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldEQ(FieldDeployedAt, v))
+}
+
+// DeployedAtNEQ applies the NEQ predicate on the "deployed_at" field.
+func DeployedAtNEQ(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldNEQ(FieldDeployedAt, v))
+}
+
+// DeployedAtIn applies the In predicate on the "deployed_at" field.
+func DeployedAtIn(vs ...time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldIn(FieldDeployedAt, vs...))
+}
+
+// DeployedAtNotIn applies the NotIn predicate on the "deployed_at" field.
+func DeployedAtNotIn(vs ...time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldNotIn(FieldDeployedAt, vs...))
+}
+
+// DeployedAtGT applies the GT predicate on the "deployed_at" field.
+func DeployedAtGT(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldGT(FieldDeployedAt, v))
+}
+
+// DeployedAtGTE applies the GTE predicate on the "deployed_at" field.
+func DeployedAtGTE(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldGTE(FieldDeployedAt, v))
+}
+
+// DeployedAtLT applies the LT predicate on the "deployed_at" field.
+func DeployedAtLT(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldLT(FieldDeployedAt, v))
+}
+
+// DeployedAtLTE applies the LTE predicate on the "deployed_at" field.
+func DeployedAtLTE(v time.Time) predicate.DeploymentEvent {
+	return predicate.DeploymentEvent(sql.FieldLTE(FieldDeployedAt, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

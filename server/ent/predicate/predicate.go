@@ -405,6 +405,24 @@ type User func(*sql.Selector)
 // UserPreference is the predicate function for userpreference builders.
 type UserPreference func(*sql.Selector)
 
+// VoiceAudioRun is the predicate function for voiceaudiorun builders.
+type VoiceAudioRun func(*sql.Selector)
+
+// VoiceCommand is the predicate function for voicecommand builders.
+type VoiceCommand func(*sql.Selector)
+
+// VoiceMemberSettings is the predicate function for voicemembersettings builders.
+type VoiceMemberSettings func(*sql.Selector)
+
+// VoiceNote is the predicate function for voicenote builders.
+type VoiceNote func(*sql.Selector)
+
+// VoiceSettings is the predicate function for voicesettings builders.
+type VoiceSettings func(*sql.Selector)
+
+// VoiceTranscriptRevision is the predicate function for voicetranscriptrevision builders.
+type VoiceTranscriptRevision func(*sql.Selector)
+
 // WebhookDelivery is the predicate function for webhookdelivery builders.
 type WebhookDelivery func(*sql.Selector)
 

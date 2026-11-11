@@ -480,11 +480,12 @@ func (c *Configuration) RunLegacyReleaseEvent(ctx context.Context, org, id strin
 		}
 		outputs.ReleaseID = result.ReleaseID
 	case automation.Merged:
-		return c.CollectAutomationChange(ctx, org, id, attempt)
+		_, err := c.CollectAutomationChange(ctx, org, id, attempt)
+		return err
 	case automation.Deployed:
 		if productionDeployment(e) {
 			sha := eventString(e, "deployment.sha")
-			_, err = c.IngestDeployment(ctx, actor, IngestDeploymentInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, ExternalID: e.ObjectID, Environment: eventString(e, "deployment.environment"), SHA: &sha, URL: nonEmptyPointer(e.URL)})
+			_, err = c.IngestDeployment(ctx, actor, IngestDeploymentInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, ExternalID: e.ObjectID, Environment: eventString(e, "deployment.environment"), SHA: &sha, URL: nonEmptyPointer(e.URL), DeployedAt: e.OccurredAt})
 			if err != nil {
 				return err
 			}
@@ -500,26 +501,32 @@ func nonEmptyPointer(value string) *string {
 	return &value
 }
 
-func (c *Configuration) CollectAutomationChange(ctx context.Context, org, id string, attempt int) error {
+// CollectAutomationChange records a merged PR or a deployment. For a
+// deployment it returns how its commit compares with earlier ones (new,
+// redeploy or rollback); only a new commit goes on to the workflow.
+func (c *Configuration) CollectAutomationChange(ctx context.Context, org, id string, attempt int) (string, error) {
 	run, event, err := c.automationAttempt(ctx, org, id, attempt)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := c.automationCheckpoint(ctx, run, event); err != nil {
-		return err
+		return "", err
 	}
 	e := event.Snapshot
 	if e.Family == automation.Deployed && productionDeployment(e) {
 		sha := eventString(e, "deployment.sha")
-		_, err := c.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: event.SourceAppID, RequestID: event.DeliveryID}, IngestDeploymentInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, ExternalID: e.ObjectID, Environment: eventString(e, "deployment.environment"), SHA: &sha, URL: nonEmptyPointer(e.URL)})
-		return err
+		result, err := c.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: event.SourceAppID, RequestID: event.DeliveryID}, IngestDeploymentInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, ExternalID: e.ObjectID, Environment: eventString(e, "deployment.environment"), SHA: &sha, URL: nonEmptyPointer(e.URL), DeployedAt: e.OccurredAt})
+		if err != nil {
+			return "", err
+		}
+		return result.Kind, nil
 	}
 	if e.Family != automation.Merged {
-		return nil
+		return "", nil
 	}
 	author := eventString(e, "pr.author")
 	_, err = c.CollectSourceChange(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: event.SourceAppID, RequestID: event.DeliveryID}, CollectSourceChangeInput{SourceAppID: event.SourceAppID, EventID: event.DeliveryID, RepositoryID: e.RepositoryID, Number: e.Number, Title: e.Title, Body: e.Notes, URL: e.URL, MergedAt: e.OccurredAt, AuthorLogin: nonEmptyPointer(author), Labels: e.Fields["pr.labels"].Values})
-	return err
+	return "", err
 }
 
 // automationFailureCode names why a node stopped, for run inspection.
@@ -553,6 +560,8 @@ func automationFailureCode(err error) string {
 		return "needs_auth"
 	case errors.Is(err, ErrCapturePending):
 		return "capture_pending"
+	case errors.Is(err, ErrCaptureSuperseded):
+		return captureSuperseded
 	case errors.Is(err, ErrInvalidInput), errors.Is(err, publishing.ErrNotFound), ent.IsNotFound(err):
 		return "configuration_invalid"
 	}
@@ -563,5 +572,5 @@ func automationFailureCode(err error) string {
 func PermanentAutomationError(err error) bool {
 	var entitlement *FeatureNotEntitledError
 	var prohibited *ProhibitedTermsError
-	return errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrCaptureMissing) || errors.Is(err, ErrCaptureRefused) || errors.Is(err, ErrCaptureNeedsAuth) || errors.Is(err, ErrAutomationStopped) || errors.Is(err, publishing.ErrForbidden) || errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrNotFound) || errors.Is(err, publishing.ErrInvalidState) || ent.IsNotFound(err) || errors.As(err, &entitlement) || errors.As(err, &prohibited)
+	return errors.Is(err, ErrInvalidInput) || errors.Is(err, ErrQuotaExceeded) || errors.Is(err, ErrCaptureMissing) || errors.Is(err, ErrCaptureRefused) || errors.Is(err, ErrCaptureNeedsAuth) || errors.Is(err, ErrCaptureSuperseded) || errors.Is(err, ErrAutomationStopped) || errors.Is(err, publishing.ErrForbidden) || errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrNotFound) || errors.Is(err, publishing.ErrInvalidState) || ent.IsNotFound(err) || errors.As(err, &entitlement) || errors.As(err, &prohibited)
 }

@@ -26,6 +26,13 @@ const (
 	ClassifyActivity = "release-automation-classify-v1"
 	StoppedError     = "ReleaseAutomationStopped"
 	PermanentError   = "ReleaseAutomationInvalid"
+	// SupersededError ends a run whose deployment a newer one replaced before
+	// its capture ran. It schedules the same finish activity as any failure, so
+	// histories without it replay unchanged.
+	SupersededError = "ReleaseAutomationSuperseded"
+	// deploymentKindChange gates skipping redeploys and rollbacks, which drops
+	// commands a run collected before the change would have scheduled.
+	deploymentKindChange = "deployment-kind"
 )
 
 type Input struct {
@@ -68,6 +75,8 @@ func Workflow(ctx workflow.Context, input Input) error {
 					finish.Status, finish.Code, finish.Reason = "cancelled", "access_revoked", "Automation was disabled or required access was revoked."
 				case PermanentError:
 					finish.Status, finish.Code, finish.Reason = "needs_attention", "configuration_invalid", "Required configuration or evidence is unavailable. No further actions were executed."
+				case SupersededError:
+					finish.Status, finish.Code, finish.Reason = "cancelled", "superseded", "A newer deployment replaced this one before its capture ran; that deployment captures for itself. Completed outputs are retained."
 				}
 			}
 		}
@@ -94,8 +103,19 @@ func execute(ctx workflow.Context, input Input, finish *Finish) error {
 		return nil
 	}
 	if event.Family == automation.Deployed {
-		if err := workflow.ExecuteActivity(ctx, CollectActivity, input).Get(ctx, nil); err != nil {
+		var kind string
+		if err := workflow.ExecuteActivity(ctx, CollectActivity, input).Get(ctx, &kind); err != nil {
 			return err
+		}
+		// Only a new commit is a release. A redeploy or rollback was captured when
+		// it was collected and starts no workflow. Earlier histories carry no kind.
+		if (kind == "redeploy" || kind == "rollback") && workflow.GetVersion(ctx, deploymentKindChange, workflow.DefaultVersion, 1) == 1 {
+			finish.Status, finish.Code = "skipped", kind
+			finish.Reason = "A redeploy of the commit already live: pages without a capture of it were captured, and no workflow started."
+			if kind == "rollback" {
+				finish.Reason = "A rollback to a commit deployed here before: its pages were captured again, and no workflow started."
+			}
+			return nil
 		}
 	}
 	needsFiles := false
