@@ -258,6 +258,34 @@ func (_c *VoiceCommandCreate) SetNillableFailureReason(v *string) *VoiceCommandC
 	return _c
 }
 
+// SetOutcome sets the "outcome" field.
+func (_c *VoiceCommandCreate) SetOutcome(v voicecommand.Outcome) *VoiceCommandCreate {
+	_c.mutation.SetOutcome(v)
+	return _c
+}
+
+// SetNillableOutcome sets the "outcome" field if the given value is not nil.
+func (_c *VoiceCommandCreate) SetNillableOutcome(v *voicecommand.Outcome) *VoiceCommandCreate {
+	if v != nil {
+		_c.SetOutcome(*v)
+	}
+	return _c
+}
+
+// SetParsedAt sets the "parsed_at" field.
+func (_c *VoiceCommandCreate) SetParsedAt(v time.Time) *VoiceCommandCreate {
+	_c.mutation.SetParsedAt(v)
+	return _c
+}
+
+// SetNillableParsedAt sets the "parsed_at" field if the given value is not nil.
+func (_c *VoiceCommandCreate) SetNillableParsedAt(v *time.Time) *VoiceCommandCreate {
+	if v != nil {
+		_c.SetParsedAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *VoiceCommandCreate) SetCreatedAt(v time.Time) *VoiceCommandCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -404,6 +432,11 @@ func (_c *VoiceCommandCreate) check() error {
 			return &ValidationError{Name: "attempts", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.attempts": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.Outcome(); ok {
+		if err := voicecommand.OutcomeValidator(v); err != nil {
+			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.outcome": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "VoiceCommand.created_at"`)}
 	}
@@ -528,6 +561,14 @@ func (_c *VoiceCommandCreate) createSpec() (*VoiceCommand, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.FailureReason(); ok {
 		_spec.SetField(voicecommand.FieldFailureReason, field.TypeString, value)
 		_node.FailureReason = &value
+	}
+	if value, ok := _c.mutation.Outcome(); ok {
+		_spec.SetField(voicecommand.FieldOutcome, field.TypeEnum, value)
+		_node.Outcome = &value
+	}
+	if value, ok := _c.mutation.ParsedAt(); ok {
+		_spec.SetField(voicecommand.FieldParsedAt, field.TypeTime, value)
+		_node.ParsedAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(voicecommand.FieldCreatedAt, field.TypeTime, value)

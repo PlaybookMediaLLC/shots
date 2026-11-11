@@ -2109,11 +2109,11 @@ func init() {
 	// voicecommand.AttemptsValidator is a validator for the "attempts" field. It is called by the builders before save.
 	voicecommand.AttemptsValidator = voicecommandDescAttempts.Validators[0].(func(int) error)
 	// voicecommandDescCreatedAt is the schema descriptor for created_at field.
-	voicecommandDescCreatedAt := voicecommandFields[22].Descriptor()
+	voicecommandDescCreatedAt := voicecommandFields[24].Descriptor()
 	// voicecommand.DefaultCreatedAt holds the default value on creation for the created_at field.
 	voicecommand.DefaultCreatedAt = voicecommandDescCreatedAt.Default.(func() time.Time)
 	// voicecommandDescUpdatedAt is the schema descriptor for updated_at field.
-	voicecommandDescUpdatedAt := voicecommandFields[23].Descriptor()
+	voicecommandDescUpdatedAt := voicecommandFields[25].Descriptor()
 	// voicecommand.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	voicecommand.DefaultUpdatedAt = voicecommandDescUpdatedAt.Default.(func() time.Time)
 	// voicecommand.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

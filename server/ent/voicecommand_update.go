@@ -350,6 +350,46 @@ func (_u *VoiceCommandUpdate) ClearFailureReason() *VoiceCommandUpdate {
 	return _u
 }
 
+// SetOutcome sets the "outcome" field.
+func (_u *VoiceCommandUpdate) SetOutcome(v voicecommand.Outcome) *VoiceCommandUpdate {
+	_u.mutation.SetOutcome(v)
+	return _u
+}
+
+// SetNillableOutcome sets the "outcome" field if the given value is not nil.
+func (_u *VoiceCommandUpdate) SetNillableOutcome(v *voicecommand.Outcome) *VoiceCommandUpdate {
+	if v != nil {
+		_u.SetOutcome(*v)
+	}
+	return _u
+}
+
+// ClearOutcome clears the value of the "outcome" field.
+func (_u *VoiceCommandUpdate) ClearOutcome() *VoiceCommandUpdate {
+	_u.mutation.ClearOutcome()
+	return _u
+}
+
+// SetParsedAt sets the "parsed_at" field.
+func (_u *VoiceCommandUpdate) SetParsedAt(v time.Time) *VoiceCommandUpdate {
+	_u.mutation.SetParsedAt(v)
+	return _u
+}
+
+// SetNillableParsedAt sets the "parsed_at" field if the given value is not nil.
+func (_u *VoiceCommandUpdate) SetNillableParsedAt(v *time.Time) *VoiceCommandUpdate {
+	if v != nil {
+		_u.SetParsedAt(*v)
+	}
+	return _u
+}
+
+// ClearParsedAt clears the value of the "parsed_at" field.
+func (_u *VoiceCommandUpdate) ClearParsedAt() *VoiceCommandUpdate {
+	_u.mutation.ClearParsedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceCommandUpdate) SetUpdatedAt(v time.Time) *VoiceCommandUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -412,6 +452,11 @@ func (_u *VoiceCommandUpdate) check() error {
 	if v, ok := _u.mutation.Attempts(); ok {
 		if err := voicecommand.AttemptsValidator(v); err != nil {
 			return &ValidationError{Name: "attempts", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.attempts": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Outcome(); ok {
+		if err := voicecommand.OutcomeValidator(v); err != nil {
+			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.outcome": %w`, err)}
 		}
 	}
 	return nil
@@ -528,6 +573,18 @@ func (_u *VoiceCommandUpdate) sqlSave(ctx context.Context) (_node int, err error
 	}
 	if _u.mutation.FailureReasonCleared() {
 		_spec.ClearField(voicecommand.FieldFailureReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.Outcome(); ok {
+		_spec.SetField(voicecommand.FieldOutcome, field.TypeEnum, value)
+	}
+	if _u.mutation.OutcomeCleared() {
+		_spec.ClearField(voicecommand.FieldOutcome, field.TypeEnum)
+	}
+	if value, ok := _u.mutation.ParsedAt(); ok {
+		_spec.SetField(voicecommand.FieldParsedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ParsedAtCleared() {
+		_spec.ClearField(voicecommand.FieldParsedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voicecommand.FieldUpdatedAt, field.TypeTime, value)
@@ -873,6 +930,46 @@ func (_u *VoiceCommandUpdateOne) ClearFailureReason() *VoiceCommandUpdateOne {
 	return _u
 }
 
+// SetOutcome sets the "outcome" field.
+func (_u *VoiceCommandUpdateOne) SetOutcome(v voicecommand.Outcome) *VoiceCommandUpdateOne {
+	_u.mutation.SetOutcome(v)
+	return _u
+}
+
+// SetNillableOutcome sets the "outcome" field if the given value is not nil.
+func (_u *VoiceCommandUpdateOne) SetNillableOutcome(v *voicecommand.Outcome) *VoiceCommandUpdateOne {
+	if v != nil {
+		_u.SetOutcome(*v)
+	}
+	return _u
+}
+
+// ClearOutcome clears the value of the "outcome" field.
+func (_u *VoiceCommandUpdateOne) ClearOutcome() *VoiceCommandUpdateOne {
+	_u.mutation.ClearOutcome()
+	return _u
+}
+
+// SetParsedAt sets the "parsed_at" field.
+func (_u *VoiceCommandUpdateOne) SetParsedAt(v time.Time) *VoiceCommandUpdateOne {
+	_u.mutation.SetParsedAt(v)
+	return _u
+}
+
+// SetNillableParsedAt sets the "parsed_at" field if the given value is not nil.
+func (_u *VoiceCommandUpdateOne) SetNillableParsedAt(v *time.Time) *VoiceCommandUpdateOne {
+	if v != nil {
+		_u.SetParsedAt(*v)
+	}
+	return _u
+}
+
+// ClearParsedAt clears the value of the "parsed_at" field.
+func (_u *VoiceCommandUpdateOne) ClearParsedAt() *VoiceCommandUpdateOne {
+	_u.mutation.ClearParsedAt()
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *VoiceCommandUpdateOne) SetUpdatedAt(v time.Time) *VoiceCommandUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -948,6 +1045,11 @@ func (_u *VoiceCommandUpdateOne) check() error {
 	if v, ok := _u.mutation.Attempts(); ok {
 		if err := voicecommand.AttemptsValidator(v); err != nil {
 			return &ValidationError{Name: "attempts", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.attempts": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Outcome(); ok {
+		if err := voicecommand.OutcomeValidator(v); err != nil {
+			return &ValidationError{Name: "outcome", err: fmt.Errorf(`ent: validator failed for field "VoiceCommand.outcome": %w`, err)}
 		}
 	}
 	return nil
@@ -1081,6 +1183,18 @@ func (_u *VoiceCommandUpdateOne) sqlSave(ctx context.Context) (_node *VoiceComma
 	}
 	if _u.mutation.FailureReasonCleared() {
 		_spec.ClearField(voicecommand.FieldFailureReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.Outcome(); ok {
+		_spec.SetField(voicecommand.FieldOutcome, field.TypeEnum, value)
+	}
+	if _u.mutation.OutcomeCleared() {
+		_spec.ClearField(voicecommand.FieldOutcome, field.TypeEnum)
+	}
+	if value, ok := _u.mutation.ParsedAt(); ok {
+		_spec.SetField(voicecommand.FieldParsedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ParsedAtCleared() {
+		_spec.ClearField(voicecommand.FieldParsedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(voicecommand.FieldUpdatedAt, field.TypeTime, value)

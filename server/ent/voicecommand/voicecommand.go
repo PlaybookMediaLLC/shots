@@ -56,6 +56,10 @@ const (
 	FieldScheduledPostID = "scheduledPostId"
 	// FieldFailureReason holds the string denoting the failure_reason field in the database.
 	FieldFailureReason = "failureReason"
+	// FieldOutcome holds the string denoting the outcome field in the database.
+	FieldOutcome = "outcome"
+	// FieldParsedAt holds the string denoting the parsed_at field in the database.
+	FieldParsedAt = "parsedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -88,6 +92,8 @@ var Columns = []string{
 	FieldContentDraftID,
 	FieldScheduledPostID,
 	FieldFailureReason,
+	FieldOutcome,
+	FieldParsedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -173,6 +179,30 @@ func ActionValidator(a Action) error {
 		return nil
 	default:
 		return fmt.Errorf("voicecommand: invalid enum value for action field: %q", a)
+	}
+}
+
+// Outcome defines the type for the "outcome" enum field.
+type Outcome string
+
+// Outcome values.
+const (
+	OutcomeScheduled       Outcome = "scheduled"
+	OutcomePendingApproval Outcome = "pending_approval"
+	OutcomeDraft           Outcome = "draft"
+)
+
+func (o Outcome) String() string {
+	return string(o)
+}
+
+// OutcomeValidator is a validator for the "outcome" field enum values. It is called by the builders before save.
+func OutcomeValidator(o Outcome) error {
+	switch o {
+	case OutcomeScheduled, OutcomePendingApproval, OutcomeDraft:
+		return nil
+	default:
+		return fmt.Errorf("voicecommand: invalid enum value for outcome field: %q", o)
 	}
 }
 
@@ -277,6 +307,16 @@ func ByScheduledPostID(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureReason orders the results by the failure_reason field.
 func ByFailureReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureReason, opts...).ToFunc()
+}
+
+// ByOutcome orders the results by the outcome field.
+func ByOutcome(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOutcome, opts...).ToFunc()
+}
+
+// ByParsedAt orders the results by the parsed_at field.
+func ByParsedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldParsedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.
