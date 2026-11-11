@@ -394,7 +394,8 @@ export function useNewDraft(): () => void {
     startBlankDraft(
       {
         channelConnectionIds: context.channelConnectionIds,
-        primaryPlatform: data.activeSet ? context.primaryPlatform : undefined,
+        // With the brand's defaults the server picks the main platform, as this shows it.
+        primaryPlatform: context.channelConnectionIds ? context.primaryPlatform : undefined,
         socialSetId: data.activeSet?.id,
         tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
       },

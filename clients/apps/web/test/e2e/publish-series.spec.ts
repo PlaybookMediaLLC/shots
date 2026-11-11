@@ -192,7 +192,8 @@ test(
   'Save draft & new writes independent drafts on the same accounts and schedules nothing',
   { tag: '@journey' },
   async ({ page, startWorkspace }) => {
-    const workspace = await startWorkspace({ channels: ['x', 'bluesky'] })
+    // Bluesky first, so the brand's main platform is not X: the next drafts must not open on it.
+    const workspace = await startWorkspace({ channels: ['bluesky', 'x'] })
     await page.goto('/publish')
 
     // New draft opens the blank post in place, focused, with no dialog.
@@ -206,14 +207,27 @@ test(
     await expectSaved(page)
     await expect(page.getByTestId('writing-bar')).toContainText('@shots_x')
     await expect(page.getByTestId('writing-bar')).not.toContainText('Bluesky')
+    // Switching Bluesky off hands Main to X; its tab holds the editor. A last edit there
+    // is saved by Save draft & new itself, not left to the autosave.
+    await page.getByTestId('platform-tab-x').click()
+    await draftEditor(page).getByText('First independent post.').click()
+    await page.keyboard.press('Control+End')
+    await page.keyboard.type(' Late edit.')
 
     const ids = [new URL(page.url()).pathname.split('/').pop() ?? '']
-    for (const text of ['Second independent post.', 'Third independent post.']) {
-      await page.getByRole('button', { name: 'Save draft & new', exact: true }).click()
+    for (const [text, start] of [
+      ['Second independent post.', 'button'],
+      ['Third independent post.', 'rail'],
+    ] as const) {
+      // The rail's New draft, with a draft open, is the same action as the button.
+      if (start === 'button')
+        await page.getByRole('button', { name: 'Save draft & new', exact: true }).click()
+      else await page.getByTestId('new-draft').first().click()
       const blank = page.getByRole('region', { name: 'New post' })
       await expect(blank.getByTestId('destination-summary')).toContainText('@shots_x')
       await expect(blank.getByTestId('destination-summary')).not.toContainText('Bluesky')
-      await expect(blank.getByTestId('blank-composer-count')).toHaveText('0/280')
+      await expect(blank.getByTestId('post-length-1')).toHaveText('0 / 280')
+      await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
       await page.keyboard.type(text)
       await page.waitForURL(
         (url) =>
@@ -231,11 +245,11 @@ test(
       [workspace.id]
     )
     expect(drafts.map((draft) => draft.text)).toEqual([
-      'First independent post.',
+      'First independent post. Late edit.',
       'Second independent post.',
       'Third independent post.',
     ])
-    for (const draft of drafts) {
+    for (const draft of drafts.slice(1)) {
       expect(draft.channels).toEqual([workspace.channels.x])
       expect(draft.primary).toBe('x')
     }
@@ -244,6 +258,43 @@ test(
         `SELECT p.id FROM scheduled_post p JOIN content_draft d ON d.id = p."contentDraftId" WHERE d."organizationId" = $1`,
         [workspace.id]
       )
+    ).toHaveLength(0)
+  }
+)
+
+test(
+  'an unused blank post leaves nothing behind, whether discarded or left',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    const workspace = await startWorkspace({ channels: ['x'] })
+    let creations = 0
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === '/api/v1/content-drafts'
+      )
+        creations++
+    })
+    await page.goto('/publish')
+    const blank = page.getByRole('region', { name: 'New post' })
+
+    await page.getByTestId('new-draft').first().click()
+    await expect(blank).toBeVisible()
+    await blank.getByRole('button', { name: 'Discard', exact: true }).click()
+    await expect(blank).toHaveCount(0)
+
+    await page.getByTestId('new-draft').first().click()
+    await expect(blank).toBeVisible()
+    await page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByRole('link', { name: 'Calendar', exact: true })
+      .click()
+    await page.waitForURL(/\/publish\/calendar/)
+    await expect(blank).toHaveCount(0)
+
+    expect(creations).toBe(0)
+    expect(
+      await db.rows(`SELECT id FROM content_draft WHERE "organizationId" = $1`, [workspace.id])
     ).toHaveLength(0)
   }
 )

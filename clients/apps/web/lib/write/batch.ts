@@ -19,7 +19,8 @@ export type BatchAccount = {
   channel: DraftChannel
   id: string
   name: string
-  /** How the account is shown beside a post: its handle, else its display name. */
+  /** How the account is shown beside a post: its avatar, handle, else its display name. */
+  avatarUrl?: string | null
   displayName?: string | null
   handle?: string | null
   /** This account's own caption limit, when it differs from its channel's. */
@@ -184,17 +185,46 @@ export function batchAudience(
 /**
  * The hourly preset: one post an hour from the window's start to its end
  * (both "HH:mm"), as the spread planner's posts per day. Posts past the end
- * go to the next day at the start time. Null when the end is not after the start.
+ * go to the next day at the start time. Null unless the end is after the start.
  */
-export function hourlyWindow(start: string, end: string): { postsPerDay: number } | null {
+export function hourlyWindow(start: string, end: string): number | null {
   const minutes = (time: string) => {
-    const [hours, mins] = time.split(':').map(Number)
-    return hours * 60 + mins
+    const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time)
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null
   }
-  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return null
-  const span = minutes(end) - minutes(start)
-  if (span < 0) return null
-  return { postsPerDay: Math.min(24, Math.floor(span / 60) + 1) }
+  const from = minutes(start)
+  const to = minutes(end)
+  if (from === null || to === null || to <= from) return null
+  return Math.min(24, Math.floor((to - from) / 60) + 1)
+}
+
+/**
+ * Whether a draft's body is still the plain single post a batch made: one
+ * post of unformatted paragraphs. Only then can its words be replaced from
+ * the batch without losing a thread, media, formatting or a post's settings.
+ */
+export function plainTextDraft(body: unknown): boolean {
+  if (!Array.isArray(body)) return false
+  const plainNode = (node: unknown, type: string) =>
+    typeof node === 'object' &&
+    node !== null &&
+    (node as { type?: unknown }).type === type &&
+    Object.keys(node).every((key) => key === 'id' || key === 'type' || key === 'children')
+  const plainLeaf = (leaf: unknown) =>
+    typeof leaf === 'object' &&
+    leaf !== null &&
+    typeof (leaf as { text?: unknown }).text === 'string' &&
+    Object.keys(leaf).length === 1
+  return (
+    body.filter((node) => plainNode(node, 'post_break')).length <= 1 &&
+    body.every(
+      (node) =>
+        plainNode(node, 'post_break') ||
+        (plainNode(node, 'p') &&
+          Array.isArray((node as { children?: unknown }).children) &&
+          ((node as { children: unknown[] }).children).every(plainLeaf))
+    )
+  )
 }
 
 /** When an item is meant to go out, or why that cannot be read yet. */

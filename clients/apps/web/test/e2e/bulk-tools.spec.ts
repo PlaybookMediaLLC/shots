@@ -6,6 +6,7 @@ import {
   apiRequest,
   chooseOption,
   db,
+  draftEditor,
   expect,
   openNewBatch,
   type Page,
@@ -251,8 +252,19 @@ test(
       timeout: 60_000,
     })
     await expect(page.getByTestId('batch-item-time-1')).toContainText('Planned for')
-    await expect(page.getByTestId('batch-item-time-1')).toContainText('9:00')
-    await expect(page.getByTestId('batch-item-time-4')).toContainText('9:00')
+    await expect(page.getByTestId('batch-item-time-1')).toContainText('9:00 AM')
+    await expect(page.getByTestId('batch-item-time-3')).toContainText('11:00 AM')
+    await expect(page.getByTestId('batch-item-time-4')).toContainText('9:00 AM')
+    const planned = (
+      (await apiRequest(page, `/api/v1/content-batches/${batchId}`)).body as {
+        items: { timing: { localTime?: string } }[]
+      }
+    ).items.map((item) => item.timing.localTime ?? '')
+    // The fourth post starts the next day: the window held three.
+    expect(planned[3]!.slice(11)).toBe('09:00')
+    expect(Date.parse(planned[3]!.slice(0, 10)) - Date.parse(planned[0]!.slice(0, 10))).toBe(
+      86_400_000
+    )
     await expect(page.getByTestId('batch-summary')).toContainText(
       '10 posts to 2 accounts, 20 in all'
     )
@@ -288,10 +300,49 @@ test(
     await expect(
       page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
     ).toHaveValue('Post 2, edited in the batch.')
+
+    // An edit made elsewhere is never overwritten: the row says so and keeps the words.
+    const thirdHref = await items
+      .nth(2)
+      .getByRole('link', { name: /^Open draft/ })
+      .getAttribute('href')
+    const thirdId = thirdHref!.split('/').pop()!
+    const third = (await apiRequest(page, `/api/v1/content-drafts/${thirdId}`)).body as {
+      version: number
+    }
+    const elsewhere = await apiRequest(page, `/api/v1/content-drafts/${thirdId}`, {
+      body: {
+        baseVersion: third.version,
+        body: [
+          { children: [{ text: '' }], id: 'p_elsewhere', type: 'post_break' },
+          { children: [{ text: 'Changed in another tab.' }], type: 'p' },
+        ],
+        plainText: 'Changed in another tab.',
+      },
+      method: 'PATCH',
+    })
+    expect(elsewhere.status, JSON.stringify(elsewhere.body)).toBe(200)
+    const thirdBox = page.getByRole('textbox', { name: 'Caption for item 3', exact: true })
+    await thirdBox.fill('Post 3, edited from a stale page.')
+    await thirdBox.blur()
+    await expect(items.nth(2).getByRole('alert')).toContainText('changed somewhere else')
+    await expect(thirdBox).toHaveValue('Post 3, edited from a stale page.')
+    expect(
+      ((await apiRequest(page, `/api/v1/content-drafts/${thirdId}`)).body as { plainText: string })
+        .plainText
+    ).toBe('Changed in another tab.')
+
     expect(await queued()).toHaveLength(0)
     expect(
       await db.rows(`SELECT id FROM content_draft WHERE "organizationId" = $1`, [workspace.id])
     ).toHaveLength(10)
+
+    // The edited draft opens in the editor as one post with the new words.
+    await app.open(href!)
+    await expect(draftEditor(page)).toContainText('Post 2, edited in the batch.', {
+      timeout: 60_000,
+    })
+    await expect(page.getByTestId('post-header')).toHaveCount(1)
   }
 )
 
@@ -339,7 +390,7 @@ test(
     // Unrendered concepts cannot become drafts.
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
 
     // One video gets a new caption; another is redrawn, keeping its music and place.
     await page.getByRole('button', { name: 'New caption for video 1', exact: true }).click()

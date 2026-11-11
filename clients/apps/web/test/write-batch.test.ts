@@ -6,6 +6,7 @@ import {
   batchSummary,
   captionProblem,
   hourlyWindow,
+  plainTextDraft,
   itemAccounts,
   pendingAccounts,
   postOn,
@@ -269,9 +270,35 @@ test('the audience counts accounts, not one destination per post', () => {
 })
 
 test('the hourly window is one post an hour, both ends included', () => {
-  assert.deepEqual(hourlyWindow('09:00', '17:00'), { postsPerDay: 9 })
-  assert.deepEqual(hourlyWindow('09:30', '10:15'), { postsPerDay: 1 })
-  assert.deepEqual(hourlyWindow('00:00', '23:59'), { postsPerDay: 24 })
+  assert.equal(hourlyWindow('09:00', '17:00'), 9)
+  assert.equal(hourlyWindow('09:30', '10:15'), 1)
+  assert.equal(hourlyWindow('00:00', '23:59'), 24)
+  assert.equal(hourlyWindow('09:00', '09:00'), null)
   assert.equal(hourlyWindow('17:00', '09:00'), null)
+  assert.equal(hourlyWindow('09:00', '25:00'), null)
   assert.equal(hourlyWindow('', '09:00'), null)
+})
+
+test('only a plain single post can take new words from the batch', () => {
+  const plain = [
+    { children: [{ text: '' }], id: 'p_1', type: 'post_break' },
+    { children: [{ text: 'One post.' }], type: 'p' },
+    { children: [{ text: 'Its second paragraph.' }], id: 'b', type: 'p' },
+  ]
+  assert.equal(plainTextDraft(plain), true)
+  // A thread, formatting, an image or a post's own settings would be lost.
+  assert.equal(
+    plainTextDraft([...plain, { children: [{ text: '' }], id: 'p_2', type: 'post_break' }]),
+    false
+  )
+  assert.equal(
+    plainTextDraft([plain[0], { children: [{ bold: true, text: 'Bold' }], type: 'p' }]),
+    false
+  )
+  assert.equal(
+    plainTextDraft([plain[0], { assetId: 'a', children: [{ text: '' }], type: 'img' }]),
+    false
+  )
+  assert.equal(plainTextDraft([{ ...plain[0], poll: { options: [] } }, plain[1]]), false)
+  assert.equal(plainTextDraft(null), false)
 })

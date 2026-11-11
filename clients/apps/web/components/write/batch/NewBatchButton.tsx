@@ -61,6 +61,8 @@ export function NewBatchButton({
     defaultSetId && sets.some((set) => set.id === defaultSetId) ? defaultSetId : sets[0]?.id
   )
   const [busy, setBusy] = React.useState(false)
+  // Radix checks a radio by clicking it as arrow keys move focus; that is not choosing it.
+  const arrowing = React.useRef(false)
   const begin = (kind = tool, name = title.trim() || suggested) => {
     if (busy) return
     setBusy(true)
@@ -93,6 +95,12 @@ export function NewBatchButton({
           className="grid gap-3 sm:grid-cols-2"
           data-testid="bulk-tools"
           disabled={busy}
+          onKeyDown={(event) => {
+            if (event.key.startsWith('Arrow')) arrowing.current = true
+          }}
+          onKeyUp={() => {
+            arrowing.current = false
+          }}
           onValueChange={setTool}
           value={tool}
         >
@@ -108,10 +116,13 @@ export function NewBatchButton({
                 value={item.value}
                 // Text needs nothing set up first: choosing it (a click, or Space) opens
                 // the writing surface, named for today in the current profile. Arrowing
-                // past it only moves the choice.
+                // onto it only moves the choice; Space or Enter then starts it.
                 onClick={
                   item.value === 'text'
-                    ? () => begin('text', `Text posts · ${new Date().toLocaleDateString()}`)
+                    ? () => {
+                        if (!arrowing.current)
+                          begin('text', `Text posts · ${new Date().toLocaleDateString()}`)
+                      }
                     : undefined
                 }
               />

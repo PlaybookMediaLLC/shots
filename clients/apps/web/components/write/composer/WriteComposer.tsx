@@ -32,7 +32,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -90,7 +89,6 @@ import { platformEditorServices } from '@/lib/editor/services'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import { countingNote } from '@/lib/write/caption-counting'
 import { writeApi } from '@/lib/write/client'
 import {
   blankDraftContext,
@@ -122,6 +120,7 @@ import { SetDot } from '../sets'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { DraftsDrawerButton } from '../WriteFrame'
 import { DestinationSummary } from '../destination-summary'
+import { PLACEHOLDERS, PostAuthor, PostCount } from './post-identity'
 import { startBlankDraft } from '../pending-draft'
 import { draftHref, useWrite, type WriteSet } from '../write-context'
 import { CommentsPanel } from './comments'
@@ -1108,25 +1107,12 @@ export function WriteComposer({
     accounts.find((item) => item.channel === active)
   const author = account?.displayName ?? set?.name ?? user.name
   const postHeader = () => (
-    <div className="flex items-center gap-2 sm:gap-3" data-testid="post-header">
-      <Avatar
-        // Covers the thread line where it meets the avatar.
-        className="relative z-[1] -ms-10 size-8 ring-4 ring-card sm:-ms-12 sm:size-9"
-        data-post-avatar
-      >
-        {account?.avatarUrl ? <AvatarImage alt="" src={account.avatarUrl} /> : null}
-        {/* Also shown when a provider's avatar link has expired. */}
-        <AvatarFallback className="bg-accent text-ui font-medium text-accent-foreground">
-          {initials(author)}
-        </AvatarFallback>
-      </Avatar>
-      <p className="min-w-0 flex-1 truncate text-ui">
-        <span className="font-medium text-foreground">{author}</span>
-        <span className="ml-1.5 text-muted-foreground">
-          {account?.handle ? `@${account.handle}` : CHANNEL_META[active].label}
-        </span>
-      </p>
-    </div>
+    <PostAuthor
+      avatarUrl={account?.avatarUrl}
+      channel={active}
+      handle={account?.handle}
+      name={author}
+    />
   )
   // Each post's characters over the limit; a platform without threads publishes the
   // posts as one caption, whose overflow is the last post's tail.
@@ -2655,92 +2641,6 @@ export function WriteComposer({
 }
 
 /** The empty post's prompt per platform, as each platform asks it. */
-const PLACEHOLDERS: Partial<Record<DraftChannel, string>> = {
-  tiktok: 'Write your TikTok caption…',
-  x: 'What’s happening?',
-}
-
-/** Up to two initials for an avatar without an image. */
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((word) => word[0]?.toUpperCase())
-      .join('') || 'S'
-  )
-}
-
-/**
- * A post's length for the platform being edited: a ring that fills toward
- * the limit, amber from 90%, red past it. It is always readable — a counter
- * you can only see once you are nearly over cannot be written to — and dims
- * on a post that is not in use so the page stays quiet.
- *
- * An account whose platform raised its limit (a verified X account posts up
- * to 25,000) also shows the standard count, because the length that matters
- * to most writers is still the one everyone else sees.
- */
-function PostCount({
-  active,
-  channel,
-  length,
-  limit,
-  number,
-  standard,
-  thread,
-}: {
-  active: boolean
-  channel: DraftChannel
-  length: number
-  limit: number
-  number: number
-  /** The platform's standard limit, when this account's is higher. */
-  standard?: number
-  thread: boolean
-}) {
-  const ratio = length / limit
-  const tone =
-    ratio > 1
-      ? 'text-destructive'
-      : ratio >= 0.9
-        ? 'text-amber-600 dark:text-amber-400'
-        : 'text-muted-foreground'
-  const overStandard = standard !== undefined && length > standard
-  return (
-    <span
-      className={cn(
-        'flex items-center gap-1.5 text-caption tabular-nums transition-opacity duration-150 motion-reduce:transition-none',
-        tone,
-        !active && ratio < 0.9 && 'opacity-60'
-      )}
-      // Counted as the platform counts it, which writers cannot check outside the app.
-      title={countingNote(channel)}
-    >
-      <span
-        aria-hidden
-        className="size-4 rounded-full"
-        style={{
-          background: `conic-gradient(currentColor ${Math.min(ratio, 1) * 360}deg, color-mix(in srgb, currentColor 20%, transparent) 0)`,
-          mask: 'radial-gradient(farthest-side, transparent calc(100% - 2.5px), black calc(100% - 2px))',
-        }}
-      />
-      <span data-testid={`post-length-${number}`}>
-        {length} / {limit}
-      </span>
-      {standard !== undefined ? (
-        <span
-          className={cn(overStandard ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}
-          data-testid={`post-standard-length-${number}`}
-        >
-          ({standard} for a standard account)
-        </span>
-      ) : null}
-      {thread ? <span className="text-muted-foreground">#{number}</span> : null}
-    </span>
-  )
-}
 
 /**
  * What stops this draft from publishing, always in view beside the post. Each

@@ -715,6 +715,13 @@ test(
     await page.keyboard.type('Second post')
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expect(page.getByTestId('post-length-2')).toHaveText('11 / 280')
+    // A thread says what it is and how it publishes; the next post is a separate one.
+    await expect(page.getByTestId('thread-label')).toHaveText(
+      'Thread · 2 posts · post 2 replies to post 1 on X'
+    )
+    await expect(
+      page.getByTestId('writing-bar').getByRole('button', { name: 'New standalone post' })
+    ).toBeVisible()
 
     // Leave during the debounce, through an in-app link.
     await page.getByRole('link', { name: 'Calendar', exact: true }).click()

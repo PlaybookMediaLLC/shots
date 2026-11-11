@@ -1,14 +1,9 @@
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
-import type { DraftChannel } from '@/lib/write/document'
+import type { DestinationAccount } from '@/lib/write/composing-session'
 import { cn } from '@/lib/utils'
 
 /** An account a post goes to, as people recognise it. */
-export type Destination = {
-  channel: DraftChannel
-  displayName: string | null
-  handle: string | null
-  id: string
-}
+export type Destination = DestinationAccount
 
 /** "@handle", else the account's name, else its platform. */
 export function destinationName(account: Destination): string {

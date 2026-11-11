@@ -659,7 +659,7 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 		// Accounts chosen for this draft outrank the set's default: the body is
 		// written for one of the platforms it publishes to, never a switched-off one.
 		if len(chosen) > 0 {
-			connections, err := tx.ChannelConnection.Query().Where(channelconnection.IDIn(chosen...)).All(ctx)
+			connections, err := tx.ChannelConnection.Query().Where(channelconnection.IDIn(chosen...), channelconnection.OrganizationID(actor.OrganizationID)).All(ctx)
 			if err != nil {
 				return nil, err
 			}

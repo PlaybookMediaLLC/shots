@@ -10,6 +10,7 @@
  */
 
 import { channelForPlatform } from '@/lib/content-drafts/serialize'
+import { countingChannelFor } from './paste-split'
 import type { DraftChannel } from './document'
 
 /** The smallest and largest gap worth learning from one schedule to the next. */
@@ -102,7 +103,8 @@ export function carriedChannels(
 }
 
 /** An account a new draft can publish to, as the composer shows it. */
-type DestinationAccount = {
+export type DestinationAccount = {
+  avatarUrl?: string | null
   channel: DraftChannel
   displayName: string | null
   handle: string | null
@@ -146,14 +148,16 @@ export function blankDraftContext(
         return account ? [account] : []
       })
   const channels = accounts.map((account) => account.channel)
-  const preferred = [explicit?.primary, channelForPlatform(set.primaryPlatform ?? ''), 'x'].find(
-    (channel): channel is DraftChannel =>
-      Boolean(channel) && channels.includes(channel as DraftChannel)
+  // The open draft's main platform, then the brand's, among the accounts it publishes to;
+  // past those, chosen accounts open on X (`countingChannelFor`) and the brand's defaults on
+  // their first, as the server picks them.
+  const preferred = [explicit?.primary, channelForPlatform(set.primaryPlatform ?? '')].find(
+    (channel): channel is DraftChannel => Boolean(channel) && channels.includes(channel as DraftChannel)
   )
   return {
     accounts,
     channelConnectionIds: chosen,
-    primaryPlatform: preferred ?? channels[0] ?? 'x',
+    primaryPlatform: preferred ?? (chosen ? countingChannelFor(accounts) : (channels[0] ?? 'x')),
   }
 }
 

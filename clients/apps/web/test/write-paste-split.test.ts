@@ -80,3 +80,14 @@ test('without rules, paragraphs are offered as pieces but not marked explicit', 
   assert.deepEqual(read.pieces, ['A first paragraph.', 'A second one, same post.'])
   assert.deepEqual(readPaste('   \n\n  ').pieces, [])
 })
+
+test('separators read the same with Windows line ends and indented dashes', () => {
+  assert.deepEqual(readPaste('One\r\n  ----  \r\nTwo').pieces, ['One', 'Two'])
+})
+
+test('a run of blank lines inside a separated post stays one paragraph break', () => {
+  assert.deepEqual(readPaste('First.\n\n\n\nStill first.\n---\nSecond.').pieces, [
+    'First.\n\nStill first.',
+    'Second.',
+  ])
+})

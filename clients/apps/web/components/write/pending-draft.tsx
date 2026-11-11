@@ -18,10 +18,13 @@ import { ButtonLink } from '@/components/platform-shell/ButtonLink'
 import { POST_COLUMN } from '@/components/drafts/layout'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
+import { ImageIcon } from '@/components/platform-shell/icons'
 import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import { cn } from '@/lib/utils'
-import { DestinationSummary, type Destination } from './destination-summary'
+import { PLACEHOLDERS, POST_TEXT, PostAuthor, PostCount } from './composer/post-identity'
+import type { Destination } from './destination-summary'
 
 const LibraryAssetPicker = dynamic(
   () =>
@@ -47,6 +50,8 @@ type PendingDraft = {
   channel?: DraftChannel
   /** The accounts the post will publish to; unset when the brand's defaults decide. */
   destinations?: readonly Destination[]
+  /** The page it was opened on: leaving it with nothing written drops the post. */
+  openedAt?: string
 }
 let pending: PendingDraft | null = null
 /** Attach media to a post still waiting to be made, and make it. */
@@ -64,7 +69,24 @@ const subscribe = (listener: () => void) => {
   }
 }
 /** What the post is written for, carried into a value that replaces the current one. */
-const shown = () => ({ channel: pending?.channel, destinations: pending?.destinations })
+const shown = () => ({
+  channel: pending?.channel,
+  destinations: pending?.destinations,
+  openedAt: pending?.openedAt,
+})
+/** Where the caret was, so a post that moves into the editor's column keeps it. */
+let caret = 0
+/** Gives the page under the post back its focus, before the draft's editor takes it. */
+let releaseCover: (() => void) | null = null
+/** Write pages mounted now: the post opens in their editor column rather than over the page. */
+let hosts = 0
+const hostListeners = new Set<() => void>()
+const subscribeHosts = (listener: () => void) => {
+  hostListeners.add(listener)
+  return () => {
+    hostListeners.delete(listener)
+  }
+}
 function update(value: PendingDraft | null) {
   pending = value
   listeners.forEach((listener) => listener())
@@ -100,7 +122,14 @@ export function startBlankDraft(
 ) {
   if (pending) return
   // Kept in the store's value, not beside it, so what is shown always follows it.
-  update({ channel: context.channel, destinations: context.accounts, text: '', waiting: true })
+  caret = 0
+  update({
+    channel: context.channel,
+    destinations: context.accounts,
+    openedAt: window.location.pathname,
+    text: '',
+    waiting: true,
+  })
   prepareCreation(input, navigate, beforeLeave)
 }
 
@@ -239,9 +268,20 @@ export function useNewPost(onStart?: () => void): () => void {
   }
 }
 
+/** Whether a new post is open, for the page that lays out around it. */
+export function useBlankDraft(): boolean {
+  return React.useSyncExternalStore(
+    subscribe,
+    () => pending !== null,
+    () => false
+  )
+}
+
 /** Deliver buffered typing once, after the shared document has initialized. */
 export function takePendingDraft(id: string): string | null {
   if (pending?.id !== id) return null
+  // The editor focuses as soon as it has the words; the page under the post must take focus by then.
+  releaseCover?.()
   const text = pending.text
   update(null)
   retry = null
@@ -249,12 +289,13 @@ export function takePendingDraft(id: string): string | null {
 }
 
 /**
- * The blank post, written in place over the page's content while its draft is
- * made and its editor loads. It is not a dialog: it shows where the post goes
- * and its length as the editor does, the navigation beside it stays usable,
- * and the first word turns it into the draft's own editor without a step.
+ * The blank post, drawn as the composer draws a draft: the header, the
+ * platforms it goes to with the main one marked, the account's avatar and
+ * handle, the editor's text and the length ring. On a Write page it takes the
+ * editor's column beside the drafts list; elsewhere it covers the page's
+ * content. The first word makes the draft and its editor takes over in place.
  */
-export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | 'page' }) {
+export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | 'page' | 'write' }) {
   const router = useRouter()
   const pathname = usePathname()
   const value = React.useSyncExternalStore(
@@ -262,6 +303,21 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
     () => pending,
     () => null
   )
+  const hosted = React.useSyncExternalStore(
+    subscribeHosts,
+    () => hosts > 0,
+    () => false
+  )
+  // A Write page draws the post in its editor column; the shell's copy then stays out of the way.
+  React.useLayoutEffect(() => {
+    if (variant !== 'write') return
+    hosts += 1
+    hostListeners.forEach((listener) => listener())
+    return () => {
+      hosts -= 1
+      hostListeners.forEach((listener) => listener())
+    }
+  }, [variant])
   React.useEffect(() => {
     const guard = (event: BeforeUnloadEvent) => {
       if (pending?.text) event.preventDefault()
@@ -282,7 +338,7 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
   }, [pathname, router])
   const box = React.useRef<HTMLElement>(null)
   const field = React.useRef<HTMLTextAreaElement>(null)
-  const open = Boolean(value)
+  const shown = Boolean(value) && (variant === 'write' || !hosted)
   const [picking, setPicking] = React.useState(false)
   const [splitting, setSplitting] = React.useState(false)
   const cancel = React.useCallback(() => {
@@ -293,22 +349,25 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
     setSplitting(false)
     update(null)
   }, [])
-  // Leaving through the navigation drops a post with nothing in it; typed
+  // Leaving the page it was opened on drops a post with nothing in it; typed
   // words stay, and their draft still opens once it is made.
-  const openedAt = React.useRef(pathname)
   React.useEffect(() => {
-    if (!open) return
-    if (openedAt.current !== pathname && pending?.waiting && !pending.text && !pending.pieces)
+    if (pending?.waiting && !pending.text && !pending.pieces && pending.openedAt !== pathname)
       cancel()
-    openedAt.current = pathname
-  }, [cancel, open, pathname])
-  // A menu or dialog that opened the post hands focus back to its own trigger
-  // as it closes, which would send the first words typed elsewhere. Focus
-  // that lands outside comes back here, until the writer moves it themselves
-  // (a click outside, or Tab): then the navigation beside the post keeps it.
-  // Dialogs above the post always keep theirs, and the covered page never gets it.
+  }, [cancel, pathname])
+  // The page under the post is inert while it is open, so neither the keyboard
+  // nor a menu closing elsewhere can put focus there. Focus a menu or dialog
+  // hands back to its trigger comes to the post until the writer moves it
+  // themselves (a click outside, or Tab); then the controls beside it keep it.
   React.useEffect(() => {
-    if (!open) return
+    if (!shown) return
+    const covered = box.current?.previousElementSibling
+    const wasInert = covered instanceof HTMLElement ? covered.inert : false
+    const release = () => {
+      if (covered instanceof HTMLElement) covered.inert = wasInert
+    }
+    if (covered instanceof HTMLElement) covered.inert = true
+    releaseCover = release
     let moved = false
     const press = (event: PointerEvent) => {
       if (!box.current?.contains(event.target as Node)) moved = true
@@ -322,55 +381,139 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
       const target = event.target as Element
       if (box.current?.contains(target)) return
       if (target.closest?.('[role="dialog"], [role="alertdialog"], [role="menu"]')) return
-      if (moved && target.closest?.('[aria-label="Primary navigation"]')) return
+      if (moved) return
       field.current?.focus()
     }
     document.addEventListener('pointerdown', press, true)
     document.addEventListener('keydown', tab, true)
     document.addEventListener('focusin', keep)
     field.current?.focus()
+    field.current?.setSelectionRange(caret, caret)
     return () => {
+      release()
+      if (releaseCover === release) releaseCover = null
       document.removeEventListener('pointerdown', press, true)
       document.removeEventListener('keydown', tab, true)
       document.removeEventListener('focusin', keep)
     }
-  }, [open])
-  if (!value) return null
+  }, [shown])
+  if (!value || !shown) return null
   const channel = value.channel ?? 'x'
   const length = platformCaptionLength(channel, value.text)
   const limit = CAPABILITIES[channel].captionLimit
+  const author = value.destinations?.find((account) => account.channel === channel)
   return (
     <section
       aria-label="New post"
       className={cn(
-        'absolute inset-0 z-40 flex flex-col overflow-y-auto bg-background',
+        'absolute inset-0 z-30 flex flex-col overflow-y-auto bg-card',
         variant === 'page' && 'md:inset-y-3 md:start-0 md:end-3 md:rounded-2xl md:border'
       )}
       data-testid="blank-composer"
+      // Write's shortcuts listen on the window and act on the draft under this one.
+      onKeyDown={(event) => {
+        if ((event.metaKey || event.ctrlKey || event.altKey) && event.key !== 'k')
+          event.stopPropagation()
+      }}
       ref={box}
     >
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border px-4 py-3">
-        <span className="text-ui font-medium text-foreground">New post</span>
-        {value.destinations ? (
-          <DestinationSummary accounts={value.destinations} />
+      {/* The composer's header: the title row, then its actions. */}
+      <header className="sticky top-0 z-20 flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card/90 px-3 py-2 backdrop-blur">
+        <span className="h-8 min-w-20 max-w-64 flex-1 truncate px-3 text-ui-lg leading-8 font-medium text-muted-foreground">
+          New post
+        </span>
+        <span
+          className={cn(
+            'min-w-[8ch] shrink-0 text-xs',
+            value.error ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground'
+          )}
+          role="status"
+        >
+          {value.error ?? (value.waiting ? 'Not saved yet' : 'Saving…')}
+        </span>
+        <div className="ml-auto flex min-h-8 basis-full items-center justify-end gap-1">
+          {value.waiting ? (
+            <Button onClick={cancel} size="sm" title="Discard (Esc)" variant="ghost">
+              Discard
+            </Button>
+          ) : null}
+        </div>
+      </header>
+      {/* The platforms it goes to, as the composer's tabs show them. */}
+      <div
+        aria-label="Platforms"
+        className="flex flex-wrap items-center gap-2 px-4 py-3"
+        data-testid="destination-summary"
+        role="group"
+      >
+        {value.destinations?.length ? (
+          value.destinations.map((account) => (
+            <span
+              className={cn(
+                'flex h-8 items-center gap-2 rounded-md border px-3 text-ui',
+                account.channel === channel
+                  ? 'border-input bg-foreground/[0.08] text-foreground'
+                  : 'border-border text-muted-foreground'
+              )}
+              key={account.id}
+            >
+              <ChannelIcon channel={account.channel} />
+              {CHANNEL_META[account.channel].label}
+              <span className="text-label text-muted-foreground">
+                {account.handle ? `@${account.handle.replace(/^@/, '')}` : null}
+                {account.channel === channel ? ' · Main' : null}
+              </span>
+            </span>
+          ))
         ) : (
           <span className="text-label text-muted-foreground">
             Goes to your profile’s default accounts
           </span>
         )}
-        <p className="ms-auto text-label text-muted-foreground" role="status">
-          {value.error ?? (value.waiting ? 'Saves as you type' : 'Saving…')}
+      </div>
+      {author ? (
+        <p className="px-4 text-label text-muted-foreground">
+          {author.displayName ?? CHANNEL_META[channel].label}
+          {author.handle ? ` · @${author.handle.replace(/^@/, '')}` : ''} · saved as a draft when
+          you start writing
         </p>
-      </header>
-      <div className={cn(POST_COLUMN, 'grid gap-3 pt-6 pb-10')}>
+      ) : null}
+      <div className="flex min-h-10 items-center justify-end px-4 pt-2">
+        {value.waiting && !value.pieces ? (
+          <Button
+            aria-label="Add media"
+            onClick={() => setPicking(true)}
+            size="sm"
+            title="Add an image or video"
+            variant="outline"
+          >
+            <ImageIcon aria-hidden />
+            Add media
+          </Button>
+        ) : null}
+      </div>
+      <div className="relative pt-10 pb-10">
+        <div className={POST_COLUMN}>
+          <PostAuthor
+            avatarUrl={author?.avatarUrl}
+            channel={channel}
+            handle={author?.handle}
+            name={author?.displayName ?? author?.handle ?? 'New post'}
+          />
+        </div>
         <Textarea
           ref={field}
           aria-label="New draft text"
-          // The editor's own writing surface: no box around the words.
-          className="min-h-48 resize-none border-0 bg-transparent p-0 text-body shadow-none dark:bg-transparent"
-          placeholder="What would you like to share?"
+          // The editor's own writing surface: its type, its measure, no box.
+          className={cn(POST_COLUMN, POST_TEXT, 'min-h-32 pt-1')}
+          data-slot="post-text"
+          placeholder={PLACEHOLDERS[channel] ?? `Write your ${CHANNEL_META[channel].label} post…`}
           value={value.text}
+          onSelect={(event) => {
+            caret = event.currentTarget.selectionStart ?? 0
+          }}
           onChange={(event) => {
+            caret = event.target.selectionStart ?? event.target.value.length
             if (!pending) return
             // A paste the writer has not answered for yet holds everything: the
             // choice decides what is created, so typing must not create one
@@ -408,74 +551,65 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
             if (event.key === 'Escape' && value.waiting && !value.text) cancel()
           }}
         />
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              'text-label tabular-nums',
-              length > limit ? 'text-destructive' : 'text-muted-foreground'
-            )}
-            data-testid="blank-composer-count"
-          >
-            {length}/{limit}
-          </span>
-          {value.waiting && !value.pieces ? (
-            <>
-              <Button className="ms-auto" onClick={() => setPicking(true)} variant="outline">
-                Add media
-              </Button>
-              <Button onClick={cancel} title="Discard (Esc)" variant="ghost">
-                Discard
-              </Button>
-            </>
+        <div className={cn(POST_COLUMN, 'flex h-8 items-center')}>
+          <PostCount
+            active
+            channel={channel}
+            length={length}
+            limit={limit}
+            number={1}
+            thread={false}
+          />
+        </div>
+        <div className={cn(POST_COLUMN, 'mt-4 grid gap-3')}>
+          {value.pieces ? (
+            <PasteSplit
+              busy={splitting}
+              channel={channel}
+              onChoose={(choice, seriesName) => {
+                setSplitting(true)
+                void resolvePaste?.(choice, seriesName).finally(() => setSplitting(false))
+              }}
+              pieces={value.pieces}
+            />
+          ) : null}
+          {value.pieces ? (
+            <Button className="w-fit" onClick={cancel} variant="ghost">
+              Discard
+            </Button>
+          ) : null}
+          {picking ? (
+            <LibraryAssetPicker
+              onClose={() => setPicking(false)}
+              onInsert={(nodes) => attachToWaiting?.(nodes)}
+            />
+          ) : null}
+          {/* A pending paste answers for itself: its three buttons are the retry,
+              and the one below would instead make a single draft of the block. */}
+          {value.error && !value.pieces ? (
+            <div className="flex gap-2">
+              {value.planRequired ? (
+                <ButtonLink
+                  href={`/upgrade?from=${encodeURIComponent('/publish')}`}
+                  onClick={() => {
+                    retry = null
+                    update(null)
+                  }}
+                >
+                  See plans
+                </ButtonLink>
+              ) : (
+                <Button onClick={() => void retry?.()}>Retry</Button>
+              )}
+              {value.id ? null : (
+                // Nothing was created: a refusal (such as no permission to write) must not trap the page.
+                <Button onClick={cancel} variant="outline">
+                  Cancel
+                </Button>
+              )}
+            </div>
           ) : null}
         </div>
-        {value.pieces ? (
-          <PasteSplit
-            busy={splitting}
-            channel={channel}
-            onChoose={(choice, seriesName) => {
-              setSplitting(true)
-              void resolvePaste?.(choice, seriesName).finally(() => setSplitting(false))
-            }}
-            pieces={value.pieces}
-          />
-        ) : null}
-        {value.pieces ? (
-          <Button className="w-fit" onClick={cancel} variant="ghost">
-            Discard
-          </Button>
-        ) : null}
-        {picking ? (
-          <LibraryAssetPicker
-            onClose={() => setPicking(false)}
-            onInsert={(nodes) => attachToWaiting?.(nodes)}
-          />
-        ) : null}
-        {/* A pending paste answers for itself: its three buttons are the retry,
-            and the one below would instead make a single draft of the block. */}
-        {value.error && !value.pieces ? (
-          <div className="flex gap-2">
-            {value.planRequired ? (
-              <ButtonLink
-                href={`/upgrade?from=${encodeURIComponent('/publish')}`}
-                onClick={() => {
-                  retry = null
-                  update(null)
-                }}
-              >
-                See plans
-              </ButtonLink>
-            ) : (
-              <Button onClick={() => void retry?.()}>Retry</Button>
-            )}
-            {value.id ? null : (
-              // Nothing was created: a refusal (such as no permission to write) must not trap the page.
-              <Button onClick={cancel} variant="outline">
-                Cancel
-              </Button>
-            )}
-          </div>
-        ) : null}
       </div>
     </section>
   )

@@ -44,6 +44,16 @@ test('the open draft’s main platform stays while it publishes there', () => {
   )
 })
 
+test('with no main platform, chosen accounts open on X and defaults on their first', () => {
+  const unset = { ...set, primaryPlatform: null }
+  assert.equal(blankDraftContext(unset, { channelIds: ['linkedin1', 'x1'] }).primaryPlatform, 'x')
+  assert.equal(blankDraftContext(unset).primaryPlatform, 'tiktok')
+})
+
+test('every account switched off falls back to the brand’s defaults', () => {
+  assert.equal(blankDraftContext(set, { channelIds: [] }).channelConnectionIds, undefined)
+})
+
 test('with nothing chosen the brand’s defaults and main platform apply', () => {
   const next = blankDraftContext(set)
   assert.equal(next.channelConnectionIds, undefined)
