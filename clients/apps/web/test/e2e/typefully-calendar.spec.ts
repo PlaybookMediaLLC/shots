@@ -169,3 +169,44 @@ test(
     await page.screenshot({ path: '.context/shots/typefully-posting-times.png', fullPage: true })
   }
 )
+
+test('a busy day shows four posts and scrolls the rest inside the day', async ({
+  app,
+  page,
+  startWorkspace,
+}) => {
+  const workspace = await startWorkspace({ channels: ['x'] })
+  const day = new Date(Date.now() + 10 * 86_400_000)
+  day.setUTCHours(10, 0, 0, 0)
+  for (let index = 0; index < 6; index++) {
+    const title = `Busy day ${index + 1}`
+    const made = await apiRequest(page, '/api/v1/content-drafts', {
+      method: 'POST',
+      body: { title, plainText: title, body: [{ type: 'p', children: [{ text: title }] }] },
+    })
+    expect(made.status, JSON.stringify(made.body)).toBe(201)
+    const draft = made.body as { id: string; version: number }
+    const scheduled = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      method: 'POST',
+      body: {
+        channelConnectionIds: [workspace.channels.x],
+        version: draft.version,
+        scheduledFor: new Date(day.getTime() + index * 30 * 60_000).toISOString(),
+      },
+    })
+    expect(scheduled.status, JSON.stringify(scheduled.body)).toBe(201)
+  }
+  const key = day.toISOString().slice(0, 10)
+  await app.open(`/publish/calendar?view=flex&week=${key}`)
+  const cell = page.locator(`[data-calendar-date="${key}"]`)
+  const cards = cell.getByTestId('calendar-day-list').getByTestId('calendar-post')
+  await expect(cards).toHaveCount(6)
+  // Four fit in the day; the others wait below its fold, and the day says how many.
+  await expect(cards.nth(3)).toBeInViewport()
+  await expect(cards.nth(4)).not.toBeInViewport()
+  const more = cell.getByRole('button', { name: 'Scroll to 2 more posts' })
+  await expect(more).toHaveText('2 more')
+  await more.click()
+  await expect(cards.nth(5)).toBeInViewport()
+  await expect(cell.getByRole('button', { name: /^Scroll to \d+ more/ })).toHaveCount(0)
+})
