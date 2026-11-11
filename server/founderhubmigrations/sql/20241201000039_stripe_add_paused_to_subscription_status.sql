@@ -1,0 +1,1 @@
+ALTER TYPE "founder_hub_billing"."subscription_status" ADD VALUE 'paused';

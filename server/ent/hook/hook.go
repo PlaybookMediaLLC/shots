@@ -933,6 +933,90 @@ func (f PlatformDraftImportFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformDraftImportMutation", m)
 }
 
+// The PlatformFounderHubDeviceFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubDevice mutator.
+type PlatformFounderHubDeviceFunc func(context.Context, *ent.PlatformFounderHubDeviceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubDeviceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubDeviceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubDeviceMutation", m)
+}
+
+// The PlatformFounderHubDeviceCommandFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubDeviceCommand mutator.
+type PlatformFounderHubDeviceCommandFunc func(context.Context, *ent.PlatformFounderHubDeviceCommandMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubDeviceCommandFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubDeviceCommandMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubDeviceCommandMutation", m)
+}
+
+// The PlatformFounderHubRevisionFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubRevision mutator.
+type PlatformFounderHubRevisionFunc func(context.Context, *ent.PlatformFounderHubRevisionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubRevisionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubRevisionMutation", m)
+}
+
+// The PlatformFounderHubSettingsFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubSettings mutator.
+type PlatformFounderHubSettingsFunc func(context.Context, *ent.PlatformFounderHubSettingsMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubSettingsFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubSettingsMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubSettingsMutation", m)
+}
+
+// The PlatformFounderHubTemplateFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubTemplate mutator.
+type PlatformFounderHubTemplateFunc func(context.Context, *ent.PlatformFounderHubTemplateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubTemplateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubTemplateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubTemplateMutation", m)
+}
+
+// The PlatformFounderHubUserFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubUser mutator.
+type PlatformFounderHubUserFunc func(context.Context, *ent.PlatformFounderHubUserMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubUserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubUserMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubUserMutation", m)
+}
+
+// The PlatformFounderHubWorkspaceFunc type is an adapter to allow the use of ordinary
+// function as PlatformFounderHubWorkspace mutator.
+type PlatformFounderHubWorkspaceFunc func(context.Context, *ent.PlatformFounderHubWorkspaceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformFounderHubWorkspaceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformFounderHubWorkspaceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformFounderHubWorkspaceMutation", m)
+}
+
 // The PlatformNotificationDeliveryFunc type is an adapter to allow the use of ordinary
 // function as PlatformNotificationDelivery mutator.
 type PlatformNotificationDeliveryFunc func(context.Context, *ent.PlatformNotificationDeliveryMutation) (ent.Value, error)
@@ -991,6 +1075,66 @@ func (f PlatformNotificationSeenActionFunc) Mutate(ctx context.Context, m ent.Mu
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformNotificationSeenActionMutation", m)
+}
+
+// The PlatformOAuthAccessTokenFunc type is an adapter to allow the use of ordinary
+// function as PlatformOAuthAccessToken mutator.
+type PlatformOAuthAccessTokenFunc func(context.Context, *ent.PlatformOAuthAccessTokenMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformOAuthAccessTokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformOAuthAccessTokenMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthAccessTokenMutation", m)
+}
+
+// The PlatformOAuthClientFunc type is an adapter to allow the use of ordinary
+// function as PlatformOAuthClient mutator.
+type PlatformOAuthClientFunc func(context.Context, *ent.PlatformOAuthClientMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformOAuthClientFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformOAuthClientMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthClientMutation", m)
+}
+
+// The PlatformOAuthConsentFunc type is an adapter to allow the use of ordinary
+// function as PlatformOAuthConsent mutator.
+type PlatformOAuthConsentFunc func(context.Context, *ent.PlatformOAuthConsentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformOAuthConsentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformOAuthConsentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthConsentMutation", m)
+}
+
+// The PlatformOAuthJWKFunc type is an adapter to allow the use of ordinary
+// function as PlatformOAuthJWK mutator.
+type PlatformOAuthJWKFunc func(context.Context, *ent.PlatformOAuthJWKMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformOAuthJWKFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformOAuthJWKMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthJWKMutation", m)
+}
+
+// The PlatformOAuthRefreshTokenFunc type is an adapter to allow the use of ordinary
+// function as PlatformOAuthRefreshToken mutator.
+type PlatformOAuthRefreshTokenFunc func(context.Context, *ent.PlatformOAuthRefreshTokenMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformOAuthRefreshTokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformOAuthRefreshTokenMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthRefreshTokenMutation", m)
 }
 
 // The PlatformSlackConnectionFunc type is an adapter to allow the use of ordinary

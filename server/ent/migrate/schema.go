@@ -13,7 +13,7 @@ var (
 	AccountDeletionRequestColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
 		{Name: "userId", Type: field.TypeString},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"REQUESTED", "CANCELLED", "COMPLETED"}, Default: "REQUESTED"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"REQUESTED", "PROCESSING", "CANCELLED", "COMPLETED"}, Default: "REQUESTED"},
 		{Name: "requestedAt", Type: field.TypeTime},
 		{Name: "executeAfter", Type: field.TypeTime},
 		{Name: "cancelledAt", Type: field.TypeTime, Nullable: true},
@@ -2407,6 +2407,138 @@ var (
 		Columns:    PlatformDraftImportColumns,
 		PrimaryKey: []*schema.Column{PlatformDraftImportColumns[0]},
 	}
+	// PlatformFounderHubDeviceColumns holds the columns for the "platform_founder_hub_device" table.
+	PlatformFounderHubDeviceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "deviceId", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString},
+		{Name: "report", Type: field.TypeJSON},
+		{Name: "reportedAt", Type: field.TypeTime},
+	}
+	// PlatformFounderHubDeviceTable holds the schema information for the "platform_founder_hub_device" table.
+	PlatformFounderHubDeviceTable = &schema.Table{
+		Name:       "platform_founder_hub_device",
+		Columns:    PlatformFounderHubDeviceColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubDeviceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformfounderhubdevice_userId_deviceId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformFounderHubDeviceColumns[1], PlatformFounderHubDeviceColumns[2]},
+			},
+		},
+	}
+	// PlatformFounderHubDeviceCommandColumns holds the columns for the "platform_founder_hub_device_command" table.
+	PlatformFounderHubDeviceCommandColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "deviceId", Type: field.TypeString},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "argument", Type: field.TypeString},
+		{Name: "status", Type: field.TypeString, Default: "pending"},
+		{Name: "error", Type: field.TypeString, Default: ""},
+		{Name: "result", Type: field.TypeString, Default: ""},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "expiresAt", Type: field.TypeTime},
+	}
+	// PlatformFounderHubDeviceCommandTable holds the schema information for the "platform_founder_hub_device_command" table.
+	PlatformFounderHubDeviceCommandTable = &schema.Table{
+		Name:       "platform_founder_hub_device_command",
+		Columns:    PlatformFounderHubDeviceCommandColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubDeviceCommandColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformfounderhubdevicecommand_userId_deviceId_status",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformFounderHubDeviceCommandColumns[1], PlatformFounderHubDeviceCommandColumns[2], PlatformFounderHubDeviceCommandColumns[5]},
+			},
+		},
+	}
+	// PlatformFounderHubRevisionColumns holds the columns for the "platform_founder_hub_revision" table.
+	PlatformFounderHubRevisionColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "revision", Type: field.TypeInt64, Default: 0},
+	}
+	// PlatformFounderHubRevisionTable holds the schema information for the "platform_founder_hub_revision" table.
+	PlatformFounderHubRevisionTable = &schema.Table{
+		Name:       "platform_founder_hub_revision",
+		Columns:    PlatformFounderHubRevisionColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubRevisionColumns[0]},
+	}
+	// PlatformFounderHubSettingsColumns holds the columns for the "platform_founder_hub_settings" table.
+	PlatformFounderHubSettingsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "deviceId", Type: field.TypeString, Default: ""},
+		{Name: "deviceName", Type: field.TypeString, Default: ""},
+		{Name: "values", Type: field.TypeJSON},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// PlatformFounderHubSettingsTable holds the schema information for the "platform_founder_hub_settings" table.
+	PlatformFounderHubSettingsTable = &schema.Table{
+		Name:       "platform_founder_hub_settings",
+		Columns:    PlatformFounderHubSettingsColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubSettingsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformfounderhubsettings_userId_deviceId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformFounderHubSettingsColumns[1], PlatformFounderHubSettingsColumns[2]},
+			},
+		},
+	}
+	// PlatformFounderHubTemplateColumns holds the columns for the "platform_founder_hub_template" table.
+	PlatformFounderHubTemplateColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "templateId", Type: field.TypeString},
+		{Name: "content", Type: field.TypeJSON},
+		{Name: "pinned", Type: field.TypeBool, Default: false},
+		{Name: "seeded", Type: field.TypeBool, Default: false},
+		{Name: "pinOrder", Type: field.TypeInt, Nullable: true},
+		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+		{Name: "deletedAt", Type: field.TypeTime, Nullable: true},
+	}
+	// PlatformFounderHubTemplateTable holds the schema information for the "platform_founder_hub_template" table.
+	PlatformFounderHubTemplateTable = &schema.Table{
+		Name:       "platform_founder_hub_template",
+		Columns:    PlatformFounderHubTemplateColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubTemplateColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformfounderhubtemplate_userId_templateId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformFounderHubTemplateColumns[1], PlatformFounderHubTemplateColumns[2]},
+			},
+		},
+	}
+	// PlatformFounderHubUserColumns holds the columns for the "platform_founder_hub_user" table.
+	PlatformFounderHubUserColumns = []*schema.Column{
+		{Name: "userId", Type: field.TypeString},
+		{Name: "accountUserId", Type: field.TypeUUID, Unique: true},
+		{Name: "templatesInitialized", Type: field.TypeBool, Default: false},
+	}
+	// PlatformFounderHubUserTable holds the schema information for the "platform_founder_hub_user" table.
+	PlatformFounderHubUserTable = &schema.Table{
+		Name:       "platform_founder_hub_user",
+		Columns:    PlatformFounderHubUserColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubUserColumns[0]},
+	}
+	// PlatformFounderHubWorkspaceColumns holds the columns for the "platform_founder_hub_workspace" table.
+	PlatformFounderHubWorkspaceColumns = []*schema.Column{
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "workspaceId", Type: field.TypeUUID, Unique: true},
+	}
+	// PlatformFounderHubWorkspaceTable holds the schema information for the "platform_founder_hub_workspace" table.
+	PlatformFounderHubWorkspaceTable = &schema.Table{
+		Name:       "platform_founder_hub_workspace",
+		Columns:    PlatformFounderHubWorkspaceColumns,
+		PrimaryKey: []*schema.Column{PlatformFounderHubWorkspaceColumns[0]},
+	}
 	// PlatformNotificationDeliveryColumns holds the columns for the "platform_notification_delivery" table.
 	PlatformNotificationDeliveryColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -2549,6 +2681,114 @@ var (
 				Columns: []*schema.Column{PlatformNotificationSeenActionColumns[1], PlatformNotificationSeenActionColumns[2], PlatformNotificationSeenActionColumns[3]},
 			},
 		},
+	}
+	// OauthAccessTokenColumns holds the columns for the "oauthAccessToken" table.
+	OauthAccessTokenColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "token", Type: field.TypeString, Unique: true},
+		{Name: "clientId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "referenceId", Type: field.TypeString, Nullable: true},
+		{Name: "refreshId", Type: field.TypeString, Nullable: true},
+		{Name: "expiresAt", Type: field.TypeTime},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "scopes", Type: field.TypeString},
+	}
+	// OauthAccessTokenTable holds the schema information for the "oauthAccessToken" table.
+	OauthAccessTokenTable = &schema.Table{
+		Name:       "oauthAccessToken",
+		Columns:    OauthAccessTokenColumns,
+		PrimaryKey: []*schema.Column{OauthAccessTokenColumns[0]},
+	}
+	// OauthClientColumns holds the columns for the "oauthClient" table.
+	OauthClientColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "clientId", Type: field.TypeString, Unique: true},
+		{Name: "clientSecret", Type: field.TypeString, Nullable: true},
+		{Name: "disabled", Type: field.TypeBool, Nullable: true},
+		{Name: "skipConsent", Type: field.TypeBool, Nullable: true},
+		{Name: "enableEndSession", Type: field.TypeBool, Nullable: true},
+		{Name: "subjectType", Type: field.TypeString, Nullable: true},
+		{Name: "scopes", Type: field.TypeString, Nullable: true},
+		{Name: "userId", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime, Nullable: true},
+		{Name: "updatedAt", Type: field.TypeTime, Nullable: true},
+		{Name: "name", Type: field.TypeString, Nullable: true},
+		{Name: "uri", Type: field.TypeString, Nullable: true},
+		{Name: "icon", Type: field.TypeString, Nullable: true},
+		{Name: "contacts", Type: field.TypeString, Nullable: true},
+		{Name: "tos", Type: field.TypeString, Nullable: true},
+		{Name: "policy", Type: field.TypeString, Nullable: true},
+		{Name: "softwareId", Type: field.TypeString, Nullable: true},
+		{Name: "softwareVersion", Type: field.TypeString, Nullable: true},
+		{Name: "softwareStatement", Type: field.TypeString, Nullable: true},
+		{Name: "redirectUris", Type: field.TypeString},
+		{Name: "postLogoutRedirectUris", Type: field.TypeString, Nullable: true},
+		{Name: "tokenEndpointAuthMethod", Type: field.TypeString, Nullable: true},
+		{Name: "grantTypes", Type: field.TypeString, Nullable: true},
+		{Name: "responseTypes", Type: field.TypeString, Nullable: true},
+		{Name: "public", Type: field.TypeBool, Nullable: true},
+		{Name: "type", Type: field.TypeString, Nullable: true},
+		{Name: "requirePKCE", Type: field.TypeBool, Nullable: true},
+		{Name: "referenceId", Type: field.TypeString, Nullable: true},
+		{Name: "metadata", Type: field.TypeString, Nullable: true},
+	}
+	// OauthClientTable holds the schema information for the "oauthClient" table.
+	OauthClientTable = &schema.Table{
+		Name:       "oauthClient",
+		Columns:    OauthClientColumns,
+		PrimaryKey: []*schema.Column{OauthClientColumns[0]},
+	}
+	// OauthConsentColumns holds the columns for the "oauthConsent" table.
+	OauthConsentColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "clientId", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "referenceId", Type: field.TypeString, Nullable: true},
+		{Name: "scopes", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "updatedAt", Type: field.TypeTime},
+	}
+	// OauthConsentTable holds the schema information for the "oauthConsent" table.
+	OauthConsentTable = &schema.Table{
+		Name:       "oauthConsent",
+		Columns:    OauthConsentColumns,
+		PrimaryKey: []*schema.Column{OauthConsentColumns[0]},
+	}
+	// JwksColumns holds the columns for the "jwks" table.
+	JwksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "publicKey", Type: field.TypeString},
+		{Name: "privateKey", Type: field.TypeString},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "expiresAt", Type: field.TypeTime, Nullable: true},
+	}
+	// JwksTable holds the schema information for the "jwks" table.
+	JwksTable = &schema.Table{
+		Name:       "jwks",
+		Columns:    JwksColumns,
+		PrimaryKey: []*schema.Column{JwksColumns[0]},
+	}
+	// OauthRefreshTokenColumns holds the columns for the "oauthRefreshToken" table.
+	OauthRefreshTokenColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "token", Type: field.TypeString, Unique: true},
+		{Name: "clientId", Type: field.TypeString},
+		{Name: "sessionId", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "referenceId", Type: field.TypeString, Nullable: true},
+		{Name: "expiresAt", Type: field.TypeTime},
+		{Name: "createdAt", Type: field.TypeTime},
+		{Name: "revoked", Type: field.TypeTime, Nullable: true},
+		{Name: "authTime", Type: field.TypeTime, Nullable: true},
+		{Name: "scopes", Type: field.TypeString},
+	}
+	// OauthRefreshTokenTable holds the schema information for the "oauthRefreshToken" table.
+	OauthRefreshTokenTable = &schema.Table{
+		Name:       "oauthRefreshToken",
+		Columns:    OauthRefreshTokenColumns,
+		PrimaryKey: []*schema.Column{OauthRefreshTokenColumns[0]},
 	}
 	// PlatformSlackConnectionColumns holds the columns for the "platform_slack_connection" table.
 	PlatformSlackConnectionColumns = []*schema.Column{
@@ -4248,11 +4488,23 @@ var (
 		PlatformCreativeSetTable,
 		PlatformCreativeSetVersionTable,
 		PlatformDraftImportTable,
+		PlatformFounderHubDeviceTable,
+		PlatformFounderHubDeviceCommandTable,
+		PlatformFounderHubRevisionTable,
+		PlatformFounderHubSettingsTable,
+		PlatformFounderHubTemplateTable,
+		PlatformFounderHubUserTable,
+		PlatformFounderHubWorkspaceTable,
 		PlatformNotificationDeliveryTable,
 		PlatformNotificationInboxTable,
 		PlatformNotificationPolicyTable,
 		PlatformNotificationPreferenceTable,
 		PlatformNotificationSeenActionTable,
+		OauthAccessTokenTable,
+		OauthClientTable,
+		OauthConsentTable,
+		JwksTable,
+		OauthRefreshTokenTable,
 		PlatformSlackConnectionTable,
 		PlatformSlackInstallationTable,
 		PlatformSlackPacingTable,
@@ -4543,6 +4795,27 @@ func init() {
 	PlatformDraftImportTable.Annotation = &entsql.Annotation{
 		Table: "platform_draft_import",
 	}
+	PlatformFounderHubDeviceTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_device",
+	}
+	PlatformFounderHubDeviceCommandTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_device_command",
+	}
+	PlatformFounderHubRevisionTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_revision",
+	}
+	PlatformFounderHubSettingsTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_settings",
+	}
+	PlatformFounderHubTemplateTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_template",
+	}
+	PlatformFounderHubUserTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_user",
+	}
+	PlatformFounderHubWorkspaceTable.Annotation = &entsql.Annotation{
+		Table: "platform_founder_hub_workspace",
+	}
 	PlatformNotificationDeliveryTable.Annotation = &entsql.Annotation{
 		Table: "platform_notification_delivery",
 	}
@@ -4557,6 +4830,21 @@ func init() {
 	}
 	PlatformNotificationSeenActionTable.Annotation = &entsql.Annotation{
 		Table: "platform_notification_seen_action",
+	}
+	OauthAccessTokenTable.Annotation = &entsql.Annotation{
+		Table: "oauthAccessToken",
+	}
+	OauthClientTable.Annotation = &entsql.Annotation{
+		Table: "oauthClient",
+	}
+	OauthConsentTable.Annotation = &entsql.Annotation{
+		Table: "oauthConsent",
+	}
+	JwksTable.Annotation = &entsql.Annotation{
+		Table: "jwks",
+	}
+	OauthRefreshTokenTable.Annotation = &entsql.Annotation{
+		Table: "oauthRefreshToken",
 	}
 	PlatformSlackConnectionTable.Annotation = &entsql.Annotation{
 		Table: "platform_slack_connection",

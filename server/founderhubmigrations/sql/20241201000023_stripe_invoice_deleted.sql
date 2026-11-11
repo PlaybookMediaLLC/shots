@@ -1,0 +1,1 @@
+ALTER TYPE "founder_hub_billing"."invoice_status" ADD VALUE 'deleted';

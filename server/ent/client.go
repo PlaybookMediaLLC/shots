@@ -92,11 +92,23 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativesetversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformdraftimport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevice"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubsettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubtemplate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubuser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubworkspace"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationinbox"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpolicy"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpreference"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationseenaction"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthaccesstoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthclient"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -311,6 +323,20 @@ type Client struct {
 	PlatformCreativeSetVersion *PlatformCreativeSetVersionClient
 	// PlatformDraftImport is the client for interacting with the PlatformDraftImport builders.
 	PlatformDraftImport *PlatformDraftImportClient
+	// PlatformFounderHubDevice is the client for interacting with the PlatformFounderHubDevice builders.
+	PlatformFounderHubDevice *PlatformFounderHubDeviceClient
+	// PlatformFounderHubDeviceCommand is the client for interacting with the PlatformFounderHubDeviceCommand builders.
+	PlatformFounderHubDeviceCommand *PlatformFounderHubDeviceCommandClient
+	// PlatformFounderHubRevision is the client for interacting with the PlatformFounderHubRevision builders.
+	PlatformFounderHubRevision *PlatformFounderHubRevisionClient
+	// PlatformFounderHubSettings is the client for interacting with the PlatformFounderHubSettings builders.
+	PlatformFounderHubSettings *PlatformFounderHubSettingsClient
+	// PlatformFounderHubTemplate is the client for interacting with the PlatformFounderHubTemplate builders.
+	PlatformFounderHubTemplate *PlatformFounderHubTemplateClient
+	// PlatformFounderHubUser is the client for interacting with the PlatformFounderHubUser builders.
+	PlatformFounderHubUser *PlatformFounderHubUserClient
+	// PlatformFounderHubWorkspace is the client for interacting with the PlatformFounderHubWorkspace builders.
+	PlatformFounderHubWorkspace *PlatformFounderHubWorkspaceClient
 	// PlatformNotificationDelivery is the client for interacting with the PlatformNotificationDelivery builders.
 	PlatformNotificationDelivery *PlatformNotificationDeliveryClient
 	// PlatformNotificationInbox is the client for interacting with the PlatformNotificationInbox builders.
@@ -321,6 +347,16 @@ type Client struct {
 	PlatformNotificationPreference *PlatformNotificationPreferenceClient
 	// PlatformNotificationSeenAction is the client for interacting with the PlatformNotificationSeenAction builders.
 	PlatformNotificationSeenAction *PlatformNotificationSeenActionClient
+	// PlatformOAuthAccessToken is the client for interacting with the PlatformOAuthAccessToken builders.
+	PlatformOAuthAccessToken *PlatformOAuthAccessTokenClient
+	// PlatformOAuthClient is the client for interacting with the PlatformOAuthClient builders.
+	PlatformOAuthClient *PlatformOAuthClientClient
+	// PlatformOAuthConsent is the client for interacting with the PlatformOAuthConsent builders.
+	PlatformOAuthConsent *PlatformOAuthConsentClient
+	// PlatformOAuthJWK is the client for interacting with the PlatformOAuthJWK builders.
+	PlatformOAuthJWK *PlatformOAuthJWKClient
+	// PlatformOAuthRefreshToken is the client for interacting with the PlatformOAuthRefreshToken builders.
+	PlatformOAuthRefreshToken *PlatformOAuthRefreshTokenClient
 	// PlatformSlackConnection is the client for interacting with the PlatformSlackConnection builders.
 	PlatformSlackConnection *PlatformSlackConnectionClient
 	// PlatformSlackInstallation is the client for interacting with the PlatformSlackInstallation builders.
@@ -515,11 +551,23 @@ func (c *Client) init() {
 	c.PlatformCreativeSet = NewPlatformCreativeSetClient(c.config)
 	c.PlatformCreativeSetVersion = NewPlatformCreativeSetVersionClient(c.config)
 	c.PlatformDraftImport = NewPlatformDraftImportClient(c.config)
+	c.PlatformFounderHubDevice = NewPlatformFounderHubDeviceClient(c.config)
+	c.PlatformFounderHubDeviceCommand = NewPlatformFounderHubDeviceCommandClient(c.config)
+	c.PlatformFounderHubRevision = NewPlatformFounderHubRevisionClient(c.config)
+	c.PlatformFounderHubSettings = NewPlatformFounderHubSettingsClient(c.config)
+	c.PlatformFounderHubTemplate = NewPlatformFounderHubTemplateClient(c.config)
+	c.PlatformFounderHubUser = NewPlatformFounderHubUserClient(c.config)
+	c.PlatformFounderHubWorkspace = NewPlatformFounderHubWorkspaceClient(c.config)
 	c.PlatformNotificationDelivery = NewPlatformNotificationDeliveryClient(c.config)
 	c.PlatformNotificationInbox = NewPlatformNotificationInboxClient(c.config)
 	c.PlatformNotificationPolicy = NewPlatformNotificationPolicyClient(c.config)
 	c.PlatformNotificationPreference = NewPlatformNotificationPreferenceClient(c.config)
 	c.PlatformNotificationSeenAction = NewPlatformNotificationSeenActionClient(c.config)
+	c.PlatformOAuthAccessToken = NewPlatformOAuthAccessTokenClient(c.config)
+	c.PlatformOAuthClient = NewPlatformOAuthClientClient(c.config)
+	c.PlatformOAuthConsent = NewPlatformOAuthConsentClient(c.config)
+	c.PlatformOAuthJWK = NewPlatformOAuthJWKClient(c.config)
+	c.PlatformOAuthRefreshToken = NewPlatformOAuthRefreshTokenClient(c.config)
 	c.PlatformSlackConnection = NewPlatformSlackConnectionClient(c.config)
 	c.PlatformSlackInstallation = NewPlatformSlackInstallationClient(c.config)
 	c.PlatformSlackPacing = NewPlatformSlackPacingClient(c.config)
@@ -742,11 +790,23 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PlatformCreativeSet:             NewPlatformCreativeSetClient(cfg),
 		PlatformCreativeSetVersion:      NewPlatformCreativeSetVersionClient(cfg),
 		PlatformDraftImport:             NewPlatformDraftImportClient(cfg),
+		PlatformFounderHubDevice:        NewPlatformFounderHubDeviceClient(cfg),
+		PlatformFounderHubDeviceCommand: NewPlatformFounderHubDeviceCommandClient(cfg),
+		PlatformFounderHubRevision:      NewPlatformFounderHubRevisionClient(cfg),
+		PlatformFounderHubSettings:      NewPlatformFounderHubSettingsClient(cfg),
+		PlatformFounderHubTemplate:      NewPlatformFounderHubTemplateClient(cfg),
+		PlatformFounderHubUser:          NewPlatformFounderHubUserClient(cfg),
+		PlatformFounderHubWorkspace:     NewPlatformFounderHubWorkspaceClient(cfg),
 		PlatformNotificationDelivery:    NewPlatformNotificationDeliveryClient(cfg),
 		PlatformNotificationInbox:       NewPlatformNotificationInboxClient(cfg),
 		PlatformNotificationPolicy:      NewPlatformNotificationPolicyClient(cfg),
 		PlatformNotificationPreference:  NewPlatformNotificationPreferenceClient(cfg),
 		PlatformNotificationSeenAction:  NewPlatformNotificationSeenActionClient(cfg),
+		PlatformOAuthAccessToken:        NewPlatformOAuthAccessTokenClient(cfg),
+		PlatformOAuthClient:             NewPlatformOAuthClientClient(cfg),
+		PlatformOAuthConsent:            NewPlatformOAuthConsentClient(cfg),
+		PlatformOAuthJWK:                NewPlatformOAuthJWKClient(cfg),
+		PlatformOAuthRefreshToken:       NewPlatformOAuthRefreshTokenClient(cfg),
 		PlatformSlackConnection:         NewPlatformSlackConnectionClient(cfg),
 		PlatformSlackInstallation:       NewPlatformSlackInstallationClient(cfg),
 		PlatformSlackPacing:             NewPlatformSlackPacingClient(cfg),
@@ -896,11 +956,23 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PlatformCreativeSet:             NewPlatformCreativeSetClient(cfg),
 		PlatformCreativeSetVersion:      NewPlatformCreativeSetVersionClient(cfg),
 		PlatformDraftImport:             NewPlatformDraftImportClient(cfg),
+		PlatformFounderHubDevice:        NewPlatformFounderHubDeviceClient(cfg),
+		PlatformFounderHubDeviceCommand: NewPlatformFounderHubDeviceCommandClient(cfg),
+		PlatformFounderHubRevision:      NewPlatformFounderHubRevisionClient(cfg),
+		PlatformFounderHubSettings:      NewPlatformFounderHubSettingsClient(cfg),
+		PlatformFounderHubTemplate:      NewPlatformFounderHubTemplateClient(cfg),
+		PlatformFounderHubUser:          NewPlatformFounderHubUserClient(cfg),
+		PlatformFounderHubWorkspace:     NewPlatformFounderHubWorkspaceClient(cfg),
 		PlatformNotificationDelivery:    NewPlatformNotificationDeliveryClient(cfg),
 		PlatformNotificationInbox:       NewPlatformNotificationInboxClient(cfg),
 		PlatformNotificationPolicy:      NewPlatformNotificationPolicyClient(cfg),
 		PlatformNotificationPreference:  NewPlatformNotificationPreferenceClient(cfg),
 		PlatformNotificationSeenAction:  NewPlatformNotificationSeenActionClient(cfg),
+		PlatformOAuthAccessToken:        NewPlatformOAuthAccessTokenClient(cfg),
+		PlatformOAuthClient:             NewPlatformOAuthClientClient(cfg),
+		PlatformOAuthConsent:            NewPlatformOAuthConsentClient(cfg),
+		PlatformOAuthJWK:                NewPlatformOAuthJWKClient(cfg),
+		PlatformOAuthRefreshToken:       NewPlatformOAuthRefreshTokenClient(cfg),
 		PlatformSlackConnection:         NewPlatformSlackConnectionClient(cfg),
 		PlatformSlackInstallation:       NewPlatformSlackInstallationClient(cfg),
 		PlatformSlackPacing:             NewPlatformSlackPacingClient(cfg),
@@ -1005,9 +1077,14 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
 		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
 		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
+		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
+		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
+		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
+		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSlackConnection,
 		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
@@ -1056,9 +1133,14 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PlatformAppConnection, c.PlatformAutoDMCampaign, c.PlatformAutoDMDelivery,
 		c.PlatformAutoDMOptOut, c.PlatformAutoDMRecipient, c.PlatformCreativeSet,
 		c.PlatformCreativeSetVersion, c.PlatformDraftImport,
-		c.PlatformNotificationDelivery, c.PlatformNotificationInbox,
-		c.PlatformNotificationPolicy, c.PlatformNotificationPreference,
-		c.PlatformNotificationSeenAction, c.PlatformSlackConnection,
+		c.PlatformFounderHubDevice, c.PlatformFounderHubDeviceCommand,
+		c.PlatformFounderHubRevision, c.PlatformFounderHubSettings,
+		c.PlatformFounderHubTemplate, c.PlatformFounderHubUser,
+		c.PlatformFounderHubWorkspace, c.PlatformNotificationDelivery,
+		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
+		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
+		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSlackConnection,
 		c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
@@ -1238,6 +1320,20 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PlatformCreativeSetVersion.mutate(ctx, m)
 	case *PlatformDraftImportMutation:
 		return c.PlatformDraftImport.mutate(ctx, m)
+	case *PlatformFounderHubDeviceMutation:
+		return c.PlatformFounderHubDevice.mutate(ctx, m)
+	case *PlatformFounderHubDeviceCommandMutation:
+		return c.PlatformFounderHubDeviceCommand.mutate(ctx, m)
+	case *PlatformFounderHubRevisionMutation:
+		return c.PlatformFounderHubRevision.mutate(ctx, m)
+	case *PlatformFounderHubSettingsMutation:
+		return c.PlatformFounderHubSettings.mutate(ctx, m)
+	case *PlatformFounderHubTemplateMutation:
+		return c.PlatformFounderHubTemplate.mutate(ctx, m)
+	case *PlatformFounderHubUserMutation:
+		return c.PlatformFounderHubUser.mutate(ctx, m)
+	case *PlatformFounderHubWorkspaceMutation:
+		return c.PlatformFounderHubWorkspace.mutate(ctx, m)
 	case *PlatformNotificationDeliveryMutation:
 		return c.PlatformNotificationDelivery.mutate(ctx, m)
 	case *PlatformNotificationInboxMutation:
@@ -1248,6 +1344,16 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PlatformNotificationPreference.mutate(ctx, m)
 	case *PlatformNotificationSeenActionMutation:
 		return c.PlatformNotificationSeenAction.mutate(ctx, m)
+	case *PlatformOAuthAccessTokenMutation:
+		return c.PlatformOAuthAccessToken.mutate(ctx, m)
+	case *PlatformOAuthClientMutation:
+		return c.PlatformOAuthClient.mutate(ctx, m)
+	case *PlatformOAuthConsentMutation:
+		return c.PlatformOAuthConsent.mutate(ctx, m)
+	case *PlatformOAuthJWKMutation:
+		return c.PlatformOAuthJWK.mutate(ctx, m)
+	case *PlatformOAuthRefreshTokenMutation:
+		return c.PlatformOAuthRefreshToken.mutate(ctx, m)
 	case *PlatformSlackConnectionMutation:
 		return c.PlatformSlackConnection.mutate(ctx, m)
 	case *PlatformSlackInstallationMutation:
@@ -11680,6 +11786,937 @@ func (c *PlatformDraftImportClient) mutate(ctx context.Context, m *PlatformDraft
 	}
 }
 
+// PlatformFounderHubDeviceClient is a client for the PlatformFounderHubDevice schema.
+type PlatformFounderHubDeviceClient struct {
+	config
+}
+
+// NewPlatformFounderHubDeviceClient returns a client for the PlatformFounderHubDevice from the given config.
+func NewPlatformFounderHubDeviceClient(c config) *PlatformFounderHubDeviceClient {
+	return &PlatformFounderHubDeviceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubdevice.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubDeviceClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubDevice = append(c.hooks.PlatformFounderHubDevice, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubdevice.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubDeviceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubDevice = append(c.inters.PlatformFounderHubDevice, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubDevice entity.
+func (c *PlatformFounderHubDeviceClient) Create() *PlatformFounderHubDeviceCreate {
+	mutation := newPlatformFounderHubDeviceMutation(c.config, OpCreate)
+	return &PlatformFounderHubDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubDevice entities.
+func (c *PlatformFounderHubDeviceClient) CreateBulk(builders ...*PlatformFounderHubDeviceCreate) *PlatformFounderHubDeviceCreateBulk {
+	return &PlatformFounderHubDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubDeviceClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubDeviceCreate, int)) *PlatformFounderHubDeviceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubDeviceCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubDeviceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubDeviceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubDeviceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubDevice.
+func (c *PlatformFounderHubDeviceClient) Update() *PlatformFounderHubDeviceUpdate {
+	mutation := newPlatformFounderHubDeviceMutation(c.config, OpUpdate)
+	return &PlatformFounderHubDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubDeviceClient) UpdateOne(_m *PlatformFounderHubDevice) *PlatformFounderHubDeviceUpdateOne {
+	mutation := newPlatformFounderHubDeviceMutation(c.config, OpUpdateOne, withPlatformFounderHubDevice(_m))
+	return &PlatformFounderHubDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubDeviceClient) UpdateOneID(id string) *PlatformFounderHubDeviceUpdateOne {
+	mutation := newPlatformFounderHubDeviceMutation(c.config, OpUpdateOne, withPlatformFounderHubDeviceID(id))
+	return &PlatformFounderHubDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubDevice.
+func (c *PlatformFounderHubDeviceClient) Delete() *PlatformFounderHubDeviceDelete {
+	mutation := newPlatformFounderHubDeviceMutation(c.config, OpDelete)
+	return &PlatformFounderHubDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubDeviceClient) DeleteOne(_m *PlatformFounderHubDevice) *PlatformFounderHubDeviceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubDeviceClient) DeleteOneID(id string) *PlatformFounderHubDeviceDeleteOne {
+	builder := c.Delete().Where(platformfounderhubdevice.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubDeviceDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubDevice.
+func (c *PlatformFounderHubDeviceClient) Query() *PlatformFounderHubDeviceQuery {
+	return &PlatformFounderHubDeviceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubDevice},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubDevice entity by its id.
+func (c *PlatformFounderHubDeviceClient) Get(ctx context.Context, id string) (*PlatformFounderHubDevice, error) {
+	return c.Query().Where(platformfounderhubdevice.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubDeviceClient) GetX(ctx context.Context, id string) *PlatformFounderHubDevice {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubDeviceClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubDevice
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubDeviceClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubDevice
+}
+
+func (c *PlatformFounderHubDeviceClient) mutate(ctx context.Context, m *PlatformFounderHubDeviceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubDeviceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubDeviceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubDeviceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubDeviceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubDevice mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubDeviceCommandClient is a client for the PlatformFounderHubDeviceCommand schema.
+type PlatformFounderHubDeviceCommandClient struct {
+	config
+}
+
+// NewPlatformFounderHubDeviceCommandClient returns a client for the PlatformFounderHubDeviceCommand from the given config.
+func NewPlatformFounderHubDeviceCommandClient(c config) *PlatformFounderHubDeviceCommandClient {
+	return &PlatformFounderHubDeviceCommandClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubdevicecommand.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubDeviceCommandClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubDeviceCommand = append(c.hooks.PlatformFounderHubDeviceCommand, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubdevicecommand.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubDeviceCommandClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubDeviceCommand = append(c.inters.PlatformFounderHubDeviceCommand, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubDeviceCommand entity.
+func (c *PlatformFounderHubDeviceCommandClient) Create() *PlatformFounderHubDeviceCommandCreate {
+	mutation := newPlatformFounderHubDeviceCommandMutation(c.config, OpCreate)
+	return &PlatformFounderHubDeviceCommandCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubDeviceCommand entities.
+func (c *PlatformFounderHubDeviceCommandClient) CreateBulk(builders ...*PlatformFounderHubDeviceCommandCreate) *PlatformFounderHubDeviceCommandCreateBulk {
+	return &PlatformFounderHubDeviceCommandCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubDeviceCommandClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubDeviceCommandCreate, int)) *PlatformFounderHubDeviceCommandCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubDeviceCommandCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubDeviceCommandClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubDeviceCommandCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubDeviceCommandCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubDeviceCommand.
+func (c *PlatformFounderHubDeviceCommandClient) Update() *PlatformFounderHubDeviceCommandUpdate {
+	mutation := newPlatformFounderHubDeviceCommandMutation(c.config, OpUpdate)
+	return &PlatformFounderHubDeviceCommandUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubDeviceCommandClient) UpdateOne(_m *PlatformFounderHubDeviceCommand) *PlatformFounderHubDeviceCommandUpdateOne {
+	mutation := newPlatformFounderHubDeviceCommandMutation(c.config, OpUpdateOne, withPlatformFounderHubDeviceCommand(_m))
+	return &PlatformFounderHubDeviceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubDeviceCommandClient) UpdateOneID(id string) *PlatformFounderHubDeviceCommandUpdateOne {
+	mutation := newPlatformFounderHubDeviceCommandMutation(c.config, OpUpdateOne, withPlatformFounderHubDeviceCommandID(id))
+	return &PlatformFounderHubDeviceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubDeviceCommand.
+func (c *PlatformFounderHubDeviceCommandClient) Delete() *PlatformFounderHubDeviceCommandDelete {
+	mutation := newPlatformFounderHubDeviceCommandMutation(c.config, OpDelete)
+	return &PlatformFounderHubDeviceCommandDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubDeviceCommandClient) DeleteOne(_m *PlatformFounderHubDeviceCommand) *PlatformFounderHubDeviceCommandDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubDeviceCommandClient) DeleteOneID(id string) *PlatformFounderHubDeviceCommandDeleteOne {
+	builder := c.Delete().Where(platformfounderhubdevicecommand.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubDeviceCommandDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubDeviceCommand.
+func (c *PlatformFounderHubDeviceCommandClient) Query() *PlatformFounderHubDeviceCommandQuery {
+	return &PlatformFounderHubDeviceCommandQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubDeviceCommand},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubDeviceCommand entity by its id.
+func (c *PlatformFounderHubDeviceCommandClient) Get(ctx context.Context, id string) (*PlatformFounderHubDeviceCommand, error) {
+	return c.Query().Where(platformfounderhubdevicecommand.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubDeviceCommandClient) GetX(ctx context.Context, id string) *PlatformFounderHubDeviceCommand {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubDeviceCommandClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubDeviceCommand
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubDeviceCommandClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubDeviceCommand
+}
+
+func (c *PlatformFounderHubDeviceCommandClient) mutate(ctx context.Context, m *PlatformFounderHubDeviceCommandMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubDeviceCommandCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubDeviceCommandUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubDeviceCommandUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubDeviceCommandDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubDeviceCommand mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubRevisionClient is a client for the PlatformFounderHubRevision schema.
+type PlatformFounderHubRevisionClient struct {
+	config
+}
+
+// NewPlatformFounderHubRevisionClient returns a client for the PlatformFounderHubRevision from the given config.
+func NewPlatformFounderHubRevisionClient(c config) *PlatformFounderHubRevisionClient {
+	return &PlatformFounderHubRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubrevision.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubRevisionClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubRevision = append(c.hooks.PlatformFounderHubRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubrevision.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubRevision = append(c.inters.PlatformFounderHubRevision, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubRevision entity.
+func (c *PlatformFounderHubRevisionClient) Create() *PlatformFounderHubRevisionCreate {
+	mutation := newPlatformFounderHubRevisionMutation(c.config, OpCreate)
+	return &PlatformFounderHubRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubRevision entities.
+func (c *PlatformFounderHubRevisionClient) CreateBulk(builders ...*PlatformFounderHubRevisionCreate) *PlatformFounderHubRevisionCreateBulk {
+	return &PlatformFounderHubRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubRevisionClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubRevisionCreate, int)) *PlatformFounderHubRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubRevisionCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubRevision.
+func (c *PlatformFounderHubRevisionClient) Update() *PlatformFounderHubRevisionUpdate {
+	mutation := newPlatformFounderHubRevisionMutation(c.config, OpUpdate)
+	return &PlatformFounderHubRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubRevisionClient) UpdateOne(_m *PlatformFounderHubRevision) *PlatformFounderHubRevisionUpdateOne {
+	mutation := newPlatformFounderHubRevisionMutation(c.config, OpUpdateOne, withPlatformFounderHubRevision(_m))
+	return &PlatformFounderHubRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubRevisionClient) UpdateOneID(id string) *PlatformFounderHubRevisionUpdateOne {
+	mutation := newPlatformFounderHubRevisionMutation(c.config, OpUpdateOne, withPlatformFounderHubRevisionID(id))
+	return &PlatformFounderHubRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubRevision.
+func (c *PlatformFounderHubRevisionClient) Delete() *PlatformFounderHubRevisionDelete {
+	mutation := newPlatformFounderHubRevisionMutation(c.config, OpDelete)
+	return &PlatformFounderHubRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubRevisionClient) DeleteOne(_m *PlatformFounderHubRevision) *PlatformFounderHubRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubRevisionClient) DeleteOneID(id string) *PlatformFounderHubRevisionDeleteOne {
+	builder := c.Delete().Where(platformfounderhubrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubRevision.
+func (c *PlatformFounderHubRevisionClient) Query() *PlatformFounderHubRevisionQuery {
+	return &PlatformFounderHubRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubRevision entity by its id.
+func (c *PlatformFounderHubRevisionClient) Get(ctx context.Context, id string) (*PlatformFounderHubRevision, error) {
+	return c.Query().Where(platformfounderhubrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubRevisionClient) GetX(ctx context.Context, id string) *PlatformFounderHubRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubRevisionClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubRevisionClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubRevision
+}
+
+func (c *PlatformFounderHubRevisionClient) mutate(ctx context.Context, m *PlatformFounderHubRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubRevision mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubSettingsClient is a client for the PlatformFounderHubSettings schema.
+type PlatformFounderHubSettingsClient struct {
+	config
+}
+
+// NewPlatformFounderHubSettingsClient returns a client for the PlatformFounderHubSettings from the given config.
+func NewPlatformFounderHubSettingsClient(c config) *PlatformFounderHubSettingsClient {
+	return &PlatformFounderHubSettingsClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubsettings.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubSettingsClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubSettings = append(c.hooks.PlatformFounderHubSettings, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubsettings.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubSettingsClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubSettings = append(c.inters.PlatformFounderHubSettings, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubSettings entity.
+func (c *PlatformFounderHubSettingsClient) Create() *PlatformFounderHubSettingsCreate {
+	mutation := newPlatformFounderHubSettingsMutation(c.config, OpCreate)
+	return &PlatformFounderHubSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubSettings entities.
+func (c *PlatformFounderHubSettingsClient) CreateBulk(builders ...*PlatformFounderHubSettingsCreate) *PlatformFounderHubSettingsCreateBulk {
+	return &PlatformFounderHubSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubSettingsClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubSettingsCreate, int)) *PlatformFounderHubSettingsCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubSettingsCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubSettingsClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubSettingsCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubSettingsCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubSettings.
+func (c *PlatformFounderHubSettingsClient) Update() *PlatformFounderHubSettingsUpdate {
+	mutation := newPlatformFounderHubSettingsMutation(c.config, OpUpdate)
+	return &PlatformFounderHubSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubSettingsClient) UpdateOne(_m *PlatformFounderHubSettings) *PlatformFounderHubSettingsUpdateOne {
+	mutation := newPlatformFounderHubSettingsMutation(c.config, OpUpdateOne, withPlatformFounderHubSettings(_m))
+	return &PlatformFounderHubSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubSettingsClient) UpdateOneID(id string) *PlatformFounderHubSettingsUpdateOne {
+	mutation := newPlatformFounderHubSettingsMutation(c.config, OpUpdateOne, withPlatformFounderHubSettingsID(id))
+	return &PlatformFounderHubSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubSettings.
+func (c *PlatformFounderHubSettingsClient) Delete() *PlatformFounderHubSettingsDelete {
+	mutation := newPlatformFounderHubSettingsMutation(c.config, OpDelete)
+	return &PlatformFounderHubSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubSettingsClient) DeleteOne(_m *PlatformFounderHubSettings) *PlatformFounderHubSettingsDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubSettingsClient) DeleteOneID(id string) *PlatformFounderHubSettingsDeleteOne {
+	builder := c.Delete().Where(platformfounderhubsettings.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubSettingsDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubSettings.
+func (c *PlatformFounderHubSettingsClient) Query() *PlatformFounderHubSettingsQuery {
+	return &PlatformFounderHubSettingsQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubSettings},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubSettings entity by its id.
+func (c *PlatformFounderHubSettingsClient) Get(ctx context.Context, id string) (*PlatformFounderHubSettings, error) {
+	return c.Query().Where(platformfounderhubsettings.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubSettingsClient) GetX(ctx context.Context, id string) *PlatformFounderHubSettings {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubSettingsClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubSettings
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubSettingsClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubSettings
+}
+
+func (c *PlatformFounderHubSettingsClient) mutate(ctx context.Context, m *PlatformFounderHubSettingsMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubSettingsCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubSettingsUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubSettingsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubSettingsDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubSettings mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubTemplateClient is a client for the PlatformFounderHubTemplate schema.
+type PlatformFounderHubTemplateClient struct {
+	config
+}
+
+// NewPlatformFounderHubTemplateClient returns a client for the PlatformFounderHubTemplate from the given config.
+func NewPlatformFounderHubTemplateClient(c config) *PlatformFounderHubTemplateClient {
+	return &PlatformFounderHubTemplateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubtemplate.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubTemplateClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubTemplate = append(c.hooks.PlatformFounderHubTemplate, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubtemplate.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubTemplateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubTemplate = append(c.inters.PlatformFounderHubTemplate, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubTemplate entity.
+func (c *PlatformFounderHubTemplateClient) Create() *PlatformFounderHubTemplateCreate {
+	mutation := newPlatformFounderHubTemplateMutation(c.config, OpCreate)
+	return &PlatformFounderHubTemplateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubTemplate entities.
+func (c *PlatformFounderHubTemplateClient) CreateBulk(builders ...*PlatformFounderHubTemplateCreate) *PlatformFounderHubTemplateCreateBulk {
+	return &PlatformFounderHubTemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubTemplateClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubTemplateCreate, int)) *PlatformFounderHubTemplateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubTemplateCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubTemplateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubTemplateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubTemplateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubTemplate.
+func (c *PlatformFounderHubTemplateClient) Update() *PlatformFounderHubTemplateUpdate {
+	mutation := newPlatformFounderHubTemplateMutation(c.config, OpUpdate)
+	return &PlatformFounderHubTemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubTemplateClient) UpdateOne(_m *PlatformFounderHubTemplate) *PlatformFounderHubTemplateUpdateOne {
+	mutation := newPlatformFounderHubTemplateMutation(c.config, OpUpdateOne, withPlatformFounderHubTemplate(_m))
+	return &PlatformFounderHubTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubTemplateClient) UpdateOneID(id string) *PlatformFounderHubTemplateUpdateOne {
+	mutation := newPlatformFounderHubTemplateMutation(c.config, OpUpdateOne, withPlatformFounderHubTemplateID(id))
+	return &PlatformFounderHubTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubTemplate.
+func (c *PlatformFounderHubTemplateClient) Delete() *PlatformFounderHubTemplateDelete {
+	mutation := newPlatformFounderHubTemplateMutation(c.config, OpDelete)
+	return &PlatformFounderHubTemplateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubTemplateClient) DeleteOne(_m *PlatformFounderHubTemplate) *PlatformFounderHubTemplateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubTemplateClient) DeleteOneID(id string) *PlatformFounderHubTemplateDeleteOne {
+	builder := c.Delete().Where(platformfounderhubtemplate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubTemplateDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubTemplate.
+func (c *PlatformFounderHubTemplateClient) Query() *PlatformFounderHubTemplateQuery {
+	return &PlatformFounderHubTemplateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubTemplate},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubTemplate entity by its id.
+func (c *PlatformFounderHubTemplateClient) Get(ctx context.Context, id string) (*PlatformFounderHubTemplate, error) {
+	return c.Query().Where(platformfounderhubtemplate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubTemplateClient) GetX(ctx context.Context, id string) *PlatformFounderHubTemplate {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubTemplateClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubTemplate
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubTemplateClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubTemplate
+}
+
+func (c *PlatformFounderHubTemplateClient) mutate(ctx context.Context, m *PlatformFounderHubTemplateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubTemplateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubTemplateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubTemplateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubTemplateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubTemplate mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubUserClient is a client for the PlatformFounderHubUser schema.
+type PlatformFounderHubUserClient struct {
+	config
+}
+
+// NewPlatformFounderHubUserClient returns a client for the PlatformFounderHubUser from the given config.
+func NewPlatformFounderHubUserClient(c config) *PlatformFounderHubUserClient {
+	return &PlatformFounderHubUserClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubuser.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubUserClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubUser = append(c.hooks.PlatformFounderHubUser, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubuser.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubUserClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubUser = append(c.inters.PlatformFounderHubUser, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubUser entity.
+func (c *PlatformFounderHubUserClient) Create() *PlatformFounderHubUserCreate {
+	mutation := newPlatformFounderHubUserMutation(c.config, OpCreate)
+	return &PlatformFounderHubUserCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubUser entities.
+func (c *PlatformFounderHubUserClient) CreateBulk(builders ...*PlatformFounderHubUserCreate) *PlatformFounderHubUserCreateBulk {
+	return &PlatformFounderHubUserCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubUserClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubUserCreate, int)) *PlatformFounderHubUserCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubUserCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubUserClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubUserCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubUserCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubUser.
+func (c *PlatformFounderHubUserClient) Update() *PlatformFounderHubUserUpdate {
+	mutation := newPlatformFounderHubUserMutation(c.config, OpUpdate)
+	return &PlatformFounderHubUserUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubUserClient) UpdateOne(_m *PlatformFounderHubUser) *PlatformFounderHubUserUpdateOne {
+	mutation := newPlatformFounderHubUserMutation(c.config, OpUpdateOne, withPlatformFounderHubUser(_m))
+	return &PlatformFounderHubUserUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubUserClient) UpdateOneID(id string) *PlatformFounderHubUserUpdateOne {
+	mutation := newPlatformFounderHubUserMutation(c.config, OpUpdateOne, withPlatformFounderHubUserID(id))
+	return &PlatformFounderHubUserUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubUser.
+func (c *PlatformFounderHubUserClient) Delete() *PlatformFounderHubUserDelete {
+	mutation := newPlatformFounderHubUserMutation(c.config, OpDelete)
+	return &PlatformFounderHubUserDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubUserClient) DeleteOne(_m *PlatformFounderHubUser) *PlatformFounderHubUserDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubUserClient) DeleteOneID(id string) *PlatformFounderHubUserDeleteOne {
+	builder := c.Delete().Where(platformfounderhubuser.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubUserDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubUser.
+func (c *PlatformFounderHubUserClient) Query() *PlatformFounderHubUserQuery {
+	return &PlatformFounderHubUserQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubUser},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubUser entity by its id.
+func (c *PlatformFounderHubUserClient) Get(ctx context.Context, id string) (*PlatformFounderHubUser, error) {
+	return c.Query().Where(platformfounderhubuser.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubUserClient) GetX(ctx context.Context, id string) *PlatformFounderHubUser {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubUserClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubUser
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubUserClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubUser
+}
+
+func (c *PlatformFounderHubUserClient) mutate(ctx context.Context, m *PlatformFounderHubUserMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubUserCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubUserUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubUserUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubUserDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubUser mutation op: %q", m.Op())
+	}
+}
+
+// PlatformFounderHubWorkspaceClient is a client for the PlatformFounderHubWorkspace schema.
+type PlatformFounderHubWorkspaceClient struct {
+	config
+}
+
+// NewPlatformFounderHubWorkspaceClient returns a client for the PlatformFounderHubWorkspace from the given config.
+func NewPlatformFounderHubWorkspaceClient(c config) *PlatformFounderHubWorkspaceClient {
+	return &PlatformFounderHubWorkspaceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformfounderhubworkspace.Hooks(f(g(h())))`.
+func (c *PlatformFounderHubWorkspaceClient) Use(hooks ...Hook) {
+	c.hooks.PlatformFounderHubWorkspace = append(c.hooks.PlatformFounderHubWorkspace, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformfounderhubworkspace.Intercept(f(g(h())))`.
+func (c *PlatformFounderHubWorkspaceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformFounderHubWorkspace = append(c.inters.PlatformFounderHubWorkspace, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformFounderHubWorkspace entity.
+func (c *PlatformFounderHubWorkspaceClient) Create() *PlatformFounderHubWorkspaceCreate {
+	mutation := newPlatformFounderHubWorkspaceMutation(c.config, OpCreate)
+	return &PlatformFounderHubWorkspaceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformFounderHubWorkspace entities.
+func (c *PlatformFounderHubWorkspaceClient) CreateBulk(builders ...*PlatformFounderHubWorkspaceCreate) *PlatformFounderHubWorkspaceCreateBulk {
+	return &PlatformFounderHubWorkspaceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformFounderHubWorkspaceClient) MapCreateBulk(slice any, setFunc func(*PlatformFounderHubWorkspaceCreate, int)) *PlatformFounderHubWorkspaceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformFounderHubWorkspaceCreateBulk{err: fmt.Errorf("calling to PlatformFounderHubWorkspaceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformFounderHubWorkspaceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformFounderHubWorkspaceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformFounderHubWorkspace.
+func (c *PlatformFounderHubWorkspaceClient) Update() *PlatformFounderHubWorkspaceUpdate {
+	mutation := newPlatformFounderHubWorkspaceMutation(c.config, OpUpdate)
+	return &PlatformFounderHubWorkspaceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformFounderHubWorkspaceClient) UpdateOne(_m *PlatformFounderHubWorkspace) *PlatformFounderHubWorkspaceUpdateOne {
+	mutation := newPlatformFounderHubWorkspaceMutation(c.config, OpUpdateOne, withPlatformFounderHubWorkspace(_m))
+	return &PlatformFounderHubWorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformFounderHubWorkspaceClient) UpdateOneID(id string) *PlatformFounderHubWorkspaceUpdateOne {
+	mutation := newPlatformFounderHubWorkspaceMutation(c.config, OpUpdateOne, withPlatformFounderHubWorkspaceID(id))
+	return &PlatformFounderHubWorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformFounderHubWorkspace.
+func (c *PlatformFounderHubWorkspaceClient) Delete() *PlatformFounderHubWorkspaceDelete {
+	mutation := newPlatformFounderHubWorkspaceMutation(c.config, OpDelete)
+	return &PlatformFounderHubWorkspaceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformFounderHubWorkspaceClient) DeleteOne(_m *PlatformFounderHubWorkspace) *PlatformFounderHubWorkspaceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformFounderHubWorkspaceClient) DeleteOneID(id string) *PlatformFounderHubWorkspaceDeleteOne {
+	builder := c.Delete().Where(platformfounderhubworkspace.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformFounderHubWorkspaceDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformFounderHubWorkspace.
+func (c *PlatformFounderHubWorkspaceClient) Query() *PlatformFounderHubWorkspaceQuery {
+	return &PlatformFounderHubWorkspaceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformFounderHubWorkspace},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformFounderHubWorkspace entity by its id.
+func (c *PlatformFounderHubWorkspaceClient) Get(ctx context.Context, id string) (*PlatformFounderHubWorkspace, error) {
+	return c.Query().Where(platformfounderhubworkspace.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformFounderHubWorkspaceClient) GetX(ctx context.Context, id string) *PlatformFounderHubWorkspace {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformFounderHubWorkspaceClient) Hooks() []Hook {
+	return c.hooks.PlatformFounderHubWorkspace
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformFounderHubWorkspaceClient) Interceptors() []Interceptor {
+	return c.inters.PlatformFounderHubWorkspace
+}
+
+func (c *PlatformFounderHubWorkspaceClient) mutate(ctx context.Context, m *PlatformFounderHubWorkspaceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformFounderHubWorkspaceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformFounderHubWorkspaceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformFounderHubWorkspaceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformFounderHubWorkspaceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformFounderHubWorkspace mutation op: %q", m.Op())
+	}
+}
+
 // PlatformNotificationDeliveryClient is a client for the PlatformNotificationDelivery schema.
 type PlatformNotificationDeliveryClient struct {
 	config
@@ -12342,6 +13379,671 @@ func (c *PlatformNotificationSeenActionClient) mutate(ctx context.Context, m *Pl
 		return (&PlatformNotificationSeenActionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PlatformNotificationSeenAction mutation op: %q", m.Op())
+	}
+}
+
+// PlatformOAuthAccessTokenClient is a client for the PlatformOAuthAccessToken schema.
+type PlatformOAuthAccessTokenClient struct {
+	config
+}
+
+// NewPlatformOAuthAccessTokenClient returns a client for the PlatformOAuthAccessToken from the given config.
+func NewPlatformOAuthAccessTokenClient(c config) *PlatformOAuthAccessTokenClient {
+	return &PlatformOAuthAccessTokenClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformoauthaccesstoken.Hooks(f(g(h())))`.
+func (c *PlatformOAuthAccessTokenClient) Use(hooks ...Hook) {
+	c.hooks.PlatformOAuthAccessToken = append(c.hooks.PlatformOAuthAccessToken, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformoauthaccesstoken.Intercept(f(g(h())))`.
+func (c *PlatformOAuthAccessTokenClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformOAuthAccessToken = append(c.inters.PlatformOAuthAccessToken, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformOAuthAccessToken entity.
+func (c *PlatformOAuthAccessTokenClient) Create() *PlatformOAuthAccessTokenCreate {
+	mutation := newPlatformOAuthAccessTokenMutation(c.config, OpCreate)
+	return &PlatformOAuthAccessTokenCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformOAuthAccessToken entities.
+func (c *PlatformOAuthAccessTokenClient) CreateBulk(builders ...*PlatformOAuthAccessTokenCreate) *PlatformOAuthAccessTokenCreateBulk {
+	return &PlatformOAuthAccessTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformOAuthAccessTokenClient) MapCreateBulk(slice any, setFunc func(*PlatformOAuthAccessTokenCreate, int)) *PlatformOAuthAccessTokenCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformOAuthAccessTokenCreateBulk{err: fmt.Errorf("calling to PlatformOAuthAccessTokenClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformOAuthAccessTokenCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformOAuthAccessTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformOAuthAccessToken.
+func (c *PlatformOAuthAccessTokenClient) Update() *PlatformOAuthAccessTokenUpdate {
+	mutation := newPlatformOAuthAccessTokenMutation(c.config, OpUpdate)
+	return &PlatformOAuthAccessTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformOAuthAccessTokenClient) UpdateOne(_m *PlatformOAuthAccessToken) *PlatformOAuthAccessTokenUpdateOne {
+	mutation := newPlatformOAuthAccessTokenMutation(c.config, OpUpdateOne, withPlatformOAuthAccessToken(_m))
+	return &PlatformOAuthAccessTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformOAuthAccessTokenClient) UpdateOneID(id string) *PlatformOAuthAccessTokenUpdateOne {
+	mutation := newPlatformOAuthAccessTokenMutation(c.config, OpUpdateOne, withPlatformOAuthAccessTokenID(id))
+	return &PlatformOAuthAccessTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformOAuthAccessToken.
+func (c *PlatformOAuthAccessTokenClient) Delete() *PlatformOAuthAccessTokenDelete {
+	mutation := newPlatformOAuthAccessTokenMutation(c.config, OpDelete)
+	return &PlatformOAuthAccessTokenDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformOAuthAccessTokenClient) DeleteOne(_m *PlatformOAuthAccessToken) *PlatformOAuthAccessTokenDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformOAuthAccessTokenClient) DeleteOneID(id string) *PlatformOAuthAccessTokenDeleteOne {
+	builder := c.Delete().Where(platformoauthaccesstoken.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformOAuthAccessTokenDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformOAuthAccessToken.
+func (c *PlatformOAuthAccessTokenClient) Query() *PlatformOAuthAccessTokenQuery {
+	return &PlatformOAuthAccessTokenQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformOAuthAccessToken},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformOAuthAccessToken entity by its id.
+func (c *PlatformOAuthAccessTokenClient) Get(ctx context.Context, id string) (*PlatformOAuthAccessToken, error) {
+	return c.Query().Where(platformoauthaccesstoken.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformOAuthAccessTokenClient) GetX(ctx context.Context, id string) *PlatformOAuthAccessToken {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformOAuthAccessTokenClient) Hooks() []Hook {
+	return c.hooks.PlatformOAuthAccessToken
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformOAuthAccessTokenClient) Interceptors() []Interceptor {
+	return c.inters.PlatformOAuthAccessToken
+}
+
+func (c *PlatformOAuthAccessTokenClient) mutate(ctx context.Context, m *PlatformOAuthAccessTokenMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformOAuthAccessTokenCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformOAuthAccessTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformOAuthAccessTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformOAuthAccessTokenDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformOAuthAccessToken mutation op: %q", m.Op())
+	}
+}
+
+// PlatformOAuthClientClient is a client for the PlatformOAuthClient schema.
+type PlatformOAuthClientClient struct {
+	config
+}
+
+// NewPlatformOAuthClientClient returns a client for the PlatformOAuthClient from the given config.
+func NewPlatformOAuthClientClient(c config) *PlatformOAuthClientClient {
+	return &PlatformOAuthClientClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformoauthclient.Hooks(f(g(h())))`.
+func (c *PlatformOAuthClientClient) Use(hooks ...Hook) {
+	c.hooks.PlatformOAuthClient = append(c.hooks.PlatformOAuthClient, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformoauthclient.Intercept(f(g(h())))`.
+func (c *PlatformOAuthClientClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformOAuthClient = append(c.inters.PlatformOAuthClient, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformOAuthClient entity.
+func (c *PlatformOAuthClientClient) Create() *PlatformOAuthClientCreate {
+	mutation := newPlatformOAuthClientMutation(c.config, OpCreate)
+	return &PlatformOAuthClientCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformOAuthClient entities.
+func (c *PlatformOAuthClientClient) CreateBulk(builders ...*PlatformOAuthClientCreate) *PlatformOAuthClientCreateBulk {
+	return &PlatformOAuthClientCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformOAuthClientClient) MapCreateBulk(slice any, setFunc func(*PlatformOAuthClientCreate, int)) *PlatformOAuthClientCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformOAuthClientCreateBulk{err: fmt.Errorf("calling to PlatformOAuthClientClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformOAuthClientCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformOAuthClientCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformOAuthClient.
+func (c *PlatformOAuthClientClient) Update() *PlatformOAuthClientUpdate {
+	mutation := newPlatformOAuthClientMutation(c.config, OpUpdate)
+	return &PlatformOAuthClientUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformOAuthClientClient) UpdateOne(_m *PlatformOAuthClient) *PlatformOAuthClientUpdateOne {
+	mutation := newPlatformOAuthClientMutation(c.config, OpUpdateOne, withPlatformOAuthClient(_m))
+	return &PlatformOAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformOAuthClientClient) UpdateOneID(id string) *PlatformOAuthClientUpdateOne {
+	mutation := newPlatformOAuthClientMutation(c.config, OpUpdateOne, withPlatformOAuthClientID(id))
+	return &PlatformOAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformOAuthClient.
+func (c *PlatformOAuthClientClient) Delete() *PlatformOAuthClientDelete {
+	mutation := newPlatformOAuthClientMutation(c.config, OpDelete)
+	return &PlatformOAuthClientDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformOAuthClientClient) DeleteOne(_m *PlatformOAuthClient) *PlatformOAuthClientDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformOAuthClientClient) DeleteOneID(id string) *PlatformOAuthClientDeleteOne {
+	builder := c.Delete().Where(platformoauthclient.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformOAuthClientDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformOAuthClient.
+func (c *PlatformOAuthClientClient) Query() *PlatformOAuthClientQuery {
+	return &PlatformOAuthClientQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformOAuthClient},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformOAuthClient entity by its id.
+func (c *PlatformOAuthClientClient) Get(ctx context.Context, id string) (*PlatformOAuthClient, error) {
+	return c.Query().Where(platformoauthclient.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformOAuthClientClient) GetX(ctx context.Context, id string) *PlatformOAuthClient {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformOAuthClientClient) Hooks() []Hook {
+	return c.hooks.PlatformOAuthClient
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformOAuthClientClient) Interceptors() []Interceptor {
+	return c.inters.PlatformOAuthClient
+}
+
+func (c *PlatformOAuthClientClient) mutate(ctx context.Context, m *PlatformOAuthClientMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformOAuthClientCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformOAuthClientUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformOAuthClientUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformOAuthClientDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformOAuthClient mutation op: %q", m.Op())
+	}
+}
+
+// PlatformOAuthConsentClient is a client for the PlatformOAuthConsent schema.
+type PlatformOAuthConsentClient struct {
+	config
+}
+
+// NewPlatformOAuthConsentClient returns a client for the PlatformOAuthConsent from the given config.
+func NewPlatformOAuthConsentClient(c config) *PlatformOAuthConsentClient {
+	return &PlatformOAuthConsentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformoauthconsent.Hooks(f(g(h())))`.
+func (c *PlatformOAuthConsentClient) Use(hooks ...Hook) {
+	c.hooks.PlatformOAuthConsent = append(c.hooks.PlatformOAuthConsent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformoauthconsent.Intercept(f(g(h())))`.
+func (c *PlatformOAuthConsentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformOAuthConsent = append(c.inters.PlatformOAuthConsent, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformOAuthConsent entity.
+func (c *PlatformOAuthConsentClient) Create() *PlatformOAuthConsentCreate {
+	mutation := newPlatformOAuthConsentMutation(c.config, OpCreate)
+	return &PlatformOAuthConsentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformOAuthConsent entities.
+func (c *PlatformOAuthConsentClient) CreateBulk(builders ...*PlatformOAuthConsentCreate) *PlatformOAuthConsentCreateBulk {
+	return &PlatformOAuthConsentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformOAuthConsentClient) MapCreateBulk(slice any, setFunc func(*PlatformOAuthConsentCreate, int)) *PlatformOAuthConsentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformOAuthConsentCreateBulk{err: fmt.Errorf("calling to PlatformOAuthConsentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformOAuthConsentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformOAuthConsentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformOAuthConsent.
+func (c *PlatformOAuthConsentClient) Update() *PlatformOAuthConsentUpdate {
+	mutation := newPlatformOAuthConsentMutation(c.config, OpUpdate)
+	return &PlatformOAuthConsentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformOAuthConsentClient) UpdateOne(_m *PlatformOAuthConsent) *PlatformOAuthConsentUpdateOne {
+	mutation := newPlatformOAuthConsentMutation(c.config, OpUpdateOne, withPlatformOAuthConsent(_m))
+	return &PlatformOAuthConsentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformOAuthConsentClient) UpdateOneID(id string) *PlatformOAuthConsentUpdateOne {
+	mutation := newPlatformOAuthConsentMutation(c.config, OpUpdateOne, withPlatformOAuthConsentID(id))
+	return &PlatformOAuthConsentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformOAuthConsent.
+func (c *PlatformOAuthConsentClient) Delete() *PlatformOAuthConsentDelete {
+	mutation := newPlatformOAuthConsentMutation(c.config, OpDelete)
+	return &PlatformOAuthConsentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformOAuthConsentClient) DeleteOne(_m *PlatformOAuthConsent) *PlatformOAuthConsentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformOAuthConsentClient) DeleteOneID(id string) *PlatformOAuthConsentDeleteOne {
+	builder := c.Delete().Where(platformoauthconsent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformOAuthConsentDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformOAuthConsent.
+func (c *PlatformOAuthConsentClient) Query() *PlatformOAuthConsentQuery {
+	return &PlatformOAuthConsentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformOAuthConsent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformOAuthConsent entity by its id.
+func (c *PlatformOAuthConsentClient) Get(ctx context.Context, id string) (*PlatformOAuthConsent, error) {
+	return c.Query().Where(platformoauthconsent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformOAuthConsentClient) GetX(ctx context.Context, id string) *PlatformOAuthConsent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformOAuthConsentClient) Hooks() []Hook {
+	return c.hooks.PlatformOAuthConsent
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformOAuthConsentClient) Interceptors() []Interceptor {
+	return c.inters.PlatformOAuthConsent
+}
+
+func (c *PlatformOAuthConsentClient) mutate(ctx context.Context, m *PlatformOAuthConsentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformOAuthConsentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformOAuthConsentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformOAuthConsentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformOAuthConsentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformOAuthConsent mutation op: %q", m.Op())
+	}
+}
+
+// PlatformOAuthJWKClient is a client for the PlatformOAuthJWK schema.
+type PlatformOAuthJWKClient struct {
+	config
+}
+
+// NewPlatformOAuthJWKClient returns a client for the PlatformOAuthJWK from the given config.
+func NewPlatformOAuthJWKClient(c config) *PlatformOAuthJWKClient {
+	return &PlatformOAuthJWKClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformoauthjwk.Hooks(f(g(h())))`.
+func (c *PlatformOAuthJWKClient) Use(hooks ...Hook) {
+	c.hooks.PlatformOAuthJWK = append(c.hooks.PlatformOAuthJWK, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformoauthjwk.Intercept(f(g(h())))`.
+func (c *PlatformOAuthJWKClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformOAuthJWK = append(c.inters.PlatformOAuthJWK, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformOAuthJWK entity.
+func (c *PlatformOAuthJWKClient) Create() *PlatformOAuthJWKCreate {
+	mutation := newPlatformOAuthJWKMutation(c.config, OpCreate)
+	return &PlatformOAuthJWKCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformOAuthJWK entities.
+func (c *PlatformOAuthJWKClient) CreateBulk(builders ...*PlatformOAuthJWKCreate) *PlatformOAuthJWKCreateBulk {
+	return &PlatformOAuthJWKCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformOAuthJWKClient) MapCreateBulk(slice any, setFunc func(*PlatformOAuthJWKCreate, int)) *PlatformOAuthJWKCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformOAuthJWKCreateBulk{err: fmt.Errorf("calling to PlatformOAuthJWKClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformOAuthJWKCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformOAuthJWKCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformOAuthJWK.
+func (c *PlatformOAuthJWKClient) Update() *PlatformOAuthJWKUpdate {
+	mutation := newPlatformOAuthJWKMutation(c.config, OpUpdate)
+	return &PlatformOAuthJWKUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformOAuthJWKClient) UpdateOne(_m *PlatformOAuthJWK) *PlatformOAuthJWKUpdateOne {
+	mutation := newPlatformOAuthJWKMutation(c.config, OpUpdateOne, withPlatformOAuthJWK(_m))
+	return &PlatformOAuthJWKUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformOAuthJWKClient) UpdateOneID(id string) *PlatformOAuthJWKUpdateOne {
+	mutation := newPlatformOAuthJWKMutation(c.config, OpUpdateOne, withPlatformOAuthJWKID(id))
+	return &PlatformOAuthJWKUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformOAuthJWK.
+func (c *PlatformOAuthJWKClient) Delete() *PlatformOAuthJWKDelete {
+	mutation := newPlatformOAuthJWKMutation(c.config, OpDelete)
+	return &PlatformOAuthJWKDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformOAuthJWKClient) DeleteOne(_m *PlatformOAuthJWK) *PlatformOAuthJWKDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformOAuthJWKClient) DeleteOneID(id string) *PlatformOAuthJWKDeleteOne {
+	builder := c.Delete().Where(platformoauthjwk.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformOAuthJWKDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformOAuthJWK.
+func (c *PlatformOAuthJWKClient) Query() *PlatformOAuthJWKQuery {
+	return &PlatformOAuthJWKQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformOAuthJWK},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformOAuthJWK entity by its id.
+func (c *PlatformOAuthJWKClient) Get(ctx context.Context, id string) (*PlatformOAuthJWK, error) {
+	return c.Query().Where(platformoauthjwk.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformOAuthJWKClient) GetX(ctx context.Context, id string) *PlatformOAuthJWK {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformOAuthJWKClient) Hooks() []Hook {
+	return c.hooks.PlatformOAuthJWK
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformOAuthJWKClient) Interceptors() []Interceptor {
+	return c.inters.PlatformOAuthJWK
+}
+
+func (c *PlatformOAuthJWKClient) mutate(ctx context.Context, m *PlatformOAuthJWKMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformOAuthJWKCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformOAuthJWKUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformOAuthJWKUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformOAuthJWKDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformOAuthJWK mutation op: %q", m.Op())
+	}
+}
+
+// PlatformOAuthRefreshTokenClient is a client for the PlatformOAuthRefreshToken schema.
+type PlatformOAuthRefreshTokenClient struct {
+	config
+}
+
+// NewPlatformOAuthRefreshTokenClient returns a client for the PlatformOAuthRefreshToken from the given config.
+func NewPlatformOAuthRefreshTokenClient(c config) *PlatformOAuthRefreshTokenClient {
+	return &PlatformOAuthRefreshTokenClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformoauthrefreshtoken.Hooks(f(g(h())))`.
+func (c *PlatformOAuthRefreshTokenClient) Use(hooks ...Hook) {
+	c.hooks.PlatformOAuthRefreshToken = append(c.hooks.PlatformOAuthRefreshToken, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformoauthrefreshtoken.Intercept(f(g(h())))`.
+func (c *PlatformOAuthRefreshTokenClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformOAuthRefreshToken = append(c.inters.PlatformOAuthRefreshToken, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformOAuthRefreshToken entity.
+func (c *PlatformOAuthRefreshTokenClient) Create() *PlatformOAuthRefreshTokenCreate {
+	mutation := newPlatformOAuthRefreshTokenMutation(c.config, OpCreate)
+	return &PlatformOAuthRefreshTokenCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformOAuthRefreshToken entities.
+func (c *PlatformOAuthRefreshTokenClient) CreateBulk(builders ...*PlatformOAuthRefreshTokenCreate) *PlatformOAuthRefreshTokenCreateBulk {
+	return &PlatformOAuthRefreshTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformOAuthRefreshTokenClient) MapCreateBulk(slice any, setFunc func(*PlatformOAuthRefreshTokenCreate, int)) *PlatformOAuthRefreshTokenCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformOAuthRefreshTokenCreateBulk{err: fmt.Errorf("calling to PlatformOAuthRefreshTokenClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformOAuthRefreshTokenCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformOAuthRefreshTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformOAuthRefreshToken.
+func (c *PlatformOAuthRefreshTokenClient) Update() *PlatformOAuthRefreshTokenUpdate {
+	mutation := newPlatformOAuthRefreshTokenMutation(c.config, OpUpdate)
+	return &PlatformOAuthRefreshTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformOAuthRefreshTokenClient) UpdateOne(_m *PlatformOAuthRefreshToken) *PlatformOAuthRefreshTokenUpdateOne {
+	mutation := newPlatformOAuthRefreshTokenMutation(c.config, OpUpdateOne, withPlatformOAuthRefreshToken(_m))
+	return &PlatformOAuthRefreshTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformOAuthRefreshTokenClient) UpdateOneID(id string) *PlatformOAuthRefreshTokenUpdateOne {
+	mutation := newPlatformOAuthRefreshTokenMutation(c.config, OpUpdateOne, withPlatformOAuthRefreshTokenID(id))
+	return &PlatformOAuthRefreshTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformOAuthRefreshToken.
+func (c *PlatformOAuthRefreshTokenClient) Delete() *PlatformOAuthRefreshTokenDelete {
+	mutation := newPlatformOAuthRefreshTokenMutation(c.config, OpDelete)
+	return &PlatformOAuthRefreshTokenDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformOAuthRefreshTokenClient) DeleteOne(_m *PlatformOAuthRefreshToken) *PlatformOAuthRefreshTokenDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformOAuthRefreshTokenClient) DeleteOneID(id string) *PlatformOAuthRefreshTokenDeleteOne {
+	builder := c.Delete().Where(platformoauthrefreshtoken.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformOAuthRefreshTokenDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformOAuthRefreshToken.
+func (c *PlatformOAuthRefreshTokenClient) Query() *PlatformOAuthRefreshTokenQuery {
+	return &PlatformOAuthRefreshTokenQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformOAuthRefreshToken},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformOAuthRefreshToken entity by its id.
+func (c *PlatformOAuthRefreshTokenClient) Get(ctx context.Context, id string) (*PlatformOAuthRefreshToken, error) {
+	return c.Query().Where(platformoauthrefreshtoken.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformOAuthRefreshTokenClient) GetX(ctx context.Context, id string) *PlatformOAuthRefreshToken {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformOAuthRefreshTokenClient) Hooks() []Hook {
+	return c.hooks.PlatformOAuthRefreshToken
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformOAuthRefreshTokenClient) Interceptors() []Interceptor {
+	return c.inters.PlatformOAuthRefreshToken
+}
+
+func (c *PlatformOAuthRefreshTokenClient) mutate(ctx context.Context, m *PlatformOAuthRefreshTokenMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformOAuthRefreshTokenCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformOAuthRefreshTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformOAuthRefreshTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformOAuthRefreshTokenDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformOAuthRefreshToken mutation op: %q", m.Op())
 	}
 }
 
@@ -19464,9 +21166,14 @@ type (
 		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
 		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
 		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
-		PlatformDraftImport, PlatformNotificationDelivery, PlatformNotificationInbox,
-		PlatformNotificationPolicy, PlatformNotificationPreference,
-		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformDraftImport, PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
+		PlatformFounderHubRevision, PlatformFounderHubSettings,
+		PlatformFounderHubTemplate, PlatformFounderHubUser,
+		PlatformFounderHubWorkspace, PlatformNotificationDelivery,
+		PlatformNotificationInbox, PlatformNotificationPolicy,
+		PlatformNotificationPreference, PlatformNotificationSeenAction,
+		PlatformOAuthAccessToken, PlatformOAuthClient, PlatformOAuthConsent,
+		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSlackConnection,
 		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
@@ -19503,9 +21210,14 @@ type (
 		PageKnowledge, PermissionGroup, PermissionGroupMember, PlatformAppConnection,
 		PlatformAutoDMCampaign, PlatformAutoDMDelivery, PlatformAutoDMOptOut,
 		PlatformAutoDMRecipient, PlatformCreativeSet, PlatformCreativeSetVersion,
-		PlatformDraftImport, PlatformNotificationDelivery, PlatformNotificationInbox,
-		PlatformNotificationPolicy, PlatformNotificationPreference,
-		PlatformNotificationSeenAction, PlatformSlackConnection,
+		PlatformDraftImport, PlatformFounderHubDevice, PlatformFounderHubDeviceCommand,
+		PlatformFounderHubRevision, PlatformFounderHubSettings,
+		PlatformFounderHubTemplate, PlatformFounderHubUser,
+		PlatformFounderHubWorkspace, PlatformNotificationDelivery,
+		PlatformNotificationInbox, PlatformNotificationPolicy,
+		PlatformNotificationPreference, PlatformNotificationSeenAction,
+		PlatformOAuthAccessToken, PlatformOAuthClient, PlatformOAuthConsent,
+		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSlackConnection,
 		PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,

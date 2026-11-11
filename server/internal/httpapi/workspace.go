@@ -20,6 +20,29 @@ var publishTimePattern = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
 var localePattern = regexp.MustCompile(`^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{2,8})*$`)
 
 func (s *Server) registerWorkspace(mux *http.ServeMux) {
+	mux.Handle("GET /v1/founder-hub/settings", s.authenticateSession(http.HandlerFunc(s.listFounderHubSettings)))
+	mux.Handle("GET /v1/founder-hub/templates", s.authenticateSession(http.HandlerFunc(s.listFounderHubTemplates)))
+	mux.Handle("POST /v1/founder-hub/resources", s.authenticateSession(http.HandlerFunc(s.founderHubResourceAction)))
+	mux.Handle("GET /v1/founder-hub/referrals", s.authenticateSession(http.HandlerFunc(s.getFounderHubReferralSummary)))
+	mux.Handle("POST /v1/founder-hub/referrals/claim", s.authenticateSession(http.HandlerFunc(s.claimFounderHubReferral)))
+	mux.Handle("GET /v1/founder-hub/crm/providers", s.authenticateSession(http.HandlerFunc(s.listFounderHubCRMProviders)))
+	mux.Handle("GET /v1/founder-hub/crm/connections", s.authenticateSession(http.HandlerFunc(s.listFounderHubCRMConnections)))
+	mux.Handle("POST /v1/founder-hub/crm/connections", s.authenticateSession(http.HandlerFunc(s.registerFounderHubCRMConnection)))
+	mux.Handle("POST /v1/founder-hub/crm/session", s.authenticateSession(http.HandlerFunc(s.createFounderHubCRMConnectSession)))
+	mux.Handle("DELETE /v1/founder-hub/crm/connections/{id}", s.authenticateSession(http.HandlerFunc(s.deleteFounderHubCRMConnection)))
+	mux.Handle("GET /v1/founder-hub/resources/workspaces", s.authenticateSession(http.HandlerFunc(s.founderHubShareWorkspaces)))
+	mux.Handle("PATCH /v1/founder-hub/templates/{id}", s.authenticateSession(http.HandlerFunc(s.updateFounderHubTemplate)))
+	mux.Handle("PATCH /v1/founder-hub/settings", s.authenticateSession(http.HandlerFunc(s.updateFounderHubSettings)))
+	mux.Handle("GET /v1/founder-hub/devices", s.authenticateSession(http.HandlerFunc(s.listFounderHubDevices)))
+	mux.Handle("POST /v1/founder-hub/devices/report", s.authenticateSession(http.HandlerFunc(s.reportFounderHubDevice)))
+	mux.Handle("POST /v1/founder-hub/devices/commands", s.authenticateSession(http.HandlerFunc(s.createFounderHubDeviceCommand)))
+	mux.Handle("GET /v1/founder-hub/devices/commands/{id}", s.authenticateSession(http.HandlerFunc(s.getFounderHubDeviceCommand)))
+	mux.Handle("PATCH /v1/founder-hub/devices/commands/{id}", s.authenticateSession(http.HandlerFunc(s.finishFounderHubDeviceCommand)))
+	mux.Handle("GET /v1/founder-hub/session", s.authenticateSession(http.HandlerFunc(s.founderHubSession)))
+	mux.Handle("GET /v1/founder-hub/authorization", s.authenticateSession(http.HandlerFunc(s.founderHubAuthorization)))
+	mux.Handle("GET /v1/founder-hub/key-session", s.authenticateSession(http.HandlerFunc(s.founderHubKeySession)))
+	mux.Handle("GET /v1/founder-hub/connector-session", s.authenticateSession(http.HandlerFunc(s.founderHubConnectorSession)))
+	mux.Handle("DELETE /v1/founder-hub/session", s.authenticateSession(http.HandlerFunc(s.revokeFounderHubSession)))
 	mux.Handle("GET /v1/invitations/{id}", s.authenticateSession(http.HandlerFunc(s.getRecipientInvitation)))
 	mux.Handle("POST /v1/invitations/{id}/respond", s.authenticateSession(http.HandlerFunc(s.respondInvitation)))
 	mux.Handle("GET /v1/workspaces", s.authenticateSession(http.HandlerFunc(s.listWorkspaces)))
@@ -81,6 +104,86 @@ func (s *Server) registerWorkspace(mux *http.ServeMux) {
 	mux.Handle("POST /v1/internal/assets/{id}/download", s.authenticateService(http.HandlerFunc(s.readAssetDownload)))
 	mux.Handle("DELETE /v1/assets/{id}", s.authenticateProduct(http.HandlerFunc(s.deleteAsset)))
 	mux.Handle("GET /v1/audit-logs", s.authenticateProduct(http.HandlerFunc(s.listAuditLogs)))
+}
+
+func (s *Server) listFounderHubCRMProviders(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"providers": product.FounderHubCRMProviders(), "configured": s.configuration.FounderHubCRMConfigured()})
+}
+
+func (s *Server) listFounderHubCRMConnections(w http.ResponseWriter, r *http.Request) {
+	connections, err := s.configuration.ListFounderHubCRMConnections(r.Context(), workspaceActor(r))
+	respond(w, http.StatusOK, map[string]any{"connections": connections}, err)
+}
+
+func (s *Server) registerFounderHubCRMConnection(w http.ResponseWriter, r *http.Request) {
+	var input product.FounderHubCRMRegisterInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid CRM connection")
+		return
+	}
+	if err := s.configuration.RegisterFounderHubCRMConnection(r.Context(), workspaceActor(r), input); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"registered": true})
+}
+
+func (s *Server) createFounderHubCRMConnectSession(w http.ResponseWriter, r *http.Request) {
+	var input product.FounderHubCRMConnectInput
+	if err := decodeJSON(r, &input); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid CRM connection request")
+		return
+	}
+	result, err := s.configuration.CreateFounderHubCRMConnectSession(r.Context(), workspaceActor(r), input)
+	respond(w, http.StatusOK, result, err)
+}
+
+func (s *Server) deleteFounderHubCRMConnection(w http.ResponseWriter, r *http.Request) {
+	if err := s.configuration.DeleteFounderHubCRMConnection(r.Context(), workspaceActor(r), r.URL.Query().Get("provider"), r.PathValue("id")); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"disconnected": true})
+}
+
+func (s *Server) founderHubSession(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.GetFounderHubSession(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) founderHubAuthorization(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.AuthorizeFounderHubSession(r.Context(), workspaceActor(r))
+	respond(w, http.StatusOK, result, err)
+}
+
+func (s *Server) founderHubKeySession(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.GetFounderHubKeySession(r.Context(), workspaceActor(r))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) founderHubConnectorSession(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.GetFounderHubConnectorSession(r.Context(), workspaceActor(r), r.URL.Query().Get("clientId"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) revokeFounderHubSession(w http.ResponseWriter, r *http.Request) {
+	if err := s.configuration.RevokeFounderHubSession(r.Context(), workspaceActor(r)); err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"revoked": true})
 }
 
 func (s *Server) currentUser(w http.ResponseWriter, r *http.Request) {

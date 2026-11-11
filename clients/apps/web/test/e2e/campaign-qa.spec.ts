@@ -11,10 +11,10 @@ import {
 
 test.use({ timezoneId: 'America/New_York' })
 
-// @dev-server until fixed: on the production build the review-limit dialog ("cannot approve posts") does not appear.
+// @quarantine until fixed: on the production build the review-limit dialog ("cannot approve posts") does not appear.
 test(
   'campaign validation, unsaved work, review limits and archive controls',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, identity, page }) => {
     await signUpViaApi(identity, page)
     const organization = (await browserJson(page, '/api/auth/organization/create', {

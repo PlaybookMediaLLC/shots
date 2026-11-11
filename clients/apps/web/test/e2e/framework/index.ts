@@ -182,6 +182,13 @@ export const test = base.extend<
 
   budget: [
     async ({}, provide, testInfo) => {
+      // A quarantined flow is already known to fail (test/e2e/README.md); a
+      // journey budget would only make the nightly run wait five minutes to
+      // learn what the project's own timeout says in two.
+      if (testInfo.tags.includes('@quarantine')) {
+        await provide()
+        return
+      }
       // 0 is no timeout (--timeout=0); a longer file budget stays.
       if (testInfo.tags.includes('@journey') && testInfo.timeout)
         testInfo.setTimeout(Math.max(testInfo.timeout, JOURNEY_TIMEOUT))

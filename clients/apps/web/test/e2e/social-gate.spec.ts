@@ -191,10 +191,21 @@ test('the backend worker publishes once through Go, retries, honors cancellation
         scheduledPostId: cancelled.scheduledPost.id,
       })
     ).toMatchObject({ body: { scheduledPost: { status: 'CANCELLED' } }, status: 200 })
-    // eslint-disable-next-line no-restricted-syntax -- Proves the worker never publishes the cancelled post; an absence needs a window.
-    await page.waitForTimeout(30_000)
+    // Proving an absence needs a boundary. A second post, scheduled after the
+    // cancelled one and due no earlier, is that boundary: once the worker has
+    // published it, it has worked through the cancelled post's due time, and
+    // the cancelled row is still untouched. A fixed wait only proved that
+    // nothing happened within the wait, and cost the gate 30 s every run.
+    const marker = await createScheduledPost(
+      page,
+      connectionId,
+      'social-gate-cancel-marker',
+      variantId,
+      soon()
+    )
+    await awaitStatus(marker.scheduledPost.id, 'PUBLISHED')
     expect(await statusOf(cancelled.scheduledPost.id)).toBe('CANCELLED')
-    expect((await fakeState()).requests).toBe(1)
+    expect((await fakeState()).requests).toBe(2)
     const actions = await db.rows<{ action: string }>(
       `SELECT action FROM audit_log WHERE "organizationId" = $1 AND action LIKE 'post.%'`,
       [organizationId]

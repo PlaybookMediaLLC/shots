@@ -189,8 +189,8 @@ test(
 
 test(
   'grid videos go from captions to an MP4 that schedules like any post',
-  // The scripted image model only runs under next dev.
-  { tag: ['@dev-server', '@journey'] },
+  // The scripted image model answers here (PLATFORM_AI_SCRIPTED, lib/e2e-hooks.ts).
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     test.setTimeout(600_000)
     await startWorkspace({ channels: ['x', 'linkedin'] })

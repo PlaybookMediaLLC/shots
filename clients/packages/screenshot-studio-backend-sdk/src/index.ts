@@ -8,6 +8,31 @@ export {
 export type { YouTubeOptions, TikTokOptions } from './video-publishing.ts'
 import { z } from 'zod'
 import {
+  founderHubProfileSchema,
+  founderHubAuthorizationSchema,
+  founderHubSessionSchema,
+  founderHubSettingsSchema,
+  founderHubSettingsProfileSchema,
+  founderHubSettingsUpdateSchema,
+} from './founder-hub.ts'
+export * from './founder-hub.ts'
+import { founderHubTemplateSchema, founderHubTemplateQuerySchema, founderHubTemplatePageSchema, founderHubTemplateUpdateSchema } from './founder-hub-templates.ts'
+export * from './founder-hub-templates.ts'
+import { founderHubResourceActionSchema, founderHubResourceResultSchema, founderHubShareWorkspaceSchema } from './founder-hub-resources.ts'
+export * from './founder-hub-resources.ts'
+import { founderHubReferralSummarySchema, founderHubReferralClaimSchema, founderHubReferralClaimResultSchema } from './founder-hub-referrals.ts'
+export * from './founder-hub-referrals.ts'
+import { founderHubCRMProvidersSchema, founderHubCRMConnectionsSchema, founderHubCRMConnectInputSchema, founderHubCRMConnectSessionSchema, founderHubCRMDisconnectResultSchema, founderHubCRMRegisterInputSchema, founderHubCRMRegisterResultSchema } from './founder-hub-crm.ts'
+export * from './founder-hub-crm.ts'
+import {
+  founderHubDeviceSchema,
+  founderHubDeviceReportInputSchema,
+  founderHubDeviceCommandInputSchema,
+  founderHubDeviceCommandSchema,
+  founderHubDeviceCommandResultSchema,
+} from './founder-hub-devices.ts'
+export * from './founder-hub-devices.ts'
+import {
   frontendSourceSchema,
   frontendEvidenceSchema,
   frontendDecisionSchema,
@@ -2705,6 +2730,146 @@ export class ScreenshotStudioBackendSDK {
 
   async getCurrentUser() {
     return this.request<{ user: BackendCurrentUser }>('v1/me')
+  }
+
+  async getFounderHubSession() {
+    return founderHubSessionSchema.parse(await this.request('v1/founder-hub/session'))
+  }
+
+  async authorizeFounderHubSession() {
+    return founderHubAuthorizationSchema.parse(await this.request('v1/founder-hub/authorization'))
+  }
+
+  async getFounderHubSettings() {
+    return founderHubSettingsSchema.parse(await this.request('v1/founder-hub/settings'))
+  }
+
+  async getFounderHubTemplates(input: z.input<typeof founderHubTemplateQuerySchema>) {
+    const query = new URLSearchParams(founderHubTemplateQuerySchema.parse(input))
+    return founderHubTemplatePageSchema.parse(await this.request(`v1/founder-hub/templates?${query}`))
+  }
+
+  async founderHubResourceAction(input: z.input<typeof founderHubResourceActionSchema>) {
+    return founderHubResourceResultSchema.parse(await this.request('v1/founder-hub/resources', {method: 'POST', body: founderHubResourceActionSchema.parse(input)}))
+  }
+
+  async founderHubShareWorkspaces() {
+    return z.array(founderHubShareWorkspaceSchema).parse(await this.request('v1/founder-hub/resources/workspaces'))
+  }
+
+  async getFounderHubReferralSummary() {
+    return founderHubReferralSummarySchema.parse(await this.request('v1/founder-hub/referrals'))
+  }
+
+  async claimFounderHubReferral(input: z.input<typeof founderHubReferralClaimSchema>) {
+    return founderHubReferralClaimResultSchema.parse(await this.request('v1/founder-hub/referrals/claim', {
+      method: 'POST',
+      body: founderHubReferralClaimSchema.parse(input),
+    }))
+  }
+
+  async getFounderHubCRMProviders() {
+    return founderHubCRMProvidersSchema.parse(await this.request('v1/founder-hub/crm/providers'))
+  }
+
+  async getFounderHubCRMConnections() {
+    return founderHubCRMConnectionsSchema.parse(await this.request('v1/founder-hub/crm/connections'))
+  }
+
+  async createFounderHubCRMConnectSession(input: z.input<typeof founderHubCRMConnectInputSchema>) {
+    return founderHubCRMConnectSessionSchema.parse(await this.request('v1/founder-hub/crm/session', {
+      method: 'POST',
+      body: founderHubCRMConnectInputSchema.parse(input),
+    }))
+  }
+
+  async registerFounderHubCRMConnection(input: z.input<typeof founderHubCRMRegisterInputSchema>) {
+    return founderHubCRMRegisterResultSchema.parse(await this.request('v1/founder-hub/crm/connections', {
+      method: 'POST',
+      body: founderHubCRMRegisterInputSchema.parse(input),
+    }))
+  }
+
+  async deleteFounderHubCRMConnection(provider: string, connectionId: string) {
+    const query = new URLSearchParams({ provider })
+    return founderHubCRMDisconnectResultSchema.parse(await this.request(`v1/founder-hub/crm/connections/${encodeURIComponent(connectionId)}?${query}`, { method: 'DELETE' }))
+  }
+
+  async updateFounderHubTemplate(id: string, input: z.input<typeof founderHubTemplateUpdateSchema>, native = false) {
+    return founderHubTemplateSchema.parse(await this.request(`v1/founder-hub/templates/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'X-Shots-Founder-Hub-Native': String(native) },
+      body: founderHubTemplateUpdateSchema.parse(input),
+    }))
+  }
+
+  async getFounderHubDevices() {
+    return z.array(founderHubDeviceSchema).parse(await this.request('v1/founder-hub/devices'))
+  }
+  async reportFounderHubDevice(input: z.input<typeof founderHubDeviceReportInputSchema>) {
+    return z.array(founderHubDeviceCommandSchema).parse(
+      await this.request('v1/founder-hub/devices/report', {
+        method: 'POST',
+        body: founderHubDeviceReportInputSchema.parse(input),
+      })
+    )
+  }
+  async createFounderHubDeviceCommand(input: z.input<typeof founderHubDeviceCommandInputSchema>) {
+    return founderHubDeviceCommandSchema.parse(
+      await this.request('v1/founder-hub/devices/commands', {
+        method: 'POST',
+        body: founderHubDeviceCommandInputSchema.parse(input),
+      })
+    )
+  }
+  async getFounderHubDeviceCommand(id: string) {
+    return founderHubDeviceCommandSchema.parse(
+      await this.request(`v1/founder-hub/devices/commands/${encodeURIComponent(id)}`)
+    )
+  }
+  async finishFounderHubDeviceCommand(
+    id: string,
+    input: z.input<typeof founderHubDeviceCommandResultSchema>
+  ) {
+    return founderHubDeviceCommandSchema.parse(
+      await this.request(`v1/founder-hub/devices/commands/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: founderHubDeviceCommandResultSchema.parse(input),
+      })
+    )
+  }
+
+  async updateFounderHubSettings(
+    input: z.input<typeof founderHubSettingsUpdateSchema>,
+    native = false
+  ) {
+    return founderHubSettingsProfileSchema.parse(
+      await this.request('v1/founder-hub/settings', {
+        method: 'PATCH',
+        headers: { 'X-Shots-Founder-Hub-Native': String(native) },
+        body: founderHubSettingsUpdateSchema.parse(input),
+      })
+    )
+  }
+
+  async getFounderHubKeySession() {
+    return founderHubSessionSchema.parse(await this.request('v1/founder-hub/key-session'))
+  }
+
+  async getFounderHubConnectorSession(clientId: string) {
+    return founderHubSessionSchema.parse(
+      await this.request(`v1/founder-hub/connector-session?${new URLSearchParams({ clientId })}`)
+    )
+  }
+
+  async getFounderHubProfile(userId: string) {
+    return founderHubProfileSchema.parse(
+      await this.request(`v1/internal/founder-hub/users/${encodeURIComponent(userId)}`)
+    )
+  }
+
+  async revokeFounderHubSession() {
+    return this.request<{ revoked: true }>('v1/founder-hub/session', { method: 'DELETE' })
   }
 
   async getActiveAccess() {

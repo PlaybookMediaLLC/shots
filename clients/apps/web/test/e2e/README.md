@@ -14,45 +14,83 @@ Run one file, with Playwright options after the path:
 
 New specs in `test/e2e/` run automatically in local `make e2e` and in CI.
 
-CI builds and smoke-tests one production web image while each shard starts
-its dependencies. Shards download that run's image, named with the exact
-commit SHA, instead of compiling Next.js again. Failed-job reruns can reuse
-an earlier successful attempt's image until its one-day artifact retention
-expires; after that, rerun the build job too. A failed build or missing image
-fails the browser job, rather than falling back to another revision.
+CI builds every image exactly once per run — the production web image, the
+backend and the collaboration server — and hands each one to the shards as a
+run artifact named with the exact commit SHA. A shard loads them
+(`STUDIO_PREBUILT_IMAGES=true`) and builds nothing: it used to compile the Go
+tree and install `node_modules` again per shard, which was about a third of
+the whole run's runner budget. Failed-job reruns can reuse an earlier
+successful attempt's images until their one-day artifact retention expires;
+after that, rerun the build job too. A failed build or missing image fails
+the browser job, rather than falling back to another revision.
 
-## Two lanes
+## One lane
 
-Next.js recommends browser tests against a production build, and a
-production build serves pages about 4 times faster than `next dev` (median
-test 3.1 s against 15.0 s, measured on 12 specs). `dev/studio e2e` therefore
-runs two lanes, one after the other:
+Every test runs against the production build of the app
+(`dev/compose.e2e.yaml`) — the artifact that ships, and the one Next.js
+recommends testing. It also serves pages about 4 times faster than
+`next dev` (median test 3.1 s against 15.0 s, measured on 12 specs).
 
-1. `production`: the production build of the app (`dev/compose.e2e.yaml`).
-   Every test runs here unless it is tagged `@dev-server`.
-2. `dev-server`: `next dev`, for tests tagged `@dev-server`. These tests need
-   something that a production build turns off on purpose: the scripted AI
-   model (`PLATFORM_AI_SCRIPTED`), screenshot downloads from the mock
-   (`SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS`), or room under Better Auth's
-   production sign-in limit (3 per 10 s).
+There used to be a second `next dev` lane for tests that needed something a
+production build turns off: the scripted AI model (`PLATFORM_AI_SCRIPTED`),
+screenshot downloads from the mock (`SCREENSHOT_E2E_ALLOWED_DOWNLOAD_HOSTS`),
+or room under Better Auth's sign-in limit of 3 per 10 s. Those hooks are now
+asked for explicitly: the e2e app sets `PLATFORM_E2E_HOOKS=1`, and
+[`lib/e2e-hooks.ts`](../../lib/e2e-hooks.ts) grants them only to a production
+build that is serving a loopback origin, which no deployment ever is.
 
-Tag a test `@dev-server` only for one of these reasons, and say which in a
-comment when it is not the AI model. Each lane is a
-Playwright project, so `npx playwright test --project=production` runs one
-lane against a server that you started yourself.
+That lane cost more CI time than every other browser test together — one
+worker, a Turbopack cache wipe, an app recreate and about thirty routes
+warmed one at a time per shard — and it hid production-build bugs behind a
+build nobody ships. Do not bring it back; add a hook to `lib/e2e-hooks.ts`
+instead.
+
+## Quarantine
+
+A test tagged `@quarantine` is held out of the suite because the production
+build has a real bug behind it, and says which in a comment above the test.
+It is a Playwright project of its own, so it never costs a pull request
+anything:
+
+```sh
+./dev/studio e2e-quarantine
+```
+
+The nightly workflow runs it against the same production image and reports
+the result without failing. A quarantined test that passes there is fixed:
+delete the tag and the comment, and it rejoins the suite. The list is meant
+to shrink — adding to it needs the production bug written down.
 
 ## When the suite runs
 
-| Event                            | Browser tests                                                      |
-| -------------------------------- | ------------------------------------------------------------------ |
-| Pull request into `develop`      | The `@smoke` tests, one shard (none when the PR changes only docs) |
-| Push to `develop`                | The full suite, 3 shards                                           |
-| Release pull request into `main` | The full suite, 3 shards, as required checks                       |
+| Event                                                                                                                       | Browser tests                                            |
+| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Pull request into `develop`                                                                                                 | The `@smoke` tests, one shard                            |
+| ...that changes only docs                                                                                                   | None                                                     |
+| ...that changes the backend, auth, billing, tenancy, the API contracts, the framework, a shared package, the lockfile or CI | The full suite                                           |
+| Push to `develop`                                                                                                           | The full suite, duration-balanced shards                 |
+| Release pull request into `main`                                                                                            | The full suite, unless the same commit already passed it |
+
+[`dev/e2e-plan.mjs`](../../../../../dev/e2e-plan.mjs) makes that decision and
+owns the escalation list; `test/e2e-plan.test.ts` holds it to those rules.
+Anything it cannot classify runs the full suite, never fewer tests.
 
 Tag a test `@smoke` only when it guards a critical path that every pull
 request must keep working: sign-up and sessions, tenant and permission
 boundaries, publishing, the editor, or sharing. Keep the smoke set small and
-fast; it runs in the production lane.
+fast.
+
+## Shards
+
+`test/e2e/durations.json` records what each spec costs, and the plan packs
+shards by that cost (longest spec first, onto the lightest shard). Without
+it, shards fall back to Playwright's `--shard`, which balances by file count:
+on one measured run that left the shards at 904 s, 1044 s and 1464 s, so the
+whole suite waited 5.5 minutes on imbalance alone.
+
+The nightly workflow refreshes the manifest from the previous full run's
+reports with `scripts/e2e-shard-manifest.mjs`. A new spec is costed at the
+p75 of the ones already measured, so it cannot land on a full shard.
 
 ## Write a spec
 
@@ -147,9 +185,8 @@ Playwright runs 4 workers in CI. The framework isolates each test:
 
 ## Durations
 
-CI writes `playwright-report/results-production.json` and
-`playwright-report/results-dev-server.json` and adds a duration table to the
-job summary. To make the table locally, run:
+CI writes `playwright-report/results-production.json` and adds a duration
+table to the job summary. To make the table locally, run:
 
 ```sh
 node scripts/e2e-durations.mjs playwright-report/results-*.json
@@ -159,8 +196,14 @@ Setup helpers record their time as `setup-ms` annotations. The table counts
 setup from every attempt, reports retry overhead, preserves flaky status,
 and ranks tests by total time including retries. Each report's wall time
 includes Playwright setup and teardown; summed test time is worker time,
-not elapsed job time. Docker setup, image transfer, and route warmup appear
-in the Actions step timings, outside the Playwright report.
+not elapsed job time. Docker setup and image transfer appear in the Actions
+step timings, outside the Playwright report.
+
+The same reports feed the committed shard manifest:
+
+```sh
+node scripts/e2e-shard-manifest.mjs playwright-report/results-*.json
+```
 
 ## Failures
 

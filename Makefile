@@ -9,12 +9,13 @@ E2E_BASE_URL ?= http://localhost:3000
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down reset status smoke rate-limit-smoke tenant-isolation e2e e2e-file e2e-onboarding e2e-recovery check publishing-up publishing-down publishing-test logs logs-app logs-postgres logs-redis logs-rustfs kind-up kind-down kind-status kind-logs
+.PHONY: help up up-production down reset status smoke rate-limit-smoke tenant-isolation e2e e2e-file e2e-onboarding e2e-recovery e2e-quarantine check publishing-up publishing-down publishing-test logs logs-app logs-postgres logs-redis logs-rustfs kind-up kind-down kind-status kind-logs
 
 help: ## Show local development commands.
 	@echo "Screenshot Studio local development"
 	@echo ""
 	@echo "  make up                         Start the hot-reload Compose stack"
+	@echo "  make up-production              Start it with the production app image, as the browser suite runs it"
 	@echo "  make down                       Stop Compose and ask about local data"
 	@echo "  make reset                      Stop Compose and remove local data"
 	@echo "  make status                     Show Compose service status"
@@ -25,6 +26,7 @@ help: ## Show local development commands.
 	@echo "  make e2e-file SPEC=test/e2e/x.ts Run one browser end-to-end flow"
 	@echo "  make e2e-onboarding             Verify sign-up and workspace onboarding in Chromium"
 	@echo "  make e2e-recovery               Verify dependency failure and recovery behavior"
+	@echo "  make e2e-quarantine             Run the flows held out for known production-build bugs"
 	@echo "  make check                      Run format, lint, type, test, and RFC checks"
 	@echo "  make publishing-up              Rebuild and restart the Go backend and orchestrator"
 	@echo "  make publishing-down            Stop the Go publishing services"
@@ -43,6 +45,9 @@ help: ## Show local development commands.
 
 up:
 	@$(STUDIO) up
+
+up-production:
+	@$(STUDIO) up --lane production
 
 down:
 	@$(STUDIO) down
@@ -74,6 +79,9 @@ e2e-onboarding:
 
 e2e-recovery:
 	@E2E_BASE_URL="$(E2E_BASE_URL)" $(STUDIO) e2e-recovery
+
+e2e-quarantine:
+	@E2E_BASE_URL="$(E2E_BASE_URL)" $(STUDIO) e2e-quarantine
 
 check:
 	@$(STUDIO) check

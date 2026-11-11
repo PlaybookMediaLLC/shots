@@ -237,6 +237,27 @@ type PlatformCreativeSetVersion func(*sql.Selector)
 // PlatformDraftImport is the predicate function for platformdraftimport builders.
 type PlatformDraftImport func(*sql.Selector)
 
+// PlatformFounderHubDevice is the predicate function for platformfounderhubdevice builders.
+type PlatformFounderHubDevice func(*sql.Selector)
+
+// PlatformFounderHubDeviceCommand is the predicate function for platformfounderhubdevicecommand builders.
+type PlatformFounderHubDeviceCommand func(*sql.Selector)
+
+// PlatformFounderHubRevision is the predicate function for platformfounderhubrevision builders.
+type PlatformFounderHubRevision func(*sql.Selector)
+
+// PlatformFounderHubSettings is the predicate function for platformfounderhubsettings builders.
+type PlatformFounderHubSettings func(*sql.Selector)
+
+// PlatformFounderHubTemplate is the predicate function for platformfounderhubtemplate builders.
+type PlatformFounderHubTemplate func(*sql.Selector)
+
+// PlatformFounderHubUser is the predicate function for platformfounderhubuser builders.
+type PlatformFounderHubUser func(*sql.Selector)
+
+// PlatformFounderHubWorkspace is the predicate function for platformfounderhubworkspace builders.
+type PlatformFounderHubWorkspace func(*sql.Selector)
+
 // PlatformNotificationDelivery is the predicate function for platformnotificationdelivery builders.
 type PlatformNotificationDelivery func(*sql.Selector)
 
@@ -251,6 +272,21 @@ type PlatformNotificationPreference func(*sql.Selector)
 
 // PlatformNotificationSeenAction is the predicate function for platformnotificationseenaction builders.
 type PlatformNotificationSeenAction func(*sql.Selector)
+
+// PlatformOAuthAccessToken is the predicate function for platformoauthaccesstoken builders.
+type PlatformOAuthAccessToken func(*sql.Selector)
+
+// PlatformOAuthClient is the predicate function for platformoauthclient builders.
+type PlatformOAuthClient func(*sql.Selector)
+
+// PlatformOAuthConsent is the predicate function for platformoauthconsent builders.
+type PlatformOAuthConsent func(*sql.Selector)
+
+// PlatformOAuthJWK is the predicate function for platformoauthjwk builders.
+type PlatformOAuthJWK func(*sql.Selector)
+
+// PlatformOAuthRefreshToken is the predicate function for platformoauthrefreshtoken builders.
+type PlatformOAuthRefreshToken func(*sql.Selector)
 
 // PlatformSlackConnection is the predicate function for platformslackconnection builders.
 type PlatformSlackConnection func(*sql.Selector)

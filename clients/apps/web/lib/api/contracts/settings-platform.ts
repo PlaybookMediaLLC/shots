@@ -150,7 +150,7 @@ export const accountDeletionStatusSchema = mirrors<AccountDeletionStatus>()(
   z.object({
     blockers: z.array(
       z.object({
-        code: z.enum(['owns_workspace']),
+        code: z.enum(['owns_workspace', 'shared_attachments']),
         message: z.string(),
         workspaceId: z.string(),
         workspaceName: z.string(),
@@ -161,7 +161,7 @@ export const accountDeletionStatusSchema = mirrors<AccountDeletionStatus>()(
         executeAfter: isoInstantSchema,
         id: z.string(),
         requestedAt: isoInstantSchema,
-        status: z.enum(['REQUESTED', 'CANCELLED', 'COMPLETED']),
+        status: z.enum(['REQUESTED', 'PROCESSING', 'CANCELLED', 'COMPLETED']),
       })
       .nullable(),
   })

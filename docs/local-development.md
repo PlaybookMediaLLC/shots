@@ -70,10 +70,18 @@ own (`docker restart`) leaves the browser unreachable until it is restarted
 too; `make up` does both. AI generation then quietly falls back to product
 shots.
 
-`make e2e` runs the app with `PLATFORM_AI_SCRIPTED=1`: a deterministic
-stand-in model (`lib/ai/models/scripted.ts`) answers every AI stage, so the
-launch pipeline is tested end to end without a provider key. It is refused in
-production builds. `make up` turns it off again.
+`make e2e` replaces the hot-reload app with the production image — the
+artifact that ships, and the only thing the browser suite runs against. Bring
+that app up on its own with `make up-production`; `make up` restores the
+hot-reload one.
+
+It runs with `PLATFORM_AI_SCRIPTED=1`: a deterministic stand-in model
+(`lib/ai/models/scripted.ts`) answers every AI stage, so the launch pipeline is
+tested end to end without a provider key. That hook, downloads from the
+screenshot mock, and room under Better Auth's sign-in limit all come from
+`PLATFORM_E2E_HOOKS=1`, which [`lib/e2e-hooks.ts`](../clients/apps/web/lib/e2e-hooks.ts)
+grants only to a production build serving a loopback origin. A deployment never
+gets them, however its environment is set.
 
 ## Onboarding browser test
 
@@ -97,7 +105,7 @@ See [`test/e2e/README.md`](../clients/apps/web/test/e2e/README.md) to add flows 
 ### Give Docker enough memory
 
 Budget at least 12GB for the Docker VM before running the browser suite; CI
-runners have 16GB. The app runs `next dev`, and compiling routes on demand is
+runners have 16GB. `make up` runs `next dev`, and compiling routes on demand is
 memory-hungry enough to exhaust an 8GB VM mid-run. The failure does not look
 like memory pressure from the test side: Playwright reports
 `page.evaluate: Failed to fetch` or `net::ERR_CONNECTION_REFUSED`, because the
@@ -110,15 +118,14 @@ docker inspect screenshot-studio-app-1 --format '{{.State.OOMKilled}}'
 The containers themselves are small, roughly 300MB in total, so raising Docker
 Desktop's memory limit is the fix rather than trimming services.
 
-### Warm routes before timing anything
+### Warming routes is a `next dev` concern only
 
-`dev/studio` requests `/sign-up`, `/sign-in`, `/two-factor`, `/onboarding`,
-`/workspace` and `/` before the suite starts. Under `next dev` a route compiles
-on its first request, which costs 5-30s, and a browser navigation to an
-uncompiled route leaves `page.url()` on the previous page until the server
-answers. An unwarmed route is therefore indistinguishable from a redirect that
-never happened, which is a slow and confusing thing to debug. Running specs
-directly with `npx playwright test` (from `clients/apps/web/`) skips that warm-up, so do it by hand:
+Under `next dev` a route compiles on its first request, which costs 5-30s, and
+a browser navigation to an uncompiled route leaves `page.url()` on the previous
+page until the server answers — indistinguishable from a redirect that never
+happened, and slow to debug. The browser suite no longer meets that: it runs
+the production build, where every route is already compiled. Only hand-driven
+work against `make up` pays the cost, and only once per route:
 
 ```sh
 for r in /sign-up /sign-in /two-factor /onboarding /workspace /; do

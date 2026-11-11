@@ -74,12 +74,26 @@ spec:
             - name: PUBLISHING_API_URL
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.config.nangoApiBase }}
+            - name: NANGO_API_BASE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.config.nangoConnectUrl }}
+            - name: NANGO_CONNECT_URL
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.existingSecret }}
             - name: PUBLISHING_SERVICE_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: {{ . }}
                   key: PUBLISHING_SERVICE_TOKEN
+                  optional: true
+            - name: NANGO_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: NANGO_API_KEY
                   optional: true
             - name: REDIS_URL
               valueFrom:

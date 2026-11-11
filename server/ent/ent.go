@@ -89,11 +89,23 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativesetversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformdraftimport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevice"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubsettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubtemplate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubuser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubworkspace"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationinbox"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpolicy"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpreference"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationseenaction"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthaccesstoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthclient"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -285,11 +297,23 @@ func checkColumn(t, c string) error {
 			platformcreativeset.Table:             platformcreativeset.ValidColumn,
 			platformcreativesetversion.Table:      platformcreativesetversion.ValidColumn,
 			platformdraftimport.Table:             platformdraftimport.ValidColumn,
+			platformfounderhubdevice.Table:        platformfounderhubdevice.ValidColumn,
+			platformfounderhubdevicecommand.Table: platformfounderhubdevicecommand.ValidColumn,
+			platformfounderhubrevision.Table:      platformfounderhubrevision.ValidColumn,
+			platformfounderhubsettings.Table:      platformfounderhubsettings.ValidColumn,
+			platformfounderhubtemplate.Table:      platformfounderhubtemplate.ValidColumn,
+			platformfounderhubuser.Table:          platformfounderhubuser.ValidColumn,
+			platformfounderhubworkspace.Table:     platformfounderhubworkspace.ValidColumn,
 			platformnotificationdelivery.Table:    platformnotificationdelivery.ValidColumn,
 			platformnotificationinbox.Table:       platformnotificationinbox.ValidColumn,
 			platformnotificationpolicy.Table:      platformnotificationpolicy.ValidColumn,
 			platformnotificationpreference.Table:  platformnotificationpreference.ValidColumn,
 			platformnotificationseenaction.Table:  platformnotificationseenaction.ValidColumn,
+			platformoauthaccesstoken.Table:        platformoauthaccesstoken.ValidColumn,
+			platformoauthclient.Table:             platformoauthclient.ValidColumn,
+			platformoauthconsent.Table:            platformoauthconsent.ValidColumn,
+			platformoauthjwk.Table:                platformoauthjwk.ValidColumn,
+			platformoauthrefreshtoken.Table:       platformoauthrefreshtoken.ValidColumn,
 			platformslackconnection.Table:         platformslackconnection.ValidColumn,
 			platformslackinstallation.Table:       platformslackinstallation.ValidColumn,
 			platformslackpacing.Table:             platformslackpacing.ValidColumn,
