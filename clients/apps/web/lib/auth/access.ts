@@ -226,7 +226,8 @@ async function requireActiveSessionOrganization(
   return access
 }
 
-function assertPermission(access: OrganizationAccess, permission: Permission): void {
+/** Refuse with 403 unless the member's role, less their group's denials, grants `permission`. */
+export function assertPermission(access: OrganizationAccess, permission: Permission): void {
   if (!accessAllows(access, permission)) {
     throw new AuthorizationError('You do not have permission for this organization.', 403)
   }

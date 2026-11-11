@@ -166,7 +166,14 @@ export { socialAccountHealthSchema, socialAccountSchema } from './settings-platf
  * grant's expiry, or a service caller's workspace.
  */
 export type BackendScope = { organizationId: string; requestId: string } & (
-  | { display?: string; kind?: 'session'; sessionId: string; userId: string }
+  | {
+      /** The OAuth client a delegated session acts through; the backend checks its live grant. */
+      client?: string
+      display?: string
+      kind?: 'session'
+      sessionId: string
+      userId: string
+    }
   | { display: string; keyId: string; kind: 'api_key' }
   | { grantId: string; kind: 'support'; userId: string }
   | { display: string; kind: 'service' | 'webhook' }
@@ -250,6 +257,7 @@ function principalHeaders(scope: BackendScope): Record<string, string> {
       return { 'x-principal-display': scope.display, 'x-principal-kind': scope.kind }
     default:
       return {
+        ...(scope.client ? { 'x-principal-client': scope.client } : {}),
         ...(scope.display ? { 'x-principal-display': scope.display } : {}),
         'x-principal-kind': 'session',
         'x-session-id': scope.sessionId,
