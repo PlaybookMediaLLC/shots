@@ -10,9 +10,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
@@ -101,40 +104,45 @@ var voiceCommandSchema = mustAutomationJSON(map[string]any{
 	},
 })
 
-// proposeVoiceCommand parses a new transcript revision into a proposal when
-// the workspace and the member have voice commands on. It returns nil when no
-// proposal applies. A model failure is not an error: the row waits and the
-// sweep retries it (K25).
+// proposeVoiceCommand queues a revision for parsing under the note's lock, so
+// a concurrent delete is seen, then parses it now when it is due. It returns
+// the note's card, or nil when no proposal applies. A model failure is not an
+// error: the row waits and the sweep retries it (K25).
 func (c *Configuration) proposeVoiceCommand(ctx context.Context, actor Actor, noteID, revisionID string) (*VoiceCommand, error) {
+	if _, err := c.ownedVoiceNote(ctx, actor, noteID); err != nil {
+		return nil, err
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	note, err := lockVoiceNote(ctx, tx, noteID)
+	if err != nil {
+		return nil, err
+	}
+	row, transcript, err := c.queueVoiceCommandTx(ctx, tx, actor, note, revisionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return c.parseQueuedVoiceCommand(ctx, actor, note, row, transcript)
+}
+
+// parseQueuedVoiceCommand parses a queued row now when it is due, then
+// returns the note's card. Any proposal stays with the current revision.
+func (c *Configuration) parseQueuedVoiceCommand(ctx context.Context, actor Actor, note *ent.VoiceNote, row *ent.VoiceCommand, transcript string) (*VoiceCommand, error) {
 	if voiceSwitchedOff(voiceSwitchParse) {
 		return nil, nil
 	}
-	note, err := c.ownedVoiceNote(ctx, actor, noteID)
-	if err != nil {
-		return nil, err
-	}
-	if note.DeletedAt != nil || note.CurrentTranscriptRevisionID == nil || *note.CurrentTranscriptRevisionID != revisionID {
-		// Not the current revision: any proposal stays with the one that is.
-		return c.voiceCommandFor(ctx, actor, noteID)
-	}
-	transcript, eligible, err := c.voiceCommandEligible(ctx, actor, note)
-	if err != nil {
-		return nil, err
-	}
-	if !eligible {
-		return nil, c.withdrawVoiceCommand(ctx, note.ID, revisionID)
-	}
-	row, err := c.resetVoiceCommand(ctx, note, revisionID)
-	if err != nil {
-		return nil, err
-	}
-	if row.Status == voicecommand.StatusWaiting && row.TranscriptRevisionID == revisionID &&
-		(row.NextAttemptAt == nil || !row.NextAttemptAt.After(time.Now())) {
+	if row != nil && row.Status == voicecommand.StatusWaiting && (row.NextAttemptAt == nil || !row.NextAttemptAt.After(time.Now())) {
 		if err := c.parseVoiceCommand(ctx, actor, note, row, transcript); err != nil {
 			return nil, err
 		}
 	}
-	return c.voiceCommandFor(ctx, actor, noteID)
+	return c.voiceCommandFor(ctx, actor, note.ID)
 }
 
 // voiceCommandFor returns the note's proposal, or nil.
@@ -205,12 +213,12 @@ func connectionName(connection *ent.ChannelConnection) string {
 // voiceCommandEligible reads the note's current transcript and whether it may
 // be parsed: the workspace and the member have commands on (the member's
 // switch carries the remote-text consent), and the text is short enough.
-func (c *Configuration) voiceCommandEligible(ctx context.Context, actor Actor, note *ent.VoiceNote) (string, bool, error) {
+func (c *Configuration) voiceCommandEligible(ctx context.Context, client *ent.Client, actor Actor, note *ent.VoiceNote) (string, bool, error) {
 	flags, choices, err := c.voiceSettings(ctx, actor)
 	if err != nil || !flags.VoiceCommands || !choices.VoiceCommands || choices.RemoteTextConsentAt == nil || note.CurrentTranscriptRevisionID == nil {
 		return "", false, err
 	}
-	revision, err := c.client.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(*note.CurrentTranscriptRevisionID),
+	revision, err := client.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(*note.CurrentTranscriptRevisionID),
 		voicetranscriptrevision.NoteID(note.ID)).Only(ctx)
 	if err != nil {
 		return "", false, err
@@ -220,26 +228,32 @@ func (c *Configuration) voiceCommandEligible(ctx context.Context, actor Actor, n
 }
 
 // withdrawVoiceCommand withdraws an open proposal when the note's new current
-// revision is not parsed (K18).
-func (c *Configuration) withdrawVoiceCommand(ctx context.Context, noteID, revisionID string) error {
-	_, err := c.client.VoiceCommand.Update().Where(voicecommand.NoteID(noteID),
-		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).
-		SetStatus(voicecommand.StatusWithdrawn).SetTranscriptRevisionID(revisionID).Save(ctx)
-	return err
+// revision is not parsed (K18), and clears the transcript words it held. One
+// whose post a confirm already scheduled stays for the confirm to record.
+func withdrawVoiceCommand(ctx context.Context, client *ent.Client, noteID, revisionID string) error {
+	return client.VoiceCommand.Update().Where(voicecommand.NoteID(noteID),
+		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed), voicecommand.Not(voiceCommandHasPost())).
+		SetStatus(voicecommand.StatusWithdrawn).SetTranscriptRevisionID(revisionID).
+		ClearText().ClearNotice().ClearPlatform().ClearLocalTime().Exec(ctx)
 }
 
-// resetVoiceCommand points the note's one row at a new revision, waiting to
-// be parsed. A new current revision withdraws the old proposal and is parsed
-// into the same row (K18). A confirmed row is final, and the same revision is
-// a replay: both are returned unchanged.
-func (c *Configuration) resetVoiceCommand(ctx context.Context, note *ent.VoiceNote, revisionID string) (*ent.VoiceCommand, error) {
-	tx, err := c.client.Tx(ctx)
-	if err != nil {
-		return nil, err
+// queueVoiceCommandTx points the note's one command row at its new current
+// revision, waiting to be parsed, in the caller's transaction, which holds the
+// note's lock (lockVoiceNote). A new current revision withdraws the old
+// proposal and is parsed into the same row (K18); one that may not be parsed
+// withdraws it. A confirmed row is final, as is one whose draft already has a
+// post, and the same revision is a replay: those are returned unchanged. The
+// row is nil when there is nothing to parse.
+func (c *Configuration) queueVoiceCommandTx(ctx context.Context, tx *ent.Tx, actor Actor, note *ent.VoiceNote, revisionID string) (*ent.VoiceCommand, string, error) {
+	if voiceSwitchedOff(voiceSwitchParse) || note.DeletedAt != nil || note.CurrentTranscriptRevisionID == nil || *note.CurrentTranscriptRevisionID != revisionID {
+		return nil, "", nil
 	}
-	defer tx.Rollback()
-	if _, err := tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext('voice-command:' || $1))`, note.ID); err != nil {
-		return nil, err
+	transcript, eligible, err := c.voiceCommandEligible(ctx, tx.Client(), actor, note)
+	if err != nil {
+		return nil, "", err
+	}
+	if !eligible {
+		return nil, "", withdrawVoiceCommand(ctx, tx.Client(), note.ID, revisionID)
 	}
 	now := time.Now()
 	row, err := tx.VoiceCommand.Query().Where(voicecommand.NoteID(note.ID)).Only(ctx)
@@ -248,19 +262,51 @@ func (c *Configuration) resetVoiceCommand(ctx context.Context, note *ent.VoiceNo
 		row, err = tx.VoiceCommand.Create().SetID(cuid.New()).SetOrganizationID(note.OrganizationID).SetOwnerUserID(note.OwnerUserID).
 			SetNoteID(note.ID).SetTranscriptRevisionID(revisionID).SetTimeZone(note.RecordedTimeZone).SetNextAttemptAt(now).Save(ctx)
 	case err != nil:
-		return nil, err
+		return nil, "", err
 	case row.Status == voicecommand.StatusConfirmed || row.TranscriptRevisionID == revisionID:
-		return row, tx.Commit()
+		return row, transcript, nil
 	default:
+		var post *ent.ScheduledPost
+		if post, err = voiceDraftPost(ctx, tx.Client(), row.OrganizationID, row.ContentDraftID); err != nil || post != nil {
+			return row, transcript, err
+		}
+		// A draft an unfinished confirm made stays an ordinary draft.
 		row, err = tx.VoiceCommand.UpdateOne(row).SetTranscriptRevisionID(revisionID).SetStatus(voicecommand.StatusWaiting).
 			SetAction(voicecommand.ActionNone).ClearPlatform().ClearText().ClearLocalTime().SetTimeZone(note.RecordedTimeZone).
 			ClearScheduledFor().ClearChannelConnectionID().SetGuessed([]string{}).SetFlags([]string{}).ClearNotice().
-			SetAttempts(0).SetNextAttemptAt(now).ClearExpiresAt().ClearFailureReason().Save(ctx)
+			SetAttempts(0).SetNextAttemptAt(now).ClearExpiresAt().ClearFailureReason().
+			ClearContentDraftID().ClearScheduledPostID().ClearOutcome().Save(ctx)
 	}
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
-	return row, tx.Commit()
+	return row, transcript, nil
+}
+
+// voiceDraftPost is the post a confirm already scheduled from a command's
+// draft, or nil: a confirm that scheduled it can fail before its own last
+// write, and the post is then the outcome (K11).
+func voiceDraftPost(ctx context.Context, client *ent.Client, organizationID string, draftID *string) (*ent.ScheduledPost, error) {
+	if draftID == nil {
+		return nil, nil
+	}
+	post, err := client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(*draftID), scheduledpost.OrganizationID(organizationID),
+		scheduledpost.StatusNEQ(scheduledpost.StatusCANCELLED)).Order(ent.Desc(scheduledpost.FieldCreatedAt), ent.Desc(scheduledpost.FieldID)).First(ctx)
+	if ent.IsNotFound(err) {
+		return nil, nil
+	}
+	return post, err
+}
+
+// voiceCommandHasPost is voiceDraftPost as a predicate: the sweep never
+// expires a proposal whose post is going out (K14).
+func voiceCommandHasPost() predicate.VoiceCommand {
+	return func(s *sql.Selector) {
+		posts := sql.Table(scheduledpost.Table)
+		s.Where(sql.Exists(sql.Select(posts.C(scheduledpost.FieldID)).From(posts).Where(sql.And(
+			sql.ColumnsEQ(posts.C(scheduledpost.FieldContentDraftID), s.C(voicecommand.FieldContentDraftID)),
+			sql.NEQ(posts.C(scheduledpost.FieldStatus), scheduledpost.StatusCANCELLED.String())))))
+	}
 }
 
 // voiceChannels are the accounts the member may post to: active social
@@ -360,10 +406,7 @@ func (c *Configuration) callVoiceParser(ctx context.Context, note *ent.VoiceNote
 	if c.automationModel == nil {
 		return reply, ErrAutomationModelUnavailable
 	}
-	recorded := note.RecordedAt.UTC()
-	if zone, err := time.LoadLocation(note.RecordedTimeZone); err == nil {
-		recorded = note.RecordedAt.In(zone)
-	}
+	recorded := voiceRecordedClock(note.RecordedAt, note.RecordedTimeZone)
 	connected := "none"
 	if len(platforms) > 0 {
 		connected = strings.Join(platforms, ", ")
@@ -380,8 +423,9 @@ func (c *Configuration) callVoiceParser(ctx context.Context, note *ent.VoiceNote
 }
 
 // VoiceCommandConfirmInput is the card as the member confirmed it. None of it
-// is trusted: every check runs again on these values (K21, K22). Without a
-// channel the text is saved as a draft.
+// is trusted: every check runs again on these values (K21, K22). The account,
+// local time and zone come together to schedule the post; with none of them
+// the text is saved as a draft.
 type VoiceCommandConfirmInput struct {
 	ChannelConnectionID string `json:"channelConnectionId"`
 	LocalTime           string `json:"localTime"`
@@ -400,11 +444,37 @@ type VoiceCommandConfirmation struct {
 	Scheduled []*ent.ScheduledPost `json:"-"`
 }
 
+// voiceConfirmed is what a confirm did, as the row records it. The account,
+// local time and zone are set when the confirm asked to schedule.
+type voiceConfirmed struct {
+	outcome                        voicecommand.Outcome
+	draftID                        string
+	postID                         *string
+	text                           string
+	at                             *time.Time
+	channelID, localTime, timeZone string
+	scheduled                      []*ent.ScheduledPost
+}
+
+// voicePostConfirmed is the outcome of a post an earlier confirm scheduled.
+func voicePostConfirmed(post *ent.ScheduledPost) voiceConfirmed {
+	done := voiceConfirmed{outcome: voicecommand.OutcomeScheduled, draftID: *post.ContentDraftID, postID: &post.ID, text: post.Caption,
+		at: &post.ScheduledFor, channelID: post.ChannelConnectionID}
+	if post.ScheduleTimeZone != nil {
+		if zone, err := time.LoadLocation(*post.ScheduleTimeZone); err == nil {
+			done.localTime, done.timeZone = post.ScheduledFor.In(zone).Format("2006-01-02T15:04"), *post.ScheduleTimeZone
+		}
+	}
+	return done
+}
+
 // ConfirmVoiceCommand turns a proposal into a draft, then schedules it through
 // ScheduleContentDraft as the signed-in member, or submits it for review where
 // the workspace requires approval, or leaves it a draft when the member cannot
-// schedule (K10). It is idempotent on the note: a confirmed row returns its
-// stored outcome, and a retry reuses the draft and the schedule key (K11).
+// schedule (K10). It is idempotent on the note (K11): a confirmed row returns
+// its stored outcome, and a retry after a failure reuses the draft the row
+// records, with the card's edits, or records the post an earlier confirm
+// already scheduled from it.
 func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, noteID string, input VoiceCommandConfirmInput) (*VoiceCommandConfirmation, error) {
 	if voiceSwitchedOff(voiceSwitchConfirm) {
 		return nil, forbidden("Voice commands are turned off for now.")
@@ -436,22 +506,34 @@ func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, no
 	if row.Status != voicecommand.StatusProposed {
 		return nil, conflict("This command is no longer waiting for confirmation.")
 	}
-	if note.CurrentTranscriptRevisionID == nil || *note.CurrentTranscriptRevisionID != row.TranscriptRevisionID {
-		return nil, conflict("The transcript changed after this command was proposed. Review the new proposal.")
-	}
 	if err := c.authorizeContentDrafts(ctx, actor, true); err != nil {
 		return nil, err
+	}
+	// Before the card's values are checked: once the post is scheduled, it is
+	// the outcome, even after its time has passed.
+	post, err := voiceDraftPost(ctx, c.client, row.OrganizationID, row.ContentDraftID)
+	if err != nil {
+		return nil, err
+	}
+	if post != nil {
+		return c.recordVoiceConfirmation(ctx, actor, note, row, voicePostConfirmed(post))
+	}
+	if note.CurrentTranscriptRevisionID == nil || *note.CurrentTranscriptRevisionID != row.TranscriptRevisionID {
+		return nil, conflict("The transcript changed after this command was proposed. Review the new proposal.")
 	}
 	text := strings.TrimSpace(input.Text)
 	if text == "" || utf8.RuneCountInString(text) > voiceCommandTextLimit {
 		return nil, invalid("Give the post text, up to 2,000 characters.")
 	}
-	draft := ContentDraftInput{Title: note.Title, PlainText: text, Body: postBody([]PostPart{{Text: text}}, nil),
-		// One draft per proposal: a resent confirm replays it.
-		ImportKey: "voice-command-" + row.ID + "-" + row.TranscriptRevisionID, sourceVoiceRevisionID: row.TranscriptRevisionID}
+	scheduling := input.ChannelConnectionID != "" || input.LocalTime != "" || input.TimeZone != ""
+	if scheduling && (input.ChannelConnectionID == "" || input.LocalTime == "" || input.TimeZone == "") {
+		return nil, invalid("Give channelConnectionId, localTime and timeZone to schedule the post, or none of them to save it as a draft.")
+	}
+	done := voiceConfirmed{outcome: voicecommand.OutcomeDraft, text: text}
+	draftInput := ContentDraftInput{Title: note.Title, PlainText: text, Body: postBody([]PostPart{{Text: text}}, nil),
+		sourceVoiceRevisionID: row.TranscriptRevisionID}
 	var schedule *ScheduleContentDraftInput
-	var at *time.Time
-	if input.ChannelConnectionID != "" {
+	if scheduling {
 		channels, err := c.voiceChannels(ctx, actor)
 		if err != nil {
 			return nil, err
@@ -465,31 +547,36 @@ func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, no
 		if err != nil {
 			return nil, err
 		}
-		at = &when
+		done.at, done.channelID, done.localTime, done.timeZone = &when, channel.ID, input.LocalTime, input.TimeZone
 		natural := false
+		// The version is a new draft's for the checks; scheduling uses the draft's own.
 		schedule = &ScheduleContentDraftInput{LocalTime: input.LocalTime, TimeZone: input.TimeZone, NaturalPostingTime: &natural,
 			Version: postDraftVersion, Targets: []ContentDraftScheduleTarget{{AssetIDs: []string{}, Caption: text, ChannelConnectionID: channel.ID}}}
-		draft.SocialSetID, draft.ChannelConnectionIDs, draft.PrimaryPlatform = *channel.SocialSetID, []string{channel.ID}, draftPlatformChannels[channel.Platform]
+		draftInput.SocialSetID, draftInput.ChannelConnectionIDs, draftInput.PrimaryPlatform = *channel.SocialSetID, []string{channel.ID}, draftPlatformChannels[channel.Platform]
 		// Everything the schedule checks, before the draft exists (K6, K21).
 		if err := c.checkPost(ctx, actor, &postPlan{setID: *channel.SocialSetID, targets: schedule.Targets}, *schedule); err != nil {
 			return nil, err
 		}
 	}
-	record, err := c.CreateContentDraft(ctx, actor, draft)
+	draft, err := c.voiceCommandDraft(ctx, actor, row, draftInput)
 	if err != nil {
 		return nil, err
 	}
-	outcome := voicecommand.OutcomeDraft
-	var postID *string
-	var scheduled []*ent.ScheduledPost
+	// Read after the draft: a concurrent confirm may have scheduled it.
+	if post, err = voiceDraftPost(ctx, c.client, actor.OrganizationID, &draft.ID); err != nil {
+		return nil, err
+	}
+	if post != nil {
+		return c.recordVoiceConfirmation(ctx, actor, note, row, voicePostConfirmed(post))
+	}
+	if draft, err = c.reviseVoiceDraft(ctx, actor, draft, draftInput); err != nil {
+		return nil, err
+	}
+	done.draftID = draft.ID
 	if schedule != nil {
-		created, err := c.loadDraft(ctx, actor, record.ID)
-		if err != nil {
-			return nil, err
-		}
 		waiting := false
-		if created.Status != contentdraft.StatusScheduled {
-			if waiting, err = c.draftAwaitsApproval(ctx, created); err != nil {
+		if draft.Status != contentdraft.StatusScheduled {
+			if waiting, err = c.draftAwaitsApproval(ctx, draft); err != nil {
 				return nil, err
 			}
 		}
@@ -499,28 +586,121 @@ func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, no
 		}
 		switch {
 		case waiting:
-			if _, err := c.ReviewContentDraft(ctx, actor, created.ID, ContentDraftReviewInput{Action: "request", Version: created.Version}); err != nil {
+			if _, err := c.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Action: "request", Version: draft.Version}); err != nil {
 				return nil, err
 			}
-			outcome = voicecommand.OutcomePendingApproval
+			done.outcome = voicecommand.OutcomePendingApproval
 		case canSchedule:
-			result, err := c.ScheduleContentDraft(ctx, actor, created.ID, *schedule)
+			schedule.Version = draft.Version
+			result, err := c.ScheduleContentDraft(ctx, actor, draft.ID, *schedule)
 			if err != nil {
 				return nil, err
 			}
-			outcome, scheduled, postID = voicecommand.OutcomeScheduled, result.Scheduled, &result.Posts[0].ID
+			done.outcome, done.scheduled, done.postID = voicecommand.OutcomeScheduled, result.Scheduled, &result.Posts[0].ID
+			// Recorded at once: a failure before the last write cannot lose it.
+			if err := c.client.VoiceCommand.Update().Where(voicecommand.ID(row.ID), voicecommand.StatusEQ(voicecommand.StatusProposed)).
+				SetScheduledPostID(*done.postID).Exec(ctx); err != nil {
+				return nil, err
+			}
 		}
 	}
+	return c.recordVoiceConfirmation(ctx, actor, note, row, done)
+}
+
+// voiceCommandDraft returns the proposal's draft: the one an earlier confirm
+// recorded on the row, or a new one created in the transaction that records
+// it, under the note's lock, so a retried or concurrent confirm finds it
+// instead of making another (K11).
+func (c *Configuration) voiceCommandDraft(ctx context.Context, actor Actor, row *ent.VoiceCommand, input ContentDraftInput) (*ent.ContentDraft, error) {
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	update := tx.VoiceCommand.Update().Where(voicecommand.ID(row.ID), voicecommand.StatusNEQ(voicecommand.StatusConfirmed)).
-		SetStatus(voicecommand.StatusConfirmed).SetOutcome(outcome).SetContentDraftID(record.ID).SetNillableScheduledPostID(postID).
-		SetText(text).SetNillableScheduledFor(at)
-	if schedule != nil {
-		update.SetChannelConnectionID(input.ChannelConnectionID).SetLocalTime(input.LocalTime).SetTimeZone(input.TimeZone)
+	note, err := lockVoiceNote(ctx, tx, row.NoteID)
+	if err != nil {
+		return nil, err
+	}
+	if note.DeletedAt != nil {
+		return nil, voiceNoteDeleted()
+	}
+	current, err := tx.VoiceCommand.Get(ctx, row.ID)
+	if err != nil {
+		return nil, err
+	}
+	if current.TranscriptRevisionID != row.TranscriptRevisionID || current.Status == voicecommand.StatusWithdrawn {
+		return nil, conflict("This command is no longer waiting for confirmation.")
+	}
+	draftID := ""
+	if current.ContentDraftID != nil {
+		// A draft deleted since, or in another social set than the account now
+		// picked, is made anew; the old one stays an ordinary draft.
+		reuse := tx.ContentDraft.Query().Where(contentdraft.ID(*current.ContentDraftID), contentdraft.OrganizationID(actor.OrganizationID))
+		if input.SocialSetID != "" {
+			reuse.Where(contentdraft.SocialSetID(input.SocialSetID))
+		}
+		exists, err := reuse.Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			draftID = *current.ContentDraftID
+		}
+	}
+	if draftID == "" {
+		record, err := c.createContentDraft(ctx, tx, actor, input)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.VoiceCommand.UpdateOneID(row.ID).SetContentDraftID(record.ID).Exec(ctx); err != nil {
+			return nil, err
+		}
+		draftID = record.ID
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return c.loadDraft(ctx, actor, draftID)
+}
+
+// reviseVoiceDraft writes the card's text and account to a draft an earlier
+// confirm made, through the draft update path, when they changed.
+func (c *Configuration) reviseVoiceDraft(ctx context.Context, actor Actor, draft *ent.ContentDraft, input ContentDraftInput) (*ent.ContentDraft, error) {
+	update := ContentDraftUpdate{BaseVersion: draft.Version}
+	if draft.PlainText != input.PlainText {
+		update.PlainText, update.Body = &input.PlainText, &input.Body
+	}
+	if input.ChannelConnectionIDs != nil && !slices.Equal(draft.ChannelConnectionIds, input.ChannelConnectionIDs) {
+		update.ChannelConnectionIDs, update.PrimaryPlatform = &input.ChannelConnectionIDs, &input.PrimaryPlatform
+	}
+	if update.PlainText == nil && update.ChannelConnectionIDs == nil {
+		return draft, nil
+	}
+	if _, err := c.UpdateContentDraft(ctx, actor, draft.ID, update); err != nil {
+		return nil, err
+	}
+	return c.loadDraft(ctx, actor, draft.ID)
+}
+
+// recordVoiceConfirmation marks the row confirmed with what the confirm did,
+// with the audit entry naming the note as the source. When a concurrent
+// confirm finished first, its stored outcome is returned.
+func (c *Configuration) recordVoiceConfirmation(ctx context.Context, actor Actor, note *ent.VoiceNote, row *ent.VoiceCommand, done voiceConfirmed) (*VoiceCommandConfirmation, error) {
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	// An expired row is taken too: the sweep can expire it while the confirm runs.
+	update := tx.VoiceCommand.Update().Where(voicecommand.ID(row.ID), voicecommand.TranscriptRevisionID(row.TranscriptRevisionID),
+		voicecommand.StatusIn(voicecommand.StatusProposed, voicecommand.StatusExpired)).
+		SetStatus(voicecommand.StatusConfirmed).SetOutcome(done.outcome).SetContentDraftID(done.draftID).
+		SetNillableScheduledPostID(done.postID).SetText(done.text).SetNillableScheduledFor(done.at)
+	if done.channelID != "" {
+		update.SetChannelConnectionID(done.channelID)
+	}
+	if done.localTime != "" {
+		update.SetLocalTime(done.localTime).SetTimeZone(done.timeZone)
 	}
 	count, err := update.Save(ctx)
 	if err != nil {
@@ -535,21 +715,21 @@ func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, no
 		}
 		return c.voiceConfirmation(ctx, actor, stored, nil)
 	}
-	edited := row.Text == nil || *row.Text != text
+	edited := row.Text == nil || *row.Text != done.text
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.voice_command_confirmed", "voice_note", note.ID, map[string]any{
-		"commandId": row.ID, "transcriptRevisionId": row.TranscriptRevisionID, "contentDraftId": record.ID,
-		"scheduledPostId": postID, "outcome": string(outcome), "edited": edited}); err != nil {
+		"commandId": row.ID, "transcriptRevisionId": row.TranscriptRevisionID, "contentDraftId": done.draftID,
+		"scheduledPostId": done.postID, "outcome": string(done.outcome), "edited": edited}); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	slog.InfoContext(ctx, "voice_command_confirmed", "command", row.ID, "outcome", string(outcome), "edited", edited)
+	slog.InfoContext(ctx, "voice_command_confirmed", "command", row.ID, "outcome", string(done.outcome), "edited", edited)
 	stored, err := c.client.VoiceCommand.Get(ctx, row.ID)
 	if err != nil {
 		return nil, err
 	}
-	return c.voiceConfirmation(ctx, actor, stored, scheduled)
+	return c.voiceConfirmation(ctx, actor, stored, done.scheduled)
 }
 
 // voiceConfirmation is a confirmed row's stored outcome.
@@ -566,12 +746,13 @@ func (c *Configuration) voiceConfirmation(ctx context.Context, actor Actor, row 
 }
 
 // SweepVoiceCommands expires proposals nobody confirmed by their proposed time
-// (K14) and retries waiting parses that are due (K25), acting as each note's
-// owner. A note that no longer qualifies has its proposal withdrawn.
+// (K14), never one whose post a confirm already scheduled, and retries waiting
+// parses that are due (K25), acting as each note's owner. A note that no
+// longer qualifies has its proposal withdrawn.
 func (c *Configuration) SweepVoiceCommands(ctx context.Context) (int, error) {
 	now := time.Now()
 	expired, err := c.client.VoiceCommand.Update().Where(voicecommand.StatusEQ(voicecommand.StatusProposed),
-		voicecommand.ExpiresAtLTE(now)).SetStatus(voicecommand.StatusExpired).Save(ctx)
+		voicecommand.ExpiresAtLTE(now), voicecommand.Not(voiceCommandHasPost())).SetStatus(voicecommand.StatusExpired).Save(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -594,7 +775,7 @@ func (c *Configuration) SweepVoiceCommands(ctx context.Context) (int, error) {
 }
 
 // retryVoiceCommand parses a waiting row again as its owner, under the same
-// rules as the inline parse.
+// rules and lock as the inline parse.
 func (c *Configuration) retryVoiceCommand(ctx context.Context, row *ent.VoiceCommand) error {
 	if voiceSwitchedOff(voiceSwitchParse) {
 		return nil
@@ -604,20 +785,14 @@ func (c *Configuration) retryVoiceCommand(ctx context.Context, row *ent.VoiceCom
 	note, err := c.ownedVoiceNote(ctx, actor, row.NoteID)
 	if errors.Is(err, publishing.ErrForbidden) || errors.Is(err, publishing.ErrUnauthorized) || errors.Is(err, publishing.ErrNotFound) {
 		// The owner left the workspace or lost the account.
-		return c.withdrawVoiceCommand(ctx, row.NoteID, row.TranscriptRevisionID)
+		return withdrawVoiceCommand(ctx, c.client, row.NoteID, row.TranscriptRevisionID)
 	}
 	if err != nil {
 		return err
 	}
 	if note.DeletedAt != nil || note.CurrentTranscriptRevisionID == nil || *note.CurrentTranscriptRevisionID != row.TranscriptRevisionID {
-		return c.withdrawVoiceCommand(ctx, row.NoteID, row.TranscriptRevisionID)
+		return withdrawVoiceCommand(ctx, c.client, row.NoteID, row.TranscriptRevisionID)
 	}
-	transcript, eligible, err := c.voiceCommandEligible(ctx, actor, note)
-	if err != nil {
-		return err
-	}
-	if !eligible {
-		return c.withdrawVoiceCommand(ctx, row.NoteID, row.TranscriptRevisionID)
-	}
-	return c.parseVoiceCommand(ctx, actor, note, row, transcript)
+	_, err = c.proposeVoiceCommand(ctx, actor, note.ID, row.TranscriptRevisionID)
+	return err
 }

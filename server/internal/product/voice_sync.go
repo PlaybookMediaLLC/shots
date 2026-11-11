@@ -138,12 +138,21 @@ func (c *Configuration) AddVoiceTranscript(ctx context.Context, actor Actor, not
 			return nil, false, err
 		}
 	}
+	// The command row is queued with the revision, so a parse that fails below
+	// still leaves it for the sweep (K25).
+	var queued *ent.VoiceCommand
+	var transcript string
+	if created {
+		if queued, transcript, err = c.queueVoiceCommandTx(ctx, tx, actor, note, revision.ID); err != nil {
+			return nil, false, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, false, err
 	}
 	var command *VoiceCommand
 	if created {
-		if command, err = c.proposeVoiceCommand(ctx, actor, noteID, revision.ID); err != nil {
+		if command, err = c.parseQueuedVoiceCommand(ctx, actor, note, queued, transcript); err != nil {
 			slog.WarnContext(ctx, "voice command proposal failed", "noteId", noteID, "revisionId", revision.ID, "error", err)
 			command = nil
 		}

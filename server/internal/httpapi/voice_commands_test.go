@@ -57,6 +57,7 @@ func TestVoiceCommandsHTTP(t *testing.T) {
 		{"confirm", note + "/command/confirm", `{"text":"Hi","channelConnectionId":"c1","localTime":"2026-11-12T10:00","timeZone":"UTC"}`, nil, http.StatusOK},
 		{"confirm with an unknown field", note + "/command/confirm", `{"text":"Hi","scheduledPostId":"p1"}`, nil, http.StatusBadRequest},
 		{"confirm a skipped time", note + "/command/confirm", `{"text":"Hi"}`, &product.LocalTimeError{Kind: "gap"}, http.StatusBadRequest},
+		{"confirm part of a schedule", note + "/command/confirm", `{"text":"Hi","channelConnectionId":"c1"}`, product.ErrInvalidInput, http.StatusBadRequest},
 		{"confirm a changed proposal", note + "/command/confirm", `{"text":"Hi"}`, publishing.ErrConflict, http.StatusConflict},
 		{"confirm another member's note", note + "/command/confirm", `{"text":"Hi"}`, publishing.ErrNotFound, http.StatusNotFound},
 	} {

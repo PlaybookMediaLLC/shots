@@ -118,6 +118,9 @@ type ContentDraftRecord struct {
 	SourceVoiceRevisionID *string          `json:"sourceVoiceRevisionId"`
 	TagIDs                []string         `json:"tagIds"`
 	Target                *draftdoc.Target `json:"target"`
+	// SourceVoiceRemoved is set when that voice revision is gone, redacted or
+	// on a deleted note, for "source removed" (reads only).
+	SourceVoiceRemoved bool `json:"sourceVoiceRemoved"`
 	// Lists only: posts waiting to go out, the next scheduled one's time, and
 	// posts that failed or whose outcome is unknown, which need attention.
 	AttentionPosts int `json:"attentionPosts"`
@@ -754,7 +757,12 @@ func (c *Configuration) GetContentDraft(ctx context.Context, actor Actor, id str
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, []*ent.ContentDraft{row})
+	if err != nil {
+		return nil, err
+	}
 	result := contentDraftRecord(row)
+	result.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 	return &result, nil
 }
 
@@ -1005,6 +1013,10 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, rows)
+	if err != nil {
+		return nil, err
+	}
 	type summary struct {
 		attention, check, published, publishing, queued int
 		next, attentionAt, lastPublished                *time.Time
@@ -1054,6 +1066,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	}
 	return func(row *ent.ContentDraft) ContentDraftRecord {
 		record := contentDraftRecord(row)
+		record.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
 			record.PublishingPosts = item.publishing
