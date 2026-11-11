@@ -45,7 +45,7 @@ type VoiceSwitches struct {
 
 // voiceNoteLimits: 30 minutes with a warning at 25 (owner decision 5).
 var voiceNoteLimits = VoiceLimits{MaxNoteMs: 30 * 60 * 1000, WarnAtMs: 25 * 60 * 1000, MinNoteMs: 1000,
-	MaxTranscriptChars: 100000, MaxCommandChars: 2000}
+	MaxTranscriptChars: 100000, MaxCommandChars: voiceCommandTextLimit}
 
 // VoiceWorkspaceFlagsInput changes only the flags it names.
 type VoiceWorkspaceFlagsInput struct {

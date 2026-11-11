@@ -125,7 +125,7 @@ func (c *Configuration) SweepVoice(ctx context.Context) (int, error) {
 		return expired, err
 	}
 	// A member added back within the grace period keeps their notes.
-	if _, err := c.client.VoiceNote.Update().Where(voicenote.OwnerRemovedAtNotNil(), voiceOwnerIsMember(true)).
+	if _, err := c.client.VoiceNote.Update().Where(voicenote.DeletedAtIsNil(), voicenote.OwnerRemovedAtNotNil(), voiceOwnerIsMember(true)).
 		ClearOwnerRemovedAt().Save(ctx); err != nil {
 		return expired, err
 	}

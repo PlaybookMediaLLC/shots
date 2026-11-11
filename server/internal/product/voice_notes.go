@@ -2,8 +2,6 @@ package product
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -250,11 +248,6 @@ func (c *Configuration) ListVoiceNoteIndex(ctx context.Context, actor Actor) ([]
 	return entries, nil
 }
 
-type voiceNoteCursor struct {
-	ID         string    `json:"id"`
-	ReceivedAt time.Time `json:"r"`
-}
-
 // ListVoiceNotes is the member's inbox: live notes, newest received first
 // (S14: the server's clock, not the phone's).
 func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query VoiceNoteListQuery) (*VoiceNotePage, error) {
@@ -267,13 +260,11 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 	rows := c.client.VoiceNote.Query().Where(voicenote.OrganizationID(actor.OrganizationID), voicenote.OwnerUserID(actor.UserID),
 		voicenote.DeletedAtIsNil())
 	if query.Cursor != "" {
-		var cursor voiceNoteCursor
-		raw, err := base64.RawURLEncoding.DecodeString(query.Cursor)
-		if err != nil || json.Unmarshal(raw, &cursor) != nil || cursor.ID == "" {
-			return nil, invalid("The page cursor is not valid.")
+		receivedAt, id, err := decodeTimeCursor(query.Cursor)
+		if err != nil {
+			return nil, err
 		}
-		rows.Where(voicenote.Or(voicenote.ReceivedAtLT(cursor.ReceivedAt),
-			voicenote.And(voicenote.ReceivedAt(cursor.ReceivedAt), voicenote.IDLT(cursor.ID))))
+		rows.Where(voicenote.Or(voicenote.ReceivedAtLT(receivedAt), voicenote.And(voicenote.ReceivedAt(receivedAt), voicenote.IDLT(id))))
 	}
 	notes, err := rows.Order(ent.Desc(voicenote.FieldReceivedAt), ent.Desc(voicenote.FieldID)).Limit(query.Limit + 1).All(ctx)
 	if err != nil {
@@ -283,8 +274,7 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 	if len(notes) > query.Limit {
 		notes = notes[:query.Limit]
 		last := notes[len(notes)-1]
-		encoded, _ := json.Marshal(voiceNoteCursor{ID: last.ID, ReceivedAt: last.ReceivedAt})
-		next := base64.RawURLEncoding.EncodeToString(encoded)
+		next := encodeTimeCursor(last.ReceivedAt, last.ID)
 		page.NextCursor = &next
 	}
 	conflicts, err := c.voiceConflicts(ctx, actor.OrganizationID, notes)
@@ -320,10 +310,10 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 
 func voiceExcerpt(text string) string {
 	text = strings.Join(strings.Fields(text), " ")
-	if utf8.RuneCountInString(text) <= voiceExcerptRunes {
-		return text
+	if excerpt := truncateRunes(text, voiceExcerptRunes); excerpt != text {
+		return excerpt + "…"
 	}
-	return string([]rune(text)[:voiceExcerptRunes]) + "…"
+	return text
 }
 
 // validVoiceTitle trims a title and checks its length.
@@ -463,7 +453,7 @@ func (c *Configuration) UpdateVoiceNote(ctx context.Context, actor Actor, id str
 			changed = true
 		}
 	}
-	if input.ProjectID.Set && !sameOptional(input.ProjectID.Value, row.ProjectID) {
+	if input.ProjectID.Set && !sameString(input.ProjectID.Value, row.ProjectID) {
 		if input.ProjectID.Value == nil {
 			update.ClearProjectID()
 		} else {
@@ -480,10 +470,6 @@ func (c *Configuration) UpdateVoiceNote(ctx context.Context, actor Actor, id str
 		return nil, err
 	}
 	return c.voiceNoteDetail(ctx, actor, row)
-}
-
-func sameOptional(a, b *string) bool {
-	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 // DeleteVoiceNote deletes the member's note: it always succeeds for its
