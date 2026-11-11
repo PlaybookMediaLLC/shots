@@ -26,7 +26,7 @@ export default async function WritePage({ params, searchParams }: WritePageProps
     `/publish${returnParams.size ? `?${returnParams}` : ''}`
   )
   const canManageSets = accessAllows(access, 'workspace:update')
-  const data = await loadWrite(access.tenant, query)
+  const data = await loadWrite(access.tenant, query, access.hasAdvancedScheduling)
   const canEdit = accessAllows(access, 'artifact:edit')
   return (
     <PlatformShell

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/upload"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/workspaceroles"
 	"github.com/lucsky/cuid"
 )
 
@@ -466,17 +468,30 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 	if err != nil {
 		return nil, err
 	}
-	accounts := map[string][]SocialAccount{}
-	for _, connection := range connections {
-		account := socialAccount(ctx, connection, health[connection.ID])
-		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && account.Health == AccountConnected {
-			standing := c.accountStanding(ctx, connection)
-			account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
-			account.MastodonQuotes = standing.MastodonQuotes
-			account.XQuotes = standing.XQuotes
-			account.TikTokCreator = standing.TikTokCreator
+	built := make([]SocialAccount, len(connections))
+	// Each standing reads the account's credentials, and TikTok's asks TikTok,
+	// so the accounts are read together rather than one after another. Five at
+	// a time keep a workspace with many accounts from taking every connection.
+	var standings sync.WaitGroup
+	slots := make(chan struct{}, 5)
+	for i, connection := range connections {
+		built[i] = socialAccount(ctx, connection, health[connection.ID])
+		if (connection.Platform == "x" || connection.Platform == "mastodon-custom" || connection.Platform == "tiktok") && built[i].Health == AccountConnected {
+			standings.Go(func() {
+				slots <- struct{}{}
+				defer func() { <-slots }()
+				standing, account := c.accountStanding(ctx, connection), &built[i]
+				account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
+				account.MastodonQuotes = standing.MastodonQuotes
+				account.XQuotes = standing.XQuotes
+				account.TikTokCreator = standing.TikTokCreator
+			})
 		}
-		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], account)
+	}
+	standings.Wait()
+	accounts := map[string][]SocialAccount{}
+	for i, connection := range connections {
+		accounts[*connection.SocialSetID] = append(accounts[*connection.SocialSetID], built[i])
 	}
 	samples := map[string]int{}
 	if len(ids) > 0 {
@@ -531,7 +546,18 @@ func (c *Configuration) socialSetRecord(ctx context.Context, actor Actor, set *e
 // that belong to no set and, for owners and admins, private sets left behind
 // by people who left the workspace.
 func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*SocialSetList, error) {
-	if err := c.authorizeContentDrafts(ctx, actor, false); err != nil {
+	// A session's one role read gates both the list and, below, the orphaned
+	// sets; a second check would read the session and membership again.
+	var role string
+	var err error
+	if actor.IsSession() {
+		if role, err = c.auth.AuthorizedRole(ctx, actor.OrganizationID, actor.UserID, actor.SessionID, readRoles...); err == nil {
+			err = c.requireWorkspaceFeature(ctx, actor.OrganizationID, contentDraftFeature)
+		}
+	} else {
+		err = c.authorizeContentDrafts(ctx, actor, false)
+	}
+	if err != nil {
 		return nil, err
 	}
 	// Keep legacy unassigned accounts usable without creating an empty brand
@@ -568,7 +594,7 @@ func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*Socia
 	for _, connection := range unassigned {
 		list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
 	}
-	if actor.IsSession() && c.authorizeRoles(ctx, actor, "owner", "admin") == nil {
+	if workspaceroles.Allows(role, "owner", "admin") {
 		orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)
 		if err != nil {
 			return nil, err

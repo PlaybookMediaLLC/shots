@@ -554,4 +554,29 @@ func TestSocialSetsPlatform(t *testing.T) {
 			t.Fatalf("cancel=%+v err=%v", cancelled, err)
 		}
 	})
+
+	t.Run("only owners and admins see a departed member's private set", func(t *testing.T) {
+		departed, err := repo.CreateSocialSet(ctx, admin, SocialSetInput{Name: "Departed", Visibility: "PRIVATE"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`DELETE FROM member WHERE id=$1`, "member_"+admin.UserID)
+		if _, err := repo.ListSocialSets(ctx, admin); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("a former member listed the sets: %v", err)
+		}
+		orphaned := func(actor Actor) bool {
+			t.Helper()
+			list, err := repo.ListSocialSets(ctx, actor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return slices.ContainsFunc(list.Orphaned, func(set OrphanedSocialSet) bool { return set.ID == departed.ID })
+		}
+		if !orphaned(owner) {
+			t.Fatal("the owner cannot see a departed member's private set")
+		}
+		if orphaned(publisher) {
+			t.Fatal("a publisher sees orphaned sets")
+		}
+	})
 }

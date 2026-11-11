@@ -25,6 +25,9 @@ func TestUnsubscribedWorkspaceCannotScheduleUntilItSubscribes(t *testing.T) {
 	if _, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Unpaid draft"}); !errors.As(err, &gate) || gate.RequiredPlan != "pro" {
 		t.Fatalf("unsubscribed draft: %v", err)
 	}
+	if _, err := repo.ListSocialSets(ctx, w.owner); !errors.As(err, &gate) {
+		t.Fatalf("unsubscribed social sets: %v", err)
+	}
 	if _, err := repo.ConsumeWorkspaceQuota(ctx, w.owner, QuotaPosts, 0); !errors.Is(err, ErrQuotaExceeded) {
 		t.Fatalf("unsubscribed posts: %v", err)
 	}

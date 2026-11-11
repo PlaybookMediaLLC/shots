@@ -78,6 +78,20 @@ func TestWritePublishing(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.exec(t, `UPDATE "Integration" SET "verifiedCapabilities"=$2 WHERE id=$1`, "x-premium-"+w.id, string(proofJSON))
+	// The set list carries each account's standing, read for the X accounts of both sets at once.
+	listed, err := repo.ListSocialSets(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listedPremium := map[string]bool{}
+	for _, set := range listed.Items {
+		for _, account := range set.Accounts {
+			listedPremium[account.ID] = account.Premium
+		}
+	}
+	if !listedPremium[x] || !listedPremium[premium] || listedPremium[linkedin] || listedPremium[premiumLinkedIn] {
+		t.Fatalf("listed standings=%v", listedPremium)
+	}
 	draft := func(input ContentDraftInput) *ContentDraftRecord {
 		t.Helper()
 		created, err := repo.CreateContentDraft(ctx, owner, input)
