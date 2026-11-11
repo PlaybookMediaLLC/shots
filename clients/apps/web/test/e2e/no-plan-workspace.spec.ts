@@ -37,7 +37,7 @@ test.describe('a workspace without a plan', () => {
     await page.getByRole('menuitem', { exact: true, name: 'Post (Pro)' }).click()
     await app.expectPath('/upgrade')
     await expect(page.getByRole('heading', { level: 1, name: 'Publish is on Pro' })).toBeVisible()
-    await expect(page.getByRole('dialog', { name: 'New draft' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'New post' })).toHaveCount(0)
     // Choosing a plan goes straight to the plan cards, not through Billing.
     await expect(page.getByRole('link', { exact: true, name: 'Choose a plan' })).toHaveAttribute(
       'href',
@@ -124,7 +124,7 @@ test('a plan that lapses while the app is open: New post explains it instead of 
   await grantWorkspacePlan(workspace.id, 'free')
   await page.getByRole('button', { exact: true, name: 'New' }).click()
   await page.getByRole('menuitem', { exact: true, name: 'Post' }).click()
-  const draft = page.getByRole('dialog', { name: 'New draft' })
+  const draft = page.getByRole('region', { name: 'New post' })
   // Nothing is asked of the server until there is something to save.
   await page.keyboard.type('First words')
   await expect(draft.getByText('Writing posts needs Pro.')).toBeVisible()
@@ -133,7 +133,7 @@ test('a plan that lapses while the app is open: New post explains it instead of 
   // Following the plan link closes the box, which would otherwise cover the plan page.
   await draft.getByRole('link', { exact: true, name: 'See plans' }).click()
   await app.expectPath('/upgrade')
-  await expect(page.getByRole('dialog', { name: 'New draft' })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'New post' })).toHaveCount(0)
   expect(
     await db.row('SELECT count(*)::int AS drafts FROM content_draft WHERE "organizationId" = $1', [
       workspace.id,

@@ -63,7 +63,7 @@ const ON_TOOLBAR = new Set(['insert-media', 'insert-emoji'])
 /**
  * Write's part of the editor's one-row toolbar: Emoji, Ask AI and More (the
  * registry's insert commands, media tools, import and export), and the Write
- * tools those open. The editor draws Add post and Image before it.
+ * tools those open. The editor draws Add to thread and Image before it.
  */
 export function ComposerToolbar({
   aiEnabled,

@@ -99,7 +99,7 @@ export async function PlatformShell({
             />
           ) : null}
           {variant === 'page' ? (
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden md:py-3 md:pe-3">
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden md:py-3 md:pe-3">
               <div
                 data-platform-scroll
                 id="platform-content"
@@ -115,19 +115,20 @@ export async function PlatformShell({
               >
                 {children}
               </div>
+              {/* New → Post opens a blank post over the page's content, beside the navigation. */}
+              <PendingDraftInput />
             </div>
           ) : (
             <div
               id="platform-content"
               tabIndex={-1}
-              className="min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
+              className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-background"
             >
               {children}
+              <PendingDraftInput variant="editor" />
             </div>
           )}
           <OnboardingProgressCard />
-          {/* New → Post types here from any page while the draft is made. */}
-          <PendingDraftInput />
         </div>
       </ProductTourProvider>
     </PreferencesProvider>

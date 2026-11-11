@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { BatchItem } from '@/lib/api/contracts/content-batches'
 import {
+  batchAudience,
   batchSummary,
   captionProblem,
+  hourlyWindow,
+  plainTextDraft,
   itemAccounts,
   pendingAccounts,
   postOn,
@@ -244,4 +247,58 @@ test('an unrendered grid video says to render it, not that it has no media', () 
   })
   const checks = stagedChecks(concept, [{ channel: 'instagram', id: 'ig', name: 'Shots' }])
   assert.deepEqual(checks.get('ig')?.problems, ['Render this video first.'])
+})
+
+test('the audience counts accounts, not one destination per post', () => {
+  const xOnly = [1, 2, 3].map((n) => item({ channelConnectionIds: ['x'], id: `x${n}` }))
+  assert.equal(batchAudience(xOnly, accounts), '3 posts to 1 X account')
+  assert.equal(
+    batchAudience([item(), item({ id: 'b' })], accounts),
+    '2 posts to 2 accounts, 4 in all'
+  )
+  assert.equal(
+    batchAudience(
+      [item({ channelConnectionIds: ['ig'] }), item({ channelConnectionIds: ['li'] })],
+      accounts
+    ),
+    '2 posts to 2 accounts'
+  )
+  assert.equal(
+    batchAudience([item({ channelConnectionIds: [] })], accounts),
+    '1 post, no account chosen'
+  )
+})
+
+test('the hourly window is one post an hour, both ends included', () => {
+  assert.equal(hourlyWindow('09:00', '17:00'), 9)
+  assert.equal(hourlyWindow('09:30', '10:15'), 1)
+  assert.equal(hourlyWindow('00:00', '23:59'), 24)
+  assert.equal(hourlyWindow('09:00', '09:00'), null)
+  assert.equal(hourlyWindow('17:00', '09:00'), null)
+  assert.equal(hourlyWindow('09:00', '25:00'), null)
+  assert.equal(hourlyWindow('', '09:00'), null)
+})
+
+test('only a plain single post can take new words from the batch', () => {
+  const plain = [
+    { children: [{ text: '' }], id: 'p_1', type: 'post_break' },
+    { children: [{ text: 'One post.' }], type: 'p' },
+    { children: [{ text: 'Its second paragraph.' }], id: 'b', type: 'p' },
+  ]
+  assert.equal(plainTextDraft(plain), true)
+  // A thread, formatting, an image or a post's own settings would be lost.
+  assert.equal(
+    plainTextDraft([...plain, { children: [{ text: '' }], id: 'p_2', type: 'post_break' }]),
+    false
+  )
+  assert.equal(
+    plainTextDraft([plain[0], { children: [{ bold: true, text: 'Bold' }], type: 'p' }]),
+    false
+  )
+  assert.equal(
+    plainTextDraft([plain[0], { assetId: 'a', children: [{ text: '' }], type: 'img' }]),
+    false
+  )
+  assert.equal(plainTextDraft([{ ...plain[0], poll: { options: [] } }, plain[1]]), false)
+  assert.equal(plainTextDraft(null), false)
 })

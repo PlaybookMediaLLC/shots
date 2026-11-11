@@ -674,7 +674,7 @@ test(
       '"What’s happening?   Type / for commands"'
     )
     await expect(editor.locator('[placeholder]')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Add post', exact: true })).toBeInViewport()
+    await expect(page.getByRole('button', { name: 'Add to thread', exact: true })).toBeInViewport()
     await editor.fill('QA persistence check two')
     await expect(page.getByTestId('post-length-1')).toHaveText('24 / 280')
     await expectSaved(page)
@@ -711,10 +711,17 @@ test(
       .boundingBox()
     const publish = await page.getByTestId('publish-button').boundingBox()
     expect(panel && publish && publish.x + publish.width <= panel.x).toBeTruthy()
-    await page.getByRole('button', { name: 'Add post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add to thread', exact: true }).click()
     await page.keyboard.type('Second post')
     await expect(page.getByTestId('post-header')).toHaveCount(2)
     await expect(page.getByTestId('post-length-2')).toHaveText('11 / 280')
+    // A thread says what it is and how it publishes; the next post is a separate one.
+    await expect(page.getByTestId('thread-label')).toHaveText(
+      'Thread · 2 posts · post 2 replies to post 1 on X'
+    )
+    await expect(
+      page.getByTestId('writing-bar').getByRole('button', { name: 'New standalone post' })
+    ).toBeVisible()
 
     // Leave during the debounce, through an in-app link.
     await page.getByRole('link', { name: 'Calendar', exact: true }).click()
