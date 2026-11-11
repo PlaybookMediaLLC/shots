@@ -10,7 +10,6 @@
     "test": "tsx --test test/*.test.ts",
     "test:founder-hub-auth": "NODE_OPTIONS='--conditions=react-server' tsx --test test/founder-hub-oauth.server.ts",
     "test:publishing-backend-client": "NODE_OPTIONS='--conditions=react-server' tsx --test test/publishing-backend-client.server.ts",
-    "test:design-renderer": "NODE_OPTIONS='--conditions=react-server' tsx --test test/design-renderer.server.ts",
     "test:workspace-creation-server": "NODE_OPTIONS='--conditions=react-server' tsx --test test/workspace-creation.server.ts",
     "test:screenshot-capture": "NODE_OPTIONS='--conditions=react-server' tsx --test test/screenshot-capture.server.ts",
     "test:server": "NODE_OPTIONS='--conditions=react-server' tsx --test test/*.server.ts",
