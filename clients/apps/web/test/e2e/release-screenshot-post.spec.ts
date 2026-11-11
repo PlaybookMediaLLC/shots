@@ -90,9 +90,15 @@ test(
       releaseId,
     ])
 
-    // One action from the release opens its screenshot in the editor.
+    // One action from the release opens its screenshot in the editor; the link shows the screenshot.
     await app.open(`/releases/${releaseId}`)
-    await page.getByTestId('release-open-editor').click()
+    const openScreenshot = page.getByTestId('release-open-editor')
+    await expect
+      .poll(() =>
+        openScreenshot.locator('img').evaluate((image: HTMLImageElement) => image.naturalWidth)
+      )
+      .toBeGreaterThan(0)
+    await openScreenshot.click()
     await page.waitForURL((url) => url.pathname.endsWith('/editor'))
     await expect(page.locator('img[alt="Main image"]')).toHaveCount(1, { timeout: 60_000 })
     // The kit applies after the image opens and says so; then the loader drops it from the address.
