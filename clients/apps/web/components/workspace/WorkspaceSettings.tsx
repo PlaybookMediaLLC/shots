@@ -58,7 +58,14 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
   }
 
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]!
-  if (section === 'founder-hub') return <WorkspaceSettingContent {...props} />
+  // Founder Hub lays out its own sidebar, so it skips Page but keeps the page title.
+  if (section === 'founder-hub')
+    return (
+      <>
+        <h1 className="sr-only">{current.title}</h1>
+        <WorkspaceSettingContent {...props} />
+      </>
+    )
   return (
     <Page description={current.description} title={current.title}>
       <ReturnToWork />

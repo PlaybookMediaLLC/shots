@@ -143,9 +143,10 @@ export function PublishButton({
         <Button
           aria-label="Publish"
           className={cn(
-            'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/[0.08] text-[13px] font-medium text-foreground',
-            'transition-colors duration-150 hover:bg-foreground/[0.06] disabled:pointer-events-none disabled:opacity-35',
-            compact ? 'px-2' : 'px-3'
+            'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg text-[13px] font-medium text-muted-foreground',
+            'transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-foreground disabled:pointer-events-none disabled:opacity-35',
+            'data-[state=open]:bg-foreground/[0.08] data-[state=open]:text-foreground',
+            compact ? 'px-2' : 'px-2.5'
           )}
           disabled={disabled || busy}
           size={null}

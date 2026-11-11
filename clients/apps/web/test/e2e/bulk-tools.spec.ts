@@ -189,6 +189,30 @@ test(
   }
 )
 
+test('an open batch opens from its row, and an empty one is discarded from the list', async ({
+  app,
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ channels: ['x'] })
+  const id = await openNewBatch(page, app)
+  await app.open('/publish/batches')
+  const batch = page.getByRole('link', { name: /^Mixed files or a CSV/ })
+  await batch.click()
+  await page.waitForURL(new RegExp(`/publish/batches/${id}$`))
+
+  // The row's link covers the row, so Discard must sit above it to take the click.
+  await app.open('/publish/batches')
+  await page.getByRole('button', { name: /^Discard the empty batch Mixed files or a CSV/ }).click()
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Discard it', exact: true })
+    .click()
+  await expect(batch).toHaveCount(0)
+  await expect(page.getByText('No open batches', { exact: true })).toBeVisible()
+  expect(page.url()).toMatch(/\/publish\/batches$/)
+})
+
 test(
   'written posts open on a text-first page: paste, review the split, undo, plan and edit in place',
   { tag: '@journey' },

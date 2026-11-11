@@ -172,7 +172,10 @@ export function ProjectMenu({ compact = false }: { compact?: boolean }) {
           type="button"
         >
           <FloppyDiskIcon className="shrink-0" size={15} />
-          {!compact ? <span className="whitespace-nowrap">Save as project</span> : null}
+          {/* The editor header narrows this to its icon when the toolbar needs the room. */}
+          {!compact ? (
+            <span className="whitespace-nowrap @max-[16rem]/editor-start:sr-only">Save as project</span>
+          ) : null}
           {compact ? <span className="sr-only">Save as project</span> : null}
         </Button>
         {dialogs}

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
-import { EmptyState, Group, Page, Pill, Row, Section } from '@/components/platform-ui'
-import { LibraryIcon } from '@/components/platform-shell/icons'
+import { EmptyState, Group, Page, Pill, Section } from '@/components/platform-ui'
+import { BatchIcon, ChevronRightIcon, LibraryIcon } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
 import { DiscardBatchButton } from '@/components/write/batch/DiscardBatchButton'
@@ -43,14 +43,10 @@ export default async function BatchesPage({
             description="Pick what you are posting, then name it and choose the profile whose accounts its posts go to."
           >
             {sets.length ? (
-              <Group>
-                <Row>
-                  <NewBatchButton
-                    sets={sets.map((set) => ({ id: set.id, name: set.name }))}
-                    defaultSetId={query.set}
-                  />
-                </Row>
-              </Group>
+              <NewBatchButton
+                sets={sets.map((set) => ({ id: set.id, name: set.name }))}
+                defaultSetId={query.set}
+              />
             ) : (
               <Button asChild variant="outline" className="w-fit">
                 <Link href="/settings/publishing-brands">Connect a social account to start a batch</Link>
@@ -62,27 +58,47 @@ export default async function BatchesPage({
           {batches.length ? (
             <Group>
               {batches.map((batch) => (
-                <Row
+                <div
+                  className="group relative flex min-w-0 items-center gap-3 px-4 py-3 transition-colors hover:bg-foreground/[0.025]"
                   key={batch.id}
-                  layout="inline"
-                  label={
-                    <SidebarLink className="hover:underline" href={`/publish/batches/${batch.id}`}>
-                      {batch.title}
-                    </SidebarLink>
-                  }
-                  description={
-                    sets.find((set) => set.id === batch.socialSetId)?.name ?? 'Profile'
-                  }
                 >
-                  <Pill>
+                  <span
+                    aria-hidden="true"
+                    className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-foreground/[0.03] text-muted-foreground"
+                  >
+                    <BatchIcon size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {/* The link covers the row; the discard button sits above it. */}
+                    <h3 className="min-w-0">
+                      <SidebarLink
+                        className="block truncate text-ui-lg text-foreground outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                        href={`/publish/batches/${batch.id}`}
+                        title={batch.title}
+                      >
+                        {batch.title}
+                      </SidebarLink>
+                    </h3>
+                    <p className="mt-0.5 truncate text-ui text-muted-foreground">
+                      {sets.find((set) => set.id === batch.socialSetId)?.name ?? 'Profile'}
+                    </p>
+                  </div>
+                  <Pill tone={batch.itemCount ? 'blue' : 'gray'}>
                     {batch.itemCount} {batch.itemCount === 1 ? 'post' : 'posts'}
                   </Pill>
                   {/* Starting a batch creates it before its first file or row, so an
                       abandoned start needs a way out of this list. */}
                   {canEdit && batch.itemCount === 0 ? (
-                    <DiscardBatchButton id={batch.id} title={batch.title} />
+                    <span className="relative">
+                      <DiscardBatchButton id={batch.id} title={batch.title} />
+                    </span>
                   ) : null}
-                </Row>
+                  <ChevronRightIcon
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
+                    size={14}
+                  />
+                </div>
               ))}
             </Group>
           ) : (
