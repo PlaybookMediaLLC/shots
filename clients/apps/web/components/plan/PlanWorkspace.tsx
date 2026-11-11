@@ -140,6 +140,14 @@ function StatusWord({ status }: { status: string }) {
 
 /** Cards a calendar day shows before the rest scroll inside it. */
 const DAY_VISIBLE = 4
+/** Pixels of padding (p-1.5) around a day's cards, for the focus outline. */
+const FOCUS_ROOM = 6
+
+/** A day list's cards whose middle is past its visible bottom. */
+const belowFold = (element: HTMLElement) =>
+  ([...element.children] as HTMLElement[]).filter(
+    (card) => card.offsetTop + card.offsetHeight / 2 > element.scrollTop + element.clientHeight
+  )
 
 /**
  * A day's cards. Past the fourth they scroll inside the day, so a day with a
@@ -153,15 +161,24 @@ function DayList({ children, ids }: { children: React.ReactNode; ids: string }) 
   const measure = React.useCallback(() => {
     const element = list.current
     if (!element) return
-    const cards = [...element.children] as HTMLElement[]
-    const last = cards[DAY_VISIBLE - 1]
-    setLimit(cards.length > DAY_VISIBLE && last ? last.offsetTop + last.offsetHeight : undefined)
-    const bottom = element.scrollTop + element.clientHeight
-    setBelow(cards.filter((card) => card.offsetTop + card.offsetHeight / 2 > bottom).length)
+    const last = element.children[DAY_VISIBLE - 1] as HTMLElement | undefined
+    // The list's padding is the room a focused card's outline needs inside the scroll box.
+    setLimit(
+      element.children.length > DAY_VISIBLE && last
+        ? last.offsetTop + last.offsetHeight + FOCUS_ROOM
+        : undefined
+    )
+    setBelow(belowFold(element).length)
   }, [])
   React.useLayoutEffect(() => {
     const element = list.current
     if (!element) return
+    // Four or fewer never scroll, so a quiet day keeps no observer.
+    if (element.children.length <= DAY_VISIBLE) {
+      setLimit(undefined)
+      setBelow(0)
+      return
+    }
     measure()
     // Width, density and wrapping change card heights, so the cards are watched too.
     const observer = new ResizeObserver(measure)
@@ -172,7 +189,7 @@ function DayList({ children, ids }: { children: React.ReactNode; ids: string }) 
   return (
     <>
       <div
-        className="relative grid gap-2 overflow-y-auto"
+        className={`relative -m-1.5 grid gap-2 p-1.5 ${limit === undefined ? '' : 'overflow-y-auto'}`}
         data-testid="calendar-day-list"
         onScroll={measure}
         ref={list}
@@ -183,10 +200,19 @@ function DayList({ children, ids }: { children: React.ReactNode; ids: string }) 
       {below > 0 ? (
         <Button
           aria-label={`Scroll to ${below} more ${below === 1 ? 'post' : 'posts'}`}
-          className="h-6 justify-start gap-1 px-1 text-xs font-normal text-muted-foreground"
-          onClick={() =>
-            list.current?.scrollBy({ behavior: 'smooth', top: list.current.clientHeight })
-          }
+          className="h-auto justify-start gap-1 px-1 py-0.5 text-xs font-normal text-muted-foreground"
+          onClick={() => {
+            const element = list.current
+            if (!element) return
+            // Focus moves to the first revealed card: this button goes once nothing is below.
+            belowFold(element)[0]?.focus({ preventScroll: true })
+            element.scrollBy({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? 'auto'
+                : 'smooth',
+              top: element.clientHeight,
+            })
+          }}
           size={null}
           variant="ghost"
         >
@@ -293,7 +319,6 @@ export function PlanWorkspace({
       : []
   )
   const setPref = (patch: Partial<PlanPreferences>) => setPrefs((p) => ({ ...p, ...patch }))
-  const filterCount = prefs.statuses.length + prefs.providers.length + prefs.tagIds.length
   const allState = selectionState(
     prefs.visible,
     sets.map((s) => s.id)
@@ -631,9 +656,14 @@ export function PlanWorkspace({
     const { visible, hidden } = capped ? visibleDayItems(onDay) : { visible: onDay, hidden: 0 }
     return (
       <div className="grid gap-2">
-        <DayList ids={(open ? onDay : visible).map((item) => item.id).join()}>
-          {(open ? onDay : visible).map((item) => card(item))}
-        </DayList>
+        {/* A capped month day has its own "+N more"; every other day scrolls past four. */}
+        {capped ? (
+          (open ? onDay : visible).map((item) => card(item))
+        ) : (
+          <DayList ids={onDay.map((item) => item.id).join()}>
+            {onDay.map((item) => card(item))}
+          </DayList>
+        )}
         {hidden > 0 ? (
           <Button
             aria-expanded={open}
@@ -883,11 +913,6 @@ export function PlanWorkspace({
                 <Button size="sm" variant="outline">
                   <FunnelSimpleIcon aria-hidden />
                   Filters
-                  {filterCount ? (
-                    <span className="min-w-4 rounded-full bg-foreground px-1 text-center text-label text-background">
-                      {filterCount}
-                    </span>
-                  ) : null}
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="grid w-64 gap-3 p-3">

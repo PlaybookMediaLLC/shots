@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { socialSetHref } from '@/components/workspace/settings-sections'
 import { call } from '@/lib/content-drafts/client'
@@ -30,6 +30,10 @@ import { useWrite, type WriteSet } from '../write-context'
 
 /** One turn of the conversation. */
 type Turn = { content: string; role: 'assistant' | 'user' }
+
+/** A quiet action under an answer; custom, so the shell's 32px button size does not apply. */
+const TURN_ACTION =
+  'inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-foreground/[0.05] hover:text-foreground'
 
 /** Starting points for a conversation about the draft. */
 const STARTERS = [
@@ -80,10 +84,10 @@ export function AssistantPanel({
   })
   const [busy, setBusy] = React.useState(false)
   const [setup, setSetup] = React.useState(false)
-  const end = React.useRef<HTMLDivElement>(null)
-  // Keep the newest message in view as the conversation grows.
+  const body = React.useRef<HTMLDivElement>(null)
+  // Keep the newest message in view; only the conversation scrolls, never the page.
   React.useEffect(() => {
-    if (turns.length) end.current?.scrollIntoView({ block: 'nearest' })
+    if (turns.length && body.current) body.current.scrollTop = body.current.scrollHeight
   }, [turns.length, busy])
   const configured = set?.writingAssistant.status === 'configured'
   // Screenshot posts put the prompts about announcing and explaining first.
@@ -117,7 +121,7 @@ export function AssistantPanel({
   return (
     // The conversation scrolls; the message box stays at the panel's foot, as in a chat.
     <div className="flex min-h-0 flex-1 flex-col text-sm" data-testid="assistant-panel">
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pt-4 pb-6" ref={body}>
         <div className="flex items-start gap-2 text-xs text-muted-foreground">
           <p className="min-w-0 flex-1">
             Writing in {set?.name ?? 'this set'}’s voice
@@ -132,8 +136,9 @@ export function AssistantPanel({
               Style guide and samples
             </Button>
           </p>
-          <Tooltip>
-            <TooltipTrigger asChild>
+          {/* A popover, not a tooltip: the panel is a sheet on phones, where tooltips never open. */}
+          <Popover>
+            <PopoverTrigger asChild>
               <Button
                 aria-label="How instructions combine"
                 className="grid size-5 shrink-0 place-items-center rounded-md hover:bg-foreground/[0.06] hover:text-foreground"
@@ -143,12 +148,12 @@ export function AssistantPanel({
               >
                 <InfoIcon aria-hidden className="size-3.5" />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-64">
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-3 text-xs text-muted-foreground">
               Workspace defaults → Profile overrides → Your instructions for this draft. Prohibited
               terms always apply.
-            </TooltipContent>
-          </Tooltip>
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="divide-y divide-border rounded-lg border border-border">
           <Disclosure className="px-3 py-2.5">
@@ -226,26 +231,26 @@ export function AssistantPanel({
                   <p className="-ml-2 flex gap-0.5">
                     {onInsert ? (
                       <Button
-                        className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                        className={TURN_ACTION}
                         // Only the post goes in: never the model's introduction.
                         onClick={() => assistPosts(turn.content).forEach(onInsert)}
-                        size="sm"
+                        size={null}
                         type="button"
-                        variant="ghost"
+                        variant="custom"
                       >
                         <PlusIcon aria-hidden className="size-3.5" />
                         Add as a new post
                       </Button>
                     ) : null}
                     <Button
-                      className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      className={TURN_ACTION}
                       onClick={() => {
                         void navigator.clipboard.writeText(turn.content)
                         toast.success('Copied.')
                       }}
-                      size="sm"
+                      size={null}
                       type="button"
-                      variant="ghost"
+                      variant="custom"
                     >
                       <CopyIcon aria-hidden className="size-3.5" />
                       Copy
@@ -262,7 +267,6 @@ export function AssistantPanel({
             ) : null}
           </ol>
         )}
-        <div ref={end} />
       </div>
       <form
         className="px-3 pt-2 pb-4"
@@ -291,7 +295,7 @@ export function AssistantPanel({
             <Select value="" onValueChange={(value) => setMessage(value)}>
               <SelectTrigger
                 aria-label="Prompt library"
-                className="h-7! w-auto gap-1 rounded-md! border-transparent! bg-transparent! px-2 text-xs text-muted-foreground hover:bg-foreground/[0.05]! hover:text-foreground"
+                className="h-7! w-auto gap-1 rounded-md! border-transparent! bg-transparent! px-2 text-xs! text-muted-foreground hover:bg-foreground/[0.05]! hover:text-foreground"
                 size="sm"
               >
                 <BookOpenTextIcon aria-hidden className="size-3.5" />

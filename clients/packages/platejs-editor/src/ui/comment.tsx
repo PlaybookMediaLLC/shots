@@ -616,16 +616,16 @@ export function CommentCreateForm({
 
             <Button
               aria-label="Send comment"
-              className="absolute right-0 bottom-0 ml-auto size-6 shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 hover:text-background disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+              className="absolute right-0 bottom-0 ml-auto shrink-0 rounded-full bg-foreground text-background hover:bg-foreground/85 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100 [&_svg]:size-3.5"
               disabled={commentContent.trim().length === 0}
               onClick={(e) => {
                 e.stopPropagation();
                 onAddComment();
               }}
-              size="icon"
-              variant="ghost"
+              size="menuAction"
+              variant="none"
             >
-              <ArrowUpIcon className="size-3.5" weight="bold" />
+              <ArrowUpIcon weight="bold" />
             </Button>
           </EditorContainer>
         </Plate>

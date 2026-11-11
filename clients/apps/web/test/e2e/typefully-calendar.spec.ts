@@ -206,7 +206,9 @@ test('a busy day shows four posts and scrolls the rest inside the day', async ({
   await expect(cards.nth(4)).not.toBeInViewport()
   const more = cell.getByRole('button', { name: 'Scroll to 2 more posts' })
   await expect(more).toHaveText('2 more')
-  await more.click()
+  // By keyboard, focus moves to the first card it reveals: the button goes once nothing is below.
+  await more.press('Enter')
+  await expect(cards.nth(4)).toBeFocused()
   await expect(cards.nth(5)).toBeInViewport()
   await expect(cell.getByRole('button', { name: /^Scroll to \d+ more/ })).toHaveCount(0)
 })
