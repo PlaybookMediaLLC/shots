@@ -1464,6 +1464,23 @@ func TestCaptureDeploymentReactivationIsItsOwnDeployment(t *testing.T) {
 	if back := ingest("dpl_3", nil, 7); back.Kind != "rollback" {
 		t.Fatalf("back=%+v", back)
 	}
+	// A provider clock a day ahead is capped at arrival: the deployment after it
+	// is not superseded, and a redelivery finds its row.
+	ahead := ingest("dpl_ahead", nil, 25*60)
+	if row := f.db.Client.DeploymentEvent.GetX(f.ctx, ahead.DeploymentID); !ahead.Created || row.DeployedAt.After(time.Now()) {
+		t.Fatalf("ahead=%+v deployedAt=%s", ahead, row.DeployedAt)
+	}
+	next, err := f.repo.IngestDeployment(f.ctx, Actor{OrganizationID: f.org, Kind: "webhook", Display: f.source.ID}, IngestDeploymentInput{Environment: "production",
+		EventID: "dpl_next", ExternalID: "dpl_next", SourceAppID: f.source.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if superseded, err := deploymentSuperseded(f.ctx, f.db.Client, f.db.Client.DeploymentEvent.GetX(f.ctx, next.DeploymentID)); err != nil || superseded {
+		t.Fatalf("a future deployment time superseded the next deployment: %v %v", superseded, err)
+	}
+	if again := ingest("dpl_ahead", nil, 25*60); again.Created || again.DeploymentID != ahead.DeploymentID {
+		t.Fatalf("redelivered ahead=%+v", again)
+	}
 }
 
 // F4: a newer deployment cancels the jobs still waiting for an older one, so a

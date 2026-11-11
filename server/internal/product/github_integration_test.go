@@ -398,13 +398,18 @@ func TestGitHubConnectionsChangesAndReleases(t *testing.T) {
 	}
 }
 
-// movedReader is GitHub after a repository left the from installation.
+// movedReader is GitHub after a repository left the from installation; err,
+// when set, is what GitHub answers instead of a 404.
 type movedReader struct {
 	fakeReader
 	from int64
+	err  error
 }
 
 func (m movedReader) Repository(ctx context.Context, installationID int64, repositoryID string) (githubapp.Repository, error) {
+	if installationID == m.from && m.err != nil {
+		return githubapp.Repository{}, m.err
+	}
 	if installationID == m.from {
 		return githubapp.Repository{}, githubapp.StatusError{Status: 404}
 	}
@@ -430,6 +435,16 @@ func TestGitHubRepositoryTransferNeedsReconnection(t *testing.T) {
 		t.Fatalf("an installation that still reads the repository lost it: %+v", result)
 	}
 	reader := f.repo.github.(fakeReader)
+	// GitHub failing, rate limiting or timing out proves nothing: the delivery
+	// fails for GitHub to send again, and the source stays.
+	for _, failure := range []error{githubapp.StatusError{Status: 502}, githubapp.StatusError{Status: 403, RateLimited: true}, context.DeadlineExceeded} {
+		f.repo.WithGitHubApp(movedReader{fakeReader: reader, from: f.installation, err: failure})
+		body := `{"action":"transferred","installation":{"id":` + strconv.FormatInt(f.installation+1, 10) + `},"repository":{"id":1001}}`
+		if _, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{DeliveryID: "transfer", EventName: "repository", Body: []byte(body)}); !errors.Is(err, failure) ||
+			f.db.Client.SourceApp.GetX(f.ctx, f.source.ID).Status != sourceapp.StatusACTIVE {
+			t.Fatalf("%v archived the source or was accepted: %v", failure, err)
+		}
+	}
 	f.repo.WithGitHubApp(movedReader{fakeReader: reader, from: f.installation})
 	if result := transfer("transfer"); result.Handled != 1 {
 		t.Fatalf("result=%+v", result)

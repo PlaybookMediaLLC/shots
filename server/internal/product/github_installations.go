@@ -480,10 +480,17 @@ func (c *Configuration) transferGitHubRepository(ctx context.Context, delivery s
 			continue
 		}
 		// The signature does not date the event: GitHub, not a replay, decides.
-		// An old installation that still reads the repository keeps it.
+		// An old installation that still reads the repository keeps it. Only a
+		// definite refusal archives; any other failure fails the delivery for
+		// GitHub to send again.
 		if reader, ok := c.github.(GitHubReader); ok && row.Status == githubinstallation.StatusACTIVE {
-			if _, err := reader.Repository(ctx, row.InstallationID, repository); err == nil {
+			_, err := reader.Repository(ctx, row.InstallationID, repository)
+			if err == nil {
 				continue
+			}
+			var status githubapp.StatusError
+			if !errors.As(err, &status) || status.RateLimited || status.Status != 404 && status.Status != 403 {
+				return nil, err
 			}
 		}
 		handled, err := func() (int, error) {
