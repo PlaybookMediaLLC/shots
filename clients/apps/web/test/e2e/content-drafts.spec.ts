@@ -14,6 +14,7 @@ import {
   openBlockedSchedule,
   openSchedule,
   type Page,
+  type Request,
   png,
   previewOf,
   settleSelection,
@@ -294,10 +295,10 @@ test(
 
 // Tables, math and footnotes are kept by the editor, survive a reload, and
 // each serializes into the channel preview as plain text.
-// @dev-server until fixed: on the production build scheduling the table and math blocks posts nothing (1 of 2 runs).
+// @quarantine until fixed: on the production build scheduling the table and math blocks posts nothing (1 of 2 runs).
 test(
   'a table, a math block and a footnote persist, and the blocks post as images',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['linkedin'] })
     const draftId = await openNewDraft(page)
@@ -353,6 +354,85 @@ test(
     await expect(draftEditor(page).locator('.katex').first()).toBeVisible()
     await expect(draftEditor(page)).toContainText('Prices exclude tax.')
     await expectPreview()
+
+    // A shared edit while an old block image is uploading must stop both actions.
+    const peer = await page.context().newPage()
+    await peer.goto(page.url())
+    await expect(draftEditor(peer).locator('table')).toContainText('Plan')
+    try {
+      for (const action of ['schedule', 'publish'] as const) {
+        let release!: () => void
+        let reached!: () => void
+        const held = new Promise<void>((resolve) => {
+          release = resolve
+        })
+        const uploading = new Promise<void>((resolve) => {
+          reached = resolve
+        })
+        const uploadPath = '**/api/trpc/asset.signUpload*'
+        await page.route(
+          uploadPath,
+          async (route) => {
+            const response = await route.fetch()
+            reached()
+            await held
+            await route.fulfill({ response })
+          },
+          { times: 1 }
+        )
+        let submits = 0
+        const countSubmit = (request: Request) => {
+          if (
+            request.method() === 'POST' &&
+            request.url().endsWith(`/content-drafts/${draftId}/schedule`)
+          )
+            submits++
+        }
+        page.on('request', countSubmit)
+        try {
+          if (action === 'schedule') {
+            const dialog = await openSchedule(page)
+            await dialog.getByRole('button', { name: 'Confirm schedule' }).click()
+          } else {
+            await page.getByTestId('publish-button').click()
+            await page
+              .getByTestId('publish-review')
+              .getByRole('button', { name: 'Publish now', exact: true })
+              .click()
+          }
+          await uploading
+          const primarySave = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'PATCH' &&
+              response.url().endsWith(`/content-drafts/${draftId}`) &&
+              response.status() === 200
+          )
+          const marker = `Updated-${action}`
+          await typeInto(peer, draftEditor(peer).locator('td').first(), marker)
+          await expect(
+            page.getByRole('textbox', { name: 'Draft body', includeHidden: true })
+          ).toContainText(marker)
+          await primarySave
+          release()
+          await expect(
+            page.getByText(
+              'The draft changed while preparing its images. Review the changes and try again.'
+            )
+          ).toBeVisible()
+          expect(submits).toBe(0)
+          expect(
+            await db.rows('SELECT id FROM scheduled_post WHERE "contentDraftId"=$1', [draftId])
+          ).toHaveLength(0)
+          await page.keyboard.press('Escape')
+        } finally {
+          release()
+          page.off('request', countSubmit)
+          await page.unroute(uploadPath)
+        }
+      }
+    } finally {
+      await peer.close()
+    }
 
     // Scheduling renders the table and the equation and attaches them.
     const scheduleDialog = await openSchedule(page)

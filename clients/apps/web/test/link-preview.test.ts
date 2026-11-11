@@ -652,3 +652,12 @@ test('share tags preserve the entered values and character counters handle emoji
   assert.equal(postLength('🚀', 'x', url), 2 + 1 + 23)
   assert.equal(postLength('', 'x', url), 23)
 })
+import { csvCell } from '@/lib/csv'
+test('remote CSV text cannot become a spreadsheet formula and retains delimiters', () => {
+  for (const prefix of ['=', '+', '-', '@', '\t=', '\r+', '\u0000@', '  -']) {
+    assert.equal(csvCell(`${prefix}1`), `"'${prefix}1"`)
+  }
+  assert.equal(csvCell('A, "title"\nwith a newline'), '"A, ""title""\nwith a newline"')
+  assert.equal(csvCell(-3), '"-3"')
+  assert.equal(csvCell(null), '""')
+})

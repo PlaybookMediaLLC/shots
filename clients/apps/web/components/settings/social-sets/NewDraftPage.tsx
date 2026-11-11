@@ -20,6 +20,8 @@ type Engagement = SocialSetRecord['engagementDefaults']
 function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialSetRecord }) {
   const save = useSaveSocialSet(set.id)
   const [state, run] = useSaveState()
+  const committing = useRef(false)
+  const disabled = !canManage || state === 'saving'
   const connected = set.accounts
     .filter((account) => account.health !== 'removed')
     .flatMap((account) => {
@@ -35,18 +37,25 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
       ? set.primaryPlatform
       : (enabled[0] ?? null)
 
-  const commit = (platforms: string[], nextPrimary: string | null = primary) =>
-    run(() =>
-      save({
-        defaultPlatforms: platforms.map((platform) => draftPlatformSchema.parse(platform)),
-        primaryPlatform:
-          nextPrimary && platforms.includes(nextPrimary)
-            ? draftPlatformSchema.parse(nextPrimary)
-            : platforms[0]
-              ? draftPlatformSchema.parse(platforms[0])
-              : '',
-      })
-    )
+  const commit = async (platforms: string[], nextPrimary: string | null = primary) => {
+    if (committing.current || !canManage) return
+    committing.current = true
+    try {
+      await run(() =>
+        save({
+          defaultPlatforms: platforms.map((platform) => draftPlatformSchema.parse(platform)),
+          primaryPlatform:
+            nextPrimary && platforms.includes(nextPrimary)
+              ? draftPlatformSchema.parse(nextPrimary)
+              : platforms[0]
+                ? draftPlatformSchema.parse(platforms[0])
+                : '',
+        })
+      )
+    } finally {
+      committing.current = false
+    }
+  }
   const move = (index: number, by: number) => {
     const next = [...enabled]
     const [item] = next.splice(index, 1)
@@ -89,7 +98,7 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
                 <span className="flex flex-wrap gap-1">
                   <Button
                     aria-label={`Move ${platform} up`}
-                    disabled={!canManage || index === 0}
+                    disabled={disabled || index === 0}
                     onClick={() => move(index, -1)}
                     size="sm"
                     type="button"
@@ -99,7 +108,7 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
                   </Button>
                   <Button
                     aria-label={`Move ${platform} down`}
-                    disabled={!canManage || index === enabled.length - 1}
+                    disabled={disabled || index === enabled.length - 1}
                     onClick={() => move(index, 1)}
                     size="sm"
                     type="button"
@@ -109,7 +118,7 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
                   </Button>
                   {platform === primary ? null : (
                     <Button
-                      disabled={!canManage}
+                      disabled={disabled}
                       onClick={() => void commit(enabled, platform)}
                       size="sm"
                       type="button"
@@ -119,7 +128,7 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
                     </Button>
                   )}
                   <Button
-                    disabled={!canManage}
+                    disabled={disabled}
                     onClick={() => void commit(enabled.filter((item) => item !== platform))}
                     size="sm"
                     type="button"
@@ -141,7 +150,7 @@ function DefaultPlatforms({ canManage, set }: { canManage: boolean; set: SocialS
                 off for new drafts
               </span>
               <Button
-                disabled={!canManage}
+                disabled={disabled}
                 onClick={() => void commit([...enabled, account.platform])}
                 size="sm"
                 type="button"

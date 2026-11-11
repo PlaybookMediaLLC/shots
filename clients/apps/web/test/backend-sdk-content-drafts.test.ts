@@ -38,6 +38,7 @@ test('content draft SDK methods call the backend draft routes', async () => {
     (error) => error instanceof BackendSDKError && error.status === 409
   )
   await sdk.deleteContentDraft('d1')
+  await sdk.reviewContentDraft('d1', { action: 'approve', version: 4 })
 
   assert.deepEqual(
     requests.map(({ method, url }) => `${method ?? 'GET'} ${url.pathname}${url.search}`),
@@ -47,8 +48,10 @@ test('content draft SDK methods call the backend draft routes', async () => {
       'GET /v1/content-drafts/d1',
       'PATCH /v1/content-drafts/d1',
       'DELETE /v1/content-drafts/d1',
+      'POST /v1/content-drafts/d1/review',
     ]
   )
   assert.deepEqual(requests[1].body, { body: [], title: 'Launch' })
   assert.deepEqual(requests[3].body, { baseVersion: 3, title: 'New' })
+  assert.deepEqual(requests[5].body, { action: 'approve', version: 4 })
 })

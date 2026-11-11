@@ -53,7 +53,13 @@ export function ReviewControls({
   const act = async (action: 'request' | 'approve' | 'changes') => {
     setBusy(true)
     try {
-      onDraft(await draftsApi.review(draftId, { action, note: note.trim() || undefined }))
+      onDraft(
+        await draftsApi.review(draftId, {
+          action,
+          version: review.version,
+          note: note.trim() || undefined,
+        })
+      )
       setNote('')
       toast.success(
         { approve: 'Approved.', changes: 'Changes requested.', request: 'Review requested.' }[

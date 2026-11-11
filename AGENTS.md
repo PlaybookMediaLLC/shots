@@ -109,6 +109,8 @@ effects (writes, audit records, emails, provider calls, quota use).
 | Social providers | `server/internal/social/integrations/social/<provider>` |
 | Events and webhooks | `server/internal/webhooks`, `server/internal/notifications` ([outbound webhooks](docs/outbound-webhooks.md), [notification events](docs/workspace-notification-events.md)) |
 | Test helpers and fixtures | `web/test/`, `web/test/e2e/framework/`, Go `*_test.go` beside the code |
+| End-to-end test hooks | `web/lib/e2e-hooks.ts`; one gate for every behavior the suite needs and production must not have |
+| CI pipeline | `.github/workflows/ci.yml` with `dev/e2e-plan.mjs` and `dev/ci-image.cjs` ([the CI pipeline](docs/ci.md)) |
 | Dependencies | `clients/apps/web/package.json`, `clients/package.json`, `server/go.mod`; npm is the only JS package manager |
 
 Check the dependency files for a library that already does the job before you
@@ -190,10 +192,17 @@ add one.
 | Tier | Where | Run |
 | --- | --- | --- |
 | Unit and contract | `web/test/*.test.ts`; other workspaces: `src/**/*.test.ts` | `npm test` in `clients/` |
-| Web server modules | `web/test/*.server.ts` | its `test:*` script in `clients/apps/web/package.json` |
+| Web server modules | `web/test/*.server.ts` | `npm run test:server` in `clients/` |
 | Go | `*_test.go`; `*_integration_test.go` need their `*_TEST_DATABASE_URL` | `make -C server check` |
 | Browser flows | `web/test/e2e/*.spec.ts` | `make e2e`, following the [add-e2e-flow skill](.agents/skills/add-e2e-flow/SKILL.md) |
 | Whole stack | tenant isolation, social publishing | `make tenant-isolation`, `./dev/social-gate` |
+
+The browser suite runs one lane, against the production image. A test that
+needs something the production build turns off asks for it through
+`web/lib/e2e-hooks.ts`; never add a second server to run it against. The
+`@quarantine` tag and the nightly run that measures it are described in
+[the suite's README](clients/apps/web/test/e2e/README.md), and
+[the CI pipeline](docs/ci.md) explains how a change selects its tests.
 
 Add a browser flow for an authenticated journey, a tenant or permission
 boundary, or a downstream integration. Never mock authentication,
@@ -205,12 +214,99 @@ authorization, tenant isolation or database constraints there.
 | --- | --- |
 | `clients/` | `npm run quality:check` in `clients/`; `make check` runs it in Docker and adds the RFC check |
 | `server/` | `make -C server check` |
+| `.github/workflows/` | the full suite — `dev/e2e-plan.mjs` escalates a CI change to it |
 | A zod API contract | `npm run api:generate` in `clients/`, then commit the diff |
 | `docs/rfcs/` | `python3 dev/verify-rfcs.py` |
 | Journeys, tenancy, publishing | `make e2e`, `make tenant-isolation`, `./dev/social-gate` as they apply |
 
 CI runs all of these. Do not loosen a lint rule, `--max-warnings=0`, the
 format scope, a CI step or a boundary test's exemption list to pass a check.
+
+## Mandatory implementation review
+
+For implementation, bug fixes, and refactors, follow this sequence:
+
+Understand scope → implement → verify → independent review → fix confirmed
+blockers → verify again → report.
+
+Use the repository's existing feature-flow skill when available. The rules
+below also apply when that skill is not installed.
+
+### Before implementation
+
+- Read the affected code and trace callers, contracts, and failure paths.
+- Define verifiable success criteria.
+- Use the smallest complete solution and preserve unrelated work.
+- For complex multi-stage work, use `workflow-orchestrator` when it helps
+  establish ownership, dependencies, and verification gates. The parent
+  agent remains responsible for execution.
+
+### Verification
+
+Run the repository-specific checks appropriate to the change, including
+focused tests, type checks, lint, and integration checks where needed.
+Run Gauntlet if the repository requires it.
+
+Report failed or unavailable checks accurately. Do not treat them as passing.
+
+### Post-implementation review
+
+After required verification passes, the parent agent must explicitly
+delegate independent review before declaring implementation complete.
+
+Reviewer sub-agents are authorized for this phase without another
+permission request, subject to higher-priority instructions.
+
+Use separate `reviewer` instances with these focused perspectives:
+
+- structure: correctness, security, contracts, and module boundaries.
+- perf: performance, resource use, and expensive execution paths.
+- chaos: invalid inputs, failure modes, cleanup, and resilience.
+- qa: test coverage, assertion quality, and missing cases.
+- lean: unnecessary abstractions, dependencies, and speculative code.
+
+Add up to two relevant stack specialists when the change warrants them.
+Run reviews in parallel within available agent limits.
+
+Give each reviewer:
+
+- The task objective and intended behavior.
+- The same change summary and review scope.
+- The task-owned diff and paths of untracked files.
+- Relevant verification results.
+- Its assigned review perspective.
+
+Reviewers must not edit files. Each finding must include severity,
+file/line evidence, a concrete failing condition, and the smallest
+recommended correction. Unsupported concerns must be identified as
+hypotheses. "No findings" is a valid result.
+
+### Resolve and report
+
+The parent agent must:
+
+- Verify significant findings and consolidate duplicates.
+- Fix confirmed blocking findings.
+- Rerun affected checks after fixes.
+- Report should-fix items and nits without expanding scope unless authorized.
+- State which reviewers ran, what was verified, and any remaining risks.
+- Give a Ship or No-ship review verdict with a reason.
+
+A Ship verdict does not authorize a commit, push, pull request, release,
+publication, or deployment.
+
+### Exceptions and limits
+
+For documentation-only changes or a few lines without logic, the parent
+agent may apply the review perspectives itself and disclose that exception.
+
+If sub-agents are unavailable, apply the perspectives sequentially and
+disclose the fallback. Do not claim an independent review occurred.
+
+A directly requested review may run independently of implementation.
+
+These are agent execution instructions. Installing the agent definitions
+does not itself create a watcher, automatic trigger, or CI enforcement.
 
 ## Handoff
 

@@ -231,6 +231,7 @@ async function savePlugDefault(
 }
 
 type RuleDraft = {
+  timeValid?: boolean
   amount: string
   at: string
   days: string
@@ -258,6 +259,7 @@ function fromDraft(draft: RuleDraft, timeZone: string): RetweetRule | null {
     const minutes = Math.round(amount * (draft.unit === 'days' ? 1_440 : 60))
     return minutes >= 1 && minutes <= 43_200 ? { afterMinutes: minutes } : null
   }
+  if (draft.timeValid === false) return null
   const days = Number(draft.days)
   return Number.isInteger(days) && days >= 0 && days <= 30 && /^\d{2}:\d{2}$/.test(draft.at)
     ? { at: draft.at, days, timeZone }
@@ -297,7 +299,15 @@ function RetweetDialog({
     unretweetAfterMinutes: removal || undefined,
   }
   const set = (index: number, change: Partial<RuleDraft>) =>
-    setRules((current) => current.map((rule, at) => (at === index ? { ...rule, ...change } : rule)))
+    setRules((current) => {
+      if (
+        Object.entries(change).every(
+          ([key, value]) => current[index]?.[key as keyof RuleDraft] === value
+        )
+      )
+        return current
+      return current.map((rule, at) => (at === index ? { ...rule, ...change } : rule))
+    })
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
       <DialogContent className="max-w-lg" data-testid="auto-rt-dialog">
@@ -369,6 +379,8 @@ function RetweetDialog({
                         value={rule.days}
                       />
                       <TimePicker
+                        required
+                        onValidityChange={(timeValid) => set(index, { timeValid })}
                         aria-label="Time of day"
                         className="w-32"
                         onChange={(at) => set(index, { at })}

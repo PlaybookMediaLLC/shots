@@ -216,7 +216,7 @@ test('a public profile is served only while it is turned on', async ({
   const toggle = page.getByRole('switch', { name: 'Make profile public' })
   await toggle.click()
   await expect(toggle).toBeChecked()
-  const address = (await page.locator('code', { hasText: '/p/' }).textContent()) ?? ''
+  const address = await page.getByRole('textbox', { name: 'Public profile address' }).inputValue()
   expect(address).toMatch(/\/p\/[0-9a-f]{24}$/)
   const path = new URL(address).pathname
 

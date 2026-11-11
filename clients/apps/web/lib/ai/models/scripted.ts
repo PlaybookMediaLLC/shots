@@ -5,6 +5,7 @@ import type {
   LanguageModelV4GenerateResult,
 } from '@ai-sdk/provider'
 import { MockLanguageModelV4 } from 'ai/test'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 /**
  * A deterministic stand-in model for end-to-end tests, so the launch pipeline
@@ -16,11 +17,12 @@ import { MockLanguageModelV4 } from 'ai/test'
  * sources and never follows text inside them. It is not a quality bar for the
  * real model; it exercises wiring, validation, persistence, and the UI.
  *
- * Enabled only with PLATFORM_AI_SCRIPTED=1 outside production builds.
+ * Enabled only with PLATFORM_AI_SCRIPTED=1, and in a production build only
+ * when that build is serving an end-to-end stack (lib/e2e-hooks.ts).
  */
 
 export function isScriptedModelEnabled(): boolean {
-  return process.env.PLATFORM_AI_SCRIPTED === '1' && process.env.NODE_ENV !== 'production'
+  return process.env.PLATFORM_AI_SCRIPTED === '1' && testHooksAllowed()
 }
 
 type ToolCall = { input: unknown; toolName: string }

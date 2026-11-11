@@ -43,11 +43,14 @@ export function stageLabel(run: StoredOnboardingRun): string {
  */
 export function useOnboardingRun(
   initial: StoredOnboardingRun,
-  onAdvance?: (run: StoredOnboardingRun) => Promise<void>
+  onAdvance?: (run: StoredOnboardingRun, signal: AbortSignal) => Promise<void>
 ) {
   const trpcClient = useTRPCClient()
   const [run, setRunState] = useState(initial)
   const [lost, setLost] = useState(false)
+  const [revision, setRevision] = useState(0)
+  const generation = useRef(0)
+  const controller = useRef<AbortController | null>(null)
   const progress = useRef(initial.progress)
   const advance = useRef(onAdvance)
   useEffect(() => {
@@ -56,41 +59,55 @@ export function useOnboardingRun(
 
   useEffect(() => {
     if (isTerminal(run.status)) return
+    const ownedGeneration = generation.current
+    const abort = new AbortController()
+    controller.current = abort
+    const active = () => !abort.signal.aborted && generation.current === ownedGeneration
     let delay = 1_000
     let failures = 0
-    let stopped = false
     let timer: ReturnType<typeof setTimeout>
     const poll = async () => {
       try {
-        const next = (await trpcClient.onboarding.run.query({ runId: run.id })).run
-        failures = 0
-        if (stopped) return
+        const next = (
+          await trpcClient.onboarding.run.query({ runId: run.id }, { signal: abort.signal })
+        ).run
+        if (!active()) return
         if (next.progress > progress.current || isTerminal(next.status)) {
+          await advance.current?.(next, abort.signal)
+          if (!active()) return
           progress.current = next.progress
-          await advance.current?.(next)
         }
+        if (!active()) return
+        failures = 0
+        setLost(false)
         setRunState(next)
         if (isTerminal(next.status)) return
       } catch {
+        if (!active()) return
         failures += 1
         if (failures >= 5) {
           setLost(true)
           return
         }
       }
+      if (!active()) return
       delay = Math.min(5_000, delay * 1.5)
       timer = setTimeout(poll, delay)
     }
     timer = setTimeout(poll, delay)
     return () => {
-      stopped = true
+      abort.abort()
       clearTimeout(timer)
     }
-  }, [run.id, run.status, trpcClient])
+  }, [revision, run.id, run.status, trpcClient])
 
   const setRun = (next: StoredOnboardingRun) => {
+    generation.current++
+    controller.current?.abort()
+    setLost(false)
+    setRevision((value) => value + 1)
     progress.current = next.progress
     setRunState(next)
   }
-  return { lost, run, setRun }
+  return { lost, run, setRun, retry: () => setRun(run) }
 }

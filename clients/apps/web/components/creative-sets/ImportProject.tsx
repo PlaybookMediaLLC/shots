@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { FileDropZone } from '@/components/ui/file-drop-zone'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { useTRPCClient } from '@/lib/trpc/react'
+import { useInfiniteQuery } from '@tanstack/react-query'
+import { Input } from '@/components/ui/input'
+import { useTRPC, useTRPCClient } from '@/lib/trpc/react'
 import { newCreativeSetId, type CreativeSetDocument } from '@/lib/creative-sets/document'
 import { copyProjectIntoSet } from '@/lib/creative-sets/import-project'
 import { fetchAssetUrl } from '@/lib/design/open-design'
@@ -22,7 +24,22 @@ export function ImportProject({
 }) {
   const client = useTRPCClient(),
     router = useRouter()
-  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const trpc = useTRPC()
+  const [search, setSearch] = useState('')
+  const projectsQuery = useInfiniteQuery(
+    trpc.project.list.infiniteQueryOptions(
+      { limit: 50, search: search.trim() || undefined, sort: 'updated' },
+      { getNextPageParam: (page) => page.nextCursor }
+    )
+  )
+  const projects = [
+    ...new Map(
+      (projectsQuery.data?.pages.flatMap((page) => page.items) ?? []).map((project) => [
+        project.id,
+        project,
+      ])
+    ).values(),
+  ]
   const [error, setError] = useState<string | null>(null),
     [busy, setBusy] = useState(false)
   const intent = useRef<{
@@ -31,20 +48,6 @@ export function ImportProject({
     name: string
     document: CreativeSetDocument
   } | null>(null)
-  useEffect(() => {
-    let active = true
-    void client.project.list
-      .query({ limit: 100 })
-      .then((page) => {
-        if (active) setProjects(page.items)
-      })
-      .catch((error) => {
-        if (active) setError(error.message)
-      })
-    return () => {
-      active = false
-    }
-  }, [client])
   async function copy(
     source: string,
     read: () => Promise<{
@@ -142,6 +145,13 @@ export function ImportProject({
             }}
           />
         </Label>
+        <Input
+          aria-label="Search saved projects"
+          placeholder="Search saved projects"
+          value={search}
+          onChange={(event) => setSearch(event.target.value.slice(0, 200))}
+          disabled={busy}
+        />
         <div className="max-h-96 space-y-2 overflow-auto">
           {projects.map((project) => (
             <Button
@@ -156,10 +166,36 @@ export function ImportProject({
               {project.name}
             </Button>
           ))}
-          {!projects.length ? (
+          {projectsQuery.isSuccess && !projects.length ? (
             <p className="text-sm text-muted-foreground">No saved projects available.</p>
           ) : null}
         </div>
+        {projectsQuery.isFetching ? <p role="status">Loading projects…</p> : null}
+        {projectsQuery.isError ? (
+          <div role="alert" className="text-sm text-destructive">
+            Projects could not be loaded.{' '}
+            <Button
+              disabled={projectsQuery.isFetching}
+              onClick={() =>
+                void (projectsQuery.isFetchNextPageError
+                  ? projectsQuery.fetchNextPage()
+                  : projectsQuery.refetch())
+              }
+              variant="outline"
+            >
+              Retry projects
+            </Button>
+          </div>
+        ) : null}
+        {projectsQuery.hasNextPage && !projectsQuery.isFetchNextPageError ? (
+          <Button
+            disabled={busy || projectsQuery.isFetching}
+            onClick={() => void projectsQuery.fetchNextPage()}
+            variant="outline"
+          >
+            Load more projects
+          </Button>
+        ) : null}
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}

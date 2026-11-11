@@ -89,11 +89,23 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativesetversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformdraftimport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevice"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubsettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubtemplate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubuser"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubworkspace"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationinbox"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpolicy"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpreference"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationseenaction"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthaccesstoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthclient"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -145,6 +157,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacesettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/brand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/founderhub"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/frontenddeploy"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/profile"
@@ -152,6 +165,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/thread"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
+	"github.com/google/uuid"
 )
 
 const (
@@ -240,11 +254,23 @@ const (
 	TypePlatformCreativeSet             = "PlatformCreativeSet"
 	TypePlatformCreativeSetVersion      = "PlatformCreativeSetVersion"
 	TypePlatformDraftImport             = "PlatformDraftImport"
+	TypePlatformFounderHubDevice        = "PlatformFounderHubDevice"
+	TypePlatformFounderHubDeviceCommand = "PlatformFounderHubDeviceCommand"
+	TypePlatformFounderHubRevision      = "PlatformFounderHubRevision"
+	TypePlatformFounderHubSettings      = "PlatformFounderHubSettings"
+	TypePlatformFounderHubTemplate      = "PlatformFounderHubTemplate"
+	TypePlatformFounderHubUser          = "PlatformFounderHubUser"
+	TypePlatformFounderHubWorkspace     = "PlatformFounderHubWorkspace"
 	TypePlatformNotificationDelivery    = "PlatformNotificationDelivery"
 	TypePlatformNotificationInbox       = "PlatformNotificationInbox"
 	TypePlatformNotificationPolicy      = "PlatformNotificationPolicy"
 	TypePlatformNotificationPreference  = "PlatformNotificationPreference"
 	TypePlatformNotificationSeenAction  = "PlatformNotificationSeenAction"
+	TypePlatformOAuthAccessToken        = "PlatformOAuthAccessToken"
+	TypePlatformOAuthClient             = "PlatformOAuthClient"
+	TypePlatformOAuthConsent            = "PlatformOAuthConsent"
+	TypePlatformOAuthJWK                = "PlatformOAuthJWK"
+	TypePlatformOAuthRefreshToken       = "PlatformOAuthRefreshToken"
 	TypePlatformSlackConnection         = "PlatformSlackConnection"
 	TypePlatformSlackInstallation       = "PlatformSlackInstallation"
 	TypePlatformSlackPacing             = "PlatformSlackPacing"
@@ -73816,6 +73842,3971 @@ func (m *PlatformDraftImportMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PlatformDraftImport edge %s", name)
 }
 
+// PlatformFounderHubDeviceMutation represents an operation that mutates the PlatformFounderHubDevice nodes in the graph.
+type PlatformFounderHubDeviceMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	user_id       *string
+	device_id     *string
+	name          *string
+	report        *founderhub.DeviceReport
+	reported_at   *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubDevice, error)
+	predicates    []predicate.PlatformFounderHubDevice
+}
+
+var _ ent.Mutation = (*PlatformFounderHubDeviceMutation)(nil)
+
+// platformfounderhubdeviceOption allows management of the mutation configuration using functional options.
+type platformfounderhubdeviceOption func(*PlatformFounderHubDeviceMutation)
+
+// newPlatformFounderHubDeviceMutation creates new mutation for the PlatformFounderHubDevice entity.
+func newPlatformFounderHubDeviceMutation(c config, op Op, opts ...platformfounderhubdeviceOption) *PlatformFounderHubDeviceMutation {
+	m := &PlatformFounderHubDeviceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubDevice,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubDeviceID sets the ID field of the mutation.
+func withPlatformFounderHubDeviceID(id string) platformfounderhubdeviceOption {
+	return func(m *PlatformFounderHubDeviceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubDevice
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubDevice, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubDevice.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubDevice sets the old PlatformFounderHubDevice of the mutation.
+func withPlatformFounderHubDevice(node *PlatformFounderHubDevice) platformfounderhubdeviceOption {
+	return func(m *PlatformFounderHubDeviceMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubDevice, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubDeviceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubDeviceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubDevice entities.
+func (m *PlatformFounderHubDeviceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubDeviceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubDeviceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubDevice.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformFounderHubDeviceMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformFounderHubDeviceMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformFounderHubDevice entity.
+// If the PlatformFounderHubDevice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformFounderHubDeviceMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetDeviceID sets the "device_id" field.
+func (m *PlatformFounderHubDeviceMutation) SetDeviceID(s string) {
+	m.device_id = &s
+}
+
+// DeviceID returns the value of the "device_id" field in the mutation.
+func (m *PlatformFounderHubDeviceMutation) DeviceID() (r string, exists bool) {
+	v := m.device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceID returns the old "device_id" field's value of the PlatformFounderHubDevice entity.
+// If the PlatformFounderHubDevice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceMutation) OldDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceID: %w", err)
+	}
+	return oldValue.DeviceID, nil
+}
+
+// ResetDeviceID resets all changes to the "device_id" field.
+func (m *PlatformFounderHubDeviceMutation) ResetDeviceID() {
+	m.device_id = nil
+}
+
+// SetName sets the "name" field.
+func (m *PlatformFounderHubDeviceMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *PlatformFounderHubDeviceMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the PlatformFounderHubDevice entity.
+// If the PlatformFounderHubDevice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *PlatformFounderHubDeviceMutation) ResetName() {
+	m.name = nil
+}
+
+// SetReport sets the "report" field.
+func (m *PlatformFounderHubDeviceMutation) SetReport(fr founderhub.DeviceReport) {
+	m.report = &fr
+}
+
+// Report returns the value of the "report" field in the mutation.
+func (m *PlatformFounderHubDeviceMutation) Report() (r founderhub.DeviceReport, exists bool) {
+	v := m.report
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReport returns the old "report" field's value of the PlatformFounderHubDevice entity.
+// If the PlatformFounderHubDevice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceMutation) OldReport(ctx context.Context) (v founderhub.DeviceReport, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReport is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReport requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReport: %w", err)
+	}
+	return oldValue.Report, nil
+}
+
+// ResetReport resets all changes to the "report" field.
+func (m *PlatformFounderHubDeviceMutation) ResetReport() {
+	m.report = nil
+}
+
+// SetReportedAt sets the "reported_at" field.
+func (m *PlatformFounderHubDeviceMutation) SetReportedAt(t time.Time) {
+	m.reported_at = &t
+}
+
+// ReportedAt returns the value of the "reported_at" field in the mutation.
+func (m *PlatformFounderHubDeviceMutation) ReportedAt() (r time.Time, exists bool) {
+	v := m.reported_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReportedAt returns the old "reported_at" field's value of the PlatformFounderHubDevice entity.
+// If the PlatformFounderHubDevice object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceMutation) OldReportedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReportedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReportedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReportedAt: %w", err)
+	}
+	return oldValue.ReportedAt, nil
+}
+
+// ResetReportedAt resets all changes to the "reported_at" field.
+func (m *PlatformFounderHubDeviceMutation) ResetReportedAt() {
+	m.reported_at = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubDeviceMutation builder.
+func (m *PlatformFounderHubDeviceMutation) Where(ps ...predicate.PlatformFounderHubDevice) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubDeviceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubDeviceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubDevice, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubDeviceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubDeviceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubDevice).
+func (m *PlatformFounderHubDeviceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubDeviceMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.user_id != nil {
+		fields = append(fields, platformfounderhubdevice.FieldUserID)
+	}
+	if m.device_id != nil {
+		fields = append(fields, platformfounderhubdevice.FieldDeviceID)
+	}
+	if m.name != nil {
+		fields = append(fields, platformfounderhubdevice.FieldName)
+	}
+	if m.report != nil {
+		fields = append(fields, platformfounderhubdevice.FieldReport)
+	}
+	if m.reported_at != nil {
+		fields = append(fields, platformfounderhubdevice.FieldReportedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubDeviceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubdevice.FieldUserID:
+		return m.UserID()
+	case platformfounderhubdevice.FieldDeviceID:
+		return m.DeviceID()
+	case platformfounderhubdevice.FieldName:
+		return m.Name()
+	case platformfounderhubdevice.FieldReport:
+		return m.Report()
+	case platformfounderhubdevice.FieldReportedAt:
+		return m.ReportedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubDeviceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubdevice.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformfounderhubdevice.FieldDeviceID:
+		return m.OldDeviceID(ctx)
+	case platformfounderhubdevice.FieldName:
+		return m.OldName(ctx)
+	case platformfounderhubdevice.FieldReport:
+		return m.OldReport(ctx)
+	case platformfounderhubdevice.FieldReportedAt:
+		return m.OldReportedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubDevice field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubDeviceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubdevice.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformfounderhubdevice.FieldDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceID(v)
+		return nil
+	case platformfounderhubdevice.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case platformfounderhubdevice.FieldReport:
+		v, ok := value.(founderhub.DeviceReport)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReport(v)
+		return nil
+	case platformfounderhubdevice.FieldReportedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReportedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDevice field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubDeviceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubDeviceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubDeviceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDevice numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubDeviceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubDeviceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubDeviceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDevice nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubDeviceMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubdevice.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformfounderhubdevice.FieldDeviceID:
+		m.ResetDeviceID()
+		return nil
+	case platformfounderhubdevice.FieldName:
+		m.ResetName()
+		return nil
+	case platformfounderhubdevice.FieldReport:
+		m.ResetReport()
+		return nil
+	case platformfounderhubdevice.FieldReportedAt:
+		m.ResetReportedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDevice field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubDeviceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubDeviceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubDeviceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubDeviceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubDeviceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubDeviceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubDeviceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDevice unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubDeviceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDevice edge %s", name)
+}
+
+// PlatformFounderHubDeviceCommandMutation represents an operation that mutates the PlatformFounderHubDeviceCommand nodes in the graph.
+type PlatformFounderHubDeviceCommandMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	user_id       *string
+	device_id     *string
+	kind          *string
+	argument      *string
+	status        *string
+	error         *string
+	result        *string
+	created_at    *time.Time
+	expires_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubDeviceCommand, error)
+	predicates    []predicate.PlatformFounderHubDeviceCommand
+}
+
+var _ ent.Mutation = (*PlatformFounderHubDeviceCommandMutation)(nil)
+
+// platformfounderhubdevicecommandOption allows management of the mutation configuration using functional options.
+type platformfounderhubdevicecommandOption func(*PlatformFounderHubDeviceCommandMutation)
+
+// newPlatformFounderHubDeviceCommandMutation creates new mutation for the PlatformFounderHubDeviceCommand entity.
+func newPlatformFounderHubDeviceCommandMutation(c config, op Op, opts ...platformfounderhubdevicecommandOption) *PlatformFounderHubDeviceCommandMutation {
+	m := &PlatformFounderHubDeviceCommandMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubDeviceCommand,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubDeviceCommandID sets the ID field of the mutation.
+func withPlatformFounderHubDeviceCommandID(id string) platformfounderhubdevicecommandOption {
+	return func(m *PlatformFounderHubDeviceCommandMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubDeviceCommand
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubDeviceCommand, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubDeviceCommand.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubDeviceCommand sets the old PlatformFounderHubDeviceCommand of the mutation.
+func withPlatformFounderHubDeviceCommand(node *PlatformFounderHubDeviceCommand) platformfounderhubdevicecommandOption {
+	return func(m *PlatformFounderHubDeviceCommandMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubDeviceCommand, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubDeviceCommandMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubDeviceCommandMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubDeviceCommand entities.
+func (m *PlatformFounderHubDeviceCommandMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubDeviceCommandMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubDeviceCommand.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetDeviceID sets the "device_id" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetDeviceID(s string) {
+	m.device_id = &s
+}
+
+// DeviceID returns the value of the "device_id" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) DeviceID() (r string, exists bool) {
+	v := m.device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceID returns the old "device_id" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceID: %w", err)
+	}
+	return oldValue.DeviceID, nil
+}
+
+// ResetDeviceID resets all changes to the "device_id" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetDeviceID() {
+	m.device_id = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetArgument sets the "argument" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetArgument(s string) {
+	m.argument = &s
+}
+
+// Argument returns the value of the "argument" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) Argument() (r string, exists bool) {
+	v := m.argument
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldArgument returns the old "argument" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldArgument(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldArgument is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldArgument requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldArgument: %w", err)
+	}
+	return oldValue.Argument, nil
+}
+
+// ResetArgument resets all changes to the "argument" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetArgument() {
+	m.argument = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetError sets the "error" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetError(s string) {
+	m.error = &s
+}
+
+// Error returns the value of the "error" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) Error() (r string, exists bool) {
+	v := m.error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldError returns the old "error" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldError(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldError: %w", err)
+	}
+	return oldValue.Error, nil
+}
+
+// ResetError resets all changes to the "error" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetError() {
+	m.error = nil
+}
+
+// SetResult sets the "result" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetResult(s string) {
+	m.result = &s
+}
+
+// Result returns the value of the "result" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) Result() (r string, exists bool) {
+	v := m.result
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResult returns the old "result" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldResult(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResult is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResult requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResult: %w", err)
+	}
+	return oldValue.Result, nil
+}
+
+// ResetResult resets all changes to the "result" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetResult() {
+	m.result = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PlatformFounderHubDeviceCommandMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PlatformFounderHubDeviceCommand entity.
+// If the PlatformFounderHubDeviceCommand object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubDeviceCommandMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubDeviceCommandMutation builder.
+func (m *PlatformFounderHubDeviceCommandMutation) Where(ps ...predicate.PlatformFounderHubDeviceCommand) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubDeviceCommandMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubDeviceCommandMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubDeviceCommand, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubDeviceCommandMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubDeviceCommandMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubDeviceCommand).
+func (m *PlatformFounderHubDeviceCommandMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubDeviceCommandMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.user_id != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldUserID)
+	}
+	if m.device_id != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldDeviceID)
+	}
+	if m.kind != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldKind)
+	}
+	if m.argument != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldArgument)
+	}
+	if m.status != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldStatus)
+	}
+	if m.error != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldError)
+	}
+	if m.result != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldResult)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldCreatedAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, platformfounderhubdevicecommand.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubDeviceCommandMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubdevicecommand.FieldUserID:
+		return m.UserID()
+	case platformfounderhubdevicecommand.FieldDeviceID:
+		return m.DeviceID()
+	case platformfounderhubdevicecommand.FieldKind:
+		return m.Kind()
+	case platformfounderhubdevicecommand.FieldArgument:
+		return m.Argument()
+	case platformfounderhubdevicecommand.FieldStatus:
+		return m.Status()
+	case platformfounderhubdevicecommand.FieldError:
+		return m.Error()
+	case platformfounderhubdevicecommand.FieldResult:
+		return m.Result()
+	case platformfounderhubdevicecommand.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformfounderhubdevicecommand.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubDeviceCommandMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubdevicecommand.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformfounderhubdevicecommand.FieldDeviceID:
+		return m.OldDeviceID(ctx)
+	case platformfounderhubdevicecommand.FieldKind:
+		return m.OldKind(ctx)
+	case platformfounderhubdevicecommand.FieldArgument:
+		return m.OldArgument(ctx)
+	case platformfounderhubdevicecommand.FieldStatus:
+		return m.OldStatus(ctx)
+	case platformfounderhubdevicecommand.FieldError:
+		return m.OldError(ctx)
+	case platformfounderhubdevicecommand.FieldResult:
+		return m.OldResult(ctx)
+	case platformfounderhubdevicecommand.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformfounderhubdevicecommand.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubDeviceCommand field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubDeviceCommandMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubdevicecommand.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceID(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldArgument:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetArgument(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetError(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldResult:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResult(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformfounderhubdevicecommand.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubDeviceCommandMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubDeviceCommandMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubDeviceCommandMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubdevicecommand.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformfounderhubdevicecommand.FieldDeviceID:
+		m.ResetDeviceID()
+		return nil
+	case platformfounderhubdevicecommand.FieldKind:
+		m.ResetKind()
+		return nil
+	case platformfounderhubdevicecommand.FieldArgument:
+		m.ResetArgument()
+		return nil
+	case platformfounderhubdevicecommand.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case platformfounderhubdevicecommand.FieldError:
+		m.ResetError()
+		return nil
+	case platformfounderhubdevicecommand.FieldResult:
+		m.ResetResult()
+		return nil
+	case platformfounderhubdevicecommand.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformfounderhubdevicecommand.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubDeviceCommandMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubDeviceCommandMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubDeviceCommandMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubDeviceCommand edge %s", name)
+}
+
+// PlatformFounderHubRevisionMutation represents an operation that mutates the PlatformFounderHubRevision nodes in the graph.
+type PlatformFounderHubRevisionMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	revision      *int64
+	addrevision   *int64
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubRevision, error)
+	predicates    []predicate.PlatformFounderHubRevision
+}
+
+var _ ent.Mutation = (*PlatformFounderHubRevisionMutation)(nil)
+
+// platformfounderhubrevisionOption allows management of the mutation configuration using functional options.
+type platformfounderhubrevisionOption func(*PlatformFounderHubRevisionMutation)
+
+// newPlatformFounderHubRevisionMutation creates new mutation for the PlatformFounderHubRevision entity.
+func newPlatformFounderHubRevisionMutation(c config, op Op, opts ...platformfounderhubrevisionOption) *PlatformFounderHubRevisionMutation {
+	m := &PlatformFounderHubRevisionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubRevision,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubRevisionID sets the ID field of the mutation.
+func withPlatformFounderHubRevisionID(id string) platformfounderhubrevisionOption {
+	return func(m *PlatformFounderHubRevisionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubRevision
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubRevision, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubRevision.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubRevision sets the old PlatformFounderHubRevision of the mutation.
+func withPlatformFounderHubRevision(node *PlatformFounderHubRevision) platformfounderhubrevisionOption {
+	return func(m *PlatformFounderHubRevisionMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubRevision, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubRevisionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubRevisionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubRevision entities.
+func (m *PlatformFounderHubRevisionMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubRevisionMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubRevisionMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubRevision.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetRevision sets the "revision" field.
+func (m *PlatformFounderHubRevisionMutation) SetRevision(i int64) {
+	m.revision = &i
+	m.addrevision = nil
+}
+
+// Revision returns the value of the "revision" field in the mutation.
+func (m *PlatformFounderHubRevisionMutation) Revision() (r int64, exists bool) {
+	v := m.revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevision returns the old "revision" field's value of the PlatformFounderHubRevision entity.
+// If the PlatformFounderHubRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubRevisionMutation) OldRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevision: %w", err)
+	}
+	return oldValue.Revision, nil
+}
+
+// AddRevision adds i to the "revision" field.
+func (m *PlatformFounderHubRevisionMutation) AddRevision(i int64) {
+	if m.addrevision != nil {
+		*m.addrevision += i
+	} else {
+		m.addrevision = &i
+	}
+}
+
+// AddedRevision returns the value that was added to the "revision" field in this mutation.
+func (m *PlatformFounderHubRevisionMutation) AddedRevision() (r int64, exists bool) {
+	v := m.addrevision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRevision resets all changes to the "revision" field.
+func (m *PlatformFounderHubRevisionMutation) ResetRevision() {
+	m.revision = nil
+	m.addrevision = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubRevisionMutation builder.
+func (m *PlatformFounderHubRevisionMutation) Where(ps ...predicate.PlatformFounderHubRevision) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubRevisionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubRevisionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubRevision, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubRevisionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubRevisionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubRevision).
+func (m *PlatformFounderHubRevisionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubRevisionMutation) Fields() []string {
+	fields := make([]string, 0, 1)
+	if m.revision != nil {
+		fields = append(fields, platformfounderhubrevision.FieldRevision)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubRevisionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		return m.Revision()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubRevisionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		return m.OldRevision(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubRevision field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubRevisionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubRevision field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubRevisionMutation) AddedFields() []string {
+	var fields []string
+	if m.addrevision != nil {
+		fields = append(fields, platformfounderhubrevision.FieldRevision)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubRevisionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		return m.AddedRevision()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubRevisionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRevision(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubRevision numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubRevisionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubRevisionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubRevisionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubRevision nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubRevisionMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubrevision.FieldRevision:
+		m.ResetRevision()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubRevision field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubRevisionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubRevisionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubRevisionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubRevisionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubRevisionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubRevisionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubRevisionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubRevision unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubRevisionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubRevision edge %s", name)
+}
+
+// PlatformFounderHubSettingsMutation represents an operation that mutates the PlatformFounderHubSettings nodes in the graph.
+type PlatformFounderHubSettingsMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	user_id       *string
+	device_id     *string
+	device_name   *string
+	values        *map[string]interface{}
+	version       *int
+	addversion    *int
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubSettings, error)
+	predicates    []predicate.PlatformFounderHubSettings
+}
+
+var _ ent.Mutation = (*PlatformFounderHubSettingsMutation)(nil)
+
+// platformfounderhubsettingsOption allows management of the mutation configuration using functional options.
+type platformfounderhubsettingsOption func(*PlatformFounderHubSettingsMutation)
+
+// newPlatformFounderHubSettingsMutation creates new mutation for the PlatformFounderHubSettings entity.
+func newPlatformFounderHubSettingsMutation(c config, op Op, opts ...platformfounderhubsettingsOption) *PlatformFounderHubSettingsMutation {
+	m := &PlatformFounderHubSettingsMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubSettings,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubSettingsID sets the ID field of the mutation.
+func withPlatformFounderHubSettingsID(id string) platformfounderhubsettingsOption {
+	return func(m *PlatformFounderHubSettingsMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubSettings
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubSettings, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubSettings.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubSettings sets the old PlatformFounderHubSettings of the mutation.
+func withPlatformFounderHubSettings(node *PlatformFounderHubSettings) platformfounderhubsettingsOption {
+	return func(m *PlatformFounderHubSettingsMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubSettings, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubSettingsMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubSettingsMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubSettings entities.
+func (m *PlatformFounderHubSettingsMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubSettingsMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubSettingsMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubSettings.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformFounderHubSettingsMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformFounderHubSettingsMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetDeviceID sets the "device_id" field.
+func (m *PlatformFounderHubSettingsMutation) SetDeviceID(s string) {
+	m.device_id = &s
+}
+
+// DeviceID returns the value of the "device_id" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) DeviceID() (r string, exists bool) {
+	v := m.device_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceID returns the old "device_id" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldDeviceID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceID: %w", err)
+	}
+	return oldValue.DeviceID, nil
+}
+
+// ResetDeviceID resets all changes to the "device_id" field.
+func (m *PlatformFounderHubSettingsMutation) ResetDeviceID() {
+	m.device_id = nil
+}
+
+// SetDeviceName sets the "device_name" field.
+func (m *PlatformFounderHubSettingsMutation) SetDeviceName(s string) {
+	m.device_name = &s
+}
+
+// DeviceName returns the value of the "device_name" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) DeviceName() (r string, exists bool) {
+	v := m.device_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeviceName returns the old "device_name" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldDeviceName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeviceName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeviceName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeviceName: %w", err)
+	}
+	return oldValue.DeviceName, nil
+}
+
+// ResetDeviceName resets all changes to the "device_name" field.
+func (m *PlatformFounderHubSettingsMutation) ResetDeviceName() {
+	m.device_name = nil
+}
+
+// SetValues sets the "values" field.
+func (m *PlatformFounderHubSettingsMutation) SetValues(value map[string]interface{}) {
+	m.values = &value
+}
+
+// Values returns the value of the "values" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) Values() (r map[string]interface{}, exists bool) {
+	v := m.values
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldValues returns the old "values" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldValues(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldValues is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldValues requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldValues: %w", err)
+	}
+	return oldValue.Values, nil
+}
+
+// ResetValues resets all changes to the "values" field.
+func (m *PlatformFounderHubSettingsMutation) ResetValues() {
+	m.values = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *PlatformFounderHubSettingsMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *PlatformFounderHubSettingsMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *PlatformFounderHubSettingsMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *PlatformFounderHubSettingsMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformFounderHubSettingsMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformFounderHubSettingsMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PlatformFounderHubSettings entity.
+// If the PlatformFounderHubSettings object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubSettingsMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformFounderHubSettingsMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubSettingsMutation builder.
+func (m *PlatformFounderHubSettingsMutation) Where(ps ...predicate.PlatformFounderHubSettings) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubSettingsMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubSettingsMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubSettings, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubSettingsMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubSettingsMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubSettings).
+func (m *PlatformFounderHubSettingsMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubSettingsMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.user_id != nil {
+		fields = append(fields, platformfounderhubsettings.FieldUserID)
+	}
+	if m.device_id != nil {
+		fields = append(fields, platformfounderhubsettings.FieldDeviceID)
+	}
+	if m.device_name != nil {
+		fields = append(fields, platformfounderhubsettings.FieldDeviceName)
+	}
+	if m.values != nil {
+		fields = append(fields, platformfounderhubsettings.FieldValues)
+	}
+	if m.version != nil {
+		fields = append(fields, platformfounderhubsettings.FieldVersion)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platformfounderhubsettings.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubSettingsMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubsettings.FieldUserID:
+		return m.UserID()
+	case platformfounderhubsettings.FieldDeviceID:
+		return m.DeviceID()
+	case platformfounderhubsettings.FieldDeviceName:
+		return m.DeviceName()
+	case platformfounderhubsettings.FieldValues:
+		return m.Values()
+	case platformfounderhubsettings.FieldVersion:
+		return m.Version()
+	case platformfounderhubsettings.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubSettingsMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubsettings.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformfounderhubsettings.FieldDeviceID:
+		return m.OldDeviceID(ctx)
+	case platformfounderhubsettings.FieldDeviceName:
+		return m.OldDeviceName(ctx)
+	case platformfounderhubsettings.FieldValues:
+		return m.OldValues(ctx)
+	case platformfounderhubsettings.FieldVersion:
+		return m.OldVersion(ctx)
+	case platformfounderhubsettings.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubSettings field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubSettingsMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubsettings.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformfounderhubsettings.FieldDeviceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceID(v)
+		return nil
+	case platformfounderhubsettings.FieldDeviceName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeviceName(v)
+		return nil
+	case platformfounderhubsettings.FieldValues:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetValues(v)
+		return nil
+	case platformfounderhubsettings.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case platformfounderhubsettings.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubSettings field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubSettingsMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, platformfounderhubsettings.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubSettingsMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubsettings.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubSettingsMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubsettings.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubSettings numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubSettingsMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubSettingsMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubSettingsMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubSettings nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubSettingsMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubsettings.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformfounderhubsettings.FieldDeviceID:
+		m.ResetDeviceID()
+		return nil
+	case platformfounderhubsettings.FieldDeviceName:
+		m.ResetDeviceName()
+		return nil
+	case platformfounderhubsettings.FieldValues:
+		m.ResetValues()
+		return nil
+	case platformfounderhubsettings.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case platformfounderhubsettings.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubSettings field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubSettingsMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubSettingsMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubSettingsMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubSettingsMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubSettingsMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubSettingsMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubSettingsMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubSettings unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubSettingsMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubSettings edge %s", name)
+}
+
+// PlatformFounderHubTemplateMutation represents an operation that mutates the PlatformFounderHubTemplate nodes in the graph.
+type PlatformFounderHubTemplateMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	user_id       *string
+	template_id   *string
+	content       *founderhub.TemplateContent
+	pinned        *bool
+	seeded        *bool
+	pin_order     *int
+	addpin_order  *int
+	version       *int
+	addversion    *int
+	created_at    *time.Time
+	updated_at    *time.Time
+	deleted_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubTemplate, error)
+	predicates    []predicate.PlatformFounderHubTemplate
+}
+
+var _ ent.Mutation = (*PlatformFounderHubTemplateMutation)(nil)
+
+// platformfounderhubtemplateOption allows management of the mutation configuration using functional options.
+type platformfounderhubtemplateOption func(*PlatformFounderHubTemplateMutation)
+
+// newPlatformFounderHubTemplateMutation creates new mutation for the PlatformFounderHubTemplate entity.
+func newPlatformFounderHubTemplateMutation(c config, op Op, opts ...platformfounderhubtemplateOption) *PlatformFounderHubTemplateMutation {
+	m := &PlatformFounderHubTemplateMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubTemplate,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubTemplateID sets the ID field of the mutation.
+func withPlatformFounderHubTemplateID(id string) platformfounderhubtemplateOption {
+	return func(m *PlatformFounderHubTemplateMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubTemplate
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubTemplate, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubTemplate.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubTemplate sets the old PlatformFounderHubTemplate of the mutation.
+func withPlatformFounderHubTemplate(node *PlatformFounderHubTemplate) platformfounderhubtemplateOption {
+	return func(m *PlatformFounderHubTemplateMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubTemplate, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubTemplateMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubTemplateMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubTemplate entities.
+func (m *PlatformFounderHubTemplateMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubTemplateMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubTemplateMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubTemplate.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformFounderHubTemplateMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformFounderHubTemplateMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetTemplateID sets the "template_id" field.
+func (m *PlatformFounderHubTemplateMutation) SetTemplateID(s string) {
+	m.template_id = &s
+}
+
+// TemplateID returns the value of the "template_id" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) TemplateID() (r string, exists bool) {
+	v := m.template_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTemplateID returns the old "template_id" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldTemplateID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTemplateID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTemplateID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTemplateID: %w", err)
+	}
+	return oldValue.TemplateID, nil
+}
+
+// ResetTemplateID resets all changes to the "template_id" field.
+func (m *PlatformFounderHubTemplateMutation) ResetTemplateID() {
+	m.template_id = nil
+}
+
+// SetContent sets the "content" field.
+func (m *PlatformFounderHubTemplateMutation) SetContent(fc founderhub.TemplateContent) {
+	m.content = &fc
+}
+
+// Content returns the value of the "content" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) Content() (r founderhub.TemplateContent, exists bool) {
+	v := m.content
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContent returns the old "content" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldContent(ctx context.Context) (v founderhub.TemplateContent, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContent: %w", err)
+	}
+	return oldValue.Content, nil
+}
+
+// ResetContent resets all changes to the "content" field.
+func (m *PlatformFounderHubTemplateMutation) ResetContent() {
+	m.content = nil
+}
+
+// SetPinned sets the "pinned" field.
+func (m *PlatformFounderHubTemplateMutation) SetPinned(b bool) {
+	m.pinned = &b
+}
+
+// Pinned returns the value of the "pinned" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) Pinned() (r bool, exists bool) {
+	v := m.pinned
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPinned returns the old "pinned" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldPinned(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPinned is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPinned requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPinned: %w", err)
+	}
+	return oldValue.Pinned, nil
+}
+
+// ResetPinned resets all changes to the "pinned" field.
+func (m *PlatformFounderHubTemplateMutation) ResetPinned() {
+	m.pinned = nil
+}
+
+// SetSeeded sets the "seeded" field.
+func (m *PlatformFounderHubTemplateMutation) SetSeeded(b bool) {
+	m.seeded = &b
+}
+
+// Seeded returns the value of the "seeded" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) Seeded() (r bool, exists bool) {
+	v := m.seeded
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeeded returns the old "seeded" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldSeeded(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeeded is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeeded requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeeded: %w", err)
+	}
+	return oldValue.Seeded, nil
+}
+
+// ResetSeeded resets all changes to the "seeded" field.
+func (m *PlatformFounderHubTemplateMutation) ResetSeeded() {
+	m.seeded = nil
+}
+
+// SetPinOrder sets the "pin_order" field.
+func (m *PlatformFounderHubTemplateMutation) SetPinOrder(i int) {
+	m.pin_order = &i
+	m.addpin_order = nil
+}
+
+// PinOrder returns the value of the "pin_order" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) PinOrder() (r int, exists bool) {
+	v := m.pin_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPinOrder returns the old "pin_order" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldPinOrder(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPinOrder is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPinOrder requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPinOrder: %w", err)
+	}
+	return oldValue.PinOrder, nil
+}
+
+// AddPinOrder adds i to the "pin_order" field.
+func (m *PlatformFounderHubTemplateMutation) AddPinOrder(i int) {
+	if m.addpin_order != nil {
+		*m.addpin_order += i
+	} else {
+		m.addpin_order = &i
+	}
+}
+
+// AddedPinOrder returns the value that was added to the "pin_order" field in this mutation.
+func (m *PlatformFounderHubTemplateMutation) AddedPinOrder() (r int, exists bool) {
+	v := m.addpin_order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearPinOrder clears the value of the "pin_order" field.
+func (m *PlatformFounderHubTemplateMutation) ClearPinOrder() {
+	m.pin_order = nil
+	m.addpin_order = nil
+	m.clearedFields[platformfounderhubtemplate.FieldPinOrder] = struct{}{}
+}
+
+// PinOrderCleared returns if the "pin_order" field was cleared in this mutation.
+func (m *PlatformFounderHubTemplateMutation) PinOrderCleared() bool {
+	_, ok := m.clearedFields[platformfounderhubtemplate.FieldPinOrder]
+	return ok
+}
+
+// ResetPinOrder resets all changes to the "pin_order" field.
+func (m *PlatformFounderHubTemplateMutation) ResetPinOrder() {
+	m.pin_order = nil
+	m.addpin_order = nil
+	delete(m.clearedFields, platformfounderhubtemplate.FieldPinOrder)
+}
+
+// SetVersion sets the "version" field.
+func (m *PlatformFounderHubTemplateMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *PlatformFounderHubTemplateMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *PlatformFounderHubTemplateMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *PlatformFounderHubTemplateMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformFounderHubTemplateMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformFounderHubTemplateMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformFounderHubTemplateMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformFounderHubTemplateMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetDeletedAt sets the "deleted_at" field.
+func (m *PlatformFounderHubTemplateMutation) SetDeletedAt(t time.Time) {
+	m.deleted_at = &t
+}
+
+// DeletedAt returns the value of the "deleted_at" field in the mutation.
+func (m *PlatformFounderHubTemplateMutation) DeletedAt() (r time.Time, exists bool) {
+	v := m.deleted_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletedAt returns the old "deleted_at" field's value of the PlatformFounderHubTemplate entity.
+// If the PlatformFounderHubTemplate object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubTemplateMutation) OldDeletedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletedAt: %w", err)
+	}
+	return oldValue.DeletedAt, nil
+}
+
+// ClearDeletedAt clears the value of the "deleted_at" field.
+func (m *PlatformFounderHubTemplateMutation) ClearDeletedAt() {
+	m.deleted_at = nil
+	m.clearedFields[platformfounderhubtemplate.FieldDeletedAt] = struct{}{}
+}
+
+// DeletedAtCleared returns if the "deleted_at" field was cleared in this mutation.
+func (m *PlatformFounderHubTemplateMutation) DeletedAtCleared() bool {
+	_, ok := m.clearedFields[platformfounderhubtemplate.FieldDeletedAt]
+	return ok
+}
+
+// ResetDeletedAt resets all changes to the "deleted_at" field.
+func (m *PlatformFounderHubTemplateMutation) ResetDeletedAt() {
+	m.deleted_at = nil
+	delete(m.clearedFields, platformfounderhubtemplate.FieldDeletedAt)
+}
+
+// Where appends a list predicates to the PlatformFounderHubTemplateMutation builder.
+func (m *PlatformFounderHubTemplateMutation) Where(ps ...predicate.PlatformFounderHubTemplate) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubTemplateMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubTemplateMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubTemplate, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubTemplateMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubTemplateMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubTemplate).
+func (m *PlatformFounderHubTemplateMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubTemplateMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.user_id != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldUserID)
+	}
+	if m.template_id != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldTemplateID)
+	}
+	if m.content != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldContent)
+	}
+	if m.pinned != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldPinned)
+	}
+	if m.seeded != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldSeeded)
+	}
+	if m.pin_order != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldPinOrder)
+	}
+	if m.version != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldVersion)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldUpdatedAt)
+	}
+	if m.deleted_at != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldDeletedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubTemplateMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubtemplate.FieldUserID:
+		return m.UserID()
+	case platformfounderhubtemplate.FieldTemplateID:
+		return m.TemplateID()
+	case platformfounderhubtemplate.FieldContent:
+		return m.Content()
+	case platformfounderhubtemplate.FieldPinned:
+		return m.Pinned()
+	case platformfounderhubtemplate.FieldSeeded:
+		return m.Seeded()
+	case platformfounderhubtemplate.FieldPinOrder:
+		return m.PinOrder()
+	case platformfounderhubtemplate.FieldVersion:
+		return m.Version()
+	case platformfounderhubtemplate.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformfounderhubtemplate.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case platformfounderhubtemplate.FieldDeletedAt:
+		return m.DeletedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubTemplateMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubtemplate.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformfounderhubtemplate.FieldTemplateID:
+		return m.OldTemplateID(ctx)
+	case platformfounderhubtemplate.FieldContent:
+		return m.OldContent(ctx)
+	case platformfounderhubtemplate.FieldPinned:
+		return m.OldPinned(ctx)
+	case platformfounderhubtemplate.FieldSeeded:
+		return m.OldSeeded(ctx)
+	case platformfounderhubtemplate.FieldPinOrder:
+		return m.OldPinOrder(ctx)
+	case platformfounderhubtemplate.FieldVersion:
+		return m.OldVersion(ctx)
+	case platformfounderhubtemplate.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformfounderhubtemplate.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case platformfounderhubtemplate.FieldDeletedAt:
+		return m.OldDeletedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubTemplate field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubTemplateMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubtemplate.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformfounderhubtemplate.FieldTemplateID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTemplateID(v)
+		return nil
+	case platformfounderhubtemplate.FieldContent:
+		v, ok := value.(founderhub.TemplateContent)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContent(v)
+		return nil
+	case platformfounderhubtemplate.FieldPinned:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPinned(v)
+		return nil
+	case platformfounderhubtemplate.FieldSeeded:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeeded(v)
+		return nil
+	case platformfounderhubtemplate.FieldPinOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPinOrder(v)
+		return nil
+	case platformfounderhubtemplate.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case platformfounderhubtemplate.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformfounderhubtemplate.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case platformfounderhubtemplate.FieldDeletedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubTemplate field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubTemplateMutation) AddedFields() []string {
+	var fields []string
+	if m.addpin_order != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldPinOrder)
+	}
+	if m.addversion != nil {
+		fields = append(fields, platformfounderhubtemplate.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubTemplateMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubtemplate.FieldPinOrder:
+		return m.AddedPinOrder()
+	case platformfounderhubtemplate.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubTemplateMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubtemplate.FieldPinOrder:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPinOrder(v)
+		return nil
+	case platformfounderhubtemplate.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubTemplate numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubTemplateMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformfounderhubtemplate.FieldPinOrder) {
+		fields = append(fields, platformfounderhubtemplate.FieldPinOrder)
+	}
+	if m.FieldCleared(platformfounderhubtemplate.FieldDeletedAt) {
+		fields = append(fields, platformfounderhubtemplate.FieldDeletedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubTemplateMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubTemplateMutation) ClearField(name string) error {
+	switch name {
+	case platformfounderhubtemplate.FieldPinOrder:
+		m.ClearPinOrder()
+		return nil
+	case platformfounderhubtemplate.FieldDeletedAt:
+		m.ClearDeletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubTemplate nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubTemplateMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubtemplate.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformfounderhubtemplate.FieldTemplateID:
+		m.ResetTemplateID()
+		return nil
+	case platformfounderhubtemplate.FieldContent:
+		m.ResetContent()
+		return nil
+	case platformfounderhubtemplate.FieldPinned:
+		m.ResetPinned()
+		return nil
+	case platformfounderhubtemplate.FieldSeeded:
+		m.ResetSeeded()
+		return nil
+	case platformfounderhubtemplate.FieldPinOrder:
+		m.ResetPinOrder()
+		return nil
+	case platformfounderhubtemplate.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case platformfounderhubtemplate.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformfounderhubtemplate.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case platformfounderhubtemplate.FieldDeletedAt:
+		m.ResetDeletedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubTemplate field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubTemplateMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubTemplateMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubTemplateMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubTemplateMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubTemplateMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubTemplateMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubTemplateMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubTemplate unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubTemplateMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubTemplate edge %s", name)
+}
+
+// PlatformFounderHubUserMutation represents an operation that mutates the PlatformFounderHubUser nodes in the graph.
+type PlatformFounderHubUserMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *string
+	account_user_id       *uuid.UUID
+	templates_initialized *bool
+	clearedFields         map[string]struct{}
+	done                  bool
+	oldValue              func(context.Context) (*PlatformFounderHubUser, error)
+	predicates            []predicate.PlatformFounderHubUser
+}
+
+var _ ent.Mutation = (*PlatformFounderHubUserMutation)(nil)
+
+// platformfounderhubuserOption allows management of the mutation configuration using functional options.
+type platformfounderhubuserOption func(*PlatformFounderHubUserMutation)
+
+// newPlatformFounderHubUserMutation creates new mutation for the PlatformFounderHubUser entity.
+func newPlatformFounderHubUserMutation(c config, op Op, opts ...platformfounderhubuserOption) *PlatformFounderHubUserMutation {
+	m := &PlatformFounderHubUserMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubUser,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubUserID sets the ID field of the mutation.
+func withPlatformFounderHubUserID(id string) platformfounderhubuserOption {
+	return func(m *PlatformFounderHubUserMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubUser
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubUser, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubUser.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubUser sets the old PlatformFounderHubUser of the mutation.
+func withPlatformFounderHubUser(node *PlatformFounderHubUser) platformfounderhubuserOption {
+	return func(m *PlatformFounderHubUserMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubUser, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubUserMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubUserMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubUser entities.
+func (m *PlatformFounderHubUserMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubUserMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubUserMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubUser.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetAccountUserID sets the "account_user_id" field.
+func (m *PlatformFounderHubUserMutation) SetAccountUserID(u uuid.UUID) {
+	m.account_user_id = &u
+}
+
+// AccountUserID returns the value of the "account_user_id" field in the mutation.
+func (m *PlatformFounderHubUserMutation) AccountUserID() (r uuid.UUID, exists bool) {
+	v := m.account_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccountUserID returns the old "account_user_id" field's value of the PlatformFounderHubUser entity.
+// If the PlatformFounderHubUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubUserMutation) OldAccountUserID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccountUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccountUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccountUserID: %w", err)
+	}
+	return oldValue.AccountUserID, nil
+}
+
+// ResetAccountUserID resets all changes to the "account_user_id" field.
+func (m *PlatformFounderHubUserMutation) ResetAccountUserID() {
+	m.account_user_id = nil
+}
+
+// SetTemplatesInitialized sets the "templates_initialized" field.
+func (m *PlatformFounderHubUserMutation) SetTemplatesInitialized(b bool) {
+	m.templates_initialized = &b
+}
+
+// TemplatesInitialized returns the value of the "templates_initialized" field in the mutation.
+func (m *PlatformFounderHubUserMutation) TemplatesInitialized() (r bool, exists bool) {
+	v := m.templates_initialized
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTemplatesInitialized returns the old "templates_initialized" field's value of the PlatformFounderHubUser entity.
+// If the PlatformFounderHubUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubUserMutation) OldTemplatesInitialized(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTemplatesInitialized is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTemplatesInitialized requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTemplatesInitialized: %w", err)
+	}
+	return oldValue.TemplatesInitialized, nil
+}
+
+// ResetTemplatesInitialized resets all changes to the "templates_initialized" field.
+func (m *PlatformFounderHubUserMutation) ResetTemplatesInitialized() {
+	m.templates_initialized = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubUserMutation builder.
+func (m *PlatformFounderHubUserMutation) Where(ps ...predicate.PlatformFounderHubUser) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubUserMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubUserMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubUser, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubUserMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubUserMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubUser).
+func (m *PlatformFounderHubUserMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubUserMutation) Fields() []string {
+	fields := make([]string, 0, 2)
+	if m.account_user_id != nil {
+		fields = append(fields, platformfounderhubuser.FieldAccountUserID)
+	}
+	if m.templates_initialized != nil {
+		fields = append(fields, platformfounderhubuser.FieldTemplatesInitialized)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubUserMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubuser.FieldAccountUserID:
+		return m.AccountUserID()
+	case platformfounderhubuser.FieldTemplatesInitialized:
+		return m.TemplatesInitialized()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubUserMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubuser.FieldAccountUserID:
+		return m.OldAccountUserID(ctx)
+	case platformfounderhubuser.FieldTemplatesInitialized:
+		return m.OldTemplatesInitialized(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubUser field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubUserMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubuser.FieldAccountUserID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccountUserID(v)
+		return nil
+	case platformfounderhubuser.FieldTemplatesInitialized:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTemplatesInitialized(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubUser field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubUserMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubUserMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubUserMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformFounderHubUser numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubUserMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubUserMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubUserMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubUser nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubUserMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubuser.FieldAccountUserID:
+		m.ResetAccountUserID()
+		return nil
+	case platformfounderhubuser.FieldTemplatesInitialized:
+		m.ResetTemplatesInitialized()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubUser field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubUserMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubUserMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubUserMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubUserMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubUserMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubUserMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubUserMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubUser unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubUserMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubUser edge %s", name)
+}
+
+// PlatformFounderHubWorkspaceMutation represents an operation that mutates the PlatformFounderHubWorkspace nodes in the graph.
+type PlatformFounderHubWorkspaceMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	workspace_id  *uuid.UUID
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformFounderHubWorkspace, error)
+	predicates    []predicate.PlatformFounderHubWorkspace
+}
+
+var _ ent.Mutation = (*PlatformFounderHubWorkspaceMutation)(nil)
+
+// platformfounderhubworkspaceOption allows management of the mutation configuration using functional options.
+type platformfounderhubworkspaceOption func(*PlatformFounderHubWorkspaceMutation)
+
+// newPlatformFounderHubWorkspaceMutation creates new mutation for the PlatformFounderHubWorkspace entity.
+func newPlatformFounderHubWorkspaceMutation(c config, op Op, opts ...platformfounderhubworkspaceOption) *PlatformFounderHubWorkspaceMutation {
+	m := &PlatformFounderHubWorkspaceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformFounderHubWorkspace,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformFounderHubWorkspaceID sets the ID field of the mutation.
+func withPlatformFounderHubWorkspaceID(id string) platformfounderhubworkspaceOption {
+	return func(m *PlatformFounderHubWorkspaceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformFounderHubWorkspace
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformFounderHubWorkspace, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformFounderHubWorkspace.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformFounderHubWorkspace sets the old PlatformFounderHubWorkspace of the mutation.
+func withPlatformFounderHubWorkspace(node *PlatformFounderHubWorkspace) platformfounderhubworkspaceOption {
+	return func(m *PlatformFounderHubWorkspaceMutation) {
+		m.oldValue = func(context.Context) (*PlatformFounderHubWorkspace, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformFounderHubWorkspaceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformFounderHubWorkspaceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformFounderHubWorkspace entities.
+func (m *PlatformFounderHubWorkspaceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformFounderHubWorkspaceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformFounderHubWorkspaceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformFounderHubWorkspace.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetWorkspaceID sets the "workspace_id" field.
+func (m *PlatformFounderHubWorkspaceMutation) SetWorkspaceID(u uuid.UUID) {
+	m.workspace_id = &u
+}
+
+// WorkspaceID returns the value of the "workspace_id" field in the mutation.
+func (m *PlatformFounderHubWorkspaceMutation) WorkspaceID() (r uuid.UUID, exists bool) {
+	v := m.workspace_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWorkspaceID returns the old "workspace_id" field's value of the PlatformFounderHubWorkspace entity.
+// If the PlatformFounderHubWorkspace object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformFounderHubWorkspaceMutation) OldWorkspaceID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWorkspaceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWorkspaceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWorkspaceID: %w", err)
+	}
+	return oldValue.WorkspaceID, nil
+}
+
+// ResetWorkspaceID resets all changes to the "workspace_id" field.
+func (m *PlatformFounderHubWorkspaceMutation) ResetWorkspaceID() {
+	m.workspace_id = nil
+}
+
+// Where appends a list predicates to the PlatformFounderHubWorkspaceMutation builder.
+func (m *PlatformFounderHubWorkspaceMutation) Where(ps ...predicate.PlatformFounderHubWorkspace) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformFounderHubWorkspaceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformFounderHubWorkspaceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformFounderHubWorkspace, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformFounderHubWorkspaceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformFounderHubWorkspaceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformFounderHubWorkspace).
+func (m *PlatformFounderHubWorkspaceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformFounderHubWorkspaceMutation) Fields() []string {
+	fields := make([]string, 0, 1)
+	if m.workspace_id != nil {
+		fields = append(fields, platformfounderhubworkspace.FieldWorkspaceID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformFounderHubWorkspaceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformfounderhubworkspace.FieldWorkspaceID:
+		return m.WorkspaceID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformFounderHubWorkspaceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformfounderhubworkspace.FieldWorkspaceID:
+		return m.OldWorkspaceID(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformFounderHubWorkspace field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubWorkspaceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformfounderhubworkspace.FieldWorkspaceID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWorkspaceID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformFounderHubWorkspaceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformFounderHubWorkspaceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformFounderHubWorkspaceMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformFounderHubWorkspaceMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformFounderHubWorkspaceMutation) ResetField(name string) error {
+	switch name {
+	case platformfounderhubworkspace.FieldWorkspaceID:
+		m.ResetWorkspaceID()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformFounderHubWorkspaceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformFounderHubWorkspaceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformFounderHubWorkspaceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformFounderHubWorkspace edge %s", name)
+}
+
 // PlatformNotificationDeliveryMutation represents an operation that mutates the PlatformNotificationDelivery nodes in the graph.
 type PlatformNotificationDeliveryMutation struct {
 	config
@@ -78466,6 +82457,5189 @@ func (m *PlatformNotificationSeenActionMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *PlatformNotificationSeenActionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PlatformNotificationSeenAction edge %s", name)
+}
+
+// PlatformOAuthAccessTokenMutation represents an operation that mutates the PlatformOAuthAccessToken nodes in the graph.
+type PlatformOAuthAccessTokenMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	token         *string
+	client_id     *string
+	session_id    *string
+	user_id       *string
+	reference_id  *string
+	refresh_id    *string
+	expires_at    *time.Time
+	created_at    *time.Time
+	scopes        *string
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformOAuthAccessToken, error)
+	predicates    []predicate.PlatformOAuthAccessToken
+}
+
+var _ ent.Mutation = (*PlatformOAuthAccessTokenMutation)(nil)
+
+// platformoauthaccesstokenOption allows management of the mutation configuration using functional options.
+type platformoauthaccesstokenOption func(*PlatformOAuthAccessTokenMutation)
+
+// newPlatformOAuthAccessTokenMutation creates new mutation for the PlatformOAuthAccessToken entity.
+func newPlatformOAuthAccessTokenMutation(c config, op Op, opts ...platformoauthaccesstokenOption) *PlatformOAuthAccessTokenMutation {
+	m := &PlatformOAuthAccessTokenMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformOAuthAccessToken,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformOAuthAccessTokenID sets the ID field of the mutation.
+func withPlatformOAuthAccessTokenID(id string) platformoauthaccesstokenOption {
+	return func(m *PlatformOAuthAccessTokenMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformOAuthAccessToken
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformOAuthAccessToken, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformOAuthAccessToken.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformOAuthAccessToken sets the old PlatformOAuthAccessToken of the mutation.
+func withPlatformOAuthAccessToken(node *PlatformOAuthAccessToken) platformoauthaccesstokenOption {
+	return func(m *PlatformOAuthAccessTokenMutation) {
+		m.oldValue = func(context.Context) (*PlatformOAuthAccessToken, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformOAuthAccessTokenMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformOAuthAccessTokenMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformOAuthAccessToken entities.
+func (m *PlatformOAuthAccessTokenMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformOAuthAccessTokenMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformOAuthAccessTokenMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformOAuthAccessToken.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetToken sets the "token" field.
+func (m *PlatformOAuthAccessTokenMutation) SetToken(s string) {
+	m.token = &s
+}
+
+// Token returns the value of the "token" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) Token() (r string, exists bool) {
+	v := m.token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldToken returns the old "token" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldToken: %w", err)
+	}
+	return oldValue.Token, nil
+}
+
+// ResetToken resets all changes to the "token" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetToken() {
+	m.token = nil
+}
+
+// SetClientID sets the "client_id" field.
+func (m *PlatformOAuthAccessTokenMutation) SetClientID(s string) {
+	m.client_id = &s
+}
+
+// ClientID returns the value of the "client_id" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) ClientID() (r string, exists bool) {
+	v := m.client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientID returns the old "client_id" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientID: %w", err)
+	}
+	return oldValue.ClientID, nil
+}
+
+// ResetClientID resets all changes to the "client_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetClientID() {
+	m.client_id = nil
+}
+
+// SetSessionID sets the "session_id" field.
+func (m *PlatformOAuthAccessTokenMutation) SetSessionID(s string) {
+	m.session_id = &s
+}
+
+// SessionID returns the value of the "session_id" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) SessionID() (r string, exists bool) {
+	v := m.session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionID returns the old "session_id" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldSessionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
+	}
+	return oldValue.SessionID, nil
+}
+
+// ResetSessionID resets all changes to the "session_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetSessionID() {
+	m.session_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformOAuthAccessTokenMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetReferenceID sets the "reference_id" field.
+func (m *PlatformOAuthAccessTokenMutation) SetReferenceID(s string) {
+	m.reference_id = &s
+}
+
+// ReferenceID returns the value of the "reference_id" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) ReferenceID() (r string, exists bool) {
+	v := m.reference_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferenceID returns the old "reference_id" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldReferenceID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferenceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferenceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferenceID: %w", err)
+	}
+	return oldValue.ReferenceID, nil
+}
+
+// ClearReferenceID clears the value of the "reference_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ClearReferenceID() {
+	m.reference_id = nil
+	m.clearedFields[platformoauthaccesstoken.FieldReferenceID] = struct{}{}
+}
+
+// ReferenceIDCleared returns if the "reference_id" field was cleared in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) ReferenceIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthaccesstoken.FieldReferenceID]
+	return ok
+}
+
+// ResetReferenceID resets all changes to the "reference_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetReferenceID() {
+	m.reference_id = nil
+	delete(m.clearedFields, platformoauthaccesstoken.FieldReferenceID)
+}
+
+// SetRefreshID sets the "refresh_id" field.
+func (m *PlatformOAuthAccessTokenMutation) SetRefreshID(s string) {
+	m.refresh_id = &s
+}
+
+// RefreshID returns the value of the "refresh_id" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) RefreshID() (r string, exists bool) {
+	v := m.refresh_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshID returns the old "refresh_id" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldRefreshID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshID: %w", err)
+	}
+	return oldValue.RefreshID, nil
+}
+
+// ClearRefreshID clears the value of the "refresh_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ClearRefreshID() {
+	m.refresh_id = nil
+	m.clearedFields[platformoauthaccesstoken.FieldRefreshID] = struct{}{}
+}
+
+// RefreshIDCleared returns if the "refresh_id" field was cleared in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) RefreshIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthaccesstoken.FieldRefreshID]
+	return ok
+}
+
+// ResetRefreshID resets all changes to the "refresh_id" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetRefreshID() {
+	m.refresh_id = nil
+	delete(m.clearedFields, platformoauthaccesstoken.FieldRefreshID)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PlatformOAuthAccessTokenMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformOAuthAccessTokenMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetScopes sets the "scopes" field.
+func (m *PlatformOAuthAccessTokenMutation) SetScopes(s string) {
+	m.scopes = &s
+}
+
+// Scopes returns the value of the "scopes" field in the mutation.
+func (m *PlatformOAuthAccessTokenMutation) Scopes() (r string, exists bool) {
+	v := m.scopes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopes returns the old "scopes" field's value of the PlatformOAuthAccessToken entity.
+// If the PlatformOAuthAccessToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthAccessTokenMutation) OldScopes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopes: %w", err)
+	}
+	return oldValue.Scopes, nil
+}
+
+// ResetScopes resets all changes to the "scopes" field.
+func (m *PlatformOAuthAccessTokenMutation) ResetScopes() {
+	m.scopes = nil
+}
+
+// Where appends a list predicates to the PlatformOAuthAccessTokenMutation builder.
+func (m *PlatformOAuthAccessTokenMutation) Where(ps ...predicate.PlatformOAuthAccessToken) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformOAuthAccessTokenMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformOAuthAccessTokenMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformOAuthAccessToken, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformOAuthAccessTokenMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformOAuthAccessTokenMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformOAuthAccessToken).
+func (m *PlatformOAuthAccessTokenMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformOAuthAccessTokenMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.token != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldToken)
+	}
+	if m.client_id != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldClientID)
+	}
+	if m.session_id != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldSessionID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldUserID)
+	}
+	if m.reference_id != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldReferenceID)
+	}
+	if m.refresh_id != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldRefreshID)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldCreatedAt)
+	}
+	if m.scopes != nil {
+		fields = append(fields, platformoauthaccesstoken.FieldScopes)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformOAuthAccessTokenMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformoauthaccesstoken.FieldToken:
+		return m.Token()
+	case platformoauthaccesstoken.FieldClientID:
+		return m.ClientID()
+	case platformoauthaccesstoken.FieldSessionID:
+		return m.SessionID()
+	case platformoauthaccesstoken.FieldUserID:
+		return m.UserID()
+	case platformoauthaccesstoken.FieldReferenceID:
+		return m.ReferenceID()
+	case platformoauthaccesstoken.FieldRefreshID:
+		return m.RefreshID()
+	case platformoauthaccesstoken.FieldExpiresAt:
+		return m.ExpiresAt()
+	case platformoauthaccesstoken.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformoauthaccesstoken.FieldScopes:
+		return m.Scopes()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformOAuthAccessTokenMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformoauthaccesstoken.FieldToken:
+		return m.OldToken(ctx)
+	case platformoauthaccesstoken.FieldClientID:
+		return m.OldClientID(ctx)
+	case platformoauthaccesstoken.FieldSessionID:
+		return m.OldSessionID(ctx)
+	case platformoauthaccesstoken.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformoauthaccesstoken.FieldReferenceID:
+		return m.OldReferenceID(ctx)
+	case platformoauthaccesstoken.FieldRefreshID:
+		return m.OldRefreshID(ctx)
+	case platformoauthaccesstoken.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case platformoauthaccesstoken.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformoauthaccesstoken.FieldScopes:
+		return m.OldScopes(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformOAuthAccessToken field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthAccessTokenMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformoauthaccesstoken.FieldToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetToken(v)
+		return nil
+	case platformoauthaccesstoken.FieldClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientID(v)
+		return nil
+	case platformoauthaccesstoken.FieldSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionID(v)
+		return nil
+	case platformoauthaccesstoken.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformoauthaccesstoken.FieldReferenceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferenceID(v)
+		return nil
+	case platformoauthaccesstoken.FieldRefreshID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshID(v)
+		return nil
+	case platformoauthaccesstoken.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case platformoauthaccesstoken.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformoauthaccesstoken.FieldScopes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthAccessToken field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformOAuthAccessTokenMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformOAuthAccessTokenMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthAccessTokenMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformOAuthAccessToken numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformOAuthAccessTokenMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformoauthaccesstoken.FieldReferenceID) {
+		fields = append(fields, platformoauthaccesstoken.FieldReferenceID)
+	}
+	if m.FieldCleared(platformoauthaccesstoken.FieldRefreshID) {
+		fields = append(fields, platformoauthaccesstoken.FieldRefreshID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformOAuthAccessTokenMutation) ClearField(name string) error {
+	switch name {
+	case platformoauthaccesstoken.FieldReferenceID:
+		m.ClearReferenceID()
+		return nil
+	case platformoauthaccesstoken.FieldRefreshID:
+		m.ClearRefreshID()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthAccessToken nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformOAuthAccessTokenMutation) ResetField(name string) error {
+	switch name {
+	case platformoauthaccesstoken.FieldToken:
+		m.ResetToken()
+		return nil
+	case platformoauthaccesstoken.FieldClientID:
+		m.ResetClientID()
+		return nil
+	case platformoauthaccesstoken.FieldSessionID:
+		m.ResetSessionID()
+		return nil
+	case platformoauthaccesstoken.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformoauthaccesstoken.FieldReferenceID:
+		m.ResetReferenceID()
+		return nil
+	case platformoauthaccesstoken.FieldRefreshID:
+		m.ResetRefreshID()
+		return nil
+	case platformoauthaccesstoken.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case platformoauthaccesstoken.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformoauthaccesstoken.FieldScopes:
+		m.ResetScopes()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthAccessToken field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformOAuthAccessTokenMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformOAuthAccessTokenMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthAccessToken unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformOAuthAccessTokenMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthAccessToken edge %s", name)
+}
+
+// PlatformOAuthClientMutation represents an operation that mutates the PlatformOAuthClient nodes in the graph.
+type PlatformOAuthClientMutation struct {
+	config
+	op                         Op
+	typ                        string
+	id                         *string
+	client_id                  *string
+	client_secret              *string
+	disabled                   *bool
+	skip_consent               *bool
+	enable_end_session         *bool
+	subject_type               *string
+	scopes                     *string
+	user_id                    *string
+	created_at                 *time.Time
+	updated_at                 *time.Time
+	name                       *string
+	uri                        *string
+	icon                       *string
+	contacts                   *string
+	tos                        *string
+	policy                     *string
+	software_id                *string
+	software_version           *string
+	software_statement         *string
+	redirect_uris              *string
+	post_logout_redirect_uris  *string
+	token_endpoint_auth_method *string
+	grant_types                *string
+	response_types             *string
+	public                     *bool
+	_type                      *string
+	require_p_k_c_e            *bool
+	reference_id               *string
+	metadata                   *string
+	clearedFields              map[string]struct{}
+	done                       bool
+	oldValue                   func(context.Context) (*PlatformOAuthClient, error)
+	predicates                 []predicate.PlatformOAuthClient
+}
+
+var _ ent.Mutation = (*PlatformOAuthClientMutation)(nil)
+
+// platformoauthclientOption allows management of the mutation configuration using functional options.
+type platformoauthclientOption func(*PlatformOAuthClientMutation)
+
+// newPlatformOAuthClientMutation creates new mutation for the PlatformOAuthClient entity.
+func newPlatformOAuthClientMutation(c config, op Op, opts ...platformoauthclientOption) *PlatformOAuthClientMutation {
+	m := &PlatformOAuthClientMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformOAuthClient,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformOAuthClientID sets the ID field of the mutation.
+func withPlatformOAuthClientID(id string) platformoauthclientOption {
+	return func(m *PlatformOAuthClientMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformOAuthClient
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformOAuthClient, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformOAuthClient.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformOAuthClient sets the old PlatformOAuthClient of the mutation.
+func withPlatformOAuthClient(node *PlatformOAuthClient) platformoauthclientOption {
+	return func(m *PlatformOAuthClientMutation) {
+		m.oldValue = func(context.Context) (*PlatformOAuthClient, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformOAuthClientMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformOAuthClientMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformOAuthClient entities.
+func (m *PlatformOAuthClientMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformOAuthClientMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformOAuthClientMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformOAuthClient.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetClientID sets the "client_id" field.
+func (m *PlatformOAuthClientMutation) SetClientID(s string) {
+	m.client_id = &s
+}
+
+// ClientID returns the value of the "client_id" field in the mutation.
+func (m *PlatformOAuthClientMutation) ClientID() (r string, exists bool) {
+	v := m.client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientID returns the old "client_id" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientID: %w", err)
+	}
+	return oldValue.ClientID, nil
+}
+
+// ResetClientID resets all changes to the "client_id" field.
+func (m *PlatformOAuthClientMutation) ResetClientID() {
+	m.client_id = nil
+}
+
+// SetClientSecret sets the "client_secret" field.
+func (m *PlatformOAuthClientMutation) SetClientSecret(s string) {
+	m.client_secret = &s
+}
+
+// ClientSecret returns the value of the "client_secret" field in the mutation.
+func (m *PlatformOAuthClientMutation) ClientSecret() (r string, exists bool) {
+	v := m.client_secret
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientSecret returns the old "client_secret" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldClientSecret(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientSecret is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientSecret requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientSecret: %w", err)
+	}
+	return oldValue.ClientSecret, nil
+}
+
+// ClearClientSecret clears the value of the "client_secret" field.
+func (m *PlatformOAuthClientMutation) ClearClientSecret() {
+	m.client_secret = nil
+	m.clearedFields[platformoauthclient.FieldClientSecret] = struct{}{}
+}
+
+// ClientSecretCleared returns if the "client_secret" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ClientSecretCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldClientSecret]
+	return ok
+}
+
+// ResetClientSecret resets all changes to the "client_secret" field.
+func (m *PlatformOAuthClientMutation) ResetClientSecret() {
+	m.client_secret = nil
+	delete(m.clearedFields, platformoauthclient.FieldClientSecret)
+}
+
+// SetDisabled sets the "disabled" field.
+func (m *PlatformOAuthClientMutation) SetDisabled(b bool) {
+	m.disabled = &b
+}
+
+// Disabled returns the value of the "disabled" field in the mutation.
+func (m *PlatformOAuthClientMutation) Disabled() (r bool, exists bool) {
+	v := m.disabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisabled returns the old "disabled" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldDisabled(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisabled: %w", err)
+	}
+	return oldValue.Disabled, nil
+}
+
+// ClearDisabled clears the value of the "disabled" field.
+func (m *PlatformOAuthClientMutation) ClearDisabled() {
+	m.disabled = nil
+	m.clearedFields[platformoauthclient.FieldDisabled] = struct{}{}
+}
+
+// DisabledCleared returns if the "disabled" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) DisabledCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldDisabled]
+	return ok
+}
+
+// ResetDisabled resets all changes to the "disabled" field.
+func (m *PlatformOAuthClientMutation) ResetDisabled() {
+	m.disabled = nil
+	delete(m.clearedFields, platformoauthclient.FieldDisabled)
+}
+
+// SetSkipConsent sets the "skip_consent" field.
+func (m *PlatformOAuthClientMutation) SetSkipConsent(b bool) {
+	m.skip_consent = &b
+}
+
+// SkipConsent returns the value of the "skip_consent" field in the mutation.
+func (m *PlatformOAuthClientMutation) SkipConsent() (r bool, exists bool) {
+	v := m.skip_consent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSkipConsent returns the old "skip_consent" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldSkipConsent(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSkipConsent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSkipConsent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSkipConsent: %w", err)
+	}
+	return oldValue.SkipConsent, nil
+}
+
+// ClearSkipConsent clears the value of the "skip_consent" field.
+func (m *PlatformOAuthClientMutation) ClearSkipConsent() {
+	m.skip_consent = nil
+	m.clearedFields[platformoauthclient.FieldSkipConsent] = struct{}{}
+}
+
+// SkipConsentCleared returns if the "skip_consent" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) SkipConsentCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldSkipConsent]
+	return ok
+}
+
+// ResetSkipConsent resets all changes to the "skip_consent" field.
+func (m *PlatformOAuthClientMutation) ResetSkipConsent() {
+	m.skip_consent = nil
+	delete(m.clearedFields, platformoauthclient.FieldSkipConsent)
+}
+
+// SetEnableEndSession sets the "enable_end_session" field.
+func (m *PlatformOAuthClientMutation) SetEnableEndSession(b bool) {
+	m.enable_end_session = &b
+}
+
+// EnableEndSession returns the value of the "enable_end_session" field in the mutation.
+func (m *PlatformOAuthClientMutation) EnableEndSession() (r bool, exists bool) {
+	v := m.enable_end_session
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnableEndSession returns the old "enable_end_session" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldEnableEndSession(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnableEndSession is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnableEndSession requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnableEndSession: %w", err)
+	}
+	return oldValue.EnableEndSession, nil
+}
+
+// ClearEnableEndSession clears the value of the "enable_end_session" field.
+func (m *PlatformOAuthClientMutation) ClearEnableEndSession() {
+	m.enable_end_session = nil
+	m.clearedFields[platformoauthclient.FieldEnableEndSession] = struct{}{}
+}
+
+// EnableEndSessionCleared returns if the "enable_end_session" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) EnableEndSessionCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldEnableEndSession]
+	return ok
+}
+
+// ResetEnableEndSession resets all changes to the "enable_end_session" field.
+func (m *PlatformOAuthClientMutation) ResetEnableEndSession() {
+	m.enable_end_session = nil
+	delete(m.clearedFields, platformoauthclient.FieldEnableEndSession)
+}
+
+// SetSubjectType sets the "subject_type" field.
+func (m *PlatformOAuthClientMutation) SetSubjectType(s string) {
+	m.subject_type = &s
+}
+
+// SubjectType returns the value of the "subject_type" field in the mutation.
+func (m *PlatformOAuthClientMutation) SubjectType() (r string, exists bool) {
+	v := m.subject_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubjectType returns the old "subject_type" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldSubjectType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubjectType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubjectType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubjectType: %w", err)
+	}
+	return oldValue.SubjectType, nil
+}
+
+// ClearSubjectType clears the value of the "subject_type" field.
+func (m *PlatformOAuthClientMutation) ClearSubjectType() {
+	m.subject_type = nil
+	m.clearedFields[platformoauthclient.FieldSubjectType] = struct{}{}
+}
+
+// SubjectTypeCleared returns if the "subject_type" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) SubjectTypeCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldSubjectType]
+	return ok
+}
+
+// ResetSubjectType resets all changes to the "subject_type" field.
+func (m *PlatformOAuthClientMutation) ResetSubjectType() {
+	m.subject_type = nil
+	delete(m.clearedFields, platformoauthclient.FieldSubjectType)
+}
+
+// SetScopes sets the "scopes" field.
+func (m *PlatformOAuthClientMutation) SetScopes(s string) {
+	m.scopes = &s
+}
+
+// Scopes returns the value of the "scopes" field in the mutation.
+func (m *PlatformOAuthClientMutation) Scopes() (r string, exists bool) {
+	v := m.scopes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopes returns the old "scopes" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldScopes(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopes: %w", err)
+	}
+	return oldValue.Scopes, nil
+}
+
+// ClearScopes clears the value of the "scopes" field.
+func (m *PlatformOAuthClientMutation) ClearScopes() {
+	m.scopes = nil
+	m.clearedFields[platformoauthclient.FieldScopes] = struct{}{}
+}
+
+// ScopesCleared returns if the "scopes" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ScopesCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldScopes]
+	return ok
+}
+
+// ResetScopes resets all changes to the "scopes" field.
+func (m *PlatformOAuthClientMutation) ResetScopes() {
+	m.scopes = nil
+	delete(m.clearedFields, platformoauthclient.FieldScopes)
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformOAuthClientMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformOAuthClientMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldUserID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (m *PlatformOAuthClientMutation) ClearUserID() {
+	m.user_id = nil
+	m.clearedFields[platformoauthclient.FieldUserID] = struct{}{}
+}
+
+// UserIDCleared returns if the "user_id" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) UserIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldUserID]
+	return ok
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformOAuthClientMutation) ResetUserID() {
+	m.user_id = nil
+	delete(m.clearedFields, platformoauthclient.FieldUserID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformOAuthClientMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformOAuthClientMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldCreatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ClearCreatedAt clears the value of the "created_at" field.
+func (m *PlatformOAuthClientMutation) ClearCreatedAt() {
+	m.created_at = nil
+	m.clearedFields[platformoauthclient.FieldCreatedAt] = struct{}{}
+}
+
+// CreatedAtCleared returns if the "created_at" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) CreatedAtCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldCreatedAt]
+	return ok
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformOAuthClientMutation) ResetCreatedAt() {
+	m.created_at = nil
+	delete(m.clearedFields, platformoauthclient.FieldCreatedAt)
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformOAuthClientMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformOAuthClientMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldUpdatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ClearUpdatedAt clears the value of the "updated_at" field.
+func (m *PlatformOAuthClientMutation) ClearUpdatedAt() {
+	m.updated_at = nil
+	m.clearedFields[platformoauthclient.FieldUpdatedAt] = struct{}{}
+}
+
+// UpdatedAtCleared returns if the "updated_at" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) UpdatedAtCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldUpdatedAt]
+	return ok
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformOAuthClientMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+	delete(m.clearedFields, platformoauthclient.FieldUpdatedAt)
+}
+
+// SetName sets the "name" field.
+func (m *PlatformOAuthClientMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *PlatformOAuthClientMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ClearName clears the value of the "name" field.
+func (m *PlatformOAuthClientMutation) ClearName() {
+	m.name = nil
+	m.clearedFields[platformoauthclient.FieldName] = struct{}{}
+}
+
+// NameCleared returns if the "name" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) NameCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldName]
+	return ok
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *PlatformOAuthClientMutation) ResetName() {
+	m.name = nil
+	delete(m.clearedFields, platformoauthclient.FieldName)
+}
+
+// SetURI sets the "uri" field.
+func (m *PlatformOAuthClientMutation) SetURI(s string) {
+	m.uri = &s
+}
+
+// URI returns the value of the "uri" field in the mutation.
+func (m *PlatformOAuthClientMutation) URI() (r string, exists bool) {
+	v := m.uri
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldURI returns the old "uri" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldURI(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldURI is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldURI requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldURI: %w", err)
+	}
+	return oldValue.URI, nil
+}
+
+// ClearURI clears the value of the "uri" field.
+func (m *PlatformOAuthClientMutation) ClearURI() {
+	m.uri = nil
+	m.clearedFields[platformoauthclient.FieldURI] = struct{}{}
+}
+
+// URICleared returns if the "uri" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) URICleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldURI]
+	return ok
+}
+
+// ResetURI resets all changes to the "uri" field.
+func (m *PlatformOAuthClientMutation) ResetURI() {
+	m.uri = nil
+	delete(m.clearedFields, platformoauthclient.FieldURI)
+}
+
+// SetIcon sets the "icon" field.
+func (m *PlatformOAuthClientMutation) SetIcon(s string) {
+	m.icon = &s
+}
+
+// Icon returns the value of the "icon" field in the mutation.
+func (m *PlatformOAuthClientMutation) Icon() (r string, exists bool) {
+	v := m.icon
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIcon returns the old "icon" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldIcon(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIcon is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIcon requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIcon: %w", err)
+	}
+	return oldValue.Icon, nil
+}
+
+// ClearIcon clears the value of the "icon" field.
+func (m *PlatformOAuthClientMutation) ClearIcon() {
+	m.icon = nil
+	m.clearedFields[platformoauthclient.FieldIcon] = struct{}{}
+}
+
+// IconCleared returns if the "icon" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) IconCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldIcon]
+	return ok
+}
+
+// ResetIcon resets all changes to the "icon" field.
+func (m *PlatformOAuthClientMutation) ResetIcon() {
+	m.icon = nil
+	delete(m.clearedFields, platformoauthclient.FieldIcon)
+}
+
+// SetContacts sets the "contacts" field.
+func (m *PlatformOAuthClientMutation) SetContacts(s string) {
+	m.contacts = &s
+}
+
+// Contacts returns the value of the "contacts" field in the mutation.
+func (m *PlatformOAuthClientMutation) Contacts() (r string, exists bool) {
+	v := m.contacts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContacts returns the old "contacts" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldContacts(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContacts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContacts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContacts: %w", err)
+	}
+	return oldValue.Contacts, nil
+}
+
+// ClearContacts clears the value of the "contacts" field.
+func (m *PlatformOAuthClientMutation) ClearContacts() {
+	m.contacts = nil
+	m.clearedFields[platformoauthclient.FieldContacts] = struct{}{}
+}
+
+// ContactsCleared returns if the "contacts" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ContactsCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldContacts]
+	return ok
+}
+
+// ResetContacts resets all changes to the "contacts" field.
+func (m *PlatformOAuthClientMutation) ResetContacts() {
+	m.contacts = nil
+	delete(m.clearedFields, platformoauthclient.FieldContacts)
+}
+
+// SetTos sets the "tos" field.
+func (m *PlatformOAuthClientMutation) SetTos(s string) {
+	m.tos = &s
+}
+
+// Tos returns the value of the "tos" field in the mutation.
+func (m *PlatformOAuthClientMutation) Tos() (r string, exists bool) {
+	v := m.tos
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTos returns the old "tos" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldTos(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTos is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTos requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTos: %w", err)
+	}
+	return oldValue.Tos, nil
+}
+
+// ClearTos clears the value of the "tos" field.
+func (m *PlatformOAuthClientMutation) ClearTos() {
+	m.tos = nil
+	m.clearedFields[platformoauthclient.FieldTos] = struct{}{}
+}
+
+// TosCleared returns if the "tos" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) TosCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldTos]
+	return ok
+}
+
+// ResetTos resets all changes to the "tos" field.
+func (m *PlatformOAuthClientMutation) ResetTos() {
+	m.tos = nil
+	delete(m.clearedFields, platformoauthclient.FieldTos)
+}
+
+// SetPolicy sets the "policy" field.
+func (m *PlatformOAuthClientMutation) SetPolicy(s string) {
+	m.policy = &s
+}
+
+// Policy returns the value of the "policy" field in the mutation.
+func (m *PlatformOAuthClientMutation) Policy() (r string, exists bool) {
+	v := m.policy
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPolicy returns the old "policy" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldPolicy(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPolicy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPolicy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPolicy: %w", err)
+	}
+	return oldValue.Policy, nil
+}
+
+// ClearPolicy clears the value of the "policy" field.
+func (m *PlatformOAuthClientMutation) ClearPolicy() {
+	m.policy = nil
+	m.clearedFields[platformoauthclient.FieldPolicy] = struct{}{}
+}
+
+// PolicyCleared returns if the "policy" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) PolicyCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldPolicy]
+	return ok
+}
+
+// ResetPolicy resets all changes to the "policy" field.
+func (m *PlatformOAuthClientMutation) ResetPolicy() {
+	m.policy = nil
+	delete(m.clearedFields, platformoauthclient.FieldPolicy)
+}
+
+// SetSoftwareID sets the "software_id" field.
+func (m *PlatformOAuthClientMutation) SetSoftwareID(s string) {
+	m.software_id = &s
+}
+
+// SoftwareID returns the value of the "software_id" field in the mutation.
+func (m *PlatformOAuthClientMutation) SoftwareID() (r string, exists bool) {
+	v := m.software_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSoftwareID returns the old "software_id" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldSoftwareID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSoftwareID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSoftwareID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSoftwareID: %w", err)
+	}
+	return oldValue.SoftwareID, nil
+}
+
+// ClearSoftwareID clears the value of the "software_id" field.
+func (m *PlatformOAuthClientMutation) ClearSoftwareID() {
+	m.software_id = nil
+	m.clearedFields[platformoauthclient.FieldSoftwareID] = struct{}{}
+}
+
+// SoftwareIDCleared returns if the "software_id" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) SoftwareIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldSoftwareID]
+	return ok
+}
+
+// ResetSoftwareID resets all changes to the "software_id" field.
+func (m *PlatformOAuthClientMutation) ResetSoftwareID() {
+	m.software_id = nil
+	delete(m.clearedFields, platformoauthclient.FieldSoftwareID)
+}
+
+// SetSoftwareVersion sets the "software_version" field.
+func (m *PlatformOAuthClientMutation) SetSoftwareVersion(s string) {
+	m.software_version = &s
+}
+
+// SoftwareVersion returns the value of the "software_version" field in the mutation.
+func (m *PlatformOAuthClientMutation) SoftwareVersion() (r string, exists bool) {
+	v := m.software_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSoftwareVersion returns the old "software_version" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldSoftwareVersion(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSoftwareVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSoftwareVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSoftwareVersion: %w", err)
+	}
+	return oldValue.SoftwareVersion, nil
+}
+
+// ClearSoftwareVersion clears the value of the "software_version" field.
+func (m *PlatformOAuthClientMutation) ClearSoftwareVersion() {
+	m.software_version = nil
+	m.clearedFields[platformoauthclient.FieldSoftwareVersion] = struct{}{}
+}
+
+// SoftwareVersionCleared returns if the "software_version" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) SoftwareVersionCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldSoftwareVersion]
+	return ok
+}
+
+// ResetSoftwareVersion resets all changes to the "software_version" field.
+func (m *PlatformOAuthClientMutation) ResetSoftwareVersion() {
+	m.software_version = nil
+	delete(m.clearedFields, platformoauthclient.FieldSoftwareVersion)
+}
+
+// SetSoftwareStatement sets the "software_statement" field.
+func (m *PlatformOAuthClientMutation) SetSoftwareStatement(s string) {
+	m.software_statement = &s
+}
+
+// SoftwareStatement returns the value of the "software_statement" field in the mutation.
+func (m *PlatformOAuthClientMutation) SoftwareStatement() (r string, exists bool) {
+	v := m.software_statement
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSoftwareStatement returns the old "software_statement" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldSoftwareStatement(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSoftwareStatement is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSoftwareStatement requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSoftwareStatement: %w", err)
+	}
+	return oldValue.SoftwareStatement, nil
+}
+
+// ClearSoftwareStatement clears the value of the "software_statement" field.
+func (m *PlatformOAuthClientMutation) ClearSoftwareStatement() {
+	m.software_statement = nil
+	m.clearedFields[platformoauthclient.FieldSoftwareStatement] = struct{}{}
+}
+
+// SoftwareStatementCleared returns if the "software_statement" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) SoftwareStatementCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldSoftwareStatement]
+	return ok
+}
+
+// ResetSoftwareStatement resets all changes to the "software_statement" field.
+func (m *PlatformOAuthClientMutation) ResetSoftwareStatement() {
+	m.software_statement = nil
+	delete(m.clearedFields, platformoauthclient.FieldSoftwareStatement)
+}
+
+// SetRedirectUris sets the "redirect_uris" field.
+func (m *PlatformOAuthClientMutation) SetRedirectUris(s string) {
+	m.redirect_uris = &s
+}
+
+// RedirectUris returns the value of the "redirect_uris" field in the mutation.
+func (m *PlatformOAuthClientMutation) RedirectUris() (r string, exists bool) {
+	v := m.redirect_uris
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRedirectUris returns the old "redirect_uris" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldRedirectUris(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRedirectUris is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRedirectUris requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRedirectUris: %w", err)
+	}
+	return oldValue.RedirectUris, nil
+}
+
+// ResetRedirectUris resets all changes to the "redirect_uris" field.
+func (m *PlatformOAuthClientMutation) ResetRedirectUris() {
+	m.redirect_uris = nil
+}
+
+// SetPostLogoutRedirectUris sets the "post_logout_redirect_uris" field.
+func (m *PlatformOAuthClientMutation) SetPostLogoutRedirectUris(s string) {
+	m.post_logout_redirect_uris = &s
+}
+
+// PostLogoutRedirectUris returns the value of the "post_logout_redirect_uris" field in the mutation.
+func (m *PlatformOAuthClientMutation) PostLogoutRedirectUris() (r string, exists bool) {
+	v := m.post_logout_redirect_uris
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPostLogoutRedirectUris returns the old "post_logout_redirect_uris" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldPostLogoutRedirectUris(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPostLogoutRedirectUris is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPostLogoutRedirectUris requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPostLogoutRedirectUris: %w", err)
+	}
+	return oldValue.PostLogoutRedirectUris, nil
+}
+
+// ClearPostLogoutRedirectUris clears the value of the "post_logout_redirect_uris" field.
+func (m *PlatformOAuthClientMutation) ClearPostLogoutRedirectUris() {
+	m.post_logout_redirect_uris = nil
+	m.clearedFields[platformoauthclient.FieldPostLogoutRedirectUris] = struct{}{}
+}
+
+// PostLogoutRedirectUrisCleared returns if the "post_logout_redirect_uris" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) PostLogoutRedirectUrisCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldPostLogoutRedirectUris]
+	return ok
+}
+
+// ResetPostLogoutRedirectUris resets all changes to the "post_logout_redirect_uris" field.
+func (m *PlatformOAuthClientMutation) ResetPostLogoutRedirectUris() {
+	m.post_logout_redirect_uris = nil
+	delete(m.clearedFields, platformoauthclient.FieldPostLogoutRedirectUris)
+}
+
+// SetTokenEndpointAuthMethod sets the "token_endpoint_auth_method" field.
+func (m *PlatformOAuthClientMutation) SetTokenEndpointAuthMethod(s string) {
+	m.token_endpoint_auth_method = &s
+}
+
+// TokenEndpointAuthMethod returns the value of the "token_endpoint_auth_method" field in the mutation.
+func (m *PlatformOAuthClientMutation) TokenEndpointAuthMethod() (r string, exists bool) {
+	v := m.token_endpoint_auth_method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTokenEndpointAuthMethod returns the old "token_endpoint_auth_method" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldTokenEndpointAuthMethod(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTokenEndpointAuthMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTokenEndpointAuthMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTokenEndpointAuthMethod: %w", err)
+	}
+	return oldValue.TokenEndpointAuthMethod, nil
+}
+
+// ClearTokenEndpointAuthMethod clears the value of the "token_endpoint_auth_method" field.
+func (m *PlatformOAuthClientMutation) ClearTokenEndpointAuthMethod() {
+	m.token_endpoint_auth_method = nil
+	m.clearedFields[platformoauthclient.FieldTokenEndpointAuthMethod] = struct{}{}
+}
+
+// TokenEndpointAuthMethodCleared returns if the "token_endpoint_auth_method" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) TokenEndpointAuthMethodCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldTokenEndpointAuthMethod]
+	return ok
+}
+
+// ResetTokenEndpointAuthMethod resets all changes to the "token_endpoint_auth_method" field.
+func (m *PlatformOAuthClientMutation) ResetTokenEndpointAuthMethod() {
+	m.token_endpoint_auth_method = nil
+	delete(m.clearedFields, platformoauthclient.FieldTokenEndpointAuthMethod)
+}
+
+// SetGrantTypes sets the "grant_types" field.
+func (m *PlatformOAuthClientMutation) SetGrantTypes(s string) {
+	m.grant_types = &s
+}
+
+// GrantTypes returns the value of the "grant_types" field in the mutation.
+func (m *PlatformOAuthClientMutation) GrantTypes() (r string, exists bool) {
+	v := m.grant_types
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGrantTypes returns the old "grant_types" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldGrantTypes(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGrantTypes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGrantTypes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGrantTypes: %w", err)
+	}
+	return oldValue.GrantTypes, nil
+}
+
+// ClearGrantTypes clears the value of the "grant_types" field.
+func (m *PlatformOAuthClientMutation) ClearGrantTypes() {
+	m.grant_types = nil
+	m.clearedFields[platformoauthclient.FieldGrantTypes] = struct{}{}
+}
+
+// GrantTypesCleared returns if the "grant_types" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) GrantTypesCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldGrantTypes]
+	return ok
+}
+
+// ResetGrantTypes resets all changes to the "grant_types" field.
+func (m *PlatformOAuthClientMutation) ResetGrantTypes() {
+	m.grant_types = nil
+	delete(m.clearedFields, platformoauthclient.FieldGrantTypes)
+}
+
+// SetResponseTypes sets the "response_types" field.
+func (m *PlatformOAuthClientMutation) SetResponseTypes(s string) {
+	m.response_types = &s
+}
+
+// ResponseTypes returns the value of the "response_types" field in the mutation.
+func (m *PlatformOAuthClientMutation) ResponseTypes() (r string, exists bool) {
+	v := m.response_types
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponseTypes returns the old "response_types" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldResponseTypes(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponseTypes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponseTypes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponseTypes: %w", err)
+	}
+	return oldValue.ResponseTypes, nil
+}
+
+// ClearResponseTypes clears the value of the "response_types" field.
+func (m *PlatformOAuthClientMutation) ClearResponseTypes() {
+	m.response_types = nil
+	m.clearedFields[platformoauthclient.FieldResponseTypes] = struct{}{}
+}
+
+// ResponseTypesCleared returns if the "response_types" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ResponseTypesCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldResponseTypes]
+	return ok
+}
+
+// ResetResponseTypes resets all changes to the "response_types" field.
+func (m *PlatformOAuthClientMutation) ResetResponseTypes() {
+	m.response_types = nil
+	delete(m.clearedFields, platformoauthclient.FieldResponseTypes)
+}
+
+// SetPublic sets the "public" field.
+func (m *PlatformOAuthClientMutation) SetPublic(b bool) {
+	m.public = &b
+}
+
+// Public returns the value of the "public" field in the mutation.
+func (m *PlatformOAuthClientMutation) Public() (r bool, exists bool) {
+	v := m.public
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublic returns the old "public" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldPublic(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublic is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublic requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublic: %w", err)
+	}
+	return oldValue.Public, nil
+}
+
+// ClearPublic clears the value of the "public" field.
+func (m *PlatformOAuthClientMutation) ClearPublic() {
+	m.public = nil
+	m.clearedFields[platformoauthclient.FieldPublic] = struct{}{}
+}
+
+// PublicCleared returns if the "public" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) PublicCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldPublic]
+	return ok
+}
+
+// ResetPublic resets all changes to the "public" field.
+func (m *PlatformOAuthClientMutation) ResetPublic() {
+	m.public = nil
+	delete(m.clearedFields, platformoauthclient.FieldPublic)
+}
+
+// SetType sets the "type" field.
+func (m *PlatformOAuthClientMutation) SetType(s string) {
+	m._type = &s
+}
+
+// GetType returns the value of the "type" field in the mutation.
+func (m *PlatformOAuthClientMutation) GetType() (r string, exists bool) {
+	v := m._type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldType returns the old "type" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldType: %w", err)
+	}
+	return oldValue.Type, nil
+}
+
+// ClearType clears the value of the "type" field.
+func (m *PlatformOAuthClientMutation) ClearType() {
+	m._type = nil
+	m.clearedFields[platformoauthclient.FieldType] = struct{}{}
+}
+
+// TypeCleared returns if the "type" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) TypeCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldType]
+	return ok
+}
+
+// ResetType resets all changes to the "type" field.
+func (m *PlatformOAuthClientMutation) ResetType() {
+	m._type = nil
+	delete(m.clearedFields, platformoauthclient.FieldType)
+}
+
+// SetRequirePKCE sets the "require_p_k_c_e" field.
+func (m *PlatformOAuthClientMutation) SetRequirePKCE(b bool) {
+	m.require_p_k_c_e = &b
+}
+
+// RequirePKCE returns the value of the "require_p_k_c_e" field in the mutation.
+func (m *PlatformOAuthClientMutation) RequirePKCE() (r bool, exists bool) {
+	v := m.require_p_k_c_e
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequirePKCE returns the old "require_p_k_c_e" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldRequirePKCE(ctx context.Context) (v *bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequirePKCE is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequirePKCE requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequirePKCE: %w", err)
+	}
+	return oldValue.RequirePKCE, nil
+}
+
+// ClearRequirePKCE clears the value of the "require_p_k_c_e" field.
+func (m *PlatformOAuthClientMutation) ClearRequirePKCE() {
+	m.require_p_k_c_e = nil
+	m.clearedFields[platformoauthclient.FieldRequirePKCE] = struct{}{}
+}
+
+// RequirePKCECleared returns if the "require_p_k_c_e" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) RequirePKCECleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldRequirePKCE]
+	return ok
+}
+
+// ResetRequirePKCE resets all changes to the "require_p_k_c_e" field.
+func (m *PlatformOAuthClientMutation) ResetRequirePKCE() {
+	m.require_p_k_c_e = nil
+	delete(m.clearedFields, platformoauthclient.FieldRequirePKCE)
+}
+
+// SetReferenceID sets the "reference_id" field.
+func (m *PlatformOAuthClientMutation) SetReferenceID(s string) {
+	m.reference_id = &s
+}
+
+// ReferenceID returns the value of the "reference_id" field in the mutation.
+func (m *PlatformOAuthClientMutation) ReferenceID() (r string, exists bool) {
+	v := m.reference_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferenceID returns the old "reference_id" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldReferenceID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferenceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferenceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferenceID: %w", err)
+	}
+	return oldValue.ReferenceID, nil
+}
+
+// ClearReferenceID clears the value of the "reference_id" field.
+func (m *PlatformOAuthClientMutation) ClearReferenceID() {
+	m.reference_id = nil
+	m.clearedFields[platformoauthclient.FieldReferenceID] = struct{}{}
+}
+
+// ReferenceIDCleared returns if the "reference_id" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ReferenceIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldReferenceID]
+	return ok
+}
+
+// ResetReferenceID resets all changes to the "reference_id" field.
+func (m *PlatformOAuthClientMutation) ResetReferenceID() {
+	m.reference_id = nil
+	delete(m.clearedFields, platformoauthclient.FieldReferenceID)
+}
+
+// SetMetadata sets the "metadata" field.
+func (m *PlatformOAuthClientMutation) SetMetadata(s string) {
+	m.metadata = &s
+}
+
+// Metadata returns the value of the "metadata" field in the mutation.
+func (m *PlatformOAuthClientMutation) Metadata() (r string, exists bool) {
+	v := m.metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadata returns the old "metadata" field's value of the PlatformOAuthClient entity.
+// If the PlatformOAuthClient object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthClientMutation) OldMetadata(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadata: %w", err)
+	}
+	return oldValue.Metadata, nil
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (m *PlatformOAuthClientMutation) ClearMetadata() {
+	m.metadata = nil
+	m.clearedFields[platformoauthclient.FieldMetadata] = struct{}{}
+}
+
+// MetadataCleared returns if the "metadata" field was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) MetadataCleared() bool {
+	_, ok := m.clearedFields[platformoauthclient.FieldMetadata]
+	return ok
+}
+
+// ResetMetadata resets all changes to the "metadata" field.
+func (m *PlatformOAuthClientMutation) ResetMetadata() {
+	m.metadata = nil
+	delete(m.clearedFields, platformoauthclient.FieldMetadata)
+}
+
+// Where appends a list predicates to the PlatformOAuthClientMutation builder.
+func (m *PlatformOAuthClientMutation) Where(ps ...predicate.PlatformOAuthClient) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformOAuthClientMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformOAuthClientMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformOAuthClient, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformOAuthClientMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformOAuthClientMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformOAuthClient).
+func (m *PlatformOAuthClientMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformOAuthClientMutation) Fields() []string {
+	fields := make([]string, 0, 29)
+	if m.client_id != nil {
+		fields = append(fields, platformoauthclient.FieldClientID)
+	}
+	if m.client_secret != nil {
+		fields = append(fields, platformoauthclient.FieldClientSecret)
+	}
+	if m.disabled != nil {
+		fields = append(fields, platformoauthclient.FieldDisabled)
+	}
+	if m.skip_consent != nil {
+		fields = append(fields, platformoauthclient.FieldSkipConsent)
+	}
+	if m.enable_end_session != nil {
+		fields = append(fields, platformoauthclient.FieldEnableEndSession)
+	}
+	if m.subject_type != nil {
+		fields = append(fields, platformoauthclient.FieldSubjectType)
+	}
+	if m.scopes != nil {
+		fields = append(fields, platformoauthclient.FieldScopes)
+	}
+	if m.user_id != nil {
+		fields = append(fields, platformoauthclient.FieldUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformoauthclient.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platformoauthclient.FieldUpdatedAt)
+	}
+	if m.name != nil {
+		fields = append(fields, platformoauthclient.FieldName)
+	}
+	if m.uri != nil {
+		fields = append(fields, platformoauthclient.FieldURI)
+	}
+	if m.icon != nil {
+		fields = append(fields, platformoauthclient.FieldIcon)
+	}
+	if m.contacts != nil {
+		fields = append(fields, platformoauthclient.FieldContacts)
+	}
+	if m.tos != nil {
+		fields = append(fields, platformoauthclient.FieldTos)
+	}
+	if m.policy != nil {
+		fields = append(fields, platformoauthclient.FieldPolicy)
+	}
+	if m.software_id != nil {
+		fields = append(fields, platformoauthclient.FieldSoftwareID)
+	}
+	if m.software_version != nil {
+		fields = append(fields, platformoauthclient.FieldSoftwareVersion)
+	}
+	if m.software_statement != nil {
+		fields = append(fields, platformoauthclient.FieldSoftwareStatement)
+	}
+	if m.redirect_uris != nil {
+		fields = append(fields, platformoauthclient.FieldRedirectUris)
+	}
+	if m.post_logout_redirect_uris != nil {
+		fields = append(fields, platformoauthclient.FieldPostLogoutRedirectUris)
+	}
+	if m.token_endpoint_auth_method != nil {
+		fields = append(fields, platformoauthclient.FieldTokenEndpointAuthMethod)
+	}
+	if m.grant_types != nil {
+		fields = append(fields, platformoauthclient.FieldGrantTypes)
+	}
+	if m.response_types != nil {
+		fields = append(fields, platformoauthclient.FieldResponseTypes)
+	}
+	if m.public != nil {
+		fields = append(fields, platformoauthclient.FieldPublic)
+	}
+	if m._type != nil {
+		fields = append(fields, platformoauthclient.FieldType)
+	}
+	if m.require_p_k_c_e != nil {
+		fields = append(fields, platformoauthclient.FieldRequirePKCE)
+	}
+	if m.reference_id != nil {
+		fields = append(fields, platformoauthclient.FieldReferenceID)
+	}
+	if m.metadata != nil {
+		fields = append(fields, platformoauthclient.FieldMetadata)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformOAuthClientMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformoauthclient.FieldClientID:
+		return m.ClientID()
+	case platformoauthclient.FieldClientSecret:
+		return m.ClientSecret()
+	case platformoauthclient.FieldDisabled:
+		return m.Disabled()
+	case platformoauthclient.FieldSkipConsent:
+		return m.SkipConsent()
+	case platformoauthclient.FieldEnableEndSession:
+		return m.EnableEndSession()
+	case platformoauthclient.FieldSubjectType:
+		return m.SubjectType()
+	case platformoauthclient.FieldScopes:
+		return m.Scopes()
+	case platformoauthclient.FieldUserID:
+		return m.UserID()
+	case platformoauthclient.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformoauthclient.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case platformoauthclient.FieldName:
+		return m.Name()
+	case platformoauthclient.FieldURI:
+		return m.URI()
+	case platformoauthclient.FieldIcon:
+		return m.Icon()
+	case platformoauthclient.FieldContacts:
+		return m.Contacts()
+	case platformoauthclient.FieldTos:
+		return m.Tos()
+	case platformoauthclient.FieldPolicy:
+		return m.Policy()
+	case platformoauthclient.FieldSoftwareID:
+		return m.SoftwareID()
+	case platformoauthclient.FieldSoftwareVersion:
+		return m.SoftwareVersion()
+	case platformoauthclient.FieldSoftwareStatement:
+		return m.SoftwareStatement()
+	case platformoauthclient.FieldRedirectUris:
+		return m.RedirectUris()
+	case platformoauthclient.FieldPostLogoutRedirectUris:
+		return m.PostLogoutRedirectUris()
+	case platformoauthclient.FieldTokenEndpointAuthMethod:
+		return m.TokenEndpointAuthMethod()
+	case platformoauthclient.FieldGrantTypes:
+		return m.GrantTypes()
+	case platformoauthclient.FieldResponseTypes:
+		return m.ResponseTypes()
+	case platformoauthclient.FieldPublic:
+		return m.Public()
+	case platformoauthclient.FieldType:
+		return m.GetType()
+	case platformoauthclient.FieldRequirePKCE:
+		return m.RequirePKCE()
+	case platformoauthclient.FieldReferenceID:
+		return m.ReferenceID()
+	case platformoauthclient.FieldMetadata:
+		return m.Metadata()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformOAuthClientMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformoauthclient.FieldClientID:
+		return m.OldClientID(ctx)
+	case platformoauthclient.FieldClientSecret:
+		return m.OldClientSecret(ctx)
+	case platformoauthclient.FieldDisabled:
+		return m.OldDisabled(ctx)
+	case platformoauthclient.FieldSkipConsent:
+		return m.OldSkipConsent(ctx)
+	case platformoauthclient.FieldEnableEndSession:
+		return m.OldEnableEndSession(ctx)
+	case platformoauthclient.FieldSubjectType:
+		return m.OldSubjectType(ctx)
+	case platformoauthclient.FieldScopes:
+		return m.OldScopes(ctx)
+	case platformoauthclient.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformoauthclient.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformoauthclient.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case platformoauthclient.FieldName:
+		return m.OldName(ctx)
+	case platformoauthclient.FieldURI:
+		return m.OldURI(ctx)
+	case platformoauthclient.FieldIcon:
+		return m.OldIcon(ctx)
+	case platformoauthclient.FieldContacts:
+		return m.OldContacts(ctx)
+	case platformoauthclient.FieldTos:
+		return m.OldTos(ctx)
+	case platformoauthclient.FieldPolicy:
+		return m.OldPolicy(ctx)
+	case platformoauthclient.FieldSoftwareID:
+		return m.OldSoftwareID(ctx)
+	case platformoauthclient.FieldSoftwareVersion:
+		return m.OldSoftwareVersion(ctx)
+	case platformoauthclient.FieldSoftwareStatement:
+		return m.OldSoftwareStatement(ctx)
+	case platformoauthclient.FieldRedirectUris:
+		return m.OldRedirectUris(ctx)
+	case platformoauthclient.FieldPostLogoutRedirectUris:
+		return m.OldPostLogoutRedirectUris(ctx)
+	case platformoauthclient.FieldTokenEndpointAuthMethod:
+		return m.OldTokenEndpointAuthMethod(ctx)
+	case platformoauthclient.FieldGrantTypes:
+		return m.OldGrantTypes(ctx)
+	case platformoauthclient.FieldResponseTypes:
+		return m.OldResponseTypes(ctx)
+	case platformoauthclient.FieldPublic:
+		return m.OldPublic(ctx)
+	case platformoauthclient.FieldType:
+		return m.OldType(ctx)
+	case platformoauthclient.FieldRequirePKCE:
+		return m.OldRequirePKCE(ctx)
+	case platformoauthclient.FieldReferenceID:
+		return m.OldReferenceID(ctx)
+	case platformoauthclient.FieldMetadata:
+		return m.OldMetadata(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformOAuthClient field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthClientMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformoauthclient.FieldClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientID(v)
+		return nil
+	case platformoauthclient.FieldClientSecret:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientSecret(v)
+		return nil
+	case platformoauthclient.FieldDisabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisabled(v)
+		return nil
+	case platformoauthclient.FieldSkipConsent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSkipConsent(v)
+		return nil
+	case platformoauthclient.FieldEnableEndSession:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnableEndSession(v)
+		return nil
+	case platformoauthclient.FieldSubjectType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubjectType(v)
+		return nil
+	case platformoauthclient.FieldScopes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopes(v)
+		return nil
+	case platformoauthclient.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformoauthclient.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformoauthclient.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case platformoauthclient.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case platformoauthclient.FieldURI:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetURI(v)
+		return nil
+	case platformoauthclient.FieldIcon:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIcon(v)
+		return nil
+	case platformoauthclient.FieldContacts:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContacts(v)
+		return nil
+	case platformoauthclient.FieldTos:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTos(v)
+		return nil
+	case platformoauthclient.FieldPolicy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPolicy(v)
+		return nil
+	case platformoauthclient.FieldSoftwareID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSoftwareID(v)
+		return nil
+	case platformoauthclient.FieldSoftwareVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSoftwareVersion(v)
+		return nil
+	case platformoauthclient.FieldSoftwareStatement:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSoftwareStatement(v)
+		return nil
+	case platformoauthclient.FieldRedirectUris:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRedirectUris(v)
+		return nil
+	case platformoauthclient.FieldPostLogoutRedirectUris:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPostLogoutRedirectUris(v)
+		return nil
+	case platformoauthclient.FieldTokenEndpointAuthMethod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTokenEndpointAuthMethod(v)
+		return nil
+	case platformoauthclient.FieldGrantTypes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGrantTypes(v)
+		return nil
+	case platformoauthclient.FieldResponseTypes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponseTypes(v)
+		return nil
+	case platformoauthclient.FieldPublic:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublic(v)
+		return nil
+	case platformoauthclient.FieldType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetType(v)
+		return nil
+	case platformoauthclient.FieldRequirePKCE:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequirePKCE(v)
+		return nil
+	case platformoauthclient.FieldReferenceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferenceID(v)
+		return nil
+	case platformoauthclient.FieldMetadata:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadata(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthClient field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformOAuthClientMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformOAuthClientMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthClientMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformOAuthClient numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformOAuthClientMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformoauthclient.FieldClientSecret) {
+		fields = append(fields, platformoauthclient.FieldClientSecret)
+	}
+	if m.FieldCleared(platformoauthclient.FieldDisabled) {
+		fields = append(fields, platformoauthclient.FieldDisabled)
+	}
+	if m.FieldCleared(platformoauthclient.FieldSkipConsent) {
+		fields = append(fields, platformoauthclient.FieldSkipConsent)
+	}
+	if m.FieldCleared(platformoauthclient.FieldEnableEndSession) {
+		fields = append(fields, platformoauthclient.FieldEnableEndSession)
+	}
+	if m.FieldCleared(platformoauthclient.FieldSubjectType) {
+		fields = append(fields, platformoauthclient.FieldSubjectType)
+	}
+	if m.FieldCleared(platformoauthclient.FieldScopes) {
+		fields = append(fields, platformoauthclient.FieldScopes)
+	}
+	if m.FieldCleared(platformoauthclient.FieldUserID) {
+		fields = append(fields, platformoauthclient.FieldUserID)
+	}
+	if m.FieldCleared(platformoauthclient.FieldCreatedAt) {
+		fields = append(fields, platformoauthclient.FieldCreatedAt)
+	}
+	if m.FieldCleared(platformoauthclient.FieldUpdatedAt) {
+		fields = append(fields, platformoauthclient.FieldUpdatedAt)
+	}
+	if m.FieldCleared(platformoauthclient.FieldName) {
+		fields = append(fields, platformoauthclient.FieldName)
+	}
+	if m.FieldCleared(platformoauthclient.FieldURI) {
+		fields = append(fields, platformoauthclient.FieldURI)
+	}
+	if m.FieldCleared(platformoauthclient.FieldIcon) {
+		fields = append(fields, platformoauthclient.FieldIcon)
+	}
+	if m.FieldCleared(platformoauthclient.FieldContacts) {
+		fields = append(fields, platformoauthclient.FieldContacts)
+	}
+	if m.FieldCleared(platformoauthclient.FieldTos) {
+		fields = append(fields, platformoauthclient.FieldTos)
+	}
+	if m.FieldCleared(platformoauthclient.FieldPolicy) {
+		fields = append(fields, platformoauthclient.FieldPolicy)
+	}
+	if m.FieldCleared(platformoauthclient.FieldSoftwareID) {
+		fields = append(fields, platformoauthclient.FieldSoftwareID)
+	}
+	if m.FieldCleared(platformoauthclient.FieldSoftwareVersion) {
+		fields = append(fields, platformoauthclient.FieldSoftwareVersion)
+	}
+	if m.FieldCleared(platformoauthclient.FieldSoftwareStatement) {
+		fields = append(fields, platformoauthclient.FieldSoftwareStatement)
+	}
+	if m.FieldCleared(platformoauthclient.FieldPostLogoutRedirectUris) {
+		fields = append(fields, platformoauthclient.FieldPostLogoutRedirectUris)
+	}
+	if m.FieldCleared(platformoauthclient.FieldTokenEndpointAuthMethod) {
+		fields = append(fields, platformoauthclient.FieldTokenEndpointAuthMethod)
+	}
+	if m.FieldCleared(platformoauthclient.FieldGrantTypes) {
+		fields = append(fields, platformoauthclient.FieldGrantTypes)
+	}
+	if m.FieldCleared(platformoauthclient.FieldResponseTypes) {
+		fields = append(fields, platformoauthclient.FieldResponseTypes)
+	}
+	if m.FieldCleared(platformoauthclient.FieldPublic) {
+		fields = append(fields, platformoauthclient.FieldPublic)
+	}
+	if m.FieldCleared(platformoauthclient.FieldType) {
+		fields = append(fields, platformoauthclient.FieldType)
+	}
+	if m.FieldCleared(platformoauthclient.FieldRequirePKCE) {
+		fields = append(fields, platformoauthclient.FieldRequirePKCE)
+	}
+	if m.FieldCleared(platformoauthclient.FieldReferenceID) {
+		fields = append(fields, platformoauthclient.FieldReferenceID)
+	}
+	if m.FieldCleared(platformoauthclient.FieldMetadata) {
+		fields = append(fields, platformoauthclient.FieldMetadata)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformOAuthClientMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformOAuthClientMutation) ClearField(name string) error {
+	switch name {
+	case platformoauthclient.FieldClientSecret:
+		m.ClearClientSecret()
+		return nil
+	case platformoauthclient.FieldDisabled:
+		m.ClearDisabled()
+		return nil
+	case platformoauthclient.FieldSkipConsent:
+		m.ClearSkipConsent()
+		return nil
+	case platformoauthclient.FieldEnableEndSession:
+		m.ClearEnableEndSession()
+		return nil
+	case platformoauthclient.FieldSubjectType:
+		m.ClearSubjectType()
+		return nil
+	case platformoauthclient.FieldScopes:
+		m.ClearScopes()
+		return nil
+	case platformoauthclient.FieldUserID:
+		m.ClearUserID()
+		return nil
+	case platformoauthclient.FieldCreatedAt:
+		m.ClearCreatedAt()
+		return nil
+	case platformoauthclient.FieldUpdatedAt:
+		m.ClearUpdatedAt()
+		return nil
+	case platformoauthclient.FieldName:
+		m.ClearName()
+		return nil
+	case platformoauthclient.FieldURI:
+		m.ClearURI()
+		return nil
+	case platformoauthclient.FieldIcon:
+		m.ClearIcon()
+		return nil
+	case platformoauthclient.FieldContacts:
+		m.ClearContacts()
+		return nil
+	case platformoauthclient.FieldTos:
+		m.ClearTos()
+		return nil
+	case platformoauthclient.FieldPolicy:
+		m.ClearPolicy()
+		return nil
+	case platformoauthclient.FieldSoftwareID:
+		m.ClearSoftwareID()
+		return nil
+	case platformoauthclient.FieldSoftwareVersion:
+		m.ClearSoftwareVersion()
+		return nil
+	case platformoauthclient.FieldSoftwareStatement:
+		m.ClearSoftwareStatement()
+		return nil
+	case platformoauthclient.FieldPostLogoutRedirectUris:
+		m.ClearPostLogoutRedirectUris()
+		return nil
+	case platformoauthclient.FieldTokenEndpointAuthMethod:
+		m.ClearTokenEndpointAuthMethod()
+		return nil
+	case platformoauthclient.FieldGrantTypes:
+		m.ClearGrantTypes()
+		return nil
+	case platformoauthclient.FieldResponseTypes:
+		m.ClearResponseTypes()
+		return nil
+	case platformoauthclient.FieldPublic:
+		m.ClearPublic()
+		return nil
+	case platformoauthclient.FieldType:
+		m.ClearType()
+		return nil
+	case platformoauthclient.FieldRequirePKCE:
+		m.ClearRequirePKCE()
+		return nil
+	case platformoauthclient.FieldReferenceID:
+		m.ClearReferenceID()
+		return nil
+	case platformoauthclient.FieldMetadata:
+		m.ClearMetadata()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthClient nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformOAuthClientMutation) ResetField(name string) error {
+	switch name {
+	case platformoauthclient.FieldClientID:
+		m.ResetClientID()
+		return nil
+	case platformoauthclient.FieldClientSecret:
+		m.ResetClientSecret()
+		return nil
+	case platformoauthclient.FieldDisabled:
+		m.ResetDisabled()
+		return nil
+	case platformoauthclient.FieldSkipConsent:
+		m.ResetSkipConsent()
+		return nil
+	case platformoauthclient.FieldEnableEndSession:
+		m.ResetEnableEndSession()
+		return nil
+	case platformoauthclient.FieldSubjectType:
+		m.ResetSubjectType()
+		return nil
+	case platformoauthclient.FieldScopes:
+		m.ResetScopes()
+		return nil
+	case platformoauthclient.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformoauthclient.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformoauthclient.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case platformoauthclient.FieldName:
+		m.ResetName()
+		return nil
+	case platformoauthclient.FieldURI:
+		m.ResetURI()
+		return nil
+	case platformoauthclient.FieldIcon:
+		m.ResetIcon()
+		return nil
+	case platformoauthclient.FieldContacts:
+		m.ResetContacts()
+		return nil
+	case platformoauthclient.FieldTos:
+		m.ResetTos()
+		return nil
+	case platformoauthclient.FieldPolicy:
+		m.ResetPolicy()
+		return nil
+	case platformoauthclient.FieldSoftwareID:
+		m.ResetSoftwareID()
+		return nil
+	case platformoauthclient.FieldSoftwareVersion:
+		m.ResetSoftwareVersion()
+		return nil
+	case platformoauthclient.FieldSoftwareStatement:
+		m.ResetSoftwareStatement()
+		return nil
+	case platformoauthclient.FieldRedirectUris:
+		m.ResetRedirectUris()
+		return nil
+	case platformoauthclient.FieldPostLogoutRedirectUris:
+		m.ResetPostLogoutRedirectUris()
+		return nil
+	case platformoauthclient.FieldTokenEndpointAuthMethod:
+		m.ResetTokenEndpointAuthMethod()
+		return nil
+	case platformoauthclient.FieldGrantTypes:
+		m.ResetGrantTypes()
+		return nil
+	case platformoauthclient.FieldResponseTypes:
+		m.ResetResponseTypes()
+		return nil
+	case platformoauthclient.FieldPublic:
+		m.ResetPublic()
+		return nil
+	case platformoauthclient.FieldType:
+		m.ResetType()
+		return nil
+	case platformoauthclient.FieldRequirePKCE:
+		m.ResetRequirePKCE()
+		return nil
+	case platformoauthclient.FieldReferenceID:
+		m.ResetReferenceID()
+		return nil
+	case platformoauthclient.FieldMetadata:
+		m.ResetMetadata()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthClient field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformOAuthClientMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformOAuthClientMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformOAuthClientMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformOAuthClientMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformOAuthClientMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformOAuthClientMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformOAuthClientMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthClient unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformOAuthClientMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthClient edge %s", name)
+}
+
+// PlatformOAuthConsentMutation represents an operation that mutates the PlatformOAuthConsent nodes in the graph.
+type PlatformOAuthConsentMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	client_id     *string
+	user_id       *string
+	reference_id  *string
+	scopes        *string
+	created_at    *time.Time
+	updated_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformOAuthConsent, error)
+	predicates    []predicate.PlatformOAuthConsent
+}
+
+var _ ent.Mutation = (*PlatformOAuthConsentMutation)(nil)
+
+// platformoauthconsentOption allows management of the mutation configuration using functional options.
+type platformoauthconsentOption func(*PlatformOAuthConsentMutation)
+
+// newPlatformOAuthConsentMutation creates new mutation for the PlatformOAuthConsent entity.
+func newPlatformOAuthConsentMutation(c config, op Op, opts ...platformoauthconsentOption) *PlatformOAuthConsentMutation {
+	m := &PlatformOAuthConsentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformOAuthConsent,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformOAuthConsentID sets the ID field of the mutation.
+func withPlatformOAuthConsentID(id string) platformoauthconsentOption {
+	return func(m *PlatformOAuthConsentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformOAuthConsent
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformOAuthConsent, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformOAuthConsent.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformOAuthConsent sets the old PlatformOAuthConsent of the mutation.
+func withPlatformOAuthConsent(node *PlatformOAuthConsent) platformoauthconsentOption {
+	return func(m *PlatformOAuthConsentMutation) {
+		m.oldValue = func(context.Context) (*PlatformOAuthConsent, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformOAuthConsentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformOAuthConsentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformOAuthConsent entities.
+func (m *PlatformOAuthConsentMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformOAuthConsentMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformOAuthConsentMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformOAuthConsent.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetClientID sets the "client_id" field.
+func (m *PlatformOAuthConsentMutation) SetClientID(s string) {
+	m.client_id = &s
+}
+
+// ClientID returns the value of the "client_id" field in the mutation.
+func (m *PlatformOAuthConsentMutation) ClientID() (r string, exists bool) {
+	v := m.client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientID returns the old "client_id" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientID: %w", err)
+	}
+	return oldValue.ClientID, nil
+}
+
+// ResetClientID resets all changes to the "client_id" field.
+func (m *PlatformOAuthConsentMutation) ResetClientID() {
+	m.client_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformOAuthConsentMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformOAuthConsentMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformOAuthConsentMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetReferenceID sets the "reference_id" field.
+func (m *PlatformOAuthConsentMutation) SetReferenceID(s string) {
+	m.reference_id = &s
+}
+
+// ReferenceID returns the value of the "reference_id" field in the mutation.
+func (m *PlatformOAuthConsentMutation) ReferenceID() (r string, exists bool) {
+	v := m.reference_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferenceID returns the old "reference_id" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldReferenceID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferenceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferenceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferenceID: %w", err)
+	}
+	return oldValue.ReferenceID, nil
+}
+
+// ClearReferenceID clears the value of the "reference_id" field.
+func (m *PlatformOAuthConsentMutation) ClearReferenceID() {
+	m.reference_id = nil
+	m.clearedFields[platformoauthconsent.FieldReferenceID] = struct{}{}
+}
+
+// ReferenceIDCleared returns if the "reference_id" field was cleared in this mutation.
+func (m *PlatformOAuthConsentMutation) ReferenceIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthconsent.FieldReferenceID]
+	return ok
+}
+
+// ResetReferenceID resets all changes to the "reference_id" field.
+func (m *PlatformOAuthConsentMutation) ResetReferenceID() {
+	m.reference_id = nil
+	delete(m.clearedFields, platformoauthconsent.FieldReferenceID)
+}
+
+// SetScopes sets the "scopes" field.
+func (m *PlatformOAuthConsentMutation) SetScopes(s string) {
+	m.scopes = &s
+}
+
+// Scopes returns the value of the "scopes" field in the mutation.
+func (m *PlatformOAuthConsentMutation) Scopes() (r string, exists bool) {
+	v := m.scopes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopes returns the old "scopes" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldScopes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopes: %w", err)
+	}
+	return oldValue.Scopes, nil
+}
+
+// ResetScopes resets all changes to the "scopes" field.
+func (m *PlatformOAuthConsentMutation) ResetScopes() {
+	m.scopes = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformOAuthConsentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformOAuthConsentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformOAuthConsentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *PlatformOAuthConsentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *PlatformOAuthConsentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the PlatformOAuthConsent entity.
+// If the PlatformOAuthConsent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthConsentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *PlatformOAuthConsentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the PlatformOAuthConsentMutation builder.
+func (m *PlatformOAuthConsentMutation) Where(ps ...predicate.PlatformOAuthConsent) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformOAuthConsentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformOAuthConsentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformOAuthConsent, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformOAuthConsentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformOAuthConsentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformOAuthConsent).
+func (m *PlatformOAuthConsentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformOAuthConsentMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.client_id != nil {
+		fields = append(fields, platformoauthconsent.FieldClientID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, platformoauthconsent.FieldUserID)
+	}
+	if m.reference_id != nil {
+		fields = append(fields, platformoauthconsent.FieldReferenceID)
+	}
+	if m.scopes != nil {
+		fields = append(fields, platformoauthconsent.FieldScopes)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformoauthconsent.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, platformoauthconsent.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformOAuthConsentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformoauthconsent.FieldClientID:
+		return m.ClientID()
+	case platformoauthconsent.FieldUserID:
+		return m.UserID()
+	case platformoauthconsent.FieldReferenceID:
+		return m.ReferenceID()
+	case platformoauthconsent.FieldScopes:
+		return m.Scopes()
+	case platformoauthconsent.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformoauthconsent.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformOAuthConsentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformoauthconsent.FieldClientID:
+		return m.OldClientID(ctx)
+	case platformoauthconsent.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformoauthconsent.FieldReferenceID:
+		return m.OldReferenceID(ctx)
+	case platformoauthconsent.FieldScopes:
+		return m.OldScopes(ctx)
+	case platformoauthconsent.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformoauthconsent.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformOAuthConsent field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthConsentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformoauthconsent.FieldClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientID(v)
+		return nil
+	case platformoauthconsent.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformoauthconsent.FieldReferenceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferenceID(v)
+		return nil
+	case platformoauthconsent.FieldScopes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopes(v)
+		return nil
+	case platformoauthconsent.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformoauthconsent.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthConsent field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformOAuthConsentMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformOAuthConsentMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthConsentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformOAuthConsent numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformOAuthConsentMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformoauthconsent.FieldReferenceID) {
+		fields = append(fields, platformoauthconsent.FieldReferenceID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformOAuthConsentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformOAuthConsentMutation) ClearField(name string) error {
+	switch name {
+	case platformoauthconsent.FieldReferenceID:
+		m.ClearReferenceID()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthConsent nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformOAuthConsentMutation) ResetField(name string) error {
+	switch name {
+	case platformoauthconsent.FieldClientID:
+		m.ResetClientID()
+		return nil
+	case platformoauthconsent.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformoauthconsent.FieldReferenceID:
+		m.ResetReferenceID()
+		return nil
+	case platformoauthconsent.FieldScopes:
+		m.ResetScopes()
+		return nil
+	case platformoauthconsent.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformoauthconsent.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthConsent field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformOAuthConsentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformOAuthConsentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformOAuthConsentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformOAuthConsentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformOAuthConsentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformOAuthConsentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformOAuthConsentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthConsent unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformOAuthConsentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthConsent edge %s", name)
+}
+
+// PlatformOAuthJWKMutation represents an operation that mutates the PlatformOAuthJWK nodes in the graph.
+type PlatformOAuthJWKMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	public_key    *string
+	private_key   *string
+	created_at    *time.Time
+	expires_at    *time.Time
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformOAuthJWK, error)
+	predicates    []predicate.PlatformOAuthJWK
+}
+
+var _ ent.Mutation = (*PlatformOAuthJWKMutation)(nil)
+
+// platformoauthjwkOption allows management of the mutation configuration using functional options.
+type platformoauthjwkOption func(*PlatformOAuthJWKMutation)
+
+// newPlatformOAuthJWKMutation creates new mutation for the PlatformOAuthJWK entity.
+func newPlatformOAuthJWKMutation(c config, op Op, opts ...platformoauthjwkOption) *PlatformOAuthJWKMutation {
+	m := &PlatformOAuthJWKMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformOAuthJWK,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformOAuthJWKID sets the ID field of the mutation.
+func withPlatformOAuthJWKID(id string) platformoauthjwkOption {
+	return func(m *PlatformOAuthJWKMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformOAuthJWK
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformOAuthJWK, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformOAuthJWK.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformOAuthJWK sets the old PlatformOAuthJWK of the mutation.
+func withPlatformOAuthJWK(node *PlatformOAuthJWK) platformoauthjwkOption {
+	return func(m *PlatformOAuthJWKMutation) {
+		m.oldValue = func(context.Context) (*PlatformOAuthJWK, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformOAuthJWKMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformOAuthJWKMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformOAuthJWK entities.
+func (m *PlatformOAuthJWKMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformOAuthJWKMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformOAuthJWKMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformOAuthJWK.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetPublicKey sets the "public_key" field.
+func (m *PlatformOAuthJWKMutation) SetPublicKey(s string) {
+	m.public_key = &s
+}
+
+// PublicKey returns the value of the "public_key" field in the mutation.
+func (m *PlatformOAuthJWKMutation) PublicKey() (r string, exists bool) {
+	v := m.public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublicKey returns the old "public_key" field's value of the PlatformOAuthJWK entity.
+// If the PlatformOAuthJWK object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthJWKMutation) OldPublicKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublicKey: %w", err)
+	}
+	return oldValue.PublicKey, nil
+}
+
+// ResetPublicKey resets all changes to the "public_key" field.
+func (m *PlatformOAuthJWKMutation) ResetPublicKey() {
+	m.public_key = nil
+}
+
+// SetPrivateKey sets the "private_key" field.
+func (m *PlatformOAuthJWKMutation) SetPrivateKey(s string) {
+	m.private_key = &s
+}
+
+// PrivateKey returns the value of the "private_key" field in the mutation.
+func (m *PlatformOAuthJWKMutation) PrivateKey() (r string, exists bool) {
+	v := m.private_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrivateKey returns the old "private_key" field's value of the PlatformOAuthJWK entity.
+// If the PlatformOAuthJWK object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthJWKMutation) OldPrivateKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrivateKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrivateKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrivateKey: %w", err)
+	}
+	return oldValue.PrivateKey, nil
+}
+
+// ResetPrivateKey resets all changes to the "private_key" field.
+func (m *PlatformOAuthJWKMutation) ResetPrivateKey() {
+	m.private_key = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformOAuthJWKMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformOAuthJWKMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformOAuthJWK entity.
+// If the PlatformOAuthJWK object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthJWKMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformOAuthJWKMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PlatformOAuthJWKMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PlatformOAuthJWKMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PlatformOAuthJWK entity.
+// If the PlatformOAuthJWK object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthJWKMutation) OldExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ClearExpiresAt clears the value of the "expires_at" field.
+func (m *PlatformOAuthJWKMutation) ClearExpiresAt() {
+	m.expires_at = nil
+	m.clearedFields[platformoauthjwk.FieldExpiresAt] = struct{}{}
+}
+
+// ExpiresAtCleared returns if the "expires_at" field was cleared in this mutation.
+func (m *PlatformOAuthJWKMutation) ExpiresAtCleared() bool {
+	_, ok := m.clearedFields[platformoauthjwk.FieldExpiresAt]
+	return ok
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PlatformOAuthJWKMutation) ResetExpiresAt() {
+	m.expires_at = nil
+	delete(m.clearedFields, platformoauthjwk.FieldExpiresAt)
+}
+
+// Where appends a list predicates to the PlatformOAuthJWKMutation builder.
+func (m *PlatformOAuthJWKMutation) Where(ps ...predicate.PlatformOAuthJWK) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformOAuthJWKMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformOAuthJWKMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformOAuthJWK, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformOAuthJWKMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformOAuthJWKMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformOAuthJWK).
+func (m *PlatformOAuthJWKMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformOAuthJWKMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.public_key != nil {
+		fields = append(fields, platformoauthjwk.FieldPublicKey)
+	}
+	if m.private_key != nil {
+		fields = append(fields, platformoauthjwk.FieldPrivateKey)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformoauthjwk.FieldCreatedAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, platformoauthjwk.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformOAuthJWKMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformoauthjwk.FieldPublicKey:
+		return m.PublicKey()
+	case platformoauthjwk.FieldPrivateKey:
+		return m.PrivateKey()
+	case platformoauthjwk.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformoauthjwk.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformOAuthJWKMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformoauthjwk.FieldPublicKey:
+		return m.OldPublicKey(ctx)
+	case platformoauthjwk.FieldPrivateKey:
+		return m.OldPrivateKey(ctx)
+	case platformoauthjwk.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformoauthjwk.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformOAuthJWK field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthJWKMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformoauthjwk.FieldPublicKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublicKey(v)
+		return nil
+	case platformoauthjwk.FieldPrivateKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrivateKey(v)
+		return nil
+	case platformoauthjwk.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformoauthjwk.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthJWK field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformOAuthJWKMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformOAuthJWKMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthJWKMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformOAuthJWK numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformOAuthJWKMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformoauthjwk.FieldExpiresAt) {
+		fields = append(fields, platformoauthjwk.FieldExpiresAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformOAuthJWKMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformOAuthJWKMutation) ClearField(name string) error {
+	switch name {
+	case platformoauthjwk.FieldExpiresAt:
+		m.ClearExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthJWK nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformOAuthJWKMutation) ResetField(name string) error {
+	switch name {
+	case platformoauthjwk.FieldPublicKey:
+		m.ResetPublicKey()
+		return nil
+	case platformoauthjwk.FieldPrivateKey:
+		m.ResetPrivateKey()
+		return nil
+	case platformoauthjwk.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformoauthjwk.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthJWK field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformOAuthJWKMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformOAuthJWKMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformOAuthJWKMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformOAuthJWKMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformOAuthJWKMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformOAuthJWKMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformOAuthJWKMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthJWK unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformOAuthJWKMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthJWK edge %s", name)
+}
+
+// PlatformOAuthRefreshTokenMutation represents an operation that mutates the PlatformOAuthRefreshToken nodes in the graph.
+type PlatformOAuthRefreshTokenMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *string
+	token         *string
+	client_id     *string
+	session_id    *string
+	user_id       *string
+	reference_id  *string
+	expires_at    *time.Time
+	created_at    *time.Time
+	revoked       *time.Time
+	auth_time     *time.Time
+	scopes        *string
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PlatformOAuthRefreshToken, error)
+	predicates    []predicate.PlatformOAuthRefreshToken
+}
+
+var _ ent.Mutation = (*PlatformOAuthRefreshTokenMutation)(nil)
+
+// platformoauthrefreshtokenOption allows management of the mutation configuration using functional options.
+type platformoauthrefreshtokenOption func(*PlatformOAuthRefreshTokenMutation)
+
+// newPlatformOAuthRefreshTokenMutation creates new mutation for the PlatformOAuthRefreshToken entity.
+func newPlatformOAuthRefreshTokenMutation(c config, op Op, opts ...platformoauthrefreshtokenOption) *PlatformOAuthRefreshTokenMutation {
+	m := &PlatformOAuthRefreshTokenMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformOAuthRefreshToken,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformOAuthRefreshTokenID sets the ID field of the mutation.
+func withPlatformOAuthRefreshTokenID(id string) platformoauthrefreshtokenOption {
+	return func(m *PlatformOAuthRefreshTokenMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformOAuthRefreshToken
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformOAuthRefreshToken, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformOAuthRefreshToken.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformOAuthRefreshToken sets the old PlatformOAuthRefreshToken of the mutation.
+func withPlatformOAuthRefreshToken(node *PlatformOAuthRefreshToken) platformoauthrefreshtokenOption {
+	return func(m *PlatformOAuthRefreshTokenMutation) {
+		m.oldValue = func(context.Context) (*PlatformOAuthRefreshToken, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformOAuthRefreshTokenMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformOAuthRefreshTokenMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformOAuthRefreshToken entities.
+func (m *PlatformOAuthRefreshTokenMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformOAuthRefreshTokenMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformOAuthRefreshToken.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetToken sets the "token" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetToken(s string) {
+	m.token = &s
+}
+
+// Token returns the value of the "token" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) Token() (r string, exists bool) {
+	v := m.token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldToken returns the old "token" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldToken: %w", err)
+	}
+	return oldValue.Token, nil
+}
+
+// ResetToken resets all changes to the "token" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetToken() {
+	m.token = nil
+}
+
+// SetClientID sets the "client_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetClientID(s string) {
+	m.client_id = &s
+}
+
+// ClientID returns the value of the "client_id" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ClientID() (r string, exists bool) {
+	v := m.client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientID returns the old "client_id" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientID: %w", err)
+	}
+	return oldValue.ClientID, nil
+}
+
+// ResetClientID resets all changes to the "client_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetClientID() {
+	m.client_id = nil
+}
+
+// SetSessionID sets the "session_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetSessionID(s string) {
+	m.session_id = &s
+}
+
+// SessionID returns the value of the "session_id" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) SessionID() (r string, exists bool) {
+	v := m.session_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSessionID returns the old "session_id" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldSessionID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSessionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSessionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSessionID: %w", err)
+	}
+	return oldValue.SessionID, nil
+}
+
+// ResetSessionID resets all changes to the "session_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetSessionID() {
+	m.session_id = nil
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetReferenceID sets the "reference_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetReferenceID(s string) {
+	m.reference_id = &s
+}
+
+// ReferenceID returns the value of the "reference_id" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ReferenceID() (r string, exists bool) {
+	v := m.reference_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReferenceID returns the old "reference_id" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldReferenceID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReferenceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReferenceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReferenceID: %w", err)
+	}
+	return oldValue.ReferenceID, nil
+}
+
+// ClearReferenceID clears the value of the "reference_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) ClearReferenceID() {
+	m.reference_id = nil
+	m.clearedFields[platformoauthrefreshtoken.FieldReferenceID] = struct{}{}
+}
+
+// ReferenceIDCleared returns if the "reference_id" field was cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ReferenceIDCleared() bool {
+	_, ok := m.clearedFields[platformoauthrefreshtoken.FieldReferenceID]
+	return ok
+}
+
+// ResetReferenceID resets all changes to the "reference_id" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetReferenceID() {
+	m.reference_id = nil
+	delete(m.clearedFields, platformoauthrefreshtoken.FieldReferenceID)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetRevoked sets the "revoked" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetRevoked(t time.Time) {
+	m.revoked = &t
+}
+
+// Revoked returns the value of the "revoked" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) Revoked() (r time.Time, exists bool) {
+	v := m.revoked
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevoked returns the old "revoked" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldRevoked(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevoked is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevoked requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevoked: %w", err)
+	}
+	return oldValue.Revoked, nil
+}
+
+// ClearRevoked clears the value of the "revoked" field.
+func (m *PlatformOAuthRefreshTokenMutation) ClearRevoked() {
+	m.revoked = nil
+	m.clearedFields[platformoauthrefreshtoken.FieldRevoked] = struct{}{}
+}
+
+// RevokedCleared returns if the "revoked" field was cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) RevokedCleared() bool {
+	_, ok := m.clearedFields[platformoauthrefreshtoken.FieldRevoked]
+	return ok
+}
+
+// ResetRevoked resets all changes to the "revoked" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetRevoked() {
+	m.revoked = nil
+	delete(m.clearedFields, platformoauthrefreshtoken.FieldRevoked)
+}
+
+// SetAuthTime sets the "auth_time" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetAuthTime(t time.Time) {
+	m.auth_time = &t
+}
+
+// AuthTime returns the value of the "auth_time" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) AuthTime() (r time.Time, exists bool) {
+	v := m.auth_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAuthTime returns the old "auth_time" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldAuthTime(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAuthTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAuthTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAuthTime: %w", err)
+	}
+	return oldValue.AuthTime, nil
+}
+
+// ClearAuthTime clears the value of the "auth_time" field.
+func (m *PlatformOAuthRefreshTokenMutation) ClearAuthTime() {
+	m.auth_time = nil
+	m.clearedFields[platformoauthrefreshtoken.FieldAuthTime] = struct{}{}
+}
+
+// AuthTimeCleared returns if the "auth_time" field was cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) AuthTimeCleared() bool {
+	_, ok := m.clearedFields[platformoauthrefreshtoken.FieldAuthTime]
+	return ok
+}
+
+// ResetAuthTime resets all changes to the "auth_time" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetAuthTime() {
+	m.auth_time = nil
+	delete(m.clearedFields, platformoauthrefreshtoken.FieldAuthTime)
+}
+
+// SetScopes sets the "scopes" field.
+func (m *PlatformOAuthRefreshTokenMutation) SetScopes(s string) {
+	m.scopes = &s
+}
+
+// Scopes returns the value of the "scopes" field in the mutation.
+func (m *PlatformOAuthRefreshTokenMutation) Scopes() (r string, exists bool) {
+	v := m.scopes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScopes returns the old "scopes" field's value of the PlatformOAuthRefreshToken entity.
+// If the PlatformOAuthRefreshToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformOAuthRefreshTokenMutation) OldScopes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScopes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScopes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScopes: %w", err)
+	}
+	return oldValue.Scopes, nil
+}
+
+// ResetScopes resets all changes to the "scopes" field.
+func (m *PlatformOAuthRefreshTokenMutation) ResetScopes() {
+	m.scopes = nil
+}
+
+// Where appends a list predicates to the PlatformOAuthRefreshTokenMutation builder.
+func (m *PlatformOAuthRefreshTokenMutation) Where(ps ...predicate.PlatformOAuthRefreshToken) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformOAuthRefreshTokenMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformOAuthRefreshTokenMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformOAuthRefreshToken, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformOAuthRefreshTokenMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformOAuthRefreshTokenMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformOAuthRefreshToken).
+func (m *PlatformOAuthRefreshTokenMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformOAuthRefreshTokenMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.token != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldToken)
+	}
+	if m.client_id != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldClientID)
+	}
+	if m.session_id != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldSessionID)
+	}
+	if m.user_id != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldUserID)
+	}
+	if m.reference_id != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldReferenceID)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldCreatedAt)
+	}
+	if m.revoked != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldRevoked)
+	}
+	if m.auth_time != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldAuthTime)
+	}
+	if m.scopes != nil {
+		fields = append(fields, platformoauthrefreshtoken.FieldScopes)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformOAuthRefreshTokenMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformoauthrefreshtoken.FieldToken:
+		return m.Token()
+	case platformoauthrefreshtoken.FieldClientID:
+		return m.ClientID()
+	case platformoauthrefreshtoken.FieldSessionID:
+		return m.SessionID()
+	case platformoauthrefreshtoken.FieldUserID:
+		return m.UserID()
+	case platformoauthrefreshtoken.FieldReferenceID:
+		return m.ReferenceID()
+	case platformoauthrefreshtoken.FieldExpiresAt:
+		return m.ExpiresAt()
+	case platformoauthrefreshtoken.FieldCreatedAt:
+		return m.CreatedAt()
+	case platformoauthrefreshtoken.FieldRevoked:
+		return m.Revoked()
+	case platformoauthrefreshtoken.FieldAuthTime:
+		return m.AuthTime()
+	case platformoauthrefreshtoken.FieldScopes:
+		return m.Scopes()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformOAuthRefreshTokenMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformoauthrefreshtoken.FieldToken:
+		return m.OldToken(ctx)
+	case platformoauthrefreshtoken.FieldClientID:
+		return m.OldClientID(ctx)
+	case platformoauthrefreshtoken.FieldSessionID:
+		return m.OldSessionID(ctx)
+	case platformoauthrefreshtoken.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformoauthrefreshtoken.FieldReferenceID:
+		return m.OldReferenceID(ctx)
+	case platformoauthrefreshtoken.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case platformoauthrefreshtoken.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case platformoauthrefreshtoken.FieldRevoked:
+		return m.OldRevoked(ctx)
+	case platformoauthrefreshtoken.FieldAuthTime:
+		return m.OldAuthTime(ctx)
+	case platformoauthrefreshtoken.FieldScopes:
+		return m.OldScopes(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformOAuthRefreshToken field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthRefreshTokenMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformoauthrefreshtoken.FieldToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetToken(v)
+		return nil
+	case platformoauthrefreshtoken.FieldClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientID(v)
+		return nil
+	case platformoauthrefreshtoken.FieldSessionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSessionID(v)
+		return nil
+	case platformoauthrefreshtoken.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformoauthrefreshtoken.FieldReferenceID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReferenceID(v)
+		return nil
+	case platformoauthrefreshtoken.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case platformoauthrefreshtoken.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case platformoauthrefreshtoken.FieldRevoked:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevoked(v)
+		return nil
+	case platformoauthrefreshtoken.FieldAuthTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAuthTime(v)
+		return nil
+	case platformoauthrefreshtoken.FieldScopes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScopes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformOAuthRefreshTokenMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformOAuthRefreshTokenMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformoauthrefreshtoken.FieldReferenceID) {
+		fields = append(fields, platformoauthrefreshtoken.FieldReferenceID)
+	}
+	if m.FieldCleared(platformoauthrefreshtoken.FieldRevoked) {
+		fields = append(fields, platformoauthrefreshtoken.FieldRevoked)
+	}
+	if m.FieldCleared(platformoauthrefreshtoken.FieldAuthTime) {
+		fields = append(fields, platformoauthrefreshtoken.FieldAuthTime)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformOAuthRefreshTokenMutation) ClearField(name string) error {
+	switch name {
+	case platformoauthrefreshtoken.FieldReferenceID:
+		m.ClearReferenceID()
+		return nil
+	case platformoauthrefreshtoken.FieldRevoked:
+		m.ClearRevoked()
+		return nil
+	case platformoauthrefreshtoken.FieldAuthTime:
+		m.ClearAuthTime()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformOAuthRefreshTokenMutation) ResetField(name string) error {
+	switch name {
+	case platformoauthrefreshtoken.FieldToken:
+		m.ResetToken()
+		return nil
+	case platformoauthrefreshtoken.FieldClientID:
+		m.ResetClientID()
+		return nil
+	case platformoauthrefreshtoken.FieldSessionID:
+		m.ResetSessionID()
+		return nil
+	case platformoauthrefreshtoken.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformoauthrefreshtoken.FieldReferenceID:
+		m.ResetReferenceID()
+		return nil
+	case platformoauthrefreshtoken.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case platformoauthrefreshtoken.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case platformoauthrefreshtoken.FieldRevoked:
+		m.ResetRevoked()
+		return nil
+	case platformoauthrefreshtoken.FieldAuthTime:
+		m.ResetAuthTime()
+		return nil
+	case platformoauthrefreshtoken.FieldScopes:
+		m.ResetScopes()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformOAuthRefreshTokenMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformOAuthRefreshTokenMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformOAuthRefreshTokenMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformOAuthRefreshToken edge %s", name)
 }
 
 // PlatformSlackConnectionMutation represents an operation that mutates the PlatformSlackConnection nodes in the graph.

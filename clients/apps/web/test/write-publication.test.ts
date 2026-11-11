@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 import type { PlateBody } from '@/lib/write/document'
-import { buildPublication, type PublicationDraft } from '@/lib/write/publication'
+import {
+  preparePublication,
+  buildPublication,
+  type PublicationDraft,
+} from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
 import { optionsSummary } from '@/components/write/composer/video-options'
 
@@ -650,4 +654,38 @@ test('a platform chip names its options in words, and option problems open the o
   })
   assert.ok(long.problems.length > 0)
   assert.deepEqual(long.optionProblems, [])
+})
+
+test('rendered media stays bound to the flushed version for scheduling and publishing', async () => {
+  const versionRef = { current: 1 }
+  const rendered = await preparePublication({
+    versionRef,
+    flush: async () => {},
+    renderBlocks: async () => ['image-v1'],
+  })
+  assert.deepEqual(rendered, { version: 1, blockImages: ['image-v1'] })
+  // An autosave or a collaboration save finishes while an old image is uploading.
+  await assert.rejects(
+    preparePublication({
+      versionRef,
+      flush: async () => {},
+      renderBlocks: async () => {
+        versionRef.current = 2
+        return ['image-v1']
+      },
+    }),
+    /changed while preparing/
+  )
+  // Also catch a local edit/reorder whose debounce has not fired yet.
+  let flushes = 0
+  await assert.rejects(
+    preparePublication({
+      versionRef,
+      flush: async () => {
+        if (++flushes === 2) versionRef.current = 3
+      },
+      renderBlocks: async () => ['image-v2'],
+    }),
+    /changed while preparing/
+  )
 })

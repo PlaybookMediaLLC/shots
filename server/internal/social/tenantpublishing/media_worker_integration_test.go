@@ -491,7 +491,7 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.ReviewContentDraft(ctx, owner, draft.ID, product.ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := store.ReviewContentDraft(ctx, owner, draft.ID, product.ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		scheduled, err := store.ScheduleContentDraft(ctx, owner, draft.ID, product.ScheduleContentDraftInput{Version: draft.Version, ScheduledFor: time.Now().Add(2 * time.Minute),
@@ -499,7 +499,10 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := store.ReviewContentDraft(ctx, owner, draft.ID, product.ContentDraftReviewInput{Action: "changes"}); err != nil {
+		if _, err := store.ReviewContentDraft(ctx, owner, draft.ID, product.ContentDraftReviewInput{Version: scheduled.Draft.Version, Action: "changes"}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.ReviewContentDraft(ctx, owner, draft.ID, product.ContentDraftReviewInput{Version: scheduled.Draft.Version, Action: "request"}); err != nil {
 			t.Fatal(err)
 		}
 		before := provider.calls

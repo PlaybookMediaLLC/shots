@@ -627,8 +627,9 @@ func (c *Configuration) ListPlannedContentDrafts(ctx context.Context, actor Acto
 // ContentDraftReviewInput is a review step: request (a writer asks), approve
 // or changes (a reviewer answers), with an optional note.
 type ContentDraftReviewInput struct {
-	Action string `json:"action"`
-	Note   string `json:"note"`
+	Action  string `json:"action"`
+	Note    string `json:"note"`
+	Version int    `json:"version"`
 }
 
 // ReviewContentDraft records a review step. Writers request review; owners,
@@ -657,6 +658,10 @@ func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id 
 		return nil, err
 	}
 	defer tx.Rollback()
+	// A review decision and scheduling must observe each other before either commits.
+	if _, err = tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext('content-draft-schedule:' || $1))`, id); err != nil {
+		return nil, err
+	}
 	if _, err = tx.PlatformExec(ctx, `SELECT id FROM content_draft WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, id, actor.OrganizationID); err != nil {
 		return nil, err
 	}
@@ -665,11 +670,24 @@ func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id 
 	if err != nil {
 		return nil, err
 	}
+	if input.Version < 1 {
+		return nil, invalid("Provide the draft version you reviewed.")
+	}
+	if draft.Version != input.Version {
+		return nil, conflict("This draft changed since you opened it. Reload and review the current content before trying again.")
+	}
 	nextStatus := map[string]string{"request": "pending", "approve": "approved", "changes": "changes_requested"}[input.Action]
 	if nextStatus == "" {
 		return nil, invalid("A review action is request, approve or changes.")
 	}
-	if string(draft.ReviewStatus) == nextStatus && optionalText(draft.ReviewNote) == note && (input.Action != "approve" || draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version) {
+	var cancelled []string
+	if input.Action == "changes" {
+		cancelled, err = cancelLiveDraftPosts(ctx, tx, actor, id, publishing.FailureChangesRequested)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cancelled) == 0 && string(draft.ReviewStatus) == nextStatus && optionalText(draft.ReviewNote) == note && (input.Action != "approve" || draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version) {
 		result := contentDraftRecord(draft)
 		return &result, nil
 	}
@@ -686,6 +704,17 @@ func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id 
 	case "approve":
 		update.SetReviewStatus(contentdraft.ReviewStatusApproved).SetApprovedVersion(draft.Version)
 	case "changes":
+		if len(cancelled) > 0 {
+			remaining, err := tx.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(id), scheduledpost.OrganizationID(actor.OrganizationID),
+				scheduledpost.StatusNEQ(scheduledpost.StatusCANCELLED)).Exist(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if !remaining {
+				update.SetStatus(contentdraft.StatusDraft)
+			}
+			update.AddCalendarVersion(1)
+		}
 		update.SetReviewStatus(contentdraft.ReviewStatusChangesRequested).ClearApprovedVersion()
 	default:
 		return nil, invalid("A review action is request, approve or changes.")

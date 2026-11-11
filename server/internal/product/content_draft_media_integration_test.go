@@ -307,7 +307,7 @@ func TestMediaScheduling(t *testing.T) {
 			_, _ = repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &off})
 		})
 		d := draft("Reviewed", photo)
-		if _, err := repo.ReviewContentDraft(ctx, owner, d.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, d.ID, ContentDraftReviewInput{Version: d.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		result, err := schedule(d, ScheduleContentDraftInput{Targets: []ContentDraftScheduleTarget{target(x, "Reviewed", photo)}})
@@ -330,11 +330,16 @@ func TestMediaScheduling(t *testing.T) {
 		if !load().WorkspaceActive {
 			t.Fatal("an approved post was held")
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, d.ID, ContentDraftReviewInput{Action: "changes", Note: "Not this week"}); err != nil {
+		w.exec(t, `UPDATE scheduled_post SET status='SCHEDULED', "triggerRunId"=NULL WHERE id=$1`, result.Posts[0].ID)
+		current, err := repo.GetContentDraft(ctx, owner, d.ID)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if load().WorkspaceActive {
-			t.Fatal("a post whose approval was withdrawn would publish")
+		if _, err := repo.ReviewContentDraft(ctx, owner, d.ID, ContentDraftReviewInput{Version: current.Version, Action: "changes", Note: "Not this week"}); err != nil {
+			t.Fatal(err)
+		}
+		if claimed, err := repo.auth.Claim(ctx, result.Posts[0].ID, "after-rejection", time.Now().Add(24*time.Hour)); err != nil || claimed {
+			t.Fatalf("a post whose approval was withdrawn was claimed: %v %v", claimed, err)
 		}
 	})
 }

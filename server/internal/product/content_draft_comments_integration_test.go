@@ -44,7 +44,7 @@ func TestMemberCommentsPreserveContentAndAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	draft, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Action: "approve"})
+	draft, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"})
 	if err != nil {
 		t.Fatal(err)
 	}

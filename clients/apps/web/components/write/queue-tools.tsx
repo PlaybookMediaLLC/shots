@@ -67,6 +67,7 @@ export function QueueBulkBar({
   rows: QueueRow[]
   zone: string
 }) {
+  const [timeValid, setTimeValid] = React.useState(true)
   const [step, setStep] = React.useState(60)
   const [gap, setGap] = React.useState(60)
   const [busy, setBusy] = React.useState(false)
@@ -150,9 +151,7 @@ export function QueueBulkBar({
       role="toolbar"
     >
       <div className="flex flex-wrap items-center gap-1">
-        <span className="mr-auto text-sky-700 dark:text-sky-200">
-          {rows.length} selected
-        </span>
+        <span className="mr-auto text-sky-700 dark:text-sky-200">{rows.length} selected</span>
         <Button onClick={onDone} size="sm" variant="ghost">
           Clear
         </Button>
@@ -195,7 +194,9 @@ export function QueueBulkBar({
             className="h-7 w-16 text-xs"
             max={1440}
             min={1}
-            onChange={(event) => setGap(Math.min(1440, Math.max(1, Number(event.target.value) || 1)))}
+            onChange={(event) =>
+              setGap(Math.min(1440, Math.max(1, Number(event.target.value) || 1)))
+            }
             type="number"
             value={gap}
           />
@@ -203,9 +204,7 @@ export function QueueBulkBar({
         </Label>
         <Button
           disabled={busy || !first || rows.length < 2}
-          onClick={() =>
-            first && void apply(spacedTimes(rows, first, gap), 'Spaced evenly.')
-          }
+          onClick={() => first && void apply(spacedTimes(rows, first, gap), 'Spaced evenly.')}
           size="sm"
           variant="ghost"
         >
@@ -222,13 +221,16 @@ export function QueueBulkBar({
           />
         </Label>
         <TimePicker
+          required
+          onValidityChange={setTimeValid}
           aria-label="Spread until time"
           onChange={(value) => setUntil({ ...until, time: value })}
           value={until.time}
         />
         <Button
-          disabled={busy || !first || rows.length < 2}
+          disabled={busy || !timeValid || !first || rows.length < 2}
           onClick={() => {
+            if (!timeValid) return
             const end = resolveLocalTime(`${until.day}T${until.time}`, zone)
             if (!first || end.kind !== 'exact' || end.at <= first)
               return toast.error('Choose an end after the first selected post.')
@@ -255,8 +257,8 @@ export function QueueBulkBar({
                 Take {rows.length} {rows.length === 1 ? 'post' : 'posts'} out of the queue?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                They stop publishing by themselves and keep their time as a plan on the calendar,
-                so you can change their text or platforms and schedule them again.
+                They stop publishing by themselves and keep their time as a plan on the calendar, so
+                you can change their text or platforms and schedule them again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
