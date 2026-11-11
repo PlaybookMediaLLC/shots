@@ -194,10 +194,10 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "voice/org-1/note-1/0-abc.aac"
-	body := []byte("ADTS bytes")
+	key := "voice/org-1/note-1/0-abc.wav"
+	body := []byte("WAV bytes")
 	digest := sha256.Sum256(body)
-	url, headers, err := store.SignChecksummedUpload(context.Background(), key, "audio/aac", int64(len(body)), digest[:], 15*time.Minute)
+	url, headers, err := store.SignChecksummedUpload(context.Background(), key, "audio/wav", int64(len(body)), digest[:], 15*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 		}
 	}
 	if headers.Get("Host") != "" || headers.Get("X-Amz-Checksum-Sha256") != base64.StdEncoding.EncodeToString(digest[:]) ||
-		headers.Get("If-None-Match") != "*" || headers.Get("Content-Type") != "audio/aac" || headers.Get("Content-Length") != strconv.Itoa(len(body)) {
+		headers.Get("If-None-Match") != "*" || headers.Get("Content-Type") != "audio/wav" || headers.Get("Content-Length") != strconv.Itoa(len(body)) {
 		t.Fatalf("headers=%v", headers)
 	}
 	request, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))

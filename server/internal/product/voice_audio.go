@@ -27,13 +27,12 @@ type voiceAudioStore interface {
 	SignDownloadFor(ctx context.Context, key string, expires time.Duration) (string, error)
 }
 
-// voiceAudioFormats are the run formats the server can decode: ADTS AAC
-// (provisional, Gate 0) and the PCM WAV the existing recorder writes. WAV
-// is larger, so its cap is too; both are bounded to 31 minutes on decode.
+// voiceAudioFormats are the run formats the server can decode: the PCM WAV
+// the Founder Hub recorder writes, bounded to 31 minutes on decode.
 var voiceAudioFormats = map[string]struct {
 	extension string
 	maxBytes  int64
-}{"audio/aac": {"aac", 20 << 20}, "audio/wav": {"wav", 200 << 20}}
+}{"audio/wav": {"wav", 200 << 20}}
 
 const (
 	voiceMaxRunIndex    = 999
@@ -109,7 +108,7 @@ func (c *Configuration) SignVoiceRunUpload(ctx context.Context, actor Actor, not
 	case validVoiceRunIndex(runIndex) != nil:
 		return nil, validVoiceRunIndex(runIndex)
 	case !known:
-		return nil, invalid("Voice audio must be audio/aac (ADTS) or audio/wav (PCM).")
+		return nil, invalid("Voice audio must be audio/wav (PCM).")
 	case input.Bytes < 1 || input.Bytes > format.maxBytes:
 		return nil, invalid(fmt.Sprintf("A %s run has 1 to %d bytes.", input.ContentType, format.maxBytes))
 	case digestErr != nil || len(digest) != 32:
@@ -223,7 +222,7 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
 	}
-	audio, err := verifyVoiceRun(object, run.ContentType, run.Bytes, run.Sha256)
+	audio, err := verifyVoiceRun(object, run.Bytes, run.Sha256)
 	object.Close()
 	if errors.Is(err, ErrInvalidInput) {
 		if deleteErr := c.objects.Delete(ctx, run.ObjectKey); deleteErr != nil {

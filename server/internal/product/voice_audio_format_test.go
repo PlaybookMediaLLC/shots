@@ -10,67 +10,7 @@ import (
 	"testing"
 )
 
-// adtsFrame builds one mono AAC-LC ADTS frame of payload bytes.
-func adtsFrame(rateIndex byte, payload int, blocks byte, crc bool) []byte {
-	headerLength := 7
-	protectionAbsent := byte(1)
-	if crc {
-		headerLength, protectionAbsent = 9, 0
-	}
-	length := headerLength + payload
-	frame := []byte{
-		0xFF, 0xF0 | protectionAbsent,
-		0x40 | rateIndex<<2, // AAC LC, then the rate index
-		0x40 | byte(length>>11)&0x03,
-		byte(length >> 3),
-		byte(length&0x07)<<5 | 0x1F,
-		0xFC | (blocks - 1),
-	}
-	frame = append(frame, make([]byte, headerLength-7+payload)...)
-	return frame
-}
-
 func joined(parts ...[]byte) []byte { return bytes.Join(parts, nil) }
-
-func TestDecodeADTS(t *testing.T) {
-	frame := adtsFrame(8, 40, 1, false) // 16 kHz
-	three := joined(frame, frame, frame)
-	for _, test := range []struct {
-		name       string
-		data       []byte
-		durationMs int
-		rate       int
-	}{
-		{"whole frames", three, 192, 16000},
-		{"two raw blocks a frame", joined(adtsFrame(4, 40, 2, false), adtsFrame(4, 40, 2, false)), 92, 44100},
-		{"frames with a CRC", joined(adtsFrame(8, 40, 1, true), adtsFrame(8, 40, 1, true)), 128, 16000},
-		{"a crash cut the last frame's body", joined(three, frame[:20]), 192, 16000},
-		{"a crash cut the last frame's header", joined(three, frame[:3]), 192, 16000},
-		{"a crash left one byte of a header", joined(three, frame[:1]), 192, 16000},
-		{"bad: trailing bytes that are not a frame", joined(three, []byte("junk")), 0, 0},
-		{"bad: a short trailing fragment without the sync word", joined(three, []byte{0xFF, 0x00}), 0, 0},
-		{"bad: garbage between frames", joined(frame, []byte("garbage"), frame), 0, 0},
-		{"bad: empty", nil, 0, 0},
-		{"bad: only a partial frame", frame[:20], 0, 0},
-		{"bad: the sample rate changes", joined(frame, adtsFrame(3, 40, 1, false)), 0, 0},
-		{"bad: an invalid rate index", adtsFrame(13, 40, 1, false), 0, 0},
-		{"bad: a frame shorter than its header", joined(frame[:3], []byte{0x40, 0x00, 0x1F, 0xFC}), 0, 0},
-		{"bad: a WAV file", wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 320)), 0, 0},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			audio, err := decodeADTS(bytes.NewReader(test.data))
-			if test.rate == 0 {
-				if !errors.Is(err, ErrInvalidInput) {
-					t.Fatalf("accepted %+v err=%v", audio, err)
-				}
-				return
-			}
-			if err != nil || audio.durationMs != test.durationMs || audio.sampleRateHz != test.rate {
-				t.Fatalf("audio=%+v err=%v", audio, err)
-			}
-		})
-	}
-}
 
 // wavFile builds a RIFF/WAVE file with the RIFF and data sizes as given, so a
 // test can write what a killed recorder leaves behind; chunks go before data.
@@ -107,7 +47,7 @@ func TestDecodeWAV(t *testing.T) {
 		{"bad: no samples", wavFile(1, 1, 16000, 16, 0, 0, nil), 0, 0},
 		{"bad: no data chunk", wavFile(1, 1, 16000, 16, 0, 0, nil)[:36], 0, 0},
 		{"bad: an impossible sample rate", wavFile(1, 1, 1000, 16, 0, 0, second), 0, 0},
-		{"bad: ADTS audio", joined(adtsFrame(8, 40, 1, false), adtsFrame(8, 40, 1, false)), 0, 0},
+		{"bad: AAC audio", joined([]byte{0xFF, 0xF1, 0x60, 0x40, 0x05, 0x7F, 0xFC}, make([]byte, 40)), 0, 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			audio, err := decodeWAV(bytes.NewReader(test.data))
@@ -143,34 +83,29 @@ func digestOf(data []byte) string {
 // The stored bytes, not the client's claims, decide: size, checksum, audio
 // and the duration the server records (S4, S19).
 func TestVerifyVoiceRun(t *testing.T) {
-	frame := adtsFrame(8, 40, 1, false)
-	run := joined(frame, frame, frame)
-	audio, err := verifyVoiceRun(bytes.NewReader(run), "audio/aac", int64(len(run)), digestOf(run))
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 6144)) // 192 ms
+	audio, err := verifyVoiceRun(bytes.NewReader(run), int64(len(run)), digestOf(run))
 	if err != nil || audio.durationMs != 192 || audio.sampleRateHz != 16000 {
 		t.Fatalf("audio=%+v err=%v", audio, err)
 	}
-	wav := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 64000))
-	if audio, err := verifyVoiceRun(bytes.NewReader(wav), "audio/wav", int64(len(wav)), digestOf(wav)); err != nil || audio.durationMs != 2000 {
-		t.Fatalf("wav audio=%+v err=%v", audio, err)
-	}
 	for name, check := range map[string]func() error{
 		"truncated": func() error {
-			_, err := verifyVoiceRun(bytes.NewReader(run[:30]), "audio/aac", int64(len(run)), digestOf(run))
+			_, err := verifyVoiceRun(bytes.NewReader(run[:30]), int64(len(run)), digestOf(run))
 			return err
 		},
 		"larger": func() error {
-			_, err := verifyVoiceRun(bytes.NewReader(joined(run, frame)), "audio/aac", int64(len(run)), digestOf(run))
+			_, err := verifyVoiceRun(bytes.NewReader(joined(run, []byte{0, 0})), int64(len(run)), digestOf(run))
 			return err
 		},
 		"different bytes": func() error {
-			other := joined(frame, frame, adtsFrame(8, 40, 1, false))
+			other := joined(run)
 			other[len(other)-1] = 1
-			_, err := verifyVoiceRun(bytes.NewReader(other), "audio/aac", int64(len(run)), digestOf(run))
+			_, err := verifyVoiceRun(bytes.NewReader(other), int64(len(run)), digestOf(run))
 			return err
 		},
 		"not audio": func() error {
 			text := bytes.Repeat([]byte("not audio "), 10)
-			_, err := verifyVoiceRun(bytes.NewReader(text), "audio/aac", int64(len(text)), digestOf(text))
+			_, err := verifyVoiceRun(bytes.NewReader(text), int64(len(text)), digestOf(text))
 			return err
 		},
 		"over 31 minutes": func() error {
@@ -181,7 +116,7 @@ func TestVerifyVoiceRun(t *testing.T) {
 			}
 			hash := sha256.New()
 			total, _ := io.Copy(hash, body())
-			_, err := verifyVoiceRun(body(), "audio/wav", total, hex.EncodeToString(hash.Sum(nil)))
+			_, err := verifyVoiceRun(body(), total, hex.EncodeToString(hash.Sum(nil)))
 			return err
 		},
 	} {
@@ -189,7 +124,7 @@ func TestVerifyVoiceRun(t *testing.T) {
 			t.Errorf("%s: err=%v", name, err)
 		}
 	}
-	if _, err := verifyVoiceRun(failingReader{}, "audio/aac", 10, digestOf(run)); err == nil || errors.Is(err, ErrInvalidInput) {
+	if _, err := verifyVoiceRun(failingReader{}, 10, digestOf(run)); err == nil || errors.Is(err, ErrInvalidInput) {
 		t.Fatalf("a storage failure was reported as a bad file: %v", err)
 	}
 }

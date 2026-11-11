@@ -263,8 +263,8 @@ func TestVoiceSettingsAndGates(t *testing.T) {
 	t.Setenv("VOICE_DISABLED", "")
 
 	// Audio upload needs the workspace flag, the note's consent and the switch.
-	run := joined(adtsFrame(8, 40, 1, false), adtsFrame(8, 40, 1, false))
-	upload := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	upload := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
 	withoutConsent, withConsent := f.note(f.creator, "n3", false), f.note(f.creator, "n4", true)
 	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, withConsent.ID, 0, upload)
 	expectVoice(t, err, publishing.ErrForbidden, "upload while the workspace has audio off")
@@ -520,15 +520,14 @@ func TestVoiceAudioRuns(t *testing.T) {
 	ctx := f.ctx
 	f.enable(true, true)
 	note := f.note(f.creator, "audio-note", true)
-	frame := adtsFrame(8, 40, 1, false)
-	run := joined(frame, frame, frame) // 192 ms at 16 kHz
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 6144)) // 192 ms at 16 kHz
 	sum := digestOf(run)
 	sign := func(runIndex int, input VoiceRunUploadInput) (*VoiceRunUpload, error) {
 		return f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, runIndex, input)
 	}
-	aac := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: strings.ToUpper(sum), StartOffsetMs: 0, DurationMs: voicePtr(5000)}
-	first, err := sign(0, aac)
-	key := "voice/" + f.org + "/" + note.ID + "/0-" + sum + ".aac"
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: strings.ToUpper(sum), StartOffsetMs: 0, DurationMs: voicePtr(5000)}
+	first, err := sign(0, pcm)
+	key := "voice/" + f.org + "/" + note.ID + "/0-" + sum + ".wav"
 	if err != nil || first.Method != "PUT" || !strings.Contains(first.URL, key) || first.Headers["If-None-Match"] != "*" ||
 		first.Headers["X-Amz-Checksum-Sha256"] == "" || !first.ExpiresAt.After(time.Now()) {
 		t.Fatalf("upload=%+v err=%v", first, err)
@@ -536,26 +535,26 @@ func TestVoiceAudioRuns(t *testing.T) {
 	if f.objects.signedSize != int64(len(run)) || fmt.Sprintf("%x", f.objects.signedSum) != sum {
 		t.Fatal("S5: the URL was not signed with the file's length and checksum")
 	}
-	second, err := sign(0, aac)
+	second, err := sign(0, pcm)
 	if err != nil || second.URL == first.URL || f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1`, note.ID) != "1" {
 		t.Fatalf("S3: a new URL for the same run=%+v err=%v", second, err)
 	}
-	other := joined(frame, frame)
-	_, err = sign(0, VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(other)), SHA256: digestOf(other)})
+	other := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	_, err = sign(0, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(other)), SHA256: digestOf(other)})
 	expectVoice(t, err, publishing.ErrConflict, "another file for an uploaded run index")
 	for name, input := range map[string]VoiceRunUploadInput{
 		"another format":  {ContentType: "audio/mpeg", Bytes: 10, SHA256: sum},
-		"too large AAC":   {ContentType: "audio/aac", Bytes: 21 << 20, SHA256: sum},
+		"AAC":             {ContentType: "audio/aac", Bytes: 10, SHA256: sum},
 		"too large WAV":   {ContentType: "audio/wav", Bytes: 201 << 20, SHA256: sum},
-		"not a checksum":  {ContentType: "audio/aac", Bytes: 10, SHA256: "xyz"},
-		"negative offset": {ContentType: "audio/aac", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
+		"not a checksum":  {ContentType: "audio/wav", Bytes: 10, SHA256: "xyz"},
+		"negative offset": {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
 	} {
 		_, err := sign(1, input)
 		expectVoice(t, err, ErrInvalidInput, name)
 	}
-	_, err = sign(1000, aac)
+	_, err = sign(1000, pcm)
 	expectVoice(t, err, ErrInvalidInput, "run index out of range")
-	_, err = f.repo.SignVoiceRunUpload(ctx, f.owner, note.ID, 0, aac)
+	_, err = f.repo.SignVoiceRunUpload(ctx, f.owner, note.ID, 0, pcm)
 	expectVoice(t, err, publishing.ErrNotFound, "another member signs an upload")
 
 	// S4: a missing, truncated or non-audio object stays pending; the phone resends.
@@ -574,10 +573,10 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatalf("a truncated object was kept (exists=%v) or the run left pending (%s)", exists, status(0))
 	}
 	garbage := bytes.Repeat([]byte("not audio "), 10)
-	if _, err := sign(2, VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(garbage)), SHA256: digestOf(garbage)}); err != nil {
+	if _, err := sign(2, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(garbage)), SHA256: digestOf(garbage)}); err != nil {
 		t.Fatal(err)
 	}
-	f.objects.put("voice/"+f.org+"/"+note.ID+"/2-"+digestOf(garbage)+".aac", garbage)
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/2-"+digestOf(garbage)+".wav", garbage)
 	_, err = complete(2)
 	expectVoice(t, err, ErrInvalidInput, "an object that is not audio")
 	if status(2) != "pending" {
@@ -643,7 +642,7 @@ func TestVoiceAudioRuns(t *testing.T) {
 	}
 	_, err = f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, publishing.ErrNotFound, "play deleted audio")
-	_, err = sign(0, aac)
+	_, err = sign(0, pcm)
 	expectVoice(t, err, publishing.ErrConflict, "upload a deleted run again")
 	if err := f.repo.DeleteVoiceAudio(ctx, f.creator, note.ID); err != nil || f.audited("product.voice_audio_deleted") != 1 {
 		t.Fatalf("deleting audio again: %v", err)
@@ -653,10 +652,10 @@ func TestVoiceAudioRuns(t *testing.T) {
 	// A purge that fails after the commit is retried by the sweep; the
 	// deletion itself still succeeds.
 	second2 := f.note(f.creator, "audio-note-2", true)
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 0, aac); err != nil {
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
-	key2 := "voice/" + f.org + "/" + second2.ID + "/0-" + sum + ".aac"
+	key2 := "voice/" + f.org + "/" + second2.ID + "/0-" + sum + ".wav"
 	f.objects.put(key2, run)
 	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, second2.ID, 0); err != nil {
 		t.Fatal(err)
@@ -677,7 +676,7 @@ func TestVoiceAudioRuns(t *testing.T) {
 	if exists, _ := f.objects.Exists(ctx, key2); exists || f.value(`SELECT "objectPurgedAt" IS NOT NULL FROM voice_audio_run WHERE "noteId"=$1`, second2.ID) != "true" {
 		t.Fatal("the sweep did not purge the deleted note's audio")
 	}
-	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 1, aac)
+	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 1, pcm)
 	expectVoice(t, err, publishing.ErrConflict, "upload to a deleted note")
 	_, err = f.repo.CompleteVoiceRun(ctx, f.creator, second2.ID, 0)
 	expectVoice(t, err, publishing.ErrConflict, "complete a run of a deleted note")
@@ -691,11 +690,10 @@ func TestVoiceSweeps(t *testing.T) {
 	ctx := f.ctx
 	f.enable(true, true)
 	note := f.note(f.creator, "sweep-note", true)
-	frame := adtsFrame(8, 40, 1, false)
-	run := joined(frame, frame)
-	aac := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: digestOf(run)}
-	key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".aac"
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, aac); err != nil {
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".wav"
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
 	f.objects.put(key, run)
@@ -711,7 +709,7 @@ func TestVoiceSweeps(t *testing.T) {
 	}
 	_, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, ErrInvalidInput, "complete an expired upload")
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, aac); err != nil {
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
 	f.objects.put(key, run)

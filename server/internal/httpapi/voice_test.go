@@ -135,7 +135,7 @@ func TestVoiceRoutesReachTheirOperations(t *testing.T) {
 		{"POST", "/v1/voice/notes/" + note + "/transcripts", `{"clientRevisionId":"r","origin":"on_device","text":"words","segments":[]}`, true, "transcript", 201},
 		{"POST", "/v1/voice/notes/" + note + "/transcripts", `{"clientRevisionId":"r","origin":"on_device","text":"words","segments":[]}`, false, "transcript", 200},
 		{"POST", "/v1/voice/notes/" + note + "/transcripts/" + revision + "/redact", "", false, "redact", 200},
-		{"POST", "/v1/voice/notes/" + note + "/runs/3/upload", `{"contentType":"audio/aac","bytes":10,"sha256":"00","startOffsetMs":0}`, false, "upload", 200},
+		{"POST", "/v1/voice/notes/" + note + "/runs/3/upload", `{"contentType":"audio/wav","bytes":10,"sha256":"00","startOffsetMs":0}`, false, "upload", 200},
 		{"POST", "/v1/voice/notes/" + note + "/runs/3/complete", "", false, "complete", 200},
 		{"GET", "/v1/voice/notes/" + note + "/runs/3/audio", "", false, "audio", 200},
 		{"DELETE", "/v1/voice/notes/" + note + "/audio", "", false, "delete audio", 204},
@@ -175,7 +175,7 @@ func TestVoiceRoutesReachTheirOperations(t *testing.T) {
 	if fake.patch.ExpectedRevision != 2 || !fake.patch.ProjectID.Set || fake.patch.ProjectID.Value != nil {
 		t.Fatalf("a null projectId must clear the project: %+v", fake.patch)
 	}
-	response = voiceRequest(handler, "POST", "/v1/voice/notes/"+note+"/runs/0/upload", `{"contentType":"audio/aac","bytes":1,"sha256":"00"}`)
+	response = voiceRequest(handler, "POST", "/v1/voice/notes/"+note+"/runs/0/upload", `{"contentType":"audio/wav","bytes":1,"sha256":"00"}`)
 	if !strings.Contains(response.Body.String(), `"method":"PUT"`) || response.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("upload body=%s headers=%v", response.Body.String(), response.Header())
 	}
