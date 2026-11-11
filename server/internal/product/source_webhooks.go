@@ -422,8 +422,11 @@ func (c *Configuration) IngestDeployment(ctx context.Context, actor Actor, input
 	if source.Status != sourceapp.StatusACTIVE {
 		return nil, publishing.ErrNotFound
 	}
-	deployedAt := time.Now()
-	if !input.DeployedAt.IsZero() {
+	// A provider's time ahead of ours is capped: a future time would mark every
+	// later deployment superseded.
+	now := time.Now()
+	deployedAt := now
+	if !input.DeployedAt.IsZero() && input.DeployedAt.Before(now) {
 		deployedAt = input.DeployedAt
 	}
 	// Stored at PostgreSQL's precision, so a redelivery compares equal.
@@ -443,7 +446,8 @@ func (c *Configuration) IngestDeployment(ctx context.Context, actor Actor, input
 	}
 	// A provider activating a deployment it reported before (a rollback on
 	// Vercel, Netlify or Pages) is a deployment of its own; a redelivery is not.
-	if prior != nil && !input.DeployedAt.IsZero() && deployedAt.After(prior.DeployedAt) {
+	// A future time is never one: capped to the arrival, it differs every time.
+	if prior != nil && !input.DeployedAt.IsZero() && input.DeployedAt.Before(now) && deployedAt.After(prior.DeployedAt) {
 		externalID = input.ExternalID + "@" + deployedAt.Format(time.RFC3339Nano)
 		if prior, err = find(); err != nil {
 			return nil, err
