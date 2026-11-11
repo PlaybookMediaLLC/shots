@@ -1214,11 +1214,11 @@ function Destinations({ context }: { context: ScheduleContext }) {
   if (!set) return null
   const on = new Set(context.items.map((item) => item.account.id))
   return (
-    <fieldset className="grid min-w-0 gap-3" data-testid="destinations">
+    <fieldset className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3" data-testid="destinations">
       <legend className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
         Post to <SetDot color={set.color} /> {set.name}
       </legend>
-      <div className="grid divide-y divide-border rounded-lg border border-border">
+      <div className="grid grid-cols-[minmax(0,1fr)] divide-y divide-border rounded-lg border border-border">
         {set.accounts.map((account) => (
           <Label
             className="flex min-h-11 items-center gap-3 px-4 py-2 text-sm font-normal"
