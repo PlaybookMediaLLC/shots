@@ -473,12 +473,25 @@ func (s *Server) authenticateWithOptions(next http.Handler, organizationRequired
 			writeError(w, http.StatusUnauthorized, "a signed-in session is required")
 			return
 		}
+		ctx := r.Context()
+		// Founder Hub names its workspace per request; its live grant, checked here, replaces the browser's active one.
+		if client := r.Header.Get("X-Principal-Client"); client != "" {
+			if client != "shots-founder-hub" || !actor.IsSession() || s.configuration == nil {
+				writeError(w, http.StatusUnauthorized, "unauthorized")
+				return
+			}
+			if _, err := s.configuration.AuthorizeFounderHubSession(ctx, actor); err != nil {
+				writeStoreError(w, err)
+				return
+			}
+			ctx = publishing.ForDelegatedSession(ctx)
+		}
 		var memo publishing.AuthorizationMemo
-		if err := authorize(publishing.RecordAuthorization(r.Context(), &memo), actor); err != nil {
+		if err := authorize(publishing.RecordAuthorization(ctx, &memo), actor); err != nil {
 			writeStoreError(w, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(publishing.ReplayAuthorization(r.Context(), &memo)))
+		next.ServeHTTP(w, r.WithContext(publishing.ReplayAuthorization(ctx, &memo)))
 	})
 }
 
