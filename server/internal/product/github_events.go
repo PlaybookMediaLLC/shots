@@ -22,6 +22,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/deploymentevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/githubinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
@@ -547,10 +548,22 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 	if !active {
 		return skip("source_inactive")
 	}
-	// A page behind a login is a durable job's, not a public screenshot's.
-	jobOwned, err := c.admitDeploymentCaptures(ctx, row)
+	already, err := capturedBefore(ctx, c.client, row)
 	if err != nil {
 		return err
+	}
+	// A page behind a login is a durable job's, not a public screenshot's.
+	jobOwned, err := c.admitDeploymentCaptures(ctx, row, already)
+	if err != nil {
+		return err
+	}
+	// The page now shows a newer deployment, which captures it as its own.
+	superseded, err := deploymentSuperseded(ctx, c.client, row)
+	if err != nil {
+		return err
+	}
+	if superseded {
+		return skip(captureSuperseded)
 	}
 	if row.URL == nil {
 		return skip("deployment_url_missing")
@@ -568,15 +581,24 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		return err
 	}
 	var surfaces []*ent.ProductSurface
+	unchanged := false
 	for _, surface := range candidates {
 		parsed, err := url.Parse(surface.URL)
-		if err == nil && !jobOwned[surface.ID] && sameOrigin(parsed, deployed) && capture.PublicPageURL(surface.URL) && len(surfaces) < maxCapturedSurfaces {
+		if err != nil || jobOwned[surface.ID] || !sameOrigin(parsed, deployed) || !capture.PublicPageURL(surface.URL) {
+			continue
+		}
+		if already[surface.ID] {
+			unchanged = true
+		} else if len(surfaces) < maxCapturedSurfaces {
 			surfaces = append(surfaces, surface)
 		}
 	}
 	if len(surfaces) == 0 {
-		if len(jobOwned) > 0 {
+		switch {
+		case len(jobOwned) > 0:
 			return skip("capture_jobs_admitted")
+		case unchanged:
+			return skip("already_captured")
 		}
 		return skip("deployment_host_rejected")
 	}
@@ -640,6 +662,76 @@ func (c *Configuration) captureDeployment(ctx context.Context, organizationID, d
 		update.SetStatus(deploymentevent.StatusPARTIAL).SetFailureCode("capture_incomplete")
 	}
 	return update.Exec(ctx)
+}
+
+// captureSuperseded ends a capture whose deployment a newer one replaced.
+const captureSuperseded = "superseded"
+
+// deploymentKind compares a deployment with the earlier ones of its source and
+// environment, by the provider's time. Only a new commit is a release.
+// shortcut: it knows only deployments Shots saw, so a rollback to a commit never
+// deployed here is new; asking GitHub whether the commit is an ancestor of the
+// live one closes that, if it matters.
+func deploymentKind(ctx context.Context, tx *ent.Tx, source *ent.SourceApp, environment string, sha *string, externalID string, at time.Time) (deploymentevent.Kind, error) {
+	earlier := tx.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(source.OrganizationID), deploymentevent.SourceAppID(source.ID),
+		deploymentevent.Environment(environment), deploymentevent.DeployedAtLTE(at))
+	live, err := earlier.Clone().Order(ent.Desc(deploymentevent.FieldDeployedAt), ent.Desc(deploymentevent.FieldCreatedAt), ent.Desc(deploymentevent.FieldID)).First(ctx)
+	if ent.IsNotFound(err) {
+		return deploymentevent.KindNew, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	same := sameDeployedVersion(sha, externalID)
+	if redeploy, err := earlier.Clone().Where(deploymentevent.ID(live.ID), same).Exist(ctx); err != nil {
+		return "", err
+	} else if redeploy {
+		return deploymentevent.KindRedeploy, nil
+	}
+	if rollback, err := earlier.Where(same).Exist(ctx); err != nil {
+		return "", err
+	} else if rollback {
+		return deploymentevent.KindRollback, nil
+	}
+	return deploymentevent.KindNew, nil
+}
+
+// sameDeployedVersion matches deployments of one commit, and every activation
+// of one provider deployment, which is how a provider without commits rolls back.
+func sameDeployedVersion(sha *string, root string) predicate.DeploymentEvent {
+	same := []predicate.DeploymentEvent{deploymentevent.ExternalID(root), deploymentevent.ExternalIDHasPrefix(root + "@")}
+	if sha != nil && *sha != "" {
+		same = append(same, deploymentevent.Sha(*sha))
+	}
+	return deploymentevent.Or(same...)
+}
+
+// capturedBefore lists the surfaces a redeploy need not capture again: those an
+// earlier deployment of the same commit captured.
+func capturedBefore(ctx context.Context, client *ent.Client, deployment *ent.DeploymentEvent) (map[string]bool, error) {
+	captured := map[string]bool{}
+	if deployment.Kind != deploymentevent.KindRedeploy {
+		return captured, nil
+	}
+	root, _, _ := strings.Cut(deployment.ExternalID, "@")
+	earlier, err := client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(deployment.OrganizationID), deploymentevent.SourceAppID(deployment.SourceAppID),
+		deploymentevent.Environment(deployment.Environment), deploymentevent.IDNEQ(deployment.ID), sameDeployedVersion(deployment.Sha, root)).IDs(ctx)
+	if err != nil || len(earlier) == 0 {
+		return captured, err
+	}
+	surfaces, err := client.SurfaceCapture.Query().Where(surfacecapture.OrganizationID(deployment.OrganizationID), surfacecapture.SourceEQ(surfacecapture.SourceDeployment),
+		surfacecapture.SourceIDIn(earlier...)).Select(surfacecapture.FieldSurfaceID).Strings(ctx)
+	for _, surface := range surfaces {
+		captured[surface] = true
+	}
+	return captured, err
+}
+
+// deploymentSuperseded reports whether the provider has since deployed the same
+// source and environment again, which makes this deployment's captures moot.
+func deploymentSuperseded(ctx context.Context, client *ent.Client, deployment *ent.DeploymentEvent) (bool, error) {
+	return client.DeploymentEvent.Query().Where(deploymentevent.OrganizationID(deployment.OrganizationID), deploymentevent.SourceAppID(deployment.SourceAppID),
+		deploymentevent.Environment(deployment.Environment), deploymentevent.DeployedAtGT(deployment.DeployedAt)).Exist(ctx)
 }
 
 // captureDeploymentSurface takes a page's capture for a deployment and records

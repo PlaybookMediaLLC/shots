@@ -32,6 +32,10 @@ const (
 	FieldFailureCode = "failureCode"
 	// FieldAssetIds holds the string denoting the asset_ids field in the database.
 	FieldAssetIds = "assetIds"
+	// FieldKind holds the string denoting the kind field in the database.
+	FieldKind = "kind"
+	// FieldDeployedAt holds the string denoting the deployed_at field in the database.
+	FieldDeployedAt = "deployedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -52,6 +56,8 @@ var Columns = []string{
 	FieldStatus,
 	FieldFailureCode,
 	FieldAssetIds,
+	FieldKind,
+	FieldDeployedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -69,6 +75,8 @@ func ValidColumn(column string) bool {
 var (
 	// DefaultAssetIds holds the default value on creation for the "asset_ids" field.
 	DefaultAssetIds []string
+	// DefaultDeployedAt holds the default value on creation for the "deployed_at" field.
+	DefaultDeployedAt func() time.Time
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -103,6 +111,33 @@ func StatusValidator(s Status) error {
 		return nil
 	default:
 		return fmt.Errorf("deploymentevent: invalid enum value for status field: %q", s)
+	}
+}
+
+// Kind defines the type for the "kind" enum field.
+type Kind string
+
+// KindNew is the default value of the Kind enum.
+const DefaultKind = KindNew
+
+// Kind values.
+const (
+	KindNew      Kind = "new"
+	KindRedeploy Kind = "redeploy"
+	KindRollback Kind = "rollback"
+)
+
+func (k Kind) String() string {
+	return string(k)
+}
+
+// KindValidator is a validator for the "kind" field enum values. It is called by the builders before save.
+func KindValidator(k Kind) error {
+	switch k {
+	case KindNew, KindRedeploy, KindRollback:
+		return nil
+	default:
+		return fmt.Errorf("deploymentevent: invalid enum value for kind field: %q", k)
 	}
 }
 
@@ -152,6 +187,16 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureCode orders the results by the failure_code field.
 func ByFailureCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureCode, opts...).ToFunc()
+}
+
+// ByKind orders the results by the kind field.
+func ByKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKind, opts...).ToFunc()
+}
+
+// ByDeployedAt orders the results by the deployed_at field.
+func ByDeployedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDeployedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

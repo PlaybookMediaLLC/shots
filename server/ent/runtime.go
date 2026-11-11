@@ -756,12 +756,16 @@ func init() {
 	deploymenteventDescAssetIds := deploymenteventFields[9].Descriptor()
 	// deploymentevent.DefaultAssetIds holds the default value on creation for the asset_ids field.
 	deploymentevent.DefaultAssetIds = deploymenteventDescAssetIds.Default.([]string)
+	// deploymenteventDescDeployedAt is the schema descriptor for deployed_at field.
+	deploymenteventDescDeployedAt := deploymenteventFields[11].Descriptor()
+	// deploymentevent.DefaultDeployedAt holds the default value on creation for the deployed_at field.
+	deploymentevent.DefaultDeployedAt = deploymenteventDescDeployedAt.Default.(func() time.Time)
 	// deploymenteventDescCreatedAt is the schema descriptor for created_at field.
-	deploymenteventDescCreatedAt := deploymenteventFields[10].Descriptor()
+	deploymenteventDescCreatedAt := deploymenteventFields[12].Descriptor()
 	// deploymentevent.DefaultCreatedAt holds the default value on creation for the created_at field.
 	deploymentevent.DefaultCreatedAt = deploymenteventDescCreatedAt.Default.(func() time.Time)
 	// deploymenteventDescUpdatedAt is the schema descriptor for updated_at field.
-	deploymenteventDescUpdatedAt := deploymenteventFields[11].Descriptor()
+	deploymenteventDescUpdatedAt := deploymenteventFields[13].Descriptor()
 	// deploymentevent.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	deploymentevent.DefaultUpdatedAt = deploymenteventDescUpdatedAt.Default.(func() time.Time)
 	// deploymentevent.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

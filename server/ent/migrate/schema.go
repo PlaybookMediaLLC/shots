@@ -1411,6 +1411,8 @@ var (
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"RECEIVED", "CAPTURED", "PARTIAL", "SKIPPED", "FAILED"}, Default: "RECEIVED"},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
 		{Name: "assetIds", Type: field.TypeJSON},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"new", "redeploy", "rollback"}, Default: "new"},
+		{Name: "deployedAt", Type: field.TypeTime},
 		{Name: "createdAt", Type: field.TypeTime},
 		{Name: "updatedAt", Type: field.TypeTime},
 	}
@@ -1428,7 +1430,12 @@ var (
 			{
 				Name:    "deploymentevent_organizationId_createdAt",
 				Unique:  false,
-				Columns: []*schema.Column{DeploymentEventColumns[1], DeploymentEventColumns[10]},
+				Columns: []*schema.Column{DeploymentEventColumns[1], DeploymentEventColumns[12]},
+			},
+			{
+				Name:    "deploymentevent_sourceAppId_environment_deployedAt",
+				Unique:  false,
+				Columns: []*schema.Column{DeploymentEventColumns[2], DeploymentEventColumns[4], DeploymentEventColumns[11]},
 			},
 		},
 	}
