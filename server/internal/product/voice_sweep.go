@@ -2,6 +2,7 @@ package product
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -12,6 +13,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicemembersettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicesettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/workspacedeletion"
 )
 
 const (
@@ -50,10 +54,62 @@ func voiceOwnerAccountDeleted() predicate.VoiceNote {
 	}
 }
 
+// voiceWorkspacePurged matches rows of a workspace whose purge ran at least
+// voicePurgeAfter ago. The purge keeps the organization row, so no foreign
+// key removes them, and by then no upload URL signed before it is valid.
+func voiceWorkspacePurged(column string) func(*entsql.Selector) {
+	return func(s *entsql.Selector) {
+		w := entsql.Table(workspacedeletion.Table)
+		s.Where(entsql.Exists(entsql.Select(w.C(workspacedeletion.FieldID)).From(w).Where(entsql.And(
+			entsql.ColumnsEQ(w.C(workspacedeletion.FieldOrganizationID), s.C(column)),
+			entsql.EQ(w.C(workspacedeletion.FieldStatus), workspacedeletion.StatusPURGED),
+			entsql.LT(w.C(workspacedeletion.FieldPurgedAt), time.Now().Add(-voicePurgeAfter))))))
+	}
+}
+
+// voiceWorkspaceBatch is how many objects of purged workspaces one sweep deletes.
+const voiceWorkspaceBatch = 500
+
+// sweepPurgedWorkspaces removes the voice data of purged workspaces: every
+// run's object first, while a row still names it, then the notes (their
+// revisions, runs and commands cascade) and the voice settings.
+func (c *Configuration) sweepPurgedWorkspaces(ctx context.Context) (int, error) {
+	runs, err := c.client.VoiceAudioRun.Query().Where(voiceaudiorun.ObjectPurgedAtIsNil(),
+		predicate.VoiceAudioRun(voiceWorkspacePurged(voiceaudiorun.FieldOrganizationID))).Limit(voiceWorkspaceBatch).All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	for _, run := range runs {
+		if c.objects == nil {
+			return 0, ErrStorageUnavailable
+		}
+		if err := c.objects.Delete(ctx, run.ObjectKey); err != nil {
+			return 0, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+		}
+		if err := c.client.VoiceAudioRun.UpdateOneID(run.ID).SetObjectPurgedAt(time.Now().UTC()).Exec(ctx); err != nil {
+			return 0, err
+		}
+	}
+	if len(runs) == voiceWorkspaceBatch {
+		// More objects are left; no row goes before they do.
+		return len(runs), nil
+	}
+	notes, err := c.client.VoiceNote.Delete().Where(predicate.VoiceNote(voiceWorkspacePurged(voicenote.FieldOrganizationID))).Exec(ctx)
+	if err != nil {
+		return len(runs), err
+	}
+	if _, err := c.client.VoiceSettings.Delete().Where(predicate.VoiceSettings(voiceWorkspacePurged(voicesettings.FieldID))).Exec(ctx); err != nil {
+		return len(runs) + notes, err
+	}
+	_, err = c.client.VoiceMemberSettings.Delete().Where(predicate.VoiceMemberSettings(voiceWorkspacePurged(voicemembersettings.FieldOrganizationID))).Exec(ctx)
+	return len(runs) + notes, err
+}
+
 // SweepVoice is the hourly voice maintenance job. It fails unfinished uploads
 // after a day; deletes the notes of a member removed 30 days ago, and at once
-// those of a deleted account, with that account's voice choices; and purges
-// the objects of deleted and failed runs until storage confirms each one.
+// those of a deleted account, with that account's voice choices; removes a
+// purged workspace's voice data; and purges the objects of deleted and failed
+// runs until storage confirms each one.
 func (c *Configuration) SweepVoice(ctx context.Context) (int, error) {
 	now := time.Now().UTC()
 	expired, err := c.client.VoiceAudioRun.Update().Where(voiceaudiorun.StatusEQ(voiceaudiorun.StatusPending),
@@ -69,7 +125,7 @@ func (c *Configuration) SweepVoice(ctx context.Context) (int, error) {
 		return expired, err
 	}
 	// A member added back within the grace period keeps their notes.
-	if _, err := c.client.VoiceNote.Update().Where(voicenote.OwnerRemovedAtNotNil(), voiceOwnerIsMember(true)).
+	if _, err := c.client.VoiceNote.Update().Where(voicenote.DeletedAtIsNil(), voicenote.OwnerRemovedAtNotNil(), voiceOwnerIsMember(true)).
 		ClearOwnerRemovedAt().Save(ctx); err != nil {
 		return expired, err
 	}
@@ -93,6 +149,11 @@ func (c *Configuration) SweepVoice(ctx context.Context) (int, error) {
 			entsql.ColumnsEQ(r.C(accountdeletionrequest.FieldUserID), s.C(voicemembersettings.FieldUserID)),
 			entsql.EQ(r.C(accountdeletionrequest.FieldStatus), accountdeletionrequest.StatusCOMPLETED)))))
 	}).Exec(ctx); err != nil {
+		return count, err
+	}
+	removed, err := c.sweepPurgedWorkspaces(ctx)
+	count += removed
+	if err != nil {
 		return count, err
 	}
 	purged, err := c.purgeVoiceObjects(ctx, 200)
@@ -138,4 +199,68 @@ func (c *Configuration) sweepVoiceNotes(ctx context.Context, reason string, due 
 		}
 	}
 	return deleted, nil
+}
+
+// ReplayVoiceDeletion deletes again a member's voice deletion that a database
+// restore brought back (the deletion ledger, docs/deployment.md): a note
+// through the owner's deletion path, a note's audio, or one transcript's
+// text. A record the restored database never had, or already deleted,
+// changes nothing. It reports whether anything was deleted again.
+func (c *Configuration) ReplayVoiceDeletion(ctx context.Context, kind, organizationID, id string) (bool, error) {
+	noteID := id
+	switch kind {
+	case "voice_note", "voice_audio":
+	case "voice_transcript":
+		revision, err := c.client.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(id),
+			voicetranscriptrevision.OrganizationID(organizationID)).Only(ctx)
+		if ent.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		noteID = revision.NoteID
+	default:
+		return false, fmt.Errorf("unknown voice deletion kind %q", kind)
+	}
+	exists, err := c.client.VoiceNote.Query().Where(voicenote.ID(noteID), voicenote.OrganizationID(organizationID)).Exist(ctx)
+	if err != nil || !exists {
+		return false, err
+	}
+	tx, err := c.client.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	note, err := lockVoiceNote(ctx, tx, noteID)
+	if err != nil {
+		return false, err
+	}
+	actor := Actor{OrganizationID: organizationID, Kind: "service", Display: "deletion-ledger-replay"}
+	changed := false
+	switch kind {
+	case "voice_note":
+		changed = note.DeletedAt == nil
+		if changed {
+			err = deleteVoiceNoteTx(ctx, tx, actor, note, "ledger_replay")
+		}
+	case "voice_audio":
+		var deleted int
+		deleted, err = deleteVoiceAudioTx(ctx, tx, actor, noteID)
+		changed = deleted > 0
+	case "voice_transcript":
+		var revision *ent.VoiceTranscriptRevision
+		if revision, err = tx.VoiceTranscriptRevision.Get(ctx, id); err == nil && revision.RedactedAt == nil {
+			_, err = redactVoiceTranscriptTx(ctx, tx, actor, revision)
+			changed = true
+		}
+	}
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	c.purgeVoiceObjectsNow(ctx, noteID)
+	return changed, nil
 }

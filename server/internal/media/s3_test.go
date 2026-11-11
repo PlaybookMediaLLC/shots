@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -194,10 +195,10 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	key := "voice/org-1/note-1/0-abc.aac"
-	body := []byte("ADTS bytes")
+	key := "voice/org-1/note-1/0-abc.wav"
+	body := []byte("WAV bytes")
 	digest := sha256.Sum256(body)
-	url, headers, err := store.SignChecksummedUpload(context.Background(), key, "audio/aac", int64(len(body)), digest[:], 15*time.Minute)
+	url, headers, err := store.SignChecksummedUpload(context.Background(), key, "audio/wav", int64(len(body)), digest[:], 15*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +216,7 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 		}
 	}
 	if headers.Get("Host") != "" || headers.Get("X-Amz-Checksum-Sha256") != base64.StdEncoding.EncodeToString(digest[:]) ||
-		headers.Get("If-None-Match") != "*" || headers.Get("Content-Type") != "audio/aac" || headers.Get("Content-Length") != strconv.Itoa(len(body)) {
+		headers.Get("If-None-Match") != "*" || headers.Get("Content-Type") != "audio/wav" || headers.Get("Content-Length") != strconv.Itoa(len(body)) {
 		t.Fatalf("headers=%v", headers)
 	}
 	request, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
@@ -232,5 +233,9 @@ func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
 	download, err := store.SignDownloadFor(context.Background(), key, time.Hour)
 	if err != nil || !strings.Contains(download, "X-Amz-Expires=3600") {
 		t.Fatalf("download=%q err=%v", download, err)
+	}
+	// Completing a run that never arrived reads it once: a missing object is told apart.
+	if _, err := store.Open(context.Background(), "voice/org-1/note-1/1-missing.wav"); !errors.Is(err, ErrObjectNotFound) {
+		t.Fatalf("open a missing object: %v", err)
 	}
 }

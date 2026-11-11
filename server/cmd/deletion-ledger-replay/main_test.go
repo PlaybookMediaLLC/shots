@@ -38,6 +38,11 @@ func TestReadLedgerReadsEntriesFromTheRestoreDayOn(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// The voice domain files its entries in its own request, the same way.
+	voice := media.DeletionRecord{Kind: "voice_note", OrganizationID: "org-1", ID: "note-1", EventID: "voice", RequestedAt: restoredTo.Add(time.Hour)}
+	if err := media.PutDeletionRecord(ctx, store, voice); err != nil {
+		t.Fatal(err)
+	}
 	records, err := readLedger(ctx, store, restoredTo, restoredTo.Add(21*time.Hour))
 	if err != nil {
 		t.Fatal(err)
@@ -46,8 +51,8 @@ func TestReadLedgerReadsEntriesFromTheRestoreDayOn(t *testing.T) {
 	for _, record := range records {
 		found[record.EventID] = record
 	}
-	if len(records) != 3 || found["after"].ID != "asset-after" || !found["after"].RequestedAt.Equal(restoredTo.Add(time.Minute)) ||
-		found["same-day-old"].Kind != "asset" || found["next-day"].OrganizationID != "org-1" {
+	if len(records) != 4 || found["after"].ID != "asset-after" || !found["after"].RequestedAt.Equal(restoredTo.Add(time.Minute)) ||
+		found["same-day-old"].Kind != "asset" || found["next-day"].OrganizationID != "org-1" || found["voice"].Kind != voice.Kind || found["voice"].ID != voice.ID {
 		t.Fatalf("records: %+v", records)
 	}
 }

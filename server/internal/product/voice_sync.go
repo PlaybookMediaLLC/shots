@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -36,25 +37,30 @@ type VoiceTranscriptResult struct {
 	Command  *VoiceCommand           `json:"command"`
 }
 
+// voiceMaxRevisions bounds a note's transcript history.
+const voiceMaxRevisions = 50
+
 func validVoiceTranscript(input AddVoiceTranscriptInput) error {
 	limit := voiceNoteLimits.MaxTranscriptChars
 	switch {
-	case input.ClientRevisionID == "" || len(input.ClientRevisionID) > 100:
-		return invalid("clientRevisionId must have 1 to 100 characters.")
+	case input.ClientRevisionID == "" || len(input.ClientRevisionID) > 100 || strings.ContainsRune(input.ClientRevisionID, 0):
+		return invalid("clientRevisionId must have 1 to 100 characters and no NUL characters.")
 	case input.Origin != "on_device" && input.Origin != "remote" && input.Origin != "user_edit":
 		return invalid("origin must be on_device, remote or user_edit.")
 	case input.Locale != nil && !voiceLocalePattern.MatchString(*input.Locale):
 		return invalid("locale must be a language tag of at most 35 characters.")
-	case input.Engine != nil && (*input.Engine == "" || utf8.RuneCountInString(*input.Engine) > 64):
-		return invalid("engine must have 1 to 64 characters.")
+	case input.Engine != nil && (*input.Engine == "" || utf8.RuneCountInString(*input.Engine) > 64 || strings.ContainsRune(*input.Engine, 0)):
+		return invalid("engine must have 1 to 64 characters and no NUL characters.")
 	case utf8.RuneCountInString(input.Text) > limit:
 		return invalid("A transcript has at most 100,000 characters.")
+	case strings.ContainsRune(input.Text, 0):
+		return invalid("A transcript cannot contain NUL characters.")
 	}
 	total := 0
 	for _, segment := range input.Segments {
 		total += utf8.RuneCountInString(segment.Text)
-		if segment.StartMs < 0 || segment.EndMs < segment.StartMs || total > limit {
-			return invalid("Each segment needs 0 <= startMs <= endMs, and the segments at most 100,000 characters.")
+		if segment.StartMs < 0 || segment.EndMs < segment.StartMs || total > limit || strings.ContainsRune(segment.Text, 0) {
+			return invalid("Each segment needs 0 <= startMs <= endMs and no NUL characters, and the segments at most 100,000 characters.")
 		}
 	}
 	return nil
@@ -106,6 +112,13 @@ func (c *Configuration) AddVoiceTranscript(ctx context.Context, actor Actor, not
 		return nil, false, err
 	}
 	if created {
+		revisions, err := tx.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.NoteID(noteID)).Count(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		if revisions >= voiceMaxRevisions {
+			return nil, false, conflict("This note has 50 transcript revisions, the most a note may hold.")
+		}
 		if input.ParentID != nil {
 			exists, err := tx.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.ID(*input.ParentID),
 				voicetranscriptrevision.NoteID(noteID)).Exist(ctx)
@@ -189,18 +202,10 @@ func (c *Configuration) RedactVoiceTranscript(ctx context.Context, actor Actor, 
 		return nil, err
 	}
 	if revision.RedactedAt == nil {
-		if revision, err = revision.Update().SetText("").SetSegments([]schema.VoiceSegment{}).SetRedactedAt(time.Now().UTC()).Save(ctx); err != nil {
+		if revision, err = redactVoiceTranscriptTx(ctx, tx, actor, revision); err != nil {
 			return nil, err
 		}
-		if _, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.TranscriptRevisionID(revisionID),
-			voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
-			return nil, err
-		}
-		if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
-			return nil, err
-		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.voice_transcript_redacted", "voice_transcript_revision", revisionID,
-			map[string]any{"noteId": noteID}); err != nil {
+		if err := c.recordVoiceDeletion(ctx, "voice_transcript", revision.OrganizationID, revisionID); err != nil {
 			return nil, err
 		}
 	}
@@ -209,4 +214,28 @@ func (c *Configuration) RedactVoiceTranscript(ctx context.Context, actor Actor, 
 	}
 	result := voiceTranscriptRecord(revision)
 	return &result, nil
+}
+
+// redactVoiceTranscriptTx clears a revision of a locked note: its text and
+// segments, a pending proposal parsed from it, and the words of any command
+// row that can no longer be confirmed. It audits the purge (D1).
+func redactVoiceTranscriptTx(ctx context.Context, tx *ent.Tx, actor Actor, revision *ent.VoiceTranscriptRevision) (*ent.VoiceTranscriptRevision, error) {
+	noteID := revision.NoteID
+	revision, err := revision.Update().SetText("").SetSegments([]schema.VoiceSegment{}).SetRedactedAt(time.Now().UTC()).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.TranscriptRevisionID(revision.ID),
+		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
+		return nil, err
+	}
+	// A row withdrawn earlier may hold this revision's words under a newer revision's id.
+	if err := scrubVoiceCommand(ctx, tx, noteID); err != nil {
+		return nil, err
+	}
+	if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
+		return nil, err
+	}
+	return revision, appendConfigurationAudit(ctx, tx, actor, "product.voice_transcript_redacted", "voice_transcript_revision", revision.ID,
+		map[string]any{"noteId": noteID})
 }

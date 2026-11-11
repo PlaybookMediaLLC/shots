@@ -110,8 +110,12 @@ in UTC, written as RFC 3339 (`2026-11-10T12:00:00Z`).
 4. **Replay the deletion ledger.** Before it removes an asset's bytes, the
    outbox writes the deletion to R2 at
    `deletion-ledger/YYYY/MM/DD/<outbox event ID>.json`, under the day the
-   deletion was requested. An entry holds IDs only: kind, workspace, asset,
-   event and request time. Against the restored database, from `server/`:
+   deletion was requested. A member's voice deletion (a note, a note's audio
+   or a transcript's text) is written there by its own request, before it
+   commits, so a voice deletion the database holds is always in the ledger. An
+   entry holds IDs only: kind (`asset`, `voice_note`, `voice_audio`,
+   `voice_transcript`), workspace, record, entry ID and request time. Against
+   the restored database, from `server/`:
 
    ```sh
    DATABASE_URL=... R2_ENDPOINT=... R2_BUCKET_NAME=screenshot-studio \
@@ -120,9 +124,13 @@ in UTC, written as RFC 3339 (`2026-11-10T12:00:00Z`).
    ```
 
    Each asset deleted after `T` becomes `DELETED` again, with an
-   `asset.deleted` outbox event and an audit entry; the command prints how
-   many entries it read and how many records it deleted again. A second run
-   changes nothing. Bytes still in R2 go once the outbox schedule resumes.
+   `asset.deleted` outbox event and an audit entry. Each voice note is deleted
+   again through the owner's deletion path (transcripts redacted, audio
+   purged, audit reason `ledger_replay`), each note's audio and each
+   transcript likewise. The command prints how many entries it read and how
+   many records it deleted again. A second run changes nothing. Asset bytes
+   still in R2 go once the outbox schedule resumes; voice audio goes at once,
+   and the voice sweep deletes it again once maintenance resumes.
 5. **Resume.** Remove `TENANT_PUBLISHING_PAUSED` (a redeploy), then unpause
    the schedules (`temporal schedule toggle --schedule-id <id> --unpause`).
    The `scheduled-posts` job starts the held posts again. One due less than
@@ -132,14 +140,20 @@ in UTC, written as RFC 3339 (`2026-11-10T12:00:00Z`).
 
 Limits:
 
-- A deletion requested in the last minute or so before `T` may be missing
-  from the ledger if the outbox had not run yet. Its bytes are then still in
-  R2, so nothing is inconsistent, but the deletion is lost: ask the
-  workspace to delete it again.
-- The ledger records asset deletions. A workspace or account purge that ran
-  after `T` runs again from its restored request once maintenance resumes; a
-  workspace or account deletion requested after `T` is lost and must be
-  requested again.
+- An asset deletion requested in the last minute or so before `T` may be
+  missing from the ledger if the outbox had not run yet. Its bytes are then
+  still in R2, so nothing is inconsistent, but the deletion is lost: ask the
+  workspace to delete it again. Voice deletions have no such gap; one whose
+  ledger write succeeded but whose commit failed is deleted by the replay,
+  which is what the member asked for.
+- The ledger records asset deletions and members' voice deletions. Voice
+  deletions made by the voice sweep (a removed member's or a deleted
+  account's notes, a purged workspace's voice data, expired uploads) are not
+  recorded: the sweep finds them due again once maintenance resumes, from the
+  restored membership, account and workspace deletion records. A workspace or
+  account purge that ran after `T` runs again from its restored request once
+  maintenance resumes; a workspace or account deletion requested after `T` is
+  lost and must be requested again.
 - The pause stops posts, not the follow-ups (reposts, plugs) of posts that
   are already live.
 - Ledger entries matter only within the two-day restore window and are never

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,13 +16,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/maintenance"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
 
 // voiceObjects is object storage in memory: what was signed, stored and
-// deleted, and a switch to make deletes fail.
+// deleted, and switches to make deletes or writes fail.
 type voiceObjects struct {
 	mu          sync.Mutex
 	stored      map[string][]byte
@@ -30,6 +34,9 @@ type voiceObjects struct {
 	signedSize  int64
 	signedSum   []byte
 	failDeletes bool
+	failPuts    bool
+	// onRead runs as a stored object is read back, before its bytes.
+	onRead func()
 }
 
 func (o *voiceObjects) SignUpload(context.Context, string, string) (string, error) {
@@ -48,15 +55,21 @@ func (o *voiceObjects) Put(_ context.Context, key, _ string, body io.Reader) err
 	data, err := io.ReadAll(body)
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if o.failPuts {
+		return errors.New("storage is down")
+	}
 	o.stored[key] = data
 	return err
 }
 func (o *voiceObjects) Read(_ context.Context, key string) ([]byte, error) {
+	if o.onRead != nil {
+		o.onRead()
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	data, ok := o.stored[key]
 	if !ok {
-		return nil, errors.New("NoSuchKey")
+		return nil, media.ErrObjectNotFound
 	}
 	return data, nil
 }
@@ -89,6 +102,42 @@ func (o *voiceObjects) put(key string, data []byte) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.stored[key] = data
+}
+
+// audio counts the stored voice recordings.
+func (o *voiceObjects) audio() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	count := 0
+	for key := range o.stored {
+		if strings.HasPrefix(key, "voice/") {
+			count++
+		}
+	}
+	return count
+}
+
+// ledger reads back the deletion-ledger entries, each filed under the day it
+// was requested and named by its event ID.
+func (o *voiceObjects) ledger(t *testing.T) []media.DeletionRecord {
+	t.Helper()
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	records := []media.DeletionRecord{}
+	for key, body := range o.stored {
+		if !strings.HasPrefix(key, "deletion-ledger/") {
+			continue
+		}
+		var record media.DeletionRecord
+		if err := json.Unmarshal(body, &record); err != nil {
+			t.Fatal(err)
+		}
+		if key != media.DeletionLedgerDay(record.RequestedAt)+record.EventID+".json" {
+			t.Fatalf("ledger entry %s is filed under the wrong key", key)
+		}
+		records = append(records, record)
+	}
+	return records
 }
 
 type voiceFixture struct {
@@ -214,7 +263,7 @@ func TestVoiceSettingsAndGates(t *testing.T) {
 	f := newVoiceFixture(t)
 	ctx, on, off := f.ctx, true, false
 	settings, err := f.repo.GetVoiceSettings(ctx, f.creator)
-	if err != nil || settings.Workspace != (VoiceWorkspaceFlags{}) || settings.CanManage || settings.MinAppVersion != "1.0.0" ||
+	if err != nil || settings.Workspace != (VoiceWorkspaceFlags{}) || settings.CanManage || settings.MinAppVersion != "0.0.0" ||
 		settings.Limits != (VoiceLimits{MaxNoteMs: 1800000, WarnAtMs: 1500000, MinNoteMs: 1000, MaxTranscriptChars: 100000, MaxCommandChars: 2000}) ||
 		settings.Switches != (VoiceSwitches{Notes: true, AudioUpload: true, Drafts: true, Parse: true, Confirm: true}) {
 		t.Fatalf("defaults=%+v err=%v", settings, err)
@@ -263,8 +312,8 @@ func TestVoiceSettingsAndGates(t *testing.T) {
 	t.Setenv("VOICE_DISABLED", "")
 
 	// Audio upload needs the workspace flag, the note's consent and the switch.
-	run := joined(adtsFrame(8, 40, 1, false), adtsFrame(8, 40, 1, false))
-	upload := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	upload := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
 	withoutConsent, withConsent := f.note(f.creator, "n3", false), f.note(f.creator, "n4", true)
 	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, withConsent.ID, 0, upload)
 	expectVoice(t, err, publishing.ErrForbidden, "upload while the workspace has audio off")
@@ -461,10 +510,19 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 		t.Fatalf("inbox=%+v err=%v", page, err)
 	}
 
-	// Redaction (D1): text and segments cleared, audited once, never shown in the audit.
+	// Redaction (D1): text and segments cleared, audited once, never shown in the
+	// audit, and no unconfirmed command row keeps transcript words.
+	commandWords := func() string {
+		return f.value(`SELECT status || ':' || concat(text, notice, platform, "localTime") FROM voice_command WHERE id=$1`, "command_"+f.id)
+	}
+	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone",text,notice,platform,"localTime")
+		VALUES ($1,$2,$3,$4,$5,'expired','UTC','post the words','words','x','2026-11-12T09:00')`, "command_"+f.id, f.org, f.creator.UserID, note.ID, later.Revision.ID)
 	redacted, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, editA.Revision.ID)
 	if err != nil || !redacted.Redacted || redacted.Text != "" || len(redacted.Segments) != 0 || f.audited("product.voice_transcript_redacted") != 1 {
 		t.Fatalf("redacted=%+v err=%v", redacted, err)
+	}
+	if words := commandWords(); words != "expired:" {
+		t.Fatalf("an expired command kept transcript words after a redaction: %s", words)
 	}
 	if _, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, editA.Revision.ID); err != nil || f.audited("product.voice_transcript_redacted") != 1 {
 		t.Fatalf("redacting again: %v", err)
@@ -472,9 +530,9 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 	_, err = f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, ownersNote.ID)
 	expectVoice(t, err, publishing.ErrNotFound, "redact a revision of no such note")
 
-	// Deletion: a tombstone, every transcript redacted, the proposal withdrawn.
-	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone") VALUES ($1,$2,$3,$4,$5,'proposed','UTC')`,
-		"command_"+f.id, f.org, f.creator.UserID, note.ID, later.Revision.ID)
+	// Deletion: a tombstone, every transcript redacted, the proposal withdrawn
+	// with no transcript words left on it.
+	f.exec(`UPDATE voice_command SET status='proposed',text='post the words',notice='words',platform='x',"localTime"='2026-11-12T09:00' WHERE id=$1`, "command_"+f.id)
 	revision := later.Note.Revision + 1 // the redaction bumped it
 	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
 		t.Fatal(err)
@@ -488,8 +546,8 @@ func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 			t.Fatalf("a transcript survived deletion: %+v", transcript)
 		}
 	}
-	if status := f.value(`SELECT status FROM voice_command WHERE id=$1`, "command_"+f.id); status != "withdrawn" {
-		t.Fatalf("command status=%s", status)
+	if words := commandWords(); words != "withdrawn:" {
+		t.Fatalf("command after deletion=%s", words)
 	}
 	if f.audited("product.voice_note_deleted") != 1 {
 		t.Fatal("deletion was not audited")
@@ -558,15 +616,14 @@ func TestVoiceAudioRuns(t *testing.T) {
 	ctx := f.ctx
 	f.enable(true, true)
 	note := f.note(f.creator, "audio-note", true)
-	frame := adtsFrame(8, 40, 1, false)
-	run := joined(frame, frame, frame) // 192 ms at 16 kHz
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 6144)) // 192 ms at 16 kHz
 	sum := digestOf(run)
 	sign := func(runIndex int, input VoiceRunUploadInput) (*VoiceRunUpload, error) {
 		return f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, runIndex, input)
 	}
-	aac := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: strings.ToUpper(sum), StartOffsetMs: 0, DurationMs: voicePtr(5000)}
-	first, err := sign(0, aac)
-	key := "voice/" + f.org + "/" + note.ID + "/0-" + sum + ".aac"
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: strings.ToUpper(sum), StartOffsetMs: 0, DurationMs: voicePtr(5000)}
+	first, err := sign(0, pcm)
+	key := "voice/" + f.org + "/" + note.ID + "/0-" + sum + ".wav"
 	if err != nil || first.Method != "PUT" || !strings.Contains(first.URL, key) || first.Headers["If-None-Match"] != "*" ||
 		first.Headers["X-Amz-Checksum-Sha256"] == "" || !first.ExpiresAt.After(time.Now()) {
 		t.Fatalf("upload=%+v err=%v", first, err)
@@ -574,26 +631,27 @@ func TestVoiceAudioRuns(t *testing.T) {
 	if f.objects.signedSize != int64(len(run)) || fmt.Sprintf("%x", f.objects.signedSum) != sum {
 		t.Fatal("S5: the URL was not signed with the file's length and checksum")
 	}
-	second, err := sign(0, aac)
+	second, err := sign(0, pcm)
 	if err != nil || second.URL == first.URL || f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1`, note.ID) != "1" {
 		t.Fatalf("S3: a new URL for the same run=%+v err=%v", second, err)
 	}
-	other := joined(frame, frame)
-	_, err = sign(0, VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(other)), SHA256: digestOf(other)})
+	other := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	_, err = sign(0, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(other)), SHA256: digestOf(other)})
 	expectVoice(t, err, publishing.ErrConflict, "another file for an uploaded run index")
 	for name, input := range map[string]VoiceRunUploadInput{
-		"another format":  {ContentType: "audio/mpeg", Bytes: 10, SHA256: sum},
-		"too large AAC":   {ContentType: "audio/aac", Bytes: 21 << 20, SHA256: sum},
-		"too large WAV":   {ContentType: "audio/wav", Bytes: 201 << 20, SHA256: sum},
-		"not a checksum":  {ContentType: "audio/aac", Bytes: 10, SHA256: "xyz"},
-		"negative offset": {ContentType: "audio/aac", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
+		"another format":         {ContentType: "audio/mpeg", Bytes: 10, SHA256: sum},
+		"AAC":                    {ContentType: "audio/aac", Bytes: 10, SHA256: sum},
+		"too large WAV":          {ContentType: "audio/wav", Bytes: 201 << 20, SHA256: sum},
+		"not a checksum":         {ContentType: "audio/wav", Bytes: 10, SHA256: "xyz"},
+		"negative offset":        {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: -1},
+		"offset past 31 minutes": {ContentType: "audio/wav", Bytes: 10, SHA256: sum, StartOffsetMs: voiceMaxRunMs + 1},
 	} {
 		_, err := sign(1, input)
 		expectVoice(t, err, ErrInvalidInput, name)
 	}
-	_, err = sign(1000, aac)
+	_, err = sign(50, pcm)
 	expectVoice(t, err, ErrInvalidInput, "run index out of range")
-	_, err = f.repo.SignVoiceRunUpload(ctx, f.owner, note.ID, 0, aac)
+	_, err = f.repo.SignVoiceRunUpload(ctx, f.owner, note.ID, 0, pcm)
 	expectVoice(t, err, publishing.ErrNotFound, "another member signs an upload")
 
 	// S4: a missing, truncated or non-audio object stays pending; the phone resends.
@@ -612,10 +670,10 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatalf("a truncated object was kept (exists=%v) or the run left pending (%s)", exists, status(0))
 	}
 	garbage := bytes.Repeat([]byte("not audio "), 10)
-	if _, err := sign(2, VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(garbage)), SHA256: digestOf(garbage)}); err != nil {
+	if _, err := sign(2, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(garbage)), SHA256: digestOf(garbage)}); err != nil {
 		t.Fatal(err)
 	}
-	f.objects.put("voice/"+f.org+"/"+note.ID+"/2-"+digestOf(garbage)+".aac", garbage)
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/2-"+digestOf(garbage)+".wav", garbage)
 	_, err = complete(2)
 	expectVoice(t, err, ErrInvalidInput, "an object that is not audio")
 	if status(2) != "pending" {
@@ -651,6 +709,22 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatalf("wav run=%+v err=%v", wavRun, err)
 	}
 
+	// A note holds at most 31 minutes of audio across its runs.
+	if _, err := sign(4, VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(wav)), SHA256: digestOf(wav), StartOffsetMs: 1692}); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/4-"+digestOf(wav)+".wav", wav)
+	f.exec(`UPDATE voice_audio_run SET "durationMs"=$2 WHERE "noteId"=$1 AND "runIndex"=0`, note.ID, voiceMaxRunMs-2999)
+	_, err = complete(4)
+	expectVoice(t, err, publishing.ErrConflict, "a run past the note's 31 minutes")
+	if status(4) != "pending" {
+		t.Fatalf("a refused run status=%s", status(4))
+	}
+	f.exec(`UPDATE voice_audio_run SET "durationMs"=$2 WHERE "noteId"=$1 AND "runIndex"=0`, note.ID, voiceMaxRunMs-3000)
+	if run, err := complete(4); err != nil || run.Status != "available" {
+		t.Fatalf("a run filling the note exactly=%+v err=%v", run, err)
+	}
+
 	// Playback is the owner's alone, and only of an available run.
 	if audio, err := f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0); err != nil || !strings.Contains(audio.URL, key) {
 		t.Fatalf("audio=%+v err=%v", audio, err)
@@ -668,7 +742,7 @@ func TestVoiceAudioRuns(t *testing.T) {
 		t.Fatal(err)
 	}
 	detail, err := f.repo.GetVoiceNote(ctx, f.creator, note.ID)
-	if err != nil || len(detail.Transcripts) != 1 || detail.Transcripts[0].Text != "kept words" || len(detail.Runs) != 3 || f.audited("product.voice_audio_deleted") != 1 {
+	if err != nil || len(detail.Transcripts) != 1 || detail.Transcripts[0].Text != "kept words" || len(detail.Runs) != 4 || f.audited("product.voice_audio_deleted") != 1 {
 		t.Fatalf("after deleting audio=%+v err=%v", detail, err)
 	}
 	for _, run := range detail.Runs {
@@ -676,12 +750,13 @@ func TestVoiceAudioRuns(t *testing.T) {
 			t.Fatalf("run=%+v", run)
 		}
 	}
-	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "0" || len(f.objects.stored) != 0 {
-		t.Fatalf("unpurged runs=%s objects=%d", left, len(f.objects.stored))
+	// The objects go at once; the purge is recorded once no upload URL is left.
+	if left := f.value(`SELECT count(*)::text FROM voice_audio_run WHERE "noteId"=$1 AND "objectPurgedAt" IS NULL`, note.ID); left != "4" || f.objects.audio() != 0 {
+		t.Fatalf("unrecorded runs=%s objects=%d", left, f.objects.audio())
 	}
 	_, err = f.repo.SignVoiceRunAudio(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, publishing.ErrNotFound, "play deleted audio")
-	_, err = sign(0, aac)
+	_, err = sign(0, pcm)
 	expectVoice(t, err, publishing.ErrConflict, "upload a deleted run again")
 	if err := f.repo.DeleteVoiceAudio(ctx, f.creator, note.ID); err != nil || f.audited("product.voice_audio_deleted") != 1 {
 		t.Fatalf("deleting audio again: %v", err)
@@ -691,10 +766,10 @@ func TestVoiceAudioRuns(t *testing.T) {
 	// A purge that fails after the commit is retried by the sweep; the
 	// deletion itself still succeeds.
 	second2 := f.note(f.creator, "audio-note-2", true)
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 0, aac); err != nil {
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
-	key2 := "voice/" + f.org + "/" + second2.ID + "/0-" + sum + ".aac"
+	key2 := "voice/" + f.org + "/" + second2.ID + "/0-" + sum + ".wav"
 	f.objects.put(key2, run)
 	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, second2.ID, 0); err != nil {
 		t.Fatal(err)
@@ -709,16 +784,47 @@ func TestVoiceAudioRuns(t *testing.T) {
 	_, err = f.repo.SweepVoice(ctx)
 	expectVoice(t, err, ErrStorageUnavailable, "the sweep reports storage failures")
 	f.objects.failDeletes = false
+	f.exec(`UPDATE voice_audio_run SET "updatedAt"=now()-interval '21 minutes' WHERE "noteId"=$1`, second2.ID)
 	if _, err := f.repo.SweepVoice(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if exists, _ := f.objects.Exists(ctx, key2); exists || f.value(`SELECT "objectPurgedAt" IS NOT NULL FROM voice_audio_run WHERE "noteId"=$1`, second2.ID) != "true" {
 		t.Fatal("the sweep did not purge the deleted note's audio")
 	}
-	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 1, aac)
+	_, err = f.repo.SignVoiceRunUpload(ctx, f.creator, second2.ID, 1, pcm)
 	expectVoice(t, err, publishing.ErrConflict, "upload to a deleted note")
 	_, err = f.repo.CompleteVoiceRun(ctx, f.creator, second2.ID, 0)
 	expectVoice(t, err, publishing.ErrConflict, "complete a run of a deleted note")
+
+	// A note deleted while its upload is in flight: the signed PUT stays
+	// valid for 15 minutes and can land after the purge. The sweep deletes it
+	// again, and records the purge only once that URL has expired.
+	inflight := f.note(f.creator, "audio-note-3", true)
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, inflight.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, inflight.ID); err != nil {
+		t.Fatal(err)
+	}
+	key3 := "voice/" + f.org + "/" + inflight.ID + "/0-" + sum + ".wav"
+	purged := func() string {
+		return f.value(`SELECT ("objectPurgedAt" IS NOT NULL)::text FROM voice_audio_run WHERE "noteId"=$1`, inflight.ID)
+	}
+	f.objects.put(key3, run) // the late PUT
+	if _, err := f.repo.SweepVoice(ctx); err != nil || purged() != "false" {
+		t.Fatalf("purge recorded while the upload URL is valid: %s %v", purged(), err)
+	}
+	if exists, _ := f.objects.Exists(ctx, key3); exists {
+		t.Fatal("a late upload outlived the sweep")
+	}
+	f.objects.put(key3, run)
+	f.exec(`UPDATE voice_audio_run SET "updatedAt"=now()-interval '21 minutes' WHERE "noteId"=$1`, inflight.ID)
+	if _, err := f.repo.SweepVoice(ctx); err != nil || purged() != "true" {
+		t.Fatalf("purge not recorded after the URL expired: %s %v", purged(), err)
+	}
+	if exists, _ := f.objects.Exists(ctx, key3); exists {
+		t.Fatal("the last sweep left the late upload")
+	}
 }
 
 // Sweeps: unfinished uploads fail after a day (D5); a removed member is
@@ -729,11 +835,10 @@ func TestVoiceSweeps(t *testing.T) {
 	ctx := f.ctx
 	f.enable(true, true)
 	note := f.note(f.creator, "sweep-note", true)
-	frame := adtsFrame(8, 40, 1, false)
-	run := joined(frame, frame)
-	aac := VoiceRunUploadInput{ContentType: "audio/aac", Bytes: int64(len(run)), SHA256: digestOf(run)}
-	key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".aac"
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, aac); err != nil {
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".wav"
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
 	f.objects.put(key, run)
@@ -741,7 +846,7 @@ func TestVoiceSweeps(t *testing.T) {
 	if _, err := f.repo.SweepVoice(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if status := f.value(`SELECT status || ':' || ("failureReason" IS NOT NULL) || ':' || ("objectPurgedAt" IS NOT NULL) FROM voice_audio_run WHERE "noteId"=$1`, note.ID); status != "failed:true:true" {
+	if status := f.value(`SELECT status || ':' || ("failureReason" IS NOT NULL) || ':' || ("objectPurgedAt" IS NOT NULL) FROM voice_audio_run WHERE "noteId"=$1`, note.ID); status != "failed:true:false" {
 		t.Fatalf("expired upload=%s", status)
 	}
 	if exists, _ := f.objects.Exists(ctx, key); exists {
@@ -749,7 +854,7 @@ func TestVoiceSweeps(t *testing.T) {
 	}
 	_, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0)
 	expectVoice(t, err, ErrInvalidInput, "complete an expired upload")
-	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, aac); err != nil {
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
 		t.Fatal(err)
 	}
 	f.objects.put(key, run)
@@ -822,4 +927,421 @@ func TestVoiceSweeps(t *testing.T) {
 	if live := f.value(`SELECT ("deletedAt" IS NULL)::text FROM voice_note WHERE id=$1`, note.ID); live != "true" {
 		t.Fatal("the sweep deleted a current member's note")
 	}
+}
+
+// A note holds at most 50 transcript revisions; a replay of a stored one
+// still answers.
+func TestVoiceTranscriptRevisionLimit(t *testing.T) {
+	f := newVoiceFixture(t)
+	f.enable(true, false)
+	note := f.note(f.creator, "many-revisions", false)
+	for i := range voiceMaxRevisions {
+		if _, _, err := f.transcript(f.creator, note.ID, "rev-"+strconv.Itoa(i), nil, "user_edit", "words"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, _, err := f.transcript(f.creator, note.ID, "rev-extra", nil, "user_edit", "words")
+	expectVoice(t, err, publishing.ErrConflict, "a 51st revision")
+	if _, created, err := f.transcript(f.creator, note.ID, "rev-0", nil, "user_edit", "words"); err != nil || created {
+		t.Fatalf("a replay at the limit: created=%v err=%v", created, err)
+	}
+}
+
+// The workspace purge keeps the organization row, so nothing cascades to
+// voice data: the sweep removes it, objects first, once the upload URLs
+// signed before the purge have expired.
+func TestVoiceSweepRemovesAPurgedWorkspace(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx, on := f.ctx, true
+	f.enable(true, true)
+	note := f.note(f.creator, "purged-note", true)
+	if _, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words"); err != nil {
+		t.Fatal(err)
+	}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	for runIndex := range 2 {
+		if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, runIndex, pcm); err != nil {
+			t.Fatal(err)
+		}
+		f.objects.put("voice/"+f.org+"/"+note.ID+"/"+strconv.Itoa(runIndex)+"-"+digestOf(run)+".wav", run)
+	}
+	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.repo.UpdateVoiceMemberSettings(ctx, f.creator, VoiceMemberSettingsInput{RemoteTextConsent: &on}); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone",text)
+		SELECT $1,$2,$3,$4,id,'proposed','UTC','post the words' FROM voice_transcript_revision WHERE "noteId"=$4`, "command_"+f.id, f.org, f.creator.UserID, note.ID)
+	if _, err := f.repo.UpdateVoiceWorkspaceSettings(ctx, f.foreign, VoiceWorkspaceFlagsInput{VoiceNotes: &on}); err != nil {
+		t.Fatal(err)
+	}
+	kept := f.note(f.foreign, "kept-note", false)
+
+	// What the workspace deletion job leaves: the organization, no members, a purged request.
+	f.exec(`INSERT INTO workspace_deletion(id,"organizationId","requestedByUserId","scheduledFor","updatedAt") VALUES($1,$2,$3,now()-interval '1 day',now())`,
+		"deletion_"+f.id, f.org, f.owner.UserID)
+	if purged, err := (&maintenance.Store{DB: f.db.SQL}).WorkspaceCleanup(ctx); err != nil || purged != 1 {
+		t.Fatalf("workspace purge=%d err=%v", purged, err)
+	}
+	voiceRows := func() string {
+		return f.value(`SELECT concat_ws(',', (SELECT count(*) FROM voice_note WHERE "organizationId"=$1), (SELECT count(*) FROM voice_transcript_revision WHERE "organizationId"=$1),
+			(SELECT count(*) FROM voice_audio_run WHERE "organizationId"=$1), (SELECT count(*) FROM voice_command WHERE "organizationId"=$1),
+			(SELECT count(*) FROM voice_settings WHERE "organizationId"=$1), (SELECT count(*) FROM voice_member_settings WHERE "organizationId"=$1))`, f.org)
+	}
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "1,1,2,1,1,1" || f.objects.audio() != 2 {
+		t.Fatalf("removed while upload URLs are valid: rows=%s objects=%d err=%v", voiceRows(), f.objects.audio(), err)
+	}
+	f.exec(`UPDATE workspace_deletion SET "purgedAt"=now()-interval '21 minutes' WHERE id=$1`, "deletion_"+f.id)
+	f.objects.failDeletes = true
+	_, err := f.repo.SweepVoice(ctx)
+	expectVoice(t, err, ErrStorageUnavailable, "a purged workspace's objects while storage is down")
+	if voiceRows() != "1,1,2,1,1,1" {
+		t.Fatalf("rows went before their objects: %s", voiceRows())
+	}
+	f.objects.failDeletes = false
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "0,0,0,0,0,0" || f.objects.audio() != 0 {
+		t.Fatalf("after the sweep: rows=%s objects=%d err=%v", voiceRows(), f.objects.audio(), err)
+	}
+	if _, err := f.repo.GetVoiceNote(ctx, f.foreign, kept.ID); err != nil {
+		t.Fatalf("another workspace's note: %v", err)
+	}
+}
+
+// D3: each deletion a member makes is written to the R2 deletion ledger
+// before it commits, and a replay after a database restore deletes it again
+// through the same paths.
+func TestVoiceDeletionLedger(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	recorded := func(clientNoteID string) (*VoiceNoteDetail, string, string) {
+		t.Helper()
+		note := f.note(f.creator, clientNoteID, true)
+		result, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+			t.Fatal(err)
+		}
+		key := "voice/" + f.org + "/" + note.ID + "/0-" + digestOf(run) + ".wav"
+		f.objects.put(key, run)
+		if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+			t.Fatal(err)
+		}
+		return note, result.Revision.ID, key
+	}
+	state := func(noteID string) string {
+		return f.value(`SELECT ("deletedAt" IS NOT NULL) || ':' || (SELECT string_agg(text, '') FROM voice_transcript_revision WHERE "noteId"=n.id) || ':' ||
+			(SELECT string_agg(status, ',') FROM voice_audio_run WHERE "noteId"=n.id) FROM voice_note n WHERE id=$1`, noteID)
+	}
+
+	// Writing: one entry for each deletion, none for a replayed request.
+	note, revisionID, _ := recorded("ledger-note")
+	before := time.Now().Add(-time.Second)
+	if _, err := f.repo.RedactVoiceTranscript(ctx, f.creator, note.ID, revisionID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceAudio(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	written := map[string]string{}
+	for _, record := range f.objects.ledger(t) {
+		if record.OrganizationID != f.org || record.RequestedAt.Before(before) || record.RequestedAt.After(time.Now()) {
+			t.Fatalf("ledger entry=%+v", record)
+		}
+		written[record.Kind] += record.ID
+	}
+	if len(written) != 3 || written["voice_transcript"] != revisionID || written["voice_audio"] != note.ID || written["voice_note"] != note.ID {
+		t.Fatalf("ledger=%v", written)
+	}
+
+	// A deletion the ledger cannot record does not happen.
+	unrecorded, _, key := recorded("unrecorded-note")
+	f.objects.failPuts = true
+	expectVoice(t, f.repo.DeleteVoiceNote(ctx, f.creator, unrecorded.ID), ErrStorageUnavailable, "delete while the ledger is down")
+	f.objects.failPuts = false
+	if state(unrecorded.ID) != "false:private words:available" || f.objects.audio() != 1 {
+		t.Fatalf("an unrecorded deletion went ahead: %s", state(unrecorded.ID))
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, unrecorded.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// Replaying: a restore to before the deletion brings the note back whole;
+	// the ledger's entries delete it again, once.
+	restoredTo := before.Add(-time.Hour)
+	f.exec(`UPDATE voice_note SET "deletedAt"=NULL WHERE id=$1`, unrecorded.ID)
+	f.exec(`UPDATE voice_transcript_revision SET text='private words',"redactedAt"=NULL WHERE "noteId"=$1`, unrecorded.ID)
+	f.exec(`UPDATE voice_audio_run SET status='available',"objectPurgedAt"=NULL WHERE "noteId"=$1`, unrecorded.ID)
+	f.objects.put(key, run)
+	jobs := &maintenance.Store{DB: f.db.SQL, Events: f.repo}
+	if replayed, err := jobs.ReplayDeletions(ctx, f.objects.ledger(t), restoredTo); err != nil || replayed != 1 {
+		t.Fatalf("replayed=%d err=%v", replayed, err)
+	}
+	if state(unrecorded.ID) != "true::deleted" || f.objects.audio() != 0 {
+		t.Fatalf("after the replay: %s objects=%d", state(unrecorded.ID), f.objects.audio())
+	}
+	if reason := f.value(`SELECT metadata->>'reason' FROM audit_log WHERE action='product.voice_note_deleted' AND "entityId"=$1 ORDER BY "createdAt" DESC LIMIT 1`, unrecorded.ID); reason != "ledger_replay" {
+		t.Fatalf("replay audit reason=%s", reason)
+	}
+	if replayed, err := jobs.ReplayDeletions(ctx, f.objects.ledger(t), restoredTo); err != nil || replayed != 0 {
+		t.Fatalf("a second replay=%d err=%v", replayed, err)
+	}
+
+	// Audio and transcript entries delete just that, and only in their workspace.
+	live, liveRevision, _ := recorded("live-note")
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_audio", f.other, live.ID); err != nil || changed {
+		t.Fatalf("another workspace's entry changed the note: %v %v", changed, err)
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_audio", f.org, live.ID); err != nil || !changed || state(live.ID) != "false:private words:deleted" {
+		t.Fatalf("audio replay: %v %v %s", changed, err, state(live.ID))
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_transcript", f.org, liveRevision); err != nil || !changed || state(live.ID) != "false::deleted" {
+		t.Fatalf("transcript replay: %v %v %s", changed, err, state(live.ID))
+	}
+	if changed, err := f.repo.ReplayVoiceDeletion(ctx, "voice_transcript", f.org, liveRevision); err != nil || changed {
+		t.Fatalf("a second transcript replay: %v %v", changed, err)
+	}
+	if _, err := f.repo.ReplayVoiceDeletion(ctx, "voice_memo", f.org, live.ID); err == nil {
+		t.Fatal("an unknown voice kind was skipped")
+	}
+}
+
+// Postgres text holds no NUL, and a phone clock a day ahead is wrong: both
+// answer 400 instead of failing the write.
+func TestVoiceNoteInputHardening(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, false)
+	create := func(clientNoteID string, title *string, recordedAt time.Time) error {
+		_, _, err := f.repo.CreateVoiceNote(ctx, f.creator, CreateVoiceNoteInput{ClientNoteID: clientNoteID, Title: title, RecordedAt: recordedAt, RecordedTimeZone: "UTC"})
+		return err
+	}
+	expectVoice(t, create("n\x00", nil, time.Now()), ErrInvalidInput, "a NUL in clientNoteId")
+	expectVoice(t, create("titled", voicePtr("a\x00b"), time.Now()), ErrInvalidInput, "a NUL in the title")
+	expectVoice(t, create("future", nil, time.Now().Add(25*time.Hour)), ErrInvalidInput, "recordedAt a day ahead")
+	if err := create("ahead", nil, time.Now().Add(23*time.Hour)); err != nil {
+		t.Fatalf("a clock less than a day ahead: %v", err)
+	}
+	note := f.note(f.creator, "plain", false)
+	_, err := f.repo.UpdateVoiceNote(ctx, f.creator, note.ID, UpdateVoiceNoteInput{ExpectedRevision: 1, Title: voicePtr("a\x00b")})
+	expectVoice(t, err, ErrInvalidInput, "a NUL in a new title")
+	_, _, err = f.transcript(f.creator, note.ID, "r1", nil, "on_device", "a\x00b")
+	expectVoice(t, err, ErrInvalidInput, "a NUL in a transcript")
+}
+
+// A run read back while the upload sweep expires it answers that the upload
+// expired and must be resent, not that its audio was deleted.
+func TestVoiceCompleteLosesToTheUploadSweep(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	note := f.note(f.creator, "slow-note", true)
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/0-"+digestOf(run)+".wav", run)
+	// What the sweep's expiry writes, between the read and the conditional update.
+	f.objects.onRead = func() {
+		f.exec(`UPDATE voice_audio_run SET status='failed',"failureReason"='The upload was not completed within 24 hours.' WHERE "noteId"=$1`, note.ID)
+	}
+	_, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0)
+	f.objects.onRead = nil
+	expectVoice(t, err, ErrInvalidInput, "complete after the sweep expired the run")
+	if !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("message=%v", err)
+	}
+}
+
+// S1 under a real race: two creates of one clientNoteId at once both answer
+// with the one note, exactly one of them as created.
+func TestVoiceCreateRace(t *testing.T) {
+	f := newVoiceFixture(t)
+	f.enable(true, false)
+	type outcome struct {
+		id      string
+		created bool
+		err     error
+	}
+	for round := range 20 {
+		input := CreateVoiceNoteInput{ClientNoteID: "race-" + strconv.Itoa(round), RecordedAt: time.Now(), RecordedTimeZone: "UTC"}
+		start, results := make(chan struct{}), make([]outcome, 2)
+		var wg sync.WaitGroup
+		for i := range results {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				note, created, err := f.repo.CreateVoiceNote(f.ctx, f.creator, input)
+				results[i] = outcome{created: created, err: err}
+				if note != nil {
+					results[i].id = note.ID
+				}
+			}()
+		}
+		close(start)
+		wg.Wait()
+		if results[0].err != nil || results[1].err != nil || results[0].id == "" || results[0].id != results[1].id || results[0].created == results[1].created {
+			t.Fatalf("round %d: %+v", round, results)
+		}
+		if count := f.value(`SELECT count(*)::text FROM voice_note WHERE "ownerUserId"=$1 AND "clientNoteId"=$2`, f.creator.UserID, input.ClientNoteID); count != "1" {
+			t.Fatalf("round %d: %s notes", round, count)
+		}
+	}
+}
+
+// Every operation on a note: another member of the workspace and another
+// workspace find nothing (its existence never leaks); an API key, which has
+// no member, is refused. Nothing changes.
+func TestVoiceNoteOperationsAreTheOwnersAlone(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	note := f.note(f.creator, "private-note", true)
+	result, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/0-"+digestOf(run)+".wav", run)
+	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	revision := f.value(`SELECT revision::text FROM voice_note WHERE id=$1`, note.ID)
+	operations := map[string]func(Actor) error{
+		"get": func(a Actor) error { _, err := f.repo.GetVoiceNote(ctx, a, note.ID); return err },
+		"update": func(a Actor) error {
+			_, err := f.repo.UpdateVoiceNote(ctx, a, note.ID, UpdateVoiceNoteInput{ExpectedRevision: 1, Title: voicePtr("Mine now")})
+			return err
+		},
+		"delete": func(a Actor) error { return f.repo.DeleteVoiceNote(ctx, a, note.ID) },
+		"add transcript": func(a Actor) error {
+			_, _, err := f.repo.AddVoiceTranscript(ctx, a, note.ID, AddVoiceTranscriptInput{ClientRevisionID: "x", Origin: "user_edit", Text: "words"})
+			return err
+		},
+		"redact": func(a Actor) error {
+			_, err := f.repo.RedactVoiceTranscript(ctx, a, note.ID, result.Revision.ID)
+			return err
+		},
+		"sign upload": func(a Actor) error {
+			_, err := f.repo.SignVoiceRunUpload(ctx, a, note.ID, 1, pcm)
+			return err
+		},
+		"complete":     func(a Actor) error { _, err := f.repo.CompleteVoiceRun(ctx, a, note.ID, 0); return err },
+		"play":         func(a Actor) error { _, err := f.repo.SignVoiceRunAudio(ctx, a, note.ID, 0); return err },
+		"delete audio": func(a Actor) error { return f.repo.DeleteVoiceAudio(ctx, a, note.ID) },
+	}
+	for name, operation := range operations {
+		for _, caller := range []struct {
+			who   string
+			actor Actor
+			want  error
+		}{{"another member", f.owner, publishing.ErrNotFound}, {"another workspace", f.foreign, publishing.ErrNotFound}, {"an API key", f.apiKey, publishing.ErrForbidden}} {
+			expectVoice(t, operation(caller.actor), caller.want, caller.who+": "+name)
+		}
+	}
+	if after := f.value(`SELECT revision::text FROM voice_note WHERE id=$1`, note.ID); after != revision || f.objects.audio() != 1 {
+		t.Fatalf("someone else changed the note: revision %s -> %s, objects=%d", revision, after, f.objects.audio())
+	}
+}
+
+// The transcript's bounds, at their edges.
+func TestValidVoiceTranscript(t *testing.T) {
+	segments := func(lengths ...int) []schema.VoiceSegment {
+		list := []schema.VoiceSegment{}
+		for i, length := range lengths {
+			list = append(list, schema.VoiceSegment{StartMs: i * 1000, EndMs: i*1000 + 999, Text: strings.Repeat("a", length)})
+		}
+		return list
+	}
+	for name, test := range map[string]struct {
+		change func(*AddVoiceTranscriptInput)
+		valid  bool
+	}{
+		"plain":                             {func(*AddVoiceTranscriptInput) {}, true},
+		"100,000 characters":                {func(i *AddVoiceTranscriptInput) { i.Text = strings.Repeat("é", 100000) }, true},
+		"100,001 characters":                {func(i *AddVoiceTranscriptInput) { i.Text = strings.Repeat("é", 100001) }, false},
+		"segments of 100,000 characters":    {func(i *AddVoiceTranscriptInput) { i.Segments = segments(60000, 40000) }, true},
+		"segments of 100,001 characters":    {func(i *AddVoiceTranscriptInput) { i.Segments = segments(60000, 40001) }, false},
+		"a segment ending before it starts": {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{StartMs: 5, EndMs: 4}} }, false},
+		"a segment starting before zero":    {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{StartMs: -1, EndMs: 4}} }, false},
+		"a NUL in a segment":                {func(i *AddVoiceTranscriptInput) { i.Segments = []schema.VoiceSegment{{Text: "a\x00b"}} }, false},
+		"a NUL in the text":                 {func(i *AddVoiceTranscriptInput) { i.Text = "a\x00b" }, false},
+		"a 100-character clientRevisionId":  {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = strings.Repeat("r", 100) }, true},
+		"a 101-character clientRevisionId":  {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = strings.Repeat("r", 101) }, false},
+		"no clientRevisionId":               {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = "" }, false},
+		"a NUL in the clientRevisionId":     {func(i *AddVoiceTranscriptInput) { i.ClientRevisionID = "r\x00" }, false},
+		"an empty engine":                   {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr("") }, false},
+		"a 65-character engine":             {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr(strings.Repeat("e", 65)) }, false},
+		"a NUL in the engine":               {func(i *AddVoiceTranscriptInput) { i.Engine = voicePtr("e\x00") }, false},
+		"an unknown origin":                 {func(i *AddVoiceTranscriptInput) { i.Origin = "dictation" }, false},
+		"a locale that is not a tag":        {func(i *AddVoiceTranscriptInput) { i.Locale = voicePtr("en US") }, false},
+	} {
+		input := AddVoiceTranscriptInput{ClientRevisionID: "r", Origin: "on_device", Text: "words"}
+		test.change(&input)
+		if err := validVoiceTranscript(input); (err == nil) != test.valid || (err != nil && !errors.Is(err, ErrInvalidInput)) {
+			t.Errorf("%s: err=%v", name, err)
+		}
+	}
+}
+
+// The inbox pages by the server's receive time, breaking ties by id, and an
+// aged tombstone still refuses a replayed create after the sweep (S8).
+func TestVoiceNotePagingAndAgedTombstones(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, false)
+	for i := range 3 {
+		f.note(f.creator, "same-time-"+strconv.Itoa(i), false)
+	}
+	f.exec(`UPDATE voice_note SET "receivedAt"='2026-11-11 09:00:00' WHERE "ownerUserId"=$1`, f.creator.UserID)
+	order, cursor := []string{}, ""
+	for {
+		page, err := f.repo.ListVoiceNotes(ctx, f.creator, VoiceNoteListQuery{Limit: 1, Cursor: cursor})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range page.Notes {
+			order = append(order, item.ID)
+		}
+		if page.NextCursor == nil {
+			break
+		}
+		cursor = *page.NextCursor
+	}
+	if want := f.value(`SELECT string_agg(id, ',' ORDER BY id DESC) FROM voice_note WHERE "ownerUserId"=$1`, f.creator.UserID); strings.Join(order, ",") != want {
+		t.Fatalf("paged %v, want %s", order, want)
+	}
+
+	input := CreateVoiceNoteInput{ClientNoteID: "old-note", RecordedAt: time.Now(), RecordedTimeZone: "UTC"}
+	note, _, err := f.repo.CreateVoiceNote(ctx, f.creator, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.repo.DeleteVoiceNote(ctx, f.creator, note.ID); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(`UPDATE voice_note SET "deletedAt"=now()-interval '400 days',"updatedAt"=now()-interval '400 days' WHERE id=$1`, note.ID)
+	if _, err := f.repo.SweepVoice(ctx); err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = f.repo.CreateVoiceNote(ctx, f.creator, input)
+	expectVoice(t, err, publishing.ErrConflict, "a replayed create of a note deleted 400 days ago")
 }

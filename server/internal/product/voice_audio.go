@@ -12,6 +12,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voiceaudiorun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/lucsky/cuid"
 )
 
@@ -27,17 +28,20 @@ type voiceAudioStore interface {
 	SignDownloadFor(ctx context.Context, key string, expires time.Duration) (string, error)
 }
 
-// voiceAudioFormats are the run formats the server can decode: ADTS AAC
-// (provisional, Gate 0) and the PCM WAV the existing recorder writes. WAV
-// is larger, so its cap is too; both are bounded to 31 minutes on decode.
+// voiceAudioFormats are the run formats the server can decode: the PCM WAV
+// the Founder Hub recorder writes, bounded to 31 minutes on decode.
 var voiceAudioFormats = map[string]struct {
 	extension string
 	maxBytes  int64
-}{"audio/aac": {"aac", 20 << 20}, "audio/wav": {"wav", 200 << 20}}
+}{"audio/wav": {"wav", 200 << 20}}
 
 const (
-	voiceMaxRunIndex    = 999
-	voiceUploadExpiry   = 15 * time.Minute
+	// voiceMaxRunIndex bounds a note to 50 runs.
+	voiceMaxRunIndex  = 49
+	voiceUploadExpiry = 15 * time.Minute
+	// voicePurgeAfter is when every upload URL signed before a run's last
+	// change has expired, so no late PUT can bring its object back.
+	voicePurgeAfter     = voiceUploadExpiry + 5*time.Minute
 	voicePlaybackExpiry = time.Hour
 )
 
@@ -85,7 +89,7 @@ func (c *Configuration) requireVoiceAudio(ctx context.Context, actor Actor, note
 
 func validVoiceRunIndex(runIndex int) error {
 	if runIndex < 0 || runIndex > voiceMaxRunIndex {
-		return invalid("runIndex must be between 0 and 999.")
+		return invalid("runIndex must be between 0 and 49.")
 	}
 	return nil
 }
@@ -109,13 +113,13 @@ func (c *Configuration) SignVoiceRunUpload(ctx context.Context, actor Actor, not
 	case validVoiceRunIndex(runIndex) != nil:
 		return nil, validVoiceRunIndex(runIndex)
 	case !known:
-		return nil, invalid("Voice audio must be audio/aac (ADTS) or audio/wav (PCM).")
+		return nil, invalid("Voice audio must be audio/wav (PCM).")
 	case input.Bytes < 1 || input.Bytes > format.maxBytes:
 		return nil, invalid(fmt.Sprintf("A %s run has 1 to %d bytes.", input.ContentType, format.maxBytes))
 	case digestErr != nil || len(digest) != 32:
 		return nil, invalid("sha256 must be the file's hex SHA-256.")
-	case input.StartOffsetMs < 0 || input.StartOffsetMs > 24*60*60*1000:
-		return nil, invalid("startOffsetMs is out of range.")
+	case input.StartOffsetMs < 0 || input.StartOffsetMs > voiceMaxRunMs:
+		return nil, invalid("startOffsetMs must be within the note's 31 minutes.")
 	case input.DurationMs != nil && (*input.DurationMs < 0 || *input.DurationMs > 24*60*60*1000):
 		return nil, invalid("durationMs is out of range.")
 	case input.SampleRateHz != nil && *input.SampleRateHz <= 0:
@@ -207,23 +211,19 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	case voiceaudiorun.StatusDeleted:
 		return nil, conflict("This run's audio was deleted.")
 	case voiceaudiorun.StatusFailed:
-		return nil, invalid("This upload expired. Ask for a new upload URL and send the run again.")
+		return nil, voiceUploadExpired()
 	}
 	if c.objects == nil {
 		return nil, ErrStorageUnavailable
 	}
-	exists, err := c.objects.Exists(ctx, run.ObjectKey)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
-	}
-	if !exists {
+	object, err := c.openObject(ctx, run.ObjectKey)
+	if errors.Is(err, media.ErrObjectNotFound) {
 		return nil, ErrObjectMissing
 	}
-	object, err := c.openObject(ctx, run.ObjectKey)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
 	}
-	audio, err := verifyVoiceRun(object, run.ContentType, run.Bytes, run.Sha256)
+	audio, err := verifyVoiceRun(object, run.Bytes, run.Sha256)
 	object.Close()
 	if errors.Is(err, ErrInvalidInput) {
 		if deleteErr := c.objects.Delete(ctx, run.ObjectKey); deleteErr != nil {
@@ -242,6 +242,21 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	if _, err := lockVoiceNote(ctx, tx, noteID); err != nil {
 		return nil, err
 	}
+	available, err := tx.VoiceAudioRun.Query().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusEQ(voiceaudiorun.StatusAvailable),
+		voiceaudiorun.IDNEQ(run.ID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	total := audio.durationMs
+	for _, other := range available {
+		if other.DurationMs != nil {
+			total += *other.DurationMs
+		}
+	}
+	if total > voiceMaxRunMs {
+		// The run stays pending; the upload sweep removes its object.
+		return nil, conflict("This run would make the note's audio longer than 31 minutes. Start a new note.")
+	}
 	updated, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.ID(run.ID), voiceaudiorun.StatusEQ(voiceaudiorun.StatusPending)).
 		SetStatus(voiceaudiorun.StatusAvailable).SetDurationMs(audio.durationMs).SetSampleRateHz(audio.sampleRateHz).Save(ctx)
 	if err != nil {
@@ -258,12 +273,21 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	if run.Status != voiceaudiorun.StatusAvailable {
+	switch run.Status {
+	case voiceaudiorun.StatusAvailable:
+	case voiceaudiorun.StatusFailed:
+		// The upload sweep expired the run while it was read.
+		return nil, voiceUploadExpired()
+	default:
 		// The note or its audio was deleted while the run was read.
 		return nil, conflict("This run's audio was deleted.")
 	}
 	result := voiceAudioRunRecord(run)
 	return &result, nil
+}
+
+func voiceUploadExpired() error {
+	return invalid("This upload expired. Ask for a new upload URL and send the run again.")
 }
 
 // SignVoiceRunAudio signs a read of an available run for its owner.
@@ -297,7 +321,8 @@ func (c *Configuration) SignVoiceRunAudio(ctx context.Context, actor Actor, note
 // DeleteVoiceAudio deletes every run of the member's note: the objects are
 // purged and the rows keep a deleted marker; the transcripts stay (D1).
 func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteID string) error {
-	if _, err := c.ownedVoiceNote(ctx, actor, noteID); err != nil {
+	note, err := c.ownedVoiceNote(ctx, actor, noteID)
+	if err != nil {
 		return err
 	}
 	tx, err := c.client.Tx(ctx)
@@ -308,17 +333,12 @@ func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteI
 	if _, err := lockVoiceNote(ctx, tx, noteID); err != nil {
 		return err
 	}
-	deleted, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusNEQ(voiceaudiorun.StatusDeleted)).
-		SetStatus(voiceaudiorun.StatusDeleted).Save(ctx)
+	deleted, err := deleteVoiceAudioTx(ctx, tx, actor, noteID)
 	if err != nil {
 		return err
 	}
 	if deleted > 0 {
-		if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
-			return err
-		}
-		if err := appendConfigurationAudit(ctx, tx, actor, "product.voice_audio_deleted", "voice_note", noteID,
-			map[string]any{"deletedRuns": deleted}); err != nil {
+		if err := c.recordVoiceDeletion(ctx, "voice_audio", note.OrganizationID, noteID); err != nil {
 			return err
 		}
 	}
@@ -329,9 +349,26 @@ func (c *Configuration) DeleteVoiceAudio(ctx context.Context, actor Actor, noteI
 	return nil
 }
 
+// deleteVoiceAudioTx marks every run of a locked note deleted, its objects
+// purged after the commit, and audits it. It reports how many runs it marked.
+func deleteVoiceAudioTx(ctx context.Context, tx *ent.Tx, actor Actor, noteID string) (int, error) {
+	deleted, err := tx.VoiceAudioRun.Update().Where(voiceaudiorun.NoteID(noteID), voiceaudiorun.StatusNEQ(voiceaudiorun.StatusDeleted)).
+		SetStatus(voiceaudiorun.StatusDeleted).Save(ctx)
+	if err != nil || deleted == 0 {
+		return 0, err
+	}
+	if err := tx.VoiceNote.UpdateOneID(noteID).AddRevision(1).Exec(ctx); err != nil {
+		return 0, err
+	}
+	return deleted, appendConfigurationAudit(ctx, tx, actor, "product.voice_audio_deleted", "voice_note", noteID,
+		map[string]any{"deletedRuns": deleted})
+}
+
 // purgeVoiceObjects deletes the stored objects of deleted and failed runs,
-// oldest first, and records each one storage confirms. It returns the first
-// storage failure after trying them all; unmarked runs are retried later.
+// oldest first, and records each one storage confirms once its last upload
+// URL has expired (voicePurgeAfter): until then a signed PUT can still land,
+// so the sweep deletes the object again. It returns the first storage
+// failure after trying them all; unmarked runs are retried later.
 func (c *Configuration) purgeVoiceObjects(ctx context.Context, limit int, where ...predicate.VoiceAudioRun) (int, error) {
 	if c.objects == nil {
 		// Without storage no upload was ever signed, so there is nothing to purge.
@@ -354,7 +391,8 @@ func (c *Configuration) purgeVoiceObjects(ctx context.Context, limit int, where 
 			continue
 		}
 		// A failed run started again since is pending and keeps its object.
-		marked, err := c.client.VoiceAudioRun.Update().Where(append([]predicate.VoiceAudioRun{voiceaudiorun.ID(run.ID)}, purgeable...)...).
+		marked, err := c.client.VoiceAudioRun.Update().Where(append([]predicate.VoiceAudioRun{voiceaudiorun.ID(run.ID),
+			voiceaudiorun.UpdatedAtLT(time.Now().Add(-voicePurgeAfter))}, purgeable...)...).
 			SetObjectPurgedAt(time.Now().UTC()).Save(ctx)
 		if err != nil {
 			return purged, err

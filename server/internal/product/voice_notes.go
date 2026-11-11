@@ -2,8 +2,7 @@ package product
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
+	"fmt"
 	"log/slog"
 	"regexp"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicecommand"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/lucsky/cuid"
 )
 
@@ -72,6 +72,10 @@ type UpdateVoiceNoteInput struct {
 var voiceLocalePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,35}$`)
 
 const voiceExcerptRunes = 200
+
+// voiceClockSkew is how far ahead of the server a phone's clock may claim a
+// recording was made (S14).
+const voiceClockSkew = 24 * time.Hour
 
 // requireVoiceNotes refuses voice note work unless the server switch and the
 // workspace both leave voice notes on. Deleting and redacting skip it: a
@@ -244,11 +248,6 @@ func (c *Configuration) ListVoiceNoteIndex(ctx context.Context, actor Actor) ([]
 	return entries, nil
 }
 
-type voiceNoteCursor struct {
-	ID         string    `json:"id"`
-	ReceivedAt time.Time `json:"r"`
-}
-
 // ListVoiceNotes is the member's inbox: live notes, newest received first
 // (S14: the server's clock, not the phone's).
 func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query VoiceNoteListQuery) (*VoiceNotePage, error) {
@@ -261,13 +260,11 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 	rows := c.client.VoiceNote.Query().Where(voicenote.OrganizationID(actor.OrganizationID), voicenote.OwnerUserID(actor.UserID),
 		voicenote.DeletedAtIsNil())
 	if query.Cursor != "" {
-		var cursor voiceNoteCursor
-		raw, err := base64.RawURLEncoding.DecodeString(query.Cursor)
-		if err != nil || json.Unmarshal(raw, &cursor) != nil || cursor.ID == "" {
-			return nil, invalid("The page cursor is not valid.")
+		receivedAt, id, err := decodeTimeCursor(query.Cursor)
+		if err != nil {
+			return nil, err
 		}
-		rows.Where(voicenote.Or(voicenote.ReceivedAtLT(cursor.ReceivedAt),
-			voicenote.And(voicenote.ReceivedAt(cursor.ReceivedAt), voicenote.IDLT(cursor.ID))))
+		rows.Where(voicenote.Or(voicenote.ReceivedAtLT(receivedAt), voicenote.And(voicenote.ReceivedAt(receivedAt), voicenote.IDLT(id))))
 	}
 	notes, err := rows.Order(ent.Desc(voicenote.FieldReceivedAt), ent.Desc(voicenote.FieldID)).Limit(query.Limit + 1).All(ctx)
 	if err != nil {
@@ -277,8 +274,7 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 	if len(notes) > query.Limit {
 		notes = notes[:query.Limit]
 		last := notes[len(notes)-1]
-		encoded, _ := json.Marshal(voiceNoteCursor{ID: last.ID, ReceivedAt: last.ReceivedAt})
-		next := base64.RawURLEncoding.EncodeToString(encoded)
+		next := encodeTimeCursor(last.ReceivedAt, last.ID)
 		page.NextCursor = &next
 	}
 	conflicts, err := c.voiceConflicts(ctx, actor.OrganizationID, notes)
@@ -314,10 +310,10 @@ func (c *Configuration) ListVoiceNotes(ctx context.Context, actor Actor, query V
 
 func voiceExcerpt(text string) string {
 	text = strings.Join(strings.Fields(text), " ")
-	if utf8.RuneCountInString(text) <= voiceExcerptRunes {
-		return text
+	if excerpt := truncateRunes(text, voiceExcerptRunes); excerpt != text {
+		return excerpt + "…"
 	}
-	return string([]rune(text)[:voiceExcerptRunes]) + "…"
+	return text
 }
 
 // validVoiceTitle trims a title and checks its length.
@@ -326,8 +322,8 @@ func validVoiceTitle(title *string) (string, error) {
 		return "", nil
 	}
 	trimmed := strings.TrimSpace(*title)
-	if utf8.RuneCountInString(trimmed) > 120 {
-		return "", invalid("A voice note title has at most 120 characters.")
+	if utf8.RuneCountInString(trimmed) > 120 || strings.ContainsRune(trimmed, 0) {
+		return "", invalid("A voice note title has at most 120 characters and no NUL characters.")
 	}
 	return trimmed, nil
 }
@@ -363,8 +359,9 @@ func (c *Configuration) CreateVoiceNote(ctx context.Context, actor Actor, input 
 		detail, err := c.voiceNoteDetail(ctx, actor, row)
 		return detail, false, err
 	}
-	if input.ClientNoteID == "" || len(input.ClientNoteID) > 100 {
-		return nil, false, invalid("clientNoteId must have 1 to 100 characters.")
+	// Postgres text cannot hold NUL; one would fail the query as a 5xx.
+	if input.ClientNoteID == "" || len(input.ClientNoteID) > 100 || strings.ContainsRune(input.ClientNoteID, 0) {
+		return nil, false, invalid("clientNoteId must have 1 to 100 characters and no NUL characters.")
 	}
 	if detail, created, err := replay(); !ent.IsNotFound(err) {
 		return detail, created, err
@@ -376,6 +373,8 @@ func (c *Configuration) CreateVoiceNote(ctx context.Context, actor Actor, input 
 	switch {
 	case input.RecordedAt.IsZero():
 		return nil, false, invalid("recordedAt is required.")
+	case input.RecordedAt.After(time.Now().Add(voiceClockSkew)):
+		return nil, false, invalid("recordedAt is more than a day after the server's time.")
 	case !validTimeZone(input.RecordedTimeZone):
 		return nil, false, invalid("recordedTimeZone must be an IANA time zone.")
 	case input.Locale != nil && !voiceLocalePattern.MatchString(*input.Locale):
@@ -454,7 +453,7 @@ func (c *Configuration) UpdateVoiceNote(ctx context.Context, actor Actor, id str
 			changed = true
 		}
 	}
-	if input.ProjectID.Set && !sameOptional(input.ProjectID.Value, row.ProjectID) {
+	if input.ProjectID.Set && !sameString(input.ProjectID.Value, row.ProjectID) {
 		if input.ProjectID.Value == nil {
 			update.ClearProjectID()
 		} else {
@@ -471,10 +470,6 @@ func (c *Configuration) UpdateVoiceNote(ctx context.Context, actor Actor, id str
 		return nil, err
 	}
 	return c.voiceNoteDetail(ctx, actor, row)
-}
-
-func sameOptional(a, b *string) bool {
-	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
 // DeleteVoiceNote deletes the member's note: it always succeeds for its
@@ -495,6 +490,9 @@ func (c *Configuration) DeleteVoiceNote(ctx context.Context, actor Actor, id str
 		}
 		if row.DeletedAt == nil {
 			if err := deleteVoiceNoteTx(ctx, tx, actor, row, "owner"); err != nil {
+				return err
+			}
+			if err := c.recordVoiceDeletion(ctx, "voice_note", row.OrganizationID, row.ID); err != nil {
 				return err
 			}
 		}
@@ -525,11 +523,39 @@ func deleteVoiceNoteTx(ctx context.Context, tx *ent.Tx, actor Actor, note *ent.V
 		voicecommand.StatusIn(voicecommand.StatusWaiting, voicecommand.StatusProposed)).SetStatus(voicecommand.StatusWithdrawn).Save(ctx); err != nil {
 		return err
 	}
+	if err := scrubVoiceCommand(ctx, tx, note.ID); err != nil {
+		return err
+	}
 	if err := tx.VoiceNote.UpdateOneID(note.ID).SetDeletedAt(now).SetTitle("").ClearProjectID().AddRevision(1).Exec(ctx); err != nil {
 		return err
 	}
 	return appendConfigurationAudit(ctx, tx, actor, "product.voice_note_deleted", "voice_note", note.ID,
 		map[string]any{"reason": reason, "redactedTranscripts": redacted, "deletedRuns": runs})
+}
+
+// recordVoiceDeletion appends a member's deletion to the R2 deletion ledger
+// before its transaction commits, so every committed deletion is named there
+// and a database restore cannot bring it back (docs/deployment.md, "Restoring
+// the database"). Sweep deletions are not recorded: after a restore the sweep
+// finds them due again. Without storage there is no ledger to write.
+func (c *Configuration) recordVoiceDeletion(ctx context.Context, kind, organizationID, id string) error {
+	if c.objects == nil {
+		return nil
+	}
+	record := media.DeletionRecord{Kind: kind, OrganizationID: organizationID, ID: id, EventID: cuid.New(), RequestedAt: time.Now().UTC()}
+	if err := media.PutDeletionRecord(ctx, c.objects, record); err != nil {
+		return fmt.Errorf("%w: %v", ErrStorageUnavailable, err)
+	}
+	return nil
+}
+
+// scrubVoiceCommand clears the transcript-derived words of the note's
+// command row once it can no longer be confirmed: expired, failed or
+// withdrawn. A confirmed row keeps the text the member confirmed.
+func scrubVoiceCommand(ctx context.Context, tx *ent.Tx, noteID string) error {
+	_, err := tx.VoiceCommand.Update().Where(voicecommand.NoteID(noteID), voicecommand.StatusIn(voicecommand.StatusExpired,
+		voicecommand.StatusFailed, voicecommand.StatusWithdrawn)).ClearText().ClearNotice().ClearPlatform().ClearLocalTime().Save(ctx)
+	return err
 }
 
 // purgeVoiceObjectsNow purges a note's deleted audio after its commit. A

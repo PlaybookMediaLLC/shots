@@ -7,9 +7,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/telemetry"
 )
 
 // voiceFake records which voice operation a route reached and with what.
@@ -25,6 +27,7 @@ type voiceFake struct {
 	patch    product.UpdateVoiceNoteInput
 	// delegated is whether the operation ran as a Founder Hub session.
 	delegated bool
+	delay     time.Duration
 }
 
 func (f *voiceFake) record(call string, ids ...string) {
@@ -90,6 +93,7 @@ func (f *voiceFake) SignVoiceRunUpload(_ context.Context, _ product.Actor, id st
 	return &product.VoiceRunUpload{URL: "https://storage.example.test/put", Method: http.MethodPut, Headers: map[string]string{}}, f.err
 }
 func (f *voiceFake) CompleteVoiceRun(_ context.Context, _ product.Actor, id string, runIndex int) (*product.VoiceAudioRun, error) {
+	time.Sleep(f.delay)
 	f.record("complete", id)
 	f.runIndex = runIndex
 	return &product.VoiceAudioRun{Status: "available"}, f.err
@@ -138,7 +142,7 @@ func TestVoiceRoutesReachTheirOperations(t *testing.T) {
 		{"POST", "/v1/voice/notes/" + note + "/transcripts", `{"clientRevisionId":"r","origin":"on_device","text":"words","segments":[]}`, true, "transcript", 201},
 		{"POST", "/v1/voice/notes/" + note + "/transcripts", `{"clientRevisionId":"r","origin":"on_device","text":"words","segments":[]}`, false, "transcript", 200},
 		{"POST", "/v1/voice/notes/" + note + "/transcripts/" + revision + "/redact", "", false, "redact", 200},
-		{"POST", "/v1/voice/notes/" + note + "/runs/3/upload", `{"contentType":"audio/aac","bytes":10,"sha256":"00","startOffsetMs":0}`, false, "upload", 200},
+		{"POST", "/v1/voice/notes/" + note + "/runs/3/upload", `{"contentType":"audio/wav","bytes":10,"sha256":"00","startOffsetMs":0}`, false, "upload", 200},
 		{"POST", "/v1/voice/notes/" + note + "/runs/3/complete", "", false, "complete", 200},
 		{"GET", "/v1/voice/notes/" + note + "/runs/3/audio", "", false, "audio", 200},
 		{"DELETE", "/v1/voice/notes/" + note + "/audio", "", false, "delete audio", 204},
@@ -178,7 +182,7 @@ func TestVoiceRoutesReachTheirOperations(t *testing.T) {
 	if fake.patch.ExpectedRevision != 2 || !fake.patch.ProjectID.Set || fake.patch.ProjectID.Value != nil {
 		t.Fatalf("a null projectId must clear the project: %+v", fake.patch)
 	}
-	response = voiceRequest(handler, "POST", "/v1/voice/notes/"+note+"/runs/0/upload", `{"contentType":"audio/aac","bytes":1,"sha256":"00"}`)
+	response = voiceRequest(handler, "POST", "/v1/voice/notes/"+note+"/runs/0/upload", `{"contentType":"audio/wav","bytes":1,"sha256":"00"}`)
 	if !strings.Contains(response.Body.String(), `"method":"PUT"`) || response.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("upload body=%s headers=%v", response.Body.String(), response.Header())
 	}
@@ -268,5 +272,30 @@ func TestVoiceRoutesAcceptFounderHubSessionsWithALiveGrant(t *testing.T) {
 		if response := request(fake, headers); response.Code != http.StatusUnauthorized || fake.call != "" || fake.founderHubActor != nil {
 			t.Fatalf("%v: status=%d call=%q", headers, response.Code, fake.call)
 		}
+	}
+}
+
+// Complete reads back a whole run in the request, so it extends the write
+// deadline past the server's WriteTimeout, through the telemetry wrappers
+// the API runs behind.
+func TestVoiceCompleteOutlastsTheWriteTimeout(t *testing.T) {
+	fake := &voiceFake{delay: 300 * time.Millisecond}
+	server := httptest.NewUnstartedServer(telemetry.Handler(NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", fake), false))
+	server.Config.WriteTimeout = 100 * time.Millisecond
+	server.Start()
+	defer server.Close()
+	request, _ := http.NewRequest(http.MethodPost, server.URL+"/v1/voice/notes/cmnote0000000000000000001/runs/0/complete", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org")
+	request.Header.Set("X-User-ID", "user")
+	request.Header.Set("X-Session-ID", "session")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatalf("the response was cut off at the write timeout: %v", err)
+	}
+	defer response.Body.Close()
+	var run product.VoiceAudioRun
+	if err := json.NewDecoder(response.Body).Decode(&run); err != nil || response.StatusCode != http.StatusOK || run.Status != "available" {
+		t.Fatalf("status=%d run=%+v err=%v", response.StatusCode, run, err)
 	}
 }
