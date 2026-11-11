@@ -240,7 +240,8 @@ func (c *Configuration) ReplayVoiceDeletion(ctx context.Context, kind, organizat
 	changed := false
 	switch kind {
 	case "voice_note":
-		if changed = note.DeletedAt == nil; changed {
+		changed = note.DeletedAt == nil
+		if changed {
 			err = deleteVoiceNoteTx(ctx, tx, actor, note, "ledger_replay")
 		}
 	case "voice_audio":
