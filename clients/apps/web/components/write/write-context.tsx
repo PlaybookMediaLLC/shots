@@ -125,12 +125,15 @@ export function WriteProvider({
   const nextDraftRef = React.useRef<(() => void) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   // The server reads the remembered set's library alongside the set list, so
-  // a person who never chose a set (or whose set is gone) gets the open one.
+  // a person who never chose a set gets the open one. The cookie is shared by
+  // every workspace, so a set chosen anywhere is never replaced here.
   const activeSetId = data.activeSet?.id
   React.useEffect(() => {
-    const remembered = rememberedSet()
-    if (activeSetId && !data.sets.some((set) => set.id === remembered)) rememberSet(activeSetId)
-  }, [activeSetId, data.sets])
+    const remembered = document.cookie
+      .split('; ')
+      .some((cookie) => cookie.startsWith(`${SOCIAL_SET_COOKIE}=`))
+    if (activeSetId && !remembered) rememberSet(activeSetId)
+  }, [activeSetId])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
       const target = event.target as Element | null
@@ -349,16 +352,6 @@ export function since(iso: string, now = Date.now()): string {
   if (minutes < 60 * 24) return `${Math.round(minutes / 60)}h`
   if (minutes < 60 * 24 * 7) return `${Math.round(minutes / 60 / 24)}d`
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-}
-
-/** The set {@link rememberSet} stored, if any. */
-function rememberedSet(): string | undefined {
-  const prefix = `${SOCIAL_SET_COOKIE}=`
-  const value = document.cookie
-    .split('; ')
-    .find((cookie) => cookie.startsWith(prefix))
-    ?.slice(prefix.length)
-  return value ? decodeURIComponent(value) : undefined
 }
 
 /** Remember the set chosen last, for the next visit. */

@@ -106,7 +106,11 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			return last.role, nil
 		}
 	}
-	if !startedRun {
+	if startedRun {
+		if err := r.requireActivePerson(ctx, userID); err != nil {
+			return "", err
+		}
+	} else {
 		// One query admits the usual request. A refusal falls through to the
 		// reads below, so it returns the error each check returns on its own.
 		role, admitted, err := r.admittedRole(ctx, organizationID, userID, sessionID)
@@ -120,12 +124,6 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			r.recordRole(ctx, organizationID, userID, sessionID, role)
 			return role, nil
 		}
-	}
-	if startedRun {
-		if err := r.requireActivePerson(ctx, userID); err != nil {
-			return "", err
-		}
-	} else {
 		current, err := r.authorizeSession(ctx, userID, sessionID)
 		if err != nil {
 			return "", err

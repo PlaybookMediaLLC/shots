@@ -1,6 +1,7 @@
 package product
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -326,9 +327,6 @@ func accountHealth(status channelconnection.Status, exists, deleted, disabled, r
 	return AccountConnected
 }
 
-// connectionHealth requires a provider record in the bound social tenant.
-// An active product row alone is not proof of usable provider credentials.
-// Missing provider tables, bindings, or records leave the account unverified.
 // socialTablesFound remembers that the social Integration table exists. A
 // database that has it keeps it, so only a found table is remembered; a
 // database without it is asked again on the next call.
@@ -348,6 +346,9 @@ func socialTablesPresent(ctx context.Context, client *ent.Client) (bool, error) 
 	return social, err
 }
 
+// connectionHealth requires a provider record in the bound social tenant.
+// An active product row alone is not proof of usable provider credentials.
+// Missing provider tables, bindings, or records leave the account unverified.
 func connectionHealth(ctx context.Context, client *ent.Client, organizationID string, connections []*ent.ChannelConnection) (map[string]string, error) {
 	health := make(map[string]string, len(connections))
 	if len(connections) == 0 {
@@ -604,45 +605,47 @@ func (c *Configuration) ListSocialSets(ctx context.Context, actor Actor) (*Socia
 		return nil, err
 	}
 	// The unassigned accounts and the orphaned sets do not depend on the sets'
-	// records, so the three are read together.
+	// records, so the three are read together. Unassigned accounts exist only
+	// when the check above found some.
 	list := &SocialSetList{Orphaned: []OrphanedSocialSet{}, Unassigned: []SocialAccount{}}
 	var unassignedErr, orphansErr error
 	var parts sync.WaitGroup
-	parts.Go(func() {
-		unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(actor.OrganizationID),
-			channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
-			Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
-		if err != nil {
-			unassignedErr = err
-			return
-		}
-		health, err := connectionHealth(ctx, c.client, actor.OrganizationID, unassigned)
-		if err != nil {
-			unassignedErr = err
-			return
-		}
-		for _, connection := range unassigned {
-			list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
-		}
-	})
+	if legacyAccounts {
+		parts.Go(func() {
+			unassignedErr = c.listUnassigned(ctx, actor.OrganizationID, list)
+		})
+	}
 	if workspaceroles.Allows(role, "owner", "admin") {
 		parts.Go(func() {
-			orphans, err := c.orphanedSocialSets(ctx, actor.OrganizationID)
-			if orphansErr = err; err == nil {
-				list.Orphaned = orphans
-			}
+			list.Orphaned, orphansErr = c.orphanedSocialSets(ctx, actor.OrganizationID)
 		})
 	}
 	records, err := c.socialSetRecords(ctx, actor, sets)
 	parts.Wait()
 	// The errors keep the order the reads had when they ran one after another.
-	for _, err := range []error{err, unassignedErr, orphansErr} {
-		if err != nil {
-			return nil, err
-		}
+	if err := cmp.Or(err, unassignedErr, orphansErr); err != nil {
+		return nil, err
 	}
 	list.Items = records
 	return list, nil
+}
+
+// listUnassigned adds the workspace's active accounts that belong to no set.
+func (c *Configuration) listUnassigned(ctx context.Context, organizationID string, list *SocialSetList) error {
+	unassigned, err := c.client.ChannelConnection.Query().Where(channelconnection.OrganizationID(organizationID),
+		channelconnection.SocialSetIDIsNil(), channelconnection.StatusEQ(channelconnection.StatusACTIVE)).
+		Order(ent.Asc(channelconnection.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return err
+	}
+	health, err := connectionHealth(ctx, c.client, organizationID, unassigned)
+	if err != nil {
+		return err
+	}
+	for _, connection := range unassigned {
+		list.Unassigned = append(list.Unassigned, socialAccount(ctx, connection, health[connection.ID]))
+	}
+	return nil
 }
 
 func (c *Configuration) orphanedSocialSets(ctx context.Context, organizationID string) ([]OrphanedSocialSet, error) {
@@ -651,13 +654,25 @@ func (c *Configuration) orphanedSocialSets(ctx context.Context, organizationID s
 	if err != nil {
 		return nil, err
 	}
-	orphans := []OrphanedSocialSet{}
+	// One read finds which owners are still members, rather than one per set.
+	owners := make([]string, 0, len(private))
 	for _, set := range private {
-		member, err := c.client.Member.Query().Where(member.OrganizationID(organizationID), member.UserID(*set.OwnerUserID)).Exist(ctx)
+		owners = append(owners, *set.OwnerUserID)
+	}
+	members := map[string]bool{}
+	if len(owners) > 0 {
+		ids, err := c.client.Member.Query().Where(member.OrganizationID(organizationID), member.UserIDIn(owners...)).
+			Select(member.FieldUserID).Strings(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if member {
+		for _, id := range ids {
+			members[id] = true
+		}
+	}
+	orphans := []OrphanedSocialSet{}
+	for _, set := range private {
+		if members[*set.OwnerUserID] {
 			continue
 		}
 		count, err := c.client.ChannelConnection.Query().Where(channelconnection.SocialSetID(set.ID),
