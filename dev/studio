@@ -439,12 +439,7 @@ run_e2e() {
   local app_url
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
-  local argument check_oauth=false
   local report="${E2E_REPORT_LANE:-production}"
-  if [[ "$#" == 0 || "${E2E_SHARD_ID:-}" == 1 ]]; then check_oauth=true; fi
-  for argument in "$@"; do
-    if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
-  done
 
   load_env
   app_url="$(e2e_app_url)"
@@ -456,11 +451,8 @@ run_e2e() {
   fi
   sync_dependencies
   start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
-  if [[ "$test_script" == test:e2e && "$check_oauth" == true ]]; then
-    FOUNDER_HUB_TEST_API_URL="${FOUNDER_HUB_TEST_API_URL:-http://127.0.0.1:8080}" \
-      BETTER_AUTH_URL="${app_url%/}" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
-      e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
-  fi
+  # The Founder Hub OAuth check (test:founder-hub-auth) needs the Founder Hub
+  # gateway, so it runs in founder-hub-integration.yml beside it, not here.
   E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
   # Keep the server's logs beside the results, which CI uploads.
   mkdir -p "$WEB_DIR/test-results"
@@ -551,12 +543,30 @@ dev_login() {
   echo "Dev login: $email (password: STUDIO_DEV_PASSWORD in .local/dev.env)"
 }
 
+# Founder Hub's domain schema, installed as the Go integration tests do it:
+# its roles, a stand-in for the Supabase Storage schema production provides,
+# then its migrations. The backend's login switches into the Founder Hub roles
+# per request, so it is granted them. Every step is safe to repeat.
+install_founder_hub() {
+  local password superuser
+  password="$(grep '^POSTGRES_SUPER_PASSWORD=' "$LOCAL_ENV" | cut -d= -f2-)"
+  superuser="postgresql://postgres:${password}@postgres:5432/screenshot_studio?sslmode=disable"
+  local psql=(exec -T postgres psql --quiet --set ON_ERROR_STOP=1 --username=postgres --dbname=screenshot_studio)
+  compose run --rm --no-deps -e DATABASE_URL="$superuser" platform-go-migrate -founder-hub bootstrap
+  if [[ "$(compose "${psql[@]}" --tuples-only --no-align --command "SELECT to_regclass('storage.buckets') IS NULL")" == t ]]; then
+    compose "${psql[@]}" <"$ROOT_DIR/server/founderhubmigrations/testdata/storage.sql"
+  fi
+  compose run --rm --no-deps -e DATABASE_URL="$superuser" platform-go-migrate -founder-hub apply
+  compose "${psql[@]}" --command "GRANT shots_hub_authenticated, shots_hub_service_role TO screenshot_studio"
+}
+
 # Everything the app depends on. CI starts these first so the stack is ready
 # while the production web image is still being built in another job.
 services() {
   ensure_env
   compose rm --force --stop rustfs-init >/dev/null 2>&1 || true
   compose_up postgres redis rustfs rustfs-init publishing-backend publishing-orchestrator collab
+  install_founder_hub
   sync_dependencies
 }
 

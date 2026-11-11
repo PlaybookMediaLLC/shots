@@ -162,13 +162,13 @@ export function EditorAiPanel() {
             <Button
               aria-expanded={open}
               aria-label="Open the AI copilot"
-              className="gap-1.5"
+              className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.06] hover:text-foreground aria-expanded:bg-foreground/[0.08] aria-expanded:text-foreground"
               onClick={() => (open ? setOpen(false) : openCopilot(false))}
-              size="sm"
+              size={null}
               type="button"
-              variant="ghost"
+              variant="custom"
             >
-              <AiMagicIcon size={16} />
+              <AiMagicIcon className="text-violet-500 dark:text-violet-400" size={15} />
               AI
             </Button>,
             headerSlot
