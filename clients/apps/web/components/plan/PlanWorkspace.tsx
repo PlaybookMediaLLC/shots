@@ -656,14 +656,11 @@ export function PlanWorkspace({
     const { visible, hidden } = capped ? visibleDayItems(onDay) : { visible: onDay, hidden: 0 }
     return (
       <div className="grid gap-2">
-        {/* A capped month day has its own "+N more"; every other day scrolls past four. */}
-        {capped ? (
-          (open ? onDay : visible).map((item) => card(item))
-        ) : (
-          <DayList ids={onDay.map((item) => item.id).join()}>
-            {onDay.map((item) => card(item))}
-          </DayList>
-        )}
+        {/* Every view scrolls past four, so no day grows with its posts: an opened month
+            day, or one full of posts that need attention, too. */}
+        <DayList ids={(open ? onDay : visible).map((item) => item.id).join()}>
+          {(open ? onDay : visible).map((item) => card(item))}
+        </DayList>
         {hidden > 0 ? (
           <Button
             aria-expanded={open}

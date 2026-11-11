@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { apiRequest, db, draftEditor, expect, test } from './framework'
+import { apiRequest, chooseOption, db, draftEditor, expect, test } from './framework'
 
 test(
   'month moves and swaps persist, failed moves stay put, and publish now requires confirmation',
@@ -211,4 +211,12 @@ test('a busy day shows four posts and scrolls the rest inside the day', async ({
   await expect(cards.nth(4)).toBeFocused()
   await expect(cards.nth(5)).toBeInViewport()
   await expect(cell.getByRole('button', { name: /^Scroll to \d+ more/ })).toHaveCount(0)
+
+  // A month day shows two, opens to all six, and still scrolls past four instead of growing.
+  await chooseOption(page.getByRole('combobox', { name: 'Calendar view' }), 'Month')
+  await cell.getByRole('button', { name: '+4 more' }).click()
+  await expect(cards).toHaveCount(6)
+  await expect(cards.nth(4)).not.toBeInViewport()
+  await expect(cell.getByRole('button', { name: 'Scroll to 2 more posts' })).toBeVisible()
+  await expect(cell.getByRole('button', { name: 'Show less' })).toBeVisible()
 })
