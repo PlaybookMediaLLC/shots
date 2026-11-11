@@ -11,7 +11,8 @@ const SETTINGS_KEY = ['content-draft-settings'] as const
 
 /**
  * Whether a draft needs approval before it is scheduled. It applies to the
- * whole workspace; each profile keeps its own posting times.
+ * whole workspace; each profile keeps its own posting times. Only an owner or
+ * admin may change it (`canManage`); others see it read-only.
  */
 export function ApprovalSetting({ canManage }: { canManage: boolean }) {
   const client = useQueryClient()
@@ -39,7 +40,7 @@ export function ApprovalSetting({ canManage }: { canManage: boolean }) {
   return (
     <Group>
       <Row
-        description="A publisher or admin approves each draft before it is scheduled, for every profile."
+        description={`A publisher or admin approves each draft before it is scheduled, for every profile.${canManage ? '' : ' Only an owner or admin can change approvals.'}`}
         label="Approvals"
       >
         {settings.isError ? (

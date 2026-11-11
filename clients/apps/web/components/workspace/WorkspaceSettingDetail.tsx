@@ -82,7 +82,7 @@ const SETTINGS_CONTENT = {
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
-  'social-sets': ({ can, draftsEnabled, socialSet }) =>
+  'social-sets': ({ can, draftsEnabled, role, socialSet }) =>
     socialSet ? (
       <SocialSetSettings
         id={socialSet.id}
@@ -97,7 +97,12 @@ const SETTINGS_CONTENT = {
     ) : (
       <>
         <SocialSetList canManage={can('workspace:update')} />
-        {draftsEnabled ? <ApprovalSetting canManage={can('publish:manage')} /> : null}
+        {draftsEnabled ? (
+          // The backend lets only an owner or admin change approvals.
+          <ApprovalSetting
+            canManage={can('publish:manage') && (role === 'owner' || role === 'admin')}
+          />
+        ) : null}
       </>
     ),
   channels: ({ can }) => <ChannelConnections canManage={can('connection:manage')} />,
