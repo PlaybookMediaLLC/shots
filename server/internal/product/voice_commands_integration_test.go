@@ -214,6 +214,13 @@ func (f *voiceCommandFixture) sync(actor Actor, noteID, transcript string) (*Voi
 	return result, created
 }
 
+// cancelQueued cancels the workspace's queued posts, so a subtest can queue
+// the fixture's text again without it being refused as a repeat.
+func (f *voiceCommandFixture) cancelQueued() {
+	f.t.Helper()
+	f.exec(`UPDATE scheduled_post SET status='CANCELLED' WHERE "organizationId"=$1 AND status='SCHEDULED'`, f.org)
+}
+
 // setAndRestore runs a change, and the statement that undoes it when t ends.
 func (f *voiceCommandFixture) setAndRestore(t *testing.T, change, restore string, args ...any) {
 	t.Helper()
@@ -593,7 +600,26 @@ func TestVoiceCommandConfirm(t *testing.T) {
 		}
 	})
 
+	t.Run("a confirm repeating a post the account has queued within a day is refused and queues nothing", func(t *testing.T) {
+		// The first subtest queued the same text to the same account at the same time.
+		noteID, revisionID := f.note(f.owner, voiceTweet)
+		f.propose(f.owner, noteID, revisionID)
+		var repeat *DuplicateContentError
+		if _, err := f.repo.ConfirmVoiceCommand(f.ctx, f.owner, noteID, f.confirmInput()); !errors.As(err, &repeat) || !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("repeat confirm err=%v", err)
+		}
+		for _, draft := range f.drafts(revisionID) {
+			if f.posts(draft.ID) != 0 {
+				t.Fatalf("a refused repeat queued a post for draft %s", draft.ID)
+			}
+		}
+		if status := f.command(noteID).Status; status != voicecommand.StatusProposed {
+			t.Fatalf("refused repeat left the command %s", status)
+		}
+	})
+
 	t.Run("two confirms at once make one post (K11)", func(t *testing.T) {
+		f.cancelQueued()
 		noteID, revisionID := f.note(f.owner, voiceTweet)
 		f.propose(f.owner, noteID, revisionID)
 		var wait sync.WaitGroup
@@ -741,6 +767,7 @@ func TestVoiceCommandConfirm(t *testing.T) {
 	})
 
 	t.Run("deleting the note keeps the scheduled post and the draft, whose source shows removed (K15)", func(t *testing.T) {
+		f.cancelQueued()
 		noteID, revisionID := f.note(f.owner, voiceTweet)
 		f.propose(f.owner, noteID, revisionID)
 		result, err := f.repo.ConfirmVoiceCommand(f.ctx, f.owner, noteID, f.confirmInput())

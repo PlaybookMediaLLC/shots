@@ -233,14 +233,24 @@ export type WritingSample = {
 /** What AI help writes with for one draft on one channel. */
 export type WritingContext = {
   audience: string
+  /** From the brand profile; a social set does not change it. */
+  ctaConventions?: string
   endings: string[]
   formatting: string
   openings: string[]
   platformGuidance: string
+  /** From the brand profile. */
+  preferredStyles?: string[]
+  /** From the brand profile. */
+  productDescription?: string
   prohibitedPhrases: string[]
   samples: string[]
+  /** From the brand profile: network to handle. */
+  socialHandles?: Record<string, string>
   socialSetName: string
   source: 'brand' | 'social_set'
+  /** From the brand profile. */
+  tagline?: string
   terminology: string[]
   tone: string
 }

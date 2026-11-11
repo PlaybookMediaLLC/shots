@@ -145,6 +145,8 @@ type StalledPost struct {
 type Attempt struct {
 	ID     string
 	Number int
+	// ProviderMessage is why a failed attempt failed, redacted (RedactProviderMessage).
+	ProviderMessage string
 }
 
 type RecoverablePost struct {

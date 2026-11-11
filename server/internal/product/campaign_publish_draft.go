@@ -119,7 +119,7 @@ func (c *Configuration) CreateCampaignPublishDraft(ctx context.Context, actor Ac
 	// Only this path may name a campaign: the field is not readable from the
 	// draft API's own input, so a draft cannot claim a campaign the caller
 	// has no role on.
-	draft.campaignID = owner.ID
+	draft.campaignID, draft.campaignPostID = owner.ID, input.CampaignPostID
 	record, err := c.createContentDraft(ctx, tx, actor, draft)
 	if err != nil {
 		return nil, err

@@ -2,8 +2,10 @@ import 'server-only'
 
 import { generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { models } from '@/lib/ai/models'
 import type { CopyRequest } from '@/lib/api/contracts/store-screenshots'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /**
  * Headline suggestions for store screenshots, grounded only in the product
@@ -44,12 +46,16 @@ function digits(text: string): string[] {
   return text.match(/\d+([.,]\d+)?/g) ?? []
 }
 
-/** Generate suggestions for each slide. */
-export async function suggestCopy(request: CopyRequest) {
+/**
+ * Generate suggestions for each slide, in the brand voice. The request's tone
+ * is the user's choice for this set and wins where the two differ.
+ */
+export async function suggestCopy(request: CopyRequest, voice: WritingContext | null) {
   const limit = LIMITS[request.length]
   const result = await generateText({
     model: models.languageModel('drafting'),
-    system: instructions(request),
+    // The request's tone is the user's choice for this set: the voice gives the rest.
+    system: instructions(request) + voiceInstructions(voice && { ...voice, tone: '' }),
     prompt: `Product brief:\n${request.brief}\n\nSlides:\n${JSON.stringify(request.slides)}`,
     tools: {
       [SUBMIT_COPY_TOOL]: tool({ description: 'Submit headline suggestions for every slide.', inputSchema: answerSchema }),

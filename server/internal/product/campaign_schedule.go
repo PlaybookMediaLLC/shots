@@ -144,7 +144,7 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 		return nil, conflict(fmt.Sprintf("This %s post is %d characters with the call to action; the limit is %d.", post.Channel, length, limit))
 	}
 	// The term list may have changed since the copy was approved.
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID,
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, nil,
 		optionalText(post.Title), post.Copy, optionalText(post.CallToAction)); err != nil {
 		return nil, err
 	}
@@ -185,6 +185,11 @@ func (c *Configuration) ScheduleCampaignPost(ctx context.Context, actor Actor, c
 	}
 	if !slices.Contains(campaignChannelPlatforms[post.Channel], connection.Platform) {
 		return nil, conflict("This channel cannot publish a " + post.Channel + " post.")
+	}
+	// The account's social set adds the phrases its voice avoids.
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, connection.SocialSetID,
+		optionalText(post.Title), post.Copy, optionalText(post.CallToAction)); err != nil {
+		return nil, err
 	}
 	scheduledAt := time.Time{}
 	if input.ScheduledAt != nil {

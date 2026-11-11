@@ -174,8 +174,13 @@ type Error struct {
 	UnknownDelivery bool
 	// Code names a known cause, such as ACCOUNT_RECONNECT, for the failure
 	// receipt to keep; empty when only the status is known.
-	Code    string
-	message string
+	Code string
+	// RetryAfter is the provider's retry guidance on a 429; zero when none.
+	RetryAfter time.Duration
+	// ProviderMessage is the provider's own explanation, kept on the attempt
+	// for support (redacted there); Error() is Shots' message.
+	ProviderMessage string
+	message         string
 }
 
 func (e *Error) Error() string { return e.message }

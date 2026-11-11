@@ -278,6 +278,78 @@ func TestCommentPublishedWhenPermalinkIsRateLimited(t *testing.T) {
 	}
 }
 
+// A story that fails after an earlier story went live leaves the post partly
+// published: a whole-post retry would post the first story again.
+func TestLaterStoryFailureAfterALiveStoryIsUnknown(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v25.0/{container}", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"status_code":"FINISHED"}`))
+	})
+	published := 0
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		if published++; published == 1 {
+			w.Write([]byte(`{"id":"story-1"}`))
+			return
+		}
+		w.WriteHeader(400)
+		w.Write([]byte(`{"error":{"error_subcode":2207042}}`))
+	})
+	p := setup(t, mux)
+	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["c1","c2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || published != 2 {
+		t.Fatalf("got %v after %d publish requests", err, published)
+	}
+}
+
+// A status read that fails after an earlier story went live is as ambiguous
+// as a failed publish: a definite outcome would invite posting it again.
+func TestStatusFailureAfterALiveStoryIsUnknown(t *testing.T) {
+	mux := http.NewServeMux()
+	reads := 0
+	mux.HandleFunc("GET /v25.0/{container}", func(w http.ResponseWriter, r *http.Request) {
+		if reads++; reads == 1 {
+			w.Write([]byte(`{"status_code":"FINISHED"}`))
+			return
+		}
+		w.WriteHeader(401)
+		w.Write([]byte(`{"error":{"message":"session has been invalidated"}}`))
+	})
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"id":"story-1"}`))
+	})
+	p := setup(t, mux)
+	_, err := p.FinalizePost(context.Background(), "tok", json.RawMessage(`{"type":"graph.facebook.com","postType":"stories","containers":["c1","c2"],"message":""}`), &ent.Integration{InternalID: "ig1"})
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery {
+		t.Fatalf("got %v", err)
+	}
+}
+
+// A container stays invisible until media_publish, so only it may be sent
+// again after a server error; media_publish is sent once.
+func TestOnlyContainersAreResentAfterAServerError(t *testing.T) {
+	mux := http.NewServeMux()
+	containers, publishes := 0, 0
+	mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+		if containers++; containers == 1 {
+			w.WriteHeader(500)
+			return
+		}
+		w.Write([]byte(`{"id":"c1"}`))
+	})
+	mux.HandleFunc("POST /v25.0/ig1/media_publish", func(w http.ResponseWriter, r *http.Request) {
+		publishes++
+		w.WriteHeader(500)
+	})
+	p := setup(t, mux)
+	if id, err := p.postID(context.Background(), origin("")+"/v25.0/ig1/media?image_url=x&access_token=tok"); err != nil || id != "c1" || containers != 2 {
+		t.Fatalf("container id=%q err=%v requests=%d", id, err, containers)
+	}
+	_, err := p.postID(context.Background(), origin("")+"/v25.0/ig1/media_publish?creation_id=c1&access_token=tok")
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || publishes != 1 {
+		t.Fatalf("media_publish err=%v requests=%d", err, publishes)
+	}
+}
+
 func TestCheckValidity(t *testing.T) {
 	p := New()
 	media := func(paths ...string) [][]integrations.ValidityMedia {

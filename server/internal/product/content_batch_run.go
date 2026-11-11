@@ -338,6 +338,8 @@ func (c *Configuration) ScheduleNextBatchRunItem(ctx context.Context, organizati
 	if err := json.Unmarshal(item.Schedule, &input); err != nil {
 		return nil, err
 	}
+	// A run has no one to answer a repeat warning: its rows were reviewed when submitted.
+	input.ConfirmDuplicate = true
 	actor := Actor{OrganizationID: organizationID, RequestID: runID}
 	if run.CreatedByUserID != nil {
 		actor.UserID = *run.CreatedByUserID

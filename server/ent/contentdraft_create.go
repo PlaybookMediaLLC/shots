@@ -402,6 +402,34 @@ func (_c *ContentDraftCreate) SetNillableCampaignID(v *string) *ContentDraftCrea
 	return _c
 }
 
+// SetReleaseID sets the "release_id" field.
+func (_c *ContentDraftCreate) SetReleaseID(v string) *ContentDraftCreate {
+	_c.mutation.SetReleaseID(v)
+	return _c
+}
+
+// SetNillableReleaseID sets the "release_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableReleaseID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetReleaseID(*v)
+	}
+	return _c
+}
+
+// SetCampaignPostID sets the "campaign_post_id" field.
+func (_c *ContentDraftCreate) SetCampaignPostID(v string) *ContentDraftCreate {
+	_c.mutation.SetCampaignPostID(v)
+	return _c
+}
+
+// SetNillableCampaignPostID sets the "campaign_post_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableCampaignPostID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetCampaignPostID(*v)
+	}
+	return _c
+}
+
 // SetCollabGeneration sets the "collab_generation" field.
 func (_c *ContentDraftCreate) SetCollabGeneration(v int) *ContentDraftCreate {
 	_c.mutation.SetCollabGeneration(v)
@@ -850,6 +878,14 @@ func (_c *ContentDraftCreate) createSpec() (*ContentDraft, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.CampaignID(); ok {
 		_spec.SetField(contentdraft.FieldCampaignID, field.TypeString, value)
 		_node.CampaignID = &value
+	}
+	if value, ok := _c.mutation.ReleaseID(); ok {
+		_spec.SetField(contentdraft.FieldReleaseID, field.TypeString, value)
+		_node.ReleaseID = &value
+	}
+	if value, ok := _c.mutation.CampaignPostID(); ok {
+		_spec.SetField(contentdraft.FieldCampaignPostID, field.TypeString, value)
+		_node.CampaignPostID = &value
 	}
 	if value, ok := _c.mutation.CollabGeneration(); ok {
 		_spec.SetField(contentdraft.FieldCollabGeneration, field.TypeInt, value)

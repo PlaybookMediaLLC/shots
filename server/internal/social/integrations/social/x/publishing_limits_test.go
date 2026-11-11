@@ -92,6 +92,7 @@ func TestPublishingRechecksCurrentGrantAndSubscription(t *testing.T) {
 		name, tier, level, native string
 		status                    int
 		want                      string
+		body                      string
 	}{
 		{name: "downgrade", tier: "None", level: "read-write", want: temporalx.TypePublicationRejected},
 		{name: "unknown tier", tier: "FutureTier", level: "read-write", want: temporalx.TypePublicationRejected},
@@ -99,6 +100,8 @@ func TestPublishingRechecksCurrentGrantAndSubscription(t *testing.T) {
 		{name: "missing grant", tier: "Premium", want: temporalx.TypeRefreshToken},
 		{name: "account replaced", tier: "Premium", level: "read-write", native: "2", want: temporalx.TypeRefreshToken},
 		{name: "revoked", status: 401, want: temporalx.TypeRefreshToken},
+		// Shots' app lost v2 access: every account would fail, so none is flagged.
+		{name: "app not enrolled", status: 403, body: `{"title":"Client Forbidden","reason":"client-not-enrolled"}`, want: temporalx.TypeAppAccess},
 		{name: "rate limited", status: 429},
 		{name: "outage", status: 503},
 	} {
@@ -120,6 +123,10 @@ func TestPublishingRechecksCurrentGrantAndSubscription(t *testing.T) {
 				native := tc.native
 				if native == "" {
 					native = "1"
+				}
+				if tc.body != "" {
+					_, _ = io.WriteString(w, tc.body)
+					return
 				}
 				_, _ = io.WriteString(w, `{"data":{"id":"`+native+`","name":"Me","username":"me","subscription_type":"`+tc.tier+`"}}`)
 			})

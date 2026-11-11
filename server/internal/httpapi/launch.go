@@ -75,6 +75,7 @@ func (s *Server) getLaunchBrand(w http.ResponseWriter, r *http.Request) {
 	}
 	if profile != nil {
 		response["profile"] = brandProfileResponse(profile)
+		response["voice"] = product.WorkspaceVoice(profile)
 	}
 	writeLaunch(w, http.StatusOK, response, err)
 }

@@ -279,7 +279,7 @@ func TestSocialSetsPlatform(t *testing.T) {
 			wait.Add(1)
 			go func() {
 				defer wait.Done()
-				result, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{Queue: true, Version: draft.Version,
+				result, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{Queue: true, Version: draft.Version, ConfirmDuplicate: true,
 					Targets: []ContentDraftScheduleTarget{{Caption: "Race", ChannelConnectionID: ids["x"]}}})
 				if err != nil {
 					failures <- err

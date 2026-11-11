@@ -19,6 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 	"github.com/lucsky/cuid"
+	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
@@ -175,6 +176,9 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	scheduler := temporalpublishing.NewScheduler(temporal, temporalpublishing.SchedulerConfig{ActivityTaskQueue: queue, ActivityTimeout: 30 * time.Second, MaxAttempts: 3,
 		Namespace: "default", RetryDelay: 2 * time.Second, WorkflowTaskQueue: queue})
 	activities := temporalpublishing.NewActivities(store, provider)
+	// The local provider fixture's "e2e" connections take drafts as X does.
+	// Set before the worker starts, so no running activity reads it mid-write.
+	product.EnableE2EDraftPlatform()
 	w := worker.New(temporal, queue, worker.Options{})
 	w.RegisterWorkflowWithOptions(temporalpublishing.PostWorkflowV2, workflow.RegisterOptions{Name: temporalpublishing.WorkflowNameV2})
 	for name, fn := range map[string]any{temporalpublishing.PrepareActivityName: activities.Prepare, temporalpublishing.BeginActivityName: activities.Begin,
@@ -255,6 +259,7 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	late := schedule(owner, "late post", connections["main"])
 	restart := schedule(owner, "restart post", connections["main"])
 	lostAgain := schedule(owner, "lost after requeue post", connections["main"])
+	openAttempt := schedule(owner, "open attempt post", connections["main"])
 	planned, err := repo.CreateContentDraft(ctx, owner, product.ContentDraftInput{PlainText: "planned post", Title: "planned post"})
 	if err != nil {
 		t.Fatal(err)
@@ -375,6 +380,11 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 	t.Run("a refusal fails once; a lost response is never retried blindly", func(t *testing.T) {
 		if row := settle(refused.Posts[0].ID, scheduledpost.StatusFAILED); code(row) != "400" || provider.count("refuse post") != 1 {
 			t.Fatalf("refused=%+v calls=%d", row, provider.count("refuse post"))
+		}
+		// The failed attempt keeps the provider's explanation for support.
+		if rows, err := db.Client.PublicationAttempt.Query().Where(publicationattempt.ScheduledPostID(refused.Posts[0].ID)).All(ctx); err != nil ||
+			len(rows) != 1 || rows[0].ProviderMessage == nil || *rows[0].ProviderMessage != "rejected" {
+			t.Fatalf("refused attempts=%+v err=%v", rows, err)
 		}
 		row := settle(lost.Posts[0].ID, scheduledpost.StatusUNKNOWN_DELIVERY)
 		if code(row) != publishing.FailureUnknownDelivery || provider.count("lost post") != 1 {
@@ -528,6 +538,41 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 		}
 	})
 
+	t.Run("a restarted workflow never sends a post an earlier run may have sent", func(t *testing.T) {
+		id := openAttempt.Posts[0].ID
+		// An earlier run opened an attempt, so the provider may have the post.
+		exec(`INSERT INTO publication_attempt (id,"organizationId","scheduledPostId","attemptNumber","startedAt") VALUES ($1,$2,$3,1,now()-interval '20 minutes')`,
+			cuid.New(), owner.OrganizationID, id)
+		exec(`UPDATE scheduled_post SET status='PROCESSING',"triggerRunId"='vanished-run-3',"updatedAt"=now()-interval '20 minutes' WHERE id=$1`, id)
+		// Each restart's run must finish (skipped) without reaching the provider.
+		restartAndFinish := func() {
+			t.Helper()
+			start(post(id))
+			deadline := time.Now().Add(90 * time.Second)
+			for {
+				described, err := temporal.DescribeWorkflowExecution(ctx, temporalpublishing.WorkflowID(id), "")
+				if err == nil && described.WorkflowExecutionInfo.Status != enumspb.WORKFLOW_EXECUTION_STATUS_RUNNING {
+					return
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("the restarted run never finished: %v", err)
+				}
+				time.Sleep(250 * time.Millisecond)
+			}
+		}
+		restartAndFinish()
+		if row := post(id); row.Status != scheduledpost.StatusPROCESSING || provider.count("open attempt post") != 0 || len(attempts(id)) != 1 {
+			t.Fatalf("a new run took over an open attempt: %+v calls=%d", row, provider.count("open attempt post"))
+		}
+		if outcome, err := accounts.ReleaseStalled(ctx, id, "vanished-run-3"); err != nil || outcome != "unknown_delivery" {
+			t.Fatalf("outcome=%q err=%v", outcome, err)
+		}
+		restartAndFinish()
+		if row := post(id); row.Status != scheduledpost.StatusUNKNOWN_DELIVERY || provider.count("open attempt post") != 0 || len(attempts(id)) != 1 {
+			t.Fatalf("an unknown delivery was sent: %+v calls=%d", row, provider.count("open attempt post"))
+		}
+	})
+
 	t.Run("a receipt that cannot be recorded is reconciled, never resent", func(t *testing.T) {
 		id := receipt.Posts[0].ID
 		deadline := time.Now().Add(90 * time.Second)
@@ -557,6 +602,44 @@ func TestSchedulingThroughTemporal(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		if provider.count("receipt post") != 1 {
 			t.Fatal("an unknown delivery was sent again")
+		}
+	})
+
+	t.Run("one draft with an X and a LinkedIn Page target publishes each caption once", func(t *testing.T) {
+		actor, accounts := workspace("xaccount:e2e", "page:linkedin-page")
+		draft, err := repo.CreateContentDraft(ctx, actor, product.ContentDraftInput{PlainText: "Exports are faster", Title: "Faster exports"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		xCaption := "Exports now finish in half the time. Try it today."
+		// Longer than X allows, so applying X's limit to LinkedIn would refuse it.
+		linkedinCaption := "Exports now finish in half the time.\n\nWe rebuilt the renderer so long reports no longer stall, " +
+			"large decks render in the background while you keep editing, and every export keeps its fonts and colours. " +
+			"Try it today on your largest project and tell us which reports you export most often."
+		if len(linkedinCaption) <= 280 {
+			t.Fatalf("the LinkedIn caption must exceed X's limit: %d", len(linkedinCaption))
+		}
+		at := time.Now().Add(35 * time.Second).UTC().Truncate(time.Second)
+		result, err := repo.ScheduleContentDraft(ctx, actor, draft.ID, product.ScheduleContentDraftInput{ScheduledFor: at, Version: draft.Version,
+			Targets: []product.ContentDraftScheduleTarget{
+				{Caption: xCaption, ChannelConnectionID: accounts["xaccount"]},
+				{Caption: linkedinCaption, ChannelConnectionID: accounts["page"]},
+			}})
+		if err != nil || len(result.Scheduled) != 2 {
+			t.Fatalf("result=%+v err=%v", result, err)
+		}
+		for _, row := range result.Scheduled {
+			start(row)
+		}
+		want := map[string]string{accounts["xaccount"]: xCaption, accounts["page"]: linkedinCaption}
+		for _, row := range result.Scheduled {
+			published := settle(row.ID, scheduledpost.StatusPUBLISHED)
+			if published.Caption != want[published.ChannelConnectionID] {
+				t.Fatalf("connection %s published %q, want its own caption", published.ChannelConnectionID, published.Caption)
+			}
+		}
+		if provider.count(xCaption) != 1 || provider.count(linkedinCaption) != 1 {
+			t.Fatalf("x calls=%d linkedin calls=%d", provider.count(xCaption), provider.count(linkedinCaption))
 		}
 	})
 }

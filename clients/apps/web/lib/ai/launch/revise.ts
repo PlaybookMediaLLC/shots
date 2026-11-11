@@ -49,16 +49,11 @@ import {
   type StoredSpec,
 } from '@/lib/launch/store'
 import { readTenantObject } from '@/lib/storage/client'
-import {
-  captureUrlsFor,
-  formatBrandKit,
-  formatBrandVoice,
-  formatPlanForStages,
-  formatSpecForStages,
-} from './context'
+import { captureUrlsFor, formatBrandKit, formatPlanForStages, formatSpecForStages } from './context'
 import { copyGuardContext } from './copy'
 import { REVISE_INSTRUCTIONS } from './prompts'
 import { runSubmitStage } from './run'
+import { voiceInstructions } from '@/lib/write/voice'
 
 export type RevisionTargetInput =
   | { planId: string; type: 'plan' }
@@ -138,7 +133,7 @@ export async function proposeCampaignRevision(
   ])
   const campaignPosts = async () => (await backendSDK(tenant).getCampaign(campaign.id)).posts
   const preferences = formatTeamPreferences(examples)
-  const voice = formatBrandVoice(brand)
+  const voice = voiceInstructions(brand.voice)
   const comment = input.comment.trim()
   const target = input.target
 
@@ -314,6 +309,8 @@ export async function proposeCampaignRevision(
         text: [
           spec ? formatSpecForStages(spec.content, spec.version) : null,
           formatBrandKit(brand.kit),
+          // Text on the image is public copy too.
+          voice,
           `<design name="${defuseMarkup(design.name).replace(/"/g, '')}">\n${JSON.stringify(document)}\n</design>`,
           design.critique
             ? `<last_review>\n${JSON.stringify(design.critique)}\n</last_review>`

@@ -1,18 +1,12 @@
 'use client'
 
 import * as React from 'react'
+import { SparkleIcon } from '@phosphor-icons/react/dist/ssr/Sparkle'
+import { TRPCClientError } from '@trpc/client'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,6 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { DRAFT_ACCOUNT_LIMIT } from '@/lib/api/contracts/content-drafts'
@@ -42,6 +44,13 @@ import {
 import { usePublishSets, useRecommendedTimes } from '@/lib/editor/use-publish-targets'
 import type { DesignDocument } from '@/lib/design/document'
 import { exportDesignDocument } from '@/lib/design/export'
+import { type CaptionChannel, captionChannelSchema } from '@/lib/captions/channels'
+import { writeDesignCaptions } from '@/lib/captions/write'
+import {
+  releaseCaptionNotes,
+  releaseClaimsNote,
+  type ReleaseSummary,
+} from '@/lib/launch/release-summary'
 import { adaptDocumentToSize, canvasSizeOf, documentCanvasSize } from '@/lib/export/adapt'
 import { imageAspectOf } from '@/lib/export/export-design'
 import type { ExportTarget } from '@/lib/export/sizes'
@@ -50,6 +59,7 @@ import { readEditorReturn } from '@/lib/platform/editor-handoff'
 import { useProjectSession } from '@/lib/projects/session'
 import { useImageStore } from '@/lib/store'
 import { useTRPCClient } from '@/lib/trpc/react'
+import { cn } from '@/lib/utils'
 import { engagementAutomation, followUpLines } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import type { DraftChannel } from '@/lib/write/document'
@@ -101,6 +111,10 @@ type Destination = 'draft' | 'batch'
 
 /** Chosen in place of a batch that is already open. */
 const NEW_BATCH = 'new'
+
+/** A destination choice drawn as a card that shows when it is chosen. */
+const CHOICE_CARD =
+  'flex cursor-pointer items-start gap-3 rounded-xl border border-border p-3 text-ui font-normal leading-normal transition-colors hover:bg-foreground/[0.02] has-[[data-state=checked]]:border-foreground/40 has-[[data-state=checked]]:bg-foreground/[0.03]'
 
 /** No calendar placement: the drafts wait in Publish. */
 const NO_TIME = 'none'
@@ -208,6 +222,21 @@ export function PrepareScreenshotPost({
     () => (open && !exports ? readEditorReturn(window.location.search).campaignId : undefined),
     [exports, open]
   )
+  // A screenshot opened from a release: its summary seeds the captions and
+  // the draft keeps the release, so its evidence stays reachable.
+  const releaseId = React.useMemo(
+    () => (open && !exports ? readEditorReturn(window.location.search).releaseId : undefined),
+    [exports, open]
+  )
+  const [release, setRelease] = React.useState<ReleaseSummary | null>(null)
+  // Until the summary settles, a draft would be made without its claims note.
+  const [releaseState, setReleaseState] = React.useState<'loading' | 'linked' | 'unlinked'>(
+    'loading'
+  )
+  const [releaseNotice, setReleaseNotice] = React.useState('')
+  const [writingFromRelease, setWritingFromRelease] = React.useState(false)
+  // Unverified claims stay marked on the draft, for whoever reviews it.
+  const releaseNotes = releaseClaimsNote(release)
 
   // Profiles and their accounts. A failure here leaves the draft path
   // working: the backend resolves the default profile and platforms itself.
@@ -292,6 +321,35 @@ export function PrepareScreenshotPost({
       live = false
     }
   }, [campaignId, open, trpcClient])
+
+  React.useEffect(() => {
+    if (!open || !releaseId) return
+    let live = true
+    setReleaseState('loading')
+    void trpcClient.release.summary
+      .query({ releaseId })
+      .then((summary) => {
+        if (!live) return
+        setRelease(summary)
+        setReleaseState('linked')
+      })
+      .catch((failure: unknown) => {
+        if (!live) return
+        // A release this workspace cannot read would refuse the draft, so
+        // it is left off; any other failure loses only the summary.
+        const code = failure instanceof TRPCClientError ? failure.data?.code : undefined
+        const unlinked = code === 'NOT_FOUND' || code === 'BAD_REQUEST'
+        setReleaseState(unlinked ? 'unlinked' : 'linked')
+        setReleaseNotice(
+          unlinked
+            ? 'This release is not in this workspace, so the draft will not keep it.'
+            : `The release summary could not load${failure instanceof Error ? `: ${failure.message}` : '.'} The draft still keeps the release.`
+        )
+      })
+    return () => {
+      live = false
+    }
+  }, [open, releaseId, trpcClient])
 
   const accounts = set?.accounts ?? []
   const chosen = accounts.filter((account) => selected.includes(account.id))
@@ -396,7 +454,11 @@ export function PrepareScreenshotPost({
           // there; a draft has no such step before it exists.
           destination === 'draft' && mediaWarnings.length > 0
           ? 'Choose other accounts, or change the design, before making the draft.'
-          : ''
+          : releaseId && releaseState === 'loading'
+            ? 'Loading the release summary…'
+            : destination === 'batch' && releaseNotes
+              ? 'A batch item cannot carry the claims to verify from this release. Make a draft.'
+              : ''
 
   /** The designs to post, as the handoff stores them. */
   function designs(): HandoffDesign[] {
@@ -456,6 +518,32 @@ export function PrepareScreenshotPost({
     return exportDesignDocument({ keepLocalSources: true })
   }
 
+  /**
+   * The X and LinkedIn captions (and any other chosen platform's) written from
+   * the release summary in the brand voice, through the editor's captions so
+   * they can be edited here and in the Captions panel.
+   */
+  async function writeFromRelease() {
+    if (!release) return
+    setWritingFromRelease(true)
+    try {
+      await writeDesignCaptions(trpcClient, {
+        channels: [...new Set(['x', 'linkedin', ...channels])].filter(
+          (item): item is CaptionChannel => captionChannelSchema.safeParse(item).success
+        ),
+        notes: releaseCaptionNotes(release),
+        socialSetId: setId || undefined,
+      })
+      setCaption(null)
+    } catch (failure) {
+      toast.error('Could not write captions from the release', {
+        description: failure instanceof Error ? failure.message : undefined,
+      })
+    } finally {
+      setWritingFromRelease(false)
+    }
+  }
+
   /** One design's draft, everything but its request key. */
   function draftFor(
     asset: { assetId: string; mediaType: string },
@@ -484,10 +572,7 @@ export function PrepareScreenshotPost({
         : body.trim().split('\n')[0]?.slice(0, 80)
     return {
       assetIds: [
-        ...new Set([
-          asset.assetId,
-          ...Object.values(platformMedia).map((media) => media.assetId),
-        ]),
+        ...new Set([asset.assetId, ...Object.values(platformMedia).map((media) => media.assetId)]),
       ],
       body: postBody,
       plainText: draftPlainText(postBody),
@@ -497,6 +582,8 @@ export function PrepareScreenshotPost({
       ...(platformVersions ? { platformVersions } : {}),
       ...(setId ? { socialSetId: setId } : {}),
       ...(title ? { title: title.slice(0, 200) } : {}),
+      ...(releaseId && releaseState === 'linked' ? { releaseId } : {}),
+      ...(releaseNotes ? { scratchpad: releaseNotes.slice(0, 20_000) } : {}),
     }
   }
 
@@ -588,6 +675,8 @@ export function PrepareScreenshotPost({
             campaignId,
             campaign?.name,
             campaignPostId,
+            releaseId,
+            releaseNotes,
             count,
             Object.entries(platformMedia).map(([platform, media]) => [platform, media.assetId]),
           ],
@@ -646,408 +735,503 @@ export function PrepareScreenshotPost({
     }
   }
 
+  const submitLabel =
+    busy ??
+    (destination === 'batch'
+      ? count > 1
+        ? `Add ${count} to the batch`
+        : 'Add to batch'
+      : count > 1
+        ? `Create ${count} drafts`
+        : 'Create draft')
+
   return (
-    <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{count > 1 ? `Prepare ${count} posts` : 'Prepare post'}</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
+      <SheetContent
+        className="w-full gap-0 p-0 sm:max-w-none md:w-[60vw] md:min-w-[min(44rem,100vw)]"
+        side="right"
+      >
+        <SheetHeader className="gap-1 border-b border-border px-6 py-5 pr-14">
+          <SheetTitle className="text-lg tracking-tight">
+            {count > 1 ? `Prepare ${count} posts` : 'Prepare post'}
+          </SheetTitle>
+          <SheetDescription className="text-ui leading-relaxed">
             {exports
-              ? `${plural(exports.length, 'rendered screenshot')} are saved to your workspace, then go to Publish one post each: as drafts to review, or into a batch you schedule together.`
-              : 'The export is saved to your workspace, then goes to Publish as a draft you can review, or into a batch you schedule with the rest of the day’s screenshots.'}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {!exports && versions.length > 0 ? (
-            <Label className="flex items-start gap-2 text-sm font-normal">
-              <Checkbox
-                checked={everyVersion}
-                onCheckedChange={(checked) => setEveryVersion(checked === true)}
-              />
-              <span className="grid gap-0.5">
-                <span>One post for each of the {versions.length} AI versions</span>
-                <span className="text-xs text-muted-foreground">
-                  Each version is rendered as previewed in Variants and becomes its own post, so
-                  they can be compared in Publish. Off posts the design as it is now.
-                </span>
-              </span>
-            </Label>
-          ) : null}
-          {campaignNotice ? (
-            <p className="text-xs text-muted-foreground" role="status">
-              {campaignNotice} The post is still attached to the campaign.
-            </p>
-          ) : null}
-          {campaign && campaign.posts.length > 0 ? (
-            <Label className="grid gap-1.5 text-sm">
-              Start from {campaign.name}&rsquo;s copy
-              <Select
-                onValueChange={(value) => {
-                  setCampaignPostId(value)
-                  setCaption(campaign.posts.find((post) => post.id === value)?.copy ?? '')
-                }}
-                value={campaignPostId}
-              >
-                <SelectTrigger aria-label="Campaign copy">
-                  <SelectValue placeholder="Choose a generated post…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {campaign.posts.map((post) => (
-                    <SelectItem key={post.id} value={post.id}>
-                      {post.title} · {post.channel}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Label>
-          ) : null}
-          {sets.length > 0 ? (
-            <Label className="grid gap-1.5 text-sm">
-              Profile
-              <Select onValueChange={chooseSet} value={setId}>
-                <SelectTrigger aria-label="Profile">
-                  <SelectValue placeholder="Choose a profile…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sets.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Label>
-          ) : status === 'loading' ? (
-            <p className="text-xs text-muted-foreground" role="status">
-              Loading your profiles…
-            </p>
-          ) : null}
-          {accounts.length > 0 ? (
-            <fieldset className="grid gap-1.5">
-              <legend className="mb-1 text-sm font-medium">Post to</legend>
-              {accounts.map((account) => {
-                const on = selected.includes(account.id)
-                return (
-                  <Label className="flex items-center gap-2 text-sm font-normal" key={account.id}>
-                    <Checkbox
-                      checked={on}
-                      // A draft names at most this many accounts; the API refuses more.
-                      disabled={!on && selected.length >= DRAFT_ACCOUNT_LIMIT}
-                      onCheckedChange={(checked) =>
-                        setSelected((current) =>
-                          checked === true
-                            ? [...current, account.id]
-                            : current.filter((value) => value !== account.id)
-                        )
-                      }
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      {CAPABILITIES[account.channel].label} · {account.name}
-                    </span>
-                    {copy && captionFor(copy, account.channel) ? (
-                      <span className="text-xs text-muted-foreground">Has its own caption</span>
-                    ) : null}
-                  </Label>
-                )
-              })}
-              {selected.length >= DRAFT_ACCOUNT_LIMIT ? (
-                <p className="text-xs text-muted-foreground">
-                  One post goes to at most {DRAFT_ACCOUNT_LIMIT} accounts.
+              ? `${plural(exports.length, 'rendered screenshot')} are saved to your workspace and become one post each in Publish.`
+              : 'The export is saved to your workspace and becomes a post in Publish.'}{' '}
+            Nothing is posted until it is scheduled.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="@container min-h-0 flex-1 overflow-y-auto">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-x-8 gap-y-8 px-6 py-6 @min-[46rem]:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+            {/* What is posted: the words, and where they come from. */}
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
+              {releaseNotice ? (
+                <p className="text-caption text-muted-foreground" role="status">
+                  {releaseNotice}
                 </p>
               ) : null}
-            </fieldset>
-          ) : null}
-          <Label className="grid gap-1.5 text-sm" htmlFor={`${id}-caption`}>
-            {channels.length > 0 ? `Caption · ${CAPABILITIES[channel].label}` : 'Caption'}
-            <Textarea
-              id={`${id}-caption`}
-              maxLength={100_000}
-              onChange={(event) => setCaption(event.target.value)}
-              placeholder="Optional. You can also write it in Publish."
-              rows={3}
-              value={body}
-            />
-          </Label>
-          {destination === 'draft' && ownCaptions.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              {ownCaptions.map((item) => CAPABILITIES[item].label).join(', ')}{' '}
-              {ownCaptions.length === 1 ? 'posts the caption' : 'post the captions'} written for{' '}
-              {ownCaptions.length === 1 ? 'it' : 'them'} in the editor&rsquo;s Captions panel; the
-              others post this one.
-            </p>
-          ) : null}
-          {overLimit.map((problem) => (
-            <p className="text-xs text-destructive" key={problem.channel} role="status">
-              {problem.reused
-                ? `${CAPABILITIES[problem.channel].label} would post this caption, which is ${problem.length} characters there; its limit is ${problem.limit}. Shorten it, or write a ${CAPABILITIES[problem.channel].label} caption in the editor’s Captions panel.`
-                : `The ${CAPABILITIES[problem.channel].label} caption is ${problem.length} characters; the limit is ${problem.limit}. Shorten it before scheduling.`}
-            </p>
-          ))}
-          <Disclosure className="rounded-lg border border-border p-3">
-            <DisclosureTrigger>Turn a longer explanation into a thread</DisclosureTrigger>
-            <DisclosureContent>
-              <p className="my-2 text-xs text-muted-foreground">
-                The screenshot stays on the opening post. Separate posts with a line containing ---
-                or four line breaks, or split by length.
-              </p>
-              <Textarea
-                aria-label="Longer explanation"
-                maxLength={100_000}
-                onChange={(event) => setExplanation(event.target.value)}
-                rows={6}
-                value={explanation}
-              />
-              <Label className="mt-2 flex gap-2 text-sm">
-                <Checkbox
-                  checked={bySize}
-                  onCheckedChange={(checked) => setBySize(checked === true)}
-                />
-                Split by post length
-              </Label>
-              {bySize ? (
-                <Label className="mt-2 block text-sm">
-                  Maximum post length
-                  <Input
-                    max={limit}
-                    min={23}
-                    onChange={(event) => setPostLength(Number(event.target.value))}
-                    type="number"
-                    value={length}
-                  />
-                </Label>
-              ) : null}
-              {thread.posts.length > 0 ? (
-                <>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    The caption is post 1, with the screenshot. These follow it.
+              {release ? (
+                <section
+                  className="grid gap-3 rounded-xl border border-border bg-gradient-to-b from-foreground/[0.035] to-transparent p-4"
+                  data-testid="release-summary"
+                >
+                  <p className="text-caption text-muted-foreground">
+                    From the release {release.source === 'spec' ? 'launch spec summary' : 'brief'}:
                   </p>
-                  <ol className="mt-1 grid max-h-48 gap-2 overflow-auto text-xs">
-                    {thread.posts.map((post, index) => (
-                      <li className="whitespace-pre-wrap rounded border p-2" key={index}>
-                        <strong>{index + 2}.</strong> {post}
-                      </li>
-                    ))}
-                  </ol>
-                </>
+                  <p className="line-clamp-4 text-ui-lg leading-relaxed text-foreground">
+                    {release.text}
+                  </p>
+                  {release.verified ? null : (
+                    <p className="text-caption text-amber-700 dark:text-amber-300" role="status">
+                      No person has verified this summary yet; the draft lists it to check.
+                    </p>
+                  )}
+                  <Button
+                    className="w-fit"
+                    disabled={writingFromRelease}
+                    onClick={() => void writeFromRelease()}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <SparkleIcon aria-hidden="true" className="size-3.5" />
+                    {writingFromRelease
+                      ? 'Writing…'
+                      : 'Write X and LinkedIn captions from the release'}
+                  </Button>
+                </section>
               ) : null}
-              {destination === 'batch' && thread.posts.length > 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground" role="status">
-                  A batch item is one post. Send this to a draft to keep the thread.
+              {campaignNotice ? (
+                <p className="text-caption text-muted-foreground" role="status">
+                  {campaignNotice} The post is still attached to the campaign.
                 </p>
               ) : null}
-            </DisclosureContent>
-          </Disclosure>
-          {/* The draft opens with the instruction waiting, so it applies to one draft. */}
-          {count === 1 ? (
-            <Disclosure className="rounded-lg border border-border p-3">
-              <DisclosureTrigger>Ask the writing assistant to draft it</DisclosureTrigger>
-              <DisclosureContent>
-                <p className="my-2 text-xs text-muted-foreground">
-                  The draft opens with this instruction waiting in the assistant, which answers in
-                  your profile&rsquo;s voice and treats the caption above as your notes. Examples
-                  show a structure; the facts stay yours.
-                </p>
-                <ul className="grid gap-2">
-                  {screenshotPrompts().map((prompt) => (
-                    <li key={prompt.id}>
-                      <Button
-                        aria-pressed={promptId === prompt.id}
-                        onClick={() => setPromptId(promptId === prompt.id ? '' : prompt.id)}
-                        size="sm"
-                        type="button"
-                        variant={promptId === prompt.id ? 'default' : 'outline'}
-                      >
-                        {prompt.title}
-                      </Button>
-                      <p className="mt-1 text-xs text-muted-foreground">{prompt.example}</p>
-                    </li>
-                  ))}
-                </ul>
-              </DisclosureContent>
-            </Disclosure>
-          ) : null}
-          {destination === 'draft' && hasX ? (
-            <div className="grid gap-2 rounded-lg border border-border p-3">
-              <div className="flex items-start justify-between gap-3">
-                <span className="min-w-0 text-sm">
-                  X follow-ups
-                  <span className="block text-xs text-muted-foreground">
-                    {followUps
-                      ? `${set?.name}’s saved Auto-RT and Auto-Plug settings, carried onto this draft. Change them in Publish before scheduling.`
-                      : `${set?.name} has no saved follow-ups. Set Auto-RT or Auto-Plug on the profile, or on the draft in Publish.`}
-                  </span>
-                </span>
-                <Switch
-                  aria-label="X follow-ups"
-                  checked={keepFollowUps && Boolean(followUps)}
-                  disabled={!followUps}
-                  onCheckedChange={(checked) => setKeepFollowUps(checked === true)}
-                />
-              </div>
-              {keepFollowUps && followUps ? (
-                <ul className="grid gap-1 text-xs text-muted-foreground">
-                  {followUpLines(followUps, undefined, 'X').map((line) => (
-                    <li key={line}>{line}</li>
-                  ))}
-                </ul>
-              ) : null}
-              {autoDm.available ? null : (
-                <p className="text-xs text-muted-foreground">Auto-DM: {autoDm.reason}</p>
-              )}
-            </div>
-          ) : null}
-          <div className="grid gap-2">
-            <p className="text-sm font-medium">Where it goes</p>
-            <RadioGroup
-              aria-label="Where it goes"
-              className="grid gap-2"
-              onValueChange={(value) => setDestination(value === 'batch' ? 'batch' : 'draft')}
-              value={destination}
-            >
-              <Label className="items-start gap-2 font-normal">
-                <RadioGroupItem value="draft" />
-                <span className="grid gap-0.5">
-                  <span>A new draft in Publish</span>
-                  <span className="text-xs text-muted-foreground">
-                    Review it, write the thread, and schedule it on its own.
-                  </span>
-                </span>
-              </Label>
-              <Label className="items-start gap-2 font-normal">
-                <RadioGroupItem value="batch" />
-                <span className="grid gap-0.5">
-                  <span>A bulk batch</span>
-                  <span className="text-xs text-muted-foreground">
-                    Prepare a day of screenshots, then set destinations, times and intervals once
-                    and schedule them together.
-                    {campaign ? ' A batch item is not linked back to the campaign.' : ''}
-                  </span>
-                </span>
-              </Label>
-            </RadioGroup>
-          </div>
-          {destination === 'batch' ? (
-            <div className="grid gap-2">
-              <Label className="grid gap-1.5 text-sm">
-                Batch
-                <Select onValueChange={setBatchId} value={chosenBatch}>
-                  <SelectTrigger aria-label="Batch">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NEW_BATCH}>Start a new batch</SelectItem>
-                    {openBatches.map((batch) => (
-                      <SelectItem key={batch.id} value={batch.id}>
-                        {batch.title} · {batch.itemCount} posts
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Label>
-              {chosenBatch === NEW_BATCH ? (
-                <Label className="grid gap-1.5 text-sm">
-                  Name
-                  <Input
-                    maxLength={200}
-                    onChange={(event) => setBatchTitle(event.target.value)}
-                    value={batchTitle}
-                  />
+              {campaign && campaign.posts.length > 0 ? (
+                <Label className="grid gap-2 text-ui font-normal leading-normal">
+                  Start from {campaign.name}&rsquo;s copy
+                  <Select
+                    onValueChange={(value) => {
+                      setCampaignPostId(value)
+                      setCaption(campaign.posts.find((post) => post.id === value)?.copy ?? '')
+                    }}
+                    value={campaignPostId}
+                  >
+                    <SelectTrigger aria-label="Campaign copy" className="w-full">
+                      <SelectValue placeholder="Choose a generated post…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {campaign.posts.map((post) => (
+                        <SelectItem key={post.id} value={post.id}>
+                          {post.title} · {post.channel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Label>
               ) : null}
-            </div>
-          ) : (
-            <div className="grid gap-1.5">
-              <Label className="grid gap-1.5 text-sm">
-                When
-                <Select onValueChange={setPlannedFor} value={when}>
-                  <SelectTrigger aria-label="When to post">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NO_TIME}>No time yet</SelectItem>
-                    {times.map((time) => (
-                      <SelectItem key={time.at} value={time.at}>
-                        {timeLabel(time.at, set?.timeZone ?? 'UTC')} · {time.reason}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Label>
-              <p className="text-xs text-muted-foreground">
-                {times.length > 0
-                  ? `Recommended from this workspace’s measured engagement, in ${set?.timeZone ?? 'UTC'}. A time places the draft on the calendar; it is scheduled in Publish.`
-                  : 'Recommended times appear once published posts have measured engagement.'}
-              </p>
-            </div>
-          )}
-          {canFit ? (
-            <fieldset className="grid gap-1.5">
-              <legend className="text-xs font-medium">Picture size</legend>
-              <Label className="flex items-start gap-2 font-normal">
-                <Checkbox
-                  checked={fitToPlatforms}
-                  onCheckedChange={(value) => setFitToPlatforms(value === true)}
+              <div className="grid gap-2">
+                <Label className="text-ui-lg font-normal" htmlFor={`${id}-caption`}>
+                  {channels.length > 0 ? `Caption · ${CAPABILITIES[channel].label}` : 'Caption'}
+                </Label>
+                <Textarea
+                  className="min-h-40 resize-y leading-relaxed"
+                  id={`${id}-caption`}
+                  maxLength={100_000}
+                  onChange={(event) => setCaption(event.target.value)}
+                  placeholder="Optional. You can also write it in Publish."
+                  rows={7}
+                  value={body}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block">Draw each platform at its own size</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {renders
-                      .map(
-                        (render) =>
-                          `${render.channels.map((platform) => CAPABILITIES[platform].label).join(', ')} ${render.target.width}\u00d7${render.target.height}`
-                      )
-                      .join(' \u00b7 ')}
+                {destination === 'draft' && ownCaptions.length > 0 ? (
+                  <p className="text-caption text-muted-foreground">
+                    {ownCaptions.map((item) => CAPABILITIES[item].label).join(', ')}{' '}
+                    {ownCaptions.length === 1 ? 'posts the caption' : 'post the captions'} written
+                    for {ownCaptions.length === 1 ? 'it' : 'them'} in the editor&rsquo;s Captions
+                    panel; the others post this one.
+                  </p>
+                ) : null}
+                {overLimit.map((problem) => (
+                  <p className="text-caption text-destructive" key={problem.channel} role="status">
+                    {problem.reused
+                      ? `${CAPABILITIES[problem.channel].label} would post this caption, which is ${problem.length} characters there; its limit is ${problem.limit}. Shorten it, or write a ${CAPABILITIES[problem.channel].label} caption in the editor’s Captions panel.`
+                      : `The ${CAPABILITIES[problem.channel].label} caption is ${problem.length} characters; the limit is ${problem.limit}. Shorten it before scheduling.`}
+                  </p>
+                ))}
+              </div>
+              {!exports && versions.length > 0 ? (
+                <Label className="flex items-start gap-3 rounded-xl border border-border p-4 text-ui font-normal leading-normal">
+                  <Checkbox
+                    checked={everyVersion}
+                    className="mt-0.5"
+                    onCheckedChange={(checked) => setEveryVersion(checked === true)}
+                  />
+                  <span className="grid gap-0.5">
+                    <span>One post for each of the {versions.length} AI versions</span>
+                    <span className="text-caption text-muted-foreground">
+                      Each version is rendered as previewed in Variants and becomes its own post, so
+                      they can be compared in Publish. Off posts the design as it is now.
+                    </span>
                   </span>
-                </span>
-              </Label>
-              {!fitting && refusedCanvas.length > 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {refusedCanvas.map((platform) => CAPABILITIES[platform].label).join(', ')} would
-                  refuse the canvas as it is.
+                </Label>
+              ) : null}
+              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                <Disclosure className="px-4 py-3">
+                  <DisclosureTrigger className="text-ui">
+                    Turn a longer explanation into a thread
+                  </DisclosureTrigger>
+                  <DisclosureContent className="grid gap-3 pt-3 pb-1">
+                    <p className="text-caption text-muted-foreground">
+                      The screenshot stays on the opening post. Separate posts with a line
+                      containing --- or four line breaks, or split by length.
+                    </p>
+                    <Textarea
+                      aria-label="Longer explanation"
+                      maxLength={100_000}
+                      onChange={(event) => setExplanation(event.target.value)}
+                      rows={6}
+                      value={explanation}
+                    />
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                      <Label className="gap-2 text-ui font-normal">
+                        <Checkbox
+                          checked={bySize}
+                          onCheckedChange={(checked) => setBySize(checked === true)}
+                        />
+                        Split by post length
+                      </Label>
+                      {bySize ? (
+                        <Label className="gap-2 text-ui font-normal">
+                          Maximum post length
+                          <Input
+                            className="w-24"
+                            max={limit}
+                            min={23}
+                            onChange={(event) => setPostLength(Number(event.target.value))}
+                            type="number"
+                            value={length}
+                          />
+                        </Label>
+                      ) : null}
+                    </div>
+                    {thread.posts.length > 0 ? (
+                      <div className="grid gap-2">
+                        <p className="text-caption text-muted-foreground">
+                          The caption is post 1, with the screenshot. These follow it.
+                        </p>
+                        <ol className="grid max-h-56 gap-2 overflow-auto text-caption">
+                          {thread.posts.map((post, index) => (
+                            <li
+                              className="flex gap-2 rounded-lg bg-foreground/[0.03] p-2.5 whitespace-pre-wrap"
+                              key={index}
+                            >
+                              <span className="shrink-0 font-medium text-muted-foreground tabular-nums">
+                                {index + 2}.
+                              </span>
+                              <span className="min-w-0">{post}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+                    {destination === 'batch' && thread.posts.length > 0 ? (
+                      <p className="text-caption text-muted-foreground" role="status">
+                        A batch item is one post. Send this to a draft to keep the thread.
+                      </p>
+                    ) : null}
+                  </DisclosureContent>
+                </Disclosure>
+                {/* The draft opens with the instruction waiting, so it applies to one draft. */}
+                {count === 1 ? (
+                  <Disclosure className="px-4 py-3">
+                    <DisclosureTrigger className="text-ui">
+                      Ask the writing assistant to draft it
+                    </DisclosureTrigger>
+                    <DisclosureContent className="grid gap-3 pt-3 pb-1">
+                      <p className="text-caption text-muted-foreground">
+                        The draft opens with this instruction waiting in the assistant, which
+                        answers in your profile&rsquo;s voice and treats the caption above as your
+                        notes. Examples show a structure; the facts stay yours.
+                      </p>
+                      <ul className="grid gap-3">
+                        {screenshotPrompts().map((prompt) => (
+                          <li className="grid gap-1" key={prompt.id}>
+                            <Button
+                              aria-pressed={promptId === prompt.id}
+                              className="w-fit"
+                              onClick={() => setPromptId(promptId === prompt.id ? '' : prompt.id)}
+                              size="sm"
+                              type="button"
+                              variant={promptId === prompt.id ? 'default' : 'outline'}
+                            >
+                              {prompt.title}
+                            </Button>
+                            <p className="text-caption text-muted-foreground">{prompt.example}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </DisclosureContent>
+                  </Disclosure>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Where and when it goes. */}
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 @min-[46rem]:border-l @min-[46rem]:border-border @min-[46rem]:pl-8">
+              {sets.length > 0 ? (
+                <Label className="grid gap-2 text-ui-lg font-normal leading-normal">
+                  Profile
+                  <Select onValueChange={chooseSet} value={setId}>
+                    <SelectTrigger aria-label="Profile" className="w-full">
+                      <SelectValue placeholder="Choose a profile…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sets.map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Label>
+              ) : status === 'loading' ? (
+                <p className="text-caption text-muted-foreground" role="status">
+                  Loading your profiles…
                 </p>
               ) : null}
-            </fieldset>
-          ) : null}
-          {mediaWarnings.map((warning) => (
-            <p className="text-xs text-destructive" key={warning} role="status">
-              {warning}
-            </p>
-          ))}
-          {blocked ? (
-            <p className="text-sm text-destructive" role="alert">
-              {blocked}
-            </p>
-          ) : null}
-          {error ? (
-            <p className="text-sm text-destructive" role="alert">
-              {error}
-            </p>
-          ) : null}
+              {accounts.length > 0 ? (
+                <fieldset className="grid gap-2">
+                  <legend className="mb-2 text-ui-lg text-foreground">Post to</legend>
+                  <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                    {accounts.map((account) => {
+                      const on = selected.includes(account.id)
+                      return (
+                        <li key={account.id}>
+                          <Label className="flex cursor-pointer items-center gap-3 px-3 py-2.5 text-ui font-normal transition-colors hover:bg-foreground/[0.03] has-[[data-state=checked]]:bg-foreground/[0.03]">
+                            <Checkbox
+                              checked={on}
+                              // A draft names at most this many accounts; the API refuses more.
+                              disabled={!on && selected.length >= DRAFT_ACCOUNT_LIMIT}
+                              onCheckedChange={(checked) =>
+                                setSelected((current) =>
+                                  checked === true
+                                    ? [...current, account.id]
+                                    : current.filter((value) => value !== account.id)
+                                )
+                              }
+                            />
+                            <span className="grid min-w-0 flex-1 gap-0.5">
+                              <span className="truncate">
+                                {CAPABILITIES[account.channel].label} · {account.name}
+                              </span>
+                              {copy && captionFor(copy, account.channel) ? (
+                                <span className="text-caption text-muted-foreground">
+                                  Has its own caption
+                                </span>
+                              ) : null}
+                            </span>
+                          </Label>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                  {selected.length >= DRAFT_ACCOUNT_LIMIT ? (
+                    <p className="text-caption text-muted-foreground">
+                      One post goes to at most {DRAFT_ACCOUNT_LIMIT} accounts.
+                    </p>
+                  ) : null}
+                </fieldset>
+              ) : null}
+              <div className="grid gap-2">
+                <p className="text-ui-lg text-foreground">Where it goes</p>
+                <RadioGroup
+                  aria-label="Where it goes"
+                  className="grid gap-2"
+                  onValueChange={(value) => setDestination(value === 'batch' ? 'batch' : 'draft')}
+                  value={destination}
+                >
+                  <Label className={CHOICE_CARD}>
+                    <RadioGroupItem className="mt-0.5" value="draft" />
+                    <span className="grid gap-0.5">
+                      <span>A new draft in Publish</span>
+                      <span className="text-caption text-muted-foreground">
+                        Review it, write the thread, and schedule it on its own.
+                      </span>
+                    </span>
+                  </Label>
+                  <Label
+                    className={cn(
+                      CHOICE_CARD,
+                      'has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60'
+                    )}
+                  >
+                    <RadioGroupItem
+                      className="mt-0.5"
+                      disabled={Boolean(releaseNotes)}
+                      value="batch"
+                    />
+                    <span className="grid gap-0.5">
+                      <span>A bulk batch</span>
+                      <span className="text-caption text-muted-foreground">
+                        Prepare a day of screenshots, then set destinations, times and intervals
+                        once and schedule them together.
+                        {campaign ? ' A batch item is not linked back to the campaign.' : ''}
+                        {releaseNotes
+                          ? ' Unavailable: a batch item cannot carry the claims to verify from this release.'
+                          : releaseId
+                            ? ' A batch item is not linked back to the release.'
+                            : ''}
+                      </span>
+                    </span>
+                  </Label>
+                </RadioGroup>
+              </div>
+              {destination === 'batch' ? (
+                <div className="grid gap-3">
+                  <Label className="grid gap-2 text-ui-lg font-normal leading-normal">
+                    Batch
+                    <Select onValueChange={setBatchId} value={chosenBatch}>
+                      <SelectTrigger aria-label="Batch" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NEW_BATCH}>Start a new batch</SelectItem>
+                        {openBatches.map((batch) => (
+                          <SelectItem key={batch.id} value={batch.id}>
+                            {batch.title} · {batch.itemCount} posts
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Label>
+                  {chosenBatch === NEW_BATCH ? (
+                    <Label className="grid gap-2 text-ui font-normal leading-normal">
+                      Name
+                      <Input
+                        maxLength={200}
+                        onChange={(event) => setBatchTitle(event.target.value)}
+                        value={batchTitle}
+                      />
+                    </Label>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label className="grid gap-2 text-ui-lg font-normal leading-normal">
+                    When
+                    <Select onValueChange={setPlannedFor} value={when}>
+                      <SelectTrigger aria-label="When to post" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_TIME}>No time yet</SelectItem>
+                        {times.map((time) => (
+                          <SelectItem key={time.at} value={time.at}>
+                            {timeLabel(time.at, set?.timeZone ?? 'UTC')} · {time.reason}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Label>
+                  <p className="text-caption text-muted-foreground">
+                    {times.length > 0
+                      ? `Recommended from this workspace’s measured engagement, in ${set?.timeZone ?? 'UTC'}. A time places the draft on the calendar; it is scheduled in Publish.`
+                      : 'Recommended times appear once published posts have measured engagement.'}
+                  </p>
+                </div>
+              )}
+              {canFit ? (
+                <fieldset className="grid gap-2">
+                  <legend className="mb-2 text-ui-lg text-foreground">Picture size</legend>
+                  <Label className="flex items-start gap-3 text-ui font-normal leading-normal">
+                    <Checkbox
+                      checked={fitToPlatforms}
+                      className="mt-0.5"
+                      onCheckedChange={(value) => setFitToPlatforms(value === true)}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block">Draw each platform at its own size</span>
+                      <span className="block text-caption text-muted-foreground">
+                        {renders
+                          .map(
+                            (render) =>
+                              `${render.channels.map((platform) => CAPABILITIES[platform].label).join(', ')} ${render.target.width}×${render.target.height}`
+                          )
+                          .join(' · ')}
+                      </span>
+                    </span>
+                  </Label>
+                  {!fitting && refusedCanvas.length > 0 ? (
+                    <p className="text-caption text-muted-foreground">
+                      {refusedCanvas.map((platform) => CAPABILITIES[platform].label).join(', ')}{' '}
+                      would refuse the canvas as it is.
+                    </p>
+                  ) : null}
+                </fieldset>
+              ) : null}
+              {mediaWarnings.map((warning) => (
+                <p className="text-caption text-destructive" key={warning} role="status">
+                  {warning}
+                </p>
+              ))}
+              {destination === 'draft' && hasX ? (
+                <div className="grid gap-2 rounded-xl border border-border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="min-w-0 text-ui">
+                      X follow-ups
+                      <span className="mt-0.5 block text-caption text-muted-foreground">
+                        {followUps
+                          ? `${set?.name}’s saved Auto-RT and Auto-Plug settings, carried onto this draft. Change them in Publish before scheduling.`
+                          : `${set?.name} has no saved follow-ups. Set Auto-RT or Auto-Plug on the profile, or on the draft in Publish.`}
+                      </span>
+                    </span>
+                    <Switch
+                      aria-label="X follow-ups"
+                      checked={keepFollowUps && Boolean(followUps)}
+                      disabled={!followUps}
+                      onCheckedChange={(checked) => setKeepFollowUps(checked === true)}
+                    />
+                  </div>
+                  {keepFollowUps && followUps ? (
+                    <ul className="grid gap-1 text-caption text-muted-foreground">
+                      {followUpLines(followUps, undefined, 'X').map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {autoDm.available ? null : (
+                    <p className="text-caption text-muted-foreground">Auto-DM: {autoDm.reason}</p>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
-        <DialogFooter>
-          <Button disabled={Boolean(busy)} onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
-          </Button>
-          <Button
-            aria-busy={Boolean(busy)}
-            disabled={
-              Boolean(busy) ||
-              Boolean(blocked) ||
-              (destination === 'batch' && chosenBatch === NEW_BATCH && !batchTitle.trim())
-            }
-            onClick={() => void submit()}
-          >
-            {busy ??
-              (destination === 'batch'
-                ? count > 1
-                  ? `Add ${count} to the batch`
-                  : 'Add to batch'
-                : count > 1
-                  ? `Create ${count} drafts`
-                  : 'Create draft')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+        <SheetFooter className="mt-0 gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1 text-ui text-destructive">
+            {blocked ? <p role="alert">{blocked}</p> : null}
+            {error ? <p role="alert">{error}</p> : null}
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button disabled={Boolean(busy)} onClick={() => onOpenChange(false)} variant="outline">
+              Cancel
+            </Button>
+            <Button
+              aria-busy={Boolean(busy)}
+              disabled={
+                Boolean(busy) ||
+                Boolean(blocked) ||
+                (destination === 'batch' && chosenBatch === NEW_BATCH && !batchTitle.trim())
+              }
+              onClick={() => void submit()}
+            >
+              {submitLabel}
+            </Button>
+          </div>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

@@ -157,6 +157,15 @@ func (o PublishOptions) Empty() bool {
 	return len(o.PhotoTagIDs) == 0 && len(o.TaggedUserIDs) == 0 && func() bool { o.TaggedUserIDs = nil; o.PhotoTagIDs = nil; return reflect.DeepEqual(o, PublishOptions{}) }()
 }
 
+// PostURL is a live post's address: the provider's own link when its receipt
+// kept one (ids that make no link), else one built from its id.
+func PostURL(platform string, remoteID *string, progress ThreadProgress) *string {
+	if receipt := progress.Publication; receipt != nil && receipt.URL != "" {
+		return &receipt.URL
+	}
+	return LivePostURL(platform, remoteID)
+}
+
 // LivePostURL is a live post's address on its platform, where one can be
 // built from its id.
 func LivePostURL(platform string, remoteID *string) *string {

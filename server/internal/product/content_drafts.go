@@ -19,6 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdrafttag"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/release"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -106,7 +107,11 @@ type ContentDraftRecord struct {
 	Article *draftdoc.Article `json:"article"`
 	// CampaignID names the campaign an edited campaign visual was published
 	// from, so the draft can lead back to it.
-	CampaignID       *string                   `json:"campaignId"`
+	CampaignID *string `json:"campaignId"`
+	// CampaignPostID and ReleaseID name the campaign post and the release the
+	// draft was made from, when it was.
+	CampaignPostID   *string                   `json:"campaignPostId"`
+	ReleaseID        *string                   `json:"releaseId"`
 	Kind             string                    `json:"kind"`
 	PinnedAt         *time.Time                `json:"pinnedAt"`
 	PlanTimeZone     *string                   `json:"planTimeZone"`
@@ -185,11 +190,17 @@ type ContentDraftInput struct {
 	Scratchpad       string                     `json:"scratchpad"`
 	TagIDs           []string                   `json:"tagIds"`
 	Target           *draftdoc.Target           `json:"target"`
+	// ReleaseID is the workspace release the draft is made from (its
+	// screenshots and summary); it must exist in the workspace. Omitted when
+	// empty, so request fingerprints from before the field still match.
+	ReleaseID string `json:"releaseId,omitempty"`
 	// campaignID is the campaign an edited visual was published from. It is
 	// unexported on purpose: only CreateCampaignPublishDraft sets it, after
 	// checking the caller's role on that campaign, so a plain draft create
-	// cannot claim one.
-	campaignID string
+	// cannot claim one. campaignPostID is that campaign's post whose copy the
+	// draft took, checked there to belong to it.
+	campaignID     string
+	campaignPostID string
 	// sourceVoiceRevisionID is the voice transcript revision the draft is
 	// made from. Unexported for the same reason: only the voice paths set it,
 	// after loading the revision through its owner's note.
@@ -234,7 +245,7 @@ func contentDraftRecord(row *ent.ContentDraft) ContentDraftRecord {
 		SocialSetID: row.SocialSetID, Article: row.Article, Kind: string(row.Kind), PinnedAt: row.PinnedAt,
 		PlanTimeZone: row.PlanTimeZone, PlatformVersions: nonNilVersions(row.PlatformVersions), Scratchpad: row.Scratchpad,
 		SourceDraftID: row.SourceDraftID, SourceVoiceRevisionID: row.SourceVoiceRevisionID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
-		CampaignID: row.CampaignID}
+		CampaignID: row.CampaignID, CampaignPostID: row.CampaignPostID, ReleaseID: row.ReleaseID}
 }
 
 func nonNilVersions(doc draftdoc.PlatformVersions) draftdoc.PlatformVersions {
@@ -745,6 +756,19 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if input.campaignID != "" {
 		create.SetCampaignID(input.campaignID)
 	}
+	if input.campaignPostID != "" {
+		create.SetCampaignPostID(input.campaignPostID)
+	}
+	if input.ReleaseID != "" {
+		known, err := tx.Release.Query().Where(release.ID(input.ReleaseID), release.OrganizationID(actor.OrganizationID)).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if !known {
+			return nil, publishing.ErrNotFound
+		}
+		create.SetReleaseID(input.ReleaseID)
+	}
 	if input.sourceVoiceRevisionID != "" {
 		create.SetSourceVoiceRevisionID(input.sourceVoiceRevisionID)
 	}
@@ -772,6 +796,12 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	creation := map[string]any{"kind": kind, "socialSetId": set.ID}
 	if input.campaignID != "" {
 		creation["campaignId"] = input.campaignID
+	}
+	if input.campaignPostID != "" {
+		creation["campaignPostId"] = input.campaignPostID
+	}
+	if input.ReleaseID != "" {
+		creation["releaseId"] = input.ReleaseID
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.content_draft_created", "content_draft", row.ID, creation); err != nil {
 		return nil, err

@@ -2,7 +2,7 @@ import 'server-only'
 
 import { TRPCError } from '@trpc/server'
 import { z } from 'zod'
-import { type BrandVoice, writeCopy } from '@/lib/ai/agents/captions'
+import { writeCopy } from '@/lib/ai/agents/captions'
 import {
   critiqueDesign,
   estimateVariantCredits,
@@ -19,7 +19,8 @@ import { backendSDK, orNull } from '@/lib/backend/sdk'
 import { brandKitById, storedBrandKitSchema } from '@/lib/brand/kit'
 import { captionChannelSchema } from '@/lib/captions/channels'
 import { designDocumentSchema } from '@/lib/design/document'
-import { getBrandProfile, listBrandKits } from '@/lib/tenant/configuration'
+import { listBrandKits } from '@/lib/tenant/configuration'
+import { getWorkspaceVoice } from '@/lib/launch/store'
 import { draftChannelSchema, writeIdSchema } from '@/lib/write/document'
 import { router } from '../init'
 import { allowAiAction, isAiEnabled } from './launch'
@@ -40,26 +41,6 @@ async function setVoice(
 ) {
   try {
     return await orNull(backendSDK(access).getSocialSetWritingContext(socialSetId, channel))
-  } catch {
-    return null
-  }
-}
-
-/** The workspace's brand voice; members who cannot read the profile write without it. */
-async function brandVoice(
-  access: Parameters<typeof getBrandProfile>[0]
-): Promise<BrandVoice | null> {
-  try {
-    const profile = await getBrandProfile(access)
-    if (!profile) return null
-    const terms = z.array(z.string()).catch([]).parse(profile.prohibitedTerms)
-    return {
-      audience: profile.audience,
-      ctaConventions: profile.ctaConventions,
-      productDescription: profile.productDescription,
-      prohibitedTerms: terms,
-      tone: profile.tone,
-    }
   } catch {
     return null
   }
@@ -137,13 +118,17 @@ export const editorAiRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await allowAiAction(ctx.access)
-      const brand = await variantBrand(ctx.access, input.brandKitId)
+      const [brand, voice] = await Promise.all([
+        variantBrand(ctx.access, input.brandKitId),
+        getWorkspaceVoice(ctx.access),
+      ])
       return {
         variants: await withAiCredits(ctx.access, () =>
           proposeVariants(input.document, {
             brand,
             count: input.count,
             instruction: input.instruction,
+            voice,
           })
         ),
       }
@@ -199,7 +184,8 @@ export const editorAiRouter = router({
     .input(gridLinesRequestSchema)
     .mutation(async ({ ctx, input }) => {
       await allowAiAction(ctx.access)
-      return { lines: await withAiCredits(ctx.access, () => suggestGridLines(input)) }
+      const voice = await getWorkspaceVoice(ctx.access)
+      return { lines: await withAiCredits(ctx.access, () => suggestGridLines(input, voice)) }
     }),
   /**
    * Alt text and platform-aware captions for the design, from a snapshot and
@@ -220,18 +206,30 @@ export const editorAiRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       await allowAiAction(ctx.access)
-      const brand = await brandVoice(ctx.access)
-      // The voice is read for the first requested channel the backend knows;
-      // its platform guidance is the only per-channel part of the context.
-      const channel = input.channels.find(
-        (candidate) => draftChannelSchema.safeParse(candidate).success
+      // With a set, its voice for each requested channel the backend knows:
+      // platform guidance is the per-channel part, so each caption gets its
+      // own. Without a set, the workspace voice: the same format, the brand's.
+      const socialSetId = input.socialSetId
+      const voices = socialSetId
+        ? await Promise.all(
+            input.channels
+              .filter((candidate) => draftChannelSchema.safeParse(candidate).success)
+              .map(
+                async (channel) =>
+                  [channel, await setVoice(ctx.access, socialSetId, channel)] as const
+              )
+          )
+        : []
+      const voice = voices.find(([, found]) => found)?.[1] ?? (await getWorkspaceVoice(ctx.access))
+      const guidance = Object.fromEntries(
+        voices.flatMap(([channel, found]) =>
+          found?.platformGuidance ? [[channel, found.platformGuidance]] : []
+        )
       )
-      const voice =
-        input.socialSetId && channel ? await setVoice(ctx.access, input.socialSetId, channel) : null
       return withAiCredits(ctx.access, () =>
         writeCopy({
-          brand,
           channels: input.channels,
+          guidance,
           document: input.document,
           notes: input.notes,
           snapshotJpegBase64: input.snapshot,

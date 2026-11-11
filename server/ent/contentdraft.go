@@ -88,6 +88,10 @@ type ContentDraft struct {
 	SourceVoiceRevisionID *string `json:"source_voice_revision_id,omitempty"`
 	// CampaignID holds the value of the "campaign_id" field.
 	CampaignID *string `json:"campaign_id,omitempty"`
+	// ReleaseID holds the value of the "release_id" field.
+	ReleaseID *string `json:"release_id,omitempty"`
+	// CampaignPostID holds the value of the "campaign_post_id" field.
+	CampaignPostID *string `json:"campaign_post_id,omitempty"`
 	// CollabGeneration holds the value of the "collab_generation" field.
 	CollabGeneration int `json:"collab_generation,omitempty"`
 	// CollabState holds the value of the "collab_state" field.
@@ -114,7 +118,7 @@ func (*ContentDraft) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case contentdraft.FieldApprovedVersion, contentdraft.FieldCalendarVersion, contentdraft.FieldVersion, contentdraft.FieldCollabGeneration:
 			values[i] = new(sql.NullInt64)
-		case contentdraft.FieldID, contentdraft.FieldOrganizationID, contentdraft.FieldTitle, contentdraft.FieldPlainText, contentdraft.FieldStatus, contentdraft.FieldReviewStatus, contentdraft.FieldReviewedByUserID, contentdraft.FieldReviewNote, contentdraft.FieldShareToken, contentdraft.FieldSocialSetID, contentdraft.FieldPrimaryPlatform, contentdraft.FieldKind, contentdraft.FieldScratchpad, contentdraft.FieldPlanTimeZone, contentdraft.FieldSourceDraftID, contentdraft.FieldSourceVoiceRevisionID, contentdraft.FieldCampaignID, contentdraft.FieldCreatedByUserID, contentdraft.FieldUpdatedByUserID:
+		case contentdraft.FieldID, contentdraft.FieldOrganizationID, contentdraft.FieldTitle, contentdraft.FieldPlainText, contentdraft.FieldStatus, contentdraft.FieldReviewStatus, contentdraft.FieldReviewedByUserID, contentdraft.FieldReviewNote, contentdraft.FieldShareToken, contentdraft.FieldSocialSetID, contentdraft.FieldPrimaryPlatform, contentdraft.FieldKind, contentdraft.FieldScratchpad, contentdraft.FieldPlanTimeZone, contentdraft.FieldSourceDraftID, contentdraft.FieldSourceVoiceRevisionID, contentdraft.FieldCampaignID, contentdraft.FieldReleaseID, contentdraft.FieldCampaignPostID, contentdraft.FieldCreatedByUserID, contentdraft.FieldUpdatedByUserID:
 			values[i] = new(sql.NullString)
 		case contentdraft.FieldPlannedFor, contentdraft.FieldPinnedAt, contentdraft.FieldCreatedAt, contentdraft.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -377,6 +381,20 @@ func (_m *ContentDraft) assignValues(columns []string, values []any) error {
 				_m.CampaignID = new(string)
 				*_m.CampaignID = value.String
 			}
+		case contentdraft.FieldReleaseID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field release_id", values[i])
+			} else if value.Valid {
+				_m.ReleaseID = new(string)
+				*_m.ReleaseID = value.String
+			}
+		case contentdraft.FieldCampaignPostID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field campaign_post_id", values[i])
+			} else if value.Valid {
+				_m.CampaignPostID = new(string)
+				*_m.CampaignPostID = value.String
+			}
 		case contentdraft.FieldCollabGeneration:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field collab_generation", values[i])
@@ -574,6 +592,16 @@ func (_m *ContentDraft) String() string {
 	builder.WriteString(", ")
 	if v := _m.CampaignID; v != nil {
 		builder.WriteString("campaign_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ReleaseID; v != nil {
+		builder.WriteString("release_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CampaignPostID; v != nil {
+		builder.WriteString("campaign_post_id=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

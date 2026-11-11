@@ -99,7 +99,8 @@ func (c *Configuration) PublishQueuedContentDraftPost(ctx context.Context, actor
 	for _, reply := range post.Replies {
 		captions = append(captions, reply.Caption)
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
+	// The set the post was scheduled under (a legacy draft's default set too).
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, post.SocialSetID, captions...); err != nil {
 		return nil, err
 	}
 	result, err := replaceQueuedDraftPostAt(ctx, tx, actor, post, time.Now().UTC(), true)

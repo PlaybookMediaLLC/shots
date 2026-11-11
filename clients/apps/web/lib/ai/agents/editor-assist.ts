@@ -1,3 +1,4 @@
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import 'server-only'
 
 import { generateText, stepCountIs, tool } from 'ai'
@@ -13,6 +14,7 @@ import {
 import { models } from '../models'
 import { tokenCostUsd, settleCredits } from '../metering/pricing'
 import { EDITOR_CRITIC_INSTRUCTIONS, EDITOR_VARIANTS_INSTRUCTIONS } from '../prompts/editor-copilot'
+import { voiceInstructions } from '@/lib/write/voice'
 import { distinctnessProblem } from '../variants'
 
 /**
@@ -147,7 +149,13 @@ function brandConstraint(brand: VariantBrand): string {
  */
 export async function proposeVariants(
   document: DesignDocument,
-  options: { brand?: VariantBrand | null; count: number; instruction?: string }
+  options: {
+    brand?: VariantBrand | null
+    count: number
+    instruction?: string
+    /** A version may add a subheadline: words on the canvas, in the brand voice. */
+    voice: WritingContext | null
+  }
 ): Promise<Variant[]> {
   const variants: Variant[] = []
   await generateText({
@@ -161,7 +169,7 @@ export async function proposeVariants(
     ],
     model: models.languageModel('deep'),
     stopWhen: stepCountIs(options.count + 4),
-    system: `${EDITOR_VARIANTS_INSTRUCTIONS}\n\nCall proposeVariant once per version, then stop.`,
+    system: `${EDITOR_VARIANTS_INSTRUCTIONS}\n\nCall proposeVariant once per version, then stop.${voiceInstructions(options.voice)}`,
     tools: {
       proposeVariant: tool({
         description: 'Propose one complete version with the exact changes that produce it.',

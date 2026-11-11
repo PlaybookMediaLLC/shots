@@ -163,6 +163,8 @@ export async function prepareContentDraftSchedule(
     version: number
     /** Beside the draft's queued posts instead of replacing them. */
     add?: boolean
+    /** Schedule a repeat of an account's post within a day, after the warning. */
+    confirmDuplicate?: boolean
   }
 ) {
   if (!input.publishNow && !input.queue && !input.localTime && !input.scheduledFor) {
@@ -187,6 +189,8 @@ export async function prepareContentDraftSchedule(
   })
   return {
     add: input.add,
+    // Only when confirmed: a backend from before the field refuses unknown fields.
+    confirmDuplicate: input.confirmDuplicate || undefined,
     expectedQueueSlot: input.expectedQueueSlot,
     disambiguation: input.disambiguation,
     localTime: input.localTime,

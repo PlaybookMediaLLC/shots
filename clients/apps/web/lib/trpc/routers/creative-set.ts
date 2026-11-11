@@ -37,6 +37,7 @@ import { organizationProcedure } from '../procedures'
 import { allowAiAction } from './launch'
 import { withAiCredits } from '@/lib/ai/metering'
 import { suggestCopy } from '@/lib/ai/store-screenshots/copy'
+import { getWorkspaceVoice } from '@/lib/launch/store'
 import {
   storyProposalRequestSchema,
   storyCopyProposalSchema,
@@ -78,17 +79,25 @@ export const creativeSetRouter = router({
       if (!story || !output)
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Story or format not found.' })
       await allowAiAction(ctx.access)
+      const voice = await getWorkspaceVoice(ctx.access)
       const result = await withAiCredits(ctx.access, () =>
-        suggestCopy({
-          brief: input.facts,
-          locale: 'en-US',
-          tone: 'direct',
-          length: 'short',
-          count: 3,
-          slides: [
-            { id: story.id, topic: story.headline, currentHeadline: story.headline.slice(0, 200) },
-          ],
-        })
+        suggestCopy(
+          {
+            brief: input.facts,
+            locale: 'en-US',
+            tone: 'direct',
+            length: 'short',
+            count: 3,
+            slides: [
+              {
+                id: story.id,
+                topic: story.headline,
+                currentHeadline: story.headline.slice(0, 200),
+              },
+            ],
+          },
+          voice
+        )
       )
       const proposals = (
         result.slides.find((slide) => slide.id === story.id)?.suggestions ?? []

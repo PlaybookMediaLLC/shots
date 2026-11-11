@@ -3,8 +3,10 @@ package x
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -22,7 +24,7 @@ func TestContentMutationsSendOnlyOnce(t *testing.T) {
 		}{
 			{"server error", `{"detail":"Service Unavailable"}`, temporalx.TypeUnknownDelivery, 503},
 			{"internal error", `{}`, temporalx.TypeUnknownDelivery, 500},
-			{"rate limit", `{"detail":"Too Many Requests"}`, temporalx.TypePublicationRejected, 429},
+			{"rate limit", `{"detail":"Too Many Requests"}`, temporalx.TypeRateLimited, 429},
 			{"unauthorized", `{}`, temporalx.TypeRefreshToken, 401},
 			{"rejected", `{}`, temporalx.TypePublicationRejected, 400},
 			{"missing receipt", `{"data":{}}`, temporalx.TypeUnknownDelivery, 201},
@@ -53,7 +55,12 @@ func TestContentMutationsSendOnlyOnce(t *testing.T) {
 					}
 					_, err = p.FinalizePost(ctx, in.Token, marshal(pending), in)
 				}
-				if temporalx.FailureType(err) != response.kind || len(*calls) != 2 {
+				want := response.kind
+				if action == "article publish" && response.name == "rate limit" {
+					// Its draft is saved on X, so a whole-post retry would make another.
+					want = temporalx.TypeUnknownDelivery
+				}
+				if temporalx.FailureType(err) != want || len(*calls) != 2 {
 					t.Fatalf("classification=%v, requests=%d", err, len(*calls))
 				}
 				if strings.Contains(err.Error(), "private canary") {
@@ -61,6 +68,48 @@ func TestContentMutationsSendOnlyOnce(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// A 429 created nothing: it carries X's reset time for the durable retry, and a
+// spent 24-hour allowance is a daily limit rather than a retry.
+func TestRateLimitedMutationCarriesRetryGuidance(t *testing.T) {
+	reset := strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10)
+	for _, tc := range []struct {
+		name, kind string
+		headers    map[string]string
+	}{
+		{"rate limit", temporalx.TypeRateLimited, map[string]string{"x-rate-limit-reset": reset}},
+		{"daily cap", temporalx.TypeDailyLimit, map[string]string{"x-rate-limit-reset": reset, "x-user-limit-24hour-remaining": "0"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DISABLE_SSRF_PROTECTION", "true")
+			t.Setenv("X_API_KEY", "key")
+			t.Setenv("X_API_SECRET", "secret")
+			var mutations atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/2/users/me" {
+					w.Header().Set("x-access-level", "read-write")
+					_, _ = io.WriteString(w, `{"data":{"id":"1","name":"Me","username":"me","subscription_type":"Premium"}}`)
+					return
+				}
+				mutations.Add(1)
+				for key, value := range tc.headers {
+					w.Header().Set(key, value)
+				}
+				w.WriteHeader(http.StatusTooManyRequests)
+			}))
+			old := apiBase
+			apiBase = server.URL
+			defer func() { apiBase = old; server.Close() }()
+			_, err := New().ReplyTo(context.Background(), publishingAccount(), "42", "hello")
+			if temporalx.FailureType(err) != tc.kind || mutations.Load() != 1 {
+				t.Fatalf("classification=%v, mutations=%d", err, mutations.Load())
+			}
+			if tc.kind == temporalx.TypeRateLimited && temporalx.RetryAfter(err) < 9*time.Minute {
+				t.Fatalf("retry guidance lost: %v", temporalx.RetryAfter(err))
+			}
+		})
 	}
 }
 

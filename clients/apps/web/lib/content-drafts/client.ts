@@ -2,7 +2,8 @@ import type {
   draftCommentResultSchema,
   DraftCommentInput,
 } from '@/lib/api/contracts/draft-comments'
-import type { z } from 'zod'
+import { z } from 'zod'
+import { duplicatePostSchema } from '@/lib/api/platform-errors'
 import type {
   calendarPostSchema,
   reviewContentDraftContract,
@@ -41,6 +42,16 @@ export class DraftRequestError extends Error {
     super(message)
     this.name = 'DraftRequestError'
   }
+}
+
+/** An account's queued or published post that a schedule would repeat within a day. */
+export type DuplicatePost = z.infer<typeof duplicatePostSchema>
+
+/** The posts a `duplicate_content` refusal named, or null for any other failure. */
+export function duplicatePosts(error: unknown): DuplicatePost[] | null {
+  if (!(error instanceof DraftRequestError) || error.status !== 409) return null
+  const parsed = z.array(duplicatePostSchema).min(1).safeParse(error.details.duplicates)
+  return parsed.success ? parsed.data : null
 }
 
 /** One API call with the session cookie; a failure throws its message and status. */

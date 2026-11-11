@@ -318,7 +318,8 @@ func TestWritePublishing(t *testing.T) {
 					targets[0].Options = &postoptions.PublishOptions{ArticleTitle: "Verified eligibility"}
 					allowed = caps.Articles != nil && *caps.Articles
 				}
-				_, err := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Targets: targets, Version: 1})
+				// Each subscription posts the same long text on purpose: a confirmed repeat.
+				_, err := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Targets: targets, Version: 1, ConfirmDuplicate: true})
 				if allowed && err != nil || !allowed && !errors.Is(err, publishing.ErrConflict) {
 					t.Fatalf("%s %s allowed=%v: %v", subscription, kind, allowed, err)
 				}

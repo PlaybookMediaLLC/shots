@@ -81,7 +81,8 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 				t.Fatal(err)
 			}
-			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
+			// Every role schedules the same text on purpose: a confirmed repeat.
+			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, ConfirmDuplicate: true, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
 			want("schedule approved content", err, publishes)
 		})
 	}
@@ -113,7 +114,7 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			t.Fatalf("re-review=%+v err=%v", approved, err)
 		}
 	})
-	t.Run("the scheduled-posts route refuses drafts where approval is required", func(t *testing.T) {
+	t.Run("the scheduled-posts route refuses drafts, with or without approval", func(t *testing.T) {
 		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Route", PlainText: "Pending"})
 		if err != nil {
 			t.Fatal(err)
@@ -132,7 +133,10 @@ func TestTeamCollaborationRoles(t *testing.T) {
 		if err != nil || len(posts) != 0 {
 			t.Fatalf("refused request queued posts=%+v err=%v", posts, err)
 		}
-		// With approval off the route schedules the draft as before.
+		// With approval off the route still refuses: it sends the caller's
+		// caption, and a draft posts only its stored text (plan F1), from the
+		// draft's own schedule route. Route posts record their scheduler in
+		// campaign_publish_integration_test.
 		off, on := false, true
 		if _, err = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &off}); err != nil {
 			t.Fatal(err)
@@ -140,12 +144,11 @@ func TestTeamCollaborationRoles(t *testing.T) {
 		t.Cleanup(func() {
 			_, _ = repo.UpdateContentDraftSettings(ctx, w.owner, ContentDraftSettingsUpdate{RequireApproval: &on})
 		})
-		created, err := repo.CreateScheduledPost(ctx, publisher, input)
-		if err != nil || !created.Created || created.Post.ContentDraftID == nil || *created.Post.ContentDraftID != draft.ID {
-			t.Fatalf("approval off: created=%+v err=%v", created, err)
+		if _, err = repo.CreateScheduledPost(ctx, publisher, input); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("approval off: the route scheduled a draft's caller text: %v", err)
 		}
-		if by := created.Post.ScheduledByUserID; by == nil || *by != publisher.UserID || created.Post.ApprovedByUserID != nil {
-			t.Fatalf("route post accountability: scheduledBy=%v approvedBy=%v", by, created.Post.ApprovedByUserID)
+		if posts, err := repo.ListContentDraftPosts(ctx, w.owner, draft.ID); err != nil || len(posts) != 0 {
+			t.Fatalf("approval off: refused request queued posts=%+v err=%v", posts, err)
 		}
 	})
 	t.Run("self-approval can be refused; a scheduled post records who scheduled and approved", func(t *testing.T) {

@@ -61,6 +61,13 @@ func (r *RefreshIntegrationService) Refresh(ctx context.Context, integration *en
 	return refresh, nil
 }
 
+// RequireReconnect flags a connection whose credentials a provider refused, so
+// the workspace is asked to reconnect it. Like a failed refresh, it writes only
+// if the connection is unchanged since before was read (ErrRefreshChanged).
+func (r *RefreshIntegrationService) RequireReconnect(ctx context.Context, before *ent.Integration) error {
+	return r.service.repo.markRefreshFailure(ctx, before, false)
+}
+
 func (r *RefreshIntegrationService) SetBetweenSteps(ctx context.Context, integration *ent.Integration, cause string) error {
 	if err := r.service.repo.markRefreshFailure(ctx, integration, true); err != nil {
 		return err

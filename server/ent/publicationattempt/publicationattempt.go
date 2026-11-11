@@ -31,6 +31,10 @@ const (
 	FieldProviderPostID = "providerPostId"
 	// FieldFailureCode holds the string denoting the failure_code field in the database.
 	FieldFailureCode = "failureCode"
+	// FieldProviderMessage holds the string denoting the provider_message field in the database.
+	FieldProviderMessage = "providerMessage"
+	// FieldRemoteURL holds the string denoting the remote_url field in the database.
+	FieldRemoteURL = "remoteUrl"
 	// EdgeScheduledPost holds the string denoting the scheduled_post edge name in mutations.
 	EdgeScheduledPost = "scheduled_post"
 	// Table holds the table name of the publicationattempt in the database.
@@ -55,6 +59,8 @@ var Columns = []string{
 	FieldOutcome,
 	FieldProviderPostID,
 	FieldFailureCode,
+	FieldProviderMessage,
+	FieldRemoteURL,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -143,6 +149,16 @@ func ByProviderPostID(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureCode orders the results by the failure_code field.
 func ByFailureCode(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureCode, opts...).ToFunc()
+}
+
+// ByProviderMessage orders the results by the provider_message field.
+func ByProviderMessage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProviderMessage, opts...).ToFunc()
+}
+
+// ByRemoteURL orders the results by the remote_url field.
+func ByRemoteURL(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRemoteURL, opts...).ToFunc()
 }
 
 // ByScheduledPostField orders the results by scheduled_post field.

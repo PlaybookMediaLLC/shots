@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { defineContract } from '@/lib/api/contract'
+import { contentDraftIdSchema } from '@/lib/api/contracts/content-draft-list'
+import { draftChannelSchema } from '@/lib/write/document'
 
 /** Most messages one copilot request may carry. */
 export const MAX_EDITOR_MESSAGES = 80
@@ -71,6 +73,16 @@ export const documentChatRequestSchema = z.looseObject({
   system: z.string().max(120_000).optional(),
 })
 
+/**
+ * The draft the document editor writes, and the platform being edited, so the
+ * AI writes in that draft's voice (its social set's, for that channel). Without
+ * them, or for a draft the caller cannot see, the workspace voice applies.
+ */
+export const documentVoiceQuerySchema = z.object({
+  channel: draftChannelSchema.optional(),
+  draftId: contentDraftIdSchema.optional(),
+})
+
 /** `POST /api/ai/document`: streams AI SDK UI message parts. */
 export const documentChatContract = defineContract({
   body: documentChatRequestSchema,
@@ -78,6 +90,7 @@ export const documentChatContract = defineContract({
   name: 'ai.document',
   output: z.never(),
   path: '/api/ai/document',
+  query: documentVoiceQuerySchema,
   summary: 'Stream a document editor AI response',
 })
 
@@ -96,5 +109,6 @@ export const documentCopilotContract = defineContract({
   name: 'ai.document-copilot',
   output: documentCopilotResponseSchema,
   path: '/api/ai/document/copilot',
+  query: documentVoiceQuerySchema,
   summary: 'Suggest an inline completion in the document editor',
 })

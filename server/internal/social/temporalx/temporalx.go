@@ -78,8 +78,13 @@ const (
 	TypePublicationRejected = "publication_rejected"
 	TypeDisconnect          = "disconnect"
 	TypeUnknownDelivery     = temporalpublishing.FailureUnknownDelivery
-	TypeRateLimited         = "rate_limited"
-	TypeDailyLimit          = "daily_limit"
+	// TypeRateLimited is a refusal the provider asked to retry later; nothing was created.
+	TypeRateLimited = "rate_limited"
+	// TypeDailyLimit is a posting cap that will not clear today; nothing was created.
+	TypeDailyLimit = "daily_limit"
+	// TypeAppAccess is a refusal of Shots' own app credentials or access, not
+	// of an account; nothing was created and no account needs reconnecting.
+	TypeAppAccess = "app_access"
 )
 
 // Temporal ships failures through gRPC with a 4MB frame limit, so every
@@ -119,6 +124,8 @@ type FailureDetails struct {
 	Identifier string `json:"identifier"`
 	JSON       string `json:"json"`
 	Body       string `json:"body"`
+	// RetryAfter is the provider's retry guidance on a rate limit; zero when none.
+	RetryAfter time.Duration `json:"retryAfter,omitempty"`
 }
 
 func failure(kind, identifier string, jsonBody, body any, message string) error {
@@ -149,22 +156,37 @@ func UnknownDelivery(identifier, message string) error {
 	return failure(TypeUnknownDelivery, identifier, "{}", "{}", message)
 }
 
+// RateLimited reports a provider that kept refusing with a rate limit after the
+// client's short retries. The post was not created, so a durable retry is safe.
+func RateLimited(identifier string, retryAfter time.Duration, message string) error {
+	return temporal.NewNonRetryableApplicationError(Truncate(message, maxFailureMessage), TypeRateLimited, nil, FailureDetails{
+		Identifier: identifier, JSON: "{}", Body: "{}", RetryAfter: max(retryAfter, 0),
+	})
+}
+
+// DailyLimit reports a posting cap that clears only tomorrow; message is shown to users.
+func DailyLimit(identifier, message string) error {
+	return failure(TypeDailyLimit, identifier, "{}", "{}", message)
+}
+
+// AppAccess reports that the provider refused Shots' app credentials or access.
+func AppAccess(identifier, message string) error {
+	return failure(TypeAppAccess, identifier, "{}", "{}", message)
+}
+
+// RetryAfter is a rate-limit failure's retry guidance, or zero.
+func RetryAfter(err error) time.Duration {
+	var app *temporal.ApplicationError
+	var details FailureDetails
+	if errors.As(err, &app) && app.Type() == TypeRateLimited && app.Details(&details) == nil {
+		return details.RetryAfter
+	}
+	return 0
+}
+
 // Disconnect means the channel must be reconnected by the user.
 func Disconnect(identifier string, jsonBody, body any, message string) error {
 	return failure(TypeDisconnect, identifier, jsonBody, body, message)
-}
-
-// RateLimited means the platform kept refusing the request as too frequent
-// and accepted nothing, so a later retry is safe. The request body is left
-// out: it can hold credentials.
-func RateLimited(identifier string, jsonBody any) error {
-	return failure(TypeRateLimited, identifier, jsonBody, "{}", "The platform is rate limiting this account")
-}
-
-// DailyLimit means a platform cap refused the post until it resets: nothing
-// was published. message is the platform's reason, shown to users.
-func DailyLimit(identifier string, jsonBody, body any, message string) error {
-	return failure(TypeDailyLimit, identifier, jsonBody, body, message)
 }
 
 // FailureType returns the application failure type anywhere in err's chain

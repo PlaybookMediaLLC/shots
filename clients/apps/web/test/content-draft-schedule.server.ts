@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test, type TestContext } from 'node:test'
 import type { OrganizationAccess } from '../lib/auth/access'
 import { scheduleContentDraftContract } from '../lib/api/contracts/content-drafts'
-import { scheduleContentDraft } from '../lib/tenant/content-drafts'
+import { prepareContentDraftSchedule, scheduleContentDraft } from '../lib/tenant/content-drafts'
 import { readVersions, withOptions } from '../lib/write/versions'
 
 const access = {
@@ -126,4 +126,31 @@ test('a replay after scheduling moved the draft on still reaches Go', async (t) 
   const result = await scheduleContentDraft(access, stored.id, body)
   assert.equal(result?.created, true)
   assert.equal((backend.sent() as { version: number }).version, 3)
+})
+
+test('a schedule names a confirmed repeat only when the member confirmed one', async (t) => {
+  process.env.PUBLISHING_API_URL = 'http://backend.test'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'token'
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+    const path = new URL(String(input)).pathname
+    if (path === '/v1/content-drafts/draft_1')
+      return Response.json({ body: [], channelText: {}, id: 'draft_1', version: 3 })
+    if (path === '/v1/channel-connections') return Response.json({ items: [] })
+    if (path === '/v1/social-sets') return Response.json({ items: [] })
+    throw new Error(`unexpected backend call ${path}`)
+  })
+  const request = { channelConnectionIds: [], localTime: '2026-11-12T09:00', version: 3 }
+  // An older backend refuses unknown fields, so an unconfirmed schedule must not name the field.
+  for (const confirmDuplicate of [undefined, false]) {
+    const plain = await prepareContentDraftSchedule(access, 'draft_1', {
+      ...request,
+      confirmDuplicate,
+    })
+    assert.ok(plain && !('confirmDuplicate' in JSON.parse(JSON.stringify(plain))))
+  }
+  const confirmed = await prepareContentDraftSchedule(access, 'draft_1', {
+    ...request,
+    confirmDuplicate: true,
+  })
+  assert.equal(confirmed?.confirmDuplicate, true)
 })

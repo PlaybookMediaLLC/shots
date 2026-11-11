@@ -108,6 +108,46 @@ func (_u *PublicationAttemptUpdate) ClearFailureCode() *PublicationAttemptUpdate
 	return _u
 }
 
+// SetProviderMessage sets the "provider_message" field.
+func (_u *PublicationAttemptUpdate) SetProviderMessage(v string) *PublicationAttemptUpdate {
+	_u.mutation.SetProviderMessage(v)
+	return _u
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_u *PublicationAttemptUpdate) SetNillableProviderMessage(v *string) *PublicationAttemptUpdate {
+	if v != nil {
+		_u.SetProviderMessage(*v)
+	}
+	return _u
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (_u *PublicationAttemptUpdate) ClearProviderMessage() *PublicationAttemptUpdate {
+	_u.mutation.ClearProviderMessage()
+	return _u
+}
+
+// SetRemoteURL sets the "remote_url" field.
+func (_u *PublicationAttemptUpdate) SetRemoteURL(v string) *PublicationAttemptUpdate {
+	_u.mutation.SetRemoteURL(v)
+	return _u
+}
+
+// SetNillableRemoteURL sets the "remote_url" field if the given value is not nil.
+func (_u *PublicationAttemptUpdate) SetNillableRemoteURL(v *string) *PublicationAttemptUpdate {
+	if v != nil {
+		_u.SetRemoteURL(*v)
+	}
+	return _u
+}
+
+// ClearRemoteURL clears the value of the "remote_url" field.
+func (_u *PublicationAttemptUpdate) ClearRemoteURL() *PublicationAttemptUpdate {
+	_u.mutation.ClearRemoteURL()
+	return _u
+}
+
 // Mutation returns the PublicationAttemptMutation object of the builder.
 func (_u *PublicationAttemptUpdate) Mutation() *PublicationAttemptMutation {
 	return _u.mutation
@@ -188,6 +228,18 @@ func (_u *PublicationAttemptUpdate) sqlSave(ctx context.Context) (_node int, err
 	}
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(publicationattempt.FieldFailureCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProviderMessage(); ok {
+		_spec.SetField(publicationattempt.FieldProviderMessage, field.TypeString, value)
+	}
+	if _u.mutation.ProviderMessageCleared() {
+		_spec.ClearField(publicationattempt.FieldProviderMessage, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemoteURL(); ok {
+		_spec.SetField(publicationattempt.FieldRemoteURL, field.TypeString, value)
+	}
+	if _u.mutation.RemoteURLCleared() {
+		_spec.ClearField(publicationattempt.FieldRemoteURL, field.TypeString)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -286,6 +338,46 @@ func (_u *PublicationAttemptUpdateOne) SetNillableFailureCode(v *string) *Public
 // ClearFailureCode clears the value of the "failure_code" field.
 func (_u *PublicationAttemptUpdateOne) ClearFailureCode() *PublicationAttemptUpdateOne {
 	_u.mutation.ClearFailureCode()
+	return _u
+}
+
+// SetProviderMessage sets the "provider_message" field.
+func (_u *PublicationAttemptUpdateOne) SetProviderMessage(v string) *PublicationAttemptUpdateOne {
+	_u.mutation.SetProviderMessage(v)
+	return _u
+}
+
+// SetNillableProviderMessage sets the "provider_message" field if the given value is not nil.
+func (_u *PublicationAttemptUpdateOne) SetNillableProviderMessage(v *string) *PublicationAttemptUpdateOne {
+	if v != nil {
+		_u.SetProviderMessage(*v)
+	}
+	return _u
+}
+
+// ClearProviderMessage clears the value of the "provider_message" field.
+func (_u *PublicationAttemptUpdateOne) ClearProviderMessage() *PublicationAttemptUpdateOne {
+	_u.mutation.ClearProviderMessage()
+	return _u
+}
+
+// SetRemoteURL sets the "remote_url" field.
+func (_u *PublicationAttemptUpdateOne) SetRemoteURL(v string) *PublicationAttemptUpdateOne {
+	_u.mutation.SetRemoteURL(v)
+	return _u
+}
+
+// SetNillableRemoteURL sets the "remote_url" field if the given value is not nil.
+func (_u *PublicationAttemptUpdateOne) SetNillableRemoteURL(v *string) *PublicationAttemptUpdateOne {
+	if v != nil {
+		_u.SetRemoteURL(*v)
+	}
+	return _u
+}
+
+// ClearRemoteURL clears the value of the "remote_url" field.
+func (_u *PublicationAttemptUpdateOne) ClearRemoteURL() *PublicationAttemptUpdateOne {
+	_u.mutation.ClearRemoteURL()
 	return _u
 }
 
@@ -399,6 +491,18 @@ func (_u *PublicationAttemptUpdateOne) sqlSave(ctx context.Context) (_node *Publ
 	}
 	if _u.mutation.FailureCodeCleared() {
 		_spec.ClearField(publicationattempt.FieldFailureCode, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProviderMessage(); ok {
+		_spec.SetField(publicationattempt.FieldProviderMessage, field.TypeString, value)
+	}
+	if _u.mutation.ProviderMessageCleared() {
+		_spec.ClearField(publicationattempt.FieldProviderMessage, field.TypeString)
+	}
+	if value, ok := _u.mutation.RemoteURL(); ok {
+		_spec.SetField(publicationattempt.FieldRemoteURL, field.TypeString, value)
+	}
+	if _u.mutation.RemoteURLCleared() {
+		_spec.ClearField(publicationattempt.FieldRemoteURL, field.TypeString)
 	}
 	_node = &PublicationAttempt{config: _u.config}
 	_spec.Assign = _node.assignValues

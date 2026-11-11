@@ -9,6 +9,7 @@ import { suggestLinkCopy } from '@/lib/link-preview/suggest'
 import { checkRateLimit } from '@/lib/rate-limit'
 import { consumeWorkspaceQuota } from '@/lib/tenant/entitlements'
 import { isAiEnabled } from '@/lib/trpc/routers/launch'
+import { getWorkspaceVoice } from '@/lib/launch/store'
 
 /** The page fetch plus a few model steps. */
 export const maxDuration = 60
@@ -35,6 +36,9 @@ export const POST = route(suggestLinkCopyContract, {
     if (!limit.allowed)
       return errorResponse(429, 'Too many AI requests. Wait a minute and try again.')
     await consumeWorkspaceQuota(access, workspaceQuotaSchema.enum['ai:credits:monthly'], 0)
-    return { variants: await withAiCredits(access, () => suggestLinkCopy(body.url, body.agent)) }
+    const voice = await getWorkspaceVoice(access)
+    return {
+      variants: await withAiCredits(access, () => suggestLinkCopy(body.url, body.agent, voice)),
+    }
   },
 })

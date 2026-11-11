@@ -778,7 +778,13 @@ function scriptCaptions(text: string) {
     altText: headline ? `A product screenshot with the headline “${headline}”.` : 'A product screenshot.',
     captions: channels.map((channel) => ({
       channel,
-      text: channel === 'instagram' ? `Meet ${subject}.\n\n#product #launch #design` : `Meet ${subject}. Take a look.`,
+      // Each platform's caption is its own, so a test can tell which one a post carries.
+      text:
+        channel === 'instagram'
+          ? `Meet ${subject}.\n\n#product #launch #design`
+          : channel === 'linkedin'
+            ? `Meet ${subject}. Take a look at what changed for your team.`
+            : `Meet ${subject}. Take a look.`,
     })),
   }
 }

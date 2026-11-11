@@ -561,8 +561,12 @@ func (p *Provider) igPermalink(ctx context.Context, mediaID, checkToken, host st
 	return body.Permalink
 }
 
+// postID POSTs and returns the created object's id. A container (/media)
+// stays invisible until media_publish, so only it may be resent after a
+// server error; media_publish and comments may not.
 func (p *Provider) postID(ctx context.Context, rawURL string) (string, error) {
-	res, err := p.Fetch(ctx, rawURL, integrations.Request{Method: http.MethodPost})
+	container := strings.Contains(rawURL, "/media?")
+	res, err := p.Fetch(ctx, rawURL, integrations.Request{Method: http.MethodPost, Retryable: container})
 	if err != nil {
 		return "", err
 	}

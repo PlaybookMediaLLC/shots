@@ -305,7 +305,7 @@ type rateLimitedReplies struct {
 func (r *rateLimitedReplies) Comment(ctx context.Context, id, postID, lastCommentID, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
 	if len(r.replies) >= r.after {
 		r.refused++
-		return nil, temporalx.RateLimited("threads", "{}")
+		return nil, temporalx.RateLimited("threads", 0, "Rate limited")
 	}
 	return r.fakePoster.Comment(ctx, id, postID, lastCommentID, token, posts, account)
 }
@@ -436,6 +436,32 @@ func TestDirectPublisherPreservesDefiniteRejection(t *testing.T) {
 	var providerErr *socialapi.Error
 	if !errors.As(err, &providerErr) || providerErr.UnknownDelivery || providerErr.Status != 400 || poster.calls != 1 {
 		t.Fatalf("known rejection became unknown: %v", err)
+	}
+}
+
+// A lasting rate limit retries durably with the provider's guidance; a daily
+// cap fails definitely with its own code. Neither is an unknown delivery.
+func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
+	var limited *socialapi.Error
+	err := publicationOutcome(temporalx.RateLimited("x", 7*time.Minute, "slow down"))
+	if !errors.As(err, &limited) || limited.UnknownDelivery || limited.Status != 429 || limited.RetryAfter != 7*time.Minute || limited.ProviderMessage != "slow down" {
+		t.Fatalf("rate limit = %#v", err)
+	}
+	var capped *socialapi.Error
+	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
+	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
+		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// A refusal of Shots' own app access fails definitely and blames no account.
+func TestAppAccessRefusalBlamesNoAccount(t *testing.T) {
+	var refused *socialapi.Error
+	err := publicationOutcome(temporalx.AppAccess("x", "client-not-enrolled"))
+	if !errors.As(err, &refused) || refused.UnknownDelivery || refused.Code != publishing.FailurePublisherUnavailable ||
+		refused.Status != http.StatusServiceUnavailable || !strings.Contains(refused.ProviderMessage, "client-not-enrolled") ||
+		!strings.Contains(refused.ProviderMessage, "No account needs reconnecting") {
+		t.Fatalf("app access = %#v", err)
 	}
 }
 

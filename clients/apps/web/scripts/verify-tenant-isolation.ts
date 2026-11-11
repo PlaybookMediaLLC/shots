@@ -317,6 +317,24 @@ async function assertSessionIsolation(
     client
   )
   assertStatus(completeResponse, 404)
+
+  // Another workspace's release cannot seed a post's captions or be kept by a draft.
+  const summaryResponse = await request(
+    `/api/trpc/release.summary?input=${encodeURIComponent(JSON.stringify({ json: { releaseId: otherReleaseId } }))}`,
+    {},
+    client
+  )
+  assertStatus(summaryResponse, 404)
+  const draftResponse = await request(
+    '/api/v1/content-drafts',
+    {
+      body: JSON.stringify({ releaseId: otherReleaseId, title: `Isolation ${testRunId}` }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    },
+    client
+  )
+  assertStatus(draftResponse, 404)
 }
 
 async function assertApiKeyIsolation(

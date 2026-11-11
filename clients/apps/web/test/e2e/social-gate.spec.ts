@@ -235,20 +235,23 @@ test('the backend worker publishes once through Go, retries, honors cancellation
     // A server error after the publish request may hide an accepted post, so it is
     // never resent: one request, and the outcome is unknown until a person checks.
     await resetFake('server-error-once')
-    const failed = await createScheduledPost(
+    const ambiguous = await createScheduledPost(
       page,
       connectionId,
       'social-gate-server-error-once',
       variantId,
       soon()
     )
-    await awaitStatus(failed.scheduledPost.id, 'UNKNOWN_DELIVERY')
+    await awaitStatus(ambiguous.scheduledPost.id, 'UNKNOWN_DELIVERY')
     // eslint-disable-next-line no-restricted-syntax -- Proves no durable retry resends the post later; an absence needs a window.
     await page.waitForTimeout(30_000)
-    expect(await statusOf(failed.scheduledPost.id)).toBe('UNKNOWN_DELIVERY')
-    const unresent = await fakeState()
-    expect(unresent.requests).toBe(1)
-    expect(unresent.posts).toHaveLength(0)
+    expect(await statusOf(ambiguous.scheduledPost.id)).toBe('UNKNOWN_DELIVERY')
+    const unresolved = await fakeState()
+    expect(unresolved.requests).toBe(1)
+    expect(unresolved.posts).toHaveLength(0)
+    expect((await attemptsOf(ambiguous.scheduledPost.id)).map((item) => item.outcome)).toEqual([
+      'FAILED',
+    ])
 
     // An expired provider credential fails the post without publishing.
     await resetFake('normal')

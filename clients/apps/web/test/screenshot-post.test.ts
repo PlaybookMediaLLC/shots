@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { POST_BREAK } from '@/lib/content-drafts/serialize'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
-import { editorHref, readEditorReturn } from '@/lib/platform/editor-handoff'
+import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
 import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
 import { platformVersionsSchema } from '@/lib/write/document'
@@ -388,4 +388,20 @@ test('the editor round trip keeps only ids it can trust', () => {
     `/editor?asset=${assetId}&fromCampaign=clf0f1a2c3d4e5f6`
   )
   assert.equal(editorHref({ designId: 'clf0f1a2c3d4e5f6' }), '/editor?design=clf0f1a2c3d4e5f6')
+})
+
+test('a release screenshot opens on the brand kit and returns to its release', () => {
+  const releaseId = '7a6b5c4d-3e2f-4a1b-8c9d-0e1f2a3b4c5d'
+  const href = editorHref({ assetId, brandKitId: 'clkit0000000001' }, { releaseId })
+  assert.equal(href, `/editor?asset=${assetId}&kit=clkit0000000001&fromRelease=${releaseId}`)
+  const search = href.slice(href.indexOf('?'))
+  assert.deepEqual(readEditorReturn(search), { releaseId })
+  assert.equal(readEditorBrandKit(search), 'clkit0000000001')
+  // A malformed release or kit is dropped, not trusted: both reach API calls.
+  assert.deepEqual(readEditorReturn('?fromRelease=../../admin'), {})
+  // So is an id the draft contract would refuse, which would block every draft.
+  assert.deepEqual(readEditorReturn('?fromRelease=12345678-1234-1234-1234-123456789012'), {})
+  assert.equal(readEditorBrandKit('?kit=<script>'), undefined)
+  // No kit, no parameter.
+  assert.equal(editorHref({ assetId, brandKitId: undefined }), `/editor?asset=${assetId}`)
 })

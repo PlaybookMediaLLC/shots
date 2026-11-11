@@ -11,6 +11,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/creativevariant"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/design"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
@@ -111,37 +112,57 @@ func requireSharedAccount(ctx context.Context, client *ent.Client, actor Actor, 
 	return err
 }
 
-// CreateScheduledPost schedules an approved variant, or for a session a
-// content draft in a workspace that does not approve drafts, to a channel
-// connection and charges the monthly posts allowance. A replay of the same
-// idempotency key returns the first post and is not charged again.
+// CreateScheduledPost schedules an approved variant to a channel connection
+// and charges the monthly posts allowance. A replay of the same idempotency
+// key returns the first post and is not charged again. A content draft is
+// refused: ScheduleContentDraft checks its approval and sends its stored text,
+// and this path would skip both (plan F1).
 func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	input publishing.CreateScheduledPostInput) (publishing.CreateScheduledPostResult, error) {
 	input.Caption = strings.TrimSpace(input.Caption)
-	if input.Caption == "" || input.IdempotencyKey == "" || !input.ScheduledFor.After(time.Now()) {
+	if input.IdempotencyKey == "" {
+		// No key: name the request by its content, so a retry replays instead of posting twice.
+		input.IdempotencyKey = publishing.ContentIdempotencyKey(input)
+	}
+	if input.Caption == "" || !input.ScheduledFor.After(time.Now()) {
 		return publishing.CreateScheduledPostResult{}, ErrInvalidInput
 	}
 	if err := c.authorizeScheduling(ctx, actor); err != nil {
 		return publishing.CreateScheduledPostResult{}, err
 	}
-	// Only a person schedules a content draft here (RFC 013); a key schedules
-	// approved campaign variants only. This route sends the caller's caption, so
-	// where drafts need approval they take the draft schedule route instead,
-	// which checks the approved version.
-	if input.ContentDraftID != "" {
-		if !actor.IsSession() {
-			return publishing.CreateScheduledPostResult{}, publishing.ErrForbidden
-		}
-		settings, err := c.client.ContentDraftSettings.Get(ctx, actor.OrganizationID)
-		if err != nil && !ent.IsNotFound(err) {
-			return publishing.CreateScheduledPostResult{}, err
-		}
-		if settings != nil && settings.RequireApproval {
-			return publishing.CreateScheduledPostResult{}, conflict("This workspace approves drafts before they are scheduled. Schedule the draft from the draft itself (POST /api/v1/content-drafts/{id}/schedule), which checks its approval.")
-		}
+	// A key schedules approved campaign variants only.
+	if input.ContentDraftID != "" && !actor.IsSession() {
+		return publishing.CreateScheduledPostResult{}, publishing.ErrForbidden
 	}
+	if input.ContentDraftID != "" {
+		return publishing.CreateScheduledPostResult{}, conflict("Schedule a content draft from the draft (POST /api/v1/content-drafts/{id}/schedule): it checks the draft's approval and sends its stored text.")
+	}
+	// The caption is the caller's: hold it to the brand's terms and those of
+	// the account's social set, as every other write path does.
+	connection, err := c.client.ChannelConnection.Query().Where(channelconnection.ID(input.ChannelConnectionID),
+		channelconnection.OrganizationID(actor.OrganizationID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return publishing.CreateScheduledPostResult{}, publishing.ErrNotFound
+	}
+	if err != nil {
+		return publishing.CreateScheduledPostResult{}, err
+	}
+	// A key's private-set refusal comes first: it answers not found, so a
+	// prohibited-phrase message cannot reveal the set.
 	if !actor.IsSession() {
 		if err := c.requireKeySchedule(ctx, actor, input); err != nil {
+			return publishing.CreateScheduledPostResult{}, err
+		}
+	}
+	// A retry of a key that already scheduled replays it, even if a term was
+	// prohibited since; only new copy is checked.
+	replay, err := c.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
+		scheduledpost.ChannelConnectionID(input.ChannelConnectionID), scheduledpost.IdempotencyKey(input.IdempotencyKey)).Exist(ctx)
+	if err != nil {
+		return publishing.CreateScheduledPostResult{}, err
+	}
+	if !replay {
+		if err := requireAllowedCopy(ctx, c.client, actor.OrganizationID, connection.SocialSetID, input.Caption); err != nil {
 			return publishing.CreateScheduledPostResult{}, err
 		}
 	}

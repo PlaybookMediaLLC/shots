@@ -4,24 +4,15 @@ import { generateText, stepCountIs, tool } from 'ai'
 import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
 import {
-  CAPTION_CHANNELS,
   type CaptionChannel,
   captionChannelSchema,
   copyProblems,
+  platformLine,
 } from '@/lib/captions/channels'
 import type { DesignDocument } from '@/lib/design/document'
 import { voiceInstructions } from '@/lib/write/voice'
 import { models } from '../models'
 import { CAPTIONS_INSTRUCTIONS } from '../prompts/captions'
-
-/** The brand's voice, from the workspace brand profile, when it has one. */
-export type BrandVoice = {
-  audience?: string
-  ctaConventions?: string | null
-  productDescription?: string
-  prohibitedTerms: string[]
-  tone?: string
-}
 
 /** What the writer returns. */
 export type WrittenCopy = { altText: string; captions: Partial<Record<CaptionChannel, string>> }
@@ -37,45 +28,29 @@ const submission = z.object({
  * platform counts them, missing platforms, prohibited terms) and sent back
  * until it passes.
  *
- * `voice` is the publishing identity's writing context (RFC 024): the same
- * merged brand and social-set voice Refine and the writing assistant use, so
- * a caption written here sounds like the account that will post it. It has
- * already absorbed the brand's tone and audience and may override them, so
- * with a voice the brand contributes only what the voice does not carry:
- * what the product is and how it asks for action. Prohibited terms are the
- * union of both and are enforced on every submission.
+ * `voice` is the one brand voice (RFC 024): the publishing identity's merged
+ * brand and social-set context, or the workspace's when no set is chosen. It
+ * carries what the product is, its calls to action and the prohibited terms
+ * of both, which are enforced on every submission.
  */
 export async function writeCopy(input: {
-  brand: BrandVoice | null
   channels: readonly CaptionChannel[]
+  /** The set's platform guidance per channel, so each caption follows its own. */
+  guidance?: Partial<Record<CaptionChannel, string>>
   document: DesignDocument
   notes?: string
   snapshotJpegBase64: string
-  voice?: WritingContext | null
+  /** The brand voice; null only when the workspace has no brand profile. */
+  voice: WritingContext | null
 }): Promise<WrittenCopy> {
   let accepted: WrittenCopy | null = null
-  const prohibited = [
-    ...(input.brand?.prohibitedTerms ?? []),
-    ...(input.voice?.prohibitedPhrases ?? []),
-  ]
+  const prohibited = input.voice?.prohibitedPhrases ?? []
   const visibleText = input.document.texts.map((text) => text.text).filter(Boolean)
   const context = [
     `<channels>${input.channels.join(',')}</channels>`,
-    ...input.channels.map(
-      (channel) =>
-        `<platform id="${channel}">${CAPTION_CHANNELS[channel].name}: at most ${CAPTION_CHANNELS[channel].limit} characters. ${CAPTION_CHANNELS[channel].conventions}</platform>`
-    ),
+    ...input.channels.map((channel) => platformLine(channel, input.guidance?.[channel])),
     `<visible-text>${visibleText.length ? visibleText.join(' | ') : '(none)'}</visible-text>`,
     input.notes ? `<notes>${input.notes}</notes>` : '',
-    input.brand
-      ? `<brand>${JSON.stringify({
-          audience: input.voice ? undefined : input.brand.audience,
-          callsToAction: input.brand.ctaConventions,
-          product: input.brand.productDescription,
-          prohibited,
-          tone: input.voice ? undefined : input.brand.tone,
-        })}</brand>`
-      : '',
   ]
     .filter(Boolean)
     .join('\n')
@@ -91,7 +66,14 @@ export async function writeCopy(input: {
     ],
     model: models.languageModel('drafting'),
     stopWhen: stepCountIs(4),
-    system: CAPTIONS_INSTRUCTIONS + voiceInstructions(input.voice ?? null),
+    // Per-channel guidance sits on each platform line, so the shared voice drops its own.
+    system:
+      CAPTIONS_INSTRUCTIONS +
+      voiceInstructions(
+        input.voice && Object.keys(input.guidance ?? {}).length > 0
+          ? { ...input.voice, platformGuidance: '' }
+          : (input.voice ?? null)
+      ),
     tools: {
       submitCaptions: tool({
         description: 'Submit the alt text and one caption per requested platform.',

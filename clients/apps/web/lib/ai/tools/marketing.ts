@@ -64,8 +64,8 @@ export function marketingTools(
       'tagline, prohibited terms). Either is null when not set.',
     effect: 'read',
     execute: async () => {
-      const { kit, profile } = await services.getActiveBrand(run.access)
-      return { kit, ok: true as const, voice: profile }
+      const { kit, voice } = await services.getActiveBrand(run.access)
+      return { kit, ok: true as const, voice }
     },
     inputSchema: z.object({}),
     maxCallsPerRun: 5,

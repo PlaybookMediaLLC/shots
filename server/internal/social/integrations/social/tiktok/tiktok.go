@@ -352,7 +352,8 @@ type pendingData struct {
 func (p *Provider) statusFetch(ctx context.Context, accessToken, publishID string) (*integrations.Response, error) {
 	body, _ := json.Marshal(map[string]string{"publish_id": publishID})
 	return p.Fetch(ctx, apiURL+"/v2/post/publish/status/fetch/", integrations.Request{
-		Method: http.MethodPost,
+		Method:    http.MethodPost,
+		Retryable: true, // a read sent as POST
 		Headers: map[string]string{
 			"Content-Type":  "application/json; charset=UTF-8",
 			"Authorization": "Bearer " + accessToken,
@@ -744,7 +745,7 @@ func (p *Provider) PostPending(ctx context.Context, id, accessToken string, post
 		// bytes and still publish. Return pending and let checkPostStatus
 		// deliver TikTok's own verdict instead of letting the caller retry the
 		// publish.
-		if temporalx.FailureType(err) == temporalx.TypeBadBody {
+		if kind := temporalx.FailureType(err); kind == temporalx.TypeBadBody || kind == temporalx.TypeRateLimited {
 			return nil, err
 		}
 	}

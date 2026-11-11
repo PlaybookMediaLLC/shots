@@ -1,8 +1,10 @@
 package x
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -52,6 +54,14 @@ func (c *client) connectionRequest(ctx context.Context, method, endpoint string,
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusTooManyRequests || response.StatusCode >= 500 {
 		return nil, nil, integrations.ErrRefreshUnavailable
+	}
+	if response.StatusCode == http.StatusForbidden {
+		// X answers 403 client-not-enrolled or client-forbidden when Shots' app
+		// lacks v2 access: every account fails that way, so none is to blame.
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 64<<10))
+		if bytes.Contains(body, []byte("client-not-enrolled")) || bytes.Contains(body, []byte("client-forbidden")) {
+			return nil, nil, fmt.Errorf("%w: X refused the app's API access", integrations.ErrAppCredentialsRefused)
+		}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, nil, errIdentity

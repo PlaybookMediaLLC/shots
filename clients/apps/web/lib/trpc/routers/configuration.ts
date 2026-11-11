@@ -85,14 +85,20 @@ export const brandProfileRouter = router({
               .join('\n\n'),
           ],
         },
+        // The unsaved form as the one voice format, as the backend would merge it.
         {
           tone: input.tone,
           audience: input.audience,
-          formatting: input.preferredStyles.join(', '),
+          ctaConventions: input.ctaConventions ?? '',
+          formatting: '',
+          preferredStyles: input.preferredStyles,
+          productDescription: input.productDescription,
           prohibitedPhrases: input.prohibitedTerms.map((term) =>
             typeof term === 'string' ? term : term.term
           ),
-          endings: input.ctaConventions ? [input.ctaConventions] : [],
+          socialHandles: input.socialHandles ?? {},
+          tagline: input.tagline ?? '',
+          endings: [],
           openings: [],
           terminology: [],
           samples: [],

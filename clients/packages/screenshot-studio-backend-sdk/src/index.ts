@@ -1009,6 +1009,10 @@ export type BackendContentDraft = {
   lastPublishedAt?: string | null
   /** The campaign an edited campaign visual was published from, if any. */
   campaignId?: string | null
+  /** The campaign post whose copy the draft took, when it did. */
+  campaignPostId?: string | null
+  /** The release the draft was made from, when it was. */
+  releaseId?: string | null
   /** The voice transcript revision the draft was made from, if any. */
   sourceVoiceRevisionId?: string | null
   /** Whether the voice note the draft was made from was deleted since. */
@@ -1257,6 +1261,8 @@ export type BackendContentDraftCreate = BackendContentDraftFields & {
   importKey?: string
   requestKey?: string
   kind?: BackendDraftKind
+  /** The workspace release the draft is made from; the backend checks it exists. */
+  releaseId?: string
   scratchpad?: string
   socialSetId?: string
   /** An experiment. */
@@ -1372,6 +1378,8 @@ export type BackendScheduleTiming = {
   timeZone?: string
   /** Schedule these accounts beside the draft's queued posts instead of replacing them. */
   add?: boolean
+  /** Schedule a repeat of an account's post within a day after a `duplicate_content` conflict. */
+  confirmDuplicate?: boolean
 }
 
 /** One attachment of a batch item: an uploaded asset, or a selected file still uploading. */
@@ -5290,8 +5298,13 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** The active kit, the brand profile and the workspace voice (the brand's WritingContext). */
   async getLaunchBrand() {
-    return this.request<{ kit: BrandKit | null; profile: BrandProfile | null }>('v1/launch/brand')
+    return this.request<{
+      kit: BrandKit | null
+      profile: BrandProfile | null
+      voice?: WritingContext | null
+    }>('v1/launch/brand')
   }
 
   async getLaunchPreferences() {

@@ -1115,6 +1115,8 @@ var (
 		{Name: "sourceDraftId", Type: field.TypeString, Nullable: true},
 		{Name: "sourceVoiceRevisionId", Type: field.TypeString, Nullable: true},
 		{Name: "campaignId", Type: field.TypeString, Nullable: true},
+		{Name: "releaseId", Type: field.TypeString, Nullable: true},
+		{Name: "campaignPostId", Type: field.TypeString, Nullable: true},
 		{Name: "collabGeneration", Type: field.TypeInt, Default: 0},
 		{Name: "collabState", Type: field.TypeBytes, Nullable: true},
 		{Name: "createdByUserId", Type: field.TypeString, Nullable: true},
@@ -1131,12 +1133,12 @@ var (
 			{
 				Name:    "contentdraft_organizationId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[40]},
+				Columns: []*schema.Column{ContentDraftColumns[1], ContentDraftColumns[42]},
 			},
 			{
 				Name:    "contentdraft_socialSetId_updatedAt",
 				Unique:  false,
-				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[40]},
+				Columns: []*schema.Column{ContentDraftColumns[18], ContentDraftColumns[42]},
 			},
 			{
 				Name:    "contentdraft_organizationId_campaignId",
@@ -3130,6 +3132,8 @@ var (
 		{Name: "outcome", Type: field.TypeEnum, Nullable: true, Enums: []string{"SUCCEEDED", "FAILED"}},
 		{Name: "providerPostId", Type: field.TypeString, Nullable: true},
 		{Name: "failureCode", Type: field.TypeString, Nullable: true},
+		{Name: "providerMessage", Type: field.TypeString, Nullable: true},
+		{Name: "remoteUrl", Type: field.TypeString, Nullable: true},
 		{Name: "scheduledPostId", Type: field.TypeString},
 	}
 	// PublicationAttemptTable holds the schema information for the "publication_attempt" table.
@@ -3140,7 +3144,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "publication_attempt_scheduled_post_attempts",
-				Columns:    []*schema.Column{PublicationAttemptColumns[8]},
+				Columns:    []*schema.Column{PublicationAttemptColumns[10]},
 				RefColumns: []*schema.Column{ScheduledPostColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -3149,7 +3153,7 @@ var (
 			{
 				Name:    "publicationattempt_scheduledPostId_attemptNumber",
 				Unique:  true,
-				Columns: []*schema.Column{PublicationAttemptColumns[8], PublicationAttemptColumns[2]},
+				Columns: []*schema.Column{PublicationAttemptColumns[10], PublicationAttemptColumns[2]},
 			},
 			{
 				Name:    "publicationattempt_organizationId_startedAt",

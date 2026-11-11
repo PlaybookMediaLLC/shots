@@ -112,6 +112,8 @@ type PublishResult struct {
 	Outcome     string
 	ProviderID  string
 	RetryAfter  time.Duration
+	// ProviderMessage is the provider's explanation of a failure, for the attempt record.
+	ProviderMessage string `json:",omitempty"`
 }
 
 type BeginInput struct {
@@ -149,6 +151,8 @@ type FailInput struct {
 	Job           PreparedPublication
 	RetryAt       time.Time
 	RunID         string
+	// ProviderMessage is kept on the attempt, redacted; empty from older histories.
+	ProviderMessage string `json:",omitempty"`
 }
 
 type MarkUnknownInput struct {
@@ -156,6 +160,8 @@ type MarkUnknownInput struct {
 	AttemptNumber int
 	PostID        string
 	RunID         string
+	// ProviderMessage is kept on the attempt, redacted; empty from older histories.
+	ProviderMessage string `json:",omitempty"`
 }
 
 type ScheduleInput struct {

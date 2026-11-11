@@ -107,9 +107,12 @@ func (c *Configuration) CreatePost(ctx context.Context, actor Actor, input Creat
 	if err != nil {
 		return nil, err
 	}
+	// The caller's Idempotency-Key guards its retries; a repeat warning would
+	// arrive after the draft exists, and createPost has no one to confirm it.
 	schedule := ScheduleContentDraftInput{
 		Disambiguation: input.Disambiguation, LocalTime: input.LocalTime, PublishNow: input.PublishNow, Queue: input.Queue,
 		ScheduledFor: input.ScheduledFor, Targets: plan.targets, TimeZone: input.TimeZone, Version: postDraftVersion,
+		ConfirmDuplicate: true,
 	}
 	if err := c.checkPost(ctx, actor, plan, schedule); err != nil {
 		return nil, err
@@ -281,7 +284,7 @@ func (c *Configuration) checkPost(ctx context.Context, actor Actor, plan *postPl
 			captions = append(captions, reply.Caption)
 		}
 	}
-	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
+	if err := requireAllowedCopy(ctx, tx.Client(), actor.OrganizationID, &plan.setID, captions...); err != nil {
 		return err
 	}
 	_, _, err = c.draftTargetConnections(ctx, tx, &ent.ContentDraft{OrganizationID: actor.OrganizationID, SocialSetID: &plan.setID,

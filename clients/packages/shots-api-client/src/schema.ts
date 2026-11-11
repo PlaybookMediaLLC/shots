@@ -995,7 +995,7 @@ export interface paths {
         put?: never;
         /**
          * Schedule a post
-         * @description Schedules an approved creative variant, or a content draft, to an active channel connection. Send exactly one of `variantId` and `contentDraftId`. A variant must be `APPROVED` with an approved review; scheduling never approves. Only a signed-in member schedules a content draft; an API key gets `403`. A key also sends only text a person approved: `caption` must be the copy of an approved campaign post for this visual, otherwise `403`. To post new text, use `POST /api/v1/posts`. A key cannot schedule to an account in a private social set. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.
+         * @description Schedules an approved creative variant to an active channel connection. A variant must be `APPROVED` with an approved review; scheduling never approves. A content draft is scheduled from the draft (`POST /api/v1/content-drafts/{id}/schedule`), which checks its approval and sends its stored text: here a `contentDraftId` is refused with `409`, and with `403` for an API key. The caption is checked against the workspace’s prohibited terms and those of the account’s social set (`409`). A key also sends only text a person approved: `caption` must be the copy of an approved campaign post for this visual, otherwise `403`. To post new text, use `POST /api/v1/posts`. A key cannot schedule to an account in a private social set. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`, even when it recomputed the time. Without the header, the request is named by its content (source, connection, caption and time), so an identical retry also returns the first post; once that post is cancelled or failed, send a key to schedule it again. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.
          */
         post: operations["createScheduledPost"];
         delete?: never;
@@ -1039,7 +1039,7 @@ export interface paths {
         put?: never;
         /**
          * Create a content draft
-         * @description Creates a content draft: a post written in the document editor, kept until it is scheduled. Every attached asset and channel must belong to the workspace. Requires the `draft:write` scope and the content drafts entitlement.
+         * @description Creates a content draft: a post written in the document editor, kept until it is scheduled. Every attached asset and channel, and the release it is made from, must belong to the workspace. Requires the `draft:write` scope and the content drafts entitlement.
          */
         post: operations["createContentDraft"];
         delete?: never;
@@ -2037,6 +2037,10 @@ export interface components {
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
                 campaignId: string | null;
+                /** @default null */
+                campaignPostId: string | null;
+                /** @default null */
+                releaseId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
                 sourceVoiceRemoved?: boolean;
@@ -3146,6 +3150,10 @@ export interface components {
                 /** @default null */
                 campaignId: string | null;
                 /** @default null */
+                campaignPostId: string | null;
+                /** @default null */
+                releaseId: string | null;
+                /** @default null */
                 sourceVoiceRevisionId: string | null;
                 sourceVoiceRemoved?: boolean;
                 /** @default null */
@@ -3350,6 +3358,10 @@ export interface components {
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
                 campaignId: string | null;
+                /** @default null */
+                campaignPostId: string | null;
+                /** @default null */
+                releaseId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
                 sourceVoiceRemoved?: boolean;
@@ -3611,6 +3623,8 @@ export interface components {
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
             primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+            /** Format: uuid */
+            releaseId?: string;
             scratchpad?: string;
             socialSetId?: string;
             tagIds?: string[];
@@ -3687,6 +3701,10 @@ export interface components {
             suppressSlackOnPublish?: boolean;
             /** @default null */
             campaignId: string | null;
+            /** @default null */
+            campaignPostId: string | null;
+            /** @default null */
+            releaseId: string | null;
             /** @default null */
             sourceVoiceRevisionId: string | null;
             sourceVoiceRemoved?: boolean;
@@ -4135,6 +4153,10 @@ export interface components {
                 suppressSlackOnPublish?: boolean;
                 /** @default null */
                 campaignId: string | null;
+                /** @default null */
+                campaignPostId: string | null;
+                /** @default null */
+                releaseId: string | null;
                 /** @default null */
                 sourceVoiceRevisionId: string | null;
                 sourceVoiceRemoved?: boolean;
@@ -9635,6 +9657,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description A content draft was sent, the caption uses a prohibited term, or a request without a key names a cancelled or failed post. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description The monthly posts allowance or the workspace write quota is exhausted. */
             429: {
                 headers: {
@@ -9872,6 +9903,15 @@ export interface operations {
             };
             /** @description The API key lacks the required workspace scope. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -10273,6 +10313,10 @@ export interface operations {
                             /** @default null */
                             campaignId: string | null;
                             /** @default null */
+                            campaignPostId: string | null;
+                            /** @default null */
+                            releaseId: string | null;
+                            /** @default null */
                             sourceVoiceRevisionId: string | null;
                             sourceVoiceRemoved?: boolean;
                             /** @default null */
@@ -10548,6 +10592,10 @@ export interface operations {
                             suppressSlackOnPublish?: boolean;
                             /** @default null */
                             campaignId: string | null;
+                            /** @default null */
+                            campaignPostId: string | null;
+                            /** @default null */
+                            releaseId: string | null;
                             /** @default null */
                             sourceVoiceRevisionId: string | null;
                             sourceVoiceRemoved?: boolean;

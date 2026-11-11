@@ -8,7 +8,7 @@ import type {
   BackendConversationMessage,
 } from 'screenshot-studio-backend-sdk'
 import { z } from 'zod'
-import { formatBrandKit, formatBrandVoice, formatProductProfile } from '@/lib/ai/launch/context'
+import { formatBrandKit, formatProductProfile } from '@/lib/ai/launch/context'
 import { withAiCredits } from '@/lib/ai/metering'
 import { models, normalizeTokenUsage } from '@/lib/ai/models'
 import {
@@ -31,6 +31,7 @@ import { getProductProfile } from '@/lib/tenant/product-profile'
 import { buildTurnContext, mayAskClarification } from './context'
 import { describeStep, isRetryableStep, type StepView } from './steps'
 import { conversationTools, type TurnState } from './tools'
+import { voiceInstructions } from '@/lib/write/voice'
 
 /**
  * One durable, non-streaming conversation turn (RFC 028, rollout step 1).
@@ -223,7 +224,7 @@ ${productSurfaces
   .join('\n')}
 </registered_products>`
           : null,
-        formatBrandVoice(brand),
+        voiceInstructions(brand.voice),
         formatBrandKit(brand.kit),
         formatCampaign(campaign),
       ],

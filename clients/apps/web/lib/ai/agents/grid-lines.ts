@@ -2,7 +2,9 @@ import 'server-only'
 
 import { generateText, stepCountIs, tool } from 'ai'
 import { z } from 'zod'
+import type { WritingContext } from 'screenshot-studio-backend-sdk'
 import { GRID_HEADLINE_LIMIT, GRID_TOPIC_LIMIT } from '@/lib/api/contracts/content-batches'
+import { voiceInstructions } from '@/lib/write/voice'
 import { models } from '../models'
 
 /** Which list a grid batch wants more of, and what it already holds. */
@@ -21,8 +23,11 @@ Captions are video headlines: short, plain and specific, such as "Four habits th
 
 Match the subject and tone of the list. Do not repeat its entries. Do not claim numbers, results or customers that the list does not state. Call submitGridLines once, then stop.`
 
-/** More lines like the ones given, without repeats and within what renders. */
-export async function suggestGridLines(input: GridLinesRequest): Promise<string[]> {
+/** More lines like the ones given, without repeats and within what renders, in the brand voice. */
+export async function suggestGridLines(
+  input: GridLinesRequest,
+  voice: WritingContext | null
+): Promise<string[]> {
   const limit = input.kind === 'captions' ? GRID_HEADLINE_LIMIT : GRID_TOPIC_LIMIT
   const known = new Set(input.existing.map((line) => line.toLowerCase()))
   let accepted: string[] = []
@@ -35,7 +40,7 @@ export async function suggestGridLines(input: GridLinesRequest): Promise<string[
     ],
     model: models.languageModel('drafting'),
     stopWhen: stepCountIs(3),
-    system: INSTRUCTIONS,
+    system: INSTRUCTIONS + voiceInstructions(voice),
     tools: {
       submitGridLines: tool({
         description: 'Submit the new lines.',
