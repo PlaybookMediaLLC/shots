@@ -837,6 +837,28 @@ func TestVoiceCommandConfirmRecovers(t *testing.T) {
 		}
 	})
 
+	t.Run("a retry leaves a draft someone edited since as a draft, without a post", func(t *testing.T) {
+		noteID, revisionID := f.note(f.owner, voiceTweet)
+		f.propose(f.owner, noteID, revisionID)
+		posts := monthlyMeterKey(QuotaPosts, f.org, time.Now())
+		f.meter.used[posts] = int64(planQuotas["pro"][QuotaPosts])
+		if _, err := f.repo.ConfirmVoiceCommand(f.ctx, f.owner, noteID, f.confirmInput()); err == nil {
+			t.Fatal("over the post quota, the confirm succeeded")
+		}
+		f.meter.used[posts] = 0
+		draftID := *f.command(noteID).ContentDraftID
+		// A teammate's edit (another platform's version, media, a poll) moves the
+		// version without changing the card's text.
+		f.exec(`UPDATE content_draft SET version=version+1 WHERE id=$1`, draftID)
+		result, err := f.repo.ConfirmVoiceCommand(f.ctx, f.owner, noteID, f.confirmInput())
+		if err != nil || result.Outcome != "draft" || result.ContentDraftID == nil || *result.ContentDraftID != draftID || result.ScheduledPostID != nil {
+			t.Fatalf("retry=%+v err=%v", result, err)
+		}
+		if f.posts(draftID) != 0 || len(f.drafts(revisionID)) != 1 {
+			t.Fatalf("posts=%d drafts=%d", f.posts(draftID), len(f.drafts(revisionID)))
+		}
+	})
+
 	t.Run("a retry with an account of another social set writes a new draft and one post", func(t *testing.T) {
 		noteID, revisionID := f.note(f.owner, voiceTweet)
 		f.propose(f.owner, noteID, revisionID)

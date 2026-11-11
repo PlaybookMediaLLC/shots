@@ -569,11 +569,17 @@ func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, no
 	if post != nil {
 		return c.recordVoiceConfirmation(ctx, actor, note, row, voicePostConfirmed(post))
 	}
+	read := draft.Version
 	if draft, err = c.reviseVoiceDraft(ctx, actor, draft, draftInput); err != nil {
 		return nil, err
 	}
 	done.draftID = draft.ID
-	if schedule != nil {
+	// A reused draft someone edited since an earlier confirm made it can hold
+	// more than the card's text (another platform's version, media, a poll) and
+	// an approval of all of it: the card's text alone must not go out under that,
+	// so it stays a draft to finish in the composer.
+	edited := draft.Version == read && read != postDraftVersion
+	if schedule != nil && !edited {
 		waiting := false
 		if draft.Status != contentdraft.StatusScheduled {
 			if waiting, err = c.draftAwaitsApproval(ctx, draft); err != nil {
