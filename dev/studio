@@ -440,12 +440,8 @@ run_e2e() {
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
   local argument check_oauth=false
-  # Names this run's reports. The recovery and onboarding runs invoke
-  # Playwright a second time against the same app; without a name of their
-  # own they overwrote the suite's JSON and blob reports.
   local report="${E2E_REPORT_LANE:-production}"
-  # The Founder Hub sign-in check runs once per suite: unsharded, or in shard 1.
-  if [[ "$#" == 0 ]]; then check_oauth=true; fi
+  if [[ "$#" == 0 || "${E2E_SHARD_ID:-}" == 1 ]]; then check_oauth=true; fi
   for argument in "$@"; do
     if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
   done
@@ -466,7 +462,7 @@ run_e2e() {
       e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
   fi
   E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
-  # Keep the server's logs beside the Playwright results, which CI uploads.
+  # Keep the server's logs beside the results, which CI uploads.
   mkdir -p "$WEB_DIR/test-results"
   compose logs --no-color app >"$WEB_DIR/test-results/app-$report.log" 2>&1 || true
   return "$test_result"
