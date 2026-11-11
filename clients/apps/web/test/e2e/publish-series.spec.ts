@@ -207,12 +207,8 @@ test(
     await expectSaved(page)
     await expect(page.getByTestId('writing-bar')).toContainText('@shots_x')
     await expect(page.getByTestId('writing-bar')).not.toContainText('Bluesky')
-    // Switching Bluesky off hands Main to X; its tab holds the editor. A last edit there
-    // is saved by Save draft & new itself, not left to the autosave.
-    await page.getByTestId('platform-tab-x').click()
-    await draftEditor(page).getByText('First independent post.').click()
-    await page.keyboard.press('Control+End')
-    await page.keyboard.type(' Late edit.')
+    // A last edit is saved by Save draft & new itself, not left to the autosave.
+    await page.getByRole('textbox', { name: 'Draft title', exact: true }).fill('Run, part one')
 
     const ids = [new URL(page.url()).pathname.split('/').pop() ?? '']
     for (const [text, start] of [
@@ -239,13 +235,19 @@ test(
       ids.push(new URL(page.url()).pathname.split('/').pop() ?? '')
     }
 
-    const drafts = await db.rows<{ channels: string[]; primary: string; text: string }>(
-      `SELECT "channelConnectionIds" AS channels, "primaryPlatform" AS primary, "plainText" AS text
+    const drafts = await db.rows<{
+      channels: string[]
+      primary: string
+      text: string
+      title: string
+    }>(
+      `SELECT "channelConnectionIds" AS channels, "primaryPlatform" AS primary, "plainText" AS text, title
          FROM content_draft WHERE "organizationId" = $1 ORDER BY "createdAt"`,
       [workspace.id]
     )
+    expect(drafts[0]!.title).toBe('Run, part one')
     expect(drafts.map((draft) => draft.text)).toEqual([
-      'First independent post. Late edit.',
+      'First independent post.',
       'Second independent post.',
       'Third independent post.',
     ])

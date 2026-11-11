@@ -215,7 +215,7 @@ test(
       '\n---\n'
     )
     await paste.fill(ten)
-    await expect(reading.getByRole('button', { pressed: true })).toHaveText('10 separate posts')
+    await expect(reading.getByRole('button', { pressed: true })).toHaveText('Separate posts')
     await expect(
       page.getByRole('list', { name: 'What the paste makes' }).getByRole('listitem')
     ).toHaveCount(10)

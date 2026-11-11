@@ -55,7 +55,7 @@ export function NewBatchButton({
   // list says what is in it rather than only when it was started.
   const [title, setTitle] = React.useState('')
   const suggested = tool
-    ? `${TOOLS.find((item) => item.value === tool)?.label ?? 'Batch'} · ${new Date().toLocaleDateString()}`
+    ? `${TOOLS.find((item) => item.value === tool)?.label ?? 'Batch'} · ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`
     : ''
   const [setId, setSetId] = React.useState(
     defaultSetId && sets.some((set) => set.id === defaultSetId) ? defaultSetId : sets[0]?.id
@@ -121,7 +121,7 @@ export function NewBatchButton({
                   item.value === 'text'
                     ? () => {
                         if (!arrowing.current)
-                          begin('text', `Text posts · ${new Date().toLocaleDateString()}`)
+                          begin('text', `Text posts · ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`)
                       }
                     : undefined
                 }

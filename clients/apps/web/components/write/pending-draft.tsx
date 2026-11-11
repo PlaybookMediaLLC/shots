@@ -478,21 +478,8 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
           you start writing
         </p>
       ) : null}
-      <div className="flex min-h-10 items-center justify-end px-4 pt-2">
-        {value.waiting && !value.pieces ? (
-          <Button
-            aria-label="Add media"
-            onClick={() => setPicking(true)}
-            size="sm"
-            title="Add an image or video"
-            variant="outline"
-          >
-            <ImageIcon aria-hidden />
-            Add media
-          </Button>
-        ) : null}
-      </div>
-      <div className="relative pt-10 pb-10">
+      {/* Where the composer keeps its account controls; the post starts below, as it does there. */}
+      <div className="relative pt-20 pb-10">
         <div className={POST_COLUMN}>
           <PostAuthor
             avatarUrl={author?.avatarUrl}
@@ -505,7 +492,7 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
           ref={field}
           aria-label="New draft text"
           // The editor's own writing surface: its type, its measure, no box.
-          className={cn(POST_COLUMN, POST_TEXT, 'min-h-32 pt-1')}
+          className={cn(POST_COLUMN, POST_TEXT, 'min-h-7 pt-1')}
           data-slot="post-text"
           placeholder={PLACEHOLDERS[channel] ?? `Write your ${CHANNEL_META[channel].label} post…`}
           value={value.text}
@@ -561,7 +548,22 @@ export function PendingDraftInput({ variant = 'page' }: { variant?: 'editor' | '
             thread={false}
           />
         </div>
-        <div className={cn(POST_COLUMN, 'mt-4 grid gap-3')}>
+        <div className={cn(POST_COLUMN, 'mt-6 grid gap-3')}>
+          {/* The editor's toolbar, with what a post can take before it exists. */}
+          {value.waiting && !value.pieces ? (
+            <div className="flex w-fit items-center gap-0.5 rounded-lg border border-border bg-card/95 p-1 shadow-popover">
+              <Button
+                aria-label="Add media"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => setPicking(true)}
+                size="icon-sm"
+                title="Image or video"
+                variant="ghost"
+              >
+                <ImageIcon aria-hidden />
+              </Button>
+            </div>
+          ) : null}
           {value.pieces ? (
             <PasteSplit
               busy={splitting}

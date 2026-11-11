@@ -31,7 +31,8 @@ export function initials(name: string): string {
   return (
     name
       .split(/\s+/)
-      .filter(Boolean)
+      // A word such as "(x)" or "—" is not a name: "Founder (x)" is F, not F(.
+      .filter((word) => /^[\p{L}\p{N}]/u.test(word))
       .slice(0, 2)
       .map((word) => word[0]?.toUpperCase())
       .join('') || 'S'

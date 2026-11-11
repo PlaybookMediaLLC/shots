@@ -434,9 +434,10 @@ function PasteBox({
             >
               {(
                 [
+                  // The counts are in the line below, so the choice fits a phone's width.
                   ['one', 'One post'],
-                  ['thread', `Thread · ${reading.pieces.length} posts`],
-                  ['posts', `${reading.pieces.length} separate posts`],
+                  ['thread', 'Thread'],
+                  ['posts', 'Separate posts'],
                 ] as const
               ).map(([value, label]) => (
                 <Button
@@ -1688,8 +1689,7 @@ export function BatchWorkspace({
       title={batch.title}
       description={
         <>
-          Each post becomes its own draft. Times are in {zone}; the batch saves as you go and
-          reopens from Publish.
+          Each post becomes its own draft. Times in {zone}. Saved as you go.
         </>
       }
       actions={
@@ -2307,7 +2307,8 @@ export function BatchWorkspace({
                         <CalendarIcon aria-hidden className="size-3.5" />
                         {planned}
                       </Button>
-                      <Pill tone={status.tone}>{status.text}</Pill>
+                      {/* A plain saved draft says so through Open draft; other states are named. */}
+                      {status.text === 'Draft' ? null : <Pill tone={status.tone}>{status.text}</Pill>}
                       {problems.length ? (
                         <Pill tone="red">Needs attention</Pill>
                       ) : ready ? (
@@ -2335,7 +2336,8 @@ export function BatchWorkspace({
                     ) : null}
                     {open ? (
                       <div className="mt-1 grid gap-3 rounded-lg border border-border bg-foreground/[0.02] p-3 text-sm">
-                        <p className="text-label text-muted-foreground">
+                        <p className="text-label font-medium text-foreground">Time</p>
+                        <p className="-mt-2 text-label text-muted-foreground">
                           {item.timing.mode === 'queue' && timing.kind === 'at'
                             ? `In the next queue slot, ${shortWhen(timing.at, zone)}. To set an exact time instead (${zone}):`
                             : `Time (${item.timing.timeZone || zone})`}
@@ -2397,6 +2399,7 @@ export function BatchWorkspace({
                             </FilePicker>
                           </div>
                         )}
+                        <p className="mt-1 text-label font-medium text-foreground">Accounts</p>
                         {accountIds.length ? (
                           <Table className="text-xs">
                             <TableHeader>
@@ -2664,22 +2667,20 @@ export function BatchWorkspace({
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-2">
-              <Label className="grid gap-1 text-label font-normal text-muted-foreground">
-                Plan
-                <Select
-                  value={timesMode}
-                  onValueChange={(value) => setTimesMode(value as 'queue' | 'hourly' | 'spread')}
-                >
-                  <SelectTrigger aria-label="Batch time mode">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="queue">Next queue slots</SelectItem>
-                    <SelectItem value="hourly">Every hour</SelectItem>
-                    <SelectItem value="spread">Spread over days</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Label>
+              <Select
+                value={timesMode}
+                onValueChange={(value) => setTimesMode(value as 'queue' | 'hourly' | 'spread')}
+              >
+                <SelectTrigger aria-label="Batch time mode">
+                  <CalendarIcon aria-hidden className="size-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="queue">Next queue slots</SelectItem>
+                  <SelectItem value="hourly">Every hour</SelectItem>
+                  <SelectItem value="spread">Spread over days</SelectItem>
+                </SelectContent>
+              </Select>
               {timesMode === 'hourly' ? (
                 <>
                   <div className="grid gap-1 text-label text-muted-foreground">
@@ -2772,7 +2773,6 @@ export function BatchWorkspace({
                 // The next step is the primary action: planning, then scheduling once checked.
                 variant={checked ? 'outline' : 'default'}
               >
-                <CalendarIcon />
                 {busy === 'times'
                   ? 'Planning…'
                   : busy === 'drafts'
@@ -2846,8 +2846,8 @@ export function BatchWorkspace({
             ) : null}
             {summary.first && summary.last ? (
               <p className="hidden text-label text-muted-foreground sm:block" data-testid="batch-summary">
-                {batchAudience(items, accounts)}. First {when(summary.first, zone)}, last{' '}
-                {when(summary.last, zone)}, on {summary.calendarDays} calendar day
+                {batchAudience(items, accounts)}, first {shortWhen(summary.first, zone)}, last{' '}
+                {shortWhen(summary.last, zone)}, on {summary.calendarDays} calendar day
                 {summary.calendarDays === 1 ? '' : 's'}.
                 {summary.withoutTime ? ` ${summary.withoutTime} still need a time.` : ''}
               </p>
