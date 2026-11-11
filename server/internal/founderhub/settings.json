@@ -1,0 +1,701 @@
+{
+  "intelligence_disabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "ai",
+    "label": "Intelligence disabled",
+    "default": false
+  },
+  "dictation_live_preview": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "dictation",
+    "label": "Dictation live preview",
+    "default": false
+  },
+  "dictation_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "dictation",
+    "label": "Dictation enabled",
+    "default": false
+  },
+  "dictation_shortcut": {
+    "type": "string",
+    "scope": "device",
+    "section": "dictation",
+    "label": "Dictation shortcut",
+    "default": "Control+Alt+Space"
+  },
+  "dictation_hands_free": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "dictation",
+    "label": "Dictation hands free",
+    "default": false
+  },
+  "export_directory": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Export directory",
+    "default": ""
+  },
+  "export_format": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Export format",
+    "default": "pdf"
+  },
+  "export_include_memo": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Export include memo",
+    "default": false
+  },
+  "export_include_summary": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Export include summary",
+    "default": true
+  },
+  "export_include_transcript": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Export include transcript",
+    "default": false
+  },
+  "autostart": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Autostart",
+    "default": false
+  },
+  "automatic_updates": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Automatic updates",
+    "default": true
+  },
+  "auto_stop_meetings": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Auto stop meetings",
+    "default": true
+  },
+  "primary_recording_device": {
+    "type": "string",
+    "scope": "account",
+    "section": "general",
+    "label": "Primary recording device",
+    "default": ""
+  },
+  "auto_start_scheduled_meetings": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Auto start scheduled meetings",
+    "default": true
+  },
+  "auto_join_scheduled_meetings": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Auto join scheduled meetings",
+    "default": false
+  },
+  "floating_bar_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Floating bar enabled",
+    "default": true
+  },
+  "floating_bar_opacity": {
+    "type": "number",
+    "scope": "device",
+    "section": "general",
+    "label": "Floating bar opacity",
+    "default": 0.78,
+    "min": 0,
+    "max": 1
+  },
+  "live_caption_opacity": {
+    "type": "number",
+    "scope": "device",
+    "section": "general",
+    "label": "Live caption opacity",
+    "default": 0.3,
+    "min": 0,
+    "max": 1
+  },
+  "live_caption_width": {
+    "type": "number",
+    "scope": "device",
+    "section": "general",
+    "label": "Live caption width",
+    "default": 440,
+    "min": 100,
+    "max": 3000
+  },
+  "live_caption_line_count": {
+    "type": "number",
+    "scope": "device",
+    "section": "general",
+    "label": "Live caption line count",
+    "default": 1,
+    "min": 1,
+    "max": 20
+  },
+  "live_caption_position": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Live caption position",
+    "default": "topCenter"
+  },
+  "live_caption_minimized": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Live caption minimized",
+    "default": true
+  },
+  "show_app_in_dock": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Show app in dock",
+    "default": true
+  },
+  "show_tray_icon": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Show tray icon",
+    "default": true
+  },
+  "use_24_hour_time": {
+    "type": "boolean",
+    "scope": "account",
+    "section": "general",
+    "label": "Use 24 hour time",
+    "default": false
+  },
+  "theme": {
+    "type": "string",
+    "scope": "account",
+    "section": "general",
+    "label": "Theme",
+    "default": "system",
+    "options": [
+      "system",
+      "light",
+      "dark"
+    ]
+  },
+  "app_icon": {
+    "type": "string",
+    "scope": "account",
+    "section": "general",
+    "label": "App icon",
+    "default": "default"
+  },
+  "sidebar_show_folder": {
+    "type": "boolean",
+    "scope": "account",
+    "section": "general",
+    "label": "Sidebar show folder",
+    "default": true
+  },
+  "sidebar_show_tags": {
+    "type": "boolean",
+    "scope": "account",
+    "section": "general",
+    "label": "Sidebar show tags",
+    "default": false
+  },
+  "save_recordings": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Save recordings",
+    "default": true
+  },
+  "audio_retention": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Audio retention",
+    "default": "forever",
+    "options": [
+      "none",
+      "oneDay",
+      "threeDays",
+      "oneWeek",
+      "oneMonth",
+      "forever"
+    ]
+  },
+  "remember_speakers": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Remember speakers",
+    "default": true
+  },
+  "microphone_device": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Microphone device",
+    "default": ""
+  },
+  "notification_disabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification disabled",
+    "default": false
+  },
+  "notification_event": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification event",
+    "default": true
+  },
+  "notification_detect": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification detect",
+    "default": true
+  },
+  "notification_summary_complete": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification summary complete",
+    "default": true
+  },
+  "notification_cloudsync_complete": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification cloudsync complete",
+    "default": true
+  },
+  "notification_recording": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification recording",
+    "default": true
+  },
+  "notification_completion_sound": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification completion sound",
+    "default": true
+  },
+  "notification_completion_sound_name": {
+    "type": "string",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification completion sound name",
+    "default": "ready"
+  },
+  "respect_dnd": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Respect dnd",
+    "default": false
+  },
+  "notification_bounce": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification bounce",
+    "default": true
+  },
+  "notification_bounce_summary": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification bounce summary",
+    "default": true
+  },
+  "notification_bounce_transcript": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "notification",
+    "label": "Notification bounce transcript",
+    "default": true
+  },
+  "telemetry_consent": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Telemetry consent",
+    "default": true
+  },
+  "crash_reporting_consent": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Crash reporting consent",
+    "default": true
+  },
+  "lock_app": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Lock app",
+    "default": false
+  },
+  "consent_auto_send_chat": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Consent auto send chat",
+    "default": false
+  },
+  "capture_meeting_chat": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Capture meeting chat",
+    "default": false
+  },
+  "capture_shared_screens": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Capture shared screens",
+    "default": false
+  },
+  "cloud_sync_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "general",
+    "label": "Cloud sync enabled",
+    "default": true
+  },
+  "ai_language": {
+    "type": "string",
+    "scope": "device",
+    "section": "language",
+    "label": "Ai language",
+    "default": "en"
+  },
+  "spoken_languages": {
+    "type": "string",
+    "scope": "device",
+    "section": "language",
+    "label": "Spoken languages",
+    "default": "[]",
+    "format": "string-array"
+  },
+  "summary_use_main_language": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "language",
+    "label": "Summary use main language",
+    "default": false
+  },
+  "personalization_dictionary_terms": {
+    "type": "string",
+    "scope": "device",
+    "section": "personalization",
+    "label": "Personalization dictionary terms",
+    "default": "[]",
+    "format": "string-array"
+  },
+  "custom_summary_instructions": {
+    "type": "string",
+    "scope": "device",
+    "section": "personalization",
+    "label": "Custom summary instructions",
+    "default": ""
+  },
+  "custom_summary_instructions_token_aware": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "personalization",
+    "label": "Custom summary instructions token aware",
+    "default": false
+  },
+  "auto_summary_prompt": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Auto summary prompt",
+    "default": ""
+  },
+  "ignored_platforms": {
+    "type": "string",
+    "scope": "device",
+    "section": "notification",
+    "label": "Ignored platforms",
+    "default": "[]",
+    "format": "string-array"
+  },
+  "included_platforms": {
+    "type": "string",
+    "scope": "device",
+    "section": "notification",
+    "label": "Included platforms",
+    "default": "[]",
+    "format": "string-array"
+  },
+  "mic_active_threshold": {
+    "type": "number",
+    "scope": "device",
+    "section": "notification",
+    "label": "Mic active threshold",
+    "default": 15,
+    "min": 0,
+    "max": 3600
+  },
+  "current_llm_provider": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Current llm provider"
+  },
+  "current_llm_model": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Current llm model"
+  },
+  "current_llm_reasoning_effort": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Current llm reasoning effort",
+    "default": "default",
+    "options": [
+      "default",
+      "none",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh"
+    ]
+  },
+  "current_stt_provider": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Current stt provider"
+  },
+  "current_stt_model": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Current stt model"
+  },
+  "local_stt_model_path": {
+    "type": "string",
+    "scope": "device",
+    "section": "ai",
+    "label": "Local stt model path",
+    "default": ""
+  },
+  "timezone": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Timezone"
+  },
+  "week_start": {
+    "type": "string",
+    "scope": "account",
+    "section": "general",
+    "label": "Week start",
+    "options": [
+      "",
+      "sunday",
+      "monday"
+    ]
+  },
+  "selected_template_id": {
+    "type": "string",
+    "scope": "device",
+    "section": "general",
+    "label": "Selected template id"
+  },
+  "default_meeting_share_access": {
+    "type": "string",
+    "scope": "account",
+    "section": "general",
+    "label": "Default meeting share access",
+    "default": "me",
+    "options": [
+      "me",
+      "participants",
+      "workspace"
+    ]
+  },
+  "todo_linear_filter": {
+    "type": "string",
+    "scope": "device",
+    "section": "todo",
+    "label": "Todo linear filter",
+    "default": ""
+  },
+  "todo_github_repository": {
+    "type": "string",
+    "scope": "device",
+    "section": "todo",
+    "label": "Todo github repository",
+    "default": ""
+  },
+  "automation_draft_template": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation draft template",
+    "default": ""
+  },
+  "automation_workflows": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation workflows",
+    "default": "[]",
+    "format": "json-array"
+  },
+  "automation_markdown_export_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation markdown export enabled",
+    "default": false
+  },
+  "automation_markdown_export_directory": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation markdown export directory",
+    "default": ""
+  },
+  "automation_markdown_export_last_run": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation markdown export last run",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_markdown_export_files": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation markdown export files",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_slack_recap_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation slack recap enabled",
+    "default": false
+  },
+  "automation_slack_recap_channel": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation slack recap channel",
+    "default": ""
+  },
+  "automation_slack_recap_last_run": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation slack recap last run",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_slack_recap_processed": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation slack recap processed",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_linear_issues_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation linear issues enabled",
+    "default": false
+  },
+  "automation_linear_issues_team": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation linear issues team",
+    "default": ""
+  },
+  "automation_linear_issues_last_run": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation linear issues last run",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_linear_issues_processed": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation linear issues processed",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_notion_update_enabled": {
+    "type": "boolean",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation notion update enabled",
+    "default": false
+  },
+  "automation_notion_update_page": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation notion update page",
+    "default": ""
+  },
+  "automation_notion_update_last_run": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation notion update last run",
+    "default": "",
+    "readOnly": true
+  },
+  "automation_notion_update_processed": {
+    "type": "string",
+    "scope": "device",
+    "section": "automations",
+    "label": "Automation notion update processed",
+    "default": "",
+    "readOnly": true
+  }
+}

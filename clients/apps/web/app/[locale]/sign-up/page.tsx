@@ -10,16 +10,16 @@ export const metadata: Metadata = { title: 'Create account' }
 
 type AuthPageProps = {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ callbackURL?: string | string[] }>
+  searchParams: Promise<{ callbackURL?: string | string[]; sig?: string }>
 }
 
 export default async function SignUpPage({ params, searchParams }: AuthPageProps) {
-  const [{ locale }, { callbackURL }, requestHeaders] = await Promise.all([
+  const [{ locale }, { callbackURL, sig }, requestHeaders] = await Promise.all([
     params,
     searchParams,
     headers(),
   ])
-  await redirectIfSignedIn(requestHeaders, locale, callbackURL)
+  if (!sig) await redirectIfSignedIn(requestHeaders, locale, callbackURL)
 
   return (
     <AuthShell

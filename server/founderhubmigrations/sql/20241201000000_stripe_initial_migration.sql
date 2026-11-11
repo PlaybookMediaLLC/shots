@@ -1,0 +1,1 @@
+-- Schema founder_hub_billing is provisioned by the privileged bootstrap.

@@ -54,3 +54,40 @@ func TestSocialPlatformAliasesKeepOneSlotAndDraftDefaults(t *testing.T) {
 		})
 	}
 }
+
+func TestChosenAccountsDecideANewDraftsMainPlatform(t *testing.T) {
+	w := newTestWorkspace(t)
+	ctx, repo, owner := w.ctx, w.repo.WithMonthlyMeter(&recordingMonthlyMeter{}), w.owner
+	subscribe(t, ctx, repo, w.org, "pro")
+	set, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Main platform"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	add := socialCredentialFixture(t, ctx, w.db.SQL, w.org)
+	actor := publishing.Actor{Organization: w.org, UserID: owner.UserID, RequestID: owner.RequestID, Type: "USER"}
+	ids := map[string]string{}
+	for _, platform := range []string{"tiktok", "x"} {
+		add(platform+w.id, platform)
+		connection, err := repo.auth.CreateConnection(ctx, actor, publishing.CreateConnectionInput{ExternalAccountID: platform + w.id, Platform: platform, ProviderSettings: map[string]any{}, SecretReference: "FIXTURE", SocialSetID: &set.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids[platform] = connection.ID
+	}
+	current, err := repo.GetSocialSet(ctx, owner, set.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaults, tiktok := []string{"tiktok", "x"}, "tiktok"
+	if _, err := repo.UpdateSocialSet(ctx, owner, set.ID, SocialSetUpdate{BaseVersion: current.Version, DefaultPlatforms: &defaults, PrimaryPlatform: &tiktok}); err != nil {
+		t.Fatal(err)
+	}
+	draft, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "X only", SocialSetID: set.ID, ChannelConnectionIDs: []string{ids["x"]}})
+	if err != nil || draft.PrimaryPlatform == nil || *draft.PrimaryPlatform != "x" || len(draft.ChannelConnectionIDs) != 1 || draft.ChannelConnectionIDs[0] != ids["x"] {
+		t.Fatalf("X-only draft opened on another platform: %+v err=%v", draft, err)
+	}
+	both, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Title: "Defaults", SocialSetID: set.ID})
+	if err != nil || both.PrimaryPlatform == nil || *both.PrimaryPlatform != "tiktok" || len(both.ChannelConnectionIDs) != 2 {
+		t.Fatalf("set defaults changed: %+v err=%v", both, err)
+	}
+}

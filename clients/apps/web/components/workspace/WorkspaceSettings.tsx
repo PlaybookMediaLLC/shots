@@ -3,6 +3,7 @@ import { Page } from '@/components/platform-ui'
 import { WorkspaceDeletionRecovery } from './WorkspaceDeletionSettings'
 import { WorkspaceSettingContent } from './WorkspaceSettingDetail'
 import { SETTINGS_SECTIONS, type SettingId, type SocialSetPage } from './settings-sections'
+import type { FounderHubPage } from '@/components/settings/founder-hub/pages'
 
 export type WorkspaceSettingsProps = {
   /** What the member's permission group subtracts from `role`. */
@@ -29,6 +30,7 @@ export type WorkspaceSettingsProps = {
   }
   role: string
   section: SettingId
+  founderHubPage?: FounderHubPage
   /** The social set and page, for a social set's own settings. */
   socialSet?: { id: string; page: SocialSetPage }
   twoFactorEnabled: boolean
@@ -56,6 +58,7 @@ export function WorkspaceSettings(props: WorkspaceSettingsProps) {
   }
 
   const current = SETTINGS_SECTIONS.find((item) => item.id === section) ?? SETTINGS_SECTIONS[0]!
+  if (section === 'founder-hub') return <WorkspaceSettingContent {...props} />
   return (
     <Page description={current.description} title={current.title}>
       <ReturnToWork />

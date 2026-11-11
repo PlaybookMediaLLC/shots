@@ -13,6 +13,7 @@ import {
 import { auth } from '@/lib/auth/server'
 import {
   AUTH_RATE_LIMIT,
+  OAUTH_TOKEN_RATE_LIMIT,
   type RateLimitPolicy,
   WORKSPACE_INVITATION_RATE_LIMIT,
 } from '@/lib/api/rate-limit-policy'
@@ -155,6 +156,7 @@ function getAuthRateLimitPolicy(request: Request): RateLimitPolicy | null {
   }
 
   const { pathname } = new URL(request.url)
+  if (pathname.endsWith('/oauth2/token')) return OAUTH_TOKEN_RATE_LIMIT
   if (pathname.includes(invitationPath)) {
     return WORKSPACE_INVITATION_RATE_LIMIT
   }

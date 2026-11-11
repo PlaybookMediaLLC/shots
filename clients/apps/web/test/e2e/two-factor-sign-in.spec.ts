@@ -46,11 +46,12 @@ async function signOut(page: Page): Promise<void> {
   expect((await requestJson(page, '/api/auth/sign-out', {})).status).toBe(200)
 }
 
-// @dev-server: it signs in several times in a few seconds, and a production
-// build applies Better Auth's limit of 3 sign-ins per 10 s.
+// Signs in several times in a few seconds on purpose. The production build
+// raises Better Auth's 3-per-10-s sign-in limit only for an end-to-end stack
+// (lib/e2e-hooks.ts); deployed builds keep it.
 test(
   'two-factor sign-in accepts a TOTP or one-time recovery code and rejects replay',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ identity, page }) => {
     const setup = await enableTwoFactorInSettings(page, identity.password)
     const recoveryCode = setup.backupCodes[0]

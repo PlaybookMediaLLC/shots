@@ -51,7 +51,7 @@ func (AccountDeletionRequest) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("id").StorageKey("id").Immutable(),
 		field.String("user_id").StorageKey("userId").Immutable(),
-		field.Enum("status").StorageKey("status").Values("REQUESTED", "CANCELLED", "COMPLETED").Default("REQUESTED"),
+		field.Enum("status").StorageKey("status").Values("REQUESTED", "PROCESSING", "CANCELLED", "COMPLETED").Default("REQUESTED"),
 		field.Time("requested_at").StorageKey("requestedAt").Default(time.Now).Immutable(),
 		field.Time("execute_after").StorageKey("executeAfter").Immutable(),
 		field.Time("cancelled_at").StorageKey("cancelledAt").Optional().Nillable(),

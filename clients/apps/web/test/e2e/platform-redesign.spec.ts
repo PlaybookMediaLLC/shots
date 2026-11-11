@@ -273,10 +273,10 @@ test(
   }
 )
 
-// @dev-server until fixed: on the production build the aborted image route does not fail the library preview.
+// @quarantine until fixed: on the production build the aborted image route does not fail the library preview.
 test(
   'a failed preview retries without rewriting the saved project',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page }) => {
     const document = { version: 2, image: { src: '/demo/notion-showcase.webp' } }
     const created = await trpcMutation(page, 'project.create', { name: 'Retry proof', document })

@@ -190,6 +190,10 @@ services:
       PLATFORM_CAPTURE_STATE_KEY_PREVIOUS: ${PLATFORM_CAPTURE_STATE_KEY_PREVIOUS:-}
       PLATFORM_CAPTURE_STATE_MAX_AGE: ${PLATFORM_CAPTURE_STATE_MAX_AGE:-}
       PLATFORM_ACTIVITY_LEGACY_PAUSED: ${PLATFORM_ACTIVITY_LEGACY_PAUSED:-true}
+      # How long a signed asset download URL lives. The browser suite shortens
+      # it so the expiry test does not sleep out the two-minute default; the
+      # backend caps it at that default either way.
+      PLATFORM_ASSET_DOWNLOAD_TTL: ${PLATFORM_ASSET_DOWNLOAD_TTL:-}
       SLACK_CLIENT_ID: ${SLACK_CLIENT_ID:-}
       SLACK_CLIENT_SECRET: ${SLACK_CLIENT_SECRET:-}
       PLATFORM_SLACK_CALLBACK_URL: ${PLATFORM_SLACK_CALLBACK_URL:-}

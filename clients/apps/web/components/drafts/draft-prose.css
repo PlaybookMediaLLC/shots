@@ -74,7 +74,8 @@
  */
 .draft-prose input[role='combobox']:focus-visible,
 /* The writing surface itself shows the caret, not a focus box around the post. */
-.draft-prose[contenteditable='true']:focus-visible {
+.draft-prose[contenteditable='true']:focus-visible,
+.draft-prose[data-slot='post-text']:focus-visible {
   outline: none;
 }
 

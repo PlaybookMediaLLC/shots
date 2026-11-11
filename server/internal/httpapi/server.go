@@ -19,6 +19,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/authstore"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/founderhub"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -163,6 +164,31 @@ type ConfigurationStore interface {
 	Authorize(context.Context, product.Actor) error
 	AuthorizeRead(context.Context, product.Actor) error
 	AuthorizeSession(context.Context, product.Actor) error
+	GetFounderHubSession(context.Context, product.Actor) (*product.FounderHubSession, error)
+	AuthorizeFounderHubSession(context.Context, product.Actor) (*product.FounderHubAuthorization, error)
+	GetFounderHubSettingsAccount(context.Context, product.Actor) (*product.FounderHubSettingsAccount, error)
+	ListFounderHubSettings(context.Context, product.Actor) ([]product.FounderHubSettings, error)
+	ListFounderHubTemplates(context.Context, product.Actor, string, bool, string) (*product.FounderHubTemplatePage, error)
+	FounderHubResourceAction(context.Context, product.Actor, product.FounderHubResourceAction) (json.RawMessage, error)
+	ListFounderHubCRMConnections(context.Context, product.Actor) ([]product.FounderHubCRMConnection, error)
+	FounderHubCRMConfigured() bool
+	RegisterFounderHubCRMConnection(context.Context, product.Actor, product.FounderHubCRMRegisterInput) error
+	CreateFounderHubCRMConnectSession(context.Context, product.Actor, product.FounderHubCRMConnectInput) (*product.FounderHubCRMConnectSession, error)
+	DeleteFounderHubCRMConnection(context.Context, product.Actor, string, string) error
+	FounderHubShareWorkspaces(context.Context, product.Actor) ([]product.FounderHubShareWorkspace, error)
+	UpdateFounderHubTemplate(context.Context, product.Actor, string, product.FounderHubTemplateUpdate) (*product.FounderHubTemplate, error)
+	UpdateFounderHubSettings(context.Context, product.Actor, product.FounderHubSettingsUpdate) (*product.FounderHubSettings, error)
+	ListFounderHubDevices(context.Context, product.Actor) ([]product.FounderHubDevice, error)
+	ReportFounderHubDevice(context.Context, product.Actor, product.FounderHubDeviceReportInput) ([]product.FounderHubDeviceCommand, error)
+	CreateFounderHubDeviceCommand(context.Context, product.Actor, founderhub.DeviceCommandInput) (*product.FounderHubDeviceCommand, error)
+	GetFounderHubDeviceCommand(context.Context, product.Actor, string) (*product.FounderHubDeviceCommand, error)
+	FinishFounderHubDeviceCommand(context.Context, product.Actor, string, product.FounderHubDeviceCommandResult) (*product.FounderHubDeviceCommand, error)
+	GetFounderHubKeySession(context.Context, product.Actor) (*product.FounderHubSession, error)
+	GetFounderHubConnectorSession(context.Context, product.Actor, string) (*product.FounderHubSession, error)
+	GetFounderHubProfile(context.Context, string) (*product.FounderHubProfile, error)
+	FounderHubReferralSummary(context.Context, product.Actor) (json.RawMessage, error)
+	ClaimFounderHubReferral(context.Context, product.Actor, string) (*product.FounderHubReferralClaim, error)
+	RevokeFounderHubSession(context.Context, product.Actor) error
 	AuthorizeSensitive(context.Context, product.Actor) error
 	ListBrandKits(context.Context, string) ([]*ent.BrandKit, error)
 	CreateBrandKit(context.Context, product.Actor, product.CreateBrandKitInput) (*ent.BrandKit, error)

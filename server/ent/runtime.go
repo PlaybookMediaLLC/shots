@@ -80,6 +80,12 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativeset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformcreativesetversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformdraftimport"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevice"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubdevicecommand"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubrevision"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubsettings"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubtemplate"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformfounderhubuser"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationdelivery"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationinbox"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpolicy"
@@ -1288,6 +1294,88 @@ func init() {
 	platformdraftimportDescCreatedAt := platformdraftimportFields[4].Descriptor()
 	// platformdraftimport.DefaultCreatedAt holds the default value on creation for the created_at field.
 	platformdraftimport.DefaultCreatedAt = platformdraftimportDescCreatedAt.Default.(func() time.Time)
+	platformfounderhubdeviceFields := schema.PlatformFounderHubDevice{}.Fields()
+	_ = platformfounderhubdeviceFields
+	// platformfounderhubdeviceDescReportedAt is the schema descriptor for reported_at field.
+	platformfounderhubdeviceDescReportedAt := platformfounderhubdeviceFields[5].Descriptor()
+	// platformfounderhubdevice.DefaultReportedAt holds the default value on creation for the reported_at field.
+	platformfounderhubdevice.DefaultReportedAt = platformfounderhubdeviceDescReportedAt.Default.(func() time.Time)
+	platformfounderhubdevicecommandFields := schema.PlatformFounderHubDeviceCommand{}.Fields()
+	_ = platformfounderhubdevicecommandFields
+	// platformfounderhubdevicecommandDescStatus is the schema descriptor for status field.
+	platformfounderhubdevicecommandDescStatus := platformfounderhubdevicecommandFields[5].Descriptor()
+	// platformfounderhubdevicecommand.DefaultStatus holds the default value on creation for the status field.
+	platformfounderhubdevicecommand.DefaultStatus = platformfounderhubdevicecommandDescStatus.Default.(string)
+	// platformfounderhubdevicecommandDescError is the schema descriptor for error field.
+	platformfounderhubdevicecommandDescError := platformfounderhubdevicecommandFields[6].Descriptor()
+	// platformfounderhubdevicecommand.DefaultError holds the default value on creation for the error field.
+	platformfounderhubdevicecommand.DefaultError = platformfounderhubdevicecommandDescError.Default.(string)
+	// platformfounderhubdevicecommandDescResult is the schema descriptor for result field.
+	platformfounderhubdevicecommandDescResult := platformfounderhubdevicecommandFields[7].Descriptor()
+	// platformfounderhubdevicecommand.DefaultResult holds the default value on creation for the result field.
+	platformfounderhubdevicecommand.DefaultResult = platformfounderhubdevicecommandDescResult.Default.(string)
+	// platformfounderhubdevicecommandDescCreatedAt is the schema descriptor for created_at field.
+	platformfounderhubdevicecommandDescCreatedAt := platformfounderhubdevicecommandFields[8].Descriptor()
+	// platformfounderhubdevicecommand.DefaultCreatedAt holds the default value on creation for the created_at field.
+	platformfounderhubdevicecommand.DefaultCreatedAt = platformfounderhubdevicecommandDescCreatedAt.Default.(func() time.Time)
+	platformfounderhubrevisionFields := schema.PlatformFounderHubRevision{}.Fields()
+	_ = platformfounderhubrevisionFields
+	// platformfounderhubrevisionDescRevision is the schema descriptor for revision field.
+	platformfounderhubrevisionDescRevision := platformfounderhubrevisionFields[1].Descriptor()
+	// platformfounderhubrevision.DefaultRevision holds the default value on creation for the revision field.
+	platformfounderhubrevision.DefaultRevision = platformfounderhubrevisionDescRevision.Default.(int64)
+	platformfounderhubsettingsFields := schema.PlatformFounderHubSettings{}.Fields()
+	_ = platformfounderhubsettingsFields
+	// platformfounderhubsettingsDescDeviceID is the schema descriptor for device_id field.
+	platformfounderhubsettingsDescDeviceID := platformfounderhubsettingsFields[2].Descriptor()
+	// platformfounderhubsettings.DefaultDeviceID holds the default value on creation for the device_id field.
+	platformfounderhubsettings.DefaultDeviceID = platformfounderhubsettingsDescDeviceID.Default.(string)
+	// platformfounderhubsettingsDescDeviceName is the schema descriptor for device_name field.
+	platformfounderhubsettingsDescDeviceName := platformfounderhubsettingsFields[3].Descriptor()
+	// platformfounderhubsettings.DefaultDeviceName holds the default value on creation for the device_name field.
+	platformfounderhubsettings.DefaultDeviceName = platformfounderhubsettingsDescDeviceName.Default.(string)
+	// platformfounderhubsettingsDescValues is the schema descriptor for values field.
+	platformfounderhubsettingsDescValues := platformfounderhubsettingsFields[4].Descriptor()
+	// platformfounderhubsettings.DefaultValues holds the default value on creation for the values field.
+	platformfounderhubsettings.DefaultValues = platformfounderhubsettingsDescValues.Default.(map[string]interface{})
+	// platformfounderhubsettingsDescVersion is the schema descriptor for version field.
+	platformfounderhubsettingsDescVersion := platformfounderhubsettingsFields[5].Descriptor()
+	// platformfounderhubsettings.DefaultVersion holds the default value on creation for the version field.
+	platformfounderhubsettings.DefaultVersion = platformfounderhubsettingsDescVersion.Default.(int)
+	// platformfounderhubsettingsDescUpdatedAt is the schema descriptor for updated_at field.
+	platformfounderhubsettingsDescUpdatedAt := platformfounderhubsettingsFields[6].Descriptor()
+	// platformfounderhubsettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	platformfounderhubsettings.DefaultUpdatedAt = platformfounderhubsettingsDescUpdatedAt.Default.(func() time.Time)
+	// platformfounderhubsettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	platformfounderhubsettings.UpdateDefaultUpdatedAt = platformfounderhubsettingsDescUpdatedAt.UpdateDefault.(func() time.Time)
+	platformfounderhubtemplateFields := schema.PlatformFounderHubTemplate{}.Fields()
+	_ = platformfounderhubtemplateFields
+	// platformfounderhubtemplateDescPinned is the schema descriptor for pinned field.
+	platformfounderhubtemplateDescPinned := platformfounderhubtemplateFields[4].Descriptor()
+	// platformfounderhubtemplate.DefaultPinned holds the default value on creation for the pinned field.
+	platformfounderhubtemplate.DefaultPinned = platformfounderhubtemplateDescPinned.Default.(bool)
+	// platformfounderhubtemplateDescSeeded is the schema descriptor for seeded field.
+	platformfounderhubtemplateDescSeeded := platformfounderhubtemplateFields[5].Descriptor()
+	// platformfounderhubtemplate.DefaultSeeded holds the default value on creation for the seeded field.
+	platformfounderhubtemplate.DefaultSeeded = platformfounderhubtemplateDescSeeded.Default.(bool)
+	// platformfounderhubtemplateDescVersion is the schema descriptor for version field.
+	platformfounderhubtemplateDescVersion := platformfounderhubtemplateFields[7].Descriptor()
+	// platformfounderhubtemplate.DefaultVersion holds the default value on creation for the version field.
+	platformfounderhubtemplate.DefaultVersion = platformfounderhubtemplateDescVersion.Default.(int)
+	// platformfounderhubtemplateDescCreatedAt is the schema descriptor for created_at field.
+	platformfounderhubtemplateDescCreatedAt := platformfounderhubtemplateFields[8].Descriptor()
+	// platformfounderhubtemplate.DefaultCreatedAt holds the default value on creation for the created_at field.
+	platformfounderhubtemplate.DefaultCreatedAt = platformfounderhubtemplateDescCreatedAt.Default.(func() time.Time)
+	// platformfounderhubtemplateDescUpdatedAt is the schema descriptor for updated_at field.
+	platformfounderhubtemplateDescUpdatedAt := platformfounderhubtemplateFields[9].Descriptor()
+	// platformfounderhubtemplate.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	platformfounderhubtemplate.DefaultUpdatedAt = platformfounderhubtemplateDescUpdatedAt.Default.(func() time.Time)
+	platformfounderhubuserFields := schema.PlatformFounderHubUser{}.Fields()
+	_ = platformfounderhubuserFields
+	// platformfounderhubuserDescTemplatesInitialized is the schema descriptor for templates_initialized field.
+	platformfounderhubuserDescTemplatesInitialized := platformfounderhubuserFields[2].Descriptor()
+	// platformfounderhubuser.DefaultTemplatesInitialized holds the default value on creation for the templates_initialized field.
+	platformfounderhubuser.DefaultTemplatesInitialized = platformfounderhubuserDescTemplatesInitialized.Default.(bool)
 	platformnotificationdeliveryFields := schema.PlatformNotificationDelivery{}.Fields()
 	_ = platformnotificationdeliveryFields
 	// platformnotificationdeliveryDescStatus is the schema descriptor for status field.

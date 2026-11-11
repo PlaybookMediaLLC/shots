@@ -1,0 +1,40 @@
+name: Load a prebuilt CI image
+description: >
+  Waits for this run's image artifact, downloads it and loads it into Docker.
+  Every image is built exactly once per run, in its own job, with a layer
+  cache; a job that needs one loads it instead of building it again. The
+  artifact is scoped to this run and this exact commit, so no revision can
+  substitute for another. dev/ci-image.cjs pairs each image with its producer
+  job, and clients/apps/web/test/ci-image.test.ts covers the waiting rules.
+
+inputs:
+  image:
+    description: web, backend, backend-e2e or collab.
+    required: true
+  github-token:
+    description: A token with actions:read, to find the producer job and its artifact.
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for the ${{ inputs.image }} image
+      id: artifact
+      uses: actions/github-script@v7
+      env:
+        CI_IMAGE: ${{ inputs.image }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { waitForImage } = require('./dev/ci-image.cjs');
+          await waitForImage({ github, context, core, image: process.env.CI_IMAGE });
+    - uses: actions/download-artifact@v4
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: ${{ runner.temp }}/ci-image-${{ inputs.image }}
+    - name: Load the ${{ inputs.image }} image
+      shell: bash
+      env:
+        IMAGE_DIR: ${{ runner.temp }}/ci-image-${{ inputs.image }}
+      run: docker load --input "$IMAGE_DIR/image.tar.gz"

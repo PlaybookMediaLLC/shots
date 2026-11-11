@@ -501,6 +501,24 @@ func (c *Configuration) loadDraft(ctx context.Context, actor Actor, id string) (
 	return visibleContentDraft(ctx, c.client, actor, id)
 }
 
+// primaryAmong keeps preferred as a new draft's main platform when it is one
+// of the platforms the draft publishes to, and otherwise takes X, then the
+// first of them. With nothing chosen, preferred stands.
+func primaryAmong(preferred string, platforms []string) string {
+	if len(platforms) == 0 || slices.Contains(platforms, preferred) {
+		return preferred
+	}
+	if slices.Contains(platforms, "x") {
+		return "x"
+	}
+	for _, platform := range platforms {
+		if platform != "" {
+			return platform
+		}
+	}
+	return preferred
+}
+
 // draftPrimary is the platform a draft's body is written for: its own, or X
 // for a draft whose set had no default platform.
 func draftPrimary(row *ent.ContentDraft) string {
@@ -636,12 +654,35 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	if err != nil {
 		return nil, err
 	}
+	var chosen []string
+	if input.ChannelConnectionIDs != nil {
+		if chosen, err = contentDraftChannels(ctx, tx, actor.OrganizationID, &set.ID, input.ChannelConnectionIDs); err != nil {
+			return nil, err
+		}
+	}
 	primary := input.PrimaryPlatform
 	if primary == "" {
 		primary = "x"
 		// A set names a platform; the body is written for its channel.
 		if defaultPrimary != nil && draftPlatformChannels[*defaultPrimary] != "" {
 			primary = draftPlatformChannels[*defaultPrimary]
+		}
+		// Accounts chosen for this draft outrank the set's default: the body is
+		// written for one of the platforms it publishes to, never a switched-off one.
+		if len(chosen) > 0 {
+			connections, err := tx.ChannelConnection.Query().Where(channelconnection.IDIn(chosen...), channelconnection.OrganizationID(actor.OrganizationID)).All(ctx)
+			if err != nil {
+				return nil, err
+			}
+			platforms := make([]string, 0, len(chosen))
+			for _, id := range chosen {
+				for _, connection := range connections {
+					if connection.ID == id {
+						platforms = append(platforms, draftPlatformChannels[socialplatform.Canonical(connection.Platform)])
+					}
+				}
+			}
+			primary = primaryAmong(primary, platforms)
 		}
 		if kind == "reply" || kind == "article" {
 			primary = "x"
@@ -680,9 +721,7 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 	})
 	channels := defaults
 	if input.ChannelConnectionIDs != nil {
-		if channels, err = contentDraftChannels(ctx, tx, actor.OrganizationID, &set.ID, input.ChannelConnectionIDs); err != nil {
-			return nil, err
-		}
+		channels = chosen
 	} else if kind == "article" || kind == "reply" || kind == "quote" {
 		// These kinds publish only on their primary platform.
 		channels = slices.DeleteFunc(slices.Clone(channels), func(id string) bool {

@@ -13,13 +13,17 @@ node_modules/
 # testing
 /clients/apps/web/coverage
 /clients/apps/web/playwright-report/
+/clients/apps/web/blob-report/
 /clients/apps/web/test-results/
+/clients/.eslintcache
 /clients/apps/web/.context/
 /clients/apps/web/.local/
 /.context/
 
 # next.js
 /clients/apps/web/.next/
+/clients/apps/web/.next-founder-hub-*/
+/clients/apps/web/tsconfig.local-*.json
 /clients/apps/web/out/
 
 # production
@@ -50,6 +54,7 @@ next-env.d.ts
 /clients/apps/web/scripts/*
 !/clients/apps/web/scripts/e2e-screenshot-mock.mjs
 !/clients/apps/web/scripts/e2e-durations.mjs
+!/clients/apps/web/scripts/e2e-shard-manifest.mjs
 !/clients/apps/web/scripts/e2e-release-automation-mock.mjs
 !/clients/apps/web/scripts/smoke-rate-limit.mjs
 !/clients/apps/web/scripts/verify-tenant-isolation.ts

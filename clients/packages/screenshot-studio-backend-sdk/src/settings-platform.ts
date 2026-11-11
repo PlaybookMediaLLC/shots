@@ -60,7 +60,7 @@ export type ExperimentState = {
 
 /** Something that must be resolved before an account can be deleted. */
 export type AccountDeletionBlocker = {
-  code: 'owns_workspace'
+  code: 'owns_workspace' | 'shared_attachments'
   message: string
   workspaceId: string
   workspaceName: string
@@ -73,7 +73,7 @@ export type AccountDeletionStatus = {
     executeAfter: string
     id: string
     requestedAt: string
-    status: 'REQUESTED' | 'CANCELLED' | 'COMPLETED'
+    status: 'REQUESTED' | 'PROCESSING' | 'CANCELLED' | 'COMPLETED'
   } | null
 }
 

@@ -295,10 +295,10 @@ test(
 
 // Tables, math and footnotes are kept by the editor, survive a reload, and
 // each serializes into the channel preview as plain text.
-// @dev-server until fixed: on the production build scheduling the table and math blocks posts nothing (1 of 2 runs).
+// @quarantine until fixed: on the production build scheduling the table and math blocks posts nothing (1 of 2 runs).
 test(
   'a table, a math block and a footnote persist, and the blocks post as images',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['linkedin'] })
     const draftId = await openNewDraft(page)

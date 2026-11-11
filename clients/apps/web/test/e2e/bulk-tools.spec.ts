@@ -5,6 +5,8 @@ import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
+  db,
+  draftEditor,
   expect,
   openNewBatch,
   type Page,
@@ -161,7 +163,7 @@ test(
     expect(moved.status).toBe(200)
     await app.reload()
     await expect(page.getByTestId('batch-summary')).toContainText('on 1 calendar day')
-    await expect(page.getByTestId('batch-summary')).toContainText('2 posts to 4 destinations')
+    await expect(page.getByTestId('batch-summary')).toContainText('2 posts to 2 accounts, 4 in all')
 
     // One refused row refuses the whole bulk change.
     const refused = await apiRequest(page, `/api/v1/content-batches/${id}/items`, {
@@ -188,9 +190,166 @@ test(
 )
 
 test(
+  'written posts open on a text-first page: paste, review the split, undo, plan and edit in place',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    const workspace = await startWorkspace({ channels: ['x', 'linkedin'] })
+    await app.open('/publish/batches')
+    // Text posts needs nothing set up first: choosing it opens the batch.
+    await page
+      .getByTestId('bulk-tools')
+      .getByRole('radio', { name: /^Text posts/ })
+      .click()
+    await page.waitForURL(/\/publish\/batches\/[^/?]+/)
+    const paste = page.getByRole('textbox', { name: 'Batch text posts' })
+    await expect(paste).toBeFocused()
+
+    // Paragraphs alone stay one post until the writer chooses otherwise.
+    await paste.fill('One idea.\n\nIts second paragraph.')
+    const reading = page.getByRole('group', { name: 'Read the paste as' })
+    await expect(reading.getByRole('button', { pressed: true })).toHaveText('One post')
+    await expect(page.getByRole('button', { name: 'Add 1 post', exact: true })).toBeVisible()
+
+    // Explicit separators make separate posts, each listed with its length first.
+    const ten = Array.from({ length: 10 }, (_, i) => `Post ${i + 1}.\n\nWith a paragraph.`).join(
+      '\n---\n'
+    )
+    await paste.fill(ten)
+    await expect(reading.getByRole('button', { pressed: true })).toHaveText('Separate posts')
+    await expect(
+      page.getByRole('list', { name: 'What the paste makes' }).getByRole('listitem')
+    ).toHaveCount(10)
+    await page.getByRole('button', { name: 'Add 10 posts', exact: true }).click()
+    const items = page.getByTestId('batch-item')
+    await expect(items).toHaveCount(10)
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 1', exact: true })
+    ).toBeFocused()
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 4', exact: true })
+    ).toHaveValue('Post 4.\n\nWith a paragraph.')
+
+    // Undo puts the paste back as it was; adding it again makes the same ten posts once.
+    await page.getByRole('button', { name: 'Undo import', exact: true }).click()
+    await expect(items).toHaveCount(0)
+    await expect(paste).toHaveValue(ten)
+    await page.getByRole('button', { name: 'Add 10 posts', exact: true }).click()
+    await expect(items).toHaveCount(10)
+    const batchId = new URL(page.url()).pathname.split('/').pop()!
+    const batch = (await apiRequest(page, `/api/v1/content-batches/${batchId}`)).body as {
+      items: { caption: string }[]
+    }
+    expect(batch.items).toHaveLength(10)
+
+    // Hourly from 09:00 to 11:00: three a day, the rest from 09:00 the next day.
+    await chooseOption(page.getByRole('combobox', { name: 'Batch time mode' }), 'Every hour')
+    const until = page.getByRole('textbox', { name: 'Hourly end of day' })
+    await until.fill('11:00')
+    await until.press('Enter')
+    await expect(page.getByTestId('hourly-explainer')).toContainText('up to 3 a day')
+    await page.getByRole('button', { name: 'Plan times', exact: true }).click()
+    await expect(items.getByRole('link', { name: /^Open draft/ })).toHaveCount(10, {
+      timeout: 60_000,
+    })
+    await expect(page.getByTestId('batch-item-time-1')).toContainText('Planned for')
+    await expect(page.getByTestId('batch-item-time-1')).toContainText('9:00 AM')
+    await expect(page.getByTestId('batch-item-time-3')).toContainText('11:00 AM')
+    await expect(page.getByTestId('batch-item-time-4')).toContainText('9:00 AM')
+    const planned = (
+      (await apiRequest(page, `/api/v1/content-batches/${batchId}`)).body as {
+        items: { timing: { localTime?: string } }[]
+      }
+    ).items.map((item) => item.timing.localTime ?? '')
+    // The fourth post starts the next day: the window held three.
+    expect(planned[3]!.slice(11)).toBe('09:00')
+    expect(Date.parse(planned[3]!.slice(0, 10)) - Date.parse(planned[0]!.slice(0, 10))).toBe(
+      86_400_000
+    )
+    await expect(page.getByTestId('batch-summary')).toContainText(
+      '10 posts to 2 accounts, 20 in all'
+    )
+    await expect(page.getByTestId('batch-readiness')).toContainText('10 drafts saved')
+
+    // A proposal is not a schedule: nothing is queued until Schedule is chosen.
+    const queued = () =>
+      db.rows(
+        `SELECT p.id FROM scheduled_post p JOIN content_draft d ON d.id = p."contentDraftId" WHERE d."organizationId" = $1`,
+        [workspace.id]
+      )
+    expect(await queued()).toHaveLength(0)
+
+    // A saved post is edited in place, on its own draft, which reopens with the change.
+    const second = page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
+    await second.fill('Post 2, edited in the batch.')
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        /\/api\/v1\/content-drafts\//.test(response.url()) &&
+        response.ok()
+    )
+    await second.blur()
+    await saved
+    const href = await items
+      .nth(1)
+      .getByRole('link', { name: /^Open draft/ })
+      .getAttribute('href')
+    const draft = (await apiRequest(page, `/api/v1/content-drafts/${href!.split('/').pop()}`))
+      .body as { plainText: string }
+    expect(draft.plainText).toBe('Post 2, edited in the batch.')
+    await app.reload()
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
+    ).toHaveValue('Post 2, edited in the batch.')
+
+    // An edit made elsewhere is never overwritten: the row says so and keeps the words.
+    const thirdHref = await items
+      .nth(2)
+      .getByRole('link', { name: /^Open draft/ })
+      .getAttribute('href')
+    const thirdId = thirdHref!.split('/').pop()!
+    const third = (await apiRequest(page, `/api/v1/content-drafts/${thirdId}`)).body as {
+      version: number
+    }
+    const elsewhere = await apiRequest(page, `/api/v1/content-drafts/${thirdId}`, {
+      body: {
+        baseVersion: third.version,
+        body: [
+          { children: [{ text: '' }], id: 'p_elsewhere', type: 'post_break' },
+          { children: [{ text: 'Changed in another tab.' }], type: 'p' },
+        ],
+        plainText: 'Changed in another tab.',
+      },
+      method: 'PATCH',
+    })
+    expect(elsewhere.status, JSON.stringify(elsewhere.body)).toBe(200)
+    const thirdBox = page.getByRole('textbox', { name: 'Caption for item 3', exact: true })
+    await thirdBox.fill('Post 3, edited from a stale page.')
+    await thirdBox.blur()
+    await expect(items.nth(2).getByRole('alert')).toContainText('changed somewhere else')
+    await expect(thirdBox).toHaveValue('Post 3, edited from a stale page.')
+    expect(
+      ((await apiRequest(page, `/api/v1/content-drafts/${thirdId}`)).body as { plainText: string })
+        .plainText
+    ).toBe('Changed in another tab.')
+
+    expect(await queued()).toHaveLength(0)
+    expect(
+      await db.rows(`SELECT id FROM content_draft WHERE "organizationId" = $1`, [workspace.id])
+    ).toHaveLength(10)
+
+    // The edited draft opens in the editor as one post with the new words.
+    await app.open(href!)
+    await expect(draftEditor(page)).toContainText('Post 2, edited in the batch.', {
+      timeout: 60_000,
+    })
+    await expect(page.getByTestId('post-header')).toHaveCount(1)
+  }
+)
+
+test(
   'grid videos go from captions to an MP4 that schedules like any post',
-  // The scripted image model only runs under next dev.
-  { tag: ['@dev-server', '@journey'] },
+  // The scripted image model answers here (PLATFORM_AI_SCRIPTED, lib/e2e-hooks.ts).
+  { tag: '@journey' },
   async ({ app, page, startWorkspace }) => {
     test.setTimeout(600_000)
     await startWorkspace({ channels: ['x', 'linkedin'] })
@@ -231,7 +390,7 @@ test(
     // Unrendered concepts cannot become drafts.
     await expect(
       page.getByRole('button', { name: 'Save ready items as drafts', exact: true })
-    ).toBeDisabled()
+    ).toHaveCount(0)
 
     // One video gets a new caption; another is redrawn, keeping its music and place.
     await page.getByRole('button', { name: 'New caption for video 1', exact: true }).click()

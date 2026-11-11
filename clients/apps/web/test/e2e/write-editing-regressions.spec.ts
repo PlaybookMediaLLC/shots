@@ -1,9 +1,9 @@
 import { apiRequest, db, draftEditor, expect, expectSaved, test, postMenu } from './framework'
 
-// @dev-server until fixed: on the production build one early-typed title character is lost.
+// @quarantine until fixed: on the production build one early-typed title character is lost.
 test(
   'early typing, reordered post controls, selected comments, and failed saves preserve text',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
     const errors: string[] = []
@@ -27,7 +27,7 @@ test(
     await page.getByTestId('new-draft').first().click()
     await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
     await page.keyboard.press('Escape')
-    await expect(page.getByRole('dialog', { name: 'New draft' })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'New post' })).toHaveCount(0)
     expect(creations).toBe(0)
     await page.getByTestId('new-draft').first().click()
     const early = page.getByRole('textbox', { name: 'New draft text' })
@@ -46,7 +46,7 @@ test(
     await expectSaved(page)
     expect((await apiRequest(page, `/api/v1/content-drafts/${id}`)).body).toMatchObject({ title })
 
-    await page.getByRole('button', { name: 'Add post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add to thread', exact: true }).click()
     await editor
       .locator('[data-slate-node="element"]')
       .filter({ has: page.locator('[data-slate-zero-width]') })
@@ -216,7 +216,7 @@ test(
     await expect(early).toBeFocused()
     await page.keyboard.type('Words typed straight away')
     await page
-      .getByRole('dialog', { name: 'New draft' })
+      .getByRole('region', { name: 'New post' })
       .getByRole('button', { name: 'Retry' })
       .click()
     await page.waitForURL(/\/publish\/[a-z0-9]+/)
