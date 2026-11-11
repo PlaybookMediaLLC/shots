@@ -82,7 +82,12 @@ function runE2EWith(args: string[], env: Record<string, string> = {}): Run {
     {
       cwd: directory,
       encoding: 'utf8',
-      env: { ...process.env, LOCAL_DIR: directory, ...env },
+      env: {
+        ...process.env,
+        LOCAL_DIR: directory,
+        ...env,
+        E2E_MANAGE_SCREENSHOT_MOCK: 'true',
+      },
       timeout: 10_000,
     }
   )
