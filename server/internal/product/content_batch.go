@@ -596,7 +596,7 @@ func (c *Configuration) UpdateContentBatchItem(ctx context.Context, actor Actor,
 func applyBatchItemUpdate(ctx context.Context, tx *ent.Tx, actor Actor, set *ent.SocialSet, item *ent.ContentBatchItem, input ContentBatchItemUpdate) error {
 	update := tx.ContentBatchItem.UpdateOneID(item.ID)
 	if item.DraftID != nil && (input.Caption != nil || input.Media != nil || input.ChannelConnectionIDs != nil || input.Grid != nil) {
-		return conflict("This item is a draft now. Edit its content in Write.")
+		return conflict("This item is a draft now. Edit its content in its draft.")
 	}
 	if input.Grid != nil {
 		if item.Grid == nil {

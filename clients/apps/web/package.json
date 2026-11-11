@@ -8,7 +8,7 @@
     "start": "next start",
     "typecheck": "rm -rf .next/types && next typegen && tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "test:founder-hub-auth": "NODE_OPTIONS='--conditions=react-server' tsx --test test/founder-hub-oauth.paired.ts",
+    "test:founder-hub-auth": "NODE_OPTIONS='--conditions=react-server' tsx --test test/founder-hub-oauth.backend.ts",
     "test:publishing-backend-client": "NODE_OPTIONS='--conditions=react-server' tsx --test test/publishing-backend-client.server.ts",
     "test:workspace-creation-server": "NODE_OPTIONS='--conditions=react-server' tsx --test test/workspace-creation.server.ts",
     "test:screenshot-capture": "NODE_OPTIONS='--conditions=react-server' tsx --test test/screenshot-capture.server.ts",

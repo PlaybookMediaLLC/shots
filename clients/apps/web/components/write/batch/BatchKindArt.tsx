@@ -40,7 +40,7 @@ function Post({ x, y, time, w = 118 }: { x: number; y: number; time: string; w?:
   )
 }
 
-/** Pasted copy split at blank lines into one post each. */
+/** Pasted copy split at its lines of dashes into one post each. */
 function TextScene() {
   const paragraphs = [
     { y: 29, widths: [96, 88, 54] },
@@ -55,6 +55,18 @@ function TextScene() {
           <Bar key={`${y}-${line}`} width={width} x={32} y={y + line * 7} />
         ))
       )}
+      {[59.5, 103.5].map((y) => (
+        <line
+          className="stroke-foreground/30"
+          key={y}
+          strokeDasharray="3 2.5"
+          vectorEffect="non-scaling-stroke"
+          x1={32}
+          x2={130}
+          y1={y}
+          y2={y}
+        />
+      ))}
       <rect className="fill-current" height={8} width={1.25} x={73} y={129.5} />
       {paragraphs.map(({ y }, index) => (
         <g key={y}>

@@ -35,7 +35,7 @@ export default async function BatchesPage({
     >
       <Page
         title="Bulk tools"
-        description="Prepare up to 100 separate posts at once from videos, folders of images or a CSV. Each becomes its own draft, so review and scheduling work as they do for one draft. A batch saves as you go."
+        description="Prepare up to 100 separate posts at once from written text, videos, folders of images or a CSV. Each becomes its own draft, so review and scheduling work as they do for one draft. A batch saves as you go."
       >
         {canEdit ? (
           <Section
@@ -105,7 +105,7 @@ export default async function BatchesPage({
             <EmptyState
               icon={LibraryIcon}
               title="No open batches"
-              description="A batch turns up to 100 videos, folders of images or CSV rows into separate drafts you can review and schedule together."
+              description="A batch turns up to 100 written posts, videos, folders of images or CSV rows into separate drafts you can review and schedule together."
             />
           )}
         </Section>

@@ -288,7 +288,7 @@ test(
     // through ClipboardItem would deliberately discard that media metadata.
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.keyboard.press('ControlOrMeta+c')
-    await page.getByRole('button', { name: 'Add post', exact: true }).click()
+    await page.getByRole('button', { name: 'Add to thread', exact: true }).click()
     await page.keyboard.type('Second post receives the copied attachment.')
     await page.keyboard.press('ControlOrMeta+v')
     await expect(editor.locator('figure')).toHaveCount(2)

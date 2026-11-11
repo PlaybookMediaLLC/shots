@@ -94,7 +94,7 @@ test(
       await expect(button).toHaveAttribute('aria-label', /.+/)
     }
     await tools.first().hover()
-    await expect(page.getByRole('tooltip')).toContainText('Add post')
+    await expect(page.getByRole('tooltip')).toContainText('Add to thread')
 
     await editor.click()
     await page.keyboard.type('Icons only ')

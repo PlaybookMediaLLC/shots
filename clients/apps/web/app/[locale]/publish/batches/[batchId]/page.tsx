@@ -32,7 +32,10 @@ export default async function BatchPage({
   const accounts = (set?.accounts ?? []).map((account) => ({
     captionLimit: captionLimit(account.channel, { maxWeightedCharacters: account.xCaptionLimit }),
     tiktokCreator: account.tiktokCreator,
+    avatarUrl: account.avatarUrl,
     channel: account.channel,
+    displayName: account.displayName,
+    handle: account.handle,
     id: account.id,
     name: account.handle
       ? `${account.handle} (${account.channel})`
@@ -46,6 +49,11 @@ export default async function BatchPage({
       <BatchWorkspace
         accounts={accounts}
         canPublish={accessAllows(access, 'publish:manage')}
+        defaults={
+          set
+            ? { defaultPlatforms: set.defaultPlatforms, primaryPlatform: set.primaryPlatform }
+            : undefined
+        }
         initial={contentBatchSchema.parse(batch)}
         start={
           query.start === 'videos' ||

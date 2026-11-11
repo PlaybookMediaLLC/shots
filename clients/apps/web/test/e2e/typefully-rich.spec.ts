@@ -18,7 +18,7 @@ test(
     await page.getByRole('menuitem', { name: 'X Article', exact: true }).click()
     await page.waitForURL(/\/publish\/[a-z0-9]+/)
     // Quick compose owns focus until it hands buffered text to the live editor.
-    await expect(page.getByRole('dialog', { name: 'New draft', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'New post', exact: true })).toHaveCount(0)
     await page.getByLabel('Article title', { exact: true }).fill('An article with structure')
     await expect(page.getByLabel('Article title', { exact: true })).toHaveValue(
       'An article with structure'
