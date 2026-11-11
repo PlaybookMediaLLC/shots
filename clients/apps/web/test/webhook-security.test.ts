@@ -28,6 +28,7 @@ const serverOnlyStub = new Module(serverOnlyPath)
 serverOnlyStub.loaded = true
 localRequire.cache[serverOnlyPath] = serverOnlyStub
 const githubModule = import('@/lib/tenant/github')
+const githubRouteModule = import('@/app/api/webhooks/github/route')
 const sourceWebhooksModule = import('@/lib/tenant/webhooks')
 
 /** GitHub's `X-Hub-Signature-256` for a body signed with a secret. */
@@ -542,6 +543,51 @@ test('a derived source secret verifies with the previous platform key while it i
     })
   assert.equal(verifyManaged('operator-secret'), true)
   assert.equal(verifyManaged(deriveSourceWebhookSecret(previous, source.id)), false)
+})
+
+test('a verified repository delivery is forwarded to the backend, which handles transfers', async (t) => {
+  const { POST } = await githubRouteModule
+  t.mock.method(console, 'info', () => undefined)
+  process.env.GITHUB_APP_WEBHOOK_SECRET = 'new-app-secret'
+  process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS = 'old-app-secret'
+  process.env.PUBLISHING_API_URL = 'https://backend.example'
+  process.env.PUBLISHING_SERVICE_TOKEN = 'service-secret'
+  const forwarded: { body: unknown; path: string }[] = []
+  t.mock.method(globalThis, 'fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    forwarded.push({ body: JSON.parse(String(init?.body)), path: new URL(String(input)).pathname })
+    return Response.json({ duplicates: 0, handled: 1 })
+  })
+  const payload = {
+    action: 'transferred',
+    installation: { id: 42 },
+    repository: { id: 123 },
+  }
+  const body = JSON.stringify(payload)
+  const deliver = (secret: string) =>
+    POST(
+      new NextRequest('https://shots.test/api/webhooks/github', {
+        body,
+        headers: {
+          'content-type': 'application/json',
+          'x-github-delivery': 'delivery-7',
+          'x-github-event': 'repository',
+          'x-hub-signature-256': signed(body, secret),
+        },
+        method: 'POST',
+      }),
+      { params: Promise.resolve({}) }
+    )
+  const response = await deliver('old-app-secret')
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { handled: 1 })
+  assert.deepEqual(forwarded, [
+    {
+      body: { body: payload, deliveryId: 'delivery-7', eventName: 'repository' },
+      path: '/v1/internal/github/events',
+    },
+  ])
+  assert.equal((await deliver('another-secret')).status, 401)
+  assert.equal(forwarded.length, 1)
 })
 
 function deploymentStatus(

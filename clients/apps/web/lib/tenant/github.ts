@@ -217,6 +217,8 @@ export const githubAppEventSchema = z.enum([
   'pull_request',
   'push',
   'release',
+  // A transferred repository: the backend archives sources that lose access.
+  'repository',
 ])
 
 const installationSchema = z.object({
