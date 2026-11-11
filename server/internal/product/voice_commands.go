@@ -558,11 +558,11 @@ func (c *Configuration) voiceConfirmation(ctx context.Context, actor Actor, row 
 	if err != nil {
 		return nil, err
 	}
-	result := &VoiceCommandConfirmation{Command: *view, ContentDraftID: row.ContentDraftID, ScheduledPostID: row.ScheduledPostID, Scheduled: scheduled}
-	if row.Outcome != nil {
-		result.Outcome = string(*row.Outcome)
+	if view == nil || row.Outcome == nil {
+		return nil, conflict("This command is no longer waiting for confirmation.")
 	}
-	return result, nil
+	return &VoiceCommandConfirmation{Command: *view, ContentDraftID: row.ContentDraftID, Outcome: string(*row.Outcome),
+		ScheduledPostID: row.ScheduledPostID, Scheduled: scheduled}, nil
 }
 
 // SweepVoiceCommands expires proposals nobody confirmed by their proposed time
