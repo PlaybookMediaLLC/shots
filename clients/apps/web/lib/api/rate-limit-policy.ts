@@ -43,6 +43,13 @@ export const AUTH_RATE_LIMIT: RateLimitPolicy = {
   windowMs: 60_000,
 }
 
+/** OAuth token requests include replay responses that bypass the provider's own limiter. */
+export const OAUTH_TOKEN_RATE_LIMIT: RateLimitPolicy = {
+  maxRequests: 20,
+  name: 'oauth-token',
+  windowMs: 60_000,
+}
+
 /** Member invitations can trigger transactional email, so this is scoped to
  * the actor and workspace rather than a shared client IP. */
 export const WORKSPACE_INVITATION_RATE_LIMIT: RateLimitPolicy = {

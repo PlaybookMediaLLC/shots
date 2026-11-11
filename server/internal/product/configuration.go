@@ -92,8 +92,9 @@ type Configuration struct {
 	// imageHost admits the hosts screenshots may be downloaded from; GitHub's by default.
 	imageHost func(string) bool
 	// web replaces the HTTP client for image downloads and readiness probes in tests.
-	web          *http.Client
-	frontendHTTP *http.Client
+	web             *http.Client
+	frontendHTTP    *http.Client
+	founderHubNango *FounderHubNangoClient
 	// postMetrics reads a live post's engagement from its platform (RFC 013).
 	postMetrics PostMetricsReader
 	analytics   AnalyticsReader

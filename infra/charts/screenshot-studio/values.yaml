@@ -42,6 +42,9 @@ config:
   # Go backend that owns all data. The web has no database; it sends
   # PUBLISHING_SERVICE_TOKEN from existingSecret with every backend call.
   publishingApiUrl: ''
+  # Optional Nango API base for Founder Hub CRM connections.
+  nangoApiBase: ''
+  nangoConnectUrl: ''
   screenshotApiUrl: 'https://api.microlink.io'
   # Content drafts (RFC 013): 'enabled' turns on the Drafts pages and API.
   contentDrafts: ''

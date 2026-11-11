@@ -1,14 +1,17 @@
 import { apiKey } from '@better-auth/api-key'
 import { dash } from '@better-auth/infra'
+import { oauthProvider } from '@better-auth/oauth-provider'
 import { scim } from '@better-auth/scim'
 import { sso } from '@better-auth/sso'
 import { betterAuth } from 'better-auth'
-import { admin, twoFactor } from 'better-auth/plugins'
+import { admin, jwt, twoFactor } from 'better-auth/plugins'
 import { workspaceOrganizationPlugin } from './workspace-organization-plugin'
 import { backendAuthAdapter } from './backend-adapter'
+import { refreshOAuthToken } from './oauth-refresh'
 import {
   getAuthBaseUrl,
   getAuthSecret,
+  getFounderHubMcpUrl,
   getBetterAuthInfrastructure,
   getSocialProviderCredentials,
   getTrustedOrigins,
@@ -22,6 +25,7 @@ import {
 import { assertSignInMethodAvailable, isPasswordAuthEnabled } from './methods'
 import { organizationHooks } from './organization-hooks'
 import { betterAuthOrganizationRoles } from './permissions'
+import { serviceBackend } from '@/lib/backend/sdk'
 import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 const google = getSocialProviderCredentials('GOOGLE')
@@ -30,6 +34,15 @@ const microsoft = getSocialProviderCredentials('MICROSOFT')
 const linkedin = getSocialProviderCredentials('LINKEDIN')
 const twitter = getSocialProviderCredentials('TWITTER')
 const infrastructure = getBetterAuthInfrastructure()
+const founderHubAudience = new URL('/api/founder-hub', getAuthBaseUrl()).toString()
+const founderHubMcp = getFounderHubMcpUrl()
+const connectorScopes = [
+  'openid',
+  'profile',
+  'email',
+  'offline_access',
+  'founder-hub:meetings:read',
+]
 const requireEmailVerification =
   process.env.NODE_ENV === 'production' && process.env.AUTH_REQUIRE_EMAIL_VERIFICATION !== 'false'
 const passwordAuthEnabled = isPasswordAuthEnabled()
@@ -59,9 +72,10 @@ const socialProviders = {
     : {}),
 }
 
-export const auth = betterAuth({
+const provider = betterAuth({
   baseURL: getAuthBaseUrl(),
   database: backendAuthAdapter,
+  disabledPaths: ['/token'],
   emailAndPassword: {
     autoSignIn: process.env.NODE_ENV !== 'production',
     enabled: passwordAuthEnabled,
@@ -77,6 +91,51 @@ export const auth = betterAuth({
       sendVerificationEmail({ actionUrl: url, to: user.email }),
   },
   plugins: [
+    jwt({
+      jwks: { keyPairConfig: { alg: 'ES256' } },
+      jwt: {
+        issuer: new URL('/api/auth', getAuthBaseUrl()).toString(),
+        audience: founderHubMcp ? [founderHubAudience, founderHubMcp] : founderHubAudience,
+      },
+    }),
+    oauthProvider({
+      loginPage: '/sign-in',
+      consentPage: '/founder-hub/consent',
+      allowPublicClientPrelogin: true,
+      signup: { page: '/sign-up' },
+      scopes: [
+        'openid',
+        'profile',
+        'email',
+        'offline_access',
+        'founder-hub',
+        'founder-hub:meetings:read',
+      ],
+      grantTypes: ['authorization_code', 'refresh_token'],
+      validAudiences: founderHubMcp ? [founderHubAudience, founderHubMcp] : [founderHubAudience],
+      accessTokenExpiresIn: 300,
+      codeExpiresIn: 600,
+      allowDynamicClientRegistration: !!founderHubMcp,
+      allowUnauthenticatedClientRegistration: !!founderHubMcp,
+      clientRegistrationDefaultScopes: connectorScopes,
+      clientRegistrationAllowedScopes: connectorScopes,
+      clientPrivileges: async () => false,
+      customAccessTokenClaims: async ({ user }) => {
+        if (!user) throw new Error('Founder Hub requires a user.')
+        const profile = await serviceBackend().getFounderHubProfile(user.id)
+        const paid = profile.workspaces.some(
+          (workspace) =>
+            workspace.features['workspace:paid'] &&
+            !workspace.deniedPermissions.includes('workspace:read')
+        )
+        return {
+          account_user_id: profile.accountUserId,
+          email: profile.user.email,
+          entitlements: paid ? ['hyprnote_pro'] : [],
+          subscription_status: paid ? 'active' : null,
+        }
+      },
+    }),
     admin({ adminRoles: [], defaultRole: 'user' }),
     workspaceOrganizationPlugin({
       disableOrganizationDeletion: true,
@@ -177,3 +236,8 @@ export const auth = betterAuth({
     },
   },
 })
+
+export const auth = {
+  ...provider,
+  handler: (request: Request) => refreshOAuthToken(request, provider.handler),
+}

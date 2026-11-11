@@ -22,6 +22,7 @@ import {
   requireSensitiveActiveOrganizationPermission,
   requireSensitiveOrganizationPermission,
   requireSessionAccess,
+  requireSensitiveSessionAccess,
   type SessionAccess,
   type TenantContext,
 } from '@/lib/auth/access'
@@ -55,6 +56,10 @@ export const maintenanceAccess: Authenticate<null> = async ({ request }) => {
 /** Any signed-in user, with or without an active organization. */
 export const sessionAccess: Authenticate<SessionAccess> = async ({ request }) =>
   requireSessionAccess(request.headers)
+
+/** A person's sensitive account operation, independent of workspace membership. */
+export const sensitiveSessionAccess: Authenticate<SessionAccess> = async ({ request }) =>
+  requireSensitiveSessionAccess(request.headers)
 
 /** The `organizationId` from the path, then the query, then the body. */
 function getRequestedOrganizationId({ body, params, query }: RawRequest): string {

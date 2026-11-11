@@ -10,16 +10,16 @@ export const metadata: Metadata = { title: 'Sign in' }
 
 type AuthPageProps = {
   params: Promise<{ locale: string }>
-  searchParams: Promise<{ callbackURL?: string | string[]; reauthenticate?: string }>
+  searchParams: Promise<{ callbackURL?: string | string[]; reauthenticate?: string; sig?: string }>
 }
 
 export default async function SignInPage({ params, searchParams }: AuthPageProps) {
-  const [{ locale }, { callbackURL, reauthenticate }, requestHeaders] = await Promise.all([
+  const [{ locale }, { callbackURL, reauthenticate, sig }, requestHeaders] = await Promise.all([
     params,
     searchParams,
     headers(),
   ])
-  if (reauthenticate !== '1') await redirectIfSignedIn(requestHeaders, locale, callbackURL)
+  if (!sig && reauthenticate !== '1') await redirectIfSignedIn(requestHeaders, locale, callbackURL)
 
   return (
     <AuthShell

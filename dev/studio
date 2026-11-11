@@ -83,6 +83,7 @@ const next = current
 NODE
     ensure_env_value CLEANUP_SECRET "$(random_hex 32)"
     ensure_env_value BETTER_AUTH_SECRET "$(random_hex 32)"
+    ensure_env_value SHOTS_AUTH_SERVICE_TOKEN "$(random_hex 48)"
     ensure_env_value AUDIT_IP_HASH_SECRET "$(random_hex 32)"
     ensure_env_value SOURCE_WEBHOOK_SIGNING_KEY "$(random_hex 32)"
     ensure_env_value AUDIT_DRAIN_ENCRYPTION_KEY "$(random_base64 32)"
@@ -137,6 +138,7 @@ RUSTFS_ACCESS_KEY=screenshot-studio
 RUSTFS_SECRET_KEY=$rustfs_secret_key
 CLEANUP_SECRET=$cleanup_secret
 BETTER_AUTH_SECRET=$better_auth_secret
+SHOTS_AUTH_SERVICE_TOKEN=$(random_hex 48)
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
 NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -206,6 +208,7 @@ RUSTFS_ACCESS_KEY=$RUSTFS_ACCESS_KEY
 RUSTFS_SECRET_KEY=$RUSTFS_SECRET_KEY
 CLEANUP_SECRET=$CLEANUP_SECRET
 BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
+SHOTS_AUTH_SERVICE_TOKEN=$SHOTS_AUTH_SERVICE_TOKEN
 BETTER_AUTH_URL=http://localhost:3000
 BETTER_AUTH_TRUSTED_ORIGINS=http://localhost:3000
 AUTH_REQUIRE_EMAIL_VERIFICATION=false
@@ -436,10 +439,12 @@ run_e2e() {
   local app_url
   local manage_screenshot_mock="${E2E_MANAGE_SCREENSHOT_MOCK:-true}"
   local test_result=0
-  # Names this run's reports. The recovery and onboarding runs invoke
-  # Playwright a second time against the same app; without a name of their
-  # own they overwrote the suite's JSON and blob reports.
+  local argument check_oauth=false
   local report="${E2E_REPORT_LANE:-production}"
+  if [[ "$#" == 0 || "${E2E_SHARD_ID:-}" == 1 ]]; then check_oauth=true; fi
+  for argument in "$@"; do
+    if [[ "$argument" == --shard=1/* ]]; then check_oauth=true; fi
+  done
 
   load_env
   app_url="$(e2e_app_url)"
@@ -451,8 +456,13 @@ run_e2e() {
   fi
   sync_dependencies
   start_e2e_app "$app_url" "$(e2e_trusted_origins "$app_url")"
+  if [[ "$test_script" == test:e2e && "$check_oauth" == true ]]; then
+    FOUNDER_HUB_TEST_API_URL="${FOUNDER_HUB_TEST_API_URL:-http://127.0.0.1:8080}" \
+      BETTER_AUTH_URL="${app_url%/}" AUTH_REQUIRE_EMAIL_VERIFICATION=false \
+      e2e_npm "$app_url" run test:founder-hub-auth || test_result=1
+  fi
   E2E_LANE="$report" e2e_npm "$app_url" run "$test_script" -- --project=production "$@" || test_result=1
-  # Keep the server's logs beside the Playwright results, which CI uploads.
+  # Keep the server's logs beside the results, which CI uploads.
   mkdir -p "$WEB_DIR/test-results"
   compose logs --no-color app >"$WEB_DIR/test-results/app-$report.log" 2>&1 || true
   return "$test_result"
