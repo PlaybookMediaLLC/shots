@@ -5,13 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicenote"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/voicetranscriptrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
 // Voice to draft (plan 5.3): the owner turns one transcript revision into an
@@ -40,10 +44,10 @@ var ErrVoiceDraftFailed = errors.New("A draft could not be written from this not
 const (
 	// voiceDraftCredits is the most AI credits one voice draft can cost.
 	voiceDraftCredits = 5
-	// voiceDraftAttempts and voiceDraftDeadline bound the model calls, inside
-	// the API's 30-second write timeout.
+	// voiceDraftAttempts and voiceDraftDeadline bound the model calls, leaving
+	// the database work room inside the API's 30-second write timeout.
 	voiceDraftAttempts = 3
-	voiceDraftDeadline = 25 * time.Second
+	voiceDraftDeadline = 20 * time.Second
 	voiceDraftListMax  = 20
 )
 
@@ -126,6 +130,16 @@ func (c *Configuration) CreateVoiceDraft(ctx context.Context, actor Actor, noteI
 	if revision.RedactedAt != nil || strings.TrimSpace(revision.Text) == "" {
 		return nil, conflict("This transcript revision has no text.")
 	}
+	// One draft per note, revision and intent: a resent request gets it back
+	// without another model call or charge.
+	key := "voice-draft-" + note.ID + "-" + revision.ID + "-" + input.Intent
+	receipt, _, err := draftImportIdentity(actor, ContentDraftInput{ImportKey: key})
+	if err != nil {
+		return nil, err
+	}
+	if id, err := voiceDraftFor(ctx, c.client, actor, receipt, false); err != nil || id != "" {
+		return voiceDraftResult(id, err)
+	}
 	// Check the attachments before paying for the model.
 	tx, err := c.client.Tx(ctx)
 	if err != nil {
@@ -146,10 +160,25 @@ func (c *Configuration) CreateVoiceDraft(ctx context.Context, actor Actor, noteI
 	if err != nil {
 		return nil, err
 	}
-	record, err := c.CreateContentDraft(ctx, actor, ContentDraftInput{Title: reply.Title, PlainText: reply.Text,
+	if tx, err = c.client.Tx(ctx); err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	// createContentDraft takes the receipt's lock too; taking it first makes a
+	// concurrent request wait, then find this draft.
+	if _, err := tx.PlatformExec(ctx, `SELECT pg_advisory_xact_lock(hashtext($1))`, receipt); err != nil {
+		return nil, err
+	}
+	if id, err := voiceDraftFor(ctx, tx.Client(), actor, receipt, true); err != nil || id != "" {
+		return voiceDraftResult(id, err)
+	}
+	record, err := c.createContentDraft(ctx, tx, actor, ContentDraftInput{ImportKey: key, Title: reply.Title, PlainText: reply.Text,
 		Body: postBody([]PostPart{{Text: reply.Text}}, nil), AssetIDs: assets, Scratchpad: voiceDraftScratchpad(reply, len(assets)),
 		sourceVoiceRevisionID: revision.ID})
 	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	// The draft exists; a charge that crosses the allowance is still recorded
@@ -159,6 +188,65 @@ func (c *Configuration) CreateVoiceDraft(ctx context.Context, actor Actor, noteI
 	}
 	slog.InfoContext(ctx, "voice_draft_created", "note", note.ID, "draft", record.ID, "intent", input.Intent)
 	return &VoiceDraftResult{ContentDraftID: record.ID}, nil
+}
+
+// voiceDraftFor is the draft an earlier request with this import receipt
+// wrote, or "" when there is none. With remove set, under the receipt's lock,
+// a receipt whose draft was deleted is dropped so a new draft can be written.
+func voiceDraftFor(ctx context.Context, client *ent.Client, actor Actor, receipt string, remove bool) (string, error) {
+	saved, err := client.PlatformDraftImport.Get(ctx, receipt)
+	if ent.IsNotFound(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	draft, err := visibleContentDraft(ctx, client, actor, saved.DraftID)
+	switch {
+	case err == nil:
+		return draft.ID, nil
+	case errors.Is(err, publishing.ErrNotFound) && remove:
+		return "", client.PlatformDraftImport.DeleteOneID(receipt).Exec(ctx)
+	case errors.Is(err, publishing.ErrNotFound):
+		return "", nil
+	}
+	return "", err
+}
+
+func voiceDraftResult(id string, err error) (*VoiceDraftResult, error) {
+	if err != nil {
+		return nil, err
+	}
+	return &VoiceDraftResult{ContentDraftID: id}, nil
+}
+
+// voiceSourcesRemoved is which voice revisions the drafts were written from
+// are gone: deleted, redacted, or on a deleted note, so the draft shows
+// "source removed" (V5, K15). One query covers a whole list.
+func (c *Configuration) voiceSourcesRemoved(ctx context.Context, organizationID string, drafts []*ent.ContentDraft) (map[string]bool, error) {
+	ids := []string{}
+	for _, draft := range drafts {
+		if draft.SourceVoiceRevisionID != nil {
+			ids = append(ids, *draft.SourceVoiceRevisionID)
+		}
+	}
+	removed := map[string]bool{}
+	if len(ids) == 0 {
+		return removed, nil
+	}
+	live, err := c.client.VoiceTranscriptRevision.Query().Where(voicetranscriptrevision.IDIn(ids...),
+		voicetranscriptrevision.OrganizationID(organizationID), voicetranscriptrevision.RedactedAtIsNil(), func(s *sql.Selector) {
+			notes := sql.Table(voicenote.Table)
+			s.Where(sql.Exists(sql.Select(notes.C(voicenote.FieldID)).From(notes).Where(sql.And(
+				sql.ColumnsEQ(notes.C(voicenote.FieldID), s.C(voicetranscriptrevision.FieldNoteID)), sql.IsNull(notes.C(voicenote.FieldDeletedAt))))))
+		}).IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range ids {
+		removed[id] = !slices.Contains(live, id)
+	}
+	return removed, nil
 }
 
 // writeVoiceDraft calls the model up to voiceDraftAttempts times within the
