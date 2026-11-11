@@ -3,6 +3,7 @@ package product
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -42,22 +43,24 @@ const voiceMaxRevisions = 50
 func validVoiceTranscript(input AddVoiceTranscriptInput) error {
 	limit := voiceNoteLimits.MaxTranscriptChars
 	switch {
-	case input.ClientRevisionID == "" || len(input.ClientRevisionID) > 100:
-		return invalid("clientRevisionId must have 1 to 100 characters.")
+	case input.ClientRevisionID == "" || len(input.ClientRevisionID) > 100 || strings.ContainsRune(input.ClientRevisionID, 0):
+		return invalid("clientRevisionId must have 1 to 100 characters and no NUL characters.")
 	case input.Origin != "on_device" && input.Origin != "remote" && input.Origin != "user_edit":
 		return invalid("origin must be on_device, remote or user_edit.")
 	case input.Locale != nil && !voiceLocalePattern.MatchString(*input.Locale):
 		return invalid("locale must be a language tag of at most 35 characters.")
-	case input.Engine != nil && (*input.Engine == "" || utf8.RuneCountInString(*input.Engine) > 64):
-		return invalid("engine must have 1 to 64 characters.")
+	case input.Engine != nil && (*input.Engine == "" || utf8.RuneCountInString(*input.Engine) > 64 || strings.ContainsRune(*input.Engine, 0)):
+		return invalid("engine must have 1 to 64 characters and no NUL characters.")
 	case utf8.RuneCountInString(input.Text) > limit:
 		return invalid("A transcript has at most 100,000 characters.")
+	case strings.ContainsRune(input.Text, 0):
+		return invalid("A transcript cannot contain NUL characters.")
 	}
 	total := 0
 	for _, segment := range input.Segments {
 		total += utf8.RuneCountInString(segment.Text)
-		if segment.StartMs < 0 || segment.EndMs < segment.StartMs || total > limit {
-			return invalid("Each segment needs 0 <= startMs <= endMs, and the segments at most 100,000 characters.")
+		if segment.StartMs < 0 || segment.EndMs < segment.StartMs || total > limit || strings.ContainsRune(segment.Text, 0) {
+			return invalid("Each segment needs 0 <= startMs <= endMs and no NUL characters, and the segments at most 100,000 characters.")
 		}
 	}
 	return nil

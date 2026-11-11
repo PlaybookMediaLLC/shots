@@ -75,6 +75,10 @@ var voiceLocalePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,35}$`)
 
 const voiceExcerptRunes = 200
 
+// voiceClockSkew is how far ahead of the server a phone's clock may claim a
+// recording was made (S14).
+const voiceClockSkew = 24 * time.Hour
+
 // requireVoiceNotes refuses voice note work unless the server switch and the
 // workspace both leave voice notes on. Deleting and redacting skip it: a
 // member can always remove their own recordings.
@@ -328,8 +332,8 @@ func validVoiceTitle(title *string) (string, error) {
 		return "", nil
 	}
 	trimmed := strings.TrimSpace(*title)
-	if utf8.RuneCountInString(trimmed) > 120 {
-		return "", invalid("A voice note title has at most 120 characters.")
+	if utf8.RuneCountInString(trimmed) > 120 || strings.ContainsRune(trimmed, 0) {
+		return "", invalid("A voice note title has at most 120 characters and no NUL characters.")
 	}
 	return trimmed, nil
 }
@@ -365,8 +369,9 @@ func (c *Configuration) CreateVoiceNote(ctx context.Context, actor Actor, input 
 		detail, err := c.voiceNoteDetail(ctx, actor, row)
 		return detail, false, err
 	}
-	if input.ClientNoteID == "" || len(input.ClientNoteID) > 100 {
-		return nil, false, invalid("clientNoteId must have 1 to 100 characters.")
+	// Postgres text cannot hold NUL; one would fail the query as a 5xx.
+	if input.ClientNoteID == "" || len(input.ClientNoteID) > 100 || strings.ContainsRune(input.ClientNoteID, 0) {
+		return nil, false, invalid("clientNoteId must have 1 to 100 characters and no NUL characters.")
 	}
 	if detail, created, err := replay(); !ent.IsNotFound(err) {
 		return detail, created, err
@@ -378,6 +383,8 @@ func (c *Configuration) CreateVoiceNote(ctx context.Context, actor Actor, input 
 	switch {
 	case input.RecordedAt.IsZero():
 		return nil, false, invalid("recordedAt is required.")
+	case input.RecordedAt.After(time.Now().Add(voiceClockSkew)):
+		return nil, false, invalid("recordedAt is more than a day after the server's time.")
 	case !validTimeZone(input.RecordedTimeZone):
 		return nil, false, invalid("recordedTimeZone must be an IANA time zone.")
 	case input.Locale != nil && !voiceLocalePattern.MatchString(*input.Locale):

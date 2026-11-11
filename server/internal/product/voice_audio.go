@@ -211,7 +211,7 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	case voiceaudiorun.StatusDeleted:
 		return nil, conflict("This run's audio was deleted.")
 	case voiceaudiorun.StatusFailed:
-		return nil, invalid("This upload expired. Ask for a new upload URL and send the run again.")
+		return nil, voiceUploadExpired()
 	}
 	if c.objects == nil {
 		return nil, ErrStorageUnavailable
@@ -273,12 +273,21 @@ func (c *Configuration) CompleteVoiceRun(ctx context.Context, actor Actor, noteI
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	if run.Status != voiceaudiorun.StatusAvailable {
+	switch run.Status {
+	case voiceaudiorun.StatusAvailable:
+	case voiceaudiorun.StatusFailed:
+		// The upload sweep expired the run while it was read.
+		return nil, voiceUploadExpired()
+	default:
 		// The note or its audio was deleted while the run was read.
 		return nil, conflict("This run's audio was deleted.")
 	}
 	result := voiceAudioRunRecord(run)
 	return &result, nil
+}
+
+func voiceUploadExpired() error {
+	return invalid("This upload expired. Ask for a new upload URL and send the run again.")
 }
 
 // SignVoiceRunAudio signs a read of an available run for its owner.

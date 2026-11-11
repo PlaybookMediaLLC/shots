@@ -34,6 +34,8 @@ type voiceObjects struct {
 	signedSum   []byte
 	failDeletes bool
 	failPuts    bool
+	// onRead runs as a stored object is read back, before its bytes.
+	onRead func()
 }
 
 func (o *voiceObjects) SignUpload(context.Context, string, string) (string, error) {
@@ -59,6 +61,9 @@ func (o *voiceObjects) Put(_ context.Context, key, _ string, body io.Reader) err
 	return err
 }
 func (o *voiceObjects) Read(_ context.Context, key string) ([]byte, error) {
+	if o.onRead != nil {
+		o.onRead()
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	data, ok := o.stored[key]
@@ -1071,5 +1076,53 @@ func TestVoiceDeletionLedger(t *testing.T) {
 	}
 	if _, err := f.repo.ReplayVoiceDeletion(ctx, "voice_memo", f.org, live.ID); err == nil {
 		t.Fatal("an unknown voice kind was skipped")
+	}
+}
+
+// Postgres text holds no NUL, and a phone clock a day ahead is wrong: both
+// answer 400 instead of failing the write.
+func TestVoiceNoteInputHardening(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, false)
+	create := func(clientNoteID string, title *string, recordedAt time.Time) error {
+		_, _, err := f.repo.CreateVoiceNote(ctx, f.creator, CreateVoiceNoteInput{ClientNoteID: clientNoteID, Title: title, RecordedAt: recordedAt, RecordedTimeZone: "UTC"})
+		return err
+	}
+	expectVoice(t, create("n\x00", nil, time.Now()), ErrInvalidInput, "a NUL in clientNoteId")
+	expectVoice(t, create("titled", voicePtr("a\x00b"), time.Now()), ErrInvalidInput, "a NUL in the title")
+	expectVoice(t, create("future", nil, time.Now().Add(25*time.Hour)), ErrInvalidInput, "recordedAt a day ahead")
+	if err := create("ahead", nil, time.Now().Add(23*time.Hour)); err != nil {
+		t.Fatalf("a clock less than a day ahead: %v", err)
+	}
+	note := f.note(f.creator, "plain", false)
+	_, err := f.repo.UpdateVoiceNote(ctx, f.creator, note.ID, UpdateVoiceNoteInput{ExpectedRevision: 1, Title: voicePtr("a\x00b")})
+	expectVoice(t, err, ErrInvalidInput, "a NUL in a new title")
+	_, _, err = f.transcript(f.creator, note.ID, "r1", nil, "on_device", "a\x00b")
+	expectVoice(t, err, ErrInvalidInput, "a NUL in a transcript")
+}
+
+// A run read back while the upload sweep expires it answers that the upload
+// expired and must be resent, not that its audio was deleted.
+func TestVoiceCompleteLosesToTheUploadSweep(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx := f.ctx
+	f.enable(true, true)
+	note := f.note(f.creator, "slow-note", true)
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, 0, pcm); err != nil {
+		t.Fatal(err)
+	}
+	f.objects.put("voice/"+f.org+"/"+note.ID+"/0-"+digestOf(run)+".wav", run)
+	// What the sweep's expiry writes, between the read and the conditional update.
+	f.objects.onRead = func() {
+		f.exec(`UPDATE voice_audio_run SET status='failed',"failureReason"='The upload was not completed within 24 hours.' WHERE "noteId"=$1`, note.ID)
+	}
+	_, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0)
+	f.objects.onRead = nil
+	expectVoice(t, err, ErrInvalidInput, "complete after the sweep expired the run")
+	if !strings.Contains(err.Error(), "expired") {
+		t.Fatalf("message=%v", err)
 	}
 }
