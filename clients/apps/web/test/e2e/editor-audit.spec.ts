@@ -438,8 +438,8 @@ test('App Store opens from the editor by keyboard, mobile navigation reaches Cre
   await expect(workspace).toHaveCount(0)
   const settingsLinks = page.getByRole('navigation', { name: 'Settings sections', exact: true })
   // Every settings section, including RFC 024's Appearance, Install, Experimental,
-  // Social sets. Create workspace lives in the account menu.
-  await expect(settingsLinks.getByRole('link')).toHaveCount(23)
+  // Social sets, and Voice notes. Create workspace lives in the account menu.
+  await expect(settingsLinks.getByRole('link')).toHaveCount(24)
   await expect(
     settingsLinks.getByRole('link', { name: 'Notifications', exact: true })
   ).toHaveAttribute('href', '/settings/notifications')
