@@ -799,8 +799,9 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	}
 	// Captions are the stored draft's at input.Version, so an approval binds the
 	// text: for the route and batch runs the web serializes them from the draft it
-	// reads and takes no text from its callers (a version only grows, and it is
-	// current here); CreatePost and voice confirm make the draft from them.
+	// read at that version and takes no text from its callers; CreatePost and voice
+	// confirm make the draft from them. Alt text and the browser-rendered table
+	// images are not bound: publishing reads alt text from the asset when it posts.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)

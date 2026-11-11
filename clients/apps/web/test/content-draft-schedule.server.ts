@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { test, type TestContext } from 'node:test'
 import type { OrganizationAccess } from '../lib/auth/access'
 import { scheduleContentDraftContract } from '../lib/api/contracts/content-drafts'
 import { scheduleContentDraft } from '../lib/tenant/content-drafts'
@@ -36,7 +36,8 @@ const stored = {
   version: 3,
 }
 
-test('a draft schedule carries the stored draft text, never text from its caller', async (t) => {
+/** Go's API as the web server sees it, keeping the schedule request it receives. */
+function mockBackend(t: TestContext): { sent: () => unknown } {
   const oldURL = process.env.PUBLISHING_API_URL
   const oldToken = process.env.PUBLISHING_SERVICE_TOKEN
   process.env.PUBLISHING_API_URL = 'http://backend.test:8082'
@@ -58,6 +59,11 @@ test('a draft schedule carries the stored draft text, never text from its caller
     sent = JSON.parse(String(init?.body))
     return Response.json({ created: true, draft: stored, posts: [] }, { status: 201 })
   })
+  return { sent: () => sent }
+}
+
+test('a draft schedule carries the stored draft text, never text from its caller', async (t) => {
+  const backend = mockBackend(t)
   // A publisher sends the approved version with text of their own, in every
   // shape a schedule used to take it: the route's contract and the web's
   // serializer leave none of it in what Go receives.
@@ -76,8 +82,8 @@ test('a draft schedule carries the stored draft text, never text from its caller
   })
   const result = await scheduleContentDraft(access, stored.id, body)
   assert.equal(result?.created, true)
-  assert.doesNotMatch(JSON.stringify(sent), /Unapproved/)
-  assert.deepEqual(sent, {
+  assert.doesNotMatch(JSON.stringify(backend.sent()), /Unapproved/)
+  assert.deepEqual(backend.sent(), {
     publishNow: true,
     targets: [
       {
@@ -89,4 +95,21 @@ test('a draft schedule carries the stored draft text, never text from its caller
     ],
     version: 3,
   })
+})
+
+test('a schedule for a newer version than the draft read is refused before Go', async (t) => {
+  const backend = mockBackend(t)
+  // The draft was read at version 3 while the caller names version 4, which
+  // a reviewer may approve before Go runs: version 3's text must not go out
+  // under it.
+  const body = scheduleContentDraftContract.body.parse({
+    channelConnectionIds: [account],
+    publishNow: true,
+    version: 4,
+  })
+  await assert.rejects(scheduleContentDraft(access, stored.id, body), {
+    message: 'This draft was saved elsewhere since you opened it; it is now at version 3.',
+    status: 409,
+  })
+  assert.equal(backend.sent(), undefined)
 })
