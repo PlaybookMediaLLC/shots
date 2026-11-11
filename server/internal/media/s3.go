@@ -1,6 +1,7 @@
 package media
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -239,6 +240,22 @@ func (s *S3Store) Read(ctx context.Context, key string) ([]byte, error) {
 	return content, nil
 }
 
+// List returns the keys under a prefix, in key order.
+func (s *S3Store) List(ctx context.Context, prefix string) ([]string, error) {
+	keys := []string{}
+	paginator := s3.NewListObjectsV2Paginator(s.client, &s3.ListObjectsV2Input{Bucket: aws.String(s.bucket), Prefix: aws.String(prefix)})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("list media objects: %w", err)
+		}
+		for _, object := range page.Contents {
+			keys = append(keys, aws.ToString(object.Key))
+		}
+	}
+	return keys, nil
+}
+
 func (s *S3Store) Put(ctx context.Context, key, mediaType string, body io.Reader) error {
 	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(mediaType), Body: body,
@@ -302,6 +319,23 @@ func (o *TenantObjects) AbortUpload(ctx context.Context, organizationID, key, up
 		return errors.New("media object is outside the active organization")
 	}
 	return o.store.AbortMultipartUpload(ctx, key, uploadID)
+}
+
+// DeletionLedgerDay is the prefix of the deletion-ledger entries for
+// deletions requested on a UTC day.
+func DeletionLedgerDay(day time.Time) string {
+	return "deletion-ledger/" + day.UTC().Format("2006/01/02") + "/"
+}
+
+// RecordDeletion writes one deletion-ledger entry, named by its request's ID
+// under the UTC day the deletion was requested. The ledger lives outside the
+// database and its backups, so a restore can replay the deletions it undoes
+// (docs/deployment.md).
+func (o *TenantObjects) RecordDeletion(ctx context.Context, requestedAt time.Time, id string, record []byte) error {
+	if !safeSegment(id) {
+		return errors.New("deletion ledger entry needs a safe ID")
+	}
+	return o.store.Put(ctx, DeletionLedgerDay(requestedAt)+id+".json", "application/json", bytes.NewReader(record))
 }
 
 func (o *TenantObjects) SignDelivery(ctx context.Context, organizationID, key string) (string, error) {

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/johannesboyne/gofakes3"
 	"github.com/johannesboyne/gofakes3/backend/s3mem"
@@ -70,6 +71,11 @@ func TestTenantObjectAccessRejectsForeignAndUnsafeKeys(t *testing.T) {
 		}
 		if _, err := objects.SignDelivery(context.Background(), "org-1", key); err == nil {
 			t.Errorf("unsafe object delivery accepted: %q", key)
+		}
+	}
+	for _, id := range []string{"", "..", "event/../org-1", "event 1"} {
+		if err := objects.RecordDeletion(context.Background(), time.Now(), id, []byte(`{}`)); err == nil {
+			t.Errorf("unsafe deletion ledger entry accepted: %q", id)
 		}
 	}
 }

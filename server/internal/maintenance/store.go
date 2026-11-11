@@ -17,6 +17,8 @@ import (
 
 type ObjectDeleter interface {
 	Delete(context.Context, string, string) error
+	// RecordDeletion writes a deletion-ledger entry outside the database.
+	RecordDeletion(ctx context.Context, requestedAt time.Time, id string, record []byte) error
 }
 
 // uploadAborter discards the parts of a multipart upload that never finished.
@@ -73,7 +75,7 @@ func (s *Store) Run(ctx context.Context, job string) (int, error) {
 			}
 			return 0, nil
 		},
-		"tenant-outbox": s.Outbox, "audit-drains": s.AuditDrains,
+		"tenant-outbox": s.Outbox, "outbox-retention": s.OutboxRetention, "audit-drains": s.AuditDrains,
 		"communications": s.Communications, "workspace-cleanup": s.WorkspaceCleanup,
 		"audit-retention":   s.AuditRetention,
 		"notifications":     s.Notifications,
