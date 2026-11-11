@@ -42,6 +42,9 @@ type CreateScheduledPostInput struct {
 	// Exactly one of VariantID and ContentDraftID is set.
 	VariantID      string
 	ContentDraftID string
+	// ScheduledBy is who queued the post, set by the product layer from its
+	// actor; a request body or MCP arguments can never set it.
+	ScheduledBy *string `json:"-"`
 }
 
 type CreateScheduledPostResult struct {

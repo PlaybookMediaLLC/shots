@@ -41,13 +41,16 @@ var defaultQueueSlots = schema.DefaultQueueSlots()
 type ContentDraftSettings struct {
 	PostingSlots    []schema.QueueSlot `json:"postingSlots"`
 	RequireApproval bool               `json:"requireApproval"`
-	TimeZone        string             `json:"timeZone"`
+	// AllowSelfApproval off refuses approval by a draft's last editor.
+	AllowSelfApproval bool   `json:"allowSelfApproval"`
+	TimeZone          string `json:"timeZone"`
 }
 
 // ContentDraftSettingsUpdate changes the settings it sets.
 type ContentDraftSettingsUpdate struct {
-	PostingSlots    *[]schema.QueueSlot `json:"postingSlots"`
-	RequireApproval *bool               `json:"requireApproval"`
+	PostingSlots      *[]schema.QueueSlot `json:"postingSlots"`
+	RequireApproval   *bool               `json:"requireApproval"`
+	AllowSelfApproval *bool               `json:"allowSelfApproval"`
 }
 
 func (c *Configuration) workspaceZone(ctx context.Context, organizationID string) (*time.Location, string) {
@@ -70,7 +73,7 @@ func (c *Configuration) draftSettings(ctx context.Context, organizationID string
 	if err != nil {
 		return ContentDraftSettings{}, err
 	}
-	settings := ContentDraftSettings{PostingSlots: nonNilSlots(set.PostingSlots), TimeZone: set.TimeZone}
+	settings := ContentDraftSettings{PostingSlots: nonNilSlots(set.PostingSlots), TimeZone: set.TimeZone, AllowSelfApproval: true}
 	row, err := c.client.ContentDraftSettings.Get(ctx, organizationID)
 	if ent.IsNotFound(err) {
 		return settings, nil
@@ -78,7 +81,7 @@ func (c *Configuration) draftSettings(ctx context.Context, organizationID string
 	if err != nil {
 		return ContentDraftSettings{}, err
 	}
-	settings.RequireApproval = row.RequireApproval
+	settings.RequireApproval, settings.AllowSelfApproval = row.RequireApproval, row.AllowSelfApproval
 	return settings, nil
 }
 
@@ -126,11 +129,15 @@ func (c *Configuration) UpdateContentDraftSettings(ctx context.Context, actor Ac
 	if input.RequireApproval != nil {
 		current.RequireApproval = *input.RequireApproval
 	}
+	if input.AllowSelfApproval != nil {
+		current.AllowSelfApproval = *input.AllowSelfApproval
+	}
 	updated, err := c.client.ContentDraftSettings.Update().Where(contentdraftsettings.ID(actor.OrganizationID)).
-		SetPostingSlots(current.PostingSlots).SetRequireApproval(current.RequireApproval).Save(ctx)
+		SetPostingSlots(current.PostingSlots).SetRequireApproval(current.RequireApproval).
+		SetAllowSelfApproval(current.AllowSelfApproval).Save(ctx)
 	if err == nil && updated == 0 {
 		err = c.client.ContentDraftSettings.Create().SetID(actor.OrganizationID).SetPostingSlots(current.PostingSlots).
-			SetRequireApproval(current.RequireApproval).Exec(ctx)
+			SetRequireApproval(current.RequireApproval).SetAllowSelfApproval(current.AllowSelfApproval).Exec(ctx)
 	}
 	if err != nil {
 		return nil, err
@@ -633,8 +640,9 @@ type ContentDraftReviewInput struct {
 }
 
 // ReviewContentDraft records a review step. Writers request review; owners,
-// admins and approvers approve or ask for changes. Approval holds for the
-// version it was given at.
+// admins and approvers approve or ask for changes, and where the workspace
+// turns self-approval off, the draft's last editor cannot approve. Approval
+// holds for the version it was given at.
 func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id string, input ContentDraftReviewInput) (*ContentDraftRecord, error) {
 	write := input.Action == "request"
 	var err error
@@ -679,6 +687,15 @@ func (c *Configuration) ReviewContentDraft(ctx context.Context, actor Actor, id 
 	nextStatus := map[string]string{"request": "pending", "approve": "approved", "changes": "changes_requested"}[input.Action]
 	if nextStatus == "" {
 		return nil, invalid("A review action is request, approve or changes.")
+	}
+	if input.Action == "approve" && draft.UpdatedByUserID != nil && *draft.UpdatedByUserID == actor.UserID {
+		settings, err := tx.ContentDraftSettings.Get(ctx, actor.OrganizationID)
+		if err != nil && !ent.IsNotFound(err) {
+			return nil, err
+		}
+		if settings != nil && !settings.AllowSelfApproval {
+			return nil, forbidden("This workspace needs someone other than the draft's last editor to approve it.")
+		}
 	}
 	var cancelled []string
 	if input.Action == "changes" {
@@ -1156,7 +1173,9 @@ func (c *Configuration) ResumeContentDraftThread(ctx context.Context, actor Acto
 		SetScheduledFor(time.Now().UTC()).SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(rest[0].Caption).
 		SetNillableSocialSetID(post.SocialSetID).SetScheduleMode(scheduledpost.ScheduleModeExplicit).
 		SetSlotAt(time.Now().UTC()).SetNaturalOffsetSeconds(0).SetNillableScheduleTimeZone(post.ScheduleTimeZone).
-		SetReplyTo(answer).SetIdempotencyKey(fmt.Sprintf("%s:resume:%d", post.IdempotencyKey, progress.Posted))
+		SetReplyTo(answer).SetIdempotencyKey(fmt.Sprintf("%s:resume:%d", post.IdempotencyKey, progress.Posted)).
+		SetNillableScheduledByUserID(schedulerID(actor)).
+		SetNillableApprovedByUserID(post.ApprovedByUserID).SetNillableApprovedVersion(post.ApprovedVersion)
 	if len(rest[0].AssetIDs) > 0 {
 		create.SetAssetID(rest[0].AssetIDs[0]).SetAssetIds(rest[0].AssetIDs)
 	}

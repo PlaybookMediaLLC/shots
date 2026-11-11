@@ -676,8 +676,12 @@ func init() {
 	contentdraftsettingsDescRequireApproval := contentdraftsettingsFields[2].Descriptor()
 	// contentdraftsettings.DefaultRequireApproval holds the default value on creation for the require_approval field.
 	contentdraftsettings.DefaultRequireApproval = contentdraftsettingsDescRequireApproval.Default.(bool)
+	// contentdraftsettingsDescAllowSelfApproval is the schema descriptor for allow_self_approval field.
+	contentdraftsettingsDescAllowSelfApproval := contentdraftsettingsFields[3].Descriptor()
+	// contentdraftsettings.DefaultAllowSelfApproval holds the default value on creation for the allow_self_approval field.
+	contentdraftsettings.DefaultAllowSelfApproval = contentdraftsettingsDescAllowSelfApproval.Default.(bool)
 	// contentdraftsettingsDescUpdatedAt is the schema descriptor for updated_at field.
-	contentdraftsettingsDescUpdatedAt := contentdraftsettingsFields[3].Descriptor()
+	contentdraftsettingsDescUpdatedAt := contentdraftsettingsFields[4].Descriptor()
 	// contentdraftsettings.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	contentdraftsettings.DefaultUpdatedAt = contentdraftsettingsDescUpdatedAt.Default.(func() time.Time)
 	// contentdraftsettings.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1791,11 +1795,11 @@ func init() {
 	// scheduledpost.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	scheduledpost.IdempotencyKeyValidator = scheduledpostDescIdempotencyKey.Validators[0].(func(string) error)
 	// scheduledpostDescCreatedAt is the schema descriptor for created_at field.
-	scheduledpostDescCreatedAt := scheduledpostFields[29].Descriptor()
+	scheduledpostDescCreatedAt := scheduledpostFields[32].Descriptor()
 	// scheduledpost.DefaultCreatedAt holds the default value on creation for the created_at field.
 	scheduledpost.DefaultCreatedAt = scheduledpostDescCreatedAt.Default.(func() time.Time)
 	// scheduledpostDescUpdatedAt is the schema descriptor for updated_at field.
-	scheduledpostDescUpdatedAt := scheduledpostFields[30].Descriptor()
+	scheduledpostDescUpdatedAt := scheduledpostFields[33].Descriptor()
 	// scheduledpost.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	scheduledpost.DefaultUpdatedAt = scheduledpostDescUpdatedAt.Default.(func() time.Time)
 	// scheduledpost.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

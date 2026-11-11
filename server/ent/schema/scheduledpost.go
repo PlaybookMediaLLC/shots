@@ -72,6 +72,11 @@ func (ScheduledPost) Fields() []ent.Field {
 		// cancelled by the worker: a provider status or a code such as
 		// MEDIA_UNAVAILABLE. Each attempt keeps its own failure code too.
 		field.String("failure_code").StorageKey("failureCode").Optional().Nillable(),
+		// Who queued the post (a member, or "api-key:<id>" for a key) and, for a
+		// draft post, who approved the version it carries. Null before F7.
+		field.String("scheduled_by_user_id").StorageKey("scheduledByUserId").Optional().Nillable().Immutable(),
+		field.String("approved_by_user_id").StorageKey("approvedByUserId").Optional().Nillable().Immutable(),
+		field.Int("approved_version").StorageKey("approvedVersion").Optional().Nillable().Immutable(),
 		field.Time("created_at").StorageKey("createdAt").Default(time.Now).Immutable(),
 		field.Time("updated_at").StorageKey("updatedAt").Default(time.Now).UpdateDefault(time.Now),
 	}

@@ -101,7 +101,9 @@ func (c *Configuration) RetryContentDraftPost(ctx context.Context, actor Actor, 
 		SetNillableContentDraftID(post.ContentDraftID).SetNillableAssetID(post.AssetID).
 		SetChannelConnectionID(post.ChannelConnectionID).SetNillableSocialSetID(post.SocialSetID).SetScheduledFor(time.Now().UTC()).
 		SetNillableScheduleTimeZone(post.ScheduleTimeZone).
-		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(post.Caption).SetIdempotencyKey(key)
+		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(post.Caption).SetIdempotencyKey(key).
+		SetNillableScheduledByUserID(schedulerID(actor)).
+		SetNillableApprovedByUserID(post.ApprovedByUserID).SetNillableApprovedVersion(post.ApprovedVersion)
 	if len(post.AssetIds) > 0 {
 		create.SetAssetIds(post.AssetIds)
 	}

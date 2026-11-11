@@ -41,6 +41,20 @@ func (_c *ContentDraftSettingsCreate) SetNillableRequireApproval(v *bool) *Conte
 	return _c
 }
 
+// SetAllowSelfApproval sets the "allow_self_approval" field.
+func (_c *ContentDraftSettingsCreate) SetAllowSelfApproval(v bool) *ContentDraftSettingsCreate {
+	_c.mutation.SetAllowSelfApproval(v)
+	return _c
+}
+
+// SetNillableAllowSelfApproval sets the "allow_self_approval" field if the given value is not nil.
+func (_c *ContentDraftSettingsCreate) SetNillableAllowSelfApproval(v *bool) *ContentDraftSettingsCreate {
+	if v != nil {
+		_c.SetAllowSelfApproval(*v)
+	}
+	return _c
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_c *ContentDraftSettingsCreate) SetUpdatedAt(v time.Time) *ContentDraftSettingsCreate {
 	_c.mutation.SetUpdatedAt(v)
@@ -100,6 +114,10 @@ func (_c *ContentDraftSettingsCreate) defaults() {
 		v := contentdraftsettings.DefaultRequireApproval
 		_c.mutation.SetRequireApproval(v)
 	}
+	if _, ok := _c.mutation.AllowSelfApproval(); !ok {
+		v := contentdraftsettings.DefaultAllowSelfApproval
+		_c.mutation.SetAllowSelfApproval(v)
+	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		v := contentdraftsettings.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
@@ -113,6 +131,9 @@ func (_c *ContentDraftSettingsCreate) check() error {
 	}
 	if _, ok := _c.mutation.RequireApproval(); !ok {
 		return &ValidationError{Name: "require_approval", err: errors.New(`ent: missing required field "ContentDraftSettings.require_approval"`)}
+	}
+	if _, ok := _c.mutation.AllowSelfApproval(); !ok {
+		return &ValidationError{Name: "allow_self_approval", err: errors.New(`ent: missing required field "ContentDraftSettings.allow_self_approval"`)}
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "ContentDraftSettings.updated_at"`)}
@@ -159,6 +180,10 @@ func (_c *ContentDraftSettingsCreate) createSpec() (*ContentDraftSettings, *sqlg
 	if value, ok := _c.mutation.RequireApproval(); ok {
 		_spec.SetField(contentdraftsettings.FieldRequireApproval, field.TypeBool, value)
 		_node.RequireApproval = value
+	}
+	if value, ok := _c.mutation.AllowSelfApproval(); ok {
+		_spec.SetField(contentdraftsettings.FieldAllowSelfApproval, field.TypeBool, value)
+		_node.AllowSelfApproval = value
 	}
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(contentdraftsettings.FieldUpdatedAt, field.TypeTime, value)
