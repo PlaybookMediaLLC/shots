@@ -244,6 +244,27 @@ session endpoint. Keep it server-side and separate from
 `PUBLISHING_SERVICE_TOKEN`. A user OAuth token alone cannot read the private
 workspace authority snapshot.
 
+## Voice capture
+
+The product API serves the voice API at `/v1/voice/...` behind
+`authenticateProduct` ([contract](../docs/plans/voice-capture-implementation.md#4-voice-api-contract)).
+Notes are private to their owner: another member's note is 404, and API keys
+are refused. Audio runs are PCM WAV uploaded straight to private storage with
+a signed length and checksum, then verified and decoded in the complete
+request. Every voice feature is off per workspace until an owner or admin
+turns it on, and each has a server-side switch that turns it off everywhere:
+`VOICE_DISABLED`, `VOICE_AUDIO_UPLOAD_DISABLED`, `VOICE_DRAFTS_DISABLED`,
+`VOICE_COMMANDS_PARSE_DISABLED` and `VOICE_COMMANDS_CONFIRM_DISABLED` (set to
+`true`). `VOICE_MIN_APP_VERSION` (default `0.0.0`) is the oldest phone app
+that may sync. The `voice-cleanup` and `voice-commands` maintenance jobs expire
+abandoned uploads, purge deleted audio, remove notes of members who left 30
+days ago or whose workspace was purged, retry waiting command parses and
+expire unconfirmed proposals. Note, audio and transcript deletions are also
+written to the R2 deletion ledger.
+
+`PUBLISHING_PAUSED=true` holds every due post before any provider call, for a
+database restore ([runbook](../docs/deployment.md)).
+
 The Founder Hub phone app reaches the voice API through the gateway at
 `/api/founder-hub/voice/<suffix>`, with the methods, bodies and responses of
 `/api/v1/voice/<suffix>`; changing the workspace switches stays browser-only.

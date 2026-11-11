@@ -1,7 +1,7 @@
 # Voice capture and evidence: implementation plan
 
 **Implements:** [the audited voice capture and evidence plan](voice-capture-and-evidence-plan.md) (v0.3), "the plan" below.
-**Delivery:** the server, web and fixes F1–F9 in one pull request into `develop` from `claude/relaxed-euler-yjb0ev`. The phone is the existing Founder Hub app (PlaybookMediaLLC/shots-founder-hub), so its part is a second pull request in that repository, stacked on its Shots sign-in pull request (#3). A third, small pull request lets the Shots voice routes accept Founder Hub tokens; it builds on the Founder Hub auth pull request (PlaybookMediaLLC/shots#499). A pull request cannot span two repositories.
+**Delivery:** the server, web, the Founder Hub voice routes and fixes F1–F9 in one pull request into `develop` (PlaybookMediaLLC/shots#500); the Founder Hub auth it builds on (PlaybookMediaLLC/shots#499) is merged. The phone is the existing Founder Hub app (PlaybookMediaLLC/shots-founder-hub), so its part is a pull request in that repository, on its `develop` after its Shots sign-in pull request (#3) merged. A pull request cannot span two repositories.
 **Execution:** a foundation commit, then up to 9 implementation subagents in parallel, then one integration and verification pass, then a review wave. At most 10 agents run at once.
 
 ---
@@ -15,7 +15,7 @@
 | 5.3 Voice to draft | Endpoint, consent, claim marking, draft source link | — |
 | 5.4 Voice commands | Inline parse, plain-code checks, proposal, confirm through `ScheduleContentDraft`, sweep for retries and expiry | Push notifications (K23): no APNs setup exists; the phone fetches proposals on sync. Hands-free scheduling (decision 8: no) |
 | 5.5–5.7 Capture hardening, staying signed in, capture at scale | — | Conditional on RFC 007's trigger and owner decisions 12–14 (plan section 8, Gates 4–5) |
-| 6.4, 6.5 and 7a Fixes F1–F9 | All nine, each with its regression test | F8's staging drill needs staging; the runbook and code ship, the drill is an owner follow-up |
+| 6.4, 6.5 and 7a Fixes F1–F9 | All nine, each with its regression test, except F1 step 4 | F1 step 4 (scheduling builds captions from the stored draft version) is deferred: captions still come from the web's serializer, so an approved draft version can be scheduled with different caption text through the draft schedule endpoint, as before this change. Building captions in Go means porting the 744-line serializer; the follow-up is a Go serializer shared by every schedule path, or checking captions against a snapshot serialized at approval. Voice commands are not affected: they schedule the confirmed text through the same draft. F8's staging drill needs staging; the runbook and code ship, the drill is an owner follow-up |
 | 6.9 Rollout | Per-workspace settings, all off; server-side switches; minimum app version | Measurement dashboards: counters are logged as structured events, no new dashboard |
 
 ## 2. Owner decisions taken as the plan recommends
@@ -105,7 +105,7 @@ Each agent owns the files listed; no two agents edit the same file. Go agents wo
 | **M1 phone** (Founder Hub, TypeScript) | "Send to Shots" sync, confirmation card, Shots voice settings | `apps/mobile/src/` Shots voice feature | 5.1, 5.2 client, 5.4 card; S1–S19 client side; K-cases on the card |
 | **M2 on-device speech** (Founder Hub, Swift) | Apple on-device transcription of saved recordings | `apps/mobile/modules/on-device-speech/`, `apps/mobile/src/data/on-device-transcription.ts` | 5.1 Transcription; R15, R16 |
 | **M3 gateway** (Founder Hub, Rust) | `/cloud/voice/*` proxy to Shots | `apps/api/src/shots.rs`, `crates/api-auth` | Section 5 path |
-| **M4 Founder Hub routes** (Shots, on #499) | `/api/founder-hub/voice/*` with Founder Hub token auth | `clients/apps/web/app/api/founder-hub/voice/**` | Section 5 path |
+| **M4 Founder Hub routes** (Shots, in #500 after #499 merged) | `/api/founder-hub/voice/*` with Founder Hub token auth | `clients/apps/web/app/api/founder-hub/voice/**` | Section 5 path |
 | **A6 approval** (Go) | F1, F7 | `internal/product/scheduled_posts.go`, `content_draft_schedule.go`, `content_draft_platform.go` (approval), `scheduledpost` and `content_draft_settings` schemas. Slot `20261111091000` | P0, P3, P4 |
 | **A7 provider** (Go) | F2, F5, F9 analytics token refresh | `internal/social/integrations/base.go` and provider error tables, publication outcome mapping, `internal/platformai`, `internal/social/tenantpublishing/refresh.go` and the analytics refresh path | P11, 5.4 prerequisite, P7 |
 | **A8 release-capture** (Go) | F3, F4, F9 environment check, capture lock, suspension, repository transfer | `internal/product/github_events.go`, `github_installations.go`, `capture_jobs.go`, `release_automation_*.go`, `internal/releaseautomation`, `internal/temporalcapture`, deployment and capture schemas. Slot `20261111092000` | C3, C4, C5, C6, C9, C11 |
