@@ -123,6 +123,9 @@ const (
 	FailureVideoTooLong = "VIDEO_TOO_LONG"
 	// The platform does not take this media.
 	FailureMediaUnsupported = "MEDIA_UNSUPPORTED"
+	// The platform's daily posting cap for the account was reached, so the post
+	// was refused.
+	FailureProviderDailyLimit = "PROVIDER_DAILY_LIMIT"
 	// Shots' publishing service is not configured or reachable.
 	FailurePublisherUnavailable = "PUBLISHER_UNAVAILABLE"
 	// Shots failed before the handoff, with no provider status.

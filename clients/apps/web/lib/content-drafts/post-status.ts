@@ -252,6 +252,8 @@ export function postFailureReason(code: string | null | undefined): string | nul
       return 'The platform could not be reached. Retry it.'
     case '429':
       return 'The platform kept rate-limiting this post. Retry it later.'
+    case 'PROVIDER_DAILY_LIMIT':
+      return 'The account reached the platform’s daily posting limit, so nothing was sent. Retry it tomorrow or reschedule it.'
     case '401':
     case '403':
       return 'The platform refused the account’s permission. Reconnect it, then retry.'
