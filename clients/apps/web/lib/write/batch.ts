@@ -3,7 +3,7 @@ import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-draft
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import type { AccountStanding } from '@/lib/write/capabilities'
 import type { DraftChannel, VersionOptions } from '@/lib/write/document'
-import { mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { LABELS, mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
 import { analyzeSpintax } from '@/lib/write/spintax'
 import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
@@ -19,6 +19,9 @@ export type BatchAccount = {
   channel: DraftChannel
   id: string
   name: string
+  /** How the account is shown beside a post: its handle, else its display name. */
+  displayName?: string | null
+  handle?: string | null
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
   tiktokCreator?: AccountStanding['tiktokCreator']
@@ -159,6 +162,39 @@ export function batchSummary(items: readonly BatchItem[], zone: string, now = ne
     posts: items.length,
     withoutTime: items.length - instants.length,
   }
+}
+
+/**
+ * Who a batch reaches, counted as people read it: "3 posts to 1 X account",
+ * not three destinations, when three posts go to the same account.
+ */
+export function batchAudience(
+  items: readonly BatchItem[],
+  accounts: readonly Pick<BatchAccount, 'channel' | 'id'>[]
+): string {
+  const ids = [...new Set(items.flatMap(itemAccounts))]
+  const posts = `${items.length} post${items.length === 1 ? '' : 's'}`
+  if (ids.length === 0) return `${posts}, no account chosen`
+  const channel = accounts.find((account) => account.id === ids[0])?.channel
+  if (ids.length === 1) return `${posts} to 1 ${channel ? `${LABELS[channel]} ` : ''}account`
+  const pairs = items.reduce((total, item) => total + itemAccounts(item).length, 0)
+  return `${posts} to ${ids.length} accounts${pairs === items.length ? '' : `, ${pairs} in all`}`
+}
+
+/**
+ * The hourly preset: one post an hour from the window's start to its end
+ * (both "HH:mm"), as the spread planner's posts per day. Posts past the end
+ * go to the next day at the start time. Null when the end is not after the start.
+ */
+export function hourlyWindow(start: string, end: string): { postsPerDay: number } | null {
+  const minutes = (time: string) => {
+    const [hours, mins] = time.split(':').map(Number)
+    return hours * 60 + mins
+  }
+  if (!/^\d{2}:\d{2}$/.test(start) || !/^\d{2}:\d{2}$/.test(end)) return null
+  const span = minutes(end) - minutes(start)
+  if (span < 0) return null
+  return { postsPerDay: Math.min(24, Math.floor(span / 60) + 1) }
 }
 
 /** When an item is meant to go out, or why that cannot be read yet. */

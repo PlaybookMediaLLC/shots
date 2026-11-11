@@ -30,6 +30,27 @@ export function pastePieces(text: string): string[] {
     .filter(Boolean)
 }
 
+/** A line of three or more dashes: a separator the writer typed on purpose. */
+const RULE = /\n[ \t]*-{3,}[ \t]*(?=\n|$)/
+
+/**
+ * A paste read for the batch page. Lines of dashes are explicit separators:
+ * when there are any, only they split, so a post keeps its own paragraphs.
+ * Without them the pieces are the blank-line ones, offered as a choice; the
+ * caller keeps the paste as one post unless the writer chooses otherwise.
+ */
+export function readPaste(text: string): { explicit: boolean; pieces: string[] } {
+  const normalized = `\n${text.replace(/\r\n?/g, '\n')}`
+  if (!RULE.test(normalized)) return { explicit: false, pieces: pastePieces(text) }
+  return {
+    explicit: true,
+    pieces: normalized
+      .split(new RegExp(RULE.source, 'g'))
+      .map((piece) => piece.trim())
+      .filter(Boolean),
+  }
+}
+
 /**
  * The platform a pasted run is measured against: X when the brand posts
  * there, because its limit is the tightest a writer meets, otherwise the

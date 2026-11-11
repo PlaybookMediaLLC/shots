@@ -9,6 +9,8 @@ import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
 import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
+import { blankDraftContext } from '@/lib/write/composing-session'
+import { startBlankDraft } from './pending-draft'
 import type { Shortcut } from './shortcuts'
 
 /** An editor command as the palette lists it. */
@@ -67,6 +69,8 @@ type WriteContextValue = {
   archiveRef: React.MutableRefObject<((status: 'draft' | 'archived') => Promise<void>) | null>
   /** The open editor's commands (composer/commands.tsx), for the command palette. */
   editorCommandsRef: React.MutableRefObject<(() => EditorCommandEntry[]) | null>
+  /** Save the open draft and start a blank one on its accounts (Save draft & new). */
+  nextDraftRef: React.MutableRefObject<(() => void) | null>
   saved: Record<string, DraftLine>
   /** The list for the chosen tab or search is still loading. */
   libraryPending: boolean
@@ -118,6 +122,7 @@ export function WriteProvider({
   const draftCommandsRef = React.useRef<DraftCommand[]>([])
   const archiveRef = React.useRef<((status: 'draft' | 'archived') => Promise<void>) | null>(null)
   const editorCommandsRef = React.useRef<(() => EditorCommandEntry[]) | null>(null)
+  const nextDraftRef = React.useRef<(() => void) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
@@ -284,6 +289,7 @@ export function WriteProvider({
       openPreviewRef,
       archiveRef,
       editorCommandsRef,
+      nextDraftRef,
       hideDraft,
       activeId,
       canEdit,
@@ -371,4 +377,30 @@ export function useWriteRouter() {
     }),
     [beforeLeaveRef, pathname, router]
   )
+}
+
+/**
+ * Start a blank post from Write. With a draft open it is Save draft & new: the
+ * open draft is saved and the new one keeps its accounts. Otherwise the post
+ * opens on the brand's accounts as `blankDraftContext` picks them, shown above
+ * the text before anything is saved.
+ */
+export function useNewDraft(): () => void {
+  const router = useWriteRouter()
+  const { beforeLeaveRef, data, nextDraftRef } = useWrite()
+  return () => {
+    if (nextDraftRef.current) return nextDraftRef.current()
+    const context = blankDraftContext(data.activeSet)
+    startBlankDraft(
+      {
+        channelConnectionIds: context.channelConnectionIds,
+        primaryPlatform: data.activeSet ? context.primaryPlatform : undefined,
+        socialSetId: data.activeSet?.id,
+        tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
+      },
+      (id) => router.push(draftHref(id, data.activeSet?.id)),
+      beforeLeaveRef.current ?? undefined,
+      { accounts: context.accounts, channel: context.primaryPlatform }
+    )
+  }
 }

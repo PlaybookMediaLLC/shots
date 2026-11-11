@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { BatchItem } from '@/lib/api/contracts/content-batches'
 import {
+  batchAudience,
   batchSummary,
   captionProblem,
+  hourlyWindow,
   itemAccounts,
   pendingAccounts,
   postOn,
@@ -244,4 +246,32 @@ test('an unrendered grid video says to render it, not that it has no media', () 
   })
   const checks = stagedChecks(concept, [{ channel: 'instagram', id: 'ig', name: 'Shots' }])
   assert.deepEqual(checks.get('ig')?.problems, ['Render this video first.'])
+})
+
+test('the audience counts accounts, not one destination per post', () => {
+  const xOnly = [1, 2, 3].map((n) => item({ channelConnectionIds: ['x'], id: `x${n}` }))
+  assert.equal(batchAudience(xOnly, accounts), '3 posts to 1 X account')
+  assert.equal(
+    batchAudience([item(), item({ id: 'b' })], accounts),
+    '2 posts to 2 accounts, 4 in all'
+  )
+  assert.equal(
+    batchAudience(
+      [item({ channelConnectionIds: ['ig'] }), item({ channelConnectionIds: ['li'] })],
+      accounts
+    ),
+    '2 posts to 2 accounts'
+  )
+  assert.equal(
+    batchAudience([item({ channelConnectionIds: [] })], accounts),
+    '1 post, no account chosen'
+  )
+})
+
+test('the hourly window is one post an hour, both ends included', () => {
+  assert.deepEqual(hourlyWindow('09:00', '17:00'), { postsPerDay: 9 })
+  assert.deepEqual(hourlyWindow('09:30', '10:15'), { postsPerDay: 1 })
+  assert.deepEqual(hourlyWindow('00:00', '23:59'), { postsPerDay: 24 })
+  assert.equal(hourlyWindow('17:00', '09:00'), null)
+  assert.equal(hourlyWindow('', '09:00'), null)
 })

@@ -159,6 +159,12 @@ test(
     const dock = page.getByTestId('schedule-dock')
     await dock.getByRole('textbox', { name: 'Schedule time in words' }).fill('+3h')
     await dock.getByTestId('dock-schedule-next-button').click()
+    // The next post opens blank on X alone, and its first word makes the draft.
+    const blank = page.getByRole('region', { name: 'New post' })
+    await expect(blank.getByTestId('destination-summary')).toContainText('X')
+    await expect(blank.getByTestId('destination-summary')).not.toContainText('Bluesky')
+    await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
+    await page.keyboard.type('The second post of the run.')
 
     await page.waitForURL(
       (url) => /\/publish\/[a-z0-9]+/.test(url.pathname) && !url.pathname.endsWith(first),
@@ -179,5 +185,65 @@ test(
     )
     expect(queued).toHaveLength(1)
     await expect(page.getByTestId('dock-schedule-button')).toContainText('Schedule for')
+  }
+)
+
+test(
+  'Save draft & new writes independent drafts on the same accounts and schedules nothing',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    const workspace = await startWorkspace({ channels: ['x', 'bluesky'] })
+    await page.goto('/publish')
+
+    // New draft opens the blank post in place, focused, with no dialog.
+    await page.getByTestId('new-draft').first().click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByRole('textbox', { name: 'New draft text' })).toBeFocused()
+    await page.keyboard.type('First independent post.')
+    await page.waitForURL(/\/publish\/[a-z0-9]+/)
+    await expect(draftEditor(page)).toContainText('First independent post.', { timeout: 60_000 })
+    await page.getByRole('switch', { name: 'Publish to Bluesky', exact: true }).click()
+    await expectSaved(page)
+    await expect(page.getByTestId('writing-bar')).toContainText('@shots_x')
+    await expect(page.getByTestId('writing-bar')).not.toContainText('Bluesky')
+
+    const ids = [new URL(page.url()).pathname.split('/').pop() ?? '']
+    for (const text of ['Second independent post.', 'Third independent post.']) {
+      await page.getByRole('button', { name: 'Save draft & new', exact: true }).click()
+      const blank = page.getByRole('region', { name: 'New post' })
+      await expect(blank.getByTestId('destination-summary')).toContainText('@shots_x')
+      await expect(blank.getByTestId('destination-summary')).not.toContainText('Bluesky')
+      await expect(blank.getByTestId('blank-composer-count')).toHaveText('0/280')
+      await page.keyboard.type(text)
+      await page.waitForURL(
+        (url) =>
+          /\/publish\/[a-z0-9]+/.test(url.pathname) &&
+          !ids.includes(url.pathname.split('/').pop() ?? '')
+      )
+      await expect(draftEditor(page)).toContainText(text, { timeout: 60_000 })
+      await expectSaved(page)
+      ids.push(new URL(page.url()).pathname.split('/').pop() ?? '')
+    }
+
+    const drafts = await db.rows<{ channels: string[]; primary: string; text: string }>(
+      `SELECT "channelConnectionIds" AS channels, "primaryPlatform" AS primary, "plainText" AS text
+         FROM content_draft WHERE "organizationId" = $1 ORDER BY "createdAt"`,
+      [workspace.id]
+    )
+    expect(drafts.map((draft) => draft.text)).toEqual([
+      'First independent post.',
+      'Second independent post.',
+      'Third independent post.',
+    ])
+    for (const draft of drafts) {
+      expect(draft.channels).toEqual([workspace.channels.x])
+      expect(draft.primary).toBe('x')
+    }
+    expect(
+      await db.rows(
+        `SELECT p.id FROM scheduled_post p JOIN content_draft d ON d.id = p."contentDraftId" WHERE d."organizationId" = $1`,
+        [workspace.id]
+      )
+    ).toHaveLength(0)
   }
 )

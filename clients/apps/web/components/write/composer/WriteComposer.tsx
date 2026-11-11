@@ -92,7 +92,11 @@ import { engagementAutomation } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import { countingNote } from '@/lib/write/caption-counting'
 import { writeApi } from '@/lib/write/client'
-import { rememberChannels, takeOffNotice } from '@/lib/write/composing-session'
+import {
+  blankDraftContext,
+  rememberChannels,
+  takeOffNotice,
+} from '@/lib/write/composing-session'
 import {
   type DraftChannel,
   type PlateBody,
@@ -117,7 +121,9 @@ import { useIsMobile } from '@/hooks/use-mobile'
 import { SetDot } from '../sets'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { DraftsDrawerButton } from '../WriteFrame'
-import { useWrite, type WriteSet } from '../write-context'
+import { DestinationSummary } from '../destination-summary'
+import { startBlankDraft } from '../pending-draft'
+import { draftHref, useWrite, type WriteSet } from '../write-context'
 import { CommentsPanel } from './comments'
 import { ThreadTools } from './thread-tools'
 import { ArticleTools } from './article-tools'
@@ -299,6 +305,8 @@ export function WriteComposer({
     canPublish,
     canReview,
     canManageSets,
+    data: library,
+    nextDraftRef,
     showSaved,
   } = useWrite()
   const services = React.useMemo(
@@ -701,6 +709,33 @@ export function WriteComposer({
   )
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
+  // Save draft & new: this draft is saved first, and the blank one keeps its
+  // accounts and, while it publishes there, its main platform. Nothing is
+  // scheduled, and no text, media, reply or time is carried over.
+  const startNext = () => {
+    const next = blankDraftContext(set, { channelIds: enabled, primary })
+    startBlankDraft(
+      {
+        channelConnectionIds: next.channelConnectionIds,
+        primaryPlatform: next.primaryPlatform,
+        socialSetId: draftSet ?? undefined,
+        tagIds: library.experiments.tags && library.query.tag ? [library.query.tag] : undefined,
+      },
+      (id) => router.push(draftHref(id, draftSet)),
+      flush,
+      { accounts: next.accounts, channel: next.primaryPlatform }
+    )
+  }
+  // New draft, from the rail, the palette or its shortcut, is this action while the draft is open.
+  React.useEffect(() => {
+    nextDraftRef.current = canEdit ? startNext : null
+  })
+  React.useEffect(
+    () => () => {
+      nextDraftRef.current = null
+    },
+    [nextDraftRef]
+  )
   const context: ScheduleContext = {
     kind: server.kind,
     approved,
@@ -717,20 +752,9 @@ export function WriteComposer({
     onDone: ({ draft, newDraft }) => {
       setServer(draft)
       void refreshPosts()
-      if (newDraft)
-        void draftsApi
-          // The next post in a run starts on the accounts this one went to, not
-          // on the brand's defaults: that is the switch the writer just set.
-          .create({
-            channelConnectionIds: enabled.length ? [...enabled] : undefined,
-            socialSetId: draft.socialSetId ?? undefined,
-          })
-          .then((next) => router.push(`/publish/${next.id}`))
-          .catch(() =>
-            toast.error(
-              'Scheduled successfully, but the next draft could not be opened. Create one from the sidebar.'
-            )
-          )
+      // The next post in a run starts on the accounts this one went to, not
+      // on the brand's defaults: that is the switch the writer just set.
+      if (newDraft) startNext()
     },
     onToggle: toggle,
     // The Calendar's unschedule cancels every queued post in one step and, unlike
@@ -1192,6 +1216,9 @@ export function WriteComposer({
   }
   // A post that is live everywhere does not change with this text, so it is not editable.
   const canEditText = canEdit && !locked
+  // The schedule dock and its fix list show to someone who can publish this post now.
+  const showSchedule =
+    canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
   // A tab that follows the main platform has no editor of its own: its media lives on that tab.
   const ownEditor = active === primary || versionOfTab.mode === 'manual'
   const liveOn = [
@@ -2271,7 +2298,7 @@ export function WriteComposer({
                 float in the middle of the page. */}
             <div className="h-32 shrink-0 grow" />
             {/* Below the post, so the caret comes first, and pinned so it stays in view. */}
-            {canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0) ? (
+            {showSchedule || (canEdit && !focus) ? (
             <div
               className={cn(
                 'sticky bottom-0 z-10 grid gap-2 border-t border-border bg-background pt-3',
@@ -2279,7 +2306,36 @@ export function WriteComposer({
               )}
               data-testid="publish-bar"
             >
-              {blockers.length > 0 ? (
+              {focus ? null : (
+                // Where this post goes and what it is, beside the action that starts the next one.
+                <div className="flex flex-wrap items-center gap-2" data-testid="writing-bar">
+                  <DestinationSummary
+                    accounts={items.map((item) => item.account)}
+                    empty="No account is switched on"
+                  />
+                  {postCount > 1 ? (
+                    <span className="text-label text-muted-foreground" data-testid="thread-label">
+                      <span className="font-medium text-foreground">Thread · {postCount} posts</span>
+                      {' · '}
+                      {CAPABILITIES[primary].thread
+                        ? `${postCount === 2 ? 'post 2 replies' : `posts 2–${postCount} reply in order`} to post 1 on ${CHANNEL_META[primary].label}`
+                        : `published as one ${CHANNEL_META[primary].label} post`}
+                    </span>
+                  ) : null}
+                  {canEdit ? (
+                    <Button
+                      className="ms-auto"
+                      onClick={startNext}
+                      size="sm"
+                      title={`Saves this draft and opens a blank one for the same accounts (${mod}.)`}
+                      variant="outline"
+                    >
+                      {postCount > 1 ? 'New standalone post' : 'Save draft & new'}
+                    </Button>
+                  ) : null}
+                </div>
+              )}
+              {showSchedule && blockers.length > 0 ? (
                 <FixList
                   action={blockedAction}
                   blockers={blockers}
@@ -2296,7 +2352,7 @@ export function WriteComposer({
                   }
                 />
               ) : null}
-              {focus ? null : (
+              {focus || !showSchedule ? null : (
                 <ScheduleDock
                   blocked={blockers.length > 0}
                   context={context}

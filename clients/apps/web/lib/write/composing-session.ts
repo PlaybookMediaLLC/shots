@@ -9,6 +9,9 @@
  * point the composer shows, and the writer can change before confirming.
  */
 
+import { channelForPlatform } from '@/lib/content-drafts/serialize'
+import type { DraftChannel } from './document'
+
 /** The smallest and largest gap worth learning from one schedule to the next. */
 const GAP_RANGE = { max: 24 * 60, min: 5 } as const
 
@@ -96,6 +99,62 @@ export function carriedChannels(
   const live = new Set(set.accounts.map((account) => account.id))
   const kept = readComposing(set.id).channelIds.filter((id) => live.has(id))
   return kept.length ? kept : undefined
+}
+
+/** An account a new draft can publish to, as the composer shows it. */
+type DestinationAccount = {
+  channel: DraftChannel
+  displayName: string | null
+  handle: string | null
+  id: string
+}
+
+/**
+ * What a blank draft opens on, before anything is saved: the accounts it
+ * publishes to and the platform its body is written for. Explicit accounts
+ * (the open draft's, for Save draft & new) come first, then this session's
+ * carried ones, then the brand's default platforms. The main platform stays
+ * among the accounts it publishes to: the brand's own main platform, else X,
+ * else the first, so a switched-off platform never becomes the editor's tab.
+ * `channelConnectionIds` is undefined when the brand's defaults apply, and the
+ * server picks them as this does.
+ */
+export function blankDraftContext(
+  set:
+    | {
+        accounts: readonly DestinationAccount[]
+        defaultPlatforms: readonly string[]
+        id: string
+        primaryPlatform: string | null
+      }
+    | null
+    | undefined,
+  explicit?: { channelIds: readonly string[]; primary?: DraftChannel }
+): {
+  accounts: DestinationAccount[]
+  channelConnectionIds: string[] | undefined
+  primaryPlatform: DraftChannel
+} {
+  if (!set) return { accounts: [], channelConnectionIds: undefined, primaryPlatform: 'x' }
+  const chosen = explicit?.channelIds.length ? [...explicit.channelIds] : carriedChannels(set)
+  // In the order chosen, as the server reads them.
+  const accounts = chosen
+    ? chosen.flatMap((id) => set.accounts.filter((account) => account.id === id))
+    : set.defaultPlatforms.flatMap((platform) => {
+        const channel = channelForPlatform(platform)
+        const account = set.accounts.find((item) => item.channel === channel)
+        return account ? [account] : []
+      })
+  const channels = accounts.map((account) => account.channel)
+  const preferred = [explicit?.primary, channelForPlatform(set.primaryPlatform ?? ''), 'x'].find(
+    (channel): channel is DraftChannel =>
+      Boolean(channel) && channels.includes(channel as DraftChannel)
+  )
+  return {
+    accounts,
+    channelConnectionIds: chosen,
+    primaryPlatform: preferred ?? channels[0] ?? 'x',
+  }
 }
 
 /** Keep the accounts a draft is publishing to, so the next new draft opens on them. */

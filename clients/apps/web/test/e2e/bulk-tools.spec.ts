@@ -5,6 +5,7 @@ import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
+  db,
   expect,
   openNewBatch,
   type Page,
@@ -161,7 +162,7 @@ test(
     expect(moved.status).toBe(200)
     await app.reload()
     await expect(page.getByTestId('batch-summary')).toContainText('on 1 calendar day')
-    await expect(page.getByTestId('batch-summary')).toContainText('2 posts to 4 destinations')
+    await expect(page.getByTestId('batch-summary')).toContainText('2 posts to 2 accounts, 4 in all')
 
     // One refused row refuses the whole bulk change.
     const refused = await apiRequest(page, `/api/v1/content-batches/${id}/items`, {
@@ -184,6 +185,113 @@ test(
       assetIds: string[]
     }
     expect(first.assetIds).toHaveLength(2)
+  }
+)
+
+test(
+  'written posts open on a text-first page: paste, review the split, undo, plan and edit in place',
+  { tag: '@journey' },
+  async ({ app, page, startWorkspace }) => {
+    const workspace = await startWorkspace({ channels: ['x', 'linkedin'] })
+    await app.open('/publish/batches')
+    // Text posts needs nothing set up first: choosing it opens the batch.
+    await page
+      .getByTestId('bulk-tools')
+      .getByRole('radio', { name: /^Text posts/ })
+      .click()
+    await page.waitForURL(/\/publish\/batches\/[^/?]+/)
+    const paste = page.getByRole('textbox', { name: 'Batch text posts' })
+    await expect(paste).toBeFocused()
+
+    // Paragraphs alone stay one post until the writer chooses otherwise.
+    await paste.fill('One idea.\n\nIts second paragraph.')
+    const reading = page.getByRole('group', { name: 'Read the paste as' })
+    await expect(reading.getByRole('button', { pressed: true })).toHaveText('One post')
+    await expect(page.getByRole('button', { name: 'Add 1 post', exact: true })).toBeVisible()
+
+    // Explicit separators make separate posts, each listed with its length first.
+    const ten = Array.from({ length: 10 }, (_, i) => `Post ${i + 1}.\n\nWith a paragraph.`).join(
+      '\n---\n'
+    )
+    await paste.fill(ten)
+    await expect(reading.getByRole('button', { pressed: true })).toHaveText('10 separate posts')
+    await expect(
+      page.getByRole('list', { name: 'What the paste makes' }).getByRole('listitem')
+    ).toHaveCount(10)
+    await page.getByRole('button', { name: 'Add 10 posts', exact: true }).click()
+    const items = page.getByTestId('batch-item')
+    await expect(items).toHaveCount(10)
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 1', exact: true })
+    ).toBeFocused()
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 4', exact: true })
+    ).toHaveValue('Post 4.\n\nWith a paragraph.')
+
+    // Undo puts the paste back as it was; adding it again makes the same ten posts once.
+    await page.getByRole('button', { name: 'Undo import', exact: true }).click()
+    await expect(items).toHaveCount(0)
+    await expect(paste).toHaveValue(ten)
+    await page.getByRole('button', { name: 'Add 10 posts', exact: true }).click()
+    await expect(items).toHaveCount(10)
+    const batchId = new URL(page.url()).pathname.split('/').pop()!
+    const batch = (await apiRequest(page, `/api/v1/content-batches/${batchId}`)).body as {
+      items: { caption: string }[]
+    }
+    expect(batch.items).toHaveLength(10)
+
+    // Hourly from 09:00 to 11:00: three a day, the rest from 09:00 the next day.
+    await chooseOption(page.getByRole('combobox', { name: 'Batch time mode' }), 'Every hour')
+    const until = page.getByRole('textbox', { name: 'Hourly end of day' })
+    await until.fill('11:00')
+    await until.press('Enter')
+    await expect(page.getByTestId('hourly-explainer')).toContainText('up to 3 a day')
+    await page.getByRole('button', { name: 'Plan times', exact: true }).click()
+    await expect(items.getByRole('link', { name: /^Open draft/ })).toHaveCount(10, {
+      timeout: 60_000,
+    })
+    await expect(page.getByTestId('batch-item-time-1')).toContainText('Planned for')
+    await expect(page.getByTestId('batch-item-time-1')).toContainText('9:00')
+    await expect(page.getByTestId('batch-item-time-4')).toContainText('9:00')
+    await expect(page.getByTestId('batch-summary')).toContainText(
+      '10 posts to 2 accounts, 20 in all'
+    )
+    await expect(page.getByTestId('batch-readiness')).toContainText('10 drafts saved')
+
+    // A proposal is not a schedule: nothing is queued until Schedule is chosen.
+    const queued = () =>
+      db.rows(
+        `SELECT p.id FROM scheduled_post p JOIN content_draft d ON d.id = p."contentDraftId" WHERE d."organizationId" = $1`,
+        [workspace.id]
+      )
+    expect(await queued()).toHaveLength(0)
+
+    // A saved post is edited in place, on its own draft, which reopens with the change.
+    const second = page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
+    await second.fill('Post 2, edited in the batch.')
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PATCH' &&
+        /\/api\/v1\/content-drafts\//.test(response.url()) &&
+        response.ok()
+    )
+    await second.blur()
+    await saved
+    const href = await items
+      .nth(1)
+      .getByRole('link', { name: /^Open draft/ })
+      .getAttribute('href')
+    const draft = (await apiRequest(page, `/api/v1/content-drafts/${href!.split('/').pop()}`))
+      .body as { plainText: string }
+    expect(draft.plainText).toBe('Post 2, edited in the batch.')
+    await app.reload()
+    await expect(
+      page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
+    ).toHaveValue('Post 2, edited in the batch.')
+    expect(await queued()).toHaveLength(0)
+    expect(
+      await db.rows(`SELECT id FROM content_draft WHERE "organizationId" = $1`, [workspace.id])
+    ).toHaveLength(10)
   }
 )
 

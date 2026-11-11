@@ -21,15 +21,13 @@ import {
 } from '@/components/ui/sheet'
 import { DraftSettingsDrawer } from '@/components/drafts/DraftSettingsDrawer'
 import { WorkspaceNav } from '@/components/plan/WorkspaceNav'
-import { startBlankDraft } from './pending-draft'
-import { carriedChannels } from '@/lib/write/composing-session'
-import { countingChannelFor } from '@/lib/write/paste-split'
 import { cn } from '@/lib/utils'
 import { WriteRail } from './library'
 import { COMMAND_SHORTCUTS, type Shortcut, useKeys, useShortcuts } from './shortcuts'
 import {
   type DraftCommand,
   draftHref,
+  useNewDraft,
   useWrite,
   type WriteLibrary,
   WriteProvider,
@@ -167,7 +165,7 @@ function FrameLayout({
 }) {
   const router = useWriteRouter()
   const keys = useKeys()
-  const { beforeLeaveRef, canEdit, data, draftCommandsRef } = useWrite()
+  const { canEdit, data, draftCommandsRef } = useWrite()
   const [railOpen, setRailOpen] = React.useState(true)
   const [drawer, setDrawer] = React.useState(false)
   const [palette, setPalette] = React.useState(false)
@@ -189,20 +187,12 @@ function FrameLayout({
       viewport.removeEventListener('scroll', resize)
     }
   }, [])
+  const startDraft = useNewDraft()
   const newDraft = async () => {
     if (!canEdit || creating) return
     setCreating(true)
     try {
-      startBlankDraft(
-        {
-          channelConnectionIds: carriedChannels(data.activeSet),
-          socialSetId: data.activeSet?.id,
-          tagIds: data.experiments.tags && data.query.tag ? [data.query.tag] : undefined,
-        },
-        (id) => router.push(draftHref(id, data.activeSet?.id)),
-        beforeLeaveRef.current ?? undefined,
-        countingChannelFor(data.activeSet?.accounts)
-      )
+      startDraft()
     } finally {
       setCreating(false)
     }
