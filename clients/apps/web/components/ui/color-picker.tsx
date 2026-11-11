@@ -12,6 +12,8 @@ interface ColorPickerProps {
   color: string;
   onChange: (color: string) => void;
   className?: string;
+  id?: string;
+  label?: string;
 }
 
 interface ColorPanelProps {
@@ -32,7 +34,7 @@ interface HsvaColor {
   alpha: number;
 }
 
-const defaultColor = { r: 125, g: 212, b: 173, alpha: 1 };
+const emptyColor: HsvaColor = { h: 0, s: 0, v: 0, alpha: 1 };
 
 // Convert HSV to RGB
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
@@ -96,7 +98,9 @@ function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
 
 // Convert hex to RGB
 function hexToRgb(hex: string): [number, number, number] | null {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})(?:[a-f\d]{2})?$/i.exec(hex);
+  const normalized = hex.replace(/^#/, '');
+  const full = /^[a-f\d]{3,4}$/i.test(normalized) ? [...normalized].map((digit) => digit + digit).join('') : normalized;
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})(?:[a-f\d]{2})?$/i.exec(full);
   return result
     ? [
         parseInt(result[1], 16),
@@ -111,34 +115,35 @@ function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
 }
 
-// Parse the comma-separated rgba(...) format emitted by this picker.
+// The design contract accepts hex and comma-separated RGB(A), including percentages.
 function rgbaToColor(color: string): { r: number; g: number; b: number; alpha: number } | null {
-  // Capture integer red, green, blue channels and a decimal alpha channel.
-  const result = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d*\.?\d+)\s*\)$/i.exec(color);
-  if (!result) return null;
-
-  const r = Number(result[1]);
-  const g = Number(result[2]);
-  const b = Number(result[3]);
-  const alpha = Number(result[4]);
-  if (r > 255 || g > 255 || b > 255 || alpha > 1) return null;
-
-  return { r, g, b, alpha };
+  const match = /^rgba?\(([^)]+)\)$/i.exec(color);
+  if (!match) return null;
+  const parts = match[1].split(',').map((part) => part.trim());
+  if (parts.length < 3 || parts.length > 4 || parts.some((part) => !/^\d*\.?\d+%?$/.test(part))) return null;
+  const channels = parts.slice(0, 3).map((part) => Number.parseFloat(part) * (part.endsWith('%') ? 255 / 100 : 1));
+  const a = parts[3] ?? '1';
+  const alpha = Number.parseFloat(a) / (a.endsWith('%') ? 100 : 1);
+  if (channels.some((value) => value < 0 || value > 255) || alpha < 0 || alpha > 1) return null;
+  return { r: Math.round(channels[0]), g: Math.round(channels[1]), b: Math.round(channels[2]), alpha };
 }
 
-function colorToHsva(color: string): HsvaColor {
-  const rgb = hexToRgb(color);
+function colorToHsva(color: string): HsvaColor | null {
+  const text = color.trim();
+  const rgb = hexToRgb(text);
+  const hex = text.replace(/^#/, '');
+  const full = hex.length <= 4 ? [...hex].map((digit) => digit + digit).join('') : hex;
   const parsed = rgb
-    ? { r: rgb[0], g: rgb[1], b: rgb[2], alpha: /^#?[a-f\d]{8}$/i.test(color) ? parseInt(color.slice(-2), 16) / 255 : 1 }
-    : rgbaToColor(color) || defaultColor;
+    ? { r: rgb[0], g: rgb[1], b: rgb[2], alpha: full.length === 8 ? parseInt(full.slice(-2), 16) / 255 : 1 }
+    : rgbaToColor(text);
+  if (!parsed) return null;
   const [h, s, v] = rgbToHsv(parsed.r, parsed.g, parsed.b);
-
   return { h, s, v, alpha: parsed.alpha };
 }
 
 const hexColorSchema = z.string()
   .trim()
-  .regex(/^#?[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/, 'Invalid hex color')
+  .regex(/^#?(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, 'Invalid hex color')
   .transform((value) => value.startsWith('#') ? value : `#${value}`);
 
 /** A 0–1 position inside an element, clamped to its edges. */
@@ -186,22 +191,26 @@ const sliderFocus = 'outline-none focus-visible:ring-[3px] focus-visible:ring-ri
 
 /** The picker itself: a saturation area, hue (and alpha) sliders, hex and channel fields. */
 export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches, showContrast }: ColorPanelProps) {
-  const parsed = colorToHsva(color);
+  const [editing, setEditing] = React.useState(() => ({ source: color, emitted: '', hsva: colorToHsva(color) }));
+  if (editing.source !== color) {
+    setEditing({ source: color, emitted: '', hsva: color === editing.emitted ? editing.hsva : colorToHsva(color) });
+  }
+  const parsed = editing.hsva ?? emptyColor;
   const { h, s, v } = parsed;
   const alpha = withAlpha ? parsed.alpha : 1;
   const currentRgb = hsvToRgb(h, s, v);
   const currentHex = rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]) + (alpha < 1 ? Math.round(alpha * 255).toString(16).padStart(2, '0') : '');
   const hueColor = rgbToHex(...hsvToRgb(h, 1, 1));
 
-  const [hexInput, setHexInput] = React.useState(currentHex);
+  const [hexInput, setHexInput] = React.useState(editing.hsva ? currentHex : color);
   const [hexError, setHexError] = React.useState(false);
   const alphaValue = alpha === 1 ? '1' : alpha.toFixed(2);
   const [alphaInput, setAlphaInput] = React.useState(alphaValue);
 
   React.useEffect(() => {
-    setHexInput(currentHex);
-    setHexError(false);
-  }, [currentHex]);
+    setHexInput(editing.hsva ? currentHex : color);
+    setHexError(!editing.hsva);
+  }, [currentHex, color, editing.hsva]);
 
   React.useEffect(() => {
     setAlphaInput(alphaValue);
@@ -209,11 +218,11 @@ export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches,
 
   const updateColor = (newColor: HsvaColor) => {
     const [r, g, b] = hsvToRgb(newColor.h, newColor.s, newColor.v);
-    if (withAlpha && newColor.alpha < 1) {
-      onChange(`rgba(${r}, ${g}, ${b}, ${newColor.alpha.toFixed(2)})`);
-      return;
-    }
-    onChange(rgbToHex(r, g, b));
+    const emitted = withAlpha && newColor.alpha < 1
+      ? `rgba(${r}, ${g}, ${b}, ${newColor.alpha.toFixed(2)})`
+      : rgbToHex(r, g, b);
+    setEditing({ source: color, emitted, hsva: newColor });
+    onChange(emitted);
   };
 
   const handleHexCommit = () => {
@@ -223,16 +232,11 @@ export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches,
       return;
     }
 
-    const rgb = hexToRgb(result.data);
-    if (!rgb) {
-      setHexError(true);
-      return;
-    }
-
-    const [newH, newS, newV] = rgbToHsv(rgb[0], rgb[1], rgb[2]);
+    const next = colorToHsva(result.data);
+    if (!next) { setHexError(true); return; }
     setHexInput(result.data.toLowerCase());
     setHexError(false);
-    updateColor({ h: newH, s: newS, v: newV, alpha: result.data.length === 9 ? parseInt(result.data.slice(-2), 16) / 255 : 1 });
+    updateColor(next);
   };
 
   const handleHexKeyDown = (e: React.KeyboardEvent) => {
@@ -293,6 +297,7 @@ export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches,
 
   return (
     <div className="space-y-3">
+      {!editing.hsva ? <p role="alert" className="text-xs text-destructive">This color could not be read. Enter a hex or RGB color to replace it.</p> : null}
       {/* Saturation/Brightness picker */}
       <div
         role="slider"
@@ -413,7 +418,7 @@ export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches,
           aria-valuenow={Math.round(alpha * 100)}
           className={cn('w-72 h-4 rounded-full cursor-pointer relative overflow-hidden touch-none', sliderFocus)}
           style={{
-            background: `linear-gradient(to right, transparent, ${currentHex}), repeating-conic-gradient(#808080 0% 25%, #fff 0% 50%) 50% / 8px 8px`,
+            background: `linear-gradient(to right, rgba(${currentRgb.join(", ")}, 0), ${solidHex}), repeating-conic-gradient(#808080 0% 25%, #fff 0% 50%) 50% / 8px 8px`,
           }}
           onPointerDown={(e) => startDrag(e, (x) => updateColor({ h, s, v, alpha: Math.round(x * 100) / 100 }))}
           onKeyDown={(e) => {
@@ -478,9 +483,10 @@ export function ColorPanel({ color, onChange, alpha: withAlpha = true, swatches,
   );
 }
 
-export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
+export function ColorPicker({ color, onChange, className, id, label }: ColorPickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
-  const { h, s, v, alpha } = colorToHsva(color);
+  const parsed = colorToHsva(color);
+  const { h, s, v, alpha } = parsed ?? emptyColor;
   const currentRgb = hsvToRgb(h, s, v);
   const currentHex = rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]) + (alpha < 1 ? Math.round(alpha * 255).toString(16).padStart(2, '0') : '');
 
@@ -488,6 +494,9 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <button
+          id={id}
+          type="button"
+          aria-label={label ? `${label}: ${color}` : color}
           className={cn(
             'flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl border border-border/40 bg-muted/30 hover:bg-accent hover:border-border/60 transition-all',
             className
@@ -496,10 +505,10 @@ export function ColorPicker({ color, onChange, className }: ColorPickerProps) {
           <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-muted">
             <div
               className="w-3.5 h-3.5 rounded-full border border-white/20"
-              style={{ backgroundColor: currentHex }}
+              style={{ backgroundColor: color }}
             />
           </div>
-          <span className="text-[10px] font-medium text-muted-foreground">{currentHex}</span>
+          <span className="text-[10px] font-medium text-muted-foreground">{parsed ? currentHex : color}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent

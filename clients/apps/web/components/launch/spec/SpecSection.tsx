@@ -2,7 +2,7 @@
 
 import { NotePencilIcon as PencilEdit02Icon } from '@phosphor-icons/react/dist/ssr/NotePencil'
 import { ArrowRightIcon as ArrowRight } from '@phosphor-icons/react/dist/ssr/ArrowRight'
-import { type FormEvent, type ReactNode, useId, useState } from 'react'
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react'
 import { RevisePanel } from '@/components/launch/RevisePanel'
 import { Group, Section } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
@@ -285,11 +285,13 @@ function parseFields(
 function SectionEditor({
   content,
   onCancel,
+  onDirtyChange,
   onSave,
   section,
 }: {
   content: ReleaseSpecContent
   onCancel: () => void
+  onDirtyChange: (dirty: boolean) => void
   onSave: (value: unknown) => Promise<void>
   section: EditableSection
 }) {
@@ -300,9 +302,15 @@ function SectionEditor({
   )
   const [errors, setErrors] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
+  const dirty = fields.some((field) => values[field.key] !== field.value)
+  useEffect(() => {
+    onDirtyChange(dirty || saving)
+    return () => onDirtyChange(false)
+  }, [dirty, saving, onDirtyChange])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving) return
     const parsed = parseFields(section, values)
     if ('errors' in parsed) {
       setErrors(parsed.errors)
@@ -336,6 +344,7 @@ function SectionEditor({
             aria-describedby={`${id}-${field.key}-help${errors.length > 0 ? ` ${id}-errors` : ''}`}
             aria-invalid={errors.length > 0 || undefined}
             className="mt-1 min-h-24 w-full rounded-lg bg-foreground/[0.03] px-3 py-2 font-mono text-[13px] leading-6 text-foreground ring-1 ring-foreground/[0.08] outline-none [field-sizing:content] focus:ring-foreground/25 aria-invalid:ring-red-500/40"
+            disabled={saving}
             id={`${id}-${field.key}`}
             onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
             value={values[field.key] ?? ''}
@@ -356,7 +365,14 @@ function SectionEditor({
         </div>
       ) : null}
       <div className="flex justify-end gap-2">
-        <Button className="rounded-lg" onClick={onCancel} size="sm" type="button" variant="ghost">
+        <Button
+          className="rounded-lg"
+          disabled={saving}
+          onClick={onCancel}
+          size="sm"
+          type="button"
+          variant="ghost"
+        >
           Cancel
         </Button>
         <Button className="rounded-lg" disabled={saving} size="sm" type="submit">
@@ -380,6 +396,7 @@ export function SpecSection({
   index,
   locked,
   onCancel,
+  onDirtyChange,
   onEdit,
   onSave,
   section,
@@ -395,6 +412,7 @@ export function SpecSection({
   /** Another section is being edited. */
   locked: boolean
   onCancel: () => void
+  onDirtyChange: (dirty: boolean) => void
   onEdit: () => void
   onSave: (value: unknown) => Promise<void>
   section: EditableSection
@@ -423,7 +441,13 @@ export function SpecSection({
       title={label}
     >
       {editing ? (
-        <SectionEditor content={content} onCancel={onCancel} onSave={onSave} section={section} />
+        <SectionEditor
+          onDirtyChange={onDirtyChange}
+          content={content}
+          onCancel={onCancel}
+          onSave={onSave}
+          section={section}
+        />
       ) : (
         <Group>
           <SectionBody content={content} index={index} section={section} />
@@ -433,7 +457,7 @@ export function SpecSection({
         <div className="-mt-1">
           <RevisePanel
             campaignId={campaignId}
-            disabled={!aiConfigured}
+            disabled={!aiConfigured || locked}
             target={{ section, specId, type: 'spec_section' }}
           />
         </div>

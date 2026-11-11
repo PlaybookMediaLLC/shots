@@ -260,7 +260,9 @@ export function buildPublication(
       !options.tiktok.brandOrganic &&
       !options.tiktok.brandedContent
     )
-      optionProblems.push('Indicate whether this TikTok content promotes your brand or another brand.')
+      optionProblems.push(
+        'Indicate whether this TikTok content promotes your brand or another brand.'
+      )
     if (
       (options.tiktok?.brandOrganic || options.tiktok?.brandedContent) &&
       !options.tiktok.commercialContent
@@ -269,7 +271,9 @@ export function buildPublication(
     if (!options.tiktok?.privacy)
       optionProblems.push('Choose who can see this TikTok post in its options before scheduling.')
     if (!options.tiktok?.consent)
-      optionProblems.push('Confirm consent to send this video to TikTok in its options before scheduling.')
+      optionProblems.push(
+        'Confirm consent to send this video to TikTok in its options before scheduling.'
+      )
     if (options.tiktok?.brandedContent && options.tiktok.privacy === 'SELF_ONLY')
       optionProblems.push('Branded TikTok content cannot be private.')
   }
@@ -441,4 +445,22 @@ export function buildPublication(
     settings,
     target,
   }
+}
+
+/** Keep rendered assets bound to the saved document used by schedule and Publish now. */
+export async function preparePublication(context: {
+  flush: () => Promise<void>
+  versionRef: { current: number }
+  renderBlocks: () => Promise<BlockImages>
+}): Promise<{ version: number; blockImages: BlockImages }> {
+  await context.flush()
+  const version = context.versionRef.current
+  const blockImages = await context.renderBlocks()
+  // Flush again to detect edits still waiting for autosave, including live body changes.
+  await context.flush()
+  if (context.versionRef.current !== version)
+    throw new Error(
+      'The draft changed while preparing its images. Review the changes and try again.'
+    )
+  return { version, blockImages }
 }

@@ -106,15 +106,35 @@ test('scripted spec, plan, and copy pass the real checks and never cite flagged 
   }
 })
 
-test('the scripted model is off in production builds', async () => {
+test('the scripted model is off in deployed production builds', async () => {
   const { isScriptedModelEnabled } = await import('@/lib/ai/models/scripted')
   const env = process.env as Record<string, string | undefined>
-  const previous = { flag: env.PLATFORM_AI_SCRIPTED, node: env.NODE_ENV }
+  const previous = {
+    flag: env.PLATFORM_AI_SCRIPTED,
+    hooks: env.PLATFORM_E2E_HOOKS,
+    node: env.NODE_ENV,
+    url: env.BETTER_AUTH_URL,
+  }
   env.PLATFORM_AI_SCRIPTED = '1'
   env.NODE_ENV = 'production'
+  env.BETTER_AUTH_URL = 'https://shots.playbookmedia.io'
   assert.equal(isScriptedModelEnabled(), false)
+  // Even asked for: a deployed origin never gets the stand-in model.
+  env.PLATFORM_E2E_HOOKS = '1'
+  assert.equal(isScriptedModelEnabled(), false)
+  // The production image the browser suite runs, on localhost, does.
+  env.BETTER_AUTH_URL = 'http://localhost:3000'
+  assert.equal(isScriptedModelEnabled(), true)
   env.NODE_ENV = 'test'
   assert.equal(isScriptedModelEnabled(), true)
-  env.PLATFORM_AI_SCRIPTED = previous.flag
-  env.NODE_ENV = previous.node
+  for (const [key, value] of Object.entries({
+    PLATFORM_AI_SCRIPTED: previous.flag,
+    PLATFORM_E2E_HOOKS: previous.hooks,
+    NODE_ENV: previous.node,
+    BETTER_AUTH_URL: previous.url,
+  })) {
+    // Assigning undefined would leave the literal string "undefined" behind.
+    if (value === undefined) delete env[key]
+    else env[key] = value
+  }
 })

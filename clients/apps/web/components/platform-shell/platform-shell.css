@@ -23,10 +23,10 @@
    13px UI text, and text-sm is that 13px step. On body, so portaled menus
    match. The editor keeps its own sizes. */
 :is(
-    body:has(.platform-shell[data-platform-variant='page']),
-    .platform-overlay,
-    [data-platform-sidebar]
-  ) {
+  body:has(.platform-shell[data-platform-variant='page']),
+  .platform-overlay,
+  [data-platform-sidebar]
+) {
   --text-sm: var(--text-ui);
   --text-sm--line-height: var(--text-ui--line-height);
 }
@@ -234,11 +234,12 @@ body:has([data-platform-shell]) [data-slot='button']:active {
 
 /* Page controls share states without changing editor tools or rendered artwork. */
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-  :where(
-    [data-slot='input'],
-    [data-slot='textarea'],
-    [data-slot='select-trigger']
-  ):not([type='radio'], [type='checkbox'], [type='range'], [type='color']) {
+  :where([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):not(
+    [type='radio'],
+    [type='checkbox'],
+    [type='range'],
+    [type='color']
+  ) {
   border-color: var(--input);
   border-radius: var(--platform-control-radius);
   background-color: var(--platform-control);
@@ -252,14 +253,16 @@ body:has([data-platform-shell]) [data-slot='button']:active {
 }
 
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-  :where(
-    [data-slot='input'],
-    [data-slot='textarea'],
-    [data-slot='select-trigger']
-  ):focus-visible {
+  :where([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):focus-visible {
   border-color: var(--ring);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 18%, transparent);
+}
+
+:where(.platform-shell[data-platform-variant='page'], .platform-overlay)
+  :where([data-slot='textarea']):focus-visible {
+  border-color: color-mix(in srgb, var(--foreground) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
@@ -281,11 +284,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
 }
 
 :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-  :where(
-    [data-slot='input'],
-    [data-slot='textarea'],
-    [data-slot='select-trigger']
-  ):disabled {
+  :where([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):disabled {
   background-color: var(--muted);
   cursor: not-allowed;
 }
@@ -462,11 +461,7 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   }
 
   :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-    :where(
-      [data-slot='input'],
-      [data-slot='textarea'],
-      [data-slot='select-trigger']
-    ):not(
+    :where([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']):not(
       :disabled,
       :focus-visible,
       [aria-invalid='true'],
@@ -517,22 +512,19 @@ body:has([data-platform-shell]) [data-slot='button']:active {
   }
 
   .platform-shell[data-platform-variant='page']
-    :where(
-      [data-slot='button'],
-      [data-slot='input'],
-      [data-slot='select-trigger']
-    ):not([type='radio'], [type='checkbox'], [type='range'], [type='color']) {
+    :where([data-slot='button'], [data-slot='input'], [data-slot='select-trigger']):not(
+      [type='radio'],
+      [type='checkbox'],
+      [type='range'],
+      [type='color']
+    ) {
     min-height: 2.75rem;
   }
 }
 
 @media (max-width: 767px) {
   :where(.platform-shell[data-platform-variant='page'], .platform-overlay)
-    :where(
-      [data-slot='input'],
-      [data-slot='textarea'],
-      [data-slot='select-trigger']
-    ) {
+    :where([data-slot='input'], [data-slot='textarea'], [data-slot='select-trigger']) {
     font-size: 1rem;
   }
 }

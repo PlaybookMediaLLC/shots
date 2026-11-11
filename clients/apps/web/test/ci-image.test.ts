@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 
 const require = createRequire(import.meta.url)
-const { waitForImage } = require('../../../../dev/ci-image.cjs') as {
+const { IMAGES, waitForImage } = require('../../../../dev/ci-image.cjs') as {
+  IMAGES: Record<string, { prefix: string; job: string; label: string }>
   waitForImage: (input: object) => Promise<void>
 }
 
 type Artifact = { id: number; name: string; expired: boolean }
 type Job = { name: string; status: string; conclusion?: string }
 
-function scenario(artifacts: Artifact[][], jobs: Job[]) {
+function scenario(artifacts: Artifact[][], jobs: Job[], image?: string) {
   let polls = 0
   let sleeps = 0
   let output = ''
@@ -20,6 +22,7 @@ function scenario(artifacts: Artifact[][], jobs: Job[]) {
     result: () => ({ polls, sleeps, output }),
     input: {
       context: { repo: { owner: 'owner', repo: 'shots' }, runId: 42, sha: 'abc' },
+      ...(image ? { image } : {}),
       core: {
         setOutput: (key: string, value: string) => {
           assert.equal(key, 'name')
@@ -102,4 +105,51 @@ test('API errors propagate instead of masquerading as a pending build', async ()
     throw new Error('API unavailable')
   }
   await assert.rejects(waitForImage(run.input), /API unavailable/)
+})
+
+test('each image waits on its own producer job and artifact prefix', async () => {
+  for (const [image, descriptor] of Object.entries(IMAGES)) {
+    const run = scenario(
+      [[], [{ id: 2, name: `${descriptor.prefix}-abc-1`, expired: false }]],
+      [{ name: descriptor.job, status: 'in_progress' }],
+      image
+    )
+    await waitForImage(run.input)
+    assert.equal(run.result().output, `${descriptor.prefix}-abc-1`)
+  }
+})
+
+// `ci-backend-` is a prefix of `ci-backend-e2e-`; only the SHA separator keeps
+// a shard from loading the e2e-tagged backend as the production one.
+test('the backend image never matches the e2e-tagged backend artifact', async () => {
+  const run = scenario(
+    [
+      [{ id: 9, name: 'ci-backend-e2e-abc-1', expired: false }],
+      [{ id: 2, name: 'ci-backend-abc-1', expired: false }],
+    ],
+    [{ name: IMAGES.backend.job, status: 'in_progress' }],
+    'backend'
+  )
+  await waitForImage(run.input)
+  assert.equal(run.result().output, 'ci-backend-abc-1')
+})
+
+test('an unknown image name fails instead of waiting for a job that never runs', async () => {
+  const run = scenario([[]], [], 'nope')
+  await assert.rejects(waitForImage(run.input), /Unknown CI image "nope"/)
+})
+
+// The loader reads one fixed file name; a producer that uploads any other name
+// hands every consumer an artifact it downloads and then cannot load.
+test('every image artifact holds the image.tar.gz the loader reads', () => {
+  const workflow = readFileSync('../../../.github/workflows/ci.yml', 'utf8')
+  const loader = readFileSync('../../../.github/actions/load-ci-image/action.yml', 'utf8')
+  assert.match(loader, /docker load --input "\$IMAGE_DIR\/image\.tar\.gz"/)
+  for (const { prefix } of Object.values(IMAGES)) {
+    const upload = workflow.match(
+      new RegExp(`name: ${prefix}-\\$\\{\\{ github\\.sha \\}\\}.*\\n\\s+path: (.+)`)
+    )
+    assert.ok(upload, `no upload step names the ${prefix} artifact`)
+    assert.match(upload[1]!, /\/image\.tar\.gz$/, `${prefix} uploads ${upload[1]}`)
+  }
 })

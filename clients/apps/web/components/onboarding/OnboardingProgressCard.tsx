@@ -22,16 +22,18 @@ const HEADINGS: Record<string, string> = {
 }
 
 function Card({ initial }: { initial: StoredOnboardingRun }) {
-  const { run } = useOnboardingRun(initial)
+  const { lost, run, retry } = useOnboardingRun(initial)
   const [dismissed, setDismissed] = useState(
     () => window.localStorage.getItem(dismissedKey(initial.id)) === '1'
   )
   const running = !isTerminal(run.status)
   const finishedAt = run.completedAt?.getTime() ?? 0
   if (dismissed || (!running && Date.now() - finishedAt > SHOW_FINISHED_MS)) return null
-  const detail = running
-    ? `${stageLabel(run)} · ${run.pagesProcessed} of ${run.pagesDiscovered} pages read`
-    : `${run.pagesProcessed} pages read${run.errorMessage ? `. ${run.errorMessage}` : ''}`
+  const detail = lost
+    ? 'Connection lost. Progress is paused until you reconnect.'
+    : running
+      ? `${stageLabel(run)} · ${run.pagesProcessed} of ${run.pagesDiscovered} pages read`
+      : `${run.pagesProcessed} pages read${run.errorMessage ? `. ${run.errorMessage}` : ''}`
   return (
     <aside
       aria-label="Profile enrichment"
@@ -39,11 +41,17 @@ function Card({ initial }: { initial: StoredOnboardingRun }) {
     >
       <div className="flex items-start justify-between gap-3">
         <p className="font-medium text-foreground">
-          {running ? 'Enriching your profile' : HEADINGS[run.status]}
+          {lost
+            ? 'Enrichment status unavailable'
+            : running
+              ? 'Enriching your profile'
+              : HEADINGS[run.status]}
         </p>
         <div className="flex items-center gap-2">
           <span className="text-foreground/80 tabular-nums">{run.progress}%</span>
-          <Button variant="custom" size={null}
+          <Button
+            variant="custom"
+            size={null}
             aria-label="Dismiss"
             className="text-muted-foreground hover:text-foreground"
             onClick={() => {
@@ -64,11 +72,19 @@ function Card({ initial }: { initial: StoredOnboardingRun }) {
         className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
         role="progressbar"
       >
-        <div className="h-full bg-foreground transition-all" style={{ width: `${run.progress}%` }} />
+        <div
+          className="h-full bg-foreground transition-all"
+          style={{ width: `${run.progress}%` }}
+        />
       </div>
       <p aria-live="polite" className="text-xs text-foreground/65">
         {detail}
       </p>
+      {lost ? (
+        <Button onClick={retry} size="sm" variant="outline">
+          Retry connection
+        </Button>
+      ) : null}
       <Link
         className="w-fit text-xs text-foreground/80 underline underline-offset-4 hover:text-foreground"
         href="/settings/product"

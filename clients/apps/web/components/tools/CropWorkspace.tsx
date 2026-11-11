@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ImageToolsWorkerClient } from "@/lib/image-tools/worker-client";
 import Image from "next/image";
 import { toast } from "sonner";
 import { CropIcon as CropIcon } from "@phosphor-icons/react/dist/ssr/Crop"
@@ -25,7 +26,6 @@ import {
   clampPoint,
   downloadBlob,
   formatBytes,
-  imageToolsWorker,
   pickCutSide,
   polygonBounds,
   readImageSize,
@@ -205,7 +205,7 @@ function resizeRect(
     if (mode.includes("n")) y = rect.y + rect.height - height;
   }
 
-  return clampCropRect({ x, y, width, height }, source);
+  return clampCropRect({ x, y, width, height }, source, ratio);
 }
 
 interface CropWorkspaceProps {
@@ -219,7 +219,7 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
   const [crop, setCrop] = React.useState<CropRect | null>(null);
   const [ratioId, setRatioId] = React.useState("free");
   const [isRunning, setIsRunning] = React.useState(false);
-  const [result, setResult] = React.useState<ProcessResult | null>(null);
+  const [result, setResult] = React.useState<(ProcessResult & { name: string }) | null>(null);
 
   const [shape, setShape] = React.useState<CropShape>("rectangle");
   const [selection, setSelection] = React.useState<FreehandSelection | null>(null);
@@ -232,12 +232,27 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
   const [draft, setDraft] = React.useState<FreehandDraft | null>(null);
   const [brushPoint, setBrushPoint] = React.useState<Point | null>(null);
 
+  const [worker] = React.useState(() => new ImageToolsWorkerClient())
+  const operation = React.useRef<AbortController | null>(null)
+  const generation = React.useRef(0)
+  const invalidate = React.useCallback(() => {
+    generation.current++
+    operation.current?.abort()
+    worker.terminate()
+  }, [worker])
   const frameRef = React.useRef<HTMLDivElement>(null);
   const dragRef = React.useRef<DragState | null>(null);
   // Mirrors `draft` so pointer handlers read the latest points synchronously.
   const draftRef = React.useRef<FreehandDraft | null>(null);
   const [displayWidth, setDisplayWidth] = React.useState(0);
   const maskId = `crop-mask-${React.useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+  React.useEffect(() => {
+    generation.current++
+    setIsRunning(false)
+    setResult(null)
+    return invalidate
+  }, [file, crop, shape, selection, side, eraseStrokes, invalidate])
 
   const ratio = RATIO_PRESETS.find((preset) => preset.id === ratioId)?.ratio ?? null;
   // Preview pixels per source pixel; every drag delta is divided by this.
@@ -296,9 +311,14 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
     async (files: File[]) => {
       const next = files[0];
       if (!next) return;
+      invalidate()
+      setIsRunning(false)
+      setResult(null)
+      const intent = generation.current
 
       try {
         const size = await readImageSize(next);
+        if (intent !== generation.current) return
         setFile(next);
         setPreviewUrl((current) => {
           if (current) URL.revokeObjectURL(current);
@@ -309,12 +329,13 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
         setRatioId("free");
         clearFreehand();
       } catch {
+        if (intent !== generation.current) return
         toast.error("Could not read that image", {
           description: "Try a PNG, JPG, WebP, or AVIF file.",
         });
       }
     },
-    [clearFreehand]
+    [clearFreehand, invalidate]
   );
 
   const handleRatioChange = React.useCallback(
@@ -486,17 +507,22 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
   const setCropField = (field: keyof CropRect, raw: string) => {
     if (!source || !crop) return;
     const value = Math.max(0, Number.parseInt(raw, 10) || 0);
-    setCrop(clampCropRect({ ...crop, [field]: value }, source));
+    const next = { ...crop, [field]: value }
+    if (ratio && field === 'height') next.width = value * ratio
+    setCrop(clampCropRect(next, source, ratio));
     setResult(null);
   };
 
   const handleCrop = async () => {
-    if (!file || !outputRect) return;
+    if (!file || !outputRect || isRunning) return;
+    const intent = ++generation.current
+    const abort = new AbortController()
+    operation.current = abort
 
     setIsRunning(true);
     try {
       const format = outputFormat(file);
-      const processed = await imageToolsWorker.process(file, {
+      const processed = await worker.process(file, {
         crop: outputRect,
         mask: isFreehand ? keptPolygon : null,
         erase: isFreehand ? eraseStrokes : null,
@@ -507,23 +533,26 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
           quality: DEFAULT_REENCODE_QUALITY,
           background: DEFAULT_TOOL_SETTINGS.background,
         },
-      });
-      setResult(processed);
+      }, abort.signal);
+      if (intent !== generation.current) return
+      setResult({ ...processed, name: buildOutputName('crop', file.name, format) });
     } catch {
+      if (intent !== generation.current) return
       toast.error("Crop failed", {
         description: "The image may be too large for this browser to process.",
       });
     } finally {
-      setIsRunning(false);
+      if (intent === generation.current) setIsRunning(false);
     }
   };
 
   const handleDownload = () => {
     if (!result || !file) return;
-    downloadBlob(result.blob, buildOutputName("crop", file.name, outputFormat(file)));
+    downloadBlob(result.blob, result.name);
   };
 
   const reset = React.useCallback(() => {
+    invalidate()
     setPreviewUrl((current) => {
       if (current) URL.revokeObjectURL(current);
       return null;
@@ -532,7 +561,7 @@ export function CropWorkspace({ tool }: CropWorkspaceProps) {
     setSource(null);
     setCrop(null);
     clearFreehand();
-  }, [clearFreehand]);
+  }, [clearFreehand, invalidate]);
 
   if (!file || !previewUrl || !source || !crop) {
     return (

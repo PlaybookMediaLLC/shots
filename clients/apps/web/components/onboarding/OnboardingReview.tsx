@@ -107,7 +107,10 @@ function RunProgress({
         className="h-1.5 overflow-hidden rounded-full bg-foreground/[0.08]"
         role="progressbar"
       >
-        <div className="h-full bg-foreground transition-all" style={{ width: `${run.progress}%` }} />
+        <div
+          className="h-full bg-foreground transition-all"
+          style={{ width: `${run.progress}%` }}
+        />
       </div>
       <ol className="grid gap-2 sm:grid-cols-2">
         {ONBOARDING_STAGES.map((stage) => {
@@ -182,7 +185,7 @@ function displayValue(source: object | null, field: string): string {
 }
 
 /** One reviewed field: its value, where it came from, and accept or edit. */
-function ReviewField({
+export function ReviewField({
   entry,
   label,
   list,
@@ -199,6 +202,7 @@ function ReviewField({
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
+  const [editBase, setEditBase] = useState(value)
   const [busy, setBusy] = useState(false)
   const id = `review-${label.toLowerCase().replace(/\W+/g, '-')}`
   const labelId = `${id}-label`
@@ -207,6 +211,8 @@ function ReviewField({
     try {
       await work()
       setEditing(false)
+    } catch {
+      // The owner displays the save error; retain the draft for retry.
     } finally {
       setBusy(false)
     }
@@ -236,6 +242,12 @@ function ReviewField({
           {value || 'Nothing yet.'}
         </p>
       )}
+      {editing && value !== editBase ? (
+        <p className="text-xs text-muted-foreground" role="status">
+          This field was updated in the background. Save to keep your edit, or cancel to use the
+          latest value.
+        </p>
+      ) : null}
       <div className="flex gap-2">
         {editing ? (
           <>
@@ -276,6 +288,7 @@ function ReviewField({
               disabled={busy}
               onClick={() => {
                 setDraft(value)
+                setEditBase(value)
                 setEditing(true)
               }}
               size="sm"
@@ -361,25 +374,45 @@ export function OnboardingReview({
   const trpcClient = useTRPCClient()
   const [profile, setProfile] = useState(initialProfile)
   const [icp, setIcp] = useState(initialIcp)
-  const [findings, setFindings] = useState<StoredEnrichment[]>([])
+  const [findings, setFindings] = useState<{ runId: string; data: StoredEnrichment[] } | null>(null)
+  const [findingsError, setFindingsError] = useState<string | null>(null)
+  const [findingsAttempt, setFindingsAttempt] = useState(0)
+  const [findingsLoading, setFindingsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // A stage finished: the drafts may have changed underneath.
-  const { lost, run, setRun } = useOnboardingRun(initialRun, async () => {
+  const { lost, run, setRun, retry } = useOnboardingRun(initialRun, async (_run, signal) => {
     const [productResult, icpResult] = await Promise.all([
-      trpcClient.productProfile.get.query(),
-      trpcClient.idealCustomerProfile.get.query(),
+      trpcClient.productProfile.get.query(undefined, { signal }),
+      trpcClient.idealCustomerProfile.get.query(undefined, { signal }),
     ])
+    if (signal.aborted) return
     if (productResult.productProfile) setProfile(productResult.productProfile)
     setIcp(icpResult.idealCustomerProfile)
   })
 
   useEffect(() => {
+    setFindingsLoading(false)
+    setFindingsError(null)
     if (!isTerminal(run.status)) return
+    const abort = new AbortController()
+    setFindingsLoading(true)
+    setFindingsError(null)
     trpcClient.onboarding.enrichment
-      .query({ runId: run.id })
-      .then((result) => setFindings(result.enrichment))
-      .catch(() => setFindings([]))
-  }, [run.id, run.status, trpcClient])
+      .query({ runId: run.id }, { signal: abort.signal })
+      .then((result) => {
+        if (!abort.signal.aborted) setFindings({ runId: run.id, data: result.enrichment })
+      })
+      .catch(() => {
+        if (!abort.signal.aborted)
+          setFindingsError(
+            'Findings could not be refreshed. Previously loaded evidence is still shown.'
+          )
+      })
+      .finally(() => {
+        if (!abort.signal.aborted) setFindingsLoading(false)
+      })
+    return () => abort.abort()
+  }, [findingsAttempt, run.id, run.status, trpcClient])
 
   const attempt = async (work: () => Promise<void>) => {
     setError(null)
@@ -439,7 +472,12 @@ export function OnboardingReview({
       {error || lost ? (
         <Alert variant="destructive">
           <AlertDescription>
-            {error ?? 'Lost track of the background read. Reload to see where it got to.'}
+            {error ?? 'Lost track of the background read. Retry to see where it got to.'}
+            {lost ? (
+              <Button onClick={retry} size="sm" variant="outline">
+                Retry connection
+              </Button>
+            ) : null}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -449,7 +487,7 @@ export function OnboardingReview({
           {PRODUCT_FIELDS.map((spec) => (
             <ReviewField
               entry={profile.provenance[spec.field as ProductProfileFieldName]}
-              key={`${spec.field}-${displayValue(profile, spec.field)}`}
+              key={spec.field}
               label={spec.label}
               list={spec.list}
               onAccept={() => saveProduct({ acceptFields: [spec.field] })}
@@ -465,7 +503,7 @@ export function OnboardingReview({
           {ICP_FIELDS.map((spec) => (
             <ReviewField
               entry={icp?.provenance[spec.field as IdealCustomerProfileFieldName]}
-              key={`${spec.field}-${displayValue(icp, spec.field)}`}
+              key={spec.field}
               label={spec.label}
               list={spec.list}
               onAccept={() => saveIcp({ acceptFields: [spec.field] })}
@@ -475,9 +513,37 @@ export function OnboardingReview({
           ))}
         </ul>
       </section>
-      <EnrichmentFacts findings={findings} />
+      {findingsError ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {findingsError}{' '}
+            <Button
+              disabled={findingsLoading}
+              onClick={() => setFindingsAttempt((value) => value + 1)}
+              size="sm"
+              variant="outline"
+            >
+              Retry findings
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      {findingsLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading findings…
+        </p>
+      ) : null}
+      {findings?.runId === run.id ? <EnrichmentFacts findings={findings.data} /> : null}
+      {!findingsLoading &&
+      !findingsError &&
+      findings?.runId === run.id &&
+      findings.data.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No additional findings were found.</p>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button variant="custom" size={null}
+        <Button
+          variant="custom"
+          size={null}
           className="text-sm text-foreground/65 underline underline-offset-4 hover:text-foreground"
           onClick={onManual}
           type="button"

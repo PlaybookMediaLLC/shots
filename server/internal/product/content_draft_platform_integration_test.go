@@ -416,7 +416,7 @@ func TestContentDraftPlatform(t *testing.T) {
 			_, _ = repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &off})
 		}()
 		draft := newDraft("Approved for scheduling")
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		queued, err = schedule(draft, at)
@@ -428,22 +428,22 @@ func TestContentDraftPlatform(t *testing.T) {
 			t.Fatal(err)
 		}
 		draft = newDraft("Review revoked after scheduling")
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		queued, err = schedule(draft, at)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "changes"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: queued.Draft.Version, Action: "changes"}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := repo.PublishQueuedContentDraftPost(ctx, owner, queued.Posts[0].ID); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("revoked approval: %v", err)
 		}
 		old, _ := db.Client.ScheduledPost.Get(ctx, queued.Posts[0].ID)
-		if old.Status != scheduledpost.StatusSCHEDULED {
-			t.Fatal("failed command consumed original timer")
+		if old.Status != scheduledpost.StatusCANCELLED {
+			t.Fatal("review did not durably cancel the rejected snapshot")
 		}
 		// Approving a corrected edit approves the edit, not the queued snapshot it replaced.
 		current, err := repo.GetContentDraft(ctx, owner, draft.ID)
@@ -454,7 +454,7 @@ func TestContentDraftPlatform(t *testing.T) {
 		if _, err := repo.UpdateContentDraft(ctx, owner, draft.ID, ContentDraftUpdate{BaseVersion: current.Version, Title: &title}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: current.Version + 1, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := repo.PublishQueuedContentDraftPost(ctx, owner, queued.Posts[0].ID); !errors.Is(err, publishing.ErrConflict) {
@@ -475,10 +475,10 @@ func TestContentDraftPlatform(t *testing.T) {
 		if _, err := schedule(draft, at); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("unreviewed schedule err=%v", err)
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "request"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"}); err != nil {
 			t.Fatal(err)
 		}
-		approved, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve", Note: "Ship it"})
+		approved, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve", Note: "Ship it"})
 		if err != nil || approved.ReviewStatus != "approved" || approved.ApprovedVersion == nil || *approved.ApprovedVersion != draft.Version {
 			t.Fatalf("approved=%+v err=%v", approved, err)
 		}
@@ -490,7 +490,7 @@ func TestContentDraftPlatform(t *testing.T) {
 		if _, err := schedule(edited, at); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("schedule after an edit err=%v", err)
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: edited.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := schedule(edited, at.Add(time.Hour)); err != nil {

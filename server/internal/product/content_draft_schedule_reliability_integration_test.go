@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -325,7 +326,7 @@ func TestContentDraftScheduleReliability(t *testing.T) {
 			_, _ = repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &off})
 		}()
 		draft := newDraft("Approved snapshot")
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 			t.Fatal(err)
 		}
 		result, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets("Approved snapshot")})
@@ -352,18 +353,182 @@ func TestContentDraftScheduleReliability(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, action := range []string{"request", "approve"} {
-			if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: action}); err != nil {
+			if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: result.Draft.Version + 1, Action: action}); err != nil {
 				t.Fatal(err)
 			}
 			if reason := eligibility("run-" + action); reason != "" {
 				t.Fatalf("after %s the queued snapshot is ineligible: %s", action, reason)
 			}
 		}
-		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "changes"}); err != nil {
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: result.Draft.Version + 1, Action: "changes"}); err != nil {
 			t.Fatal(err)
 		}
-		if reason := eligibility("run-changes"); reason != publishing.FailureChangesRequested {
-			t.Fatalf("a draft sent back still publishes: %q", reason)
+		for _, action := range []string{"request", "approve"} {
+			if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: result.Draft.Version + 1, Action: action}); err != nil {
+				t.Fatal(err)
+			}
+			if claimed, err := repo.auth.Claim(ctx, id, "rejected-"+action, time.Now()); err != nil || claimed {
+				t.Fatalf("rejected snapshot claimed after %s: %v %v", action, claimed, err)
+			}
+			if _, err := repo.PublishQueuedContentDraftPost(ctx, owner, id); !errors.Is(err, publishing.ErrConflict) {
+				t.Fatalf("rejected snapshot publish now after %s: %v", action, err)
+			}
+		}
+		post, err := db.Client.ScheduledPost.Get(ctx, id)
+		if err != nil || post.Status != scheduledpost.StatusCANCELLED || post.FailureCode == nil || *post.FailureCode != publishing.FailureChangesRequested {
+			t.Fatalf("rejected post=%+v err=%v", post, err)
+		}
+		fresh, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(2 * time.Hour), Version: result.Draft.Version + 1, Targets: targets(title)})
+		if err != nil || fresh.Posts[0].ID == id {
+			t.Fatalf("fresh explicit reschedule=%+v err=%v", fresh, err)
+		}
+		// If a worker wins the claim, the review must not report a successful stop.
+		if claimed, err := repo.auth.Claim(ctx, fresh.Posts[0].ID, "worker-won", time.Now().Add(3*time.Hour)); err != nil || !claimed {
+			t.Fatalf("claim=%v err=%v", claimed, err)
+		}
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: fresh.Draft.Version, Action: "changes"}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("claimed review err=%v", err)
+		}
+		unchanged, err := repo.GetContentDraft(ctx, owner, draft.ID)
+		if err != nil || unchanged.ReviewStatus != "approved" {
+			t.Fatalf("failed review mutated state: %+v %v", unchanged, err)
+		}
+	})
+
+	t.Run("a racing claim and rejection cannot both succeed", func(t *testing.T) {
+		for attempt := 0; attempt < 8; attempt++ {
+			draft := newDraft("Race review")
+			queued, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets("Race review")})
+			if err != nil {
+				t.Fatal(err)
+			}
+			start := make(chan struct{})
+			var wg sync.WaitGroup
+			var claimed bool
+			var claimErr, reviewErr error
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				<-start
+				claimed, claimErr = repo.auth.Claim(ctx, queued.Posts[0].ID, "race", time.Now().Add(2*time.Hour))
+			}()
+			go func() {
+				defer wg.Done()
+				<-start
+				_, reviewErr = repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Action: "changes", Version: queued.Draft.Version})
+			}()
+			close(start)
+			wg.Wait()
+			if claimErr != nil {
+				t.Fatal(claimErr)
+			}
+			if claimed {
+				if !errors.Is(reviewErr, publishing.ErrConflict) {
+					t.Fatalf("claim succeeded but review err=%v", reviewErr)
+				}
+			} else {
+				if reviewErr != nil {
+					t.Fatal(reviewErr)
+				}
+				if _, err := repo.auth.LoadPublishJob(ctx, queued.Posts[0].ID, "race"); !errors.Is(err, publishing.ErrNotFound) {
+					t.Fatalf("rejected snapshot load err=%v", err)
+				}
+			}
+		}
+	})
+
+	t.Run("repeating a rejection cancels a new optional-review schedule", func(t *testing.T) {
+		draft := newDraft("Optional review")
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "changes"}); err != nil {
+			t.Fatal(err)
+		}
+		queued, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets("Optional review")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: queued.Draft.Version, Action: "changes"}); err != nil {
+			t.Fatal(err)
+		}
+		post, err := db.Client.ScheduledPost.Get(ctx, queued.Posts[0].ID)
+		if err != nil || post.Status != scheduledpost.StatusCANCELLED {
+			t.Fatalf("repeat rejection: post=%+v err=%v", post, err)
+		}
+	})
+
+	t.Run("first scheduling serializes with a concurrent rejection", func(t *testing.T) {
+		required := true
+		if _, err := repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &required}); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			off := false
+			_, _ = repo.UpdateContentDraftSettings(ctx, owner, ContentDraftSettingsUpdate{RequireApproval: &off})
+		}()
+		draft := newDraft("First schedule review race")
+		if _, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
+			t.Fatal(err)
+		}
+		started, proceed := make(chan struct{}), make(chan struct{})
+		var release sync.Once
+		defer release.Do(func() { close(proceed) })
+		// Pause after the approval read, before revision insertion takes a draft FK lock.
+		db.Client.ContentDraftRevision.Use(func(next ent.Mutator) ent.Mutator {
+			return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
+				if id, _ := mutation.(*ent.ContentDraftRevisionMutation).ContentDraftID(); id == draft.ID {
+					close(started)
+					<-proceed
+				}
+				return next.Mutate(ctx, mutation)
+			})
+		})
+		done := make(chan error, 1)
+		go func() {
+			_, err := repo.ScheduleContentDraft(ctx, owner, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(time.Hour), Version: draft.Version, Targets: targets("First schedule review race")})
+			done <- err
+		}()
+		select {
+		case <-started:
+		case <-time.After(5 * time.Second):
+			t.Fatal("schedule did not reach revision insert")
+		}
+		reviewDone := make(chan error, 1)
+		go func() {
+			_, err := repo.ReviewContentDraft(ctx, owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "changes"})
+			reviewDone <- err
+		}()
+		var reviewErr error
+		reviewFinished := false
+		deadline := time.After(5 * time.Second)
+		tick := time.NewTicker(5 * time.Millisecond)
+		defer tick.Stop()
+	waitReview:
+		for {
+			select {
+			case reviewErr = <-reviewDone:
+				reviewFinished = true
+				break waitReview
+			case <-deadline:
+				t.Fatal("review did not reach its serialization boundary")
+			case <-tick.C:
+				var waiting bool
+				err := db.SQL.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' AND NOT granted AND objid=((hashtext('content-draft-schedule:' || $1)::bigint & 4294967295)::oid))`, draft.ID).Scan(&waiting)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if waiting {
+					break waitReview
+				}
+			}
+		}
+		release.Do(func() { close(proceed) })
+		if err := <-done; err != nil {
+			t.Fatal(err)
+		}
+		if !reviewFinished {
+			reviewErr = <-reviewDone
+		}
+		if !errors.Is(reviewErr, publishing.ErrConflict) {
+			t.Fatalf("stale review across first schedule err=%v", reviewErr)
 		}
 	})
 

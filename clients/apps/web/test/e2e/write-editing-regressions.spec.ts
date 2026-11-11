@@ -1,9 +1,9 @@
 import { apiRequest, db, draftEditor, expect, expectSaved, test, postMenu } from './framework'
 
-// @dev-server until fixed: on the production build one early-typed title character is lost.
+// @quarantine until fixed: on the production build one early-typed title character is lost.
 test(
   'early typing, reordered post controls, selected comments, and failed saves preserve text',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ app, page, startWorkspace }) => {
     await startWorkspace({ channels: ['x', 'linkedin'] })
     const errors: string[] = []

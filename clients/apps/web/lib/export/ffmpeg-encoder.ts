@@ -52,6 +52,15 @@ let loadPromise: Promise<FFmpeg> | null = null;
 // Mutex to prevent concurrent exports from corrupting the virtual filesystem
 let exportLock: Promise<void> = Promise.resolve();
 
+/** Exclusive access to the shared engine and virtual filesystem, including the video tool. */
+export async function acquireFFmpegLock(): Promise<() => void> {
+  let release!: () => void;
+  const previous = exportLock;
+  exportLock = new Promise<void>((resolve) => { release = resolve; });
+  await previous;
+  return release;
+}
+
 const CACHE_NAME = 'ffmpeg-wasm-cache-v1';
 
 /**
@@ -225,16 +234,17 @@ export class FFmpegVideoEncoder {
    */
   async initialize(): Promise<void> {
     // Wait for any in-progress export to finish (prevents VFS corruption)
-    let releaseLock: () => void;
-    const lockPromise = new Promise<void>((resolve) => { releaseLock = resolve; });
-    const previousLock = exportLock;
-    exportLock = lockPromise;
-    await previousLock;
-    this.releaseLock = releaseLock!;
+    this.releaseLock = await acquireFFmpegLock();
 
-    this.ffmpeg = await loadFFmpeg((p) => {
-      this.options.onProgress(p * 0.1);
-    });
+    try {
+      this.ffmpeg = await loadFFmpeg((p) => {
+        this.options.onProgress(p * 0.1);
+      });
+    } catch (error) {
+      this.releaseLock?.();
+      this.releaseLock = null;
+      throw error;
+    }
 
     // Set up logging with tracked handler for cleanup
     this.logHandler = ({ message }) => {
@@ -510,7 +520,8 @@ export async function encodeWithFFmpeg(
 /**
  * Terminate FFmpeg and free memory
  */
-export function terminateFFmpeg(): void {
+export function terminateFFmpeg(expected?: FFmpeg): void {
+  if (expected && expected !== ffmpegInstance) return;
   if (ffmpegInstance) {
     ffmpegInstance.terminate();
     ffmpegInstance = null;
@@ -518,6 +529,6 @@ export function terminateFFmpeg(): void {
   }
   // Reset the mutex so a cancelled export mid-encode can't deadlock the next one.
   // Any encoder still holding the old lock resolves a now-unreferenced promise.
-  exportLock = Promise.resolve();
+  if (!expected) exportLock = Promise.resolve();
   isLoading = false;
 }

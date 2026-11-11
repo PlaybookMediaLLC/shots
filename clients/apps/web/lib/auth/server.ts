@@ -26,6 +26,7 @@ import { assertSignInMethodAvailable, isPasswordAuthEnabled } from './methods'
 import { organizationHooks } from './organization-hooks'
 import { betterAuthOrganizationRoles } from './permissions'
 import { serviceBackend } from '@/lib/backend/sdk'
+import { testHooksAllowed } from '@/lib/e2e-hooks'
 
 const google = getSocialProviderCredentials('GOOGLE')
 const github = getSocialProviderCredentials('GITHUB')
@@ -199,6 +200,26 @@ const provider = betterAuth({
     }),
     ...(infrastructure ? [dash(infrastructure)] : []),
   ],
+  // Better Auth rate limits /sign-in, /sign-up and the password and email
+  // change routes to 3 requests per 10 seconds per client address, and that
+  // limit is what kept the two-factor and invitation flows — which sign in
+  // several times in a few seconds on purpose — off the production build.
+  // Every browser test already carries its own x-forwarded-for, the header
+  // the limiter keys on, so raising the ceiling for an end-to-end stack
+  // isolates nothing less than before. Deployed builds keep the default.
+  ...(testHooksAllowed()
+    ? {
+        rateLimit: {
+          customRules: {
+            '/sign-in/*': { window: 10, max: 100 },
+            '/sign-up/*': { window: 10, max: 100 },
+            '/change-password': { window: 10, max: 100 },
+            '/change-email': { window: 10, max: 100 },
+            '/two-factor/*': { window: 10, max: 100 },
+          },
+        },
+      }
+    : {}),
   secret: getAuthSecret(),
   // A database-backed session must be checked on every request so a removed
   // member cannot keep using a signed cookie cache until it expires.

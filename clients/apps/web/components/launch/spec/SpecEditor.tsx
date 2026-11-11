@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { useUnsavedCampaignChanges } from '@/components/campaigns/useUnsavedCampaignChanges'
 import { RunButton } from '@/components/launch/RunButton'
 import { EmptyState } from '@/components/platform-ui'
 import { Button } from '@/components/ui/button'
@@ -64,13 +65,18 @@ export function SpecEditor({
   const [editing, setEditing] = useState<EditableSection | null>(null)
   const [approving, setApproving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [, startRefresh] = useTransition()
+  const [refreshing, startRefresh] = useTransition()
+  const [answersDirty, setAnswersDirty] = useState(false)
+  const [sectionDirty, setSectionDirty] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const blocked = answersDirty || sectionDirty || saving || refreshing
+  useUnsavedCampaignChanges(blocked)
 
   const draft = canEdit ? (
     <RunButton
       activeRunId={activeRunId}
       className={spec ? 'md:items-end' : 'items-center'}
-      disabled={!aiConfigured}
+      disabled={!aiConfigured || blocked || editing !== null || approving}
       doneMessage="Spec drafted"
       hint="Reads the brief and sources; about a minute"
       initialError={lastRunError}
@@ -110,21 +116,30 @@ export function SpecEditor({
   const index = { brief, byId: new Map(current.sources.map((source) => [source.id, source])) }
 
   async function save(content: ReleaseSpecContent, summary: string) {
-    const { spec: saved } = await trpcClient.launch.spec.update.mutate({
-      baseSpecId: current.id,
-      campaignId,
-      content,
-      summary,
-    })
-    toast.success(`Saved as v${saved.version}`)
-    // Close the editor together with the refreshed content, not before it.
-    startRefresh(() => {
-      setEditing(null)
-      router.refresh()
-    })
+    if (saving || refreshing || approving) throw new Error('Wait for the current change to finish.')
+    setSaving(true)
+    try {
+      const { spec: saved } = await trpcClient.launch.spec.update.mutate({
+        baseSpecId: current.id,
+        campaignId,
+        content,
+        summary,
+      })
+      toast.success(`Saved as v${saved.version}`)
+      // Close the editor together with the refreshed content, not before it.
+      startRefresh(() => {
+        setEditing(null)
+        setSectionDirty(false)
+        setAnswersDirty(false)
+        router.refresh()
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function approve() {
+    if (blocked || editing !== null || approving) return
     const unanswered = current.content.openQuestions.filter(
       (question) => !question.answer.trim()
     ).length
@@ -166,7 +181,7 @@ export function SpecEditor({
             {isLatest && canApprove && current.status !== 'APPROVED' ? (
               <Button
                 className="rounded-lg"
-                disabled={approving}
+                disabled={approving || blocked || editing !== null}
                 onClick={() => void approve()}
                 size="sm"
                 type="button"
@@ -178,6 +193,12 @@ export function SpecEditor({
           {aiNote}
         </div>
       </div>
+
+      {answersDirty || editing !== null ? (
+        <p className="text-sm text-muted-foreground">
+          Save or discard the open edits before approving or editing another section.
+        </p>
+      ) : null}
 
       {error ? (
         <p
@@ -230,19 +251,25 @@ export function SpecEditor({
               aiConfigured={aiConfigured}
               campaignId={campaignId}
               content={current.content}
-              editable={editable}
+              editable={editable && !approving && !saving && !refreshing}
               editing={editing === section}
               index={index}
               key={section}
-              locked={editing !== null && editing !== section}
-              onCancel={() => setEditing(null)}
+              locked={answersDirty || (editing !== null && editing !== section)}
+              onCancel={() => {
+                setEditing(null)
+                setSectionDirty(false)
+              }}
+              onDirtyChange={setSectionDirty}
               onEdit={() => setEditing(section)}
-              onSave={(value) =>
-                save(
+              onSave={(value) => {
+                if (answersDirty)
+                  return Promise.reject(new Error('Save or discard your answers first.'))
+                return save(
                   { ...current.content, [section]: value } as ReleaseSpecContent,
                   `Edited ${SPEC_SECTION_LABELS[section]}`
                 )
-              }
+              }}
               section={section}
               specId={current.id}
             />
@@ -250,6 +277,8 @@ export function SpecEditor({
           <OpenQuestions
             editable={editable}
             key={current.id}
+            disabled={editing !== null || saving || refreshing || approving}
+            onDirtyChange={setAnswersDirty}
             onSave={(openQuestions) =>
               save({ ...current.content, openQuestions }, 'Answered open questions')
             }

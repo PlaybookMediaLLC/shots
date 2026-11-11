@@ -57,6 +57,7 @@ export default async function SpecPage({ params, searchParams }: SpecPageProps) 
 
   return (
     <SpecEditor
+      key={viewed?.id ?? 'empty'}
       activeRunId={run?.status === 'RUNNING' ? run.id : null}
       aiConfigured={isCampaignStudioConfigured()}
       brief={[

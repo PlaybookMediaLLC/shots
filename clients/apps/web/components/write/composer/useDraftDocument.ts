@@ -36,7 +36,13 @@ const AUTOSAVE_DELAY_MS = 800
 // Keep failed edits across client route changes (including browser Back).
 const pendingDocuments = new Map<
   string,
-  { document: DraftDocument; discussions: DraftDiscussions; version: number; generation: number }
+  {
+    document: DraftDocument
+    baseline: DraftDocument
+    discussions: DraftDiscussions
+    version: number
+    generation: number
+  }
 >()
 // A local edit a newer version replaced, kept until the writer restores or discards it.
 const conflictedDocuments = new Map<string, DraftDocument>()
@@ -95,6 +101,8 @@ export function useDraftDocument({
   const version = React.useRef(recovery?.version ?? draft.version)
   const generation = React.useRef(recovery?.generation ?? draft.collabGeneration)
   const latest = React.useRef(document)
+  const baseline = React.useRef(recovery?.baseline ?? document)
+  const serverRecord = React.useRef(draft)
   const savedCallback = React.useRef(onSaved)
   savedCallback.current = onSaved
   const discussions = React.useRef(recovery?.discussions ?? readDiscussions(draft.discussions))
@@ -105,25 +113,33 @@ export function useDraftDocument({
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const legacyText = React.useRef(Object.keys(draft.channelText).length > 0)
 
-  const reloadLatest = React.useCallback(async () => {
-    const fresh = await draftsApi.get(draft.id)
-    version.current = fresh.version
-    generation.current = fresh.collabGeneration
-    pendingDocuments.delete(draft.id)
-    discussions.current = readDiscussions(fresh.discussions)
-    setServer(fresh)
-    latest.current = documentOf(fresh)
-    dirty.current = false
-    setDocument(latest.current)
-    setEditorKey((key) => key + 1)
-  }, [draft.id])
-
-  const keepConflict = React.useCallback(
-    (mine: DraftDocument) => {
-      conflictedDocuments.set(draft.id, mine)
-      setConflict(mine)
+  const replaceLatest = React.useCallback(
+    (fetched: DraftWire, preserveConflict = false) => {
+      const fresh = fetched.version >= serverRecord.current.version ? fetched : serverRecord.current
+      if (preserveConflict) {
+        conflictedDocuments.set(draft.id, latest.current)
+        setConflict(latest.current)
+      }
+      version.current = fresh.version
+      generation.current = fresh.collabGeneration
+      pendingDocuments.delete(draft.id)
+      discussions.current = readDiscussions(fresh.discussions)
+      serverRecord.current = fresh
+      setServer(fresh)
+      latest.current = documentOf(fresh)
+      baseline.current = latest.current
+      dirty.current = false
+      setDocument(latest.current)
+      setEditorKey((key) => key + 1)
     },
     [draft.id]
+  )
+
+  const reloadLatest = React.useCallback(
+    async (preserveConflict = false) => {
+      replaceLatest(await draftsApi.get(draft.id), preserveConflict)
+    },
+    [draft.id, replaceLatest]
   )
 
   const save = React.useCallback(async (): Promise<boolean> => {
@@ -159,7 +175,11 @@ export function useDraftDocument({
           legacyText.current = false
           version.current = saved.version
           generation.current = saved.collabGeneration
-          setServer(saved)
+          baseline.current = documentOf(saved)
+          if (saved.version >= serverRecord.current.version) {
+            serverRecord.current = saved
+            setServer(saved)
+          }
           savedCallback.current?.(saved)
           // Drain edits made during this request before reporting Saved or leaving.
           if (dirty.current) {
@@ -175,17 +195,29 @@ export function useDraftDocument({
             collaborating &&
             attempt < 3
           ) {
-            // Another editor's autosave moved the version: save on top of it,
-            // keeping the comment threads they saved as well as ours.
             const fresh = await draftsApi.get(draft.id)
-            if (fresh.collabGeneration !== generation.current) {
-              const mine = latest.current
-              await reloadLatest()
-              keepConflict(mine)
+            const remote = documentOf(fresh)
+            // Only the primary body is shared live. Rebase the other fields against
+            // the document that our version belongs to, refusing overlapping edits.
+            const merged = { ...latest.current }
+            let overlaps = fresh.collabGeneration !== generation.current
+            for (const key of Object.keys(remote) as (keyof DraftDocument)[]) {
+              if (key === 'value') continue
+              const localValue = JSON.stringify(latest.current[key])
+              const remoteValue = JSON.stringify(remote[key])
+              const baseValue = JSON.stringify(baseline.current[key])
+              if (localValue === baseValue) Object.assign(merged, { [key]: remote[key] })
+              else if (remoteValue !== baseValue && remoteValue !== localValue) overlaps = true
+            }
+            if (overlaps) {
+              replaceLatest(fresh, true)
               setSaveState('saved')
-              toast.info('This draft was replaced elsewhere. Your edit is kept above the editor.')
+              toast.info('This draft was changed elsewhere. Your edit is kept above the editor.')
               return false
             }
+            latest.current = merged
+            setDocument(merged)
+            baseline.current = remote
             version.current = fresh.version
             discussions.current = mergeDiscussions(
               discussions.current,
@@ -195,9 +227,7 @@ export function useDraftDocument({
           }
           if (error instanceof DraftRequestError && error.status === 409) {
             // Someone saved a newer version: show it, and keep ours to restore or copy.
-            const mine = latest.current
-            await reloadLatest()
-            keepConflict(mine)
+            await reloadLatest(true)
             setSaveState('saved')
             toast.info('This draft was changed elsewhere. Your edit is kept above the editor.')
             return false
@@ -233,12 +263,13 @@ export function useDraftDocument({
       if (dirty.current)
         pendingDocuments.set(draft.id, {
           document: latest.current,
+          baseline: baseline.current,
           discussions: discussions.current,
           version: version.current,
           generation: generation.current,
         })
     }
-  }, [canEdit, collaborating, draft.id, keepConflict, reloadLatest])
+  }, [canEdit, collaborating, draft.id, replaceLatest, reloadLatest])
 
   const scheduleSave = React.useCallback(() => {
     if (!canEdit) return
@@ -246,6 +277,7 @@ export function useDraftDocument({
     setRetryCount(0)
     pendingDocuments.set(draft.id, {
       document: latest.current,
+      baseline: baseline.current,
       discussions: discussions.current,
       version: version.current,
       generation: generation.current,
@@ -336,11 +368,20 @@ export function useDraftDocument({
     [save]
   )
 
-  // A draft the server sent back (scheduled, archived, reviewed): newer
-  // saves build on its version; a late, older answer never moves it back.
+  // Metadata responses may contain remote edits. A write version advances only
+  // together with its document; dirty/in-flight work keeps its conflict protection.
   const adopt = React.useCallback((next: DraftWire) => {
-    version.current = Math.max(version.current, next.version)
+    if (next.version < version.current || next.version < serverRecord.current.version) return
+    serverRecord.current = next
     setServer(next)
+    if (next.version === version.current || dirty.current || inFlight.current) return
+    version.current = next.version
+    generation.current = next.collabGeneration
+    baseline.current = documentOf(next)
+    latest.current = baseline.current
+    discussions.current = readDiscussions(next.discussions)
+    setDocument(latest.current)
+    setEditorKey((key) => key + 1)
   }, [])
   return {
     conflict,

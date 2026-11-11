@@ -162,9 +162,9 @@ test(
 
 test(
   'a slash AI command is reviewed first and one Undo takes it back',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ page, startWorkspace }) => {
-    // @dev-server: the scripted AI model runs only under next dev.
+    // The scripted AI model answers here (PLATFORM_AI_SCRIPTED, lib/e2e-hooks.ts).
     await startWorkspace({ channels: ['x'] })
     await openNewDraft(page)
     const editor = draftEditor(page)

@@ -69,19 +69,47 @@ func TestTeamCollaborationRoles(t *testing.T) {
 			if (token.Access == collab.AccessWrite) != writes {
 				t.Fatalf("collab capability differs: %s", token.Access)
 			}
-			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Action: "request"})
+			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "request"})
 			want("request review", err, writes)
-			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Action: "approve"})
+			_, err = repo.ReviewContentDraft(ctx, actor, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"})
 			want("approve", err, approves)
 			want("manage accounts", repo.auth.AuthorizeConnections(ctx, w.org, actor.UserID, actor.SessionID), manages)
 			want("manage sets", repo.AuthorizeSocialSetConnection(ctx, actor, setID), manages)
-			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Action: "approve"}); err != nil {
+			if _, err = repo.ReviewContentDraft(ctx, w.owner, draft.ID, ContentDraftReviewInput{Version: draft.Version, Action: "approve"}); err != nil {
 				t.Fatal(err)
 			}
 			_, err = repo.ScheduleContentDraft(ctx, actor, draft.ID, ScheduleContentDraftInput{ScheduledFor: time.Now().Add(48 * time.Hour).UTC(), Version: draft.Version, Targets: []ContentDraftScheduleTarget{{Caption: "Team policy", ChannelConnectionID: connection.ID}}})
 			want("schedule approved content", err, publishes)
 		})
 	}
+	t.Run("a stale reviewer cannot approve another writer's unseen content", func(t *testing.T) {
+		draft, err := repo.CreateContentDraft(ctx, w.owner, ContentDraftInput{Title: "Seen by reviewer", PlainText: "Seen"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		title := "Unseen writer edit"
+		edited, err := repo.UpdateContentDraft(ctx, w.actor("writer_publisher"), draft.ID, ContentDraftUpdate{BaseVersion: draft.Version, Title: &title})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, version := range []int{0, draft.Version} {
+			_, err = repo.ReviewContentDraft(ctx, w.actor("approver"), draft.ID, ContentDraftReviewInput{Action: "approve", Version: version})
+			if err == nil {
+				t.Fatalf("accepted approval of version %d", version)
+			}
+			if version > 0 && (!errors.Is(err, publishing.ErrConflict) || !strings.Contains(err.Error(), "review the current content")) {
+				t.Fatalf("stale review err=%v", err)
+			}
+		}
+		current, err := repo.GetContentDraft(ctx, w.owner, draft.ID)
+		if err != nil || current.ApprovedVersion != nil {
+			t.Fatalf("stale approval persisted: %+v %v", current, err)
+		}
+		approved, err := repo.ReviewContentDraft(ctx, w.actor("approver"), draft.ID, ContentDraftReviewInput{Action: "approve", Version: edited.Version})
+		if err != nil || approved.ApprovedVersion == nil || *approved.ApprovedVersion != edited.Version {
+			t.Fatalf("re-review=%+v err=%v", approved, err)
+		}
+	})
 	writer := w.actor("writer_publisher")
 	draft, err := repo.CreateContentDraft(ctx, writer, ContentDraftInput{Title: "Demotion", PlainText: "Unapproved"})
 	if err != nil {

@@ -16,7 +16,7 @@ func TestDecisionsRefuseNonSessionActors(t *testing.T) {
 	repo := &Configuration{}
 	entrypoints := map[string]func(Actor) error{
 		"ReviewContentDraft": func(a Actor) error {
-			_, err := repo.ReviewContentDraft(ctx, a, "draft", ContentDraftReviewInput{Action: "approve"})
+			_, err := repo.ReviewContentDraft(ctx, a, "draft", ContentDraftReviewInput{Version: 1, Action: "approve"})
 			return err
 		},
 		"DecideCreativeVariant": func(a Actor) error {

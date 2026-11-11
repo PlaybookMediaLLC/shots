@@ -13,6 +13,8 @@
     "test:design-renderer": "NODE_OPTIONS='--conditions=react-server' tsx --test test/design-renderer.server.ts",
     "test:workspace-creation-server": "NODE_OPTIONS='--conditions=react-server' tsx --test test/workspace-creation.server.ts",
     "test:screenshot-capture": "NODE_OPTIONS='--conditions=react-server' tsx --test test/screenshot-capture.server.ts",
+    "test:server": "NODE_OPTIONS='--conditions=react-server' tsx --test test/*.server.ts",
+    "test:design-renderer": "NODE_OPTIONS='--conditions=react-server' tsx --test test/design-renderer.browser.ts",
     "test:agents": "tsx --test test/agent-readiness.test.ts",
     "verify:agents": "tsx test/verify-agent-endpoints.ts",
     "test:e2e": "playwright test",

@@ -3740,7 +3740,7 @@ export class ScreenshotStudioBackendSDK {
 
   async reviewContentDraft(
     id: string,
-    input: { action: 'request' | 'approve' | 'changes'; note?: string }
+    input: { action: 'request' | 'approve' | 'changes'; version: number; note?: string }
   ) {
     return this.request<BackendContentDraft>(`v1/content-drafts/${encodeURIComponent(id)}/review`, {
       body: input,

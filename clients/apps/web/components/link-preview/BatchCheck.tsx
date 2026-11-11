@@ -17,6 +17,7 @@ import {
 import { duplicateGroups } from '@/lib/link-preview/insights'
 import { scoreLinkPreview } from '@/lib/link-preview/metadata'
 import { cn } from '@/lib/utils'
+import { csvCell } from '@/lib/csv'
 import { downloadText, normalizeUrl, parseUrlLines, requestPreview } from './client'
 import { PANEL } from './MetadataPanels'
 import { hostname } from './PlatformPreviews'
@@ -45,8 +46,6 @@ type Row = {
   /** Absent while pending. */
   result?: { error: string } | { issues: LinkPreviewIssue[]; preview: LinkPreview; score: number }
 }
-
-const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
 
 function toCsv(rows: Row[]): string {
   const lines = [['URL', 'Score', 'Errors', 'Warnings', 'Title', 'Image', 'Top issue']]
@@ -171,7 +170,11 @@ export function BatchCheck({
 
   return (
     <div className="space-y-6">
-      {rows.length > 0 && checkedAgent !== agent && <p role="status">These results are for {checkedAgent}. Choose Check all to use {agent}.</p>}
+      {rows.length > 0 && checkedAgent !== agent && (
+        <p role="status">
+          These results are for {checkedAgent}. Choose Check all to use {agent}.
+        </p>
+      )}
       <section className={cn(PANEL, 'space-y-3 p-5')}>
         <form
           onSubmit={(event) => {
@@ -208,8 +211,14 @@ export function BatchCheck({
             className="w-full resize-y rounded-lg bg-white/[0.03] px-3 py-2 font-mono text-sm text-foreground ring-1 ring-white/[0.08] outline-none placeholder:text-muted-foreground focus:ring-white/25"
           />
         </Label>
-        <p id="batch-url-errors" role={invalid.length ? 'alert' : undefined} className="min-h-5 text-xs text-red-400">
-          {invalid.length ? `Invalid URL lines: ${invalid.join(', ')}. Enter one web URL per line.` : '\u00a0'}
+        <p
+          id="batch-url-errors"
+          role={invalid.length ? 'alert' : undefined}
+          className="min-h-5 text-xs text-red-400"
+        >
+          {invalid.length
+            ? `Invalid URL lines: ${invalid.join(', ')}. Enter one web URL per line.`
+            : '\u00a0'}
         </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
@@ -227,7 +236,8 @@ export function BatchCheck({
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-ui-lg font-medium text-foreground">
-              Results · {checked.length} checked, {done - checked.length} failed · {done} of {rows.length}
+              Results · {checked.length} checked, {done - checked.length} failed · {done} of{' '}
+              {rows.length}
               {checked.length > 0 &&
                 ` · average score ${Math.round(checked.reduce((sum, row) => sum + row.score, 0) / checked.length)}`}
             </h3>
@@ -235,7 +245,7 @@ export function BatchCheck({
               <Label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Checkbox
                   checked={onlyProblems}
-                  onCheckedChange={(checked) => setOnlyProblems((checked === true))}
+                  onCheckedChange={(checked) => setOnlyProblems(checked === true)}
                 />
                 Only pages with errors or warnings
               </Label>
@@ -284,7 +294,9 @@ export function BatchCheck({
                 <TableRow className="border-b border-white/[0.07]">
                   <TableHead className="whitespace-normal px-4 py-3 font-medium">Link</TableHead>
                   <TableHead className="whitespace-normal px-4 py-3 font-medium">
-                    <Button variant="custom" size={null}
+                    <Button
+                      variant="custom"
+                      size={null}
                       type="button"
                       onClick={() => setSortByScore((value) => !value)}
                       aria-pressed={sortByScore}
@@ -297,17 +309,25 @@ export function BatchCheck({
                       <ArrowDownUp className="size-3" />
                     </Button>
                   </TableHead>
-                  <TableHead className="whitespace-normal px-4 py-3 font-medium">Errors · Warnings</TableHead>
-                  <TableHead className="whitespace-normal px-4 py-3 font-medium">Top issue</TableHead>
+                  <TableHead className="whitespace-normal px-4 py-3 font-medium">
+                    Errors · Warnings
+                  </TableHead>
+                  <TableHead className="whitespace-normal px-4 py-3 font-medium">
+                    Top issue
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody className="divide-y divide-white/[0.07]">
                 {shown.map(({ result, url }) => (
                   <TableRow key={url} className="align-top">
                     <TableCell className="whitespace-normal max-w-64 px-4 py-3">
-                      <Button variant="custom" size={null}
+                      <Button
+                        variant="custom"
+                        size={null}
                         type="button"
-                        onClick={() => onOpen(url, result && 'preview' in result ? result.preview : undefined)}
+                        onClick={() =>
+                          onOpen(url, result && 'preview' in result ? result.preview : undefined)
+                        }
                         className="block truncate text-left text-foreground hover:underline"
                         title={url}
                       >
@@ -316,7 +336,10 @@ export function BatchCheck({
                       </Button>
                     </TableCell>
                     {!result ? (
-                      <TableCell colSpan={3} className="whitespace-normal px-4 py-3 text-muted-foreground">
+                      <TableCell
+                        colSpan={3}
+                        className="whitespace-normal px-4 py-3 text-muted-foreground"
+                      >
                         <Loader2 className="size-4 animate-spin" aria-label="Checking" />
                       </TableCell>
                     ) : 'error' in result ? (

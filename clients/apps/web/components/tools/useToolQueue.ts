@@ -4,7 +4,6 @@ import * as React from "react";
 import { toast } from "sonner";
 import { MAX_IMAGE_SIZE } from "@/lib/constants";
 import {
-  imageToolsWorker,
   readImageSize,
   downloadResults,
   formatBytes,
@@ -13,6 +12,8 @@ import {
   type ProcessOptions,
   type ProcessResult,
 } from "@/lib/image-tools";
+
+import { ImageToolsWorkerClient } from '@/lib/image-tools/worker-client'
 
 /** MIME types createImageBitmap can decode in every browser we target. */
 const ACCEPTED_TYPES = [
@@ -82,12 +83,20 @@ export function useToolQueue(toolSlug: string) {
   itemsRef.current = items;
 
   const cancelRef = React.useRef(false);
+  const mounted = React.useRef(false)
+  const abort = React.useRef<AbortController | null>(null)
+  const [worker] = React.useState(() => new ImageToolsWorkerClient())
 
   React.useEffect(() => {
+    mounted.current = true
     return () => {
+      mounted.current = false
+      cancelRef.current = true
+      abort.current?.abort()
+      worker.terminate()
       for (const item of itemsRef.current) URL.revokeObjectURL(item.previewUrl);
     };
-  }, []);
+  }, [worker]);
 
   const addFiles = React.useCallback((files: File[]) => {
     const accepted: QueueItem[] = [];
@@ -138,6 +147,7 @@ export function useToolQueue(toolSlug: string) {
     for (const item of accepted) {
       readImageSize(item.file)
         .then((size) => {
+          if (!mounted.current) return
           setItems((previous) =>
             previous.map((row) =>
               row.id === item.id ? { ...row, source: size } : row
@@ -145,6 +155,7 @@ export function useToolQueue(toolSlug: string) {
           );
         })
         .catch(() => {
+          if (!mounted.current) return
           setItems((previous) =>
             previous.map((row) =>
               row.id === item.id
@@ -194,7 +205,9 @@ export function useToolQueue(toolSlug: string) {
 
   const cancel = React.useCallback(() => {
     cancelRef.current = true;
-  }, []);
+    abort.current?.abort()
+    worker.terminate()
+  }, [worker]);
 
   /**
    * Processes the queue one file at a time. Sequential on purpose: a parallel
@@ -207,6 +220,8 @@ export function useToolQueue(toolSlug: string) {
       if (queued.length === 0 || isRunning) return;
 
       cancelRef.current = false;
+      const operation = new AbortController()
+      abort.current = operation
       setIsRunning(true);
       setCompleted(0);
 
@@ -226,7 +241,8 @@ export function useToolQueue(toolSlug: string) {
 
         try {
           const plan = buildPlan(item);
-          const processed = await imageToolsWorker.process(item.file, plan.options);
+          const processed = await worker.process(item.file, plan.options, operation.signal);
+          if (cancelRef.current || !mounted.current) break
 
           // Re-encoding is not guaranteed to help. When it did not, and the
           // format is unchanged, the original file is the better answer.
@@ -257,6 +273,7 @@ export function useToolQueue(toolSlug: string) {
             )
           );
         } catch (error) {
+          if (cancelRef.current || !mounted.current) break
           failed += 1;
           setItems((previous) =>
             previous.map((row) =>
@@ -278,6 +295,12 @@ export function useToolQueue(toolSlug: string) {
         setCompleted((count) => count + 1);
       }
 
+      if (!mounted.current) return
+      setItems((previous) =>
+        previous.map((item) =>
+          item.status === 'processing' ? { ...item, status: 'pending' } : item
+        )
+      )
       setIsRunning(false);
 
       if (cancelRef.current) {
@@ -292,7 +315,7 @@ export function useToolQueue(toolSlug: string) {
         });
       }
     },
-    [isRunning]
+    [isRunning, worker]
   );
 
   const download = React.useCallback(async () => {
@@ -318,6 +341,8 @@ export function useToolQueue(toolSlug: string) {
   }, [toolSlug]);
 
   const doneItems = items.filter((item) => item.status === "done");
+  const successfulInputBytes = doneItems.reduce((sum, item) => sum + item.bytes, 0)
+  const failedCount = items.filter((item) => item.status === 'error').length
   const totalInputBytes = items.reduce((sum, item) => sum + item.bytes, 0);
   const totalOutputBytes = doneItems.reduce(
     (sum, item) => sum + (item.result?.bytes ?? 0),
@@ -331,6 +356,8 @@ export function useToolQueue(toolSlug: string) {
     hasResults: doneItems.length > 0,
     doneCount: doneItems.length,
     totalInputBytes,
+    successfulInputBytes,
+    failedCount,
     totalOutputBytes,
     addFiles,
     removeItem,

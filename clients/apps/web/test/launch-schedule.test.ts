@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { isRunStale } from '../lib/launch/run-lease'
-import { connectionsForChannel, visualChoices } from '../lib/launch/schedule'
+import { connectionsForChannel, customScheduleTime, visualChoices } from '../lib/launch/schedule'
 import type { CampaignPlanContent } from '../lib/launch/spec-schema'
 
 const connections = [
@@ -11,6 +11,25 @@ const connections = [
   { id: 'ig', platform: 'instagram', status: 'ACTIVE' },
   { id: 'igs', platform: 'instagram-standalone', status: 'ACTIVE' },
 ]
+
+test('custom scheduling accepts only empty or complete, unambiguous choices in the displayed zone', () => {
+  assert.equal(customScheduleTime('', '', 'America/New_York'), undefined)
+  assert.throws(() => customScheduleTime('2026-11-10', '', 'America/New_York'), /both/)
+  assert.throws(() => customScheduleTime('', '09:00', 'America/New_York'), /both/)
+  assert.equal(
+    customScheduleTime('2026-11-10', '09:00', 'America/New_York'),
+    '2026-11-10T14:00:00.000Z'
+  )
+  assert.equal(
+    customScheduleTime('2026-11-10', '09:00', 'Europe/London'),
+    '2026-11-10T09:00:00.000Z'
+  )
+  assert.throws(
+    () => customScheduleTime('2027-03-14', '02:30', 'America/New_York'),
+    /does not exist/
+  )
+  assert.throws(() => customScheduleTime('2027-11-07', '01:30', 'America/New_York'), /twice/)
+})
 
 test('a post channel offers only active connections on its platforms', () => {
   assert.deepEqual(

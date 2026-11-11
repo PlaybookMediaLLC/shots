@@ -49,7 +49,10 @@ test(
     expect(created.status).toBe(201)
     const draft = state.parse(created.body)
     const path = `/api/v1/content-drafts/${draft.id}`
-    expect((await requestJson(page, `${path}/review`, { action: 'approve' })).status).toBe(200)
+    expect(
+      (await requestJson(page, `${path}/review`, { action: 'approve', version: draft.version }))
+        .status
+    ).toBe(200)
     const viewerContext = await browser.newContext()
     const reviewerContext = await browser.newContext()
     const viewer = await viewerContext.newPage(),
