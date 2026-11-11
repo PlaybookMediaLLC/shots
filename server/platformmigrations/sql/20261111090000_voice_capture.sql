@@ -19,6 +19,10 @@ CREATE TABLE "voice_note" (
   "revision" integer NOT NULL DEFAULT 1 CHECK ("revision" >= 1),
   "currentTranscriptRevisionId" text,
   "deletedAt" timestamp(3),
+  -- When the voice sweep first saw the owner gone from the workspace. Their
+  -- live notes are deleted 30 days later (owner decision 6); a member added
+  -- back in time keeps them.
+  "ownerRemovedAt" timestamp(3),
   "createdAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -26,6 +30,8 @@ CREATE UNIQUE INDEX "voice_note_organizationId_ownerUserId_clientNoteId_key"
   ON "voice_note" ("organizationId", "ownerUserId", "clientNoteId");
 CREATE INDEX "voice_note_organizationId_ownerUserId_receivedAt_idx"
   ON "voice_note" ("organizationId", "ownerUserId", "receivedAt");
+CREATE INDEX "voice_note_ownerRemovedAt_idx" ON "voice_note" ("ownerRemovedAt")
+  WHERE "deletedAt" IS NULL AND "ownerRemovedAt" IS NOT NULL;
 
 CREATE TABLE "voice_transcript_revision" (
   "id" text PRIMARY KEY,
@@ -66,11 +72,17 @@ CREATE TABLE "voice_audio_run" (
   "objectKey" text NOT NULL UNIQUE,
   "status" text NOT NULL DEFAULT 'pending' CHECK ("status" IN ('pending', 'available', 'failed', 'deleted')),
   "failureReason" text,
+  -- When storage confirmed a deleted or failed run's object is gone. The
+  -- sweep retries every such run without it, so a purge that failed after the
+  -- database commit is never forgotten.
+  "objectPurgedAt" timestamp(3),
   "createdAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX "voice_audio_run_noteId_runIndex_key" ON "voice_audio_run" ("noteId", "runIndex");
 CREATE INDEX "voice_audio_run_status_updatedAt_idx" ON "voice_audio_run" ("status", "updatedAt");
+CREATE INDEX "voice_audio_run_objectPurgedAt_idx" ON "voice_audio_run" ("updatedAt")
+  WHERE "objectPurgedAt" IS NULL AND "status" IN ('deleted', 'failed');
 
 CREATE TABLE "voice_settings" (
   "organizationId" text PRIMARY KEY REFERENCES "organization"("id") ON DELETE CASCADE,
@@ -118,10 +130,15 @@ CREATE TABLE "voice_command" (
   "contentDraftId" text,
   "scheduledPostId" text,
   "failureReason" text,
+  -- The outcome a confirm stored, so a resent confirm returns it (K11).
+  "outcome" text CHECK ("outcome" IN ('scheduled', 'pending_approval', 'draft')),
+  -- When the row was last sent to the model, for the per-member parse limit.
+  "parsedAt" timestamp(3),
   "createdAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "updatedAt" timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX "voice_command_status_nextAttemptAt_idx" ON "voice_command" ("status", "nextAttemptAt");
 CREATE INDEX "voice_command_status_expiresAt_idx" ON "voice_command" ("status", "expiresAt");
+CREATE INDEX "voice_command_ownerUserId_parsedAt_idx" ON "voice_command" ("ownerUserId", "parsedAt");
 
 ALTER TABLE "content_draft" ADD COLUMN "sourceVoiceRevisionId" text;
