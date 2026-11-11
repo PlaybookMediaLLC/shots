@@ -160,14 +160,23 @@ func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
 	return &integrations.PollDetails{Options: poll.Options, Duration: hours}
 }
 
-// publicationOutcome maps a provider failure: reconnect, or an outcome the
-// remote account must be checked for before any retry.
+// publicationOutcome maps a provider failure: reconnect, a rate limit the
+// workflow retries later, a daily cap, or an outcome the remote account must
+// be checked for before any retry.
 func publicationOutcome(err error) error {
 	if temporalx.FailureType(err) == temporalx.TypePublicationRejected {
 		return socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
 	}
 	if temporalx.FailureType(err) == temporalx.TypeRefreshToken || temporalx.FailureType(err) == temporalx.TypeDisconnect {
 		return socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
+	}
+	if temporalx.FailureType(err) == temporalx.TypeRateLimited {
+		// The platform accepted nothing, so this 429 is the durable retry's.
+		return socialapi.NewError(http.StatusTooManyRequests, false, "The platform is rate limiting this account.")
+	}
+	if temporalx.FailureType(err) == temporalx.TypeDailyLimit {
+		// Not 429: a cap that lasts until tomorrow is not retried in minutes.
+		return socialapi.NewCodedError(http.StatusForbidden, publishing.FailureProviderDailyLimit, temporalx.FailureMessage(err))
 	}
 	// The provider may have accepted the post before the call failed. A
 	// reconciliation step must inspect the remote account before retrying.

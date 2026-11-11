@@ -155,7 +155,7 @@ test(
     )
     // The compact rail lists every settings section as an icon, without the search box.
     const sections = page.getByRole('navigation', { name: 'Settings sections', exact: true })
-    await expect(sections.getByRole('link')).toHaveCount(24)
+    await expect(sections.getByRole('link')).toHaveCount(25)
     await expect(sections.getByRole('searchbox')).toHaveCount(0)
     await page.getByRole('button', { name: 'Expand navigation' }).click()
     await expect(page.getByRole('complementary', { name: 'Primary navigation' })).toHaveAttribute(

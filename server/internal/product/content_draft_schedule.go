@@ -797,6 +797,11 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	if err != nil {
 		return nil, err
 	}
+	// Captions are the stored draft's at input.Version, so an approval binds the
+	// text: for the route and batch runs the web serializes them from the draft it
+	// read at that version and takes no text from its callers; CreatePost and voice
+	// confirm make the draft from them. Alt text and the browser-rendered table
+	// images are not bound: publishing reads alt text from the asset when it posts.
 	captions := make([]string, 0, len(input.Targets))
 	for _, target := range input.Targets {
 		captions = append(captions, target.Caption)
@@ -806,6 +811,12 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 	}
 	if err := requireAllowedCopy(ctx, tx.BrandProfile, actor.OrganizationID, captions...); err != nil {
 		return nil, err
+	}
+	// Who approved the version these posts carry, if anyone did.
+	var approvedBy *string
+	var approvedVersion *int
+	if draft.ReviewStatus == contentdraft.ReviewStatusApproved && draft.ApprovedVersion != nil && *draft.ApprovedVersion == draft.Version {
+		approvedBy, approvedVersion = draft.ReviewedByUserID, draft.ApprovedVersion
 	}
 	var cancelled, kept []string
 	if input.Add {
@@ -859,6 +870,8 @@ func (c *Configuration) scheduleContentDraft(ctx context.Context, actor Actor, d
 			SetNaturalOffsetSeconds(placement.offset).SetScheduleTimeZone(placement.zone).SetScheduleIntent(intent).
 			SetScheduledFor(placement.at).SetStatus(scheduledpost.StatusSCHEDULED).
 			SetCaption(strings.TrimSpace(target.Caption)).
+			SetNillableScheduledByUserID(schedulerID(actor)).
+			SetNillableApprovedByUserID(approvedBy).SetNillableApprovedVersion(approvedVersion).
 			SetIdempotencyKey(contentDraftPostKey(draft.ID, target.ChannelConnectionID, input.Version)).Save(ctx)
 		if err != nil {
 			if ent.IsConstraintError(err) {

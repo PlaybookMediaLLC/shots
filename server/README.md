@@ -244,6 +244,37 @@ session endpoint. Keep it server-side and separate from
 `PUBLISHING_SERVICE_TOKEN`. A user OAuth token alone cannot read the private
 workspace authority snapshot.
 
+## Voice capture
+
+The product API serves the voice API at `/v1/voice/...` behind
+`authenticateProduct` ([contract](../docs/plans/voice-capture-implementation.md#4-voice-api-contract)).
+Notes are private to their owner: another member's note is 404, and API keys
+are refused. Audio runs are PCM WAV uploaded straight to private storage with
+a signed length and checksum, then verified and decoded in the complete
+request. Every voice feature is off per workspace until an owner or admin
+turns it on, and each has a server-side switch that turns it off everywhere:
+`VOICE_DISABLED`, `VOICE_AUDIO_UPLOAD_DISABLED`, `VOICE_DRAFTS_DISABLED`,
+`VOICE_COMMANDS_PARSE_DISABLED` and `VOICE_COMMANDS_CONFIRM_DISABLED` (set to
+`true`). `VOICE_MIN_APP_VERSION` (default `0.0.0`) is the oldest phone app
+that may sync. The `voice-cleanup` and `voice-commands` maintenance jobs expire
+abandoned uploads, purge deleted audio, remove notes of members who left 30
+days ago or whose workspace was purged, retry waiting command parses and
+expire unconfirmed proposals. Note, audio and transcript deletions are also
+written to the R2 deletion ledger.
+
+`PUBLISHING_PAUSED=true` holds every due post before any provider call, for a
+database restore ([runbook](../docs/deployment.md)).
+
+The Founder Hub phone app reaches the voice API through the gateway at
+`/api/founder-hub/voice/<suffix>`, with the methods, bodies and responses of
+`/api/v1/voice/<suffix>`; changing the workspace switches stays browser-only.
+The gateway sends its service token, the person's Founder Hub access token and
+the Founder Hub workspace id in `X-Shots-Organization-Id`. The web maps that id
+to one of the person's organizations and forwards the session with
+`X-Principal-Client: shots-founder-hub`; the backend checks that client's live
+grant itself and holds the session to the named workspace's membership instead
+of the browser's active workspace.
+
 For hosted connectors, set `FOUNDER_HUB_MCP_URL` on both the Shots web server and
 Founder Hub sync API to the exact public HTTPS `/mcp` URL (loopback HTTP is
 supported locally). Shots then exposes OAuth discovery and public PKCE client
@@ -256,12 +287,14 @@ seconds. Reuse after that window revokes only the affected Shots session,
 including its OAuth grants. If rotation completes but its retry response cannot
 be saved, that session may need to sign in again after a lost response.
 
-`dev/studio e2e` runs the server OAuth integration test locally and on CI's first
-shard. To run it against another local stack, set `FOUNDER_HUB_TEST_API_URL`,
-`BETTER_AUTH_URL`, `PUBLISHING_SERVICE_TOKEN`, and `SHOTS_AUTH_SERVICE_TOKEN`, then
-run `npm run test:founder-hub-auth --workspace screenshot-studio` from `clients/`.
-Set `FOUNDER_HUB_GATEWAY_URL` to the local Hub API's `/cloud` URL to include real
-storage, resumable uploads, and gateway revocation checks.
+The server OAuth integration test (`test/founder-hub-oauth.backend.ts`) needs
+the Founder Hub gateway, so it runs in the paired stack
+(`.github/workflows/founder-hub-integration.yml`), not in `dev/studio e2e`. To
+run it against another local stack, set `FOUNDER_HUB_TEST_API_URL`,
+`BETTER_AUTH_URL`, `PUBLISHING_SERVICE_TOKEN`, `SHOTS_AUTH_SERVICE_TOKEN`, and
+`FOUNDER_HUB_GATEWAY_URL` (the local Hub API's `/cloud` URL, for real storage,
+resumable uploads, and gateway revocation checks), then run
+`npm run test:founder-hub-auth --workspace screenshot-studio` from `clients/`.
 
 ```sh
 SOCIAL_TEST_DATABASE_URL=postgresql://postgres@localhost:55432/social_test?sslmode=disable go test ./internal/social/...

@@ -21,6 +21,7 @@ type executionFixture struct {
 	selected  string
 	nodes     []string
 	collected int
+	kind      string
 	legacy    int
 	finish    Finish
 	enrich    func() (automation.Event, error)
@@ -54,7 +55,12 @@ func environment(t *testing.T, f *executionFixture) *testsuite.TestWorkflowEnvir
 		return automation.Outputs{}, nil
 	}, activity.RegisterOptions{Name: NodeActivity})
 	env.RegisterActivityWithOptions(func(context.Context, Input) (automation.Event, error) { return f.enrich() }, activity.RegisterOptions{Name: EnrichActivity})
-	env.RegisterActivityWithOptions(func(context.Context, Input) error { f.collected++; return nil }, activity.RegisterOptions{Name: CollectActivity})
+	if f.kind == "" {
+		// A worker from before deployment kinds returns no result.
+		env.RegisterActivityWithOptions(func(context.Context, Input) error { f.collected++; return nil }, activity.RegisterOptions{Name: CollectActivity})
+	} else {
+		env.RegisterActivityWithOptions(func(context.Context, Input) (string, error) { f.collected++; return f.kind, nil }, activity.RegisterOptions{Name: CollectActivity})
+	}
 	env.RegisterActivityWithOptions(func(context.Context, Input) error { f.legacy++; return nil }, activity.RegisterOptions{Name: LegacyActivity})
 	env.RegisterActivityWithOptions(func(_ context.Context, value Finish) error { f.finish = value; return nil }, activity.RegisterOptions{Name: FinishActivity})
 	return env
@@ -298,5 +304,54 @@ func TestInterpreterBranchesOnTheRecordedAIVerdict(t *testing.T) {
 		if asked != 1 || !reflect.DeepEqual(f.nodes, want) || f.finish.Status != status {
 			t.Fatalf("worthy=%v asked=%d nodes=%v finish=%+v", worthy, asked, f.nodes, f.finish)
 		}
+	}
+}
+
+// Only a new commit starts a workflow. A redeploy or rollback is collected,
+// which captures it, but selects no workflow and runs no node.
+func TestInterpreterRedeploysAndRollbacksStartNoWorkflow(t *testing.T) {
+	production := automation.Condition{Field: "deployment.environment", Operator: "eq", Values: []string{"production"}}
+	graph := testGraph()
+	graph.Family, graph.Qualification, graph.Nodes[1].Condition = automation.Deployed, production, &production
+	for _, kind := range []string{"redeploy", "rollback", "new"} {
+		f := fixture()
+		f.kind = kind
+		f.loaded.Event = automation.Event{Family: automation.Deployed, Origin: "live", Fields: map[string]automation.Value{"deployment.environment": automation.StringValue("production")}}
+		f.loaded.Plans = []product.AutomationPlan{{DefinitionID: "definition-1", VersionID: "version-1", Graph: graph}}
+		env := environment(t, f)
+		env.ExecuteWorkflow(WorkflowName, Input{OrganizationID: "org", RunID: "run"})
+		if err := env.GetWorkflowError(); err != nil {
+			t.Fatal(err)
+		}
+		if kind == "new" {
+			if f.selected != "version-1" || len(f.nodes) == 0 || f.finish.Status != "succeeded" {
+				t.Fatalf("new commit: %+v", f)
+			}
+			continue
+		}
+		if f.collected != 1 || f.selected != "" || len(f.nodes) != 0 || f.finish.Status != "skipped" || f.finish.Code != kind {
+			t.Fatalf("%s started a workflow: %+v", kind, f)
+		}
+	}
+}
+
+// A run whose deployment a newer one superseded ends as superseded, keeping
+// what it completed; the product error maps to that outcome.
+func TestInterpreterSupersededCaptureEndsTheRun(t *testing.T) {
+	f := fixture()
+	f.node = func(input NodeInput) error {
+		if input.NodeID == "release" {
+			return activityError(product.ErrCaptureSuperseded)
+		}
+		return nil
+	}
+	env := environment(t, f)
+	env.ExecuteWorkflow(WorkflowName, Input{OrganizationID: "org", RunID: "run"})
+	if env.GetWorkflowError() == nil || f.finish.Status != "cancelled" || f.finish.Code != "superseded" || f.nodes[len(f.nodes)-1] != "release" {
+		t.Fatalf("fixture=%+v", f)
+	}
+	var app *temporal.ApplicationError
+	if !errors.As(activityError(product.ErrCaptureSuperseded), &app) || app.Type() != SupersededError || !app.NonRetryable() {
+		t.Fatalf("mapped=%v", app)
 	}
 }

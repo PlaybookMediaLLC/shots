@@ -361,14 +361,17 @@ func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 		t.Errorf("credentialed deployment URL err=%v", err)
 	}
 
-	// Deployments that finish out of order: the older one is history and the
-	// newer one's image stays current.
+	// Deployments that finish out of order: the newer one's image stays current,
+	// and the older one, superseded, takes no capture that would show the newer page.
 	slower, faster := ingest("5", &live), ingest("6", &live)
 	handle(faster)
 	handle(slower)
 	current, err := repo.ListSurfaceCaptures(ctx, owner, surface.ID)
-	if err != nil || current[0].SupersededAt == nil || *current[0].SourceID != slower || current[1].SupersededAt != nil || *current[1].SourceID != faster {
+	if err != nil || current[0].SupersededAt != nil || *current[0].SourceID != faster {
 		t.Fatalf("out-of-order captures=%+v err=%v", current, err)
+	}
+	if row, _ := db.Client.DeploymentEvent.Get(ctx, slower); row.Status != deploymentevent.StatusSKIPPED || *row.FailureCode != captureSuperseded {
+		t.Fatalf("superseded deployment=%+v", row)
 	}
 
 	// An HTTP page or another port on the deployed host is not the deployed origin.

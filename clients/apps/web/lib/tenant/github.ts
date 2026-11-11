@@ -193,10 +193,15 @@ export async function deleteGitHubConnection(access: OrganizationAccess, connect
   return backendSDK(access).deleteGitHubConnection(connectionId)
 }
 
-/** The App's deliveries are signed with one secret, configured on the App. */
+/**
+ * The App's deliveries are signed with the secret configured on the App.
+ * During a rotation the previous secret also verifies (docs/deployment.md).
+ */
 export function verifyGitHubAppDelivery(body: string, signature: string | null): boolean {
-  const secret = process.env.GITHUB_APP_WEBHOOK_SECRET
-  return Boolean(secret) && verifyWebhookSignature(body, signature, secret ?? '')
+  return [
+    process.env.GITHUB_APP_WEBHOOK_SECRET,
+    process.env.GITHUB_APP_WEBHOOK_SECRET_PREVIOUS,
+  ].some((secret) => Boolean(secret) && verifyWebhookSignature(body, signature, secret ?? ''))
 }
 
 /** App events the platform acts on; any other is acknowledged and ignored. */
@@ -212,6 +217,8 @@ export const githubAppEventSchema = z.enum([
   'pull_request',
   'push',
   'release',
+  // A transferred repository: the backend archives sources that lose access.
+  'repository',
 ])
 
 const installationSchema = z.object({

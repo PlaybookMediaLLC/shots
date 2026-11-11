@@ -121,3 +121,13 @@ export function filterQueue<T extends { accountIds: string[]; at: string }>(
       (!range.to || row.at < range.to)
   )
 }
+
+/** The URL of a draft, keeping the library's set so links stay in the workspace's context. */
+export function draftHref(id: string, setId?: string | null, panel?: string, tab?: string): string {
+  const query = new URLSearchParams()
+  if (setId) query.set('set', setId)
+  if (panel) query.set('panel', panel)
+  // The list stays on the tab it was opened from; Drafts is the default.
+  if (tab && tab !== 'drafts') query.set('tab', tab)
+  return `/publish/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
+}

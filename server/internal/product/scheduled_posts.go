@@ -97,6 +97,10 @@ func (c *Configuration) requireKeySchedule(ctx context.Context, actor Actor, inp
 	return forbidden("A key with post:schedule sends only text a person approved: use the approved copy of a campaign post for this visual. To post new text, use createPost, which needs post:publish.")
 }
 
+// schedulerID is who queued a post, as scheduled_post records it: the member,
+// or "api-key:<id>" for a key (the identity comments use); nil for neither.
+func schedulerID(actor Actor) *string { return nonEmptyPointer(commentAuthorID(actor)) }
+
 // requireSharedAccount keeps a key out of a private social set's accounts: not
 // found, the same as another workspace's account. People keep their own access.
 func requireSharedAccount(ctx context.Context, client *ent.Client, actor Actor, connection *ent.ChannelConnection) error {
@@ -108,9 +112,9 @@ func requireSharedAccount(ctx context.Context, client *ent.Client, actor Actor, 
 }
 
 // CreateScheduledPost schedules an approved variant, or for a session a
-// content draft, to a channel connection and charges the monthly posts
-// allowance. A replay of the same idempotency
-// key returns the first post and is not charged again.
+// content draft in a workspace that does not approve drafts, to a channel
+// connection and charges the monthly posts allowance. A replay of the same
+// idempotency key returns the first post and is not charged again.
 func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	input publishing.CreateScheduledPostInput) (publishing.CreateScheduledPostResult, error) {
 	input.Caption = strings.TrimSpace(input.Caption)
@@ -120,10 +124,21 @@ func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	if err := c.authorizeScheduling(ctx, actor); err != nil {
 		return publishing.CreateScheduledPostResult{}, err
 	}
-	// A content draft has no approval step, so only a person schedules one
-	// (RFC 013). A key schedules approved campaign variants only.
-	if input.ContentDraftID != "" && !actor.IsSession() {
-		return publishing.CreateScheduledPostResult{}, publishing.ErrForbidden
+	// Only a person schedules a content draft here (RFC 013); a key schedules
+	// approved campaign variants only. This route sends the caller's caption, so
+	// where drafts need approval they take the draft schedule route instead,
+	// which checks the approved version.
+	if input.ContentDraftID != "" {
+		if !actor.IsSession() {
+			return publishing.CreateScheduledPostResult{}, publishing.ErrForbidden
+		}
+		settings, err := c.client.ContentDraftSettings.Get(ctx, actor.OrganizationID)
+		if err != nil && !ent.IsNotFound(err) {
+			return publishing.CreateScheduledPostResult{}, err
+		}
+		if settings != nil && settings.RequireApproval {
+			return publishing.CreateScheduledPostResult{}, conflict("This workspace approves drafts before they are scheduled. Schedule the draft from the draft itself (POST /api/v1/content-drafts/{id}/schedule), which checks its approval.")
+		}
 	}
 	if !actor.IsSession() {
 		if err := c.requireKeySchedule(ctx, actor, input); err != nil {
@@ -139,6 +154,7 @@ func (c *Configuration) CreateScheduledPost(ctx context.Context, actor Actor,
 	if err != nil {
 		return publishing.CreateScheduledPostResult{}, err
 	}
+	input.ScheduledBy = schedulerID(actor)
 	result, err := c.auth.CreateScheduledPost(ctx, actor.auditActor(), input)
 	if err != nil || !result.Created {
 		refund()

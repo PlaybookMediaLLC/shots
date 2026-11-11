@@ -4,7 +4,7 @@ import * as React from 'react'
 import { registerNavigationGuard } from '@/lib/platform/navigation-guard'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { WriteData } from '@/app/[locale]/publish/write-data'
-import { libraryDraft, libraryQuery, libraryRange } from '@/lib/write/library'
+import { draftHref, libraryDraft, libraryQuery, libraryRange } from '@/lib/write/library'
 import type { DraftWire } from '@/lib/content-drafts/client'
 import { toast } from 'sonner'
 import { platformHref } from '@/lib/platform/navigation'
@@ -12,6 +12,9 @@ import { SOCIAL_SET_COOKIE } from '@/lib/settings/appearance'
 import { blankDraftContext } from '@/lib/write/composing-session'
 import { startBlankDraft } from './pending-draft'
 import type { Shortcut } from './shortcuts'
+
+// The draft URL lives with the library helpers, so a link to a draft does not load the composer.
+export { draftHref }
 
 /** An editor command as the palette lists it. */
 export type EditorCommandEntry = {
@@ -327,21 +330,6 @@ export function WriteProvider({
     ]
   )
   return <WriteContext.Provider value={value}>{children}</WriteContext.Provider>
-}
-
-/** The URL of a draft, keeping the library's set so links stay in the workspace's context. */
-export function draftHref(
-  id: string,
-  setId?: string | null,
-  panel?: string,
-  tab?: string
-): string {
-  const query = new URLSearchParams()
-  if (setId) query.set('set', setId)
-  if (panel) query.set('panel', panel)
-  // The list stays on the tab it was opened from; Drafts is the default.
-  if (tab && tab !== 'drafts') query.set('tab', tab)
-  return `/publish/${encodeURIComponent(id)}${query.size > 0 ? `?${query}` : ''}`
 }
 
 /** "now", "5m", "3h", "2d", then a date: how long ago something happened. */

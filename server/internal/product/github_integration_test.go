@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourceapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -392,5 +395,88 @@ func TestGitHubConnectionsChangesAndReleases(t *testing.T) {
 	}
 	if n := count(`SELECT count(*) FROM outbox_event WHERE type='deployment.succeeded' AND "organizationId"=$1`, orgA); n != 1 {
 		t.Fatalf("deployment events=%d", n)
+	}
+}
+
+// movedReader is GitHub after a repository left the from installation; err,
+// when set, is what GitHub answers instead of a 404.
+type movedReader struct {
+	fakeReader
+	from int64
+	err  error
+}
+
+func (m movedReader) Repository(ctx context.Context, installationID int64, repositoryID string) (githubapp.Repository, error) {
+	if installationID == m.from && m.err != nil {
+		return githubapp.Repository{}, m.err
+	}
+	if installationID == m.from {
+		return githubapp.Repository{}, githubapp.StatusError{Status: 404}
+	}
+	return m.fakeReader.Repository(ctx, installationID, repositoryID)
+}
+
+// C6: a repository moved to another account reaches only the new owner's
+// installation. A source still bound to the old one is archived for a person to
+// reconnect, visibly, with an audit record and a workspace notification. A
+// replayed event changes nothing while the old installation still reads it.
+func TestGitHubRepositoryTransferNeedsReconnection(t *testing.T) {
+	f := newAutomationFixture(t)
+	transfer := func(delivery string) *GitHubEventAcceptance {
+		t.Helper()
+		body := `{"action":"transferred","installation":{"id":` + strconv.FormatInt(f.installation+1, 10) + `},"repository":{"id":1001,"full_name":"newowner/app"}}`
+		result, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{DeliveryID: delivery, EventName: "repository", Body: []byte(body)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return result
+	}
+	if result := transfer("transfer-replay"); result.Handled != 0 || f.db.Client.SourceApp.GetX(f.ctx, f.source.ID).Status != sourceapp.StatusACTIVE {
+		t.Fatalf("an installation that still reads the repository lost it: %+v", result)
+	}
+	reader := f.repo.github.(fakeReader)
+	// GitHub failing, rate limiting or timing out proves nothing: the delivery
+	// fails for GitHub to send again, and the source stays.
+	for _, failure := range []error{githubapp.StatusError{Status: 502}, githubapp.StatusError{Status: 403, RateLimited: true}, context.DeadlineExceeded} {
+		f.repo.WithGitHubApp(movedReader{fakeReader: reader, from: f.installation, err: failure})
+		body := `{"action":"transferred","installation":{"id":` + strconv.FormatInt(f.installation+1, 10) + `},"repository":{"id":1001}}`
+		if _, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{DeliveryID: "transfer", EventName: "repository", Body: []byte(body)}); !errors.Is(err, failure) ||
+			f.db.Client.SourceApp.GetX(f.ctx, f.source.ID).Status != sourceapp.StatusACTIVE {
+			t.Fatalf("%v archived the source or was accepted: %v", failure, err)
+		}
+	}
+	f.repo.WithGitHubApp(movedReader{fakeReader: reader, from: f.installation})
+	if result := transfer("transfer"); result.Handled != 1 {
+		t.Fatalf("result=%+v", result)
+	}
+	overview, err := f.repo.ReleaseAutomationOverview(f.ctx, f.owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.IndexFunc(overview.Sources, func(source AutomationSource) bool { return source.ID == f.source.ID })
+	if i < 0 || overview.Sources[i].Status != "ARCHIVED" || overview.Sources[i].ConnectionState != "repository_access_removed" {
+		t.Fatalf("sources=%+v", overview.Sources)
+	}
+	audit := f.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(f.org), auditlog.Action("product.source_app_archived"), auditlog.EntityID(f.source.ID)).OnlyX(f.ctx)
+	if audit.Metadata["reason"] != "repository_transferred" {
+		t.Fatalf("audit=%+v", audit.Metadata)
+	}
+	if n := f.db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(f.org), outboxevent.Type("activity.integration.reconnect_required"), outboxevent.AggregateID(f.source.ID)).CountX(f.ctx); n != 1 {
+		t.Fatalf("notifications=%d", n)
+	}
+	// A redelivery finds nothing left to archive; another action is ignored.
+	if result := transfer("transfer"); result.Handled != 0 {
+		t.Fatalf("redelivery=%+v", result)
+	}
+	renamed, err := f.repo.AcceptGitHubEvent(f.ctx, AcceptGitHubEventInput{DeliveryID: "renamed", EventName: "repository", Body: []byte(`{"action":"renamed","repository":{"id":1001}}`)})
+	if err != nil || renamed.Handled != 0 {
+		t.Fatalf("renamed=%+v err=%v", renamed, err)
+	}
+	// Reconnecting restores the same source.
+	f.repo.WithGitHubApp(reader)
+	link, external := "link"+f.id, "1001"
+	restored, err := f.repo.CreateSourceApp(f.ctx, f.owner, CreateSourceAppInput{Name: "acme/app", Provider: "github", ExternalID: &external, GitHubConnectionID: &link, AllowedHosts: []string{"https://api.github.com"}})
+	if err != nil || restored.ID != f.source.ID || restored.Status != sourceapp.StatusACTIVE {
+		t.Fatalf("restored=%+v err=%v", restored, err)
 	}
 }

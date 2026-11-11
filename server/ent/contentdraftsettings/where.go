@@ -69,6 +69,11 @@ func RequireApproval(v bool) predicate.ContentDraftSettings {
 	return predicate.ContentDraftSettings(sql.FieldEQ(FieldRequireApproval, v))
 }
 
+// AllowSelfApproval applies equality check predicate on the "allow_self_approval" field. It's identical to AllowSelfApprovalEQ.
+func AllowSelfApproval(v bool) predicate.ContentDraftSettings {
+	return predicate.ContentDraftSettings(sql.FieldEQ(FieldAllowSelfApproval, v))
+}
+
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.ContentDraftSettings {
 	return predicate.ContentDraftSettings(sql.FieldEQ(FieldUpdatedAt, v))
@@ -82,6 +87,16 @@ func RequireApprovalEQ(v bool) predicate.ContentDraftSettings {
 // RequireApprovalNEQ applies the NEQ predicate on the "require_approval" field.
 func RequireApprovalNEQ(v bool) predicate.ContentDraftSettings {
 	return predicate.ContentDraftSettings(sql.FieldNEQ(FieldRequireApproval, v))
+}
+
+// AllowSelfApprovalEQ applies the EQ predicate on the "allow_self_approval" field.
+func AllowSelfApprovalEQ(v bool) predicate.ContentDraftSettings {
+	return predicate.ContentDraftSettings(sql.FieldEQ(FieldAllowSelfApproval, v))
+}
+
+// AllowSelfApprovalNEQ applies the NEQ predicate on the "allow_self_approval" field.
+func AllowSelfApprovalNEQ(v bool) predicate.ContentDraftSettings {
+	return predicate.ContentDraftSettings(sql.FieldNEQ(FieldAllowSelfApproval, v))
 }
 
 // UpdatedAtEQ applies the EQ predicate on the "updated_at" field.

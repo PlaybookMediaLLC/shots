@@ -85,6 +85,7 @@ test('settings sections are grouped and each has its own address', () => {
     ['install', 'personal'],
     ['billing', 'workspace'],
     ['members', 'workspace'],
+    ['voice-notes', 'workspace'],
     ['integrations', 'integrations'],
     ['developers', 'advanced'],
     ['experimental', 'advanced'],

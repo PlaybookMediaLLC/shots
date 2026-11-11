@@ -11,19 +11,20 @@ const SETTINGS_KEY = ['content-draft-settings'] as const
 
 /**
  * Whether a draft needs approval before it is scheduled. It applies to the
- * whole workspace; each profile keeps its own posting times.
+ * whole workspace; each profile keeps its own posting times. Only an owner or
+ * admin may change it (`canManage`); others see it read-only.
  */
 export function ApprovalSetting({ canManage }: { canManage: boolean }) {
   const client = useQueryClient()
   const settings = useQuery({ queryKey: SETTINGS_KEY, queryFn: () => draftsApi.settings() })
   const [state, run] = useSaveState()
-  const save = (requireApproval: boolean) =>
+  const save = (change: Pick<Partial<SettingsWire>, 'allowSelfApproval' | 'requireApproval'>) =>
     run(async () => {
       const previous = client.getQueryData<SettingsWire>(SETTINGS_KEY)
-      if (previous) client.setQueryData(SETTINGS_KEY, { ...previous, requireApproval })
+      if (previous) client.setQueryData(SETTINGS_KEY, { ...previous, ...change })
       try {
-        // Only the approval switch is sent, so a plan without queue slots can still change it.
-        client.setQueryData(SETTINGS_KEY, await draftsApi.saveSettings({ requireApproval }))
+        // Only the approval switches are sent, so a plan without queue slots can still change them.
+        client.setQueryData(SETTINGS_KEY, await draftsApi.saveSettings(change))
         return { ok: true }
       } catch (error) {
         client.setQueryData(SETTINGS_KEY, previous)
@@ -39,7 +40,7 @@ export function ApprovalSetting({ canManage }: { canManage: boolean }) {
   return (
     <Group>
       <Row
-        description="A publisher or admin approves each draft before it is scheduled, for every profile."
+        description={`A publisher or admin approves each draft before it is scheduled, for every profile.${canManage ? '' : ' Only an owner or admin can change approvals.'}`}
         label="Approvals"
       >
         {settings.isError ? (
@@ -53,11 +54,25 @@ export function ApprovalSetting({ canManage }: { canManage: boolean }) {
               aria-label="Require approval"
               checked={settings.data?.requireApproval ?? false}
               disabled={!canManage || !settings.data}
-              onCheckedChange={(checked) => void save(checked)}
+              onCheckedChange={(checked) => void save({ requireApproval: checked })}
             />
           </div>
         )}
       </Row>
+      {settings.data ? (
+        <Row
+          description="When off, the person who last edited a draft cannot approve it."
+          label="Self-approval"
+          layout="inline"
+        >
+          <Switch
+            aria-label="Allow self-approval"
+            checked={settings.data.allowSelfApproval}
+            disabled={!canManage}
+            onCheckedChange={(checked) => void save({ allowSelfApproval: checked })}
+          />
+        </Row>
+      ) : null}
     </Group>
   )
 }

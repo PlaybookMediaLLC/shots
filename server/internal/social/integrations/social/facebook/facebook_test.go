@@ -186,6 +186,25 @@ func TestFeedPermissionError(t *testing.T) {
 	}
 }
 
+// Facebook calls "Sorry, something went wrong" retryable, but after a publish
+// it may have posted: one request, outcome unknown, no resend without the preset.
+func TestFeedServerErrorIsNotResent(t *testing.T) {
+	requests := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v25.0/page1/feed", func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.WriteHeader(500)
+		w.Write([]byte(`{"error":{"message":"Sorry, something went wrong.","code":1}}`))
+	})
+	p := setup(t, mux)
+	_, err := p.Post(context.Background(), "page1", "tok", []integrations.PostDetails{{
+		ID: "post", Message: "hello", Settings: json.RawMessage(`{"text_format_preset_id":"106018623298955"}`),
+	}}, &ent.Integration{})
+	if requests != 1 || temporalx.FailureType(err) != temporalx.TypeUnknownDelivery {
+		t.Fatalf("requests=%d err=%v", requests, err)
+	}
+}
+
 func TestFetchPageInformation(t *testing.T) {
 	mux := http.NewServeMux()
 	var base string

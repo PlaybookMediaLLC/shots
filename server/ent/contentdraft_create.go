@@ -374,6 +374,20 @@ func (_c *ContentDraftCreate) SetNillableSourceDraftID(v *string) *ContentDraftC
 	return _c
 }
 
+// SetSourceVoiceRevisionID sets the "source_voice_revision_id" field.
+func (_c *ContentDraftCreate) SetSourceVoiceRevisionID(v string) *ContentDraftCreate {
+	_c.mutation.SetSourceVoiceRevisionID(v)
+	return _c
+}
+
+// SetNillableSourceVoiceRevisionID sets the "source_voice_revision_id" field if the given value is not nil.
+func (_c *ContentDraftCreate) SetNillableSourceVoiceRevisionID(v *string) *ContentDraftCreate {
+	if v != nil {
+		_c.SetSourceVoiceRevisionID(*v)
+	}
+	return _c
+}
+
 // SetCampaignID sets the "campaign_id" field.
 func (_c *ContentDraftCreate) SetCampaignID(v string) *ContentDraftCreate {
 	_c.mutation.SetCampaignID(v)
@@ -828,6 +842,10 @@ func (_c *ContentDraftCreate) createSpec() (*ContentDraft, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.SourceDraftID(); ok {
 		_spec.SetField(contentdraft.FieldSourceDraftID, field.TypeString, value)
 		_node.SourceDraftID = &value
+	}
+	if value, ok := _c.mutation.SourceVoiceRevisionID(); ok {
+		_spec.SetField(contentdraft.FieldSourceVoiceRevisionID, field.TypeString, value)
+		_node.SourceVoiceRevisionID = &value
 	}
 	if value, ok := _c.mutation.CampaignID(); ok {
 		_spec.SetField(contentdraft.FieldCampaignID, field.TypeString, value)

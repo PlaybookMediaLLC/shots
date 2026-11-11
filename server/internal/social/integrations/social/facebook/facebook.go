@@ -784,11 +784,12 @@ func (p *Provider) postNonStory(ctx context.Context, id, accessToken string, pos
 		//   - malformed id  -> HTTP 400, code 100, message names
 		//                      "text_format_preset_id" explicitly
 		//   - retired numeric id -> HTTP 500, code 1, generic "unknown error"
-		//     (our fetch() retries 500s and then reports it with the body stripped)
-		// So retry once without the preset on an explicit preset error or a
-		// generic/unknown failure, but never on a recognized auth/token error
-		// (dropping the background can't fix that). A retry that only succeeds once
-		// the preset is removed confirms the preset was the cause.
+		//     (a 500 to a publish is UNKNOWN_DELIVERY and is never resent: the
+		//     post may exist, so it is not retried without the preset either)
+		// So retry once without the preset on a refusal that names the preset or
+		// is generic, but never on a recognized auth/token error (dropping the
+		// background can't fix that). A retry that only succeeds once the preset
+		// is removed confirms the preset was the cause.
 		result, err := publishFeed(presetID != "")
 		if err != nil {
 			if presetID == "" || !isPresetRejection(err) {

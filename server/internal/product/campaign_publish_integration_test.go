@@ -315,6 +315,9 @@ func TestCampaignPublishing(t *testing.T) {
 	if err != nil || !created.Created {
 		t.Fatalf("created=%+v err=%v", created, err)
 	}
+	if by := created.Post.ScheduledByUserID; by == nil || *by != "api-key:"+scheduler {
+		t.Fatalf("a key's post records scheduledBy=%v, want the key", by)
+	}
 	replayed, err := repo.CreateScheduledPost(ctx, key(scheduler), direct)
 	if err != nil || replayed.Created || replayed.Post.ID != created.Post.ID {
 		t.Fatalf("replayed=%+v err=%v", replayed, err)

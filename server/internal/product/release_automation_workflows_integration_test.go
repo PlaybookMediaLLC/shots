@@ -391,7 +391,7 @@ func TestAutomationTagPushReleasesBundleUnreleasedChanges(t *testing.T) {
 		history, _ := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{Family: automation.Merged})
 		for _, item := range history {
 			if item.Event.Snapshot.Number == number {
-				if err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
+				if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -457,7 +457,7 @@ func TestAutomationMilestoneReleasesTakeAssignedPullRequests(t *testing.T) {
 	}
 	prs, _ := f.repo.ListAutomationHistory(f.ctx, f.owner, AutomationHistoryFilter{Family: automation.Merged})
 	for _, item := range prs {
-		if err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
+		if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, item.Run.ID, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -794,7 +794,7 @@ func (f *captureFixture) deploy(t *testing.T, id int, environment string) string
 	if _, err := f.repo.LoadReleaseAutomation(f.ctx, f.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil {
+	if _, err := f.repo.CollectAutomationChange(f.ctx, f.org, runID, 0); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.repo.SelectReleaseAutomation(f.ctx, f.org, runID, *f.active.ActiveVersionID, 0); err != nil {

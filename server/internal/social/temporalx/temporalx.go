@@ -78,6 +78,8 @@ const (
 	TypePublicationRejected = "publication_rejected"
 	TypeDisconnect          = "disconnect"
 	TypeUnknownDelivery     = temporalpublishing.FailureUnknownDelivery
+	TypeRateLimited         = "rate_limited"
+	TypeDailyLimit          = "daily_limit"
 )
 
 // Temporal ships failures through gRPC with a 4MB frame limit, so every
@@ -150,6 +152,19 @@ func UnknownDelivery(identifier, message string) error {
 // Disconnect means the channel must be reconnected by the user.
 func Disconnect(identifier string, jsonBody, body any, message string) error {
 	return failure(TypeDisconnect, identifier, jsonBody, body, message)
+}
+
+// RateLimited means the platform kept refusing the request as too frequent
+// and accepted nothing, so a later retry is safe. The request body is left
+// out: it can hold credentials.
+func RateLimited(identifier string, jsonBody any) error {
+	return failure(TypeRateLimited, identifier, jsonBody, "{}", "The platform is rate limiting this account")
+}
+
+// DailyLimit means a platform cap refused the post until it resets: nothing
+// was published. message is the platform's reason, shown to users.
+func DailyLimit(identifier string, jsonBody, body any, message string) error {
+	return failure(TypeDailyLimit, identifier, jsonBody, body, message)
 }
 
 // FailureType returns the application failure type anywhere in err's chain

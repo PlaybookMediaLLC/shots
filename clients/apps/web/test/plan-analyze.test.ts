@@ -736,6 +736,7 @@ test('every failure names a cause and an action besides retrying when one exists
     'VIDEO_TOO_LONG',
     'MEDIA_UNSUPPORTED',
     'PROVIDER_PERMISSIONS',
+    'PROVIDER_DAILY_LIMIT',
   ])
     assert.doesNotMatch(postFailureReason(code) ?? '', /\(/, code)
   assert.equal(postFailureFix('ACCOUNT_RECONNECT'), 'reconnect')
