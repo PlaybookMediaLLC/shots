@@ -1622,16 +1622,23 @@ export function WriteComposer({
                   >
                     Publish now…
                   </Button>
-                  {/* Schedule picks a time; its arrow takes the next free queue slot. */}
-                  <span className="flex items-center" role="group" aria-label="Schedule">
+                  {/* Schedule picks a time; its arrow takes the next free queue slot. One
+                      joined control: custom halves, so the shell's per-button radius and
+                      border do not split it into two pills. */}
+                  <span
+                    className={cn('flex items-center', blockers.length > 0 && 'opacity-60')}
+                    role="group"
+                    aria-label="Schedule"
+                  >
                     <Button
-                      className={cn('rounded-r-none', blockers.length > 0 && 'opacity-60')}
+                      className="inline-flex h-8 items-center whitespace-nowrap rounded-l-md bg-foreground px-3 text-ui font-medium text-background transition-colors hover:bg-foreground/85"
                       data-testid="schedule-button"
                       onClick={() => startPublishing('schedule')}
-                      size="sm"
+                      size={null}
                       title={
                         blockers.length > 0 ? 'Shows what to fix before scheduling' : 'Choose a time'
                       }
+                      variant="custom"
                     >
                       {posts.some((post) => post.status === 'SCHEDULED')
                         ? 'Reschedule'
@@ -1641,18 +1648,16 @@ export function WriteComposer({
                     </Button>
                     <Button
                       aria-label="Add to the next free slot"
-                      className={cn(
-                        'rounded-l-none border-l border-background/25 px-2',
-                        blockers.length > 0 && 'opacity-60'
-                      )}
+                      className="grid h-8 place-items-center rounded-r-md border-l border-background/20 bg-foreground pe-2.5 ps-2 text-background transition-colors hover:bg-foreground/85"
                       data-testid="queue-button"
                       onClick={() => startPublishing('queue')}
-                      size="sm"
+                      size={null}
                       title={
                         blockers.length > 0
                           ? 'Shows what to fix before scheduling'
                           : `Add to the next free slot (${mod}${alt}↵)`
                       }
+                      variant="custom"
                     >
                       <ListPlus aria-hidden className="size-4" />
                     </Button>
@@ -2315,7 +2320,9 @@ export function WriteComposer({
             // Sticky at the frame's height, so the panel stays in view as the draft scrolls.
             className={cn(
               'sticky top-0 max-h-[calc(100vh-1rem-2px)] min-w-64 self-start overflow-y-auto border-l border-border animate-in fade-in duration-150',
-              split ? 'max-w-[70%]' : 'max-w-[48vw]'
+              split ? 'max-w-[70%]' : 'max-w-[48vw]',
+              // The assistant fills the column (its max height caps it) so its message box sits at the foot.
+              sidePanel === 'assistant' && 'flex h-screen flex-col'
             )}
             ref={fitToScroller}
             data-composer-panel
