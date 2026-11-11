@@ -201,7 +201,8 @@ export function EditorHeader() {
           isMobile ? 'grid-cols-[1fr_auto] px-2 py-2' : 'h-12 grid-cols-[minmax(0,1fr)_auto_auto] px-3'
         )}
       >
-        <div className="flex min-w-0 items-center gap-1 overflow-hidden justify-self-stretch">
+        {/* A container, so its labels give way to icons when the toolbar leaves little room. */}
+        <div className="@container/editor-start flex min-w-0 items-center gap-1 overflow-hidden justify-self-stretch">
           {/* On desktop the logo lives in the sidebar rail. */}
           {isMobile ? (
             <Link
@@ -234,8 +235,9 @@ export function EditorHeader() {
             type="button"
           >
             <MagicWand01Icon className="shrink-0" size={15} />
-            {!isMobile ? <span>Templates</span> : null}
+            {!isMobile ? <span className="@max-[8rem]/editor-start:hidden">Templates</span> : null}
           </Button>
+          {!isMobile ? <ToolDivider /> : null}
           <ProjectMenu compact={isMobile} />
         </div>
 
@@ -330,7 +332,8 @@ export function EditorHeader() {
           </Popover>
 
           {!isMobile || !hasImage ? (
-            <div className="inline-flex shrink-0">
+            <div className="inline-flex shrink-0 items-center">
+              {!isMobile ? <ToolDivider /> : null}
               <Input
                 ref={addSlideInputRef}
                 accept="image/png,image/jpeg,image/webp"
@@ -349,7 +352,7 @@ export function EditorHeader() {
                 }}
                 type="file"
               />
-              <Button variant="custom" size={null} type="button" onClick={() => addSlideInputRef.current?.click()} className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium leading-none text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground">
+              <Button variant="custom" size={null} type="button" onClick={() => addSlideInputRef.current?.click()} className={cn('inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium leading-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground', hasImage ? 'text-muted-foreground' : 'text-foreground')}>
                 <Add01Icon size={14} />
                 <span>{hasImage ? 'Add slide from image…' : 'Upload image…'}</span>
               </Button>
@@ -370,11 +373,12 @@ export function EditorHeader() {
           >
             <Copy01Icon size={15} />
           </ToolButton>
+          {!isMobile ? <ToolDivider /> : null}
 
           {hasImage && showVideoExport && !isMobile ? (
             <Button variant="custom" size={null}
               aria-label="Export Video"
-              className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-foreground/[0.08] px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-foreground/[0.06]"
+              className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
               onClick={() => setExportSlideshowOpen(true)}
               type="button"
             >
@@ -402,8 +406,8 @@ export function EditorHeader() {
                 aria-label="Export"
                 className={cn(
                   'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-foreground text-[13px] font-medium text-background',
-                  'transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98]',
-                  'disabled:pointer-events-none disabled:opacity-35',
+                  'shadow-sm transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98]',
+                  'disabled:pointer-events-none disabled:bg-foreground/[0.07] disabled:text-muted-foreground disabled:shadow-none',
                   isMobile ? 'px-2' : 'px-3'
                 )}
                 disabled={!hasContent}
@@ -446,6 +450,7 @@ export function EditorHeader() {
             </PopoverContent>
           </Popover>
 
+          {!isMobile ? <ToolDivider /> : null}
           {!isMobile ? (
             <ToolButton label="Keyboard shortcuts" onClick={() => setShortcutsOpen(true)}>
               <KeyboardIcon size={15} />

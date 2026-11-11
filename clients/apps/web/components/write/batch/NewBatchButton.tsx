@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import type { ContentBatch } from '@/lib/api/contracts/content-batches'
 import { call } from '@/lib/content-drafts/client'
 import { cn } from '@/lib/utils'
+import { BatchKindArt } from './BatchKindArt'
 
 /** The kinds of batch; each opens the same batch page, set up for it. */
 const TOOLS = [
@@ -79,17 +80,17 @@ export function NewBatchButton({
   }
   return (
     <form
-      className="grid gap-5"
+      className="grid gap-6"
       onSubmit={(event) => {
         event.preventDefault()
         begin()
       }}
     >
-      <div className="grid gap-2">
-        <p className="text-sm font-medium">1. What are you posting?</p>
+      <div className="grid gap-3">
+        <Step number={1}>What are you posting?</Step>
         <RadioGroup
           aria-label="Batch type"
-          className="grid gap-3 sm:grid-cols-2"
+          className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
           data-testid="bulk-tools"
           disabled={busy}
           onValueChange={setTool}
@@ -98,16 +99,21 @@ export function NewBatchButton({
           {TOOLS.map((item) => (
             <Label
               className={cn(
-                'cursor-pointer items-start gap-3 rounded-xl border border-border p-4 font-normal hover:bg-muted',
-                tool === item.value && 'border-primary bg-muted'
+                'group cursor-pointer flex-col items-stretch gap-0 rounded-xl border border-border bg-card p-1.5 font-normal transition-[border-color,box-shadow] duration-150',
+                'hover:border-foreground/20 hover:shadow-sm',
+                tool === item.value &&
+                  'border-foreground/70 shadow-sm ring-1 ring-foreground/70 hover:border-foreground/70'
               )}
               key={item.value}
             >
-              <RadioGroupItem value={item.value} />
-              <span className="grid gap-1">
-                <span className="font-medium">{item.label}</span>
-                <span className="text-xs leading-normal text-muted-foreground">
-                  {item.description}
+              <BatchKindArt kind={item.value} />
+              <span className="flex items-start gap-3 px-2.5 pt-3 pb-2">
+                <RadioGroupItem className="mt-px" value={item.value} />
+                <span className="grid gap-1">
+                  <span className="font-medium leading-snug">{item.label}</span>
+                  <span className="text-xs leading-normal text-muted-foreground">
+                    {item.description}
+                  </span>
                 </span>
               </span>
             </Label>
@@ -115,10 +121,10 @@ export function NewBatchButton({
         </RadioGroup>
       </div>
       {tool ? (
-        <div className="grid gap-2">
-          <p className="text-sm font-medium">2. Name it and start</p>
-          <div className="flex flex-wrap items-end gap-3">
-            <Label className="grid gap-1 font-normal">
+        <div className="grid gap-3 rounded-xl border border-border bg-[var(--platform-group,var(--card))] p-4 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+          <Step number={2}>Name it and start</Step>
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,16rem)_auto] md:items-end">
+            <Label className="grid gap-1.5 font-normal">
               Name
               <Input
                 value={title || suggested}
@@ -126,7 +132,7 @@ export function NewBatchButton({
                 onChange={(event) => setTitle(event.target.value)}
               />
             </Label>
-            <Label className="grid gap-1 font-normal">
+            <Label className="grid gap-1.5 font-normal">
               Profile
               <Combobox
                 aria-label="Profile"
@@ -144,5 +150,20 @@ export function NewBatchButton({
         </div>
       ) : null}
     </form>
+  )
+}
+
+/** A numbered step heading. */
+function Step({ children, number }: { children: React.ReactNode; number: number }) {
+  return (
+    <p className="flex items-center gap-2 text-sm font-medium">
+      <span
+        aria-hidden="true"
+        className="grid size-5 place-items-center rounded-full bg-foreground text-[11px] font-semibold text-background tabular-nums"
+      >
+        {number}
+      </span>
+      {children}
+    </p>
   )
 }

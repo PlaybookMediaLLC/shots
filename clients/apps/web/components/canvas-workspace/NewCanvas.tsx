@@ -34,6 +34,7 @@ import { type Artboard } from '@/lib/canvas/document'
 import { releaseCanvas, stacked } from '@/lib/canvas/plan'
 import { usePrivateCreativeSurface } from '@/components/creative-sets/use-private-surface'
 import { RecipePreview } from './RecipePreview'
+import { StartArt } from './StartArt'
 import {
   CampaignDesignPicker,
   ProjectPicker,
@@ -230,10 +231,15 @@ export function NewCanvas({
       detail: 'Every format of a Story Set as editable artboards.',
     },
   ]
+  const visible = choices.filter((choice) => !choice.hidden)
+  const chosen = visible.find((choice) => choice.id === start)
 
   return (
-    <main className="w-full space-y-8 p-8" aria-busy={busy}>
-      <header className="flex flex-wrap items-start justify-between gap-4">
+    <main
+      className="mx-auto w-full space-y-8 px-4 pt-8 pb-16 md:max-w-[1200px] md:px-10"
+      aria-busy={busy}
+    >
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Link href="/canvas" className="text-sm text-muted-foreground hover:text-foreground">
             ← Canvas
@@ -263,110 +269,140 @@ export function NewCanvas({
           {error}
         </p>
       ) : null}
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
-        <nav aria-label="Ways to start" className="grid content-start gap-2">
-          {choices
-            .filter((choice) => !choice.hidden)
-            .map((choice) => (
-              <Button
-                variant="custom"
-                size={null}
-                key={choice.id}
-                type="button"
-                aria-pressed={start === choice.id}
-                onClick={() => {
-                  setStart(choice.id)
-                  setRecipe(choice.id === 'launch' ? 'product-launch' : null)
-                }}
-                className={`rounded-xl border p-4 text-left transition-colors hover:bg-foreground/[0.03] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring ${start === choice.id ? 'border-foreground/30 bg-foreground/[0.04]' : ''}`}
-              >
-                <span className="block font-medium">{choice.title}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">{choice.detail}</span>
-              </Button>
-            ))}
+      {chosen ? (
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
+          <aside className="grid gap-4 lg:sticky lg:top-8">
+            <Button
+              className="cursor-pointer justify-self-start rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
+              onClick={() => {
+                setStart(null)
+                setRecipe(null)
+              }}
+              size={null}
+              type="button"
+              variant="custom"
+            >
+              ← All ways to start
+            </Button>
+            <StartArt className="hidden sm:block" start={chosen.id} />
+            <div>
+              <h2 className="font-medium">{chosen.title}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{chosen.detail}</p>
+            </div>
+          </aside>
+          <section
+            aria-label="Starting point"
+            className="min-h-64 rounded-xl border bg-[var(--platform-group,var(--card))] p-5"
+          >
+            {start === 'screenshots' ? (
+              <ScreenshotStart
+                disabled={busy}
+                onCreate={(shots) =>
+                  void create(`shots:${shots.map((shot) => shot.src).join(',')}`, async () => ({
+                    name: 'Product screenshots',
+                    artboards: stacked(
+                      ...shots.map((shot) =>
+                        buildRecipe('feature-announcement', { screenshots: [shot] })
+                      )
+                    ),
+                  }))
+                }
+              />
+            ) : null}
+            {start === 'feature' ? (
+              <ReleasePicker
+                disabled={busy}
+                onPick={(choice) =>
+                  void create(`release:${choice.release.id}:${choice.featureIndex ?? 'all'}`, () =>
+                    featurePlan(client, choice)
+                  )
+                }
+              />
+            ) : null}
+            {start === 'template' && !recipe ? <RecipeGallery onPick={setRecipe} /> : null}
+            {(start === 'template' || start === 'launch') && recipe ? (
+              <RecipeForm
+                recipe={recipe}
+                disabled={busy}
+                onBack={start === 'template' ? () => setRecipe(null) : undefined}
+                onCreate={(input) =>
+                  void create(`recipe:${recipe}:${JSON.stringify(input)}`, async () => ({
+                    name: CANVAS_RECIPES[recipe].name,
+                    artboards: buildRecipe(recipe, input),
+                  }))
+                }
+              />
+            ) : null}
+            {start === 'campaign' ? (
+              <CampaignDesignPicker
+                disabled={busy}
+                onPick={(id) =>
+                  void create(
+                    `design:${id}`,
+                    async () => (await planFromSource(client, { design: id }))!
+                  )
+                }
+              />
+            ) : null}
+            {start === 'project' ? (
+              <ProjectPicker
+                disabled={busy}
+                onPick={(id) =>
+                  void create(
+                    `project:${id}`,
+                    async () => (await planFromSource(client, { project: id }))!
+                  )
+                }
+              />
+            ) : null}
+            {start === 'story-set' ? (
+              <StorySetPicker
+                disabled={busy}
+                onPick={(id) =>
+                  void create(`set:${id}`, async () => (await planFromSource(client, { set: id }))!)
+                }
+              />
+            ) : null}
+            {busy ? (
+              <p className="mt-4 text-sm text-muted-foreground" role="status">
+                Creating your canvas…
+              </p>
+            ) : null}
+          </section>
+        </div>
+      ) : (
+        <nav aria-label="Ways to start" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((choice) => (
+            <Button
+              variant="custom"
+              size={null}
+              key={choice.id}
+              type="button"
+              onClick={() => {
+                setStart(choice.id)
+                setRecipe(choice.id === 'launch' ? 'product-launch' : null)
+              }}
+              className="group flex min-w-0 flex-col items-stretch rounded-xl border bg-card p-1.5 text-left transition-[border-color,box-shadow] duration-150 hover:border-foreground/20 hover:shadow-md focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
+            >
+              <StartArt start={choice.id} />
+              <span className="block px-2.5 pt-3 pb-2">
+                <span className="flex items-center justify-between gap-2 font-medium">
+                  {choice.title}
+                  <span
+                    aria-hidden="true"
+                    className="text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
+                  >
+                    →
+                  </span>
+                </span>
+                <span className="mt-1 block text-xs leading-normal text-muted-foreground">
+                  {choice.detail}
+                </span>
+              </span>
+            </Button>
+          ))}
         </nav>
-        <section aria-label="Starting point" className="min-h-64 rounded-xl border p-5">
-          {start === null ? (
-            <p className="text-sm text-muted-foreground">
-              Choose how to start. A blank canvas opens with one 16:9 artboard.
-            </p>
-          ) : null}
-          {start === 'screenshots' ? (
-            <ScreenshotStart
-              disabled={busy}
-              onCreate={(shots) =>
-                void create(`shots:${shots.map((shot) => shot.src).join(',')}`, async () => ({
-                  name: 'Product screenshots',
-                  artboards: stacked(
-                    ...shots.map((shot) =>
-                      buildRecipe('feature-announcement', { screenshots: [shot] })
-                    )
-                  ),
-                }))
-              }
-            />
-          ) : null}
-          {start === 'feature' ? (
-            <ReleasePicker
-              disabled={busy}
-              onPick={(choice) =>
-                void create(`release:${choice.release.id}:${choice.featureIndex ?? 'all'}`, () =>
-                  featurePlan(client, choice)
-                )
-              }
-            />
-          ) : null}
-          {start === 'template' && !recipe ? <RecipeGallery onPick={setRecipe} /> : null}
-          {(start === 'template' || start === 'launch') && recipe ? (
-            <RecipeForm
-              recipe={recipe}
-              disabled={busy}
-              onBack={start === 'template' ? () => setRecipe(null) : undefined}
-              onCreate={(input) =>
-                void create(`recipe:${recipe}:${JSON.stringify(input)}`, async () => ({
-                  name: CANVAS_RECIPES[recipe].name,
-                  artboards: buildRecipe(recipe, input),
-                }))
-              }
-            />
-          ) : null}
-          {start === 'campaign' ? (
-            <CampaignDesignPicker
-              disabled={busy}
-              onPick={(id) =>
-                void create(
-                  `design:${id}`,
-                  async () => (await planFromSource(client, { design: id }))!
-                )
-              }
-            />
-          ) : null}
-          {start === 'project' ? (
-            <ProjectPicker
-              disabled={busy}
-              onPick={(id) =>
-                void create(
-                  `project:${id}`,
-                  async () => (await planFromSource(client, { project: id }))!
-                )
-              }
-            />
-          ) : null}
-          {start === 'story-set' ? (
-            <StorySetPicker
-              disabled={busy}
-              onPick={(id) =>
-                void create(`set:${id}`, async () => (await planFromSource(client, { set: id }))!)
-              }
-            />
-          ) : null}
-          {busy ? (
-            <p className="mt-4 text-sm text-muted-foreground" role="status">
-              Creating your canvas…
-            </p>
-          ) : null}
-        </section>
-      </div>
+      )}
     </main>
   )
 }
