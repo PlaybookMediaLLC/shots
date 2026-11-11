@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 
@@ -136,4 +137,19 @@ test('the backend image never matches the e2e-tagged backend artifact', async ()
 test('an unknown image name fails instead of waiting for a job that never runs', async () => {
   const run = scenario([[]], [], 'nope')
   await assert.rejects(waitForImage(run.input), /Unknown CI image "nope"/)
+})
+
+// The loader reads one fixed file name; a producer that uploads any other name
+// hands every consumer an artifact it downloads and then cannot load.
+test('every image artifact holds the image.tar.gz the loader reads', () => {
+  const workflow = readFileSync('../../../.github/workflows/ci.yml', 'utf8')
+  const loader = readFileSync('../../../.github/actions/load-ci-image/action.yml', 'utf8')
+  assert.match(loader, /docker load --input "\$IMAGE_DIR\/image\.tar\.gz"/)
+  for (const { prefix } of Object.values(IMAGES)) {
+    const upload = workflow.match(
+      new RegExp(`name: ${prefix}-\\$\\{\\{ github\\.sha \\}\\}.*\\n\\s+path: (.+)`)
+    )
+    assert.ok(upload, `no upload step names the ${prefix} artifact`)
+    assert.match(upload[1]!, /\/image\.tar\.gz$/, `${prefix} uploads ${upload[1]}`)
+  }
 })

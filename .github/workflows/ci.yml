@@ -204,21 +204,26 @@ jobs:
           load: true
           cache-from: type=gha,scope=social-backend-e2e
           cache-to: ${{ github.event_name == 'push' && 'type=gha,mode=max,scope=social-backend-e2e' || '' }}
+      # .github/actions/load-ci-image loads image.tar.gz from every artifact.
       - name: Export the backend image
-        run: docker save screenshot-studio-backend:local | gzip -1 > "$RUNNER_TEMP/backend.tar.gz"
+        run: |
+          mkdir -p "$RUNNER_TEMP/backend"
+          docker save screenshot-studio-backend:local | gzip -1 > "$RUNNER_TEMP/backend/image.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
           name: ci-backend-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/backend.tar.gz
+          path: ${{ runner.temp }}/backend/image.tar.gz
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
       - name: Export the end-to-end backend image
-        run: docker save screenshot-studio-backend:social-gate | gzip -1 > "$RUNNER_TEMP/backend-e2e.tar.gz"
+        run: |
+          mkdir -p "$RUNNER_TEMP/backend-e2e"
+          docker save screenshot-studio-backend:social-gate | gzip -1 > "$RUNNER_TEMP/backend-e2e/image.tar.gz"
       - uses: actions/upload-artifact@v4
         with:
           name: ci-backend-e2e-${{ github.sha }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/backend-e2e.tar.gz
+          path: ${{ runner.temp }}/backend-e2e/image.tar.gz
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
@@ -704,6 +709,11 @@ jobs:
           PLAYWRIGHT_HTML_OUTPUT_DIR: ${{ runner.temp }}/playwright-html
         run: |
           set -euo pipefail
+          # A pattern that matches no artifact succeeds without creating the directory.
+          if [[ ! -d "$RUNNER_TEMP/blob-reports" ]]; then
+            echo 'No shard uploaded a blob report; the integration jobs carry the failure.'
+            exit 0
+          fi
           (cd clients && npm ci --prefer-offline --no-audit)
           cd clients/apps/web
           npx playwright merge-reports --reporter html "$RUNNER_TEMP/blob-reports"
