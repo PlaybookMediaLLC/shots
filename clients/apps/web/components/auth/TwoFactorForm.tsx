@@ -7,6 +7,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { z } from 'zod'
 import { authClient } from '@/lib/auth/client'
+import { authPageSearch, authRedirect } from '@/lib/auth/oauth-navigation'
 import { getAuthErrorMessage } from './error-message'
 import { AuthField, FormAlert, SubmitButton } from './fields'
 import { Label } from '@/components/ui/label'
@@ -54,7 +55,7 @@ export function TwoFactorForm() {
         ? await authClient.twoFactor.verifyBackupCode({ code: code.data, trustDevice })
         : await authClient.twoFactor.verifyTotp({ code: code.data, trustDevice })
       if (result.error) throw new Error(result.error.message ?? 'Verification failed.')
-      window.location.assign(callbackURL)
+      window.location.assign(authRedirect(result.data, callbackURL))
     } catch (requestError) {
       setError(getAuthErrorMessage(requestError, 'Verification failed. Try again.'))
     } finally {
@@ -102,7 +103,7 @@ export function TwoFactorForm() {
         </Button>
         <Link
           className="text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          href="/sign-in"
+          href={`/sign-in?${authPageSearch(searchParams.toString(), callbackURL)}`}
         >
           Back to sign in
         </Link>

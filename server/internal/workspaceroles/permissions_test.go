@@ -23,4 +23,24 @@ func TestPermissionsMatchWeb(t *testing.T) {
 	if !slices.Equal(web, Permissions) {
 		t.Fatalf("permissions drifted:\nweb: %v\ngo:  %v", web, Permissions)
 	}
+	roles := regexp.MustCompile(`(?s)const rolePermissions:.*?= \{(.*?)\n\}`).FindSubmatch(source)
+	if roles == nil {
+		t.Fatal("role permission contract not found")
+	}
+	for _, role := range regexp.MustCompile(`(?s)(\w+): (permissions|\[.*?\])`).FindAllSubmatch(roles[1], -1) {
+		var expected []string
+		if string(role[2]) == "permissions" {
+			expected = web
+		} else {
+			for _, permission := range regexp.MustCompile(`'([^']+)'`).FindAllSubmatch(role[2], -1) {
+				expected = append(expected, string(permission[1]))
+			}
+		}
+		if !slices.Equal(expected, ForRole(string(role[1]))) {
+			t.Fatalf("role %s permission ceiling drifted", role[1])
+		}
+	}
+	if !slices.Equal(ForRole("member"), ForRole("viewer")) || !slices.Equal(ForRole("unknown"), ForRole("viewer")) {
+		t.Fatal("legacy or unknown role exceeded viewer ceiling")
+	}
 }

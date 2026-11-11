@@ -1,8 +1,14 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "types": ["node"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "types": [
+      "node"
+    ],
     "allowJs": true,
     "allowImportingTsExtensions": true,
     "skipLibCheck": true,
@@ -21,8 +27,12 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"],
-      "screenshot-studio-backend-sdk": ["../../packages/screenshot-studio-backend-sdk/src/index.ts"]
+      "@/*": [
+        "./*"
+      ],
+      "screenshot-studio-backend-sdk": [
+        "../../packages/screenshot-studio-backend-sdk/src/index.ts"
+      ]
     }
   },
   "include": [
@@ -31,7 +41,11 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    ".next-founder-hub-founder-hub-76d2fd2c3f/types/**/*.ts",
+    ".next-founder-hub-founder-hub-76d2fd2c3f/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules"
+  ]
 }

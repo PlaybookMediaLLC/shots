@@ -247,6 +247,7 @@ export default defineConfig([
     ignores: [
       'node_modules/**',
       'apps/web/.next/**',
+      'apps/web/.next-*/**',
       'apps/web/out/**',
       'apps/web/build/**',
       'packages/*/dist/**',

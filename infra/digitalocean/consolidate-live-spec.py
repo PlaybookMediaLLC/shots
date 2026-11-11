@@ -60,6 +60,7 @@ OPTIONAL_TENANT_SECRETS = (
     # from the design renderer's and never reaches the web.
     "PLATFORM_CAPTURE_CDP_URL", "PLATFORM_CAPTURE_CDP_TOKEN", "PLATFORM_CAPTURE_STATE_KEY",
     "PLATFORM_CAPTURE_STATE_KEY_PREVIOUS", "PLATFORM_CAPTURE_STATE_MAX_AGE",
+    "NANGO_API_KEY",
 )
 # OpenTelemetry export to Axiom (docs/observability.md). The headers carry the
 # Axiom token. The backend and the web read the same keys.

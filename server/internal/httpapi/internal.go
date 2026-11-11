@@ -13,11 +13,21 @@ import (
 // tier with the service token alone because they run before a session exists
 // (the Better Auth adapter) or record effects of an auth change it made.
 func (s *Server) registerInternal(mux *http.ServeMux) {
+	mux.Handle("GET /v1/internal/founder-hub/users/{id}", s.authenticateService(http.HandlerFunc(s.founderHubProfile)))
 	mux.Handle("POST /v1/internal/auth-store", s.authenticateService(http.HandlerFunc(s.executeAuthStore)))
 	mux.Handle("POST /v1/internal/auth-events", s.authenticateService(http.HandlerFunc(s.recordAuthEvent)))
 	mux.Handle("GET /v1/internal/workspaces/{id}/operational", s.authenticateService(http.HandlerFunc(s.workspaceOperational)))
 	mux.Handle("GET /v1/internal/workspaces/{id}/seat", s.authenticateService(http.HandlerFunc(s.workspaceSeat)))
 	mux.Handle("POST /v1/audit-events", s.authenticateProduct(http.HandlerFunc(s.appendAuditEvent)))
+}
+
+func (s *Server) founderHubProfile(w http.ResponseWriter, r *http.Request) {
+	result, err := s.configuration.GetFounderHubProfile(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 func (s *Server) executeAuthStore(w http.ResponseWriter, r *http.Request) {

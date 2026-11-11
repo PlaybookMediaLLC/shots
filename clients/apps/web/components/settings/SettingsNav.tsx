@@ -43,6 +43,7 @@ import { withoutLocale } from '@/lib/settings/appearance'
 const noSubscription = () => () => {}
 
 const ICONS = {
+  'founder-hub': HubIcon,
   profile: PersonIcon,
   notifications: NotificationsIcon,
   appearance: ContrastIcon,
