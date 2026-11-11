@@ -20,7 +20,7 @@ export default async function PostingTimesPage({
 }) {
   const { locale } = await params
   const access = await requireDraftsPageAccess(locale, '/publish/analyze/posting-times')
-  const data = await loadWrite(access.tenant, await searchParams)
+  const data = await loadWrite(access.tenant, await searchParams, access.hasAdvancedScheduling)
   const set = data.activeSet
   const now = new Date()
   const posts = set

@@ -127,6 +127,16 @@ export function WriteProvider({
   const editorCommandsRef = React.useRef<(() => EditorCommandEntry[]) | null>(null)
   const nextDraftRef = React.useRef<(() => void) | null>(null)
   React.useEffect(() => registerNavigationGuard(() => beforeLeaveRef.current?.()), [])
+  // The server reads the remembered set's library alongside the set list, so
+  // a person who never chose a set gets the open one. The cookie is shared by
+  // every workspace, so a set chosen anywhere is never replaced here.
+  const activeSetId = data.activeSet?.id
+  React.useEffect(() => {
+    const remembered = document.cookie
+      .split('; ')
+      .some((cookie) => cookie.startsWith(`${SOCIAL_SET_COOKIE}=`))
+    if (activeSetId && !remembered) rememberSet(activeSetId)
+  }, [activeSetId])
   React.useEffect(() => {
     const guard = (event: MouseEvent) => {
       const target = event.target as Element | null

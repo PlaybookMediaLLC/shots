@@ -108,6 +108,45 @@ func TestSocialSetsPlatform(t *testing.T) {
 	}
 	ids := accounts(current)
 
+	t.Run("an account in no set is listed apart from the sets", func(t *testing.T) {
+		exec(`UPDATE channel_connection SET "socialSetId"=NULL WHERE id=$1`, ids["linkedin"])
+		defer exec(`UPDATE channel_connection SET "socialSetId"=$2 WHERE id=$1`, ids["linkedin"], defaultSet.ID)
+		list, err := repo.ListSocialSets(ctx, owner)
+		if err != nil || len(list.Unassigned) != 1 || list.Unassigned[0].ID != ids["linkedin"] {
+			t.Fatalf("unassigned=%+v err=%v", list, err)
+		}
+	})
+
+	t.Run("the list counts writing samples and shows a configured assistant without AI", func(t *testing.T) {
+		exec(`INSERT INTO social_set_writing_sample (id,"organizationId","socialSetId",text,source) VALUES ($1,$2,$3,'A sample','manual')`, "sample_"+id, org, defaultSet.ID)
+		defer exec(`DELETE FROM social_set_writing_sample WHERE id=$1`, "sample_"+id)
+		exec(`UPDATE social_set SET "writingAssistant"='{"status":"configured"}' WHERE id=$1`, defaultSet.ID)
+		defer exec(`UPDATE social_set SET "writingAssistant"='{}' WHERE id=$1`, defaultSet.ID)
+		assistant := func() WritingAssistantRecord {
+			t.Helper()
+			list, err := repo.ListSocialSets(ctx, owner)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, set := range list.Items {
+				if set.ID == defaultSet.ID {
+					return set.WritingAssistant
+				}
+			}
+			t.Fatal("the default set is not listed")
+			return WritingAssistantRecord{}
+		}
+		if got := assistant(); got.SampleCount != 1 || got.Status != "configured" {
+			t.Fatalf("assistant=%+v", got)
+		}
+		exec(`INSERT INTO workspace_settings ("organizationId","aiAgentEnabled","updatedAt") VALUES ($1,false,now())
+			ON CONFLICT ("organizationId") DO UPDATE SET "aiAgentEnabled"=false`, org)
+		defer exec(`UPDATE workspace_settings SET "aiAgentEnabled"=true WHERE "organizationId"=$1`, org)
+		if got := assistant(); got.Status != "attention" {
+			t.Fatalf("AI turned off: %+v", got)
+		}
+	})
+
 	t.Run("a second account of a platform is refused in the same set", func(t *testing.T) {
 		actor := publishing.Actor{Organization: org, UserID: owner.UserID, RequestID: owner.RequestID, Type: "USER"}
 		_, err := repo.auth.CreateConnection(ctx, actor, publishing.CreateConnectionInput{ExternalAccountID: "x-" + cuid.New(),
@@ -552,6 +591,31 @@ func TestSocialSetsPlatform(t *testing.T) {
 		cancelled, err := repo.CancelAccountDeletion(ctx, publisher)
 		if err != nil || cancelled.Request != nil {
 			t.Fatalf("cancel=%+v err=%v", cancelled, err)
+		}
+	})
+
+	t.Run("only owners and admins see a departed member's private set", func(t *testing.T) {
+		departed, err := repo.CreateSocialSet(ctx, admin, SocialSetInput{Name: "Departed", Visibility: "PRIVATE"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`DELETE FROM member WHERE id=$1`, "member_"+admin.UserID)
+		if _, err := repo.ListSocialSets(ctx, admin); !errors.Is(err, publishing.ErrForbidden) {
+			t.Fatalf("a former member listed the sets: %v", err)
+		}
+		orphaned := func(actor Actor) bool {
+			t.Helper()
+			list, err := repo.ListSocialSets(ctx, actor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return slices.ContainsFunc(list.Orphaned, func(set OrphanedSocialSet) bool { return set.ID == departed.ID })
+		}
+		if !orphaned(owner) {
+			t.Fatal("the owner cannot see a departed member's private set")
+		}
+		if orphaned(publisher) {
+			t.Fatal("a publisher sees orphaned sets")
 		}
 	})
 }
