@@ -233,9 +233,9 @@ func HandleErrors(body string, status int) *integrations.HandledError {
 	case has("2207009"):
 		return h("bad-body", "Aspect ratio not supported, must be between 4:5 to 1.91:1")
 	case has("Page request limit reached"):
-		return h("bad-body", "Page posting for today is limited, please try again tomorrow")
+		return h("limit", "Page posting for today is limited, please try again tomorrow")
 	case has("2207042"):
-		return h("bad-body", "You have reached the maximum of 25 posts per day, allowed for your account")
+		return h("limit", "You have reached the maximum of 25 posts per day, allowed for your account")
 	case has("(#200)"):
 		return h("bad-body", "Facebook rejected the post due to missing permissions. Make sure your Facebook account has full content access to the Page linked to this Instagram account, then reconnect the channel.")
 	case has("Not enough permissions to post"):

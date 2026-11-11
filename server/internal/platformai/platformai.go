@@ -127,7 +127,10 @@ func (c *Client) Structured(ctx context.Context, request Request, out any) (Usag
 			{"content": system, "role": "system"},
 			{"content": request.Prompt, "role": "user"},
 		},
-		"model":     model,
+		"model": model,
+		// OPENROUTER_PROVIDER_PREFERENCES in clients/apps/web/lib/ai/models/provider.ts, plus
+		// require_parameters so no endpoint drops the schema. With no endpoint left the call fails as a 404.
+		"provider":  map[string]any{"data_collection": "deny", "require_parameters": true},
 		"reasoning": map[string]string{"effort": "low"},
 		"response_format": map[string]any{"type": "json_schema", "json_schema": map[string]any{
 			"name": request.SchemaName, "schema": request.Schema, "strict": true}},
