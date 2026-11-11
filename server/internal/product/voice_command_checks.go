@@ -113,14 +113,14 @@ func checkVoiceProposal(reply voiceParse, in voiceCheckInput) voiceProposal {
 		return voiceProposal{Status: "failed", Action: "none", Guessed: []string{}, Flags: []string{}, Notice: &notice}
 	}
 	result.Text = &text
-	for _, field := range reply.Guessed {
-		if (field == "platform" || field == "text" || field == "local_time") && !slices.Contains(result.Guessed, field) {
-			result.Guessed = append(result.Guessed, field)
-		}
-	}
 	guess := func(field string) {
 		if !slices.Contains(result.Guessed, field) {
 			result.Guessed = append(result.Guessed, field)
+		}
+	}
+	for _, field := range reply.Guessed {
+		if field == "platform" || field == "text" || field == "local_time" {
+			guess(field)
 		}
 	}
 	if added := voiceAddedWords(in.Transcript, text); len(added) > 0 {
@@ -168,10 +168,7 @@ func checkVoiceProposal(reply voiceParse, in voiceCheckInput) voiceProposal {
 
 	// When: a wall-clock time in the recording's zone, resolved from the
 	// recording time, that names exactly one future instant (K1, K2, K4, K16).
-	recorded := in.RecordedAt
-	if zone, err := time.LoadLocation(in.TimeZone); err == nil {
-		recorded = in.RecordedAt.In(zone)
-	}
+	recorded := voiceRecordedClock(in.RecordedAt, in.TimeZone)
 	if reply.LocalTime != nil && strings.TrimSpace(*reply.LocalTime) != "" {
 		local := strings.TrimSpace(*reply.LocalTime)
 		at, flag := voiceInstant(local, in.TimeZone, in.Now)
@@ -222,6 +219,16 @@ func checkVoiceProposal(reply voiceParse, in voiceCheckInput) voiceProposal {
 // voiceCommandTextLimit is the longest post text a command carries; the
 // table's check holds the same number.
 const voiceCommandTextLimit = 2000
+
+// voiceRecordedClock is the recording time on its zone's wall clock, which
+// the model and the relative-day checks count from (K1, K3); UTC when the
+// zone is unknown.
+func voiceRecordedClock(at time.Time, zone string) time.Time {
+	if location, err := time.LoadLocation(zone); err == nil {
+		return at.In(location)
+	}
+	return at.UTC()
+}
 
 // voiceWallTime parses a wall time written exactly as YYYY-MM-DDTHH:MM, the
 // only form a command stores.
@@ -314,17 +321,18 @@ func voiceWords(text string) (normalized, written []string) {
 func voiceAddedWords(transcript, text string) []string {
 	spoken, _ := voiceWords(transcript)
 	words, written := voiceWords(text)
-	// lcs[i][j] is the common length of words[i:] and spoken[j:].
-	lcs := make([][]int, len(words)+1)
-	for i := range lcs {
-		lcs[i] = make([]int, len(spoken)+1)
-	}
+	// One flat table of 16-bit lengths: both texts are at most 2,000
+	// characters, so at most 1,000 words each and about 2 MB at worst.
+	width := len(spoken) + 1
+	lcs := make([]uint16, (len(words)+1)*width)
+	// at(i, j) is the common length of words[i:] and spoken[j:].
+	at := func(i, j int) uint16 { return lcs[i*width+j] }
 	for i := len(words) - 1; i >= 0; i-- {
 		for j := len(spoken) - 1; j >= 0; j-- {
 			if words[i] == spoken[j] {
-				lcs[i][j] = lcs[i+1][j+1] + 1
+				lcs[i*width+j] = at(i+1, j+1) + 1
 			} else {
-				lcs[i][j] = max(lcs[i+1][j], lcs[i][j+1])
+				lcs[i*width+j] = max(at(i+1, j), at(i, j+1))
 			}
 		}
 	}
@@ -333,7 +341,7 @@ func voiceAddedWords(transcript, text string) []string {
 		switch {
 		case j < len(spoken) && words[i] == spoken[j]:
 			i, j = i+1, j+1
-		case j < len(spoken) && lcs[i][j+1] >= lcs[i+1][j]:
+		case j < len(spoken) && at(i, j+1) >= at(i+1, j):
 			j++
 		default:
 			added = append(added, written[i])

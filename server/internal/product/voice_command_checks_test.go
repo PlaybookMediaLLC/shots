@@ -37,8 +37,10 @@ func TestVoiceCommandInstant(t *testing.T) {
 		want                    time.Time
 	}{
 		{"one instant", "2026-11-12T10:00", "America/New_York", "", time.Date(2026, 11, 12, 15, 0, 0, 0, time.UTC)},
-		{"clocks skip it (K4)", "2027-03-14T02:30", "America/New_York", voiceFlagTimeGap, time.Time{}},
-		{"clocks repeat it (K4)", "2027-11-07T01:30", "America/New_York", voiceFlagTimeAmbiguous, time.Time{}},
+		// Past clock changes, whose rules can no longer change; the clock is
+		// checked before the time is.
+		{"clocks skip it (K4)", "2026-03-08T02:30", "America/New_York", voiceFlagTimeGap, time.Time{}},
+		{"clocks repeat it (K4)", "2025-11-02T01:30", "America/New_York", voiceFlagTimeAmbiguous, time.Time{}},
 		{"already passed (K2)", "2026-11-11T06:59", "America/New_York", voiceFlagTimePast, time.Time{}},
 		{"beyond the horizon (K2)", "2027-11-12T10:00", "America/New_York", voiceFlagTimeTooFar, time.Time{}},
 		{"not a zone", "2026-11-12T10:00", "Mars/Olympus", voiceFlagTimeInvalid, time.Time{}},
@@ -147,6 +149,9 @@ func TestVoiceCommandProposalChecks(t *testing.T) {
 		{name: "over the platform's limit (K6)", reply: with(func(r *voiceParse) { r.Text = text(long) }), transcript: long,
 			channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post", channel: "x1",
 			flags: []string{voiceFlagTextTooLong}, scheduled: &at, expires: &at},
+		{name: "exactly the platform's limit (K6)", reply: with(func(r *voiceParse) { r.Text = text(strings.Repeat("a", 280)) }),
+			transcript: strings.Repeat("a", 280), channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post",
+			channel: "x1", scheduled: &at, expires: &at},
 		{name: "a role that cannot schedule gets a draft (K10)", reply: tweet, channels: []*ent.ChannelConnection{x1}, cannot: true,
 			status: "proposed", action: "create_draft", channel: "x1", flags: []string{voiceFlagCannotSchedule}, notice: "saved as a draft",
 			scheduled: &at, expires: &at},
@@ -179,7 +184,7 @@ func TestVoiceCommandProposalChecks(t *testing.T) {
 		{name: "a time already passed asks again (K2)", reply: with(func(r *voiceParse) { r.LocalTime = text("2026-11-11T07:00") }),
 			channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post", channel: "x1", flags: []string{voiceFlagTimePast},
 			guessed: []string{"local_time"}, expires: timePointer(now.Add(voiceCommandAskWindow))},
-		{name: "a time the clocks skip asks (K4)", reply: with(func(r *voiceParse) { r.LocalTime = text("2027-03-14T02:30") }), transcript: "post at 2:30 on March 14",
+		{name: "a time the clocks skip asks (K4)", reply: with(func(r *voiceParse) { r.LocalTime = text("2026-03-08T02:30") }), transcript: "post at 2:30 on March 8",
 			channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post", channel: "x1", flags: []string{voiceFlagAddedWords, voiceFlagTimeGap},
 			guessed: []string{"text", "local_time"}, expires: timePointer(now.Add(voiceCommandAskWindow))},
 		{name: "no time said asks for one", reply: with(func(r *voiceParse) { r.LocalTime = nil }), channels: []*ent.ChannelConnection{x1},
