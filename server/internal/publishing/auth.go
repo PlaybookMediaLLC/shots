@@ -33,17 +33,25 @@ func (r *Repository) AuthorizeConnections(ctx context.Context, organizationID, u
 type recordAuthorizationKey struct{}
 type replayAuthorizationKey struct{}
 
-// AuthorizationMemo carries the role a middleware's check read to the
-// handler's first check of its own, so that check skips the session, user,
-// membership and workspace queries it would repeat.
+// AuthorizationMemo carries the role or session a middleware's check read to
+// the handler's first check of the same kind, so that check skips the session,
+// user, membership and workspace queries it would repeat.
 type AuthorizationMemo struct {
-	last atomic.Pointer[authorizedRole]
+	last    atomic.Pointer[authorizedRole]
+	session atomic.Pointer[authorizedSession]
 }
 
 // authorizedRole is an actor AuthorizeRole admitted, and the client it read with.
 type authorizedRole struct {
 	client                                  *ent.Client
 	organizationID, userID, sessionID, role string
+}
+
+// authorizedSession is a session AuthorizeSession admitted, and the client it read with.
+type authorizedSession struct {
+	client            *ent.Client
+	userID, sessionID string
+	current           *ent.Session
 }
 
 // startedRunKey marks work a person already authorized when they started it.
@@ -58,15 +66,36 @@ func ForStartedRun(ctx context.Context) context.Context {
 	return context.WithValue(ctx, startedRunKey{}, true)
 }
 
-// RecordAuthorization keeps what AuthorizeRole admits under ctx in memo.
+// delegatedSessionKey marks a session acting through an OAuth client whose live grant was checked.
+type delegatedSessionKey struct{}
+
+// ForDelegatedSession is for an OAuth client, such as Founder Hub, acting for a
+// person's live session after the caller verified the client's grant. The client
+// names its workspace on each request, so AuthorizeRole under ctx does not hold
+// it to the browser's active workspace. Every other check still applies: the
+// session is live, the account is active, and it holds the role in a workspace
+// that is not being deleted.
+func ForDelegatedSession(ctx context.Context) context.Context {
+	return context.WithValue(ctx, delegatedSessionKey{}, true)
+}
+
+// IsDelegatedSession reports whether ctx is marked by ForDelegatedSession.
+func IsDelegatedSession(ctx context.Context) bool {
+	delegated, _ := ctx.Value(delegatedSessionKey{}).(bool)
+	return delegated
+}
+
+// RecordAuthorization keeps what AuthorizeRole or AuthorizeSession admits
+// under ctx in memo.
 func RecordAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
 	return context.WithValue(ctx, recordAuthorizationKey{}, memo)
 }
 
-// ReplayAuthorization lets the first AuthorizeRole under ctx reuse memo for
-// the same actor and client. Every later check reads again, so a change the
-// handler makes is always seen, and a transaction's repository has its own
-// client, so a check under a row lock reads again too.
+// ReplayAuthorization lets the first AuthorizeRole, and the first
+// AuthorizeSession, under ctx reuse memo for the same actor and client. Every
+// later check reads again, so a change the handler makes is always seen, and a
+// transaction's repository has its own client, so a check under a row lock
+// reads again too.
 func ReplayAuthorization(ctx context.Context, memo *AuthorizationMemo) context.Context {
 	return context.WithValue(ctx, replayAuthorizationKey{}, memo)
 }
@@ -99,11 +128,11 @@ func (r *Repository) AuthorizedRole(ctx context.Context, organizationID, userID,
 			return "", err
 		}
 	} else {
-		current, err := r.AuthorizeSession(ctx, userID, sessionID)
+		current, err := r.authorizeSession(ctx, userID, sessionID)
 		if err != nil {
 			return "", err
 		}
-		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID {
+		if current.ActiveOrganizationID != nil && *current.ActiveOrganizationID != organizationID && !IsDelegatedSession(ctx) {
 			return "", ErrForbidden
 		}
 	}
@@ -144,8 +173,28 @@ func (r *Repository) requireOperational(ctx context.Context, organizationID stri
 }
 
 // AuthorizeSession validates a user session without requiring an active
-// workspace. Workspace creation and switching use this entry point.
+// workspace. Workspace creation and switching use this entry point. Its first
+// call under ReplayAuthorization can return the middleware's session unread.
 func (r *Repository) AuthorizeSession(ctx context.Context, userID, sessionID string) (*ent.Session, error) {
+	if memo, _ := ctx.Value(replayAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		last := memo.session.Swap(nil)
+		if last != nil && last.client == r.client && last.userID == userID && last.sessionID == sessionID {
+			return last.current, nil
+		}
+	}
+	current, err := r.authorizeSession(ctx, userID, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if memo, _ := ctx.Value(recordAuthorizationKey{}).(*AuthorizationMemo); memo != nil {
+		memo.session.Store(&authorizedSession{r.client, userID, sessionID, current})
+	}
+	return current, nil
+}
+
+// authorizeSession reads the session and its account. AuthorizedRole calls it
+// directly, so a role check never records or replays a session check.
+func (r *Repository) authorizeSession(ctx context.Context, userID, sessionID string) (*ent.Session, error) {
 	if userID == "" || sessionID == "" {
 		return nil, ErrUnauthorized
 	}

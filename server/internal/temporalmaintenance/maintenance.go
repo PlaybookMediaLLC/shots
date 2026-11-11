@@ -21,7 +21,7 @@ const WorkflowName = "platform-maintenance-v1"
 const ActivityName = "platform-maintenance-run-v1"
 const TaskQueue = "platform-maintenance"
 
-var Jobs = []string{"frontend-deployments", "tenant-outbox", "audit-drains", "communications", "workspace-cleanup", "audit-retention", "scheduled-posts", "notifications", "account-deletions", "webhooks", "social-analytics", "social-token-refresh", "asset-cleanup"}
+var Jobs = []string{"frontend-deployments", "tenant-outbox", "audit-drains", "communications", "workspace-cleanup", "audit-retention", "scheduled-posts", "notifications", "account-deletions", "webhooks", "social-analytics", "social-token-refresh", "asset-cleanup", "outbox-retention", "voice-cleanup", "voice-commands"}
 
 type Runner interface {
 	Run(context.Context, string) (int, error)
@@ -89,7 +89,7 @@ func ScheduleOptions(job string) client.ScheduleOptions {
 		spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: time.Hour}}}
 		catchup = 24 * time.Hour
 	}
-	if job == "asset-cleanup" {
+	if job == "asset-cleanup" || job == "voice-cleanup" {
 		// Abandoned uploads age in hours, so hourly keeps reserved storage honest.
 		spec = client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: time.Hour}}}
 	}
@@ -99,6 +99,10 @@ func ScheduleOptions(job string) client.ScheduleOptions {
 	}
 	if job == "audit-retention" {
 		spec = client.ScheduleSpec{CronExpressions: []string{"5 3 * * *"}, TimeZoneName: "UTC"}
+		catchup = 24 * time.Hour
+	}
+	if job == "outbox-retention" {
+		spec = client.ScheduleSpec{CronExpressions: []string{"35 3 * * *"}, TimeZoneName: "UTC"}
 		catchup = 24 * time.Hour
 	}
 	return client.ScheduleOptions{ID: "platform-maintenance-" + job, Spec: spec, Action: &client.ScheduleWorkflowAction{ID: "platform-maintenance-" + job, Workflow: WorkflowName, TaskQueue: TaskQueue, Args: []any{job}, WorkflowExecutionTimeout: 40 * time.Minute}, Overlap: enumspb.SCHEDULE_OVERLAP_POLICY_SKIP, CatchupWindow: catchup}

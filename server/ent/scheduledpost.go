@@ -77,6 +77,12 @@ type ScheduledPost struct {
 	ScheduleIntent *string `json:"schedule_intent,omitempty"`
 	// FailureCode holds the value of the "failure_code" field.
 	FailureCode *string `json:"failure_code,omitempty"`
+	// ScheduledByUserID holds the value of the "scheduled_by_user_id" field.
+	ScheduledByUserID *string `json:"scheduled_by_user_id,omitempty"`
+	// ApprovedByUserID holds the value of the "approved_by_user_id" field.
+	ApprovedByUserID *string `json:"approved_by_user_id,omitempty"`
+	// ApprovedVersion holds the value of the "approved_version" field.
+	ApprovedVersion *int `json:"approved_version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -125,9 +131,9 @@ func (*ScheduledPost) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case scheduledpost.FieldAssetIds, scheduledpost.FieldReplies, scheduledpost.FieldThreadProgress, scheduledpost.FieldMetrics, scheduledpost.FieldAutoActions, scheduledpost.FieldPoll, scheduledpost.FieldPublishOptions:
 			values[i] = new([]byte)
-		case scheduledpost.FieldNaturalOffsetSeconds:
+		case scheduledpost.FieldNaturalOffsetSeconds, scheduledpost.FieldApprovedVersion:
 			values[i] = new(sql.NullInt64)
-		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldFailureCode:
+		case scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldVariantID, scheduledpost.FieldContentDraftID, scheduledpost.FieldAssetID, scheduledpost.FieldReplyTo, scheduledpost.FieldRemotePostID, scheduledpost.FieldChannelConnectionID, scheduledpost.FieldStatus, scheduledpost.FieldCaption, scheduledpost.FieldIdempotencyKey, scheduledpost.FieldTriggerRunID, scheduledpost.FieldSocialSetID, scheduledpost.FieldScheduleMode, scheduledpost.FieldScheduleTimeZone, scheduledpost.FieldScheduleIntent, scheduledpost.FieldFailureCode, scheduledpost.FieldScheduledByUserID, scheduledpost.FieldApprovedByUserID:
 			values[i] = new(sql.NullString)
 		case scheduledpost.FieldPublishedAt, scheduledpost.FieldMetricsAt, scheduledpost.FieldScheduledFor, scheduledpost.FieldSlotAt, scheduledpost.FieldCreatedAt, scheduledpost.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -349,6 +355,27 @@ func (_m *ScheduledPost) assignValues(columns []string, values []any) error {
 				_m.FailureCode = new(string)
 				*_m.FailureCode = value.String
 			}
+		case scheduledpost.FieldScheduledByUserID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field scheduled_by_user_id", values[i])
+			} else if value.Valid {
+				_m.ScheduledByUserID = new(string)
+				*_m.ScheduledByUserID = value.String
+			}
+		case scheduledpost.FieldApprovedByUserID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_by_user_id", values[i])
+			} else if value.Valid {
+				_m.ApprovedByUserID = new(string)
+				*_m.ApprovedByUserID = value.String
+			}
+		case scheduledpost.FieldApprovedVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field approved_version", values[i])
+			} else if value.Valid {
+				_m.ApprovedVersion = new(int)
+				*_m.ApprovedVersion = int(value.Int64)
+			}
 		case scheduledpost.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -519,6 +546,21 @@ func (_m *ScheduledPost) String() string {
 	if v := _m.FailureCode; v != nil {
 		builder.WriteString("failure_code=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ScheduledByUserID; v != nil {
+		builder.WriteString("scheduled_by_user_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ApprovedByUserID; v != nil {
+		builder.WriteString("approved_by_user_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ApprovedVersion; v != nil {
+		builder.WriteString("approved_version=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")

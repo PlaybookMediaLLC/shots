@@ -126,7 +126,8 @@ func replaceQueuedDraftPostAt(ctx context.Context, tx *ent.Tx, actor Actor, post
 		SetStatus(scheduledpost.StatusSCHEDULED).SetCaption(post.Caption).
 		SetNillableSocialSetID(post.SocialSetID).SetScheduleMode(scheduledpost.ScheduleModeExplicit).SetSlotAt(at.UTC()).
 		SetNaturalOffsetSeconds(offset).SetNillableScheduleTimeZone(post.ScheduleTimeZone).
-		SetIdempotencyKey(key)
+		SetIdempotencyKey(key).SetNillableScheduledByUserID(schedulerID(actor)).
+		SetNillableApprovedByUserID(post.ApprovedByUserID).SetNillableApprovedVersion(post.ApprovedVersion)
 	if len(post.AssetIds) > 0 {
 		create.SetAssetIds(post.AssetIds)
 	}

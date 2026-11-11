@@ -644,9 +644,11 @@ func (c *Configuration) frontendWorkflow(ctx context.Context, tx *ent.Tx, s *ent
 
 // frontendWorkflowEvent sets the repository and action fields that
 // NormalizeGitHub and ProductionEvent set for a successful deployment: workflow
-// conditions read only Fields, and an absent field selects no branch.
+// conditions read only Fields, and an absent field selects no branch. It occurs
+// when it went live: a restored older deployment keeps its artifact's own time,
+// and only the activation time tells the rollback from a redelivery.
 func frontendWorkflowEvent(a *ent.FrontendActivation) ra.Event {
-	return ra.Event{Family: ra.Deployed, SemanticKey: "frontend:" + a.ID, RepositoryID: a.Snapshot.RepositoryID, ObjectID: a.Snapshot.DeploymentID, OccurredAt: a.Snapshot.OccurredAt, Origin: "live", Title: "Production deployment reported successful", Notes: a.Decision.Reason, URL: a.Snapshot.URL, Fields: map[string]ra.Value{"repository.id": ra.StringValue(a.Snapshot.RepositoryID), "deployment.environment": ra.StringValue(a.Snapshot.Environment), "deployment.state": ra.StringValue("success"), "deployment.production": ra.BoolValue(true), "deployment.sha": ra.StringValue(a.Snapshot.Revision), "event.family": ra.StringValue(string(ra.Deployed)), "event.action": ra.StringValue("success")}}
+	return ra.Event{Family: ra.Deployed, SemanticKey: "frontend:" + a.ID, RepositoryID: a.Snapshot.RepositoryID, ObjectID: a.Snapshot.DeploymentID, OccurredAt: frontendActivationTime(a.Snapshot), Origin: "live", Title: "Production deployment reported successful", Notes: a.Decision.Reason, URL: a.Snapshot.URL, Fields: map[string]ra.Value{"repository.id": ra.StringValue(a.Snapshot.RepositoryID), "deployment.environment": ra.StringValue(a.Snapshot.Environment), "deployment.state": ra.StringValue("success"), "deployment.production": ra.BoolValue(true), "deployment.sha": ra.StringValue(a.Snapshot.Revision), "event.family": ra.StringValue(string(ra.Deployed)), "event.action": ra.StringValue("success")}}
 }
 
 // acceptGitHubFrontend observes the same authenticated envelope for each opted-in

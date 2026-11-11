@@ -27,7 +27,7 @@ import (
 // HandledError is a provider's classification of a failed response
 // (SocialAbstract.handleErrors).
 type HandledError struct {
-	Type  string // refresh-token | bad-body | retry | disconnect | limit
+	Type  string // refresh-token | bad-body | retry | disconnect | limit (a daily cap)
 	Value string
 }
 
@@ -136,13 +136,15 @@ func (r *Response) JSON(v any) error { return json.Unmarshal(r.Body, v) }
 func (r *Response) Text() string { return string(r.Body) }
 
 // Fetch is SocialAbstract.fetch: it returns 200/201 responses and otherwise
-// retries 429, rate-limit bodies and `retry` classifications up to three
-// times, then maps the failure to Disconnect, RefreshToken, DailyLimit,
-// RateLimited or BadBody. RateLimited and DailyLimit (nothing was created)
-// come only from a refused write; a read's failures stay BadBody, since a
-// read may follow a write that committed. An unclassified 500 is retried for
-// reads and Retryable writes; on any other write it is UnknownDelivery after
-// one request. A transport error is returned as-is and never resent.
+// retries 429, rate-limit bodies, `retry` classifications and unclassified
+// 500s up to three times, then maps the failure to Disconnect, RefreshToken,
+// DailyLimit, RateLimited or BadBody. RateLimited and DailyLimit (nothing was
+// created) come only from a refused write; a read's failures stay BadBody,
+// since a read may follow a write that committed. A 5xx to a write that is a
+// 500, unclassified or classified `retry` is UnknownDelivery after one
+// request, since the platform may have acted on it; only a Retryable write
+// (invisible until a later publish call) is resent after a 500. A transport
+// error is returned as-is and never resent.
 func (b *Base) Fetch(ctx context.Context, url string, req Request) (*Response, error) {
 	return b.fetch(ctx, url, req, 0, "", false)
 }
@@ -197,10 +199,9 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 	if handled != nil && handled.Type == "limit" && !write {
 		handled = &HandledError{Type: "bad-body", Value: handled.Value}
 	}
-	serverError := res.StatusCode == http.StatusInternalServerError && handled == nil
-	if res.StatusCode == http.StatusInternalServerError && write && !req.Retryable {
+	if write && !req.Retryable && serverFailure(res.StatusCode, handled) {
 		// A write may have committed before the server failed: never resend it.
-		return nil, temporalx.UnknownDelivery(b.identifier, "The platform failed while handling this request and may have accepted it. Check the account before sending again.")
+		return nil, temporalx.UnknownDelivery(b.identifier, "The platform failed after receiving the request, so it may have acted on it. Check the account before resending.")
 	}
 	if handled != nil && handled.Type == "limit" {
 		if resent {
@@ -209,6 +210,7 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 		// A daily cap does not clear by retrying.
 		return nil, b.classify(text, requestBody, res.StatusCode, handled)
 	}
+	serverError := res.StatusCode == http.StatusInternalServerError && handled == nil
 	rateLimited := rateLimitedResponse(res.StatusCode, text)
 	if retries > 2 {
 		if rateLimited && write && resent {
@@ -216,7 +218,7 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 		}
 		if rateLimited && write {
 			retryAt := RetryAt(res.Header, time.Now())
-			return nil, temporalx.RateLimited(b.identifier, time.Until(retryAt), message)
+			return nil, temporalx.RateLimited(b.identifier, time.Until(retryAt), rateLimitMessage)
 		}
 		return nil, temporalx.BadBody(b.identifier, text, requestBody, message)
 	}
@@ -238,6 +240,16 @@ func (b *Base) fetch(ctx context.Context, url string, req Request, retries int, 
 // commit: the limit that stopped the resend says nothing about the first send.
 func ambiguousResend(identifier string) error {
 	return temporalx.UnknownDelivery(identifier, "The platform may have accepted an earlier attempt before limiting the retry. Check the account before sending again.")
+}
+
+// rateLimitMessage is what a user reads when a platform kept refusing as too frequent.
+const rateLimitMessage = "The platform is rate limiting this account."
+
+// serverFailure is a server error that may follow a committed write: any 500,
+// or another 5xx the provider left unclassified or called retryable.
+func serverFailure(status int, handled *HandledError) bool {
+	return status == http.StatusInternalServerError ||
+		status >= http.StatusInternalServerError && (handled == nil || handled.Type == "retry")
 }
 
 // rateLimitedResponse is a provider asking to slow down, by status or by body.
@@ -327,7 +339,7 @@ func RunStreamedUpload[T any](ctx context.Context, b *Base, retryable bool, fn f
 			text = "{}"
 		}
 		handled := b.handleErrors(text, status)
-		if status == 500 && !retryable {
+		if !retryable && serverFailure(status, handled) {
 			// A server error may follow a committed post: never resend it.
 			return value, temporalx.UnknownDelivery(b.identifier, "The platform failed while handling this upload and may have accepted it. Check the account before sending again.")
 		}
@@ -343,7 +355,7 @@ func RunStreamedUpload[T any](ctx context.Context, b *Base, retryable bool, fn f
 			continue
 		}
 		if rateLimited {
-			return value, temporalx.RateLimited(b.identifier, 0, "Rate limited")
+			return value, temporalx.RateLimited(b.identifier, 0, rateLimitMessage)
 		}
 		return value, b.classify(text, "{}", status, handled)
 	}

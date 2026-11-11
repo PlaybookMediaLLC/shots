@@ -118,8 +118,14 @@ type ContentDraftRecord struct {
 	PlatformVersions draftdoc.PlatformVersions `json:"platformVersions"`
 	Scratchpad       string                    `json:"scratchpad"`
 	SourceDraftID    *string                   `json:"sourceDraftId"`
-	TagIDs           []string                  `json:"tagIds"`
-	Target           *draftdoc.Target          `json:"target"`
+	// SourceVoiceRevisionID is the voice transcript revision the draft was
+	// made from; the revision may since have been redacted or deleted.
+	SourceVoiceRevisionID *string          `json:"sourceVoiceRevisionId"`
+	TagIDs                []string         `json:"tagIds"`
+	Target                *draftdoc.Target `json:"target"`
+	// SourceVoiceRemoved is set when that voice revision is gone, redacted or
+	// on a deleted note, for "source removed" (reads only).
+	SourceVoiceRemoved bool `json:"sourceVoiceRemoved"`
 	// Lists only: posts waiting to go out, the next scheduled one's time, and
 	// posts that failed or whose outcome is unknown, which need attention.
 	AttentionPosts int `json:"attentionPosts"`
@@ -195,6 +201,10 @@ type ContentDraftInput struct {
 	// draft took, checked there to belong to it.
 	campaignID     string
 	campaignPostID string
+	// sourceVoiceRevisionID is the voice transcript revision the draft is
+	// made from. Unexported for the same reason: only the voice paths set it,
+	// after loading the revision through its owner's note.
+	sourceVoiceRevisionID string
 }
 
 // ContentDraftUpdate changes the fields it sets, based on BaseVersion.
@@ -234,7 +244,7 @@ func contentDraftRecord(row *ent.ContentDraft) ContentDraftRecord {
 		NaturalPostingTime: row.NaturalPostingTime, SuppressSlackOnPublish: row.SuppressSlackOnPublish, PlannedFor: row.PlannedFor, PrimaryPlatform: row.PrimaryPlatform,
 		SocialSetID: row.SocialSetID, Article: row.Article, Kind: string(row.Kind), PinnedAt: row.PinnedAt,
 		PlanTimeZone: row.PlanTimeZone, PlatformVersions: nonNilVersions(row.PlatformVersions), Scratchpad: row.Scratchpad,
-		SourceDraftID: row.SourceDraftID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
+		SourceDraftID: row.SourceDraftID, SourceVoiceRevisionID: row.SourceVoiceRevisionID, TagIDs: nonNilStrings(row.TagIds), Target: row.Target,
 		CampaignID: row.CampaignID, CampaignPostID: row.CampaignPostID, ReleaseID: row.ReleaseID}
 }
 
@@ -759,6 +769,9 @@ func (c *Configuration) createContentDraft(ctx context.Context, tx *ent.Tx, acto
 		}
 		create.SetReleaseID(input.ReleaseID)
 	}
+	if input.sourceVoiceRevisionID != "" {
+		create.SetSourceVoiceRevisionID(input.sourceVoiceRevisionID)
+	}
 	if target != nil {
 		create.SetTarget(target)
 		if kind == "repurpose" && target.SourceDraftID != "" {
@@ -813,7 +826,12 @@ func (c *Configuration) GetContentDraft(ctx context.Context, actor Actor, id str
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, []*ent.ContentDraft{row})
+	if err != nil {
+		return nil, err
+	}
 	result := contentDraftRecord(row)
+	result.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 	return &result, nil
 }
 
@@ -1064,6 +1082,10 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	if err != nil {
 		return nil, err
 	}
+	removed, err := c.voiceSourcesRemoved(ctx, actor.OrganizationID, rows)
+	if err != nil {
+		return nil, err
+	}
 	type summary struct {
 		attention, check, published, publishing, queued int
 		next, attentionAt, lastPublished                *time.Time
@@ -1113,6 +1135,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 	}
 	return func(row *ent.ContentDraft) ContentDraftRecord {
 		record := contentDraftRecord(row)
+		record.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
 			record.PublishingPosts = item.publishing

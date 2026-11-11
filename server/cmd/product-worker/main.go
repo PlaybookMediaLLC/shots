@@ -304,6 +304,10 @@ func main() {
 		if github != nil {
 			events.WithGitHubApp(github)
 		}
+		// The voice-commands sweep retries parses that waited on the model.
+		if model := platformai.FromEnvironment(); model != nil {
+			events.WithAutomationModel(model)
+		}
 		jobs := &maintenance.Store{Analytics: events, Tokens: provider, Activity: notifications.New(db.SQL, db.Client), DB: db.SQL, RetentionDB: retention.SQL, Objects: tenantObjects, Events: events,
 			Onboarding: &temporalonboarding.Client{Temporal: temporalClient},
 			Drains:     maintenance.NewDrainSender(cfg.AuditDrainEncryptionKey),

@@ -40,8 +40,45 @@ func sameRefreshState(before, current *ent.Integration) bool {
 	return before.UpdatedAt.Equal(*current.UpdatedAt)
 }
 
+// lockRefresh takes the account's refresh lock until unlock: a rotating refresh
+// token spent twice can revoke the account, and the version check only stops
+// the second write, not the second provider call. Linked accounts share their
+// root's lock. The lock is held by an otherwise idle transaction; a refresh
+// already holding it answers ErrRefreshChanged.
+func (r *Repository) lockRefresh(ctx context.Context, account *ent.Integration) (unlock func(), err error) {
+	root := account.InternalID
+	if account.RootInternalID != nil && *account.RootInternalID != "" {
+		root = *account.RootInternalID
+	}
+	tx, err := r.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	locked := false
+	rows, err := tx.QueryContext(ctx, `SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0))`,
+		"social-refresh:"+account.OrganizationID+":"+account.ProviderIdentifier+":"+root)
+	if err == nil {
+		if rows.Next() {
+			err = rows.Scan(&locked)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		_ = rows.Close()
+	}
+	if err != nil || !locked {
+		_ = tx.Rollback()
+		if err == nil {
+			err = ErrRefreshChanged
+		}
+		return nil, err
+	}
+	return func() { _ = tx.Rollback() }, nil
+}
+
 // prepareRefresh checks authority before the remote call and remembers the
-// versions of linked accounts. Database locks are never held over provider HTTP.
+// versions of linked accounts. Row locks are never held over provider HTTP;
+// only lockRefresh's advisory lock is.
 func (r *Repository) prepareRefresh(ctx context.Context, before *ent.Integration, linked bool) (*refreshSnapshot, error) {
 	if before == nil {
 		return nil, ErrRefreshChanged

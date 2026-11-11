@@ -80,6 +80,8 @@ const (
 	FieldPlanTimeZone = "planTimeZone"
 	// FieldSourceDraftID holds the string denoting the source_draft_id field in the database.
 	FieldSourceDraftID = "sourceDraftId"
+	// FieldSourceVoiceRevisionID holds the string denoting the source_voice_revision_id field in the database.
+	FieldSourceVoiceRevisionID = "sourceVoiceRevisionId"
 	// FieldCampaignID holds the string denoting the campaign_id field in the database.
 	FieldCampaignID = "campaignId"
 	// FieldReleaseID holds the string denoting the release_id field in the database.
@@ -137,6 +139,7 @@ var Columns = []string{
 	FieldPinnedAt,
 	FieldPlanTimeZone,
 	FieldSourceDraftID,
+	FieldSourceVoiceRevisionID,
 	FieldCampaignID,
 	FieldReleaseID,
 	FieldCampaignPostID,
@@ -388,6 +391,11 @@ func ByPlanTimeZone(opts ...sql.OrderTermOption) OrderOption {
 // BySourceDraftID orders the results by the source_draft_id field.
 func BySourceDraftID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceDraftID, opts...).ToFunc()
+}
+
+// BySourceVoiceRevisionID orders the results by the source_voice_revision_id field.
+func BySourceVoiceRevisionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceVoiceRevisionID, opts...).ToFunc()
 }
 
 // ByCampaignID orders the results by the campaign_id field.

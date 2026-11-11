@@ -120,51 +120,53 @@ func TestRefreshCannotReviveOrOverwriteChangedAccount(t *testing.T) {
 	}
 }
 
+// A rotating refresh token is spent once: while the scheduled refresh is at
+// the provider, a second refresh (scheduled or from analytics) does not call
+// it, and a late refresh from the old state is refused too.
 func TestConcurrentRefreshHasOneCredentialWinner(t *testing.T) {
-	for _, secondFails := range []bool{false, true} {
-		t.Run(map[bool]string{false: "two successes", true: "late failure"}[secondFails], func(t *testing.T) {
+	for _, second := range []string{"scheduled refresh", "analytics"} {
+		t.Run(second, func(t *testing.T) {
 			f := setup(t, "fake")
 			before := f.connect(t, CreateOrUpdateIntegrationParams{Name: "Account", InternalID: "account", Provider: "fake", Token: "old", RefreshToken: "refresh"})
 			var calls atomic.Int32
-			entered := []chan struct{}{make(chan struct{}), make(chan struct{})}
-			release := []chan struct{}{make(chan struct{}), make(chan struct{})}
+			entered, release := make(chan struct{}), make(chan struct{})
 			defer func() {
-				for _, signal := range release {
-					select {
-					case <-signal:
-					default:
-						close(signal)
-					}
+				select {
+				case <-release:
+				default:
+					close(release)
 				}
 			}()
 			f.providers["fake"].refresh = func() (*integrations.AuthTokenDetails, error) {
-				index := int(calls.Add(1)) - 1
-				close(entered[index])
-				<-release[index]
-				if index == 1 && secondFails {
-					return nil, errors.New("old refresh token consumed")
+				if calls.Add(1) > 1 {
+					return &integrations.AuthTokenDetails{AccessToken: "loser", RefreshToken: "loser-refresh", ExpiresIn: 3600}, nil
 				}
-				if index == 0 {
-					return &integrations.AuthTokenDetails{AccessToken: "winner", RefreshToken: "winner-refresh", ExpiresIn: 3600}, nil
-				}
-				return &integrations.AuthTokenDetails{AccessToken: "loser", RefreshToken: "loser-refresh", ExpiresIn: 3600}, nil
+				close(entered)
+				<-release
+				return &integrations.AuthTokenDetails{AccessToken: "winner", RefreshToken: "winner-refresh", ExpiresIn: 3600}, nil
 			}
-			done := []chan error{make(chan error, 1), make(chan error, 1)}
-			for i := range done {
-				go func(index int) { _, err := f.service.refresh.Refresh(f.ctx, before, ""); done[index] <- err }(i)
-				waitSignal(t, entered[i])
+			done := make(chan error, 1)
+			go func() { _, err := f.service.refresh.Refresh(f.ctx, before, ""); done <- err }()
+			waitSignal(t, entered)
+			var err error
+			if second == "analytics" {
+				_, err = f.service.CheckAnalytics(f.ctx, f.org, before.ID, "7", true)
+			} else {
+				_, err = f.service.refresh.Refresh(f.ctx, before, "")
 			}
-			close(release[0])
-			if err := waitRefresh(t, done[0]); err != nil {
+			if !errors.Is(err, ErrRefreshChanged) {
+				t.Fatalf("refresh during a refresh: %v", err)
+			}
+			close(release)
+			if err := waitRefresh(t, done); err != nil {
 				t.Fatal(err)
 			}
-			close(release[1])
-			if err := waitRefresh(t, done[1]); !errors.Is(err, ErrRefreshChanged) {
-				t.Fatalf("late completion: %v", err)
+			if _, err := f.service.refresh.Refresh(f.ctx, before, ""); !errors.Is(err, ErrRefreshChanged) {
+				t.Fatalf("late refresh from the old state: %v", err)
 			}
 			stored := f.client.Integration.GetX(f.ctx, before.ID)
-			if stored.Token != "winner" || stored.RefreshToken == nil || *stored.RefreshToken != "winner-refresh" || stored.RefreshNeeded || stored.InBetweenSteps || len(f.notifications.sent) != 0 {
-				t.Fatal("late completion corrupted the winning connection")
+			if calls.Load() != 1 || stored.Token != "winner" || stored.RefreshToken == nil || *stored.RefreshToken != "winner-refresh" || stored.RefreshNeeded || stored.InBetweenSteps || len(f.notifications.sent) != 0 {
+				t.Fatalf("provider calls=%d: the winning connection was not kept alone", calls.Load())
 			}
 		})
 	}

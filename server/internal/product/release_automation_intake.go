@@ -57,6 +57,9 @@ func (c *Configuration) AcceptGitHubEvent(ctx context.Context, input AcceptGitHu
 	if input.DeliveryID == "" || len(input.DeliveryID) > 255 {
 		return nil, ErrInvalidInput
 	}
+	if input.EventName == "repository" {
+		return c.transferGitHubRepository(ctx, input.DeliveryID, input.Body)
+	}
 	evidence, err := automation.NormalizeGitHubEvidence(input.EventName, input.Body)
 	if err != nil {
 		return nil, ErrInvalidInput

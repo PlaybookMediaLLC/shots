@@ -11,6 +11,7 @@ import { NewTeamSettings } from '@/components/settings/NewTeamSettings'
 import { SocialSetList } from '@/components/settings/social-sets/SocialSetList'
 import { SocialSetSettings } from '@/components/settings/social-sets/SocialSetSettings'
 import { WebhookSettings } from '@/components/settings/WebhookSettings'
+import { VoiceSettings } from '@/components/voice/VoiceSettings'
 import { ChannelConnections } from './ChannelConnections'
 import { WorkspaceAgentSettings } from './WorkspaceAgentSettings'
 import { WorkspaceAuditSettings } from './WorkspaceAuditSettings'
@@ -80,6 +81,7 @@ const SETTINGS_CONTENT = {
     />
   ),
   roles: () => <WorkspaceRolesSettings />,
+  voice: () => <VoiceSettings />,
   'new-team': ({ email, userId }) => <NewTeamSettings email={email} userId={userId} />,
   brand: ({ can }) => <WorkspaceBrandSettings canManage={can('workspace:update')} />,
   product: ({ can }) => (
@@ -90,7 +92,7 @@ const SETTINGS_CONTENT = {
   ),
   surfaces: ({ can }) => <WorkspaceProductSurfaces canManage={can('brand:manage')} />,
   sharing: ({ can }) => <WorkspaceSharedLinks canEdit={can('artifact:edit')} />,
-  'social-sets': ({ can, draftsEnabled, socialSet }) =>
+  'social-sets': ({ can, draftsEnabled, role, socialSet }) =>
     socialSet ? (
       <SocialSetSettings
         id={socialSet.id}
@@ -105,7 +107,12 @@ const SETTINGS_CONTENT = {
     ) : (
       <>
         <SocialSetList canManage={can('workspace:update')} />
-        {draftsEnabled ? <ApprovalSetting canManage={can('publish:manage')} /> : null}
+        {draftsEnabled ? (
+          // The backend lets only an owner or admin change approvals.
+          <ApprovalSetting
+            canManage={can('publish:manage') && (role === 'owner' || role === 'admin')}
+          />
+        ) : null}
       </>
     ),
   channels: ({ can }) => <ChannelConnections canManage={can('connection:manage')} />,
