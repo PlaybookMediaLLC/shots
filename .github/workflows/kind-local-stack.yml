@@ -9,7 +9,14 @@ permissions:
 jobs:
   integration:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Three image builds, a cluster, a Helm install with --wait, two rollouts
+    # and the whole browser suite. The old 20-minute budget could not cover
+    # the builds alone, and a timed-out job is cancelled, so `if: failure()`
+    # never ran and the run produced no diagnostics either.
+    timeout-minutes: 60
+    env:
+      # The three images are built below, with a layer cache.
+      STUDIO_PREBUILT_IMAGES: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,11 +27,37 @@ jobs:
       - uses: helm/kind-action@v1.12.0
         with:
           install_only: true
-      - run: npm ci
+      - run: npm ci --prefer-offline --no-audit
         working-directory: clients
       - name: Install browser test dependencies
         working-directory: clients
         run: npx playwright install --with-deps chromium
+      - uses: docker/setup-buildx-action@v3
+      # The same layer caches ci.yml fills, read-only: this workflow is manual,
+      # so it never refreshes them for anyone else.
+      - name: Build the web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: clients/apps/web/Dockerfile
+          tags: screenshot-studio:kind-dev
+          load: true
+          cache-from: type=gha,scope=screenshot-studio-web
+      - name: Build the backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: server
+          tags: screenshot-studio-backend:kind-dev
+          load: true
+          cache-from: type=gha,scope=social-backend
+      - name: Build the collab image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: clients/apps/collab-server/Dockerfile
+          tags: screenshot-studio-collab:kind-dev
+          load: true
+          cache-from: type=gha,scope=screenshot-studio-collab
       - run: ./dev/studio kind-up
       - name: Smoke test the Helm release
         run: |

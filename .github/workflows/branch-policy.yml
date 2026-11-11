@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# This is a required check, so overlapping runs would make the context flap.
+# `edited` fires on every pull request description change.
+concurrency:
+  group: branch-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Branch policy

@@ -1,7 +1,7 @@
-# The production lane of the browser suite (dev/studio run_e2e): the web app
-# as a production build (`next start`), as Next.js recommends for browser
-# tests. Tests tagged @dev-server need hooks that only `next dev` has
-# (the scripted AI model, screenshot-mock downloads) and run in the dev lane.
+# The browser suite's app (dev/studio run_e2e): the web app as a production
+# build (`next start`), as Next.js recommends for browser tests and as
+# production serves it. There is no second lane; the few hooks the suite needs
+# are asked for here instead of being inferred from NODE_ENV.
 services:
   app:
     image: screenshot-studio-web-e2e
@@ -13,6 +13,10 @@ services:
     volumes: !reset []
     environment:
       NODE_ENV: production
+      # The scripted AI model, downloads from the screenshot mock, and room
+      # under Better Auth's sign-in limit. clients/apps/web/lib/e2e-hooks.ts
+      # also requires a loopback origin, so this enables nothing anywhere else.
+      PLATFORM_E2E_HOOKS: '1'
       # Offers GIF search so its flow can be tested; each spec answers the search
       # itself, so GIPHY is never contacted. test/write-giphy.server.ts covers the gate.
       PLATFORM_GIPHY_APPROVED_API_AND_STORAGE: 'true'

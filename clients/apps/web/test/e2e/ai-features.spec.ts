@@ -45,7 +45,7 @@ async function exportCorner(page: Page) {
 
 test(
   'copilot versions compare before applying; captions and alt text are written and kept',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page }) => {
     await app.openEditor()
     await dropScreenshot(page)
@@ -102,7 +102,7 @@ test(
 
 test(
   'an AI background in the screenshot palette applies as an image background and exports',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page }) => {
     await app.openEditor()
     await dropScreenshot(page)

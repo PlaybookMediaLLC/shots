@@ -17,7 +17,7 @@ const RUN_TIMEOUT = 240_000
 
 test(
   'one sentence becomes a drafted campaign with inspectable steps that survive a reload',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: '@journey' },
   async ({ app, page }) => {
     const profile = await trpcMutation(page, 'productSurface.create', {
       featureTags: ['recurring invoices'],

@@ -359,7 +359,8 @@ test('LinkedIn OAuth callback connects through the SDK and rejects replay', asyn
   }
 })
 
-// Instagram retains its existing lane; Page and channel selection also run in production.
+// @quarantine: Instagram was held out of the production lane with no reason
+// recorded; the nightly quarantine run decides whether it can rejoin.
 for (const [providerName, authorizationURL] of [
   ['instagram', 'https://www.facebook.com/v24.0/dialog/oauth'],
   ['linkedin-page', 'https://www.linkedin.com/oauth/v2/authorization'],
@@ -367,7 +368,7 @@ for (const [providerName, authorizationURL] of [
 ] as const) {
   test(
     `${providerName} registers only the selected provider account once`,
-    providerName === 'instagram' ? { tag: '@dev-server' } : {},
+    providerName === 'instagram' ? { tag: '@quarantine' } : {},
     async ({ identity, page }) => {
       let organizationId: string | null = null
       const state = `oauth-state-for-${providerName}-${randomUUID()}`

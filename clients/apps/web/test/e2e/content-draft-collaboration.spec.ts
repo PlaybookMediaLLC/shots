@@ -359,10 +359,10 @@ test(
   }
 )
 
-// @dev-server until fixed: on the production build the owner's update does not reach the demoted reader (2 of 3 runs).
+// @quarantine until fixed: on the production build the owner's update does not reach the demoted reader (2 of 3 runs).
 test(
   'demotion blocks live edits and removal stops an already open reader',
-  { tag: ['@dev-server', '@journey'] },
+  { tag: ['@quarantine', '@journey'] },
   async ({ browser, identity, page, workspace }, testInfo) => {
     const organizationId = workspace.id
     const memberIdentity = {
@@ -501,7 +501,8 @@ test(
 
 test(
   'a draft opened for the first time shows its stored body even when its browser copy loads last',
-  { tag: '@dev-server' },
+  // @quarantine: held out of the production lane with no reason recorded.
+  { tag: '@quarantine' },
   async ({ page, startWorkspace }) => {
     await startWorkspace()
     // Plate seeds a never-opened live document from the stored body only while no
