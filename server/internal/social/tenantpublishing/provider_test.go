@@ -281,6 +281,35 @@ func TestDirectPublisherRejectsWrongWorkspaceBinding(t *testing.T) {
 	}
 }
 
+// A rate limit in the middle of a thread keeps the live post, the replies
+// already out and the progress, and never resends any of them: the rest wait
+// for the composer's resume.
+func TestThreadRateLimitedMidwayKeepsPostedReplies(t *testing.T) {
+	p, _, fake, input := directFixture()
+	input.Replies = []publishing.PublishReply{{Caption: "two"}, {Caption: "three"}, {Caption: "four"}}
+	limited := &rateLimitedReplies{fakePoster: fake, after: 1}
+	p.resolve = func(string) poster { return limited }
+	receipt, err := p.PublishThread(context.Background(), input)
+	if err != nil || receipt.PostID != "remote-post-1" || fake.calls != 1 || strings.Join(fake.replies, ",") != "two>remote-post-1" ||
+		receipt.Thread.Posted != 1 || receipt.Thread.Total != 3 || receipt.Thread.LastReplyID != "reply-1" || len(receipt.Thread.Receipts) != 1 || limited.refused != 1 {
+		t.Fatalf("receipt=%+v err=%v replies=%v refused=%d", receipt, err, fake.replies, limited.refused)
+	}
+}
+
+// rateLimitedReplies posts the first `after` replies, then is rate limited.
+type rateLimitedReplies struct {
+	*fakePoster
+	after, refused int
+}
+
+func (r *rateLimitedReplies) Comment(ctx context.Context, id, postID, lastCommentID, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
+	if len(r.replies) >= r.after {
+		r.refused++
+		return nil, temporalx.RateLimited("threads", "{}")
+	}
+	return r.fakePoster.Comment(ctx, id, postID, lastCommentID, token, posts, account)
+}
+
 func TestDirectPublisherResumesAThreadAndReportsProgress(t *testing.T) {
 	p, _, poster, input := directFixture()
 	input.ReplyTo = "live-reply-2"
@@ -459,6 +488,7 @@ func TestPlatformLimitsReachTheirPublicationOutcome(t *testing.T) {
 		{"lasting 429", "{}", []int{429}, 4, temporalpublishing.OutcomeRetry, "429"},
 		{"daily cap", `{"error":{"error_subcode":2207042}}`, []int{400}, 1, temporalpublishing.OutcomeFailed, publishing.FailureProviderDailyLimit},
 		{"500 to the publish", "{}", []int{500}, 1, temporalpublishing.OutcomeUnknown, publishing.FailureUnknownDelivery},
+		{"retryable 500 to the publish", `{"error":{"message":"An unknown error occurred"}}`, []int{500}, 1, temporalpublishing.OutcomeUnknown, publishing.FailureUnknownDelivery},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var requests atomic.Int32

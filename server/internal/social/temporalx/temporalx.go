@@ -155,23 +155,10 @@ func Disconnect(identifier string, jsonBody, body any, message string) error {
 }
 
 // RateLimited means the platform kept refusing the request as too frequent
-// and accepted nothing, so a later retry is safe. The platform's Retry-After
-// (zero when it sent none) rides as the failure's next retry delay. The
-// request body is left out: it can hold credentials.
-func RateLimited(identifier string, jsonBody any, retryAfter time.Duration) error {
-	return temporal.NewApplicationErrorWithOptions("The platform is rate limiting this account", TypeRateLimited, temporal.ApplicationErrorOptions{
-		NonRetryable: true, NextRetryDelay: retryAfter,
-		Details: []any{FailureDetails{Identifier: identifier, JSON: Truncate(jsonBody, maxFailureField), Body: "{}"}},
-	})
-}
-
-// RetryAfter is the wait a RateLimited failure carries, zero when none.
-func RetryAfter(err error) time.Duration {
-	var app *temporal.ApplicationError
-	if errors.As(err, &app) {
-		return app.NextRetryDelay()
-	}
-	return 0
+// and accepted nothing, so a later retry is safe. The request body is left
+// out: it can hold credentials.
+func RateLimited(identifier string, jsonBody any) error {
+	return failure(TypeRateLimited, identifier, jsonBody, "{}", "The platform is rate limiting this account")
 }
 
 // DailyLimit means a platform cap refused the post until it resets: nothing

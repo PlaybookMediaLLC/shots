@@ -777,19 +777,28 @@ func (p *Provider) FinalizePost(ctx context.Context, token string, raw json.RawM
 		// Stories don't support carousels - publish each media as a separate
 		// story, skipping containers a previous (crashed) run already published
 		lastMediaID := ""
+		live := false
+		// Once a story is live, resending the post would repeat it.
+		partly := func(err error) error {
+			if live {
+				return temporalx.UnknownDelivery("instagram", "Instagram published part of this story before failing. Check the account before resending.")
+			}
+			return err
+		}
 		for _, mediaCreationID := range pending.Containers {
 			status, err := p.igContainerStatus(ctx, mediaCreationID, checkToken, pending.Type)
 			if err != nil {
-				return nil, err
+				return nil, partly(err)
 			}
 			if status == "PUBLISHED" {
+				live = true
 				continue
 			}
 			mediaID, err := p.postID(ctx, base+"/"+igID+"/media_publish?creation_id="+mediaCreationID+"&access_token="+accessToken+"&field=id")
 			if err != nil {
-				return nil, err
+				return nil, partly(err)
 			}
-			lastMediaID = mediaID
+			lastMediaID, live = mediaID, true
 		}
 
 		if lastMediaID == "" {
@@ -902,7 +911,7 @@ func (p *Provider) Comment(ctx context.Context, id, postID, lastCommentID, token
 }
 
 // CommentOn is comment with an explicit graph host.
-func (p *Provider) CommentOn(ctx context.Context, _, postID, _, token string, posts []integrations.PostDetails, _ *ent.Integration, host string) ([]integrations.PostResponse, error) {
+func (p *Provider) CommentOn(ctx context.Context, _, postID, _, token string, posts []integrations.PostDetails, integration *ent.Integration, host string) ([]integrations.PostResponse, error) {
 	accessToken, userToken := splitToken(token)
 	commentPost := posts[0]
 
@@ -911,22 +920,12 @@ func (p *Provider) CommentOn(ctx context.Context, _, postID, _, token string, po
 		return nil, err
 	}
 
-	// Get the permalink from the parent post
+	// The comment is live: the parent's permalink is only cosmetic.
 	readToken := userToken
 	if readToken == "" {
 		readToken = accessToken
 	}
-	res, err := p.Fetch(ctx, graph(host)+"/"+postID+"?fields=permalink&access_token="+readToken, integrations.Request{})
-	if err != nil {
-		return nil, err
-	}
-	var parent struct {
-		Permalink string `json:"permalink"`
-	}
-	if err := res.JSON(&parent); err != nil {
-		return nil, err
-	}
-	return []integrations.PostResponse{{ID: commentPost.ID, PostID: commentID, ReleaseURL: parent.Permalink, Status: "success"}}, nil
+	return []integrations.PostResponse{{ID: commentPost.ID, PostID: commentID, ReleaseURL: p.igPermalink(ctx, postID, readToken, host, integration), Status: "success"}}, nil
 }
 
 func setTitle(name string) string {

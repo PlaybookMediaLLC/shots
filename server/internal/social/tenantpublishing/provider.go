@@ -171,13 +171,8 @@ func publicationOutcome(err error) error {
 		return socialapi.NewCodedError(http.StatusConflict, publishing.FailureAccountReconnect, "social credentials must be reconnected")
 	}
 	if temporalx.FailureType(err) == temporalx.TypeRateLimited {
-		// The platform accepted nothing, so this 429 is the durable retry's. The
-		// workflow keeps its own delay; the platform's Retry-After is reported.
-		message := "The platform is rate limiting this account."
-		if wait := temporalx.RetryAfter(err); wait > 0 {
-			message += fmt.Sprintf(" It asked to wait %s.", wait)
-		}
-		return socialapi.NewError(http.StatusTooManyRequests, false, message)
+		// The platform accepted nothing, so this 429 is the durable retry's.
+		return socialapi.NewError(http.StatusTooManyRequests, false, "The platform is rate limiting this account.")
 	}
 	if temporalx.FailureType(err) == temporalx.TypeDailyLimit {
 		// Not 429: a cap that lasts until tomorrow is not retried in minutes.
