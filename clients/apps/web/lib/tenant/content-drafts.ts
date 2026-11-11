@@ -186,7 +186,8 @@ export async function prepareContentDraftSchedule(
   })
   return {
     add: input.add,
-    confirmDuplicate: input.confirmDuplicate,
+    // Only when confirmed: a backend from before the field refuses unknown fields.
+    confirmDuplicate: input.confirmDuplicate || undefined,
     expectedQueueSlot: input.expectedQueueSlot,
     disambiguation: input.disambiguation,
     localTime: input.localTime,

@@ -19,11 +19,28 @@ import {
 import type {
   documentChatRequestSchema,
   documentCopilotRequestSchema,
+  documentVoiceQuerySchema,
 } from '@/lib/api/contracts/ai'
 import { getWorkspaceVoice } from '@/lib/launch/store'
+import { writingContext } from '@/lib/write/ai-route'
 import { voiceInstructions } from '@/lib/write/voice'
 
 type DocumentChatRequest = z.infer<typeof documentChatRequestSchema>
+type DocumentVoiceQuery = z.infer<typeof documentVoiceQuerySchema>
+
+/**
+ * The voice the editor's AI writes in: the draft's (its social set's, for the
+ * channel being edited) when the caller can see that draft, else the
+ * workspace's. It starts loading at once and is awaited inside the credit scope.
+ */
+function documentVoice(access: OrganizationAccess, query: DocumentVoiceQuery) {
+  const voice = (async () =>
+    (query.draftId && query.channel
+      ? await writingContext(access, query.draftId, query.channel)
+      : null) ?? getWorkspaceVoice(access))()
+  voice.catch(() => undefined)
+  return voice
+}
 
 /**
  * Streams the document AI menu's answer. The stream opens with the tool the
@@ -33,12 +50,11 @@ type DocumentChatRequest = z.infer<typeof documentChatRequestSchema>
  */
 export function streamDocumentChat(
   access: OrganizationAccess,
-  body: DocumentChatRequest
+  body: DocumentChatRequest,
+  query: DocumentVoiceQuery
 ): Promise<Response> {
   const toolName = body.ctx?.toolName ?? 'generate'
-  // The voice loads while the credits are checked; it is awaited below.
-  const voice = getWorkspaceVoice(access)
-  voice.catch(() => undefined)
+  const voice = documentVoice(access, query)
   return new Promise<Response>((resolve, reject) => {
     withAiCredits(access, async () => {
       const messages = await convertToModelMessages(body.messages as unknown as UIMessage[])
@@ -51,8 +67,6 @@ export function streamDocumentChat(
           ...messages,
         ],
         model: models.languageModel('drafting'),
-        // The request carries no draft, so the workspace voice; a draft's set
-        // voice reaches Refine and the writing assistant instead.
         system: DOCUMENT_EDITOR_INSTRUCTIONS + voiceInstructions(await voice),
       })
       const stream = createUIMessageStream({
@@ -70,11 +84,10 @@ export function streamDocumentChat(
 /** One inline completion for the document copilot. */
 export function completeDocumentText(
   access: OrganizationAccess,
-  body: z.infer<typeof documentCopilotRequestSchema>
+  body: z.infer<typeof documentCopilotRequestSchema>,
+  query: DocumentVoiceQuery
 ): Promise<{ text: string }> {
-  // The voice loads while the credits are checked; it is awaited below.
-  const voice = getWorkspaceVoice(access)
-  voice.catch(() => undefined)
+  const voice = documentVoice(access, query)
   return withAiCredits(access, async () => {
     const { text } = await generateText({
       model: models.languageModel('fast'),

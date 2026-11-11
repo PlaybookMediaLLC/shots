@@ -183,6 +183,12 @@ test('contracts accept what the Go backend actually sends', () => {
   assert.ok(parsed.success)
 })
 
+test('a draft from a backend that predates its source ids still parses', () => {
+  // The web can run beside an older backend during a rollout or a rollback.
+  for (const field of ['campaignPostId', 'releaseId'] as const)
+    assert.equal(contentDrafts.contentDraftSchema.shape[field].parse(undefined), null)
+})
+
 test('a contract that declares access binds it, and the spec publishes it', () => {
   const paths = openApiSpec.paths as Record<string, Record<string, Record<string, unknown>>>
   for (const [name, contract] of contracts) {

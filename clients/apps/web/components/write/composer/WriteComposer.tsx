@@ -301,10 +301,6 @@ export function WriteComposer({
     canManageSets,
     showSaved,
   } = useWrite()
-  const services = React.useMemo(
-    () => platformEditorServices(trpcClient, aiEnabled),
-    [trpcClient, aiEnabled]
-  )
   const {
     conflict,
     discardConflict,
@@ -389,6 +385,11 @@ export function WriteComposer({
     [split]
   )
   const [tab, setTab] = React.useState<DraftChannel>(() => primaryChannel(initial.primaryPlatform))
+  // The editor's AI writes in this draft's voice for the platform being edited.
+  const services = React.useMemo(
+    () => platformEditorServices(trpcClient, aiEnabled, { channel: tab, draftId: initial.id }),
+    [trpcClient, aiEnabled, tab, initial.id]
+  )
   const [panel, setPanel] = React.useState<Panel | null>(() => {
     const asked = params.get('panel')
     return asked === 'properties' ||

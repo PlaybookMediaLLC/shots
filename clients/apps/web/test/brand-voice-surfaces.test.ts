@@ -3,6 +3,8 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import test from 'node:test'
 import type { WritingContext } from 'screenshot-studio-backend-sdk'
+import { documentVoiceQuerySchema } from '../lib/api/contracts/ai'
+import { platformEditorServices } from '../lib/editor/services'
 import { voiceInstructions } from '../lib/write/voice'
 
 /**
@@ -158,4 +160,22 @@ test('the voice block carries every field of the merged context', () => {
     at = next
   }
   assert.equal(block.match(/<\/writing_context>/g)?.length, 1)
+})
+
+test("the document editor asks for its draft's voice, and the boundary checks what it names", () => {
+  const draftId = 'clf0f1a2c3d4e5f6'
+  const services = platformEditorServices({} as never, true, { channel: 'linkedin', draftId })
+  assert.equal(services.ai?.chat?.api, `/api/ai/document?channel=linkedin&draftId=${draftId}`)
+  assert.equal(
+    services.ai?.copilot?.api,
+    `/api/ai/document/copilot?channel=linkedin&draftId=${draftId}`
+  )
+  assert.equal(platformEditorServices({} as never, true).ai?.chat?.api, '/api/ai/document')
+  assert.deepEqual(documentVoiceQuerySchema.parse({ channel: 'linkedin', draftId }), {
+    channel: 'linkedin',
+    draftId,
+  })
+  // An id or channel the backend would not know is refused before any lookup.
+  assert.equal(documentVoiceQuerySchema.safeParse({ draftId: '../admin' }).success, false)
+  assert.equal(documentVoiceQuerySchema.safeParse({ channel: 'myspace' }).success, false)
 })

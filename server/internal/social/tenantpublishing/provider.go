@@ -152,6 +152,12 @@ func (p *Publisher) resolveAccount(ctx context.Context, organizationID, destinat
 	return account, provider, settings, nil
 }
 
+// appVerifier is a provider that signs requests with Shots' own app keys as
+// well as the account's token, so a refused token may be the app's fault.
+type appVerifier interface {
+	VerifyAppCredentials(ctx context.Context) error
+}
+
 // requireReconnect flags a channel whose credentials the provider refused or
 // that lapsed with nothing to renew them, so the workspace hears of it
 // (integration.reconnect_required, raised by the Integration trigger) rather
@@ -309,10 +315,21 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		response, err = provider.Post(ctx, account.InternalID, account.Token, details, account)
 	}
 	if err != nil {
+		kind := temporalx.FailureType(err)
+		// A provider that signs with Shots' app keys too (X) refuses every
+		// account when the keys are bad: that is not this account's to fix.
+		if verifier, ok := provider.(appVerifier); ok && kind == temporalx.TypeRefreshToken {
+			if appErr := verifier.VerifyAppCredentials(ctx); appErr != nil {
+				slog.WarnContext(ctx, "provider refused the app credentials", "platform", input.Platform, "error", appErr)
+				refused := socialapi.NewCodedError(http.StatusServiceUnavailable, publishing.FailurePublisherUnavailable,
+					"The platform refused Shots' app credentials, so nothing was sent. No account needs reconnecting.")
+				refused.ProviderMessage = temporalx.FailureMessage(err)
+				return socialapi.Receipt{}, refused
+			}
+		}
 		// A disconnect, or a refused token nothing can renew, needs a person. A
 		// token with a refresh token is the maintenance refresh's to renew, or to
 		// flag when the provider refuses that too.
-		kind := temporalx.FailureType(err)
 		if kind == temporalx.TypeDisconnect || kind == temporalx.TypeRefreshToken && account.RefreshToken == nil {
 			p.requireReconnect(ctx, account)
 		}

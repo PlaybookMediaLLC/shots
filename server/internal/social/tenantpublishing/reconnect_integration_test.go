@@ -13,6 +13,7 @@ import (
 	socialdatabase "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/database"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/x"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
 	"github.com/lucsky/cuid"
@@ -71,28 +72,38 @@ func TestRefusedOrLapsedCredentialsAskTheWorkspaceToReconnect(t *testing.T) {
 		return count
 	}
 	for _, tc := range []struct {
-		name          string
-		expiresIn     time.Duration
-		refreshToken  *string
-		providerErr   error
+		name         string
+		expiresIn    time.Duration
+		refreshToken *string
+		providerErr  error
+		// appRefused, when set, makes the provider sign with Shots' app keys
+		// (as X does) and the check of those keys answer it.
+		appRefused    *bool
 		reconnected   bool
 		wantFlag      bool
 		wantProvider  int
 		wantNewEvents int
 	}{
-		{"the provider refuses the token", time.Hour, nil, temporalx.RefreshToken("linkedin", "{}", "{}", "revoked"), false, true, 1, 1},
-		{"the provider disconnects the account", time.Hour, nil, temporalx.Disconnect("linkedin", "{}", "{}", "gone"), false, true, 1, 1},
-		{"a reconnect after the read wins", time.Hour, nil, temporalx.RefreshToken("linkedin", "{}", "{}", "revoked"), true, false, 1, 0},
-		{"a refused token the refresh can still renew", time.Hour, new("refresh"), temporalx.RefreshToken("linkedin", "{}", "{}", "expired"), false, false, 1, 0},
-		{"the token lapsed with nothing to renew it", -time.Minute, nil, nil, false, true, 0, 1},
-		{"the token lapsed but can be renewed", -time.Minute, new("refresh"), nil, false, false, 0, 0},
+		{"the provider refuses the token", time.Hour, nil, temporalx.RefreshToken("linkedin", "{}", "{}", "revoked"), nil, false, true, 1, 1},
+		{"the provider disconnects the account", time.Hour, nil, temporalx.Disconnect("linkedin", "{}", "{}", "gone"), nil, false, true, 1, 1},
+		{"a reconnect after the read wins", time.Hour, nil, temporalx.RefreshToken("linkedin", "{}", "{}", "revoked"), nil, true, false, 1, 0},
+		{"a refused token the refresh can still renew", time.Hour, new("refresh"), temporalx.RefreshToken("linkedin", "{}", "{}", "expired"), nil, false, false, 1, 0},
+		{"the token lapsed with nothing to renew it", -time.Minute, nil, nil, nil, false, true, 0, 1},
+		{"the token lapsed but can be renewed", -time.Minute, new("refresh"), nil, nil, false, false, 0, 0},
+		{"X refuses the account while the app keys are good", time.Hour, nil, temporalx.RefreshToken("x", "{}", "{}", "revoked"), new(false), false, true, 1, 1},
+		// Bad app keys fail every X account the same way; none is the account's to fix.
+		{"X refuses the app keys", time.Hour, nil, temporalx.RefreshToken("x", "{}", "{}", "unauthorized"), new(true), false, false, 1, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			native := "remote-" + cuid.New()
 			channel := db.Client.Integration.Create().SetOrganizationID(boundOrg).SetName(tc.name).SetType("social").
 				SetProviderIdentifier("linkedin").SetInternalID(native).SetToken("private-token").
 				SetRefreshToken(tc.refreshToken).SetTokenExpiration(time.Now().Add(tc.expiresIn)).SaveX(ctx)
-			provider := &fakePoster{err: tc.providerErr, expectedNativeID: native}
+			fake := &fakePoster{err: tc.providerErr, expectedNativeID: native}
+			var provider poster = fake
+			if tc.appRefused != nil {
+				provider = appSigningPoster{fakePoster: fake, refused: *tc.appRefused}
+			}
 			lookup := &reconnectingLookup{EntIntegrationLookup: EntIntegrationLookup{Client: db.Client}}
 			if tc.reconnected {
 				// A person reconnects between the publisher's last read and the refusal.
@@ -109,17 +120,37 @@ func TestRefusedOrLapsedCredentialsAskTheWorkspaceToReconnect(t *testing.T) {
 				OrganizationID: productOrg, DestinationID: channel.ID, Platform: "linkedin", PostID: "canonical-post-1",
 				SecretReference: "SOCIAL_API_KEY", Caption: "Canary",
 			})
+			want := publishing.FailureAccountReconnect
+			if tc.appRefused != nil && *tc.appRefused {
+				want = publishing.FailurePublisherUnavailable
+			}
 			var refused *socialapi.Error
-			if !errors.As(err, &refused) || refused.Code != publishing.FailureAccountReconnect || refused.UnknownDelivery {
-				t.Fatalf("err=%v, want ACCOUNT_RECONNECT", err)
+			if !errors.As(err, &refused) || refused.Code != want || refused.UnknownDelivery {
+				t.Fatalf("err=%v, want %s", err, want)
 			}
 			flagged := db.Client.Integration.GetX(ctx, channel.ID).RefreshNeeded
-			if flagged != tc.wantFlag || provider.calls != tc.wantProvider || reconnectEvents()-before != tc.wantNewEvents {
-				t.Fatalf("flagged=%v provider calls=%d events=%d", flagged, provider.calls, reconnectEvents()-before)
+			if flagged != tc.wantFlag || fake.calls != tc.wantProvider || reconnectEvents()-before != tc.wantNewEvents {
+				t.Fatalf("flagged=%v provider calls=%d events=%d", flagged, fake.calls, reconnectEvents()-before)
 			}
 		})
 	}
 }
+
+// appSigningPoster is a provider that signs with Shots' app keys too, as X does.
+type appSigningPoster struct {
+	*fakePoster
+	refused bool
+}
+
+func (p appSigningPoster) VerifyAppCredentials(context.Context) error {
+	if p.refused {
+		return errors.New("app keys refused")
+	}
+	return nil
+}
+
+// X is such a provider, so its refused tokens are checked against the app keys.
+var _ appVerifier = x.New()
 
 // reconnectingLookup runs afterSecond once the publisher has re-read the
 // account just before its handoff to the provider.

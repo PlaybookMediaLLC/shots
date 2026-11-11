@@ -995,7 +995,7 @@ export interface paths {
         put?: never;
         /**
          * Schedule a post
-         * @description Schedules an approved creative variant to an active channel connection. A variant must be `APPROVED` with an approved review; scheduling never approves. A content draft is scheduled from the draft (`POST /api/v1/content-drafts/{id}/schedule`), which checks its approval and sends its stored text: here a `contentDraftId` is refused with `409`, and with `403` for an API key. The caption is checked against the workspace’s prohibited terms and those of the account’s social set (`409`). A key also sends only text a person approved: `caption` must be the copy of an approved campaign post for this visual, otherwise `403`. To post new text, use `POST /api/v1/posts`. A key cannot schedule to an account in a private social set. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`, and the key reused for another caption, time or source is `409`. Without the header, the request is named by its content (source, connection, caption and time), so an identical retry also returns the first post; once that post is cancelled or failed, send a key to schedule it again. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.
+         * @description Schedules an approved creative variant to an active channel connection. A variant must be `APPROVED` with an approved review; scheduling never approves. A content draft is scheduled from the draft (`POST /api/v1/content-drafts/{id}/schedule`), which checks its approval and sends its stored text: here a `contentDraftId` is refused with `409`, and with `403` for an API key. The caption is checked against the workspace’s prohibited terms and those of the account’s social set (`409`). A key also sends only text a person approved: `caption` must be the copy of an approved campaign post for this visual, otherwise `403`. To post new text, use `POST /api/v1/posts`. A key cannot schedule to an account in a private social set. Everything must belong to the workspace. Each new post counts against the monthly posts allowance. Accepts `Idempotency-Key`, unique per channel connection: a retry returns the first post with `200`, even when it recomputed the time. Without the header, the request is named by its content (source, connection, caption and time), so an identical retry also returns the first post; once that post is cancelled or failed, send a key to schedule it again. Requires the `post:schedule` scope, or a member who manages publishing, signed in within 15 minutes with two-factor.
          */
         post: operations["createScheduledPost"];
         delete?: never;
@@ -9171,7 +9171,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description A content draft was sent, the caption uses a prohibited term, or the idempotency key already scheduled other content or names a cancelled or failed post. */
+            /** @description A content draft was sent, the caption uses a prohibited term, or a request without a key names a cancelled or failed post. */
             409: {
                 headers: {
                     [name: string]: unknown;
