@@ -307,6 +307,44 @@ func TestVoiceSettingsAndGates(t *testing.T) {
 // Notes (rows 4-11): idempotent create (S1), the server's receive time (S14),
 // owner-only access, labels, the current-transcript rule (S9), conflicts
 // (S6), redaction, and deletion that wins over every replay (S7, S8).
+// A Founder Hub session acts in the workspace it names rather than the
+// browser's active one, only where the person is a member, and a note stays
+// private to its owner (the middleware marks the session after checking its grant).
+func TestVoiceFounderHubSessionActsInTheWorkspaceItNames(t *testing.T) {
+	f := newVoiceFixture(t)
+	f.enable(true, false)
+	notes := true
+	if _, err := f.repo.UpdateVoiceWorkspaceSettings(f.ctx, f.foreign, VoiceWorkspaceFlagsInput{VoiceNotes: &notes}); err != nil {
+		t.Fatal(err)
+	}
+	// The other workspace's owner also joins this one; their browser session stays in theirs.
+	f.exec(`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'creator',now())`,
+		"member_hub_"+f.id, f.org, f.foreign.UserID)
+	hub := f.foreign
+	hub.OrganizationID = f.org
+	_, err := f.repo.ListVoiceNoteIndex(f.ctx, hub)
+	expectVoice(t, err, publishing.ErrForbidden, "a browser session outside its active workspace")
+
+	delegated := publishing.ForDelegatedSession(f.ctx)
+	note, created, err := f.repo.CreateVoiceNote(delegated, hub, CreateVoiceNoteInput{ClientNoteID: "hub-note", RecordedAt: time.Now(), RecordedTimeZone: "UTC"})
+	if err != nil || !created {
+		t.Fatalf("note=%+v created=%v err=%v", note, created, err)
+	}
+	if index, err := f.repo.ListVoiceNoteIndex(delegated, hub); err != nil || len(index) != 1 || index[0].ID != note.ID {
+		t.Fatalf("index=%+v err=%v", index, err)
+	}
+	_, err = f.repo.GetVoiceNote(delegated, hub, f.note(f.owner, "owner-note", false).ID)
+	expectVoice(t, err, publishing.ErrNotFound, "another member's note")
+
+	stranger := f.creator
+	stranger.OrganizationID = f.other
+	_, err = f.repo.ListVoiceNoteIndex(delegated, stranger)
+	expectVoice(t, err, publishing.ErrForbidden, "notes of a workspace the person is not a member of")
+	f.exec(`DELETE FROM session WHERE id=$1`, hub.SessionID)
+	_, err = f.repo.ListVoiceNoteIndex(delegated, hub)
+	expectVoice(t, err, publishing.ErrUnauthorized, "a signed-out session")
+}
+
 func TestVoiceNotesSyncAndIsolation(t *testing.T) {
 	f := newVoiceFixture(t)
 	ctx := f.ctx

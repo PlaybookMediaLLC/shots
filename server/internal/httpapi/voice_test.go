@@ -23,6 +23,8 @@ type voiceFake struct {
 	runIndex int
 	query    product.VoiceNoteListQuery
 	patch    product.UpdateVoiceNoteInput
+	// delegated is whether the operation ran as a Founder Hub session.
+	delegated bool
 }
 
 func (f *voiceFake) record(call string, ids ...string) {
@@ -35,8 +37,9 @@ func (f *voiceFake) record(call string, ids ...string) {
 	}
 }
 
-func (f *voiceFake) GetVoiceSettings(context.Context, product.Actor) (*product.VoiceSettings, error) {
+func (f *voiceFake) GetVoiceSettings(ctx context.Context, _ product.Actor) (*product.VoiceSettings, error) {
 	f.record("settings")
+	f.delegated = publishing.IsDelegatedSession(ctx)
 	return &product.VoiceSettings{MinAppVersion: "1.0.0"}, f.err
 }
 func (f *voiceFake) UpdateVoiceWorkspaceSettings(context.Context, product.Actor, product.VoiceWorkspaceFlagsInput) (*product.VoiceSettings, error) {
@@ -220,5 +223,50 @@ func TestVoiceRouteStatusCodes(t *testing.T) {
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized || fake.call != "" {
 		t.Fatalf("unauthenticated status=%d", response.Code)
+	}
+}
+
+// A Founder Hub session names its workspace per request: the backend checks
+// its live grant itself, and only then runs the operation as a delegated
+// session. Any other client, or a principal that is not a session, is refused.
+func TestVoiceRoutesAcceptFounderHubSessionsWithALiveGrant(t *testing.T) {
+	request := func(fake *voiceFake, headers map[string]string) *httptest.ResponseRecorder {
+		handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", fake)
+		request := httptest.NewRequest(http.MethodGet, "/v1/voice/settings", nil)
+		for name, value := range map[string]string{"Authorization": "Bearer secret", "X-Organization-ID": "org",
+			"X-User-ID": "user", "X-Session-ID": "session"} {
+			request.Header.Set(name, value)
+		}
+		for name, value := range headers {
+			request.Header.Set(name, value)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		return recorder
+	}
+	browser := &voiceFake{}
+	if response := request(browser, nil); response.Code != http.StatusOK || browser.delegated || browser.founderHubActor != nil {
+		t.Fatalf("a browser session: status=%d delegated=%v grant checked=%v", response.Code, browser.delegated, browser.founderHubActor != nil)
+	}
+	hub := &voiceFake{}
+	if response := request(hub, map[string]string{"X-Principal-Client": "shots-founder-hub"}); response.Code != http.StatusOK || !hub.delegated {
+		t.Fatalf("a Founder Hub session: status=%d delegated=%v body=%s", response.Code, hub.delegated, response.Body.String())
+	}
+	if hub.founderHubActor == nil || hub.founderHubActor.UserID != "user" || hub.founderHubActor.SessionID != "session" || hub.founderHubActor.OrganizationID != "org" {
+		t.Fatalf("the grant was not checked for the forwarded session: %+v", hub.founderHubActor)
+	}
+	revoked := &voiceFake{}
+	revoked.founderHubError = publishing.ErrUnauthorized
+	if response := request(revoked, map[string]string{"X-Principal-Client": "shots-founder-hub"}); response.Code != http.StatusUnauthorized || revoked.call != "" {
+		t.Fatalf("a revoked grant: status=%d call=%q", response.Code, revoked.call)
+	}
+	for _, headers := range []map[string]string{
+		{"X-Principal-Client": "another-client"},
+		{"X-Principal-Client": "shots-founder-hub", "X-Principal-Kind": "api_key", "X-API-Key-ID": "key"},
+	} {
+		fake := &voiceFake{}
+		if response := request(fake, headers); response.Code != http.StatusUnauthorized || fake.call != "" || fake.founderHubActor != nil {
+			t.Fatalf("%v: status=%d call=%q", headers, response.Code, fake.call)
+		}
 	}
 }
