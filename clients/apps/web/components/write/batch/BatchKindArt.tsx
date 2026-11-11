@@ -6,10 +6,22 @@ import {
   Illustration,
   type IllustrationTone,
   Picture,
-  Play,
   Surface,
   Tint,
 } from '@/components/platform-ui/illustration'
+
+/** A round play button for video. */
+function Play({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  return (
+    <g>
+      <circle className="fill-card" cx={cx} cy={cy} fillOpacity={0.92} r={r} />
+      <path
+        className="fill-foreground/70"
+        d={`M${cx - r * 0.28} ${cy - r * 0.42}L${cx + r * 0.45} ${cy}L${cx - r * 0.28} ${cy + r * 0.42}Z`}
+      />
+    </g>
+  )
+}
 
 /** A post card on the right of a scene: avatar, two lines and a time. */
 function Post({ x, y, time, w = 118 }: { x: number; y: number; time: string; w?: number }) {

@@ -87,6 +87,18 @@ for (const width of [1440, 390]) {
       await page.evaluate(() => window.scrollTo(0, 0))
       await mkdir(output, { recursive: true })
       await page.screenshot({ path: path.join(output, `after-${width}.png`), fullPage: true })
+
+      // The way to start can be changed again, and keyboard focus follows each switch.
+      const back = page.getByRole('button', { name: '← All ways to start', exact: true })
+      await back.click()
+      await expect(gallery).toHaveCount(0)
+      const template = page
+        .getByRole('navigation', { name: 'Ways to start', exact: true })
+        .getByRole('button', { name: /^Start from a template/ })
+      await expect(template).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(gallery).toBeVisible()
+      await expect(back).toBeFocused()
       expect(errors).toEqual([])
     }
   )

@@ -99,7 +99,7 @@ export function NewBatchButton({
           {TOOLS.map((item) => (
             <Label
               className={cn(
-                'group cursor-pointer flex-col items-stretch gap-0 rounded-xl border border-border bg-card p-1.5 font-normal transition-[border-color,box-shadow] duration-150',
+                'cursor-pointer flex-col items-stretch gap-0 rounded-xl border border-border bg-card p-1.5 font-normal transition-[border-color,box-shadow] duration-150',
                 'hover:border-foreground/20 hover:shadow-sm',
                 tool === item.value &&
                   'border-foreground/70 shadow-sm ring-1 ring-foreground/70 hover:border-foreground/70'

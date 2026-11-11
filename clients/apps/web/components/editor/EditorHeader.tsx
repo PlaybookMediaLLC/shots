@@ -107,7 +107,8 @@ function ToolButton({
 
 /** A hairline between toolbar groups. */
 function ToolDivider() {
-  return <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-foreground/[0.08]" />
+  // last:hidden: a group whose final control renders nothing keeps no trailing hairline.
+  return <span aria-hidden className="mx-1 h-4 w-px shrink-0 bg-foreground/[0.08] last:hidden" />
 }
 
 export function EditorHeader() {
@@ -407,7 +408,7 @@ export function EditorHeader() {
                 className={cn(
                   'inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg bg-foreground text-[13px] font-medium text-background',
                   'shadow-sm transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98]',
-                  'disabled:pointer-events-none disabled:bg-foreground/[0.07] disabled:text-muted-foreground disabled:shadow-none',
+                  'disabled:pointer-events-none disabled:bg-foreground/[0.07] disabled:text-muted-foreground disabled:opacity-100 disabled:shadow-none',
                   isMobile ? 'px-2' : 'px-3'
                 )}
                 disabled={!hasContent}

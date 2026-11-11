@@ -64,10 +64,7 @@ export function Surface(props: SVGProps<SVGRectElement>) {
 }
 
 /** An accent-tinted area; `strength` is its opacity. */
-export function Tint({
-  strength = 0.16,
-  ...props
-}: SVGProps<SVGRectElement> & { strength?: number }) {
+export function Tint({ strength, ...props }: SVGProps<SVGRectElement> & { strength: number }) {
   return <rect className="fill-current" fillOpacity={strength} rx={3} {...props} />
 }
 
@@ -113,7 +110,8 @@ export function Arrow({
   )
 }
 
-type Box = { x: number; y: number; w: number; h: number }
+/** A rectangle in scene units. */
+export type Box = { x: number; y: number; w: number; h: number }
 
 /** A photo: an accent tint with a sun and two hills. */
 export function Picture({ x, y, w, h, strength = 0.22 }: Box & { strength?: number }) {
@@ -137,58 +135,6 @@ export function Picture({ x, y, w, h, strength = 0.22 }: Box & { strength?: numb
         className="fill-current"
         d={`M${x + w * 0.3} ${base}L${x + w * 0.62} ${y + h * 0.42}L${x + w} ${base}Z`}
         fillOpacity={0.7}
-      />
-    </g>
-  )
-}
-
-/** A product screenshot: a window with a sidebar, a heading and a chart. */
-export function Screenshot({ x, y, w, h }: Box) {
-  const side = w * 0.22
-  return (
-    <g>
-      <Surface height={h} rx={3.5} width={w} x={x} y={y} />
-      <line
-        className="stroke-foreground/10"
-        vectorEffect="non-scaling-stroke"
-        x1={x}
-        x2={x + w}
-        y1={y + 7}
-        y2={y + 7}
-      />
-      {[3.5, 7, 10.5].map((dx) => (
-        <circle className="fill-foreground/20" cx={x + dx + 1} cy={y + 3.5} key={dx} r={1.1} />
-      ))}
-      <rect
-        className="fill-foreground/[0.06]"
-        height={h - 14}
-        rx={1.5}
-        width={side}
-        x={x + 3.5}
-        y={y + 10.5}
-      />
-      <Bar h={2.5} tone="ink" width={w * 0.34} x={x + side + 7} y={y + 11} />
-      <Bar h={2} width={w * 0.24} x={x + side + 7} y={y + 16} />
-      <Tint
-        height={Math.max(h - 25, 4)}
-        rx={1.5}
-        strength={0.24}
-        width={w - side - 11}
-        x={x + side + 7}
-        y={y + 21}
-      />
-    </g>
-  )
-}
-
-/** A round play button for video. */
-export function Play({ cx, cy, r = 6 }: { cx: number; cy: number; r?: number }) {
-  return (
-    <g>
-      <circle className="fill-card" cx={cx} cy={cy} fillOpacity={0.92} r={r} />
-      <path
-        className="fill-foreground/70"
-        d={`M${cx - r * 0.28} ${cy - r * 0.42}L${cx + r * 0.45} ${cy}L${cx - r * 0.28} ${cy + r * 0.42}Z`}
       />
     </g>
   )

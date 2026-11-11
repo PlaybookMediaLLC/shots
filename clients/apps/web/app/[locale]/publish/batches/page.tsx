@@ -1,9 +1,7 @@
 import Link from 'next/link'
 import { PlatformShell } from '@/components/platform-shell/PlatformShell'
-import { CaretRightIcon } from '@phosphor-icons/react/dist/ssr/CaretRight'
-import { StackIcon } from '@phosphor-icons/react/dist/ssr/Stack'
 import { EmptyState, Group, Page, Pill, Section } from '@/components/platform-ui'
-import { LibraryIcon } from '@/components/platform-shell/icons'
+import { BatchIcon, ChevronRightIcon, LibraryIcon } from '@/components/platform-shell/icons'
 import { SidebarLink } from '@/components/platform-shell/SidebarLink'
 import { Button } from '@/components/ui/button'
 import { DiscardBatchButton } from '@/components/write/batch/DiscardBatchButton'
@@ -68,16 +66,19 @@ export default async function BatchesPage({
                     aria-hidden="true"
                     className="grid size-9 shrink-0 place-items-center rounded-lg border border-border bg-foreground/[0.03] text-muted-foreground"
                   >
-                    <StackIcon size={16} />
+                    <BatchIcon size={16} />
                   </span>
                   <div className="min-w-0 flex-1">
                     {/* The link covers the row; the discard button sits above it. */}
-                    <SidebarLink
-                      className="block truncate text-ui-lg text-foreground outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
-                      href={`/publish/batches/${batch.id}`}
-                    >
-                      {batch.title}
-                    </SidebarLink>
+                    <h3 className="min-w-0">
+                      <SidebarLink
+                        className="block truncate text-ui-lg text-foreground outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset"
+                        href={`/publish/batches/${batch.id}`}
+                        title={batch.title}
+                      >
+                        {batch.title}
+                      </SidebarLink>
+                    </h3>
                     <p className="mt-0.5 truncate text-ui text-muted-foreground">
                       {sets.find((set) => set.id === batch.socialSetId)?.name ?? 'Profile'}
                     </p>
@@ -92,7 +93,7 @@ export default async function BatchesPage({
                       <DiscardBatchButton id={batch.id} title={batch.title} />
                     </span>
                   ) : null}
-                  <CaretRightIcon
+                  <ChevronRightIcon
                     aria-hidden="true"
                     className="shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5"
                     size={14}

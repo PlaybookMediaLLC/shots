@@ -2,16 +2,53 @@ import type { ReactNode } from 'react'
 import {
   Arrow,
   Bar,
+  type Box,
   Caption,
   Illustration,
   type IllustrationTone,
   Picture,
-  Screenshot,
   Surface,
   Tint,
 } from '@/components/platform-ui/illustration'
 
-type Box = { x: number; y: number; w: number; h: number }
+/** A product screenshot: a window with a sidebar, a heading and a chart. */
+function Screenshot({ x, y, w, h }: Box) {
+  const side = w * 0.22
+  return (
+    <g>
+      <Surface height={h} rx={3.5} width={w} x={x} y={y} />
+      <line
+        className="stroke-foreground/10"
+        vectorEffect="non-scaling-stroke"
+        x1={x}
+        x2={x + w}
+        y1={y + 7}
+        y2={y + 7}
+      />
+      {[3.5, 7, 10.5].map((dx) => (
+        <circle className="fill-foreground/20" cx={x + dx + 1} cy={y + 3.5} key={dx} r={1.1} />
+      ))}
+      <rect
+        className="fill-foreground/[0.06]"
+        height={h - 14}
+        rx={1.5}
+        width={side}
+        x={x + 3.5}
+        y={y + 10.5}
+      />
+      <Bar h={2.5} tone="ink" width={w * 0.34} x={x + side + 7} y={y + 11} />
+      <Bar h={2} width={w * 0.24} x={x + side + 7} y={y + 16} />
+      <Tint
+        height={Math.max(h - 25, 4)}
+        rx={1.5}
+        strength={0.24}
+        width={w - side - 11}
+        x={x + side + 7}
+        y={y + 21}
+      />
+    </g>
+  )
+}
 
 /** An announcement artboard: headline, supporting line and button beside a screenshot. */
 function Announcement({ x, y, w, h }: Box) {

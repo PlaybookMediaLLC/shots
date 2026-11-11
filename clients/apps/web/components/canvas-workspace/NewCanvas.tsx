@@ -109,10 +109,23 @@ export function NewCanvas({
   const [start, setStart] = useState<Start | null>(
     () => startSchema.safeParse(source.start).data ?? null
   )
-  const [recipe, setRecipe] = useState<CanvasRecipe | null>(null)
+  const [recipe, setRecipe] = useState<CanvasRecipe | null>(() =>
+    source.start === 'launch' ? 'product-launch' : null
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const intent = useRef<{ key: string; intent: CanvasIntent } | null>(null)
+  // Choosing a start swaps the gallery for its panel, so focus follows the
+  // switch: to the way back, then to the card it came from.
+  const backRef = useRef<HTMLButtonElement>(null)
+  const switched = useRef(false)
+  const returnTo = useRef<Start | null>(null)
+  useEffect(() => {
+    if (!switched.current) return
+    switched.current = false
+    if (start) backRef.current?.focus()
+    else document.querySelector<HTMLElement>(`[data-start="${returnTo.current}"]`)?.focus()
+  }, [start])
   const automatic = Boolean(
     source.project || source.set || source.design || source.recipe || source.blank
   )
@@ -246,7 +259,8 @@ export function NewCanvas({
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">New canvas</h1>
           <p className="mt-2 max-w-xl text-muted-foreground">
-            Pick a starting point. Everything it creates stays fully editable.
+            Pick a starting point, or open a blank canvas with one 16:9 artboard. Everything it
+            creates stays fully editable.
           </p>
         </div>
         <Button
@@ -271,13 +285,18 @@ export function NewCanvas({
       ) : null}
       {chosen ? (
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)]">
-          <aside className="grid gap-4 lg:sticky lg:top-8">
+          <div className="grid gap-4 lg:sticky lg:top-8">
             <Button
               className="cursor-pointer justify-self-start rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
+              disabled={busy}
               onClick={() => {
+                switched.current = true
+                returnTo.current = start
+                setError(null)
                 setStart(null)
                 setRecipe(null)
               }}
+              ref={backRef}
               size={null}
               type="button"
               variant="custom"
@@ -289,7 +308,7 @@ export function NewCanvas({
               <h2 className="font-medium">{chosen.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">{chosen.detail}</p>
             </div>
-          </aside>
+          </div>
           <section
             aria-label="Starting point"
             className="min-h-64 rounded-xl border bg-[var(--platform-group,var(--card))] p-5"
@@ -371,37 +390,48 @@ export function NewCanvas({
           </section>
         </div>
       ) : (
-        <nav aria-label="Ways to start" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visible.map((choice) => (
-            <Button
-              variant="custom"
-              size={null}
-              key={choice.id}
-              type="button"
-              onClick={() => {
-                setStart(choice.id)
-                setRecipe(choice.id === 'launch' ? 'product-launch' : null)
-              }}
-              className="group flex min-w-0 flex-col items-stretch rounded-xl border bg-card p-1.5 text-left transition-[border-color,box-shadow] duration-150 hover:border-foreground/20 hover:shadow-md focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
-            >
-              <StartArt start={choice.id} />
-              <span className="block px-2.5 pt-3 pb-2">
-                <span className="flex items-center justify-between gap-2 font-medium">
-                  {choice.title}
-                  <span
-                    aria-hidden="true"
-                    className="text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
-                  >
-                    →
+        <>
+          {busy ? (
+            <p className="text-sm text-muted-foreground" role="status">
+              Creating your canvas…
+            </p>
+          ) : null}
+          <nav aria-label="Ways to start" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {visible.map((choice) => (
+              <Button
+                variant="custom"
+                size={null}
+                key={choice.id}
+                type="button"
+                data-start={choice.id}
+                disabled={busy}
+                onClick={() => {
+                  switched.current = true
+                  setError(null)
+                  setStart(choice.id)
+                  setRecipe(choice.id === 'launch' ? 'product-launch' : null)
+                }}
+                className="group flex min-w-0 flex-col items-stretch rounded-xl border bg-card p-1.5 text-left transition-[border-color,box-shadow] duration-150 hover:border-foreground/20 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring"
+              >
+                <StartArt start={choice.id} />
+                <span className="block px-2.5 pt-3 pb-2">
+                  <span className="flex items-center justify-between gap-2 font-medium">
+                    {choice.title}
+                    <span
+                      aria-hidden="true"
+                      className="text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-foreground"
+                    >
+                      →
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-xs leading-normal text-muted-foreground">
+                    {choice.detail}
                   </span>
                 </span>
-                <span className="mt-1 block text-xs leading-normal text-muted-foreground">
-                  {choice.detail}
-                </span>
-              </span>
-            </Button>
-          ))}
-        </nav>
+              </Button>
+            ))}
+          </nav>
+        </>
       )}
     </main>
   )
