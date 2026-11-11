@@ -176,6 +176,20 @@ func (_c *VoiceNoteCreate) SetNillableDeletedAt(v *time.Time) *VoiceNoteCreate {
 	return _c
 }
 
+// SetOwnerRemovedAt sets the "owner_removed_at" field.
+func (_c *VoiceNoteCreate) SetOwnerRemovedAt(v time.Time) *VoiceNoteCreate {
+	_c.mutation.SetOwnerRemovedAt(v)
+	return _c
+}
+
+// SetNillableOwnerRemovedAt sets the "owner_removed_at" field if the given value is not nil.
+func (_c *VoiceNoteCreate) SetNillableOwnerRemovedAt(v *time.Time) *VoiceNoteCreate {
+	if v != nil {
+		_c.SetOwnerRemovedAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *VoiceNoteCreate) SetCreatedAt(v time.Time) *VoiceNoteCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -396,6 +410,10 @@ func (_c *VoiceNoteCreate) createSpec() (*VoiceNote, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.DeletedAt(); ok {
 		_spec.SetField(voicenote.FieldDeletedAt, field.TypeTime, value)
 		_node.DeletedAt = &value
+	}
+	if value, ok := _c.mutation.OwnerRemovedAt(); ok {
+		_spec.SetField(voicenote.FieldOwnerRemovedAt, field.TypeTime, value)
+		_node.OwnerRemovedAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(voicenote.FieldCreatedAt, field.TypeTime, value)

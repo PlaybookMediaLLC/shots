@@ -40,6 +40,8 @@ const (
 	FieldStatus = "status"
 	// FieldFailureReason holds the string denoting the failure_reason field in the database.
 	FieldFailureReason = "failureReason"
+	// FieldObjectPurgedAt holds the string denoting the object_purged_at field in the database.
+	FieldObjectPurgedAt = "objectPurgedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -64,6 +66,7 @@ var Columns = []string{
 	FieldObjectKey,
 	FieldStatus,
 	FieldFailureReason,
+	FieldObjectPurgedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -192,6 +195,11 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByFailureReason orders the results by the failure_reason field.
 func ByFailureReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldFailureReason, opts...).ToFunc()
+}
+
+// ByObjectPurgedAt orders the results by the object_purged_at field.
+func ByObjectPurgedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldObjectPurgedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

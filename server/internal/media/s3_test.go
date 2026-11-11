@@ -3,9 +3,12 @@ package media
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -178,5 +181,56 @@ func TestMultipartUploadThroughSignedParts(t *testing.T) {
 	}
 	if err := store.AbortMultipartUpload(ctx, key, uploadID); err != nil {
 		t.Fatalf("abort after completion: %v", err)
+	}
+}
+
+// A voice run's upload URL signs its length and SHA-256 as headers, so
+// storage refuses a larger or different file; the checksum must not ride in
+// the query string, where storage may ignore it.
+func TestChecksummedUploadSignsLengthAndChecksumAsHeaders(t *testing.T) {
+	server := httptest.NewServer(gofakes3.New(s3mem.New(), gofakes3.WithAutoBucket(true)).Server())
+	defer server.Close()
+	store, err := NewS3Store(server.URL, server.URL, "us-east-1", "tenant-assets", "test-key", "test-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := "voice/org-1/note-1/0-abc.aac"
+	body := []byte("ADTS bytes")
+	digest := sha256.Sum256(body)
+	url, headers, err := store.SignChecksummedUpload(context.Background(), key, "audio/aac", int64(len(body)), digest[:], 15*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := neturl.Parse(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Query().Has("x-amz-checksum-sha256") || parsed.Query().Get("X-Amz-Expires") != "900" {
+		t.Fatalf("query=%v", parsed.Query())
+	}
+	signed := parsed.Query().Get("X-Amz-SignedHeaders")
+	for _, name := range []string{"content-length", "content-type", "if-none-match", "x-amz-checksum-sha256"} {
+		if !strings.Contains(signed, name) {
+			t.Fatalf("%s is not signed: %q", name, signed)
+		}
+	}
+	if headers.Get("Host") != "" || headers.Get("X-Amz-Checksum-Sha256") != base64.StdEncoding.EncodeToString(digest[:]) ||
+		headers.Get("If-None-Match") != "*" || headers.Get("Content-Type") != "audio/aac" || headers.Get("Content-Length") != strconv.Itoa(len(body)) {
+		t.Fatalf("headers=%v", headers)
+	}
+	request, _ := http.NewRequest(http.MethodPut, url, bytes.NewReader(body))
+	for name, values := range headers {
+		if name != "Content-Length" { // net/http sets it from the body
+			request.Header[name] = values
+		}
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil || response.StatusCode != http.StatusOK {
+		t.Fatalf("upload with the signed headers: %v %v", response, err)
+	}
+	response.Body.Close()
+	download, err := store.SignDownloadFor(context.Background(), key, time.Hour)
+	if err != nil || !strings.Contains(download, "X-Amz-Expires=3600") {
+		t.Fatalf("download=%q err=%v", download, err)
 	}
 }

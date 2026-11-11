@@ -138,6 +138,20 @@ func (_c *VoiceAudioRunCreate) SetNillableFailureReason(v *string) *VoiceAudioRu
 	return _c
 }
 
+// SetObjectPurgedAt sets the "object_purged_at" field.
+func (_c *VoiceAudioRunCreate) SetObjectPurgedAt(v time.Time) *VoiceAudioRunCreate {
+	_c.mutation.SetObjectPurgedAt(v)
+	return _c
+}
+
+// SetNillableObjectPurgedAt sets the "object_purged_at" field if the given value is not nil.
+func (_c *VoiceAudioRunCreate) SetNillableObjectPurgedAt(v *time.Time) *VoiceAudioRunCreate {
+	if v != nil {
+		_c.SetObjectPurgedAt(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *VoiceAudioRunCreate) SetCreatedAt(v time.Time) *VoiceAudioRunCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -362,6 +376,10 @@ func (_c *VoiceAudioRunCreate) createSpec() (*VoiceAudioRun, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.FailureReason(); ok {
 		_spec.SetField(voiceaudiorun.FieldFailureReason, field.TypeString, value)
 		_node.FailureReason = &value
+	}
+	if value, ok := _c.mutation.ObjectPurgedAt(); ok {
+		_spec.SetField(voiceaudiorun.FieldObjectPurgedAt, field.TypeTime, value)
+		_node.ObjectPurgedAt = &value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(voiceaudiorun.FieldCreatedAt, field.TypeTime, value)

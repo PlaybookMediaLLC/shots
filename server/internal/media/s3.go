@@ -3,15 +3,18 @@ package media
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -174,10 +177,42 @@ func (s *S3Store) AbortMultipartUpload(ctx context.Context, key, uploadID string
 	return err
 }
 
+// unhoistedSigner signs every header as a header. The default presigner moves
+// x-amz-* headers such as the checksum into the query string, where storage
+// may not check them.
+var unhoistedSigner = v4.NewSigner(func(o *v4.SignerOptions) {
+	o.DisableURIPathEscaping = true
+	o.DisableHeaderHoisting = true
+})
+
+// SignChecksummedUpload signs a write-once PUT of exactly size bytes whose
+// SHA-256 is digest. The caller sends the returned headers: storage refuses a
+// body of another length or content, and If-None-Match: * refuses to overwrite
+// an object already stored.
+func (s *S3Store) SignChecksummedUpload(ctx context.Context, key, mediaType string, size int64, digest []byte, expires time.Duration) (string, http.Header, error) {
+	request, err := s.signer.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(mediaType),
+		ContentLength: aws.Int64(size), ChecksumSHA256: aws.String(base64.StdEncoding.EncodeToString(digest)),
+		IfNoneMatch: aws.String("*"),
+	}, s3.WithPresignExpires(expires), func(o *s3.PresignOptions) { o.Presigner = unhoistedSigner })
+	if err != nil {
+		return "", nil, fmt.Errorf("sign checksummed upload: %w", err)
+	}
+	headers := request.SignedHeader.Clone()
+	headers.Del("Host") // the HTTP client sets it from the URL
+	return request.URL, headers, nil
+}
+
 func (s *S3Store) SignDownload(ctx context.Context, key string) (string, error) {
+	return s.SignDownloadFor(ctx, key, 2*time.Minute)
+}
+
+// SignDownloadFor signs a GET valid for expires, for media a person plays and
+// seeks through long after the first request.
+func (s *S3Store) SignDownloadFor(ctx context.Context, key string, expires time.Duration) (string, error) {
 	request, err := s.signer.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket), Key: aws.String(key),
-	}, s3.WithPresignExpires(2*time.Minute))
+	}, s3.WithPresignExpires(expires))
 	if err != nil {
 		return "", fmt.Errorf("sign media download: %w", err)
 	}

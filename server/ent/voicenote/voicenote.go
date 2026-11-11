@@ -41,6 +41,8 @@ const (
 	FieldCurrentTranscriptRevisionID = "currentTranscriptRevisionId"
 	// FieldDeletedAt holds the string denoting the deleted_at field in the database.
 	FieldDeletedAt = "deletedAt"
+	// FieldOwnerRemovedAt holds the string denoting the owner_removed_at field in the database.
+	FieldOwnerRemovedAt = "ownerRemovedAt"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "createdAt"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -66,6 +68,7 @@ var Columns = []string{
 	FieldRevision,
 	FieldCurrentTranscriptRevisionID,
 	FieldDeletedAt,
+	FieldOwnerRemovedAt,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -173,6 +176,11 @@ func ByCurrentTranscriptRevisionID(opts ...sql.OrderTermOption) OrderOption {
 // ByDeletedAt orders the results by the deleted_at field.
 func ByDeletedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDeletedAt, opts...).ToFunc()
+}
+
+// ByOwnerRemovedAt orders the results by the owner_removed_at field.
+func ByOwnerRemovedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOwnerRemovedAt, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

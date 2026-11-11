@@ -43,6 +43,8 @@ type VoiceAudioRun struct {
 	Status voiceaudiorun.Status `json:"status,omitempty"`
 	// FailureReason holds the value of the "failure_reason" field.
 	FailureReason *string `json:"failure_reason,omitempty"`
+	// ObjectPurgedAt holds the value of the "object_purged_at" field.
+	ObjectPurgedAt *time.Time `json:"object_purged_at,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -59,7 +61,7 @@ func (*VoiceAudioRun) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case voiceaudiorun.FieldID, voiceaudiorun.FieldOrganizationID, voiceaudiorun.FieldNoteID, voiceaudiorun.FieldContentType, voiceaudiorun.FieldSha256, voiceaudiorun.FieldObjectKey, voiceaudiorun.FieldStatus, voiceaudiorun.FieldFailureReason:
 			values[i] = new(sql.NullString)
-		case voiceaudiorun.FieldCreatedAt, voiceaudiorun.FieldUpdatedAt:
+		case voiceaudiorun.FieldObjectPurgedAt, voiceaudiorun.FieldCreatedAt, voiceaudiorun.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -164,6 +166,13 @@ func (_m *VoiceAudioRun) assignValues(columns []string, values []any) error {
 				_m.FailureReason = new(string)
 				*_m.FailureReason = value.String
 			}
+		case voiceaudiorun.FieldObjectPurgedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field object_purged_at", values[i])
+			} else if value.Valid {
+				_m.ObjectPurgedAt = new(time.Time)
+				*_m.ObjectPurgedAt = value.Time
+			}
 		case voiceaudiorun.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field created_at", values[i])
@@ -257,6 +266,11 @@ func (_m *VoiceAudioRun) String() string {
 	if v := _m.FailureReason; v != nil {
 		builder.WriteString("failure_reason=")
 		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ObjectPurgedAt; v != nil {
+		builder.WriteString("object_purged_at=")
+		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")

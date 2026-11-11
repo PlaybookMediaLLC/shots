@@ -124,6 +124,11 @@ func FailureReason(v string) predicate.VoiceAudioRun {
 	return predicate.VoiceAudioRun(sql.FieldEQ(FieldFailureReason, v))
 }
 
+// ObjectPurgedAt applies equality check predicate on the "object_purged_at" field. It's identical to ObjectPurgedAtEQ.
+func ObjectPurgedAt(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldEQ(FieldObjectPurgedAt, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.VoiceAudioRun {
 	return predicate.VoiceAudioRun(sql.FieldEQ(FieldCreatedAt, v))
@@ -822,6 +827,56 @@ func FailureReasonEqualFold(v string) predicate.VoiceAudioRun {
 // FailureReasonContainsFold applies the ContainsFold predicate on the "failure_reason" field.
 func FailureReasonContainsFold(v string) predicate.VoiceAudioRun {
 	return predicate.VoiceAudioRun(sql.FieldContainsFold(FieldFailureReason, v))
+}
+
+// ObjectPurgedAtEQ applies the EQ predicate on the "object_purged_at" field.
+func ObjectPurgedAtEQ(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldEQ(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtNEQ applies the NEQ predicate on the "object_purged_at" field.
+func ObjectPurgedAtNEQ(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldNEQ(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtIn applies the In predicate on the "object_purged_at" field.
+func ObjectPurgedAtIn(vs ...time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldIn(FieldObjectPurgedAt, vs...))
+}
+
+// ObjectPurgedAtNotIn applies the NotIn predicate on the "object_purged_at" field.
+func ObjectPurgedAtNotIn(vs ...time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldNotIn(FieldObjectPurgedAt, vs...))
+}
+
+// ObjectPurgedAtGT applies the GT predicate on the "object_purged_at" field.
+func ObjectPurgedAtGT(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldGT(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtGTE applies the GTE predicate on the "object_purged_at" field.
+func ObjectPurgedAtGTE(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldGTE(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtLT applies the LT predicate on the "object_purged_at" field.
+func ObjectPurgedAtLT(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldLT(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtLTE applies the LTE predicate on the "object_purged_at" field.
+func ObjectPurgedAtLTE(v time.Time) predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldLTE(FieldObjectPurgedAt, v))
+}
+
+// ObjectPurgedAtIsNil applies the IsNil predicate on the "object_purged_at" field.
+func ObjectPurgedAtIsNil() predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldIsNull(FieldObjectPurgedAt))
+}
+
+// ObjectPurgedAtNotNil applies the NotNil predicate on the "object_purged_at" field.
+func ObjectPurgedAtNotNil() predicate.VoiceAudioRun {
+	return predicate.VoiceAudioRun(sql.FieldNotNull(FieldObjectPurgedAt))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
