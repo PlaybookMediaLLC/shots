@@ -31,6 +31,10 @@ func TestStructuredDecodesTheReplyAndItsCost(t *testing.T) {
 		!strings.HasPrefix(system, "sys") || !strings.HasSuffix(system, "JSON Schema:\n{}") {
 		t.Fatalf("sent %+v", sent)
 	}
+	// The web's provider rules: no endpoint that stores prompts, none that drops the schema.
+	if provider, _ := sent["provider"].(map[string]any); provider["data_collection"] != "deny" || provider["require_parameters"] != true {
+		t.Fatalf("provider rules sent %+v", sent["provider"])
+	}
 	// Claude 5.5 models reject a non-default temperature.
 	if _, ok := sent["temperature"]; ok || sent["reasoning"].(map[string]any)["effort"] != "low" {
 		t.Fatalf("sampling and reasoning sent %+v", sent)
@@ -38,7 +42,7 @@ func TestStructuredDecodesTheReplyAndItsCost(t *testing.T) {
 }
 
 func TestStructuredClassifiesFailures(t *testing.T) {
-	for status, retryable := range map[int]bool{429: true, 503: true, 400: false} {
+	for status, retryable := range map[int]bool{429: true, 503: true, 400: false, 404: false} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }))
 		client := &Client{APIKey: "key", BaseURL: server.URL, HTTP: server.Client()}
 		var out any
