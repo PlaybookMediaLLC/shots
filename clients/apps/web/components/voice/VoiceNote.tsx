@@ -1,23 +1,19 @@
 'use client'
 
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import {
+  type InfiniteData,
+  type QueryClient,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { z } from 'zod'
 import { Group, Pill, Row, Section } from '@/components/platform-ui'
 import { ButtonLink } from '@/components/platform-shell/ButtonLink'
+import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { draftHref } from '@/components/write/write-context'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -42,13 +38,17 @@ import type {
   VoiceTranscriptRevision,
   voiceAudioRunSchema,
   voiceDraftIntentSchema,
+  voiceNotePageSchema,
 } from '@/lib/api/contracts/voice-schemas'
 import {
   REMOTE_TEXT_DISCLOSURE,
   recordedLabel,
   reviewParts,
+  VOICE_NOTES_KEY,
   VOICE_SETTINGS_KEY,
   voiceApi,
+  voiceExcerpt,
+  voiceNoteKey,
 } from '@/lib/voice/client'
 
 type Intent = z.output<typeof voiceDraftIntentSchema>
@@ -62,48 +62,34 @@ const INTENTS: Record<Intent, string> = {
 
 const ORIGINS: Record<VoiceTranscriptRevision['origin'], string> = {
   on_device: 'On the phone',
-  remote: 'Transcribed by Shots',
+  // The phone's chosen cloud provider; Shots itself transcribes nothing.
+  remote: 'Transcribed by a cloud provider',
   user_edit: 'Your edit',
 }
 
-/** The key one note's detail is cached under. */
-export const voiceNoteKey = (id: string) => ['voice-note', id] as const
+type InboxPages = InfiniteData<z.output<typeof voiceNotePageSchema>>
+type InboxNote = InboxPages['pages'][number]['notes'][number]
 
-/** A button that asks before it does something that cannot be undone. */
-function ConfirmButton({
-  action,
-  busy,
-  description,
-  label,
-  onConfirm,
-  title,
-}: {
-  action: string
-  busy: boolean
-  description: string
-  label: string
-  onConfirm: () => void
-  title: string
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <Button disabled={busy} onClick={() => setOpen(true)} size="sm" variant="outline">
-        {label}
-      </Button>
-      <AlertDialog onOpenChange={setOpen} open={open}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{title}</AlertDialogTitle>
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirm}>{action}</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+/**
+ * Changes one note in the inbox's loaded pages, or drops it with `null`, so a
+ * change to one note refetches no page. The inbox orders by `receivedAt`,
+ * which no change here moves.
+ */
+function patchInbox(
+  client: QueryClient,
+  id: string,
+  change: (note: InboxNote) => InboxNote | null
+) {
+  client.setQueryData<InboxPages>(VOICE_NOTES_KEY, (data) =>
+    data
+      ? {
+          ...data,
+          pages: data.pages.map((page) => ({
+            ...page,
+            notes: page.notes.flatMap((note) => (note.id === id ? (change(note) ?? []) : note)),
+          })),
+        }
+      : data
   )
 }
 
@@ -151,9 +137,11 @@ function RunAudio({ noteId, run }: { noteId: string; run: z.output<typeof voiceA
 
 /** A transcript with numbers and names marked for review (V3). */
 function ReviewedText({ text }: { text: string }) {
+  // A transcript runs to 100,000 characters; split it again only when it changes.
+  const parts = useMemo(() => reviewParts(text), [text])
   return (
     <p className="text-ui whitespace-pre-wrap text-foreground">
-      {reviewParts(text).map((part, index) =>
+      {parts.map((part, index) =>
         part.flagged ? (
           <mark className="rounded-sm bg-amber-500/20 text-inherit" key={index}>
             {part.text}
@@ -173,24 +161,29 @@ function TranscriptEditor({
   parent,
 }: {
   noteId: string
-  onDone: (saved: boolean) => void
+  /** The saved text, or null when the edit was cancelled. */
+  onDone: (saved: string | null) => void
   parent: VoiceTranscriptRevision
 }) {
   const [text, setText] = useState(parent.text)
   const [busy, setBusy] = useState(false)
-  // One id per edit, so retrying a save that may have reached the server cannot add it twice.
-  const [clientRevisionId] = useState(() => crypto.randomUUID())
+  // A retry of the same text keeps its id, so a save that reached the server is not added
+  // twice; changed text gets a new id, so the server never answers it with the earlier save.
+  const lastSave = useRef<{ clientRevisionId: string; text: string } | null>(null)
   const save = async () => {
+    if (lastSave.current?.text !== text) {
+      lastSave.current = { clientRevisionId: crypto.randomUUID(), text }
+    }
     setBusy(true)
     try {
       await voiceApi.addTranscript(noteId, {
-        clientRevisionId,
+        clientRevisionId: lastSave.current.clientRevisionId,
         origin: 'user_edit',
         parentId: parent.id,
         segments: [],
         text,
       })
-      onDone(true)
+      onDone(text)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The transcript could not be saved.')
       setBusy(false)
@@ -203,7 +196,7 @@ function TranscriptEditor({
         <Textarea onChange={(event) => setText(event.target.value)} rows={8} value={text} />
       </Label>
       <div className="flex justify-end gap-2">
-        <Button disabled={busy} onClick={() => onDone(false)} size="sm" variant="ghost">
+        <Button disabled={busy} onClick={() => onDone(null)} size="sm" variant="ghost">
           Cancel
         </Button>
         <Button disabled={busy || text === parent.text} onClick={() => void save()} size="sm">
@@ -341,21 +334,25 @@ export function VoiceNote({
   const note = useQuery({ queryFn: () => voiceApi.note(id), queryKey: voiceNoteKey(id) })
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
-  const refresh = () =>
-    Promise.all([
-      client.invalidateQueries({ queryKey: voiceNoteKey(id) }),
-      client.invalidateQueries({ queryKey: ['voice-notes'] }),
-    ])
-  const run = async (request: () => Promise<unknown>, failure: string) => {
-    setBusy(true)
+  const refreshNote = () => client.invalidateQueries({ queryKey: voiceNoteKey(id) })
+  // A new current transcript changes the note's inbox excerpt, and nothing else there.
+  const showCurrent = (text: string) => {
+    patchInbox(client, id, (item) => ({ ...item, excerpt: voiceExcerpt(text) }))
+    return refreshNote()
+  }
+  /** Runs a request; resolves to its failure message, or null once the view caught up. */
+  const attempt = async (
+    request: () => Promise<unknown>,
+    failure: string,
+    then: () => unknown = refreshNote
+  ) => {
     try {
       await request()
-      await refresh()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : failure)
-    } finally {
-      setBusy(false)
+      return error instanceof Error ? error.message : failure
     }
+    await then()
+    return null
   }
   if (note.isError) {
     return (
@@ -389,15 +386,16 @@ export function VoiceNote({
       <Section
         actions={
           audio.length ? (
-            <ConfirmButton
-              action="Delete audio"
-              busy={busy}
+            <ConfirmDialog
+              confirmLabel="Delete audio"
               description="Every recording of this note is deleted. The transcripts stay."
-              label="Delete audio"
+              destructive
+              disabled={busy}
               onConfirm={() =>
-                void run(() => voiceApi.deleteAudio(id), 'The audio could not be deleted.')
+                attempt(() => voiceApi.deleteAudio(id), 'The audio could not be deleted.')
               }
               title="Delete this note’s audio?"
+              triggerLabel="Delete audio"
             />
           ) : null
         }
@@ -429,7 +427,7 @@ export function VoiceNote({
             noteId={id}
             onDone={(saved) => {
               setEditing(false)
-              if (saved) void refresh()
+              if (saved !== null) void showCurrent(saved)
             }}
             parent={current}
           />
@@ -456,8 +454,9 @@ export function VoiceNote({
                     {detail.transcriptConflict ? (
                       <Button
                         disabled={busy}
-                        onClick={() =>
-                          void run(
+                        onClick={async () => {
+                          setBusy(true)
+                          const failure = await attempt(
                             () =>
                               voiceApi.addTranscript(id, {
                                 // The same choice at the same note revision is one request, however often it is retried.
@@ -467,9 +466,12 @@ export function VoiceNote({
                                 segments: revision.segments,
                                 text: revision.text,
                               }),
-                            'The revision could not be chosen.'
+                            'The revision could not be chosen.',
+                            () => showCurrent(revision.text)
                           )
-                        }
+                          setBusy(false)
+                          if (failure) toast.error(failure)
+                        }}
                         size="sm"
                         variant="outline"
                       >
@@ -486,18 +488,23 @@ export function VoiceNote({
                         Edit
                       </Button>
                     ) : null}
-                    <ConfirmButton
-                      action="Redact"
-                      busy={busy}
+                    <ConfirmDialog
+                      confirmLabel="Redact"
                       description="The text of this revision is cleared for good. Drafts made from it keep their text."
-                      label="Redact"
+                      destructive
+                      disabled={busy}
                       onConfirm={() =>
-                        void run(
+                        attempt(
                           () => voiceApi.redact(id, revision.id),
-                          'The revision could not be redacted.'
+                          'The revision could not be redacted.',
+                          // Only the current revision gives the inbox its excerpt.
+                          revision.id === detail.currentTranscriptRevisionId
+                            ? () => showCurrent('')
+                            : refreshNote
                         )
                       }
                       title="Redact this revision?"
+                      triggerLabel="Redact"
                     />
                   </div>
                 )}
@@ -512,27 +519,23 @@ export function VoiceNote({
           description="The audio is deleted and the transcripts are cleared."
           label="Delete note"
         >
-          <ConfirmButton
-            action="Delete note"
-            busy={busy}
+          <ConfirmDialog
+            confirmLabel="Delete note"
             description="The note is deleted on every device. This cannot be undone."
-            label="Delete note"
+            destructive
+            disabled={busy}
             onConfirm={() =>
-              void (async () => {
-                setBusy(true)
-                try {
-                  await voiceApi.deleteNote(id)
-                  await client.invalidateQueries({ queryKey: ['voice-notes'] })
+              attempt(
+                () => voiceApi.deleteNote(id),
+                'The note could not be deleted.',
+                () => {
+                  patchInbox(client, id, () => null)
                   onDeleted()
-                } catch (error) {
-                  toast.error(
-                    error instanceof Error ? error.message : 'The note could not be deleted.'
-                  )
-                  setBusy(false)
                 }
-              })()
+              )
             }
             title="Delete this note?"
+            triggerLabel="Delete note"
           />
         </Row>
       </Group>

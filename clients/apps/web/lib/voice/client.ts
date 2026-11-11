@@ -25,6 +25,12 @@ export const REMOTE_TEXT_DISCLOSURE =
 /** The query key the inbox, the settings and the navigation share. */
 export const VOICE_SETTINGS_KEY = ['voice-settings'] as const
 
+/** The query key of the inbox's loaded pages. */
+export const VOICE_NOTES_KEY = ['voice-notes'] as const
+
+/** The query key of one note's detail. */
+export const voiceNoteKey = (id: string) => ['voice-note', id] as const
+
 /** Browser calls to the voice API (`/api/v1/voice`), with the session cookie. */
 export const voiceApi = {
   settings: async () => readWire(voiceSettingsSchema, await call(`${base}/settings`)),
@@ -79,6 +85,13 @@ export function reviewParts(text: string): { flagged: boolean; text: string }[] 
     .split(REVIEW)
     .map((part, index) => ({ flagged: index % 2 === 1, text: part }))
     .filter((part) => part.text)
+}
+
+/** A note's inbox excerpt of its current transcript, cut as the backend cuts it (`voiceExcerpt`). */
+export function voiceExcerpt(text: string): string {
+  const words = text.split(/\s+/).filter(Boolean).join(' ')
+  const characters = [...words]
+  return characters.length <= 200 ? words : `${characters.slice(0, 200).join('')}…`
 }
 
 /** When a note was recorded, in the zone it was recorded in, and how long it runs. */

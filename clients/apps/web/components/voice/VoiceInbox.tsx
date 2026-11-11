@@ -8,7 +8,7 @@ import { MicrophoneIcon } from '@/components/platform-shell/icons'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { isPlanRefusal } from '@/lib/api/platform-errors'
-import { recordedLabel, useVoiceSettings, voiceApi } from '@/lib/voice/client'
+import { recordedLabel, useVoiceSettings, VOICE_NOTES_KEY, voiceApi } from '@/lib/voice/client'
 import { cn } from '@/lib/utils'
 import { VoiceNote } from './VoiceNote'
 
@@ -22,7 +22,7 @@ export function VoiceInbox({ canDraft }: { canDraft: boolean }) {
   // queryFn comes first so TypeScript infers the page type before getNextPageParam reads it.
   const notes = useInfiniteQuery({
     queryFn: ({ pageParam }: { pageParam: string | undefined }) => voiceApi.list(pageParam),
-    queryKey: ['voice-notes'],
+    queryKey: VOICE_NOTES_KEY,
     enabled,
     getNextPageParam: (page) => page.nextCursor ?? undefined,
     initialPageParam: undefined as string | undefined,

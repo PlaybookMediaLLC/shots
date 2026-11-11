@@ -11,7 +11,7 @@ import * as voiceActions from '@/lib/api/contracts/voice-actions'
 import * as voice from '@/lib/api/contracts/voice-schemas'
 import { openApiSpec } from '@/lib/api/openapi'
 import { createLinks, CREATE_LINKS, platformArea, VOICE_NOTES } from '@/lib/platform/navigation'
-import { recordedLabel, reviewParts } from '@/lib/voice/client'
+import { recordedLabel, reviewParts, voiceExcerpt } from '@/lib/voice/client'
 
 const voiceContracts = Object.entries({ ...voiceNotes, ...voiceActions }).filter(
   ([, value]) => routeContractSchema.safeParse(value).success
@@ -279,6 +279,14 @@ test('numbers and names are marked for review, but not the word that starts a se
   )
 })
 
+test('an inbox excerpt collapses whitespace and is cut at 200 characters, as the backend cuts it', () => {
+  assert.equal(voiceExcerpt('  Ship\n\tit   now '), 'Ship it now')
+  assert.equal(voiceExcerpt(''), '')
+  assert.equal(voiceExcerpt('é'.repeat(200)), 'é'.repeat(200))
+  // Characters, not UTF-16 units, like Go's runes.
+  assert.equal(voiceExcerpt('😀'.repeat(201)), `${'😀'.repeat(200)}…`)
+})
+
 test('a note shows when it was recorded in its own zone, and survives a zone the browser lacks', () => {
   assert.match(recordedLabel(note), /\(Europe\/Berlin\) · 1:01$/)
   assert.match(
@@ -307,4 +315,8 @@ test('a draft keeps its voice source, and drafts settings default to self-approv
   const source = contentDraftSchema.shape.sourceVoiceRevisionId
   assert.equal(source.parse(undefined), null)
   assert.equal(source.parse('crev0000000000000000000001'), 'crev0000000000000000000001')
+  // An older backend omits whether the note was deleted since.
+  const removed = contentDraftSchema.shape.sourceVoiceRemoved
+  assert.equal(removed.parse(undefined), undefined)
+  assert.equal(removed.parse(true), true)
 })

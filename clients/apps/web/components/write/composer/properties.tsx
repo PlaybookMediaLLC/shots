@@ -313,11 +313,15 @@ export function PropertiesPanel({
             </dd>
           </>
         ) : null}
-        {draft.sourceVoiceRevisionId ? (
+        {draft.sourceVoiceRevisionId || draft.sourceVoiceRemoved ? (
           <>
             <dt className="text-muted-foreground">Source</dt>
             {/* The note stays private to whoever recorded it, so there is no link. */}
-            <dd data-testid="properties-voice-source">From a voice note</dd>
+            <dd data-testid="properties-voice-source">
+              {draft.sourceVoiceRemoved
+                ? 'From a voice note · source removed'
+                : 'From a voice note'}
+            </dd>
           </>
         ) : null}
         <dt className="text-muted-foreground">Created</dt>
