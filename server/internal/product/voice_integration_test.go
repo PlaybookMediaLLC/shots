@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/maintenance"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/media"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
@@ -858,5 +859,67 @@ func TestVoiceTranscriptRevisionLimit(t *testing.T) {
 	expectVoice(t, err, publishing.ErrConflict, "a 51st revision")
 	if _, created, err := f.transcript(f.creator, note.ID, "rev-0", nil, "user_edit", "words"); err != nil || created {
 		t.Fatalf("a replay at the limit: created=%v err=%v", created, err)
+	}
+}
+
+// The workspace purge keeps the organization row, so nothing cascades to
+// voice data: the sweep removes it, objects first, once the upload URLs
+// signed before the purge have expired.
+func TestVoiceSweepRemovesAPurgedWorkspace(t *testing.T) {
+	f := newVoiceFixture(t)
+	ctx, on := f.ctx, true
+	f.enable(true, true)
+	note := f.note(f.creator, "purged-note", true)
+	if _, _, err := f.transcript(f.creator, note.ID, "r1", nil, "on_device", "private words"); err != nil {
+		t.Fatal(err)
+	}
+	run := wavFile(1, 1, 16000, 16, 0, 0, make([]byte, 4096))
+	pcm := VoiceRunUploadInput{ContentType: "audio/wav", Bytes: int64(len(run)), SHA256: digestOf(run)}
+	for runIndex := range 2 {
+		if _, err := f.repo.SignVoiceRunUpload(ctx, f.creator, note.ID, runIndex, pcm); err != nil {
+			t.Fatal(err)
+		}
+		f.objects.put("voice/"+f.org+"/"+note.ID+"/"+strconv.Itoa(runIndex)+"-"+digestOf(run)+".wav", run)
+	}
+	if _, err := f.repo.CompleteVoiceRun(ctx, f.creator, note.ID, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.repo.UpdateVoiceMemberSettings(ctx, f.creator, VoiceMemberSettingsInput{RemoteTextConsent: &on}); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(`INSERT INTO voice_command (id,"organizationId","ownerUserId","noteId","transcriptRevisionId",status,"timeZone",text)
+		SELECT $1,$2,$3,$4,id,'proposed','UTC','post the words' FROM voice_transcript_revision WHERE "noteId"=$4`, "command_"+f.id, f.org, f.creator.UserID, note.ID)
+	if _, err := f.repo.UpdateVoiceWorkspaceSettings(ctx, f.foreign, VoiceWorkspaceFlagsInput{VoiceNotes: &on}); err != nil {
+		t.Fatal(err)
+	}
+	kept := f.note(f.foreign, "kept-note", false)
+
+	// What the workspace deletion job leaves: the organization, no members, a purged request.
+	f.exec(`INSERT INTO workspace_deletion(id,"organizationId","requestedByUserId","scheduledFor","updatedAt") VALUES($1,$2,$3,now()-interval '1 day',now())`,
+		"deletion_"+f.id, f.org, f.owner.UserID)
+	if purged, err := (&maintenance.Store{DB: f.db.SQL}).WorkspaceCleanup(ctx); err != nil || purged != 1 {
+		t.Fatalf("workspace purge=%d err=%v", purged, err)
+	}
+	voiceRows := func() string {
+		return f.value(`SELECT concat_ws(',', (SELECT count(*) FROM voice_note WHERE "organizationId"=$1), (SELECT count(*) FROM voice_transcript_revision WHERE "organizationId"=$1),
+			(SELECT count(*) FROM voice_audio_run WHERE "organizationId"=$1), (SELECT count(*) FROM voice_command WHERE "organizationId"=$1),
+			(SELECT count(*) FROM voice_settings WHERE "organizationId"=$1), (SELECT count(*) FROM voice_member_settings WHERE "organizationId"=$1))`, f.org)
+	}
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "1,1,2,1,1,1" || len(f.objects.stored) != 2 {
+		t.Fatalf("removed while upload URLs are valid: rows=%s objects=%d err=%v", voiceRows(), len(f.objects.stored), err)
+	}
+	f.exec(`UPDATE workspace_deletion SET "purgedAt"=now()-interval '21 minutes' WHERE id=$1`, "deletion_"+f.id)
+	f.objects.failDeletes = true
+	_, err := f.repo.SweepVoice(ctx)
+	expectVoice(t, err, ErrStorageUnavailable, "a purged workspace's objects while storage is down")
+	if voiceRows() != "1,1,2,1,1,1" {
+		t.Fatalf("rows went before their objects: %s", voiceRows())
+	}
+	f.objects.failDeletes = false
+	if _, err := f.repo.SweepVoice(ctx); err != nil || voiceRows() != "0,0,0,0,0,0" || len(f.objects.stored) != 0 {
+		t.Fatalf("after the sweep: rows=%s objects=%d err=%v", voiceRows(), len(f.objects.stored), err)
+	}
+	if _, err := f.repo.GetVoiceNote(ctx, f.foreign, kept.ID); err != nil {
+		t.Fatalf("another workspace's note: %v", err)
 	}
 }
