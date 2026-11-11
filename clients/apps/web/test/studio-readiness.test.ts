@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -191,18 +191,94 @@ test('dev/studio has no second browser lane left to maintain', () => {
   assert.match(startApp, /PLATFORM_AI_SCRIPTED=1/)
 })
 
-test('the first balanced E2E shard runs the Founder Hub OAuth check', () => {
-  const first = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '1' })
-  const later = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: '2' })
-  try {
-    assert.equal(first.status, 0, first.stderr)
-    assert.ok(first.commands.some((command) => command.includes('test:founder-hub-auth')))
-    assert.equal(later.status, 0, later.stderr)
-    assert.ok(!later.commands.some((command) => command.includes('test:founder-hub-auth')))
-  } finally {
-    rmSync(first.directory, { recursive: true, force: true })
-    rmSync(later.directory, { recursive: true, force: true })
+// The OAuth check needs the Founder Hub gateway, which only the paired
+// environment in founder-hub-integration.yml starts.
+test('no shard of the main suite runs the Founder Hub OAuth check', () => {
+  for (const shard of ['1', '2']) {
+    const run = runE2EWith(['./test/e2e/settings.spec.ts'], { E2E_SHARD_ID: shard })
+    try {
+      assert.equal(run.status, 0, run.stderr)
+      assert.ok(run.commands.some((command) => command.includes('test:e2e')))
+      assert.ok(!run.commands.some((command) => command.includes('test:founder-hub-auth')))
+    } finally {
+      rmSync(run.directory, { recursive: true, force: true })
+    }
   }
+})
+
+const installFounderHub = section('install_founder_hub() {', '# Everything the app depends on.')
+
+/** Runs install_founder_hub against a database whose Storage stand-in exists or not. */
+function installFounderHubWith(storageMissing: boolean) {
+  const directory = mkdtempSync(join(tmpdir(), 'studio-founder-hub-'))
+  writeFileSync(join(directory, 'dev.env'), 'POSTGRES_SUPER_PASSWORD=super-secret\n')
+  mkdirSync(join(directory, 'server/founderhubmigrations/testdata'), { recursive: true })
+  writeFileSync(
+    join(directory, 'server/founderhubmigrations/testdata/storage.sql'),
+    '-- stand-in\n'
+  )
+  const result = spawnSync(
+    'bash',
+    [
+      '-c',
+      `
+      set -euo pipefail
+      compose() {
+        printf '%s\\n' "$*" >> commands
+        case "$*" in
+          *to_regclass*) printf '%s\\n' ${storageMissing ? 't' : 'f'} ;;
+          *--dbname=screenshot_studio) cat >> storage-input ;;
+        esac
+      }
+      ${installFounderHub}
+      install_founder_hub
+    `,
+    ],
+    {
+      cwd: directory,
+      encoding: 'utf8',
+      env: { ...process.env, LOCAL_ENV: join(directory, 'dev.env'), ROOT_DIR: directory },
+      timeout: 10_000,
+    }
+  )
+  const read = (file: string) => {
+    try {
+      return readFileSync(join(directory, file), 'utf8')
+    } catch {
+      return ''
+    }
+  }
+  const run = {
+    result,
+    commands: read('commands').trim().split('\n'),
+    storage: read('storage-input'),
+  }
+  rmSync(directory, { recursive: true, force: true })
+  return run
+}
+
+test('the stack installs the Founder Hub schema once, as the superuser, then grants its roles', () => {
+  const superuser =
+    'DATABASE_URL=postgresql://postgres:super-secret@postgres:5432/screenshot_studio?sslmode=disable'
+  const fresh = installFounderHubWith(true)
+  assert.equal(fresh.result.status, 0, fresh.result.stderr)
+  assert.deepEqual(
+    fresh.commands.map((command) => command.replace(/ --quiet.*--dbname=screenshot_studio/, '')),
+    [
+      `run --rm --no-deps -e ${superuser} platform-go-migrate -founder-hub bootstrap`,
+      `exec -T postgres psql --tuples-only --no-align --command SELECT to_regclass('storage.buckets') IS NULL`,
+      'exec -T postgres psql',
+      `run --rm --no-deps -e ${superuser} platform-go-migrate -founder-hub apply`,
+      'exec -T postgres psql --command GRANT shots_hub_authenticated, shots_hub_service_role TO screenshot_studio',
+    ]
+  )
+  assert.equal(fresh.storage, '-- stand-in\n')
+
+  // A rerun keeps the Storage stand-in it already has.
+  const rerun = installFounderHubWith(false)
+  assert.equal(rerun.result.status, 0, rerun.result.stderr)
+  assert.equal(rerun.commands.length, 4)
+  assert.equal(rerun.storage, '')
 })
 
 test('the e2e app shortens the signed-download lifetime it is tested against', () => {

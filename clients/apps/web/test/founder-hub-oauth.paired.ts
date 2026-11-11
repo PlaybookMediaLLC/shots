@@ -1,3 +1,5 @@
+// Needs the Founder Hub gateway and backend, so it runs only in the paired environment
+// (founder-hub-integration.yml, via `npm run test:founder-hub-auth`), not in `test:server`.
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { test } from 'node:test'
