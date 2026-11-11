@@ -198,7 +198,7 @@ export function EditorHeader() {
     <>
       <header
         className={cn(
-          'grid shrink-0 items-center gap-2 border-b border-foreground/[0.06] bg-background',
+          '@container/editor-header grid shrink-0 items-center gap-2 border-b border-foreground/[0.06] bg-background',
           isMobile ? 'grid-cols-[1fr_auto] px-2 py-2' : 'h-12 grid-cols-[minmax(0,1fr)_auto_auto] px-3'
         )}
       >
@@ -353,9 +353,10 @@ export function EditorHeader() {
                 }}
                 type="file"
               />
-              <Button variant="custom" size={null} type="button" onClick={() => addSlideInputRef.current?.click()} className={cn('inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium leading-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground', hasImage ? 'text-muted-foreground' : 'text-foreground')}>
+              <Button variant="custom" size={null} type="button" onClick={() => addSlideInputRef.current?.click()} className={cn('inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium leading-none transition-colors hover:bg-foreground/[0.06] hover:text-foreground', hasImage ? 'text-muted-foreground' : 'text-foreground')} aria-label={hasImage ? 'Add slide from image' : undefined} title={hasImage ? 'Add slide from image' : undefined}>
                 <Add01Icon size={14} />
-                <span>{hasImage ? 'Add slide from image…' : 'Upload image…'}</span>
+                {/* Icon only in a narrow header, so Templates and Save keep their place. */}
+                <span className={hasImage ? '@max-[68rem]/editor-header:hidden' : undefined}>{hasImage ? 'Add slide from image…' : 'Upload image…'}</span>
               </Button>
             </div>
           ) : null}
