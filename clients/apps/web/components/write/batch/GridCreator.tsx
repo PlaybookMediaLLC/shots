@@ -32,6 +32,7 @@ import { runPool } from '@/lib/export/batch'
 import { zipFiles } from '@/lib/export/zip'
 import { downloadBlob } from '@/lib/image-tools/download'
 import { useTRPCClient } from '@/lib/trpc/react'
+import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import {
   assembleConcepts,
@@ -78,7 +79,7 @@ function LineList({
 }) {
   const filled = lines.filter((line) => line.trim()).length
   return (
-    <div className="grid gap-2">
+    <div className="grid w-full gap-2">
       {lines.map((line, index) => (
         <div className="flex items-center gap-2" key={index}>
           <Input
@@ -483,15 +484,24 @@ export function GridCreator({
       title="Grid videos"
       description="Each video shows a headline above four labelled images for six seconds, at 1080×1920. Each one becomes a post of this batch."
     >
-      <ol aria-label="Grid video steps" className="flex flex-wrap gap-2 text-sm">
+      <ol
+        aria-label="Grid video steps"
+        className="inline-flex flex-wrap self-start rounded-md border border-border p-0.5"
+      >
         {stages.map(({ key, label }, index) => (
           <li key={key}>
             <Button
               aria-current={stage === key ? 'step' : undefined}
+              className={cn(
+                'h-7 rounded px-2.5 text-label',
+                stage === key
+                  ? 'bg-foreground/[0.08] text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
               disabled={running || (key !== 'inputs' && !concepts.length)}
-              size="sm"
+              size={null}
               type="button"
-              variant={stage === key ? 'default' : 'ghost'}
+              variant="custom"
               onClick={() => setStage(key)}
             >
               {index + 1}. {label}

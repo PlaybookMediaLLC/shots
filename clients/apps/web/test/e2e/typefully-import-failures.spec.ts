@@ -1,4 +1,12 @@
-import { addBatchRows, apiRequest, expect, openNewBatch, saveBatchDrafts, test } from './framework'
+import {
+  addBatchRows,
+  apiRequest,
+  expect,
+  fillBatchCSV,
+  openNewBatch,
+  saveBatchDrafts,
+  test,
+} from './framework'
 
 test(
   'a bulk batch keeps refused rows, recovers a refused draft and a lost response after reload',
@@ -16,6 +24,10 @@ test(
     await expect(preview).toContainText('Unknown channel myspace')
     await expect(preview).toContainText('no selected file is named gone.png')
     await expect(preview.getByRole('button', { name: /^Add 0 ready rows/ })).toBeDisabled()
+    // Cancel drops the refused rows from view and leaves the added post alone.
+    await preview.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(preview).toHaveCount(0)
+    await expect(items).toHaveCount(1)
 
     const requests: Record<string, unknown>[] = []
     let refuse = true
@@ -97,7 +109,7 @@ test(
     )
     const uploading = page.waitForRequest((request) => request.method() === 'PUT')
     await page.getByLabel('Batch media files').setInputFiles(file)
-    await page.getByLabel('Batch CSV', { exact: true }).fill('caption,asset\nCut short,cut.png')
+    await fillBatchCSV(page, 'caption,asset\nCut short,cut.png')
     await page.getByRole('button', { name: 'Preview import', exact: true }).click()
     await page.getByRole('button', { name: /^Add 1 ready rows/ }).click()
     await reserved
