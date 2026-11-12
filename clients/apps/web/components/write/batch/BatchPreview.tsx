@@ -13,122 +13,98 @@ import {
 import type { BatchItem } from '@/lib/api/contracts/content-batches'
 import {
   type BatchAccount,
-  itemAccounts,
-  stagedBody,
+  previewPublications,
   stagedChecks,
-  stagedVersions,
   waitingToRender,
 } from '@/lib/write/batch'
 import type { VersionOptions } from '@/lib/write/document'
-import { buildPublication } from '@/lib/write/publication'
-import { readVersions } from '@/lib/write/versions'
-import { type PreviewCard, PreviewPanel, type PreviewSelection } from '../composer/preview'
+import { PreviewPanel, type PreviewSelection } from '../composer/preview'
 
-/**
- * What each of a post's accounts would show, built as saving its draft
- * builds it: the same body, platform versions and publication. A saved
- * draft may have changed in Write since; its own preview there is exact.
- */
-export function batchPreviewCards(
-  item: BatchItem,
-  accounts: readonly BatchAccount[],
-  options: VersionOptions
-): PreviewCard[] {
-  const ids = itemAccounts(item)
-  const chosen = accounts.filter((account) => ids.includes(account.id))
-  const draft = {
-    article: null,
-    body: stagedBody({ caption: item.draft?.plainText ?? item.caption, media: item.media }),
-    kind: 'standard' as const,
-    platformVersions:
-      stagedVersions(
-        item,
-        chosen.map((account) => account.channel),
-        options
-      ) ?? readVersions(undefined),
-    target: null,
-  }
-  return chosen.map((account) => ({
-    account,
-    publication: buildPublication(draft, {
-      channel: account.channel,
-      connectionId: account.id,
-      standing: {
-        maxWeightedCharacters: account.xCaptionLimit,
-        tiktokCreator: account.tiktokCreator,
-      },
-    }),
-  }))
-}
-
-/** Keys typed into a field or a menu stay there; elsewhere the arrows step through posts. */
-const typing = (target: EventTarget) =>
+/** Keys pressed in the device menu or on a video stay there; elsewhere the arrows step through posts. */
+const ownsArrows = (target: EventTarget) =>
   target instanceof HTMLElement &&
-  Boolean(target.closest('input, textarea, [role="combobox"], [role="listbox"], [role="menu"]'))
+  Boolean(target.closest('video, audio, [role="combobox"], [role="listbox"]'))
 
 /**
  * A batch's posts as their platforms show them, one at a time, in a side
  * sheet. The arrows and the ← and → keys step through the posts, and the
- * platform and device chosen stay as they step.
+ * platform and device chosen stay as they step. The post is followed by its
+ * id, so a list that changes underneath never shows another post.
  */
 export function BatchPreviewSheet({
   accounts,
-  index,
+  itemId,
   items,
-  onIndexChange,
+  onItemChange,
   options,
 }: {
   accounts: readonly BatchAccount[]
-  /** The post shown, by its place in `items`; null keeps the sheet closed. */
-  index: number | null
+  /** The post shown; null keeps the sheet closed. */
+  itemId: string | null
   items: readonly BatchItem[]
-  onIndexChange: (index: number | null) => void
+  onItemChange: (itemId: string | null) => void
   options: VersionOptions
 }) {
   const [selection, setSelection] = React.useState<PreviewSelection>({
     channel: null,
     device: 'desktop',
   })
-  const item = index === null ? undefined : items[index]
-  const cards = React.useMemo(
-    () => (item ? batchPreviewCards(item, accounts, options) : []),
+  // The sheet opens from page state, not a trigger, so it returns focus itself.
+  const opener = React.useRef<HTMLElement | null>(null)
+  const index = items.findIndex((candidate) => candidate.id === itemId)
+  const item = index < 0 ? undefined : items[index]
+  const preview = React.useMemo(
+    () => (item ? previewPublications(item, accounts, options) : { cards: [] }),
     [item, accounts, options]
   )
   const step = (by: number) => {
-    if (index === null) return
-    const next = index + by
-    if (next >= 0 && next < items.length) onIndexChange(next)
+    const next = items[index + by]
+    if (index >= 0 && next) onItemChange(next.id)
   }
   const uploading = item?.media.filter((entry) => !entry.assetId).length ?? 0
   // The media rules need every file uploaded; a saved draft is checked in Write.
-  const problems =
-    item && !uploading && !item.draftId && !waitingToRender(item)
-    ? [...stagedChecks(item, [...accounts]).entries()].flatMap(([id, check]) =>
-        check.problems.map(
-          (problem) => `${accounts.find((account) => account.id === id)?.name}: ${problem}`
+  const problems = [
+    ...(preview.problem ? [preview.problem] : []),
+    ...(item && !uploading && !item.draftId && !waitingToRender(item)
+      ? [...stagedChecks(item, accounts).entries()].flatMap(([id, check]) =>
+          check.problems.map(
+            (problem) => `${accounts.find((account) => account.id === id)?.name}: ${problem}`
+          )
         )
-      )
-    : []
+      : []),
+  ]
   const caption = (item?.draft?.plainText ?? item?.caption ?? '').trim().split('\n')[0]
+  const first = index <= 0
+  const last = index >= items.length - 1
   return (
-    <Sheet open={Boolean(item)} onOpenChange={(open) => (open ? null : onIndexChange(null))}>
+    <Sheet open={Boolean(item)} onOpenChange={(open) => (open ? null : onItemChange(null))}>
       <SheetContent
         className="w-full gap-0 p-0 sm:max-w-[40rem]"
         data-testid="batch-preview"
         side="right"
+        onCloseAutoFocus={(event) => {
+          if (!opener.current?.isConnected) return
+          event.preventDefault()
+          opener.current.focus()
+        }}
         onKeyDown={(event) => {
-          if (typing(event.target)) return
+          if (ownsArrows(event.target)) return
           if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
             event.preventDefault()
             step(event.key === 'ArrowLeft' ? -1 : 1)
           }
         }}
+        onOpenAutoFocus={() => {
+          opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+        }}
       >
         <SheetHeader className="border-b border-border pe-14">
           <div className="flex items-center gap-2">
+            {/* aria-disabled, not disabled: the focused arrow keeps focus at either end. */}
             <Button
+              aria-disabled={first}
               aria-label="Previous post"
-              disabled={!index}
+              className="aria-disabled:cursor-default aria-disabled:opacity-50"
               onClick={() => step(-1)}
               size="icon-sm"
               variant="outline"
@@ -136,16 +112,17 @@ export function BatchPreviewSheet({
               <ArrowBackIcon />
             </Button>
             <Button
+              aria-disabled={last}
               aria-label="Next post"
-              disabled={index === null || index >= items.length - 1}
+              className="aria-disabled:cursor-default aria-disabled:opacity-50"
               onClick={() => step(1)}
               size="icon-sm"
               variant="outline"
             >
               <ArrowForwardIcon />
             </Button>
-            <SheetTitle className="ms-1 text-ui font-medium tabular-nums">
-              Post {(index ?? 0) + 1} of {items.length}
+            <SheetTitle aria-live="polite" className="ms-1 text-ui font-medium tabular-nums">
+              Post {index + 1} of {items.length}
             </SheetTitle>
           </div>
           <SheetDescription className="truncate">{caption || 'No caption'}</SheetDescription>
@@ -186,12 +163,19 @@ export function BatchPreviewSheet({
                 ))}
               </ul>
             ) : null}
-            <PreviewPanel
-              items={cards}
-              onSelect={setSelection}
-              selection={selection}
-              target={null}
-            />
+            {preview.cards.length ? (
+              <PreviewPanel
+                items={preview.cards}
+                onSelect={setSelection}
+                selection={selection}
+                target={null}
+              />
+            ) : preview.problem ? null : (
+              <p className="m-4 text-label text-muted-foreground">
+                This post goes to no account yet. Choose its accounts from its time and accounts
+                panel.
+              </p>
+            )}
           </div>
         ) : null}
       </SheetContent>

@@ -337,6 +337,17 @@ test(
     await expect(
       page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
     ).toHaveValue('Post 2, edited in the batch.')
+    // A saved post previews its draft's words from its own row, and focus comes back to the row.
+    const previewSecond = page.getByRole('button', { name: 'Preview post 2', exact: true })
+    await previewSecond.click()
+    const savedSheet = page.getByTestId('batch-preview')
+    await expect(savedSheet.getByTestId('preview-panel')).toContainText(
+      'Post 2, edited in the batch.'
+    )
+    await expect(savedSheet).toContainText('Saved as a draft.')
+    await page.keyboard.press('Escape')
+    await expect(savedSheet).toBeHidden()
+    await expect(previewSecond).toBeFocused()
 
     // An edit made elsewhere is never overwritten: the row says so and keeps the words.
     const thirdHref = await items

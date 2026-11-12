@@ -1173,8 +1173,8 @@ export function BatchWorkspace({
   const [rowErrors, setRowErrors] = React.useState<Record<string, string>>({})
   /** Posts whose time and accounts are open; the rest show one line of each. */
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
-  /** The post open in the preview sheet, by its place in the list. */
-  const [previewing, setPreviewing] = React.useState<number | null>(null)
+  /** The post open in the preview sheet, by its id. */
+  const [previewing, setPreviewing] = React.useState<string | null>(null)
   const draftSaves = React.useRef(new Map<string, Promise<void>>())
   const recheck = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const busyRef = React.useRef(busy)
@@ -2141,7 +2141,7 @@ export function BatchWorkspace({
             }
             actions={
               items.length ? (
-                <Button onClick={() => setPreviewing(0)} size="sm" variant="outline">
+                <Button onClick={() => setPreviewing(items[0]!.id)} size="sm" variant="outline">
                   <EyeIcon aria-hidden />
                   Preview posts
                 </Button>
@@ -2385,7 +2385,7 @@ export function BatchWorkspace({
                           <Button
                             aria-label={`Preview post ${index + 1}`}
                             className="inline-flex items-center gap-1 text-label text-muted-foreground hover:text-foreground"
-                            onClick={() => setPreviewing(index)}
+                            onClick={() => setPreviewing(item.id)}
                             size={null}
                             variant="custom"
                           >
@@ -2954,9 +2954,9 @@ export function BatchWorkspace({
       </div>
       <BatchPreviewSheet
         accounts={accounts}
-        index={previewing}
+        itemId={previewing}
         items={items}
-        onIndexChange={setPreviewing}
+        onItemChange={setPreviewing}
         options={videoOptions}
       />
     </Page>
