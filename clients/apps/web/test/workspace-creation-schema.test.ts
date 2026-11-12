@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { workspaceCreateSchema } from '../lib/workspace/input-schemas'
 import {
+  signupSourceSchema,
   workspaceCreationInputSchema,
   workspaceCreationMetadataSchema,
   workspaceCreationLogoSchema,
@@ -49,4 +51,54 @@ test('creation metadata is bounded and logo references contain no credentials', 
   ]) {
     assert.equal(workspaceCreationLogoSchema.safeParse(value).success, false)
   }
+})
+
+test('where the creator heard about Shots is one known source, with a short detail only for other', () => {
+  const base = { name: 'Team', slug: 'team' }
+  for (const schema of [workspaceCreateSchema, workspaceCreationInputSchema]) {
+    assert.deepEqual(schema.parse({ ...base, heardAbout: { source: 'linkedin' } }).heardAbout, {
+      source: 'linkedin',
+    })
+    assert.deepEqual(
+      schema.parse({ ...base, heardAbout: { source: 'other', detail: '  A talk  ' } }).heardAbout,
+      { source: 'other', detail: 'A talk' }
+    )
+    for (const heardAbout of [
+      { source: 'billboard' },
+      { source: 'search', detail: 'Google' },
+      { source: 'other', detail: 'x'.repeat(201) },
+      { source: 'other', campaign: 'spring' },
+      { source: 'other', detail: 'a\u0000b' },
+    ]) {
+      assert.equal(
+        schema.safeParse({ ...base, heardAbout }).success,
+        false,
+        JSON.stringify(heardAbout)
+      )
+    }
+  }
+})
+
+test('the answers the web offers are exactly the ones Go and the database accept', () => {
+  // A value in one list only would fail onboarding with a 400 or a 500 for whoever picks it.
+  const quoted = (text: string) =>
+    [...text.matchAll(/'([a-z_]+)'|"([a-z_]+)"/g)].map((m) => m[1] ?? m[2])
+  const ent = readFileSync(
+    new URL('../../../../server/ent/schema/platform_signup_source.go', import.meta.url),
+    'utf8'
+  )
+  const sql = readFileSync(
+    new URL(
+      '../../../../server/platformmigrations/sql/20261112120000_platform_signup_source.sql',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  const entValues = quoted(
+    ent.slice(ent.indexOf('.Values('), ent.indexOf(').Immutable()', ent.indexOf('.Values(')))
+  )
+  const sqlList = sql.indexOf('"source" IN (') + '"source" IN ('.length
+  const sqlValues = quoted(sql.slice(sqlList, sql.indexOf('))', sqlList)))
+  assert.deepEqual(entValues, signupSourceSchema.options)
+  assert.deepEqual(sqlValues, signupSourceSchema.options)
 })

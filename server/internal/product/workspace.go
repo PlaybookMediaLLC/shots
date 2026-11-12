@@ -96,6 +96,15 @@ type CreateWorkspaceInput struct {
 	KeepCurrentActiveOrganization bool           `json:"keepCurrentActiveOrganization,omitempty"`
 	Logo                          *string        `json:"logo,omitempty"`
 	Metadata                      map[string]any `json:"metadata,omitempty"`
+	// Where the creator heard about Shots. Optional; kept once per person.
+	HeardAbout *SignupSourceInput `json:"heardAbout,omitempty"`
+}
+
+// SignupSourceInput is one platform_signup_source value, and a short detail
+// that only "other" takes.
+type SignupSourceInput struct {
+	Source string `json:"source"`
+	Detail string `json:"detail,omitempty"`
 }
 
 // WorkspaceCreationMember is the actual membership returned by atomic creation

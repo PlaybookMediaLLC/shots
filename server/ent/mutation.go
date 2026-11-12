@@ -106,6 +106,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsignupsource"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -277,6 +278,7 @@ const (
 	TypePlatformOAuthConsent            = "PlatformOAuthConsent"
 	TypePlatformOAuthJWK                = "PlatformOAuthJWK"
 	TypePlatformOAuthRefreshToken       = "PlatformOAuthRefreshToken"
+	TypePlatformSignupSource            = "PlatformSignupSource"
 	TypePlatformSlackConnection         = "PlatformSlackConnection"
 	TypePlatformSlackInstallation       = "PlatformSlackInstallation"
 	TypePlatformSlackPacing             = "PlatformSlackPacing"
@@ -88033,6 +88035,576 @@ func (m *PlatformOAuthRefreshTokenMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *PlatformOAuthRefreshTokenMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown PlatformOAuthRefreshToken edge %s", name)
+}
+
+// PlatformSignupSourceMutation represents an operation that mutates the PlatformSignupSource nodes in the graph.
+type PlatformSignupSourceMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *string
+	user_id         *string
+	organization_id *string
+	source          *platformsignupsource.Source
+	detail          *string
+	created_at      *time.Time
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*PlatformSignupSource, error)
+	predicates      []predicate.PlatformSignupSource
+}
+
+var _ ent.Mutation = (*PlatformSignupSourceMutation)(nil)
+
+// platformsignupsourceOption allows management of the mutation configuration using functional options.
+type platformsignupsourceOption func(*PlatformSignupSourceMutation)
+
+// newPlatformSignupSourceMutation creates new mutation for the PlatformSignupSource entity.
+func newPlatformSignupSourceMutation(c config, op Op, opts ...platformsignupsourceOption) *PlatformSignupSourceMutation {
+	m := &PlatformSignupSourceMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePlatformSignupSource,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPlatformSignupSourceID sets the ID field of the mutation.
+func withPlatformSignupSourceID(id string) platformsignupsourceOption {
+	return func(m *PlatformSignupSourceMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PlatformSignupSource
+		)
+		m.oldValue = func(ctx context.Context) (*PlatformSignupSource, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PlatformSignupSource.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPlatformSignupSource sets the old PlatformSignupSource of the mutation.
+func withPlatformSignupSource(node *PlatformSignupSource) platformsignupsourceOption {
+	return func(m *PlatformSignupSourceMutation) {
+		m.oldValue = func(context.Context) (*PlatformSignupSource, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PlatformSignupSourceMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PlatformSignupSourceMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PlatformSignupSource entities.
+func (m *PlatformSignupSourceMutation) SetID(id string) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PlatformSignupSourceMutation) ID() (id string, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PlatformSignupSourceMutation) IDs(ctx context.Context) ([]string, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []string{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PlatformSignupSource.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetUserID sets the "user_id" field.
+func (m *PlatformSignupSourceMutation) SetUserID(s string) {
+	m.user_id = &s
+}
+
+// UserID returns the value of the "user_id" field in the mutation.
+func (m *PlatformSignupSourceMutation) UserID() (r string, exists bool) {
+	v := m.user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserID returns the old "user_id" field's value of the PlatformSignupSource entity.
+// If the PlatformSignupSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformSignupSourceMutation) OldUserID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserID: %w", err)
+	}
+	return oldValue.UserID, nil
+}
+
+// ResetUserID resets all changes to the "user_id" field.
+func (m *PlatformSignupSourceMutation) ResetUserID() {
+	m.user_id = nil
+}
+
+// SetOrganizationID sets the "organization_id" field.
+func (m *PlatformSignupSourceMutation) SetOrganizationID(s string) {
+	m.organization_id = &s
+}
+
+// OrganizationID returns the value of the "organization_id" field in the mutation.
+func (m *PlatformSignupSourceMutation) OrganizationID() (r string, exists bool) {
+	v := m.organization_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrganizationID returns the old "organization_id" field's value of the PlatformSignupSource entity.
+// If the PlatformSignupSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformSignupSourceMutation) OldOrganizationID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrganizationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrganizationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrganizationID: %w", err)
+	}
+	return oldValue.OrganizationID, nil
+}
+
+// ResetOrganizationID resets all changes to the "organization_id" field.
+func (m *PlatformSignupSourceMutation) ResetOrganizationID() {
+	m.organization_id = nil
+}
+
+// SetSource sets the "source" field.
+func (m *PlatformSignupSourceMutation) SetSource(pl platformsignupsource.Source) {
+	m.source = &pl
+}
+
+// Source returns the value of the "source" field in the mutation.
+func (m *PlatformSignupSourceMutation) Source() (r platformsignupsource.Source, exists bool) {
+	v := m.source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSource returns the old "source" field's value of the PlatformSignupSource entity.
+// If the PlatformSignupSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformSignupSourceMutation) OldSource(ctx context.Context) (v platformsignupsource.Source, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSource: %w", err)
+	}
+	return oldValue.Source, nil
+}
+
+// ResetSource resets all changes to the "source" field.
+func (m *PlatformSignupSourceMutation) ResetSource() {
+	m.source = nil
+}
+
+// SetDetail sets the "detail" field.
+func (m *PlatformSignupSourceMutation) SetDetail(s string) {
+	m.detail = &s
+}
+
+// Detail returns the value of the "detail" field in the mutation.
+func (m *PlatformSignupSourceMutation) Detail() (r string, exists bool) {
+	v := m.detail
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetail returns the old "detail" field's value of the PlatformSignupSource entity.
+// If the PlatformSignupSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformSignupSourceMutation) OldDetail(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetail: %w", err)
+	}
+	return oldValue.Detail, nil
+}
+
+// ClearDetail clears the value of the "detail" field.
+func (m *PlatformSignupSourceMutation) ClearDetail() {
+	m.detail = nil
+	m.clearedFields[platformsignupsource.FieldDetail] = struct{}{}
+}
+
+// DetailCleared returns if the "detail" field was cleared in this mutation.
+func (m *PlatformSignupSourceMutation) DetailCleared() bool {
+	_, ok := m.clearedFields[platformsignupsource.FieldDetail]
+	return ok
+}
+
+// ResetDetail resets all changes to the "detail" field.
+func (m *PlatformSignupSourceMutation) ResetDetail() {
+	m.detail = nil
+	delete(m.clearedFields, platformsignupsource.FieldDetail)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PlatformSignupSourceMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PlatformSignupSourceMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PlatformSignupSource entity.
+// If the PlatformSignupSource object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PlatformSignupSourceMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PlatformSignupSourceMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the PlatformSignupSourceMutation builder.
+func (m *PlatformSignupSourceMutation) Where(ps ...predicate.PlatformSignupSource) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PlatformSignupSourceMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PlatformSignupSourceMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PlatformSignupSource, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PlatformSignupSourceMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PlatformSignupSourceMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PlatformSignupSource).
+func (m *PlatformSignupSourceMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PlatformSignupSourceMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.user_id != nil {
+		fields = append(fields, platformsignupsource.FieldUserID)
+	}
+	if m.organization_id != nil {
+		fields = append(fields, platformsignupsource.FieldOrganizationID)
+	}
+	if m.source != nil {
+		fields = append(fields, platformsignupsource.FieldSource)
+	}
+	if m.detail != nil {
+		fields = append(fields, platformsignupsource.FieldDetail)
+	}
+	if m.created_at != nil {
+		fields = append(fields, platformsignupsource.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PlatformSignupSourceMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case platformsignupsource.FieldUserID:
+		return m.UserID()
+	case platformsignupsource.FieldOrganizationID:
+		return m.OrganizationID()
+	case platformsignupsource.FieldSource:
+		return m.Source()
+	case platformsignupsource.FieldDetail:
+		return m.Detail()
+	case platformsignupsource.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PlatformSignupSourceMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case platformsignupsource.FieldUserID:
+		return m.OldUserID(ctx)
+	case platformsignupsource.FieldOrganizationID:
+		return m.OldOrganizationID(ctx)
+	case platformsignupsource.FieldSource:
+		return m.OldSource(ctx)
+	case platformsignupsource.FieldDetail:
+		return m.OldDetail(ctx)
+	case platformsignupsource.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PlatformSignupSource field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformSignupSourceMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case platformsignupsource.FieldUserID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserID(v)
+		return nil
+	case platformsignupsource.FieldOrganizationID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrganizationID(v)
+		return nil
+	case platformsignupsource.FieldSource:
+		v, ok := value.(platformsignupsource.Source)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSource(v)
+		return nil
+	case platformsignupsource.FieldDetail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetail(v)
+		return nil
+	case platformsignupsource.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformSignupSource field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PlatformSignupSourceMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PlatformSignupSourceMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PlatformSignupSourceMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PlatformSignupSource numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PlatformSignupSourceMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(platformsignupsource.FieldDetail) {
+		fields = append(fields, platformsignupsource.FieldDetail)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PlatformSignupSourceMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PlatformSignupSourceMutation) ClearField(name string) error {
+	switch name {
+	case platformsignupsource.FieldDetail:
+		m.ClearDetail()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformSignupSource nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PlatformSignupSourceMutation) ResetField(name string) error {
+	switch name {
+	case platformsignupsource.FieldUserID:
+		m.ResetUserID()
+		return nil
+	case platformsignupsource.FieldOrganizationID:
+		m.ResetOrganizationID()
+		return nil
+	case platformsignupsource.FieldSource:
+		m.ResetSource()
+		return nil
+	case platformsignupsource.FieldDetail:
+		m.ResetDetail()
+		return nil
+	case platformsignupsource.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PlatformSignupSource field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PlatformSignupSourceMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PlatformSignupSourceMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PlatformSignupSourceMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PlatformSignupSourceMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PlatformSignupSourceMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PlatformSignupSourceMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PlatformSignupSourceMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PlatformSignupSource unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PlatformSignupSourceMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PlatformSignupSource edge %s", name)
 }
 
 // PlatformSlackConnectionMutation represents an operation that mutates the PlatformSlackConnection nodes in the graph.

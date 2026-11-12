@@ -33,10 +33,76 @@ func TestWorkspaceCreationInput(t *testing.T) {
 		{Name: strings.Repeat("x", 101), Slug: "studio"}, {Name: "Studio", Slug: "wrong/slug"},
 		{Name: "Studio", Slug: "studio", IdempotencyKey: "not-a-key"},
 		{Name: "Studio", Slug: "studio", IdempotencyKey: uuid.Nil.String()},
+		{Name: "Studio", Slug: "studio", HeardAbout: &SignupSourceInput{Source: "billboard"}},
+		{Name: "Studio", Slug: "studio", HeardAbout: &SignupSourceInput{Source: "search", Detail: "Google"}},
+		{Name: "Studio", Slug: "studio", HeardAbout: &SignupSourceInput{Source: "other", Detail: strings.Repeat("é", 201)}},
+		{Name: "Studio", Slug: "studio", HeardAbout: &SignupSourceInput{Source: "other", Detail: "a\x00b"}},
 	} {
 		if _, _, _, err := normalizeWorkspaceCreation(input); !errors.Is(err, ErrInvalidInput) {
 			t.Fatalf("invalid input accepted: %+v %v", input, err)
 		}
+	}
+	// An answer is trimmed, and 200 characters of any width fit. It is not part
+	// of the workspace, so it leaves the fingerprint as old receipts hold it.
+	heard, _, heardHash, err := normalizeWorkspaceCreation(CreateWorkspaceInput{
+		Name: "Studio", Slug: "studio", HeardAbout: &SignupSourceInput{Source: "other", Detail: "  " + strings.Repeat("é", 200) + " "},
+	})
+	if err != nil || heard.HeardAbout.Detail != strings.Repeat("é", 200) || heardHash != hash {
+		t.Fatalf("answered input: %+v %v", heard.HeardAbout, err)
+	}
+}
+
+func TestWorkspaceCreationKeepsTheFirstSignupSource(t *testing.T) {
+	db, repo, actor := workspaceCreationFixture(t)
+	ctx := context.Background()
+	first := creationInput()
+	first.HeardAbout = &SignupSourceInput{Source: "other", Detail: "A conference talk"}
+	created, err := repo.CreateWorkspace(ctx, actor, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The unique index on "userId" leaves at most one row to read.
+	answer := func() (source, detail, organizationID string) {
+		t.Helper()
+		err := db.SQL.QueryRow(`SELECT source, coalesce(detail,''), "organizationId" FROM platform_signup_source WHERE "userId"=$1`,
+			actor.UserID).Scan(&source, &detail, &organizationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
+	if source, detail, organizationID := answer(); source != "other" || detail != "A conference talk" || organizationID != created.ID {
+		t.Fatalf("saved answer: %s %q %s", source, detail, organizationID)
+	}
+	// A retry that changed its answer still replays the first workspace, and a
+	// later workspace keeps the first answer.
+	changed := first
+	changed.HeardAbout = &SignupSourceInput{Source: "youtube"}
+	replayed, err := repo.CreateWorkspace(ctx, actor, changed)
+	if err != nil || replayed.ID != created.ID {
+		t.Fatalf("changed-answer retry=%+v err=%v", replayed, err)
+	}
+	second := creationInput()
+	second.HeardAbout = &SignupSourceInput{Source: "linkedin"}
+	if _, err := repo.CreateWorkspace(ctx, actor, second); err != nil {
+		t.Fatal(err)
+	}
+	if source, _, organizationID := answer(); source != "other" || organizationID != created.ID {
+		t.Fatalf("first answer replaced: %s %s", source, organizationID)
+	}
+	// Deleting the account deletes the answer. Rolled back, so the fixture's
+	// cleanup still finds this test's workspaces through their receipts.
+	tx, err := db.SQL.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	var left int
+	if _, err := tx.Exec(`DELETE FROM "user" WHERE id=$1`, actor.UserID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.QueryRow(`SELECT count(*) FROM platform_signup_source WHERE "userId"=$1`, actor.UserID).Scan(&left); err != nil || left != 0 {
+		t.Fatalf("answer outlived the account: %d %v", left, err)
 	}
 }
 

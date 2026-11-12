@@ -9,9 +9,12 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsignupsource"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformworkspacecreation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
@@ -47,6 +50,18 @@ func normalizeWorkspaceCreation(input CreateWorkspaceInput) (CreateWorkspaceInpu
 			return input, "", "", ErrInvalidInput
 		}
 	}
+	if input.HeardAbout != nil {
+		heard := *input.HeardAbout
+		heard.Detail = strings.TrimSpace(heard.Detail)
+		if platformsignupsource.SourceValidator(platformsignupsource.Source(heard.Source)) != nil ||
+			utf8.RuneCountInString(heard.Detail) > 200 ||
+			// Postgres refuses NUL in text, so control characters are a 400, not a failed transaction.
+			strings.IndexFunc(heard.Detail, unicode.IsControl) >= 0 ||
+			(heard.Detail != "" && heard.Source != string(platformsignupsource.SourceOther)) {
+			return input, "", "", ErrInvalidInput
+		}
+		input.HeardAbout = &heard
+	}
 	// Older clients have a stable, caller-chosen slug. Preserve their retry
 	// identity independently of subsequent changes to the organization's slug.
 	key := "slug:" + input.Slug
@@ -66,6 +81,9 @@ func normalizeWorkspaceCreation(input CreateWorkspaceInput) (CreateWorkspaceInpu
 
 func workspaceCreationFingerprint(input CreateWorkspaceInput) (string, error) {
 	input.IdempotencyKey = ""
+	// The answer is not part of the workspace, and only the first one is kept:
+	// a retry that changed it still replays the workspace it made.
+	input.HeardAbout = nil
 	encoded, err := json.Marshal(input)
 	if err != nil {
 		return "", err
@@ -181,6 +199,9 @@ func (c *Configuration) CreateWorkspace(ctx context.Context, actor Actor, input 
 	if err != nil {
 		return nil, err
 	}
+	if err := recordSignupSource(ctx, tx, actor.UserID, org.ID, input.HeardAbout, now); err != nil {
+		return nil, err
+	}
 	if !input.KeepCurrentActiveOrganization {
 		updated, err := tx.Session.Update().Where(session.ID(actor.SessionID), session.UserID(actor.UserID), session.ExpiresAtGT(time.Now())).SetActiveOrganizationID(org.ID).Save(ctx)
 		if err != nil {
@@ -202,6 +223,26 @@ func (c *Configuration) CreateWorkspace(ctx context.Context, actor Actor, input 
 		return nil, err
 	}
 	return createdWorkspaceResult(org, owner, settings.Unwrap()), nil
+}
+
+// recordSignupSource keeps where the creator heard about Shots, once per
+// person: a later workspace keeps the first answer. CreateWorkspace holds the
+// user's row lock, so two creations cannot both find no answer.
+func recordSignupSource(ctx context.Context, tx *ent.Tx, userID, organizationID string, heard *SignupSourceInput, now time.Time) error {
+	if heard == nil {
+		return nil
+	}
+	answered, err := tx.PlatformSignupSource.Query().Where(platformsignupsource.UserID(userID)).Exist(ctx)
+	if err != nil || answered {
+		return err
+	}
+	create := tx.PlatformSignupSource.Create().SetID(uuid.NewString()).SetUserID(userID).
+		SetOrganizationID(organizationID).SetSource(platformsignupsource.Source(heard.Source)).SetCreatedAt(now)
+	if heard.Detail != "" {
+		create.SetDetail(heard.Detail)
+	}
+	_, err = create.Save(ctx)
+	return err
 }
 
 func replayWorkspaceCreation(ctx context.Context, tx *ent.Tx, actor Actor, organizationID string) (*Workspace, error) {

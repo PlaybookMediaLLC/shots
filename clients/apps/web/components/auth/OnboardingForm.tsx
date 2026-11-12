@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { type SignupSource, signupSourceSchema } from 'screenshot-studio-backend-sdk'
 import { TimeZonePicker } from '@/components/settings/TimeZonePicker'
 import { browserTimeZone } from '@/lib/time-zones'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { workspaceCreateSchema } from '@/lib/workspace/input-schemas'
 import type { WorkspaceCreateInput } from '@/lib/workspace/schemas'
@@ -11,6 +14,26 @@ import { workspaceInitials } from '@/lib/workspace/initials'
 import { getAuthErrorMessage } from './error-message'
 import { authInputClassName, FormAlert, SubmitButton } from './fields'
 import { Label } from '@/components/ui/label'
+
+/**
+ * The answers to "Where did you hear about us?", in the order the form shows
+ * them. The values come from the backend SDK; a value without a label here
+ * fails the type check.
+ */
+const SIGNUP_SOURCE_LABELS: Record<SignupSource, string> = {
+  search: 'Search (Google, Bing)',
+  ai_assistant: 'AI assistant (ChatGPT, Claude)',
+  x: 'X (Twitter)',
+  linkedin: 'LinkedIn',
+  youtube: 'YouTube',
+  tiktok_instagram: 'TikTok or Instagram',
+  reddit: 'Reddit',
+  product_hunt_hacker_news: 'Product Hunt or Hacker News',
+  friend_colleague: 'Friend or colleague',
+  newsletter_blog_podcast: 'Newsletter, blog or podcast',
+  event_community: 'Event or community',
+  other: 'Other',
+}
 
 function slugify(value: string): string {
   return value
@@ -30,6 +53,10 @@ export function OnboardingForm() {
   const [timeZone, setTimeZone] = useState('UTC')
   useEffect(() => setTimeZone(browserTimeZone()), [])
   const [slug, setSlug] = useState('')
+  // Where they heard about Shots: optional, so nothing is picked at first.
+  const [heardAbout, setHeardAbout] = useState<SignupSource | null>(null)
+  const [heardAboutDetail, setHeardAboutDetail] = useState('')
+  const heardAboutGroup = useRef<HTMLDivElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
   const slugInputRef = useRef<HTMLInputElement>(null)
   // Once someone types their own slug, the name stops overwriting it.
@@ -62,10 +89,14 @@ export function OnboardingForm() {
     const formData = new FormData(event.currentTarget)
     const typedName = String(formData.get('name') ?? '')
     const typedSlug = String(formData.get('slug') ?? '').trim()
+    const detail = heardAboutDetail.trim()
     const input = workspaceCreateSchema.safeParse({
       name: typedName,
       slug: typedSlug || slugify(typedName),
       timeZone,
+      heardAbout: heardAbout
+        ? { source: heardAbout, ...(heardAbout === 'other' && detail ? { detail } : {}) }
+        : undefined,
     })
     if (!input.success) {
       setError(input.error.issues[0]?.message ?? 'Check the workspace name.')
@@ -154,6 +185,63 @@ export function OnboardingForm() {
           onChange={setTimeZone}
           disabled={isSubmitting}
         />
+
+        <div className="space-y-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm font-medium text-neutral-300" id="heard-about">
+              Where did you hear about us?{' '}
+              <span className="font-normal text-neutral-500">Optional</span>
+            </p>
+            {heardAbout ? (
+              <Button
+                className="h-auto p-0 text-xs text-neutral-400 hover:text-neutral-200"
+                disabled={isSubmitting}
+                onClick={() => {
+                  setHeardAbout(null)
+                  setHeardAboutDetail('')
+                  // The button goes away with the answer: keep keyboard focus in the question.
+                  heardAboutGroup.current?.querySelector<HTMLElement>('[role="radio"]')?.focus()
+                }}
+                size={null}
+                type="button"
+                variant="link"
+              >
+                Clear
+              </Button>
+            ) : null}
+          </div>
+          <RadioGroup
+            aria-labelledby="heard-about"
+            className="flex flex-wrap gap-2"
+            disabled={isSubmitting}
+            onValueChange={(value) => setHeardAbout(signupSourceSchema.parse(value))}
+            ref={heardAboutGroup}
+            value={heardAbout ?? ''}
+          >
+            {(Object.entries(SIGNUP_SOURCE_LABELS) as [SignupSource, string][]).map(
+              ([value, label]) => (
+                <Label
+                  className="flex h-9 cursor-pointer items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 text-sm font-normal text-neutral-300 transition-colors hover:border-white/[0.16] has-[[data-state=checked]]:border-white/40 has-[[data-state=checked]]:bg-white/[0.08] has-[[data-state=checked]]:text-white"
+                  key={value}
+                >
+                  <RadioGroupItem value={value} />
+                  {label}
+                </Label>
+              )
+            )}
+          </RadioGroup>
+          {heardAbout === 'other' ? (
+            <Input
+              aria-label="Where else did you hear about us?"
+              className={authInputClassName}
+              disabled={isSubmitting}
+              maxLength={200}
+              onChange={(event) => setHeardAboutDetail(event.target.value)}
+              placeholder="A talk, a teammate, a post…"
+              value={heardAboutDetail}
+            />
+          ) : null}
+        </div>
         {error ? <FormAlert>{error}</FormAlert> : null}
       </div>
 
