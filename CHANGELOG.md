@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.50.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.49.0...v2.50.0) (2026-11-12)
+
+
+### Features
+
+* **onboarding:** ask where people heard about Shots ([b2e56ae](https://github.com/PlaybookMediaLLC/shots/commit/b2e56ae86ccf159709488e7fdf613ac485cb35e1))
+* **onboarding:** ask where people heard about Shots ([adb1fab](https://github.com/PlaybookMediaLLC/shots/commit/adb1faba9e691b6d7633dbdbe5eda27639e61314))
+
 ## [2.49.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.48.0...v2.49.0) (2026-11-12)
 
 
