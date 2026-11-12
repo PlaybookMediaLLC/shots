@@ -13,7 +13,6 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { BatchItemInput } from '@/lib/api/contracts/content-batches'
-import { assetContentUrl } from '@/lib/editor/asset-url'
 import { clock, shapeName } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
 
@@ -27,26 +26,27 @@ export type Staged = {
 
 /**
  * A file's picture before it is uploaded: an image as itself, a video at its
- * opening frame with its length and shape, a library asset by its thumbnail,
- * and anything else by its kind. Pictures come from this browser's copy of
- * the file, so nothing is uploaded to show them.
+ * opening frame, each with its shape and a video's length. The picture comes
+ * from this browser's copy of the file, so nothing uploads to show it. A file
+ * the browser cannot draw, a library asset (its kind is not known here, and a
+ * thumbnail request for a video would read the whole file) and anything else
+ * show the icon of their kind.
  */
 export function FileThumb({
-  assetId,
   badge = true,
   className,
   file,
 }: {
-  assetId?: string
-  /** Show a video's length and shape over it. */
+  /** Show the shape, and a video's length, over the picture. */
   badge?: boolean
   className?: string
   file?: File
 }) {
   const type = file?.type ?? ''
-  const visual = type.startsWith('image/') || type.startsWith('video/')
+  const video = type.startsWith('video/')
+  const visual = video || type.startsWith('image/')
   const [url, setUrl] = React.useState<string>()
-  // A video's length and shape, or an image's shape, once the browser has read them.
+  // The shape, and a video's length, once the browser has read the file.
   const [facts, setFacts] = React.useState<{ ms?: number; shape: string }>()
   const [broken, setBroken] = React.useState(false)
   React.useEffect(() => {
@@ -56,58 +56,52 @@ export function FileThumb({
     return () => URL.revokeObjectURL(next)
   }, [file, visual])
   const box = cn('relative flex items-center justify-center overflow-hidden bg-muted', className)
-  if (file && url && type.startsWith('video/'))
+  if (url && visual && !broken)
     return (
       <span className={box}>
-        {/* ponytail: one <video> per thumbnail; draw posters with captureVideoPoster in a queue if large imports stutter. */}
-        <video
-          aria-hidden
-          className="size-full object-cover"
-          muted
-          playsInline
-          preload="metadata"
-          src={`${url}#t=0.1`}
-          onLoadedMetadata={(event) => {
-            const element = event.currentTarget
-            setFacts({
-              ms: element.duration * 1000,
-              shape: shapeName(element.videoWidth, element.videoHeight),
-            })
-          }}
-        />
-        {badge && facts ? <Badge facts={facts} /> : null}
+        {video ? (
+          // ponytail: one <video> per thumbnail; draw posters with captureVideoPoster in a queue if large imports stutter.
+          <video
+            aria-hidden
+            className="size-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            src={`${url}#t=0.1`}
+            onError={() => setBroken(true)}
+            onLoadedMetadata={(event) => {
+              const element = event.currentTarget
+              // No picture track this browser can draw: show the icon instead.
+              if (!element.videoHeight) return setBroken(true)
+              setFacts({
+                // A recording with no length in its header reports Infinity.
+                ms: Number.isFinite(element.duration) ? element.duration * 1000 : undefined,
+                shape: shapeName(element.videoWidth, element.videoHeight),
+              })
+            }}
+          />
+        ) : (
+          <img
+            alt=""
+            className="size-full object-cover"
+            onError={() => setBroken(true)}
+            onLoad={(event) =>
+              setFacts({
+                shape: shapeName(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight),
+              })
+            }
+            src={url}
+          />
+        )}
+        {badge && facts ? (
+          <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[10px] text-white tabular-nums">
+            {facts.ms ? `${clock(facts.ms)} · ` : ''}
+            {facts.shape}
+          </span>
+        ) : null}
       </span>
     )
-  if (file && url && type.startsWith('image/'))
-    return (
-      <span className={box}>
-        <img
-          alt=""
-          className="size-full object-cover"
-          onLoad={(event) =>
-            setFacts({
-              shape: shapeName(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight),
-            })
-          }
-          src={url}
-        />
-        {badge && facts ? <Badge facts={facts} /> : null}
-      </span>
-    )
-  if (!file && assetId && !broken)
-    return (
-      <span className={box}>
-        <img
-          alt=""
-          className="size-full object-cover"
-          loading="lazy"
-          onError={() => setBroken(true)}
-          src={`${assetContentUrl(assetId)}?variant=thumbnail`}
-        />
-      </span>
-    )
-  const Icon =
-    type === 'application/pdf' ? PdfIcon : type.startsWith('video/') ? VideoIcon : ImageIcon
+  const Icon = type === 'application/pdf' ? PdfIcon : video ? VideoIcon : ImageIcon
   return (
     <span className={box}>
       <Icon aria-hidden className="size-6 text-muted-foreground" />
@@ -115,15 +109,8 @@ export function FileThumb({
   )
 }
 
-/** A picture's length and shape, over its corner. */
-function Badge({ facts }: { facts: { ms?: number; shape: string } }) {
-  return (
-    <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[10px] text-white tabular-nums">
-      {facts.ms ? `${clock(facts.ms)} · ` : ''}
-      {facts.shape}
-    </span>
-  )
-}
+/** What a row's attachment is called: its file name, or its library asset ID. */
+const mediaName = (media: Staged['input']['media'][number]) => media.fileName ?? media.assetId ?? ''
 
 /** Where a row stands: ready to add, or what to fix first. */
 function RowStatus({ row }: { row: Staged }) {
@@ -131,7 +118,7 @@ function RowStatus({ row }: { row: Staged }) {
     <div className="grid justify-items-start gap-1">
       <Pill tone="red">Needs fixing</Pill>
       {row.problems.map((problem) => (
-        <p key={problem} role="alert" className="text-label text-destructive">
+        <p key={problem} className="text-label text-destructive">
           {problem}
         </p>
       ))}
@@ -155,7 +142,9 @@ export function ImportReview({
   rows: readonly Staged[]
 }) {
   const visual = rows.some((row) => row.input.media.length > 0)
-  const [view, setView] = React.useState<'grid' | 'list'>(visual ? 'grid' : 'list')
+  // Cards lead for rows with files until a view is picked, preview after preview.
+  const [picked, setView] = React.useState<'grid' | 'list'>()
+  const view = picked ?? (visual ? 'grid' : 'list')
   const when = (row: Staged) =>
     row.input.timing.localTime
       ? `${row.input.timing.localTime.replace('T', ' ')} (${row.input.timing.timeZone})`
@@ -207,11 +196,7 @@ export function ImportReview({
                 >
                   <div className="relative aspect-[4/5]">
                     {first ? (
-                      <FileThumb
-                        assetId={first.assetId}
-                        className="size-full"
-                        file={row.files[0]}
-                      />
+                      <FileThumb className="size-full" file={row.files[0]} />
                     ) : (
                       <p className="line-clamp-[8] size-full bg-muted/50 p-3 text-ui whitespace-pre-wrap">
                         {row.input.caption || 'No caption'}
@@ -224,8 +209,12 @@ export function ImportReview({
                     ) : null}
                   </div>
                   <div className="grid gap-1.5 p-3">
-                    <span className="text-label text-muted-foreground tabular-nums">
+                    <span
+                      className="truncate text-label text-muted-foreground tabular-nums"
+                      title={first ? mediaName(first) : undefined}
+                    >
                       Row {row.line}
+                      {first ? ` · ${mediaName(first)}` : ''}
                     </span>
                     {first ? (
                       <p className="line-clamp-2 text-ui">
@@ -264,21 +253,22 @@ export function ImportReview({
                   <TableCell>{row.line}</TableCell>
                   <TableCell>
                     {row.input.media.length ? (
-                      <div className="flex gap-1">
+                      <div className="flex items-center gap-1">
                         {row.input.media.slice(0, 3).map((media, at) => (
                           <FileThumb
-                            assetId={media.assetId}
                             badge={false}
                             className="size-10 rounded-md"
                             file={row.files[at]}
                             key={at}
                           />
                         ))}
-                        {row.input.media.length > 3 ? (
-                          <span className="self-center text-muted-foreground">
-                            +{row.input.media.length - 3}
-                          </span>
-                        ) : null}
+                        <span
+                          className="ms-1 max-w-32 truncate text-muted-foreground"
+                          title={row.input.media.map(mediaName).join(', ')}
+                        >
+                          {mediaName(row.input.media[0]!)}
+                          {row.input.media.length > 1 ? ` +${row.input.media.length - 1}` : ''}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">None</span>

@@ -138,4 +138,6 @@ test('a picture is named by the platform shape it is within 3% of, else by its s
   assert.equal(shapeName(1920, 1080), '16:9')
   assert.equal(shapeName(1000, 1040), '1000×1040')
   assert.equal(clock(65_600), '1:06')
+  // Seconds round before minutes do: 59.6s is a minute.
+  assert.equal(clock(59_600), '1:00')
 })

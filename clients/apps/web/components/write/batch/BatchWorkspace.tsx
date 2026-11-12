@@ -115,6 +115,7 @@ import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
 import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye'
 import { uploadByteLimit } from '@/lib/write/media-limits'
+import { clock } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { expandSpintax } from '@/lib/write/spintax'
@@ -236,10 +237,6 @@ const FORMAT_NAMES: Record<string, string> = {
   'video/webm': 'WebM',
 }
 
-/** A length as minutes and seconds, such as 1:05. */
-const clock = (ms: number) =>
-  `${Math.floor(ms / 60_000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`
-
 /** One attachment of a post: its picture or kind, and where its upload stands. */
 function MediaTile({
   entry,
@@ -254,14 +251,7 @@ function MediaTile({
 }) {
   const type = entry.mediaType ?? file?.type ?? ''
   const stored = entry.assetId ?? (entry.status === 'UPLOADED' ? entry.uploadAssetId : undefined)
-  const [local, setLocal] = React.useState<string>()
-  React.useEffect(() => {
-    if (stored || !file || !type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setLocal(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file, stored, type])
-  const picture = type.startsWith('image/') ? (stored ? assetContentUrl(stored) : local) : undefined
+  const picture = stored && type.startsWith('image/') ? assetContentUrl(stored) : undefined
   const Icon =
     type === 'application/pdf' ? PdfIcon : type.startsWith('video/') ? VideoIcon : ImageIcon
   const problem = Boolean(upload?.error) || entry.status === 'FAILED'
@@ -282,8 +272,9 @@ function MediaTile({
       <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
         {picture ? (
           <img src={picture} alt="" className="size-full object-cover" />
-        ) : file && type.startsWith('video/') ? (
-          <FileThumb badge={!entry.durationMs} className="size-full" file={file} />
+        ) : file ? (
+          // This tab's copy of the file, until the stored one can be shown.
+          <FileThumb badge={entry.status !== 'UPLOADED'} className="size-full" file={file} />
         ) : (
           <Icon aria-hidden className="size-7 text-muted-foreground" />
         )}
