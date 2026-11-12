@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table'
 import type { BatchItemInput } from '@/lib/api/contracts/content-batches'
 import { clock, shapeName } from '@/lib/write/media-rules'
+import { captureVideoFrame, type VideoFrame } from '@/lib/workspace/video-poster'
 import { cn } from '@/lib/utils'
 
 /** A row of the import preview; `files` holds each attachment's file, in order. */
@@ -24,8 +25,35 @@ export type Staged = {
   problems: string[]
 }
 
+// Each video is read once per page, three at a time: a decoder holds tens of
+// megabytes, and a few hundred at once stop loading at all. A reader that
+// finishes hands its place straight to the next one waiting.
+const frames = new WeakMap<File, Promise<VideoFrame | null>>()
+let reading = 0
+const waiting: (() => void)[] = []
+function videoFrame(file: File): Promise<VideoFrame | null> {
+  let frame = frames.get(file)
+  if (!frame) {
+    frame = (async () => {
+      if (reading >= 3) await new Promise<void>((resolve) => waiting.push(resolve))
+      else reading += 1
+      try {
+        return await captureVideoFrame(file)
+      } catch {
+        return null
+      } finally {
+        const next = waiting.shift()
+        if (next) next()
+        else reading -= 1
+      }
+    })()
+    frames.set(file, frame)
+  }
+  return frame
+}
+
 /**
- * A file's picture before it is uploaded: an image as itself, a video at its
+ * A file's picture before it is uploaded: an image as itself, a video by its
  * opening frame, each with its shape and a video's length. The picture comes
  * from this browser's copy of the file, so nothing uploads to show it. A file
  * the browser cannot draw, a library asset (its kind is not known here, and a
@@ -51,48 +79,45 @@ export function FileThumb({
   const [broken, setBroken] = React.useState(false)
   React.useEffect(() => {
     if (!file || !visual) return
-    const next = URL.createObjectURL(file)
-    setUrl(next)
-    return () => URL.revokeObjectURL(next)
-  }, [file, visual])
+    if (!video) {
+      const next = URL.createObjectURL(file)
+      setUrl(next)
+      return () => URL.revokeObjectURL(next)
+    }
+    let live = true
+    let shown: string | undefined
+    void videoFrame(file).then((frame) => {
+      if (!live) return
+      if (!frame) return setBroken(true)
+      shown = URL.createObjectURL(frame.poster)
+      setUrl(shown)
+      setFacts({
+        ms: frame.durationMs ?? undefined,
+        shape: shapeName(frame.width, frame.height),
+      })
+    })
+    return () => {
+      live = false
+      if (shown) URL.revokeObjectURL(shown)
+    }
+  }, [file, video, visual])
   const box = cn('relative flex items-center justify-center overflow-hidden bg-muted', className)
   if (url && visual && !broken)
     return (
       <span className={box}>
-        {video ? (
-          // ponytail: one <video> per thumbnail; draw posters with captureVideoPoster in a queue if large imports stutter.
-          <video
-            aria-hidden
-            className="size-full object-cover"
-            muted
-            playsInline
-            preload="metadata"
-            src={`${url}#t=0.1`}
-            onError={() => setBroken(true)}
-            onLoadedMetadata={(event) => {
-              const element = event.currentTarget
-              // No picture track this browser can draw: show the icon instead.
-              if (!element.videoHeight) return setBroken(true)
-              setFacts({
-                // A recording with no length in its header reports Infinity.
-                ms: Number.isFinite(element.duration) ? element.duration * 1000 : undefined,
-                shape: shapeName(element.videoWidth, element.videoHeight),
-              })
-            }}
-          />
-        ) : (
-          <img
-            alt=""
-            className="size-full object-cover"
-            onError={() => setBroken(true)}
-            onLoad={(event) =>
+        <img
+          alt=""
+          className="size-full object-cover"
+          onError={() => setBroken(true)}
+          onLoad={(event) => {
+            // A video's facts came with its frame; an image's come from the image.
+            if (!video)
               setFacts({
                 shape: shapeName(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight),
               })
-            }
-            src={url}
-          />
-        )}
+          }}
+          src={url}
+        />
         {badge && facts ? (
           <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 text-[10px] text-white tabular-nums">
             {facts.ms ? `${clock(facts.ms)} · ` : ''}

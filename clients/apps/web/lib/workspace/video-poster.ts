@@ -7,6 +7,23 @@ const LOAD_TIMEOUT_MS = 10_000
  * no video decoder. Null when this browser can't decode the video.
  */
 export async function captureVideoPoster(video: Blob): Promise<Blob | null> {
+  return (await captureVideoFrame(video))?.poster ?? null
+}
+
+/** A video's opening frame as a small JPEG, with the video's size and length. */
+export type VideoFrame = {
+  /** Null when the length is not in the file, as in some recordings. */
+  durationMs: number | null
+  height: number
+  poster: Blob
+  width: number
+}
+
+/**
+ * The opening frame and the facts the browser read on the way: its size and
+ * length. Null when this browser can't decode the video.
+ */
+export async function captureVideoFrame(video: Blob): Promise<VideoFrame | null> {
   if (typeof document === 'undefined') return null
   const url = URL.createObjectURL(video)
   const element = document.createElement('video')
@@ -41,7 +58,16 @@ export async function captureVideoPoster(video: Blob): Promise<Blob | null> {
     const context = canvas.getContext('2d')
     if (!context) return null
     context.drawImage(element, 0, 0, canvas.width, canvas.height)
-    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', POSTER_QUALITY))
+    const poster = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/jpeg', POSTER_QUALITY)
+    )
+    if (!poster) return null
+    return {
+      durationMs: Number.isFinite(element.duration) ? element.duration * 1000 : null,
+      height: element.videoHeight,
+      poster,
+      width: element.videoWidth,
+    }
   } finally {
     element.removeAttribute('src')
     URL.revokeObjectURL(url)
