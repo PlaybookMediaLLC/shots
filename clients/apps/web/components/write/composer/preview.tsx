@@ -89,9 +89,8 @@ export function PreviewPanel({
   target: DraftTarget | null
 }) {
   const channel = selection.channel ?? initialChannel ?? items[0]?.account.channel ?? null
-  const { device } = selection
   const item = items.find((entry) => entry.account.channel === channel) ?? items[0]
-  const size = DEVICES.find((entry) => entry.label === device)
+  const size = DEVICES.find((entry) => entry.label === selection.device)
   if (!item) {
     return <p className="p-4 text-sm text-muted-foreground">Turn on a platform to preview it.</p>
   }
@@ -100,57 +99,16 @@ export function PreviewPanel({
       <p className="rounded-md border border-dashed border-input px-2 py-1 text-center text-[11px] text-muted-foreground">
         Preview — not published
       </p>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {items.map((entry) => (
-          <Button
-            aria-pressed={entry.account.channel === item.account.channel}
-            className={cn(
-              'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs',
-              entry.account.channel === item.account.channel
-                ? 'border-foreground/40 text-foreground'
-                : 'border-border text-muted-foreground'
-            )}
-            key={entry.account.id}
-            onClick={() => onSelect({ ...selection, channel: entry.account.channel })}
-            size={null}
-            type="button"
-            variant="custom"
-          >
-            <ChannelIcon channel={entry.account.channel} />
-            {CHANNEL_META[entry.account.channel].label}
-          </Button>
-        ))}
-        <Select
-          onValueChange={(value) =>
-            onSelect({ ...selection, device: value as PreviewSelection['device'] })
-          }
-          value={device}
-        >
-          <SelectTrigger aria-label="Preview device" className="ml-auto h-7 w-auto text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="desktop">Desktop</SelectItem>
-            {DEVICES.map((entry) => (
-              <SelectItem key={entry.label} value={entry.label}>
-                {entry.label} · {entry.width}×{entry.height}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <PreviewToolbar
+        accounts={items.map((entry) => entry.account)}
+        active={item.account.channel}
+        onSelect={onSelect}
+        selection={selection}
+      />
       <DescribeMediaContext.Provider value={onDescribe}>
         <ScaledPreview width={size?.width ?? 600} height={size?.height}>
           <div data-testid={`preview-${item.account.channel}`} key={item.account.id}>
-            {item.publication.target.options?.articleTitle ? (
-              <ArticlePreview item={item} />
-            ) : item.account.channel === 'linkedin' ? (
-              <LinkedInPost item={item} target={target} />
-            ) : item.account.channel === 'tiktok' ? (
-              <TikTokPost item={item} />
-            ) : (
-              <ThreadPreview item={item} target={target} />
-            )}
+            <PlatformPost item={item} target={target} />
           </div>
         </ScaledPreview>
       </DescribeMediaContext.Provider>
@@ -173,6 +131,144 @@ export function PreviewPanel({
         </p>
       ))}
     </div>
+  )
+}
+
+/** The platform chips and the device menu above a preview. */
+export function PreviewToolbar({
+  accounts,
+  active,
+  onSelect,
+  selection,
+}: {
+  /** One chip each, in order. */
+  accounts: readonly PreviewAccount[]
+  active: DraftChannel
+  onSelect: (selection: PreviewSelection) => void
+  selection: PreviewSelection
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {accounts.map((account) => (
+        <Button
+          aria-pressed={account.channel === active}
+          className={cn(
+            'flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs',
+            account.channel === active
+              ? 'border-foreground/40 text-foreground'
+              : 'border-border text-muted-foreground'
+          )}
+          key={account.id}
+          onClick={() => onSelect({ ...selection, channel: account.channel })}
+          size={null}
+          type="button"
+          variant="custom"
+        >
+          <ChannelIcon channel={account.channel} />
+          {CHANNEL_META[account.channel].label}
+        </Button>
+      ))}
+      <Select
+        onValueChange={(value) =>
+          onSelect({ ...selection, device: value as PreviewSelection['device'] })
+        }
+        value={selection.device}
+      >
+        <SelectTrigger aria-label="Preview device" className="ml-auto h-7 w-auto text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="desktop">Desktop</SelectItem>
+          {DEVICES.map((entry) => (
+            <SelectItem key={entry.label} value={entry.label}>
+              {entry.label} · {entry.width}×{entry.height}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+/** One post as its platform draws it. Memoized: a feed draws many, and its page renders often. */
+const PlatformPost = React.memo(function PlatformPost({
+  item,
+  target,
+}: {
+  item: PreviewCard
+  target: DraftTarget | null
+}) {
+  if (item.publication.target.options?.articleTitle) return <ArticlePreview item={item} />
+  if (item.account.channel === 'linkedin') return <LinkedInPost item={item} target={target} />
+  if (item.account.channel === 'tiktok') return <TikTokPost item={item} />
+  return <ThreadPreview item={item} target={target} />
+})
+
+/**
+ * Draws its children once they come into view, and keeps them: a feed of a
+ * hundred posts loads only the media, documents and link cards someone sees.
+ */
+// ponytail: posts stay drawn once seen; unmount far-off posts if a long scroll through video posts grows memory.
+function WhenSeen({ children }: { children: React.ReactNode }) {
+  const box = React.useRef<HTMLDivElement>(null)
+  const [seen, setSeen] = React.useState(false)
+  React.useEffect(() => {
+    const node = box.current
+    if (!node || seen) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setSeen(true)
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [seen])
+  return (
+    <div ref={box} className={seen ? undefined : 'h-32 rounded-2xl border border-border bg-muted/40'}>
+      {seen ? children : null}
+    </div>
+  )
+}
+
+/**
+ * Several posts on one platform, one after another as its feed shows them,
+ * each in a desktop column or a chosen phone. Above each post, at full size
+ * whatever the scale, a line says when it goes out, and its button opens
+ * that post on its own.
+ */
+export function PreviewFeed({
+  device,
+  onOpen,
+  posts,
+}: {
+  device: PreviewSelection['device']
+  onOpen: (key: string) => void
+  posts: readonly { card: PreviewCard; key: string; label: string; name: string }[]
+}) {
+  const size = DEVICES.find((entry) => entry.label === device)
+  return (
+    <ol aria-label="Feed preview" className="grid gap-4">
+      {posts.map(({ card, key, label, name }) => (
+        // Keyed by account too: another platform draws the post afresh, as PreviewPanel does.
+        <li className="grid gap-1.5" data-testid="feed-post" key={`${key}:${card.account.id}`}>
+          <div className="flex items-center justify-between gap-2 text-label text-muted-foreground">
+            <span>{label}</span>
+            <Button
+              className="h-auto p-0 text-label"
+              onClick={() => onOpen(key)}
+              size={null}
+              type="button"
+              variant="link"
+            >
+              {name}
+            </Button>
+          </div>
+          <WhenSeen>
+            <ScaledPreview width={size?.width ?? 600} height={size?.height}>
+              <PlatformPost item={card} target={null} />
+            </ScaledPreview>
+          </WhenSeen>
+        </li>
+      ))}
+    </ol>
   )
 }
 

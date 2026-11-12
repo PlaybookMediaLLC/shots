@@ -282,6 +282,18 @@ test(
     await page.keyboard.press('ArrowRight')
     await expect(sheet.getByRole('heading', { name: 'Post 3 of 10' })).toBeVisible()
     await expect(sheet.getByTestId('preview-panel')).toContainText('Post 3.')
+    // The feed shows every post on one platform, in order; a post opens on its own from it.
+    await sheet.getByRole('button', { name: 'Feed', exact: true }).click()
+    await expect(sheet.getByTestId('feed-post')).toHaveCount(10)
+    await expect(sheet.getByTestId('feed-post').first()).toContainText('Post 1.')
+    await sheet.getByRole('button', { name: 'Post 4', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 4 of 10' })).toBeVisible()
+    // Closed from the feed, the sheet opens again on one post.
+    await sheet.getByRole('button', { name: 'Feed', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    await page.getByRole('button', { name: 'Preview posts', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 1 of 10' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(sheet).toBeHidden()
 

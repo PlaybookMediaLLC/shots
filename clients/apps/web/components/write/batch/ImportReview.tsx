@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { ImageIcon, PdfIcon, VideoIcon } from '@/components/platform-shell/icons'
 import { Group, Pill } from '@/components/platform-ui'
-import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -16,6 +15,7 @@ import type { BatchItemInput } from '@/lib/api/contracts/content-batches'
 import { clock, shapeName } from '@/lib/write/media-rules'
 import { captureVideoFrame, type VideoFrame } from '@/lib/workspace/video-poster'
 import { cn } from '@/lib/utils'
+import { Segmented } from './Segmented'
 
 /** A row of the import preview; `files` holds each attachment's file, in order. */
 export type Staged = {
@@ -178,34 +178,15 @@ export function ImportReview({
     row.input.channelConnectionIds.map(accountName).join(', ') || 'No account'
   return (
     <div className="grid gap-3">
-      <div
-        aria-label="Show the rows as"
-        className="inline-flex self-start justify-self-start rounded-md border border-border p-0.5"
-        role="group"
-      >
-        {(
-          [
-            ['grid', 'Cards'],
-            ['list', 'Table'],
-          ] as const
-        ).map(([value, label]) => (
-          <Button
-            aria-pressed={view === value}
-            className={cn(
-              'h-7 rounded px-2.5 text-label',
-              view === value
-                ? 'bg-foreground/[0.08] text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            )}
-            key={value}
-            onClick={() => setView(value)}
-            size={null}
-            variant="custom"
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
+      <Segmented
+        label="Show the rows as"
+        onChange={setView}
+        options={[
+          ['grid', 'Cards'],
+          ['list', 'Table'],
+        ]}
+        value={view}
+      />
       {view === 'grid' ? (
         <div className="@container">
           <ul

@@ -78,10 +78,12 @@ import {
   itemAccounts,
   pendingAccounts,
   plainTextDraft,
+  plannedText,
   postOn,
   queueTimings,
   readTiming,
   runOutcomes,
+  shortWhen,
   spreadHourOptions,
   spreadTimings,
   stagedBody,
@@ -165,18 +167,6 @@ type Upload = { progress: number; error?: string }
 function when(at: Date | string, zone: string) {
   const date = typeof at === 'string' ? new Date(at) : at
   return `${date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone || undefined })}${zone ? ` (${zone})` : ''}`
-}
-
-/** A time beside a post, short because the batch names its zone once: 'Nov 3, 9:30 AM'. */
-function shortWhen(at: Date | string, zone: string) {
-  const date = typeof at === 'string' ? new Date(at) : at
-  return date.toLocaleString(undefined, {
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    month: 'short',
-    timeZone: zone || undefined,
-  })
 }
 
 /** A random retry key for an item and its draft. */
@@ -2095,16 +2085,7 @@ export function BatchWorkspace({
                       accountIds.length > 0 && remaining.length === 0
                         ? accountIds.map((id) => postOn(item, id)).find(Boolean)
                         : undefined
-                    // A proposal says Planned or Next queue slot; only the scheduler's answer says Scheduled.
-                    const planned = live
-                      ? `${postState(live.status, live.scheduledFor)} · ${shortWhen(live.scheduledFor, live.scheduleTimeZone ?? zone)}`
-                      : timing.kind === 'at'
-                        ? item.timing.mode === 'queue'
-                          ? `Next queue slot: ${shortWhen(timing.at, zone)}`
-                          : `Planned for ${shortWhen(timing.at, timing.zone || zone)}`
-                        : timing.kind === 'problem'
-                          ? timing.text
-                          : 'No time yet'
+                    const planned = plannedText(item, zone)
                     const problems = accountIds.flatMap((id) => {
                       const verdict = verdicts[verdictKey(item.id, id)]
                       if (verdict) return verdict.valid ? [] : [verdict.error]
@@ -2888,6 +2869,7 @@ export function BatchWorkspace({
         items={items}
         onItemChange={setPreviewing}
         options={videoOptions}
+        zone={zone}
       />
     </Page>
   )
