@@ -73,8 +73,22 @@ function formatNames(types: string[]) {
     .join(', ')
 }
 
+/** The shapes platforms ask for, named as people know them. */
+const SHAPES = [
+  ['9:16', 9 / 16],
+  ['4:5', 4 / 5],
+  ['1:1', 1],
+  ['16:9', 16 / 9],
+] as const
+
+/** A picture's shape: a known ratio when it is within 3%, else its size. */
+export function shapeName(width: number, height: number): string {
+  const ratio = width / height
+  return SHAPES.find(([, known]) => Math.abs(ratio / known - 1) < 0.03)?.[0] ?? `${width}×${height}`
+}
+
 /** A duration as minutes and seconds, such as 2:05. */
-function clock(ms: number) {
+export function clock(ms: number) {
   const seconds = Math.round(ms / 1000)
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  clock,
   DESTINATION_MEDIA,
   mediaChanges,
   mediaProblems,
   type MediaFacts,
+  shapeName,
 } from '@/lib/write/media-rules'
 import type { DraftChannel } from '@/lib/write/document'
 
@@ -127,4 +129,13 @@ test('video destinations require exactly one MP4 and refuse photos', () => {
       true
     )
   }
+})
+
+test('a picture is named by the platform shape it is within 3% of, else by its size', () => {
+  assert.equal(shapeName(1080, 1920), '9:16')
+  assert.equal(shapeName(1080, 1350), '4:5')
+  assert.equal(shapeName(1000, 1020), '1:1')
+  assert.equal(shapeName(1920, 1080), '16:9')
+  assert.equal(shapeName(1000, 1040), '1000×1040')
+  assert.equal(clock(65_600), '1:06')
 })

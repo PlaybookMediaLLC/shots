@@ -126,6 +126,7 @@ import { type Destination, DestinationSummary, destinationName } from '../destin
 import { BatchPreviewSheet } from './BatchPreview'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
+import { FileThumb, ImportReview, type Staged } from './ImportReview'
 import { GridCreator } from './GridCreator'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
@@ -139,14 +140,6 @@ const UPLOAD_CONCURRENCY = 3
 const VALIDATE_CHUNK = 25
 /** How often a running schedule's progress is read. */
 const SUBMIT_POLL_MS = 1500
-
-/** A row of the import preview; `files` holds each attachment's file, in order. */
-type Staged = {
-  files: (File | undefined)[]
-  input: BatchItemInput
-  line: number
-  problems: string[]
-}
 
 /** A saved attachment as an item's next save sends it. */
 function mediaInput({
@@ -289,6 +282,8 @@ function MediaTile({
       <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
         {picture ? (
           <img src={picture} alt="" className="size-full object-cover" />
+        ) : file && type.startsWith('video/') ? (
+          <FileThumb badge={!entry.durationMs} className="size-full" file={file} />
         ) : (
           <Icon aria-hidden className="size-7 text-muted-foreground" />
         )}
@@ -2051,63 +2046,7 @@ export function BatchWorkspace({
                     {preview.skipped.map((entry) => `${entry.name} (${entry.reason})`).join(', ')}
                   </p>
                 ) : null}
-                <Group>
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Row</TableHead>
-                        <TableHead>Caption</TableHead>
-                        <TableHead>Media</TableHead>
-                        <TableHead>Accounts</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.staged.map((row) => (
-                        <TableRow key={row.input.importKey} className="align-top">
-                          <TableCell>{row.line}</TableCell>
-                          <TableCell className="max-w-64 truncate">
-                            {row.input.caption || (
-                              <span className="text-muted-foreground">No caption</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="max-w-48 truncate">
-                            {row.input.media
-                              .map(
-                                (media) => ('assetId' in media && media.assetId) || media.fileName
-                              )
-                              .join(', ') || <span className="text-muted-foreground">None</span>}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.channelConnectionIds.map(accountName).join(', ') || (
-                              <span className="text-muted-foreground">None</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.timing.localTime
-                              ? `${row.input.timing.localTime.replace('T', ' ')} (${row.input.timing.timeZone})`
-                              : 'Set later'}
-                          </TableCell>
-                          <TableCell className="whitespace-normal">
-                            {row.problems.length ? (
-                              <div className="grid justify-items-start gap-1">
-                                <Pill tone="red">Needs fixing</Pill>
-                                {row.problems.map((problem) => (
-                                  <p key={problem} role="alert" className="text-destructive">
-                                    {problem}
-                                  </p>
-                                ))}
-                              </div>
-                            ) : (
-                              <Pill tone="green">Ready</Pill>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Group>
+                <ImportReview accountName={accountName} rows={preview.staged} />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     disabled={

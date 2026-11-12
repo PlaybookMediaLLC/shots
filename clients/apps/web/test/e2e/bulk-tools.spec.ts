@@ -63,6 +63,10 @@ test(
     await page.getByRole('button', { name: 'Preview import', exact: true }).click()
     const preview = page.getByTestId('import-preview')
     await expect(preview.getByText('Ready', { exact: true })).toHaveCount(2)
+    // Rows with files show as cards with their first picture, read from this browser's copy.
+    const cards = preview.getByRole('list', { name: 'Rows to add' }).getByRole('listitem')
+    await expect(cards).toHaveCount(2)
+    await expect(cards.first().locator('img')).toBeVisible()
     await expect(page.getByTestId('import-skipped')).toContainText('.DS_Store')
     await expect(page.getByTestId('import-skipped')).toContainText('notes.txt')
     // Nothing is added until the preview is accepted.
