@@ -1,5 +1,32 @@
 # Changelog
 
+## [2.49.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.48.0...v2.49.0) (2026-11-12)
+
+
+### Features
+
+* **web:** lay the bulk batch page out across the full width ([68714b4](https://github.com/PlaybookMediaLLC/shots/commit/68714b42c6605aae8ca5b7e246698d4fada97cf3))
+* **web:** lay the bulk batch page out across the full width ([d6ddb9d](https://github.com/PlaybookMediaLLC/shots/commit/d6ddb9dc9f43a1d8ac21ea1d9b3cbb3da26c1f32))
+* **web:** preview a whole batch as one platform's feed ([76122d8](https://github.com/PlaybookMediaLLC/shots/commit/76122d8187373010d1ecd283eb3cea804d073a44))
+* **web:** preview a whole batch as one platform's feed ([c2a30a0](https://github.com/PlaybookMediaLLC/shots/commit/c2a30a0da70cc15363be94276d711fee035619df))
+* **web:** preview each bulk post as its platforms show it ([9eba4fb](https://github.com/PlaybookMediaLLC/shots/commit/9eba4fb5e47ba1667533f24a8c39e5c0c82eba2d))
+* **web:** preview each bulk post as its platforms show it ([3ee634e](https://github.com/PlaybookMediaLLC/shots/commit/3ee634e2e684d20c3529111ba2ae9a0c0373d440))
+* **web:** show an import's pictures before anything is added ([3ae8770](https://github.com/PlaybookMediaLLC/shots/commit/3ae87704492ac6df2327be026348a4533057ebcf))
+* **web:** show an import's pictures before anything is added ([00bc0a1](https://github.com/PlaybookMediaLLC/shots/commit/00bc0a113547438c543bf628249f443ddcde4427))
+
+
+### Bug Fixes
+
+* **web:** keep the batch save bar clear of the toasts ([5eff579](https://github.com/PlaybookMediaLLC/shots/commit/5eff57945fc7a992e17c1637948690c2eb1ce4d4))
+* **web:** review fixes for the batch feed preview ([8987225](https://github.com/PlaybookMediaLLC/shots/commit/8987225ee5be53a00ac56b7027380573c64bf6ad))
+* **web:** review fixes for the bulk post preview ([0dc6ac9](https://github.com/PlaybookMediaLLC/shots/commit/0dc6ac9b90b91a9b692e3cb1726d35603a7e5b22))
+* **web:** review fixes for the import pictures ([f1701f5](https://github.com/PlaybookMediaLLC/shots/commit/f1701f593721df1a346cdb49ec8249e4a23648dc))
+
+
+### Performance Improvements
+
+* **web:** read import video frames three at a time, once per file ([31ea1ae](https://github.com/PlaybookMediaLLC/shots/commit/31ea1aee5b9dce8c6fff6a5202f7c96eb7d7b743))
+
 ## [2.48.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.47.2...v2.48.0) (2026-11-11)
 
 
