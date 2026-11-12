@@ -178,17 +178,15 @@ export function ImportReview({
     row.input.channelConnectionIds.map(accountName).join(', ') || 'No account'
   return (
     <div className="grid gap-3">
-      <div className="justify-self-start">
-        <Segmented
-          label="Show the rows as"
-          onChange={setView}
-          options={[
-            ['grid', 'Cards'],
-            ['list', 'Table'],
-          ]}
-          value={view}
-        />
-      </div>
+      <Segmented
+        label="Show the rows as"
+        onChange={setView}
+        options={[
+          ['grid', 'Cards'],
+          ['list', 'Table'],
+        ]}
+        value={view}
+      />
       {view === 'grid' ? (
         <div className="@container">
           <ul

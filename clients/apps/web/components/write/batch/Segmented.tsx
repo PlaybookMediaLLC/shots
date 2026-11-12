@@ -22,7 +22,7 @@ export function Segmented<T extends string>({
   return (
     <div
       aria-label={label}
-      className="inline-flex shrink-0 self-start rounded-md border border-border p-0.5"
+      className="inline-flex justify-self-start rounded-md border border-border p-0.5"
       role="group"
     >
       {options.map(([option, text]) => (

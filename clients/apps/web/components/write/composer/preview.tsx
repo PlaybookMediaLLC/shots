@@ -190,18 +190,49 @@ export function PreviewToolbar({
   )
 }
 
-/** One post as its platform draws it. */
-function PlatformPost({ item, target }: { item: PreviewCard; target: DraftTarget | null }) {
+/** One post as its platform draws it. Memoized: a feed draws many, and its page renders often. */
+const PlatformPost = React.memo(function PlatformPost({
+  item,
+  target,
+}: {
+  item: PreviewCard
+  target: DraftTarget | null
+}) {
   if (item.publication.target.options?.articleTitle) return <ArticlePreview item={item} />
   if (item.account.channel === 'linkedin') return <LinkedInPost item={item} target={target} />
   if (item.account.channel === 'tiktok') return <TikTokPost item={item} />
   return <ThreadPreview item={item} target={target} />
+})
+
+/**
+ * Draws its children once they come into view, and keeps them: a feed of a
+ * hundred posts loads only the media, documents and link cards someone sees.
+ */
+// ponytail: posts stay drawn once seen; unmount far-off posts if a long scroll through video posts grows memory.
+function WhenSeen({ children }: { children: React.ReactNode }) {
+  const box = React.useRef<HTMLDivElement>(null)
+  const [seen, setSeen] = React.useState(false)
+  React.useEffect(() => {
+    const node = box.current
+    if (!node || seen) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setSeen(true)
+    })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [seen])
+  return (
+    <div ref={box} className={seen ? undefined : 'h-32 rounded-2xl border border-border bg-muted/40'}>
+      {seen ? children : null}
+    </div>
+  )
 }
 
 /**
  * Several posts on one platform, one after another as its feed shows them,
- * in a desktop column or a chosen phone. A line above each post says when it
- * goes out, and its button opens that post on its own.
+ * each in a desktop column or a chosen phone. Above each post, at full size
+ * whatever the scale, a line says when it goes out, and its button opens
+ * that post on its own.
  */
 export function PreviewFeed({
   device,
@@ -214,27 +245,30 @@ export function PreviewFeed({
 }) {
   const size = DEVICES.find((entry) => entry.label === device)
   return (
-    <ScaledPreview width={size?.width ?? 600} height={size?.height}>
-      <ol aria-label="Feed preview" className="divide-y divide-border">
-        {posts.map(({ card, key, label, name }) => (
-          <li data-testid="feed-post" key={key}>
-            <div className="flex items-center justify-between gap-2 px-4 pt-3 text-[11px] text-muted-foreground">
-              <span>{label}</span>
-              <Button
-                className="h-auto p-0 text-[11px]"
-                onClick={() => onOpen(key)}
-                size={null}
-                type="button"
-                variant="link"
-              >
-                {name}
-              </Button>
-            </div>
-            <PlatformPost item={card} target={null} />
-          </li>
-        ))}
-      </ol>
-    </ScaledPreview>
+    <ol aria-label="Feed preview" className="grid gap-4">
+      {posts.map(({ card, key, label, name }) => (
+        // Keyed by account too: another platform draws the post afresh, as PreviewPanel does.
+        <li className="grid gap-1.5" data-testid="feed-post" key={`${key}:${card.account.id}`}>
+          <div className="flex items-center justify-between gap-2 text-label text-muted-foreground">
+            <span>{label}</span>
+            <Button
+              className="h-auto p-0 text-label"
+              onClick={() => onOpen(key)}
+              size={null}
+              type="button"
+              variant="link"
+            >
+              {name}
+            </Button>
+          </div>
+          <WhenSeen>
+            <ScaledPreview width={size?.width ?? 600} height={size?.height}>
+              <PlatformPost item={card} target={null} />
+            </ScaledPreview>
+          </WhenSeen>
+        </li>
+      ))}
+    </ol>
   )
 }
 

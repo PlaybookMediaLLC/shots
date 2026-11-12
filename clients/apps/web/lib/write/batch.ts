@@ -309,10 +309,10 @@ export type TimingView =
   | { kind: 'problem'; text: string }
 
 /**
- * A batch's posts on one platform, in order, as its feed preview shows them:
- * each post that goes to an account there, built as previewPublications
- * builds it, with when it goes out. A post the preview cannot build is left
- * out and counted in `refused`.
+ * A batch's posts on one platform, in list order, as its feed preview shows
+ * them: each post that goes to an account there, built as previewPublications
+ * builds it, with when it goes out there. A post the preview cannot build is
+ * left out and counted in `refused`.
  */
 export function feedPublications(
   items: readonly BatchItem[],
@@ -321,25 +321,27 @@ export function feedPublications(
   channel: DraftChannel,
   zone: string
 ) {
-  const posts: {
-    card: { account: BatchAccount; publication: Publication }
-    key: string
-    label: string
-    name: string
-  }[] = []
   let refused = 0
-  items.forEach((item, index) => {
+  const posts = items.flatMap((item, index) => {
     const ids = itemAccounts(item)
     const account = accounts.find(
       (candidate) => candidate.channel === channel && ids.includes(candidate.id)
     )
-    if (!account) return
+    if (!account) return []
     const [card] = previewPublications(item, [account], options).cards
     if (!card) {
       refused += 1
-      return
+      return []
     }
-    posts.push({ card, key: item.id, label: plannedText(item, zone), name: `Post ${index + 1}` })
+    return [
+      {
+        card,
+        key: item.id,
+        // A grid video has no picture until it is rendered: the feed says so beside it.
+        label: waitingToRender(item) ? 'Not rendered yet' : plannedText(item, zone, [account.id]),
+        name: `Post ${index + 1}`,
+      },
+    ]
   })
   return { posts, refused }
 }
@@ -358,12 +360,16 @@ export function shortWhen(at: Date | string, zone: string) {
 
 /**
  * When an item goes out, as its row and the feed preview say it. Once every
- * account has a post, the scheduler's answer; else the proposal (Planned
- * for, or the next queue slot), else what is missing. Only the scheduler's
- * answer says Scheduled.
+ * account given has a post, the scheduler's answer; else the proposal
+ * (Planned for, or the next queue slot), else what is missing. Only the
+ * scheduler's answer says Scheduled. The row asks about all its accounts; the
+ * feed asks about the one account it shows.
  */
-export function plannedText(item: BatchItem, zone: string): string {
-  const accountIds = itemAccounts(item)
+export function plannedText(
+  item: BatchItem,
+  zone: string,
+  accountIds: string[] = itemAccounts(item)
+): string {
   const live =
     accountIds.length > 0 && pendingAccounts(item, accountIds).remaining.length === 0
       ? accountIds.map((id) => postOn(item, id)).find(Boolean)

@@ -288,6 +288,12 @@ test(
     await expect(sheet.getByTestId('feed-post').first()).toContainText('Post 1.')
     await sheet.getByRole('button', { name: 'Post 4', exact: true }).click()
     await expect(sheet.getByRole('heading', { name: 'Post 4 of 10' })).toBeVisible()
+    // Closed from the feed, the sheet opens again on one post.
+    await sheet.getByRole('button', { name: 'Feed', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    await page.getByRole('button', { name: 'Preview posts', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 1 of 10' })).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(sheet).toBeHidden()
 

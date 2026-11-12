@@ -36,7 +36,7 @@ const ownsArrows = (target: EventTarget) =>
 
 /**
  * A batch's posts as their platforms show them, in a side sheet: one at a
- * time, or all of them as one platform's feed, in posting order. The arrows
+ * time, or all of them as one platform's feed, in list order. The arrows
  * and the ← and → keys step through the posts, and the platform and device
  * chosen stay as they step and between the two views. The post is followed by
  * its id, so a list that changes underneath never shows another post.
@@ -97,8 +97,10 @@ export function BatchPreviewSheet({
       used.has(account.id) &&
       all.findIndex((other) => used.has(other.id) && other.channel === account.channel) === at
   )
+  // With no platform picked, the feed opens on the one the post on screen shows.
   const feedChannel =
     channels.find((account) => account.channel === selection.channel)?.channel ??
+    channels.find((account) => account.channel === preview.cards[0]?.account.channel)?.channel ??
     channels[0]?.channel
   const feed = React.useMemo(
     () =>
@@ -182,7 +184,7 @@ export function BatchPreviewSheet({
             {mode === 'post'
               ? caption || 'No caption'
               : feedChannel
-                ? `${feed.posts.length} of ${items.length} posts go to ${CHANNEL_META[feedChannel].label}, in posting order.`
+                ? `${feed.posts.length + feed.refused} of ${items.length} posts go to ${CHANNEL_META[feedChannel].label}, in list order.`
                 : 'No post goes to an account yet.'}
           </SheetDescription>
         </SheetHeader>
@@ -203,6 +205,8 @@ export function BatchPreviewSheet({
               <PreviewFeed
                 device={selection.device}
                 onOpen={(key) => {
+                  // The post opens on the platform the feed shows.
+                  setSelection({ ...selection, channel: feedChannel ?? null })
                   setMode('post')
                   onItemChange(key)
                 }}
