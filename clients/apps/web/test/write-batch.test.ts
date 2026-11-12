@@ -15,6 +15,7 @@ import {
   readTiming,
   spreadHourOptions,
   spreadTimings,
+  stagedBody,
   stagedChecks,
   stagedVersions,
 } from '@/lib/write/batch'
@@ -301,4 +302,59 @@ test('only a plain single post can take new words from the batch', () => {
   )
   assert.equal(plainTextDraft([{ ...plain[0], poll: { options: [] } }, plain[1]]), false)
   assert.equal(plainTextDraft(null), false)
+})
+
+test('a staged body holds each post, then only the attachments already uploaded', () => {
+  const body = stagedBody({
+    caption: 'First post.\n---\nSecond post.',
+    media: [
+      {
+        assetId: 'img',
+        bytes: 1,
+        durationMs: null,
+        height: 1,
+        mediaType: 'image/png',
+        status: 'UPLOADED',
+        width: 1,
+      },
+      {
+        assetId: 'vid',
+        bytes: 1,
+        durationMs: 1000,
+        height: 1,
+        mediaType: 'video/mp4',
+        status: 'UPLOADED',
+        width: 1,
+      },
+      {
+        assetId: 'doc',
+        bytes: 1,
+        durationMs: null,
+        height: null,
+        mediaType: 'application/pdf',
+        status: 'UPLOADED',
+        width: null,
+      },
+      {
+        fileName: 'late.png',
+        bytes: 1,
+        durationMs: null,
+        height: null,
+        status: 'local',
+        width: null,
+      },
+    ],
+  })
+  const kinds = body.map((node) => node.type)
+  assert.deepEqual(kinds.filter((kind) => kind === 'post_break').length, 2)
+  assert.deepEqual(
+    body.filter((node) => 'assetId' in node).map((node) => [node.type, node.assetId]),
+    [
+      ['img', 'img'],
+      ['video', 'vid'],
+      ['file', 'doc'],
+    ]
+  )
+  // An empty caption still makes one empty post, so the draft has a body.
+  assert.equal(stagedBody({ caption: '', media: [] }).length, 2)
 })

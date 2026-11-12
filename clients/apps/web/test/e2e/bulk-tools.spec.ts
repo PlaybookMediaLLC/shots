@@ -265,6 +265,19 @@ test(
     }
     expect(batch.items).toHaveLength(10)
 
+    // Each post previews as its platforms show it; the arrows step through the batch.
+    await page.getByRole('button', { name: 'Preview posts', exact: true }).click()
+    const sheet = page.getByTestId('batch-preview')
+    await expect(sheet.getByRole('heading', { name: 'Post 1 of 10' })).toBeVisible()
+    await expect(sheet.getByTestId('preview-panel')).toContainText('Post 1.')
+    await sheet.getByRole('button', { name: 'Next post', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 2 of 10' })).toBeVisible()
+    await page.keyboard.press('ArrowRight')
+    await expect(sheet.getByRole('heading', { name: 'Post 3 of 10' })).toBeVisible()
+    await expect(sheet.getByTestId('preview-panel')).toContainText('Post 3.')
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+
     // Hourly from 09:00 to 11:00: three a day, the rest from 09:00 the next day.
     await chooseOption(page.getByRole('combobox', { name: 'Batch time mode' }), 'Every hour')
     const until = page.getByRole('textbox', { name: 'Hourly end of day' })

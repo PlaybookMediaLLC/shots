@@ -84,6 +84,7 @@ import {
   runOutcomes,
   spreadHourOptions,
   spreadTimings,
+  stagedBody,
   stagedChecks,
   stagedVersions,
   waitingToRender,
@@ -101,7 +102,7 @@ import { groupFiles, isInFolder, storedFileName } from '@/lib/write/bulk-intake'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, VersionOptions } from '@/lib/write/document'
-import { importedBody, importedPosts } from '@/lib/write/import-text'
+import { importedBody } from '@/lib/write/import-text'
 import { blankDraftContext } from '@/lib/write/composing-session'
 import {
   countingChannelFor,
@@ -112,6 +113,7 @@ import {
 import { wallTime } from '@/lib/write/zoned-time'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
+import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye'
 import { uploadByteLimit } from '@/lib/write/media-limits'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
@@ -121,6 +123,7 @@ import { VideoOptions } from '../composer/video-options'
 import { type PasteChoice } from '../paste-split'
 import { useKeys } from '../shortcuts'
 import { type Destination, DestinationSummary, destinationName } from '../destination-summary'
+import { BatchPreviewSheet } from './BatchPreview'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
 import { GridCreator } from './GridCreator'
@@ -1170,6 +1173,8 @@ export function BatchWorkspace({
   const [rowErrors, setRowErrors] = React.useState<Record<string, string>>({})
   /** Posts whose time and accounts are open; the rest show one line of each. */
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
+  /** The post open in the preview sheet, by its place in the list. */
+  const [previewing, setPreviewing] = React.useState<number | null>(null)
   const draftSaves = React.useRef(new Map<string, Promise<void>>())
   const recheck = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const busyRef = React.useRef(busy)
@@ -1410,22 +1415,11 @@ export function BatchWorkspace({
       if (item.draftId || item.media.some((entry) => !entry.assetId) || waitingToRender(item))
         continue
       try {
-        const posts = importedPosts(item.caption)
-        const body = importedBody(posts.length ? posts : [''])
-        const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+        const body = stagedBody(item)
         const channels = accounts
           .filter((account) => item.channelConnectionIds.includes(account.id))
           .map((account) => account.channel)
         const platformVersions = stagedVersions(item, channels, videoOptions)
-        for (const entry of item.media)
-          body.push({
-            type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
-            assetId: entry.assetId!,
-            url: assetContentUrl(entry.assetId!),
-            ...(entry.mediaType ? { mimeType: entry.mediaType } : {}),
-            name: entry.fileName ?? '',
-            children: [{ text: '' }],
-          })
         replaceItem(
           await call<BatchItem>(`${base}/items/${encodeURIComponent(item.id)}/draft`, {
             method: 'POST',
@@ -2145,6 +2139,14 @@ export function BatchWorkspace({
                 ? `${items.length} post${items.length === 1 ? '' : 's'} in this batch.`
                 : 'No posts yet. Write one below or add files.'
             }
+            actions={
+              items.length ? (
+                <Button onClick={() => setPreviewing(0)} size="sm" variant="outline">
+                  <EyeIcon aria-hidden />
+                  Preview posts
+                </Button>
+              ) : null
+            }
           >
             {/* The posts read as Write shows a post: who it goes out as, its words,
                 its length and when it is planned. The writing box ends the list. */}
@@ -2380,6 +2382,16 @@ export function BatchWorkspace({
                           ) : ready ? (
                             <Pill tone="green">Ready</Pill>
                           ) : null}
+                          <Button
+                            aria-label={`Preview post ${index + 1}`}
+                            className="inline-flex items-center gap-1 text-label text-muted-foreground hover:text-foreground"
+                            onClick={() => setPreviewing(index)}
+                            size={null}
+                            variant="custom"
+                          >
+                            <EyeIcon aria-hidden className="size-3.5" />
+                            Preview
+                          </Button>
                           {item.draftId ? (
                             <a
                               className="inline-flex items-center gap-1 text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
@@ -2940,6 +2952,13 @@ export function BatchWorkspace({
           </section>
         ) : null}
       </div>
+      <BatchPreviewSheet
+        accounts={accounts}
+        index={previewing}
+        items={items}
+        onIndexChange={setPreviewing}
+        options={videoOptions}
+      />
     </Page>
   )
 }

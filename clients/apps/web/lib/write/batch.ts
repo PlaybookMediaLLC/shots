@@ -1,8 +1,10 @@
 import type { BatchItem, BatchRun, BatchTiming } from '@/lib/api/contracts/content-batches'
 import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
+import { assetContentUrl } from '@/lib/editor/services'
 import type { AccountStanding } from '@/lib/write/capabilities'
-import type { DraftChannel, VersionOptions } from '@/lib/write/document'
+import type { DraftChannel, PlateBody, VersionOptions } from '@/lib/write/document'
+import { importedBody, importedPosts } from '@/lib/write/import-text'
 import { LABELS, mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
 import { analyzeSpintax } from '@/lib/write/spintax'
 import { readVersions, withOptions } from '@/lib/write/versions'
@@ -26,6 +28,8 @@ export type BatchAccount = {
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
   tiktokCreator?: AccountStanding['tiktokCreator']
+  /** An X account's own limit, which the preview counts against. */
+  xCaptionLimit?: AccountStanding['maxWeightedCharacters']
 }
 
 /**
@@ -141,6 +145,28 @@ export function stagedVersions(
     changed = true
   }
   return changed ? versions : undefined
+}
+
+/**
+ * The body a staged item's draft starts with: its caption as posts (a line of
+ * --- starts the next), then each uploaded attachment. Saving and the preview
+ * both build it here, so the preview shows what the draft will hold.
+ */
+export function stagedBody(item: Pick<BatchItem, 'caption' | 'media'>): PlateBody {
+  const posts = importedPosts(item.caption)
+  const body = importedBody(posts.length ? posts : [''])
+  const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+  for (const entry of item.media)
+    if (entry.assetId)
+      body.push({
+        type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
+        assetId: entry.assetId,
+        url: assetContentUrl(entry.assetId),
+        ...(entry.mediaType ? { mimeType: entry.mediaType } : {}),
+        name: entry.fileName ?? '',
+        children: [{ text: '' }],
+      })
+  return body
 }
 
 /** The hours between posts that keep a day's posts inside its 24 hours. */
