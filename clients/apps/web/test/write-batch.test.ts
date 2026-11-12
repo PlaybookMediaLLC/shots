@@ -5,8 +5,10 @@ import {
   batchAudience,
   batchSummary,
   captionProblem,
+  feedPublications,
   hourlyWindow,
   plainTextDraft,
+  plannedText,
   itemAccounts,
   previewPublications,
   pendingAccounts,
@@ -389,4 +391,40 @@ test('a preview builds each account publication as saving builds the draft', () 
   const refused = previewPublications(item({ caption: long }), accounts, {})
   assert.deepEqual(refused.cards, [])
   assert.match(refused.problem ?? '', /at most 25 posts/)
+})
+
+test('a post says when it is planned until the scheduler answers', () => {
+  assert.equal(plannedText(item({ timing: {} }), 'UTC'), 'No time yet')
+  assert.match(
+    plannedText(
+      item({ timing: { mode: 'time', localTime: '2026-11-13T09:30', timeZone: 'UTC' } }),
+      'UTC'
+    ),
+    /^Planned for Nov 13/
+  )
+})
+
+test('the feed shows the posts that go to its platform, in order, with their times', () => {
+  const long = Array.from({ length: 26 }, (_, at) => `Part ${at + 1}`).join('\n---\n')
+  const feed = feedPublications(
+    [
+      item({ caption: 'First', channelConnectionIds: ['x'], id: 'one' }),
+      item({ caption: 'Second', channelConnectionIds: ['li'], id: 'two' }),
+      item({ caption: long, channelConnectionIds: ['x'], id: 'three' }),
+      item({ caption: 'Fourth', channelConnectionIds: ['x', 'li'], id: 'four' }),
+    ],
+    accounts,
+    {},
+    'x',
+    'UTC'
+  )
+  assert.deepEqual(
+    feed.posts.map((post) => [post.key, post.name, post.card.account.id, post.label]),
+    [
+      ['one', 'Post 1', 'x', 'No time yet'],
+      ['four', 'Post 4', 'x', 'No time yet'],
+    ]
+  )
+  // A post the preview cannot build is counted, not dropped unseen.
+  assert.equal(feed.refused, 1)
 })
