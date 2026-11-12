@@ -106,6 +106,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsignupsource"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -314,6 +315,7 @@ func checkColumn(t, c string) error {
 			platformoauthconsent.Table:            platformoauthconsent.ValidColumn,
 			platformoauthjwk.Table:                platformoauthjwk.ValidColumn,
 			platformoauthrefreshtoken.Table:       platformoauthrefreshtoken.ValidColumn,
+			platformsignupsource.Table:            platformsignupsource.ValidColumn,
 			platformslackconnection.Table:         platformslackconnection.ValidColumn,
 			platformslackinstallation.Table:       platformslackinstallation.ValidColumn,
 			platformslackpacing.Table:             platformslackpacing.ValidColumn,

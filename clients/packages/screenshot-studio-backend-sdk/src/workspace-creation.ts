@@ -33,6 +33,34 @@ export const workspaceCreationLogoSchema = z
     return !url.username && !url.password
   }, 'Logo URLs must not contain credentials.')
 
+/** Where a workspace's creator heard about Shots, as the backend's platform_signup_source stores it. */
+export const signupSourceSchema = z.enum([
+  'search',
+  'ai_assistant',
+  'x',
+  'linkedin',
+  'youtube',
+  'tiktok_instagram',
+  'reddit',
+  'product_hunt_hacker_news',
+  'friend_colleague',
+  'newsletter_blog_podcast',
+  'event_community',
+  'other',
+])
+
+/** One of {@link signupSourceSchema}. */
+export type SignupSource = z.infer<typeof signupSourceSchema>
+
+/** The creator's answer: one source, and a short detail that only "other" takes. */
+export const signupSourceInputSchema = z
+  .strictObject({
+    source: signupSourceSchema,
+    // Plain text: the database refuses NUL, and nothing here needs a control character.
+    detail: z.string().trim().max(200).regex(/^\P{Cc}*$/u, 'Use plain text.').optional(),
+  })
+  .refine((answer) => !answer.detail || answer.source === 'other', 'Only "Other" takes a detail.')
+
 /** Session-owned creation intent; callers retain the key when retrying. */
 export const workspaceCreationInputSchema = z.strictObject({
   name: workspaceNameInputSchema,
@@ -42,6 +70,7 @@ export const workspaceCreationInputSchema = z.strictObject({
   timeZone: z.string().max(100).optional(),
   logo: workspaceCreationLogoSchema.nullish(),
   metadata: workspaceCreationMetadataSchema.optional(),
+  heardAbout: signupSourceInputSchema.optional(),
 })
 
 /** Input for the canonical atomic workspace creation service. */
