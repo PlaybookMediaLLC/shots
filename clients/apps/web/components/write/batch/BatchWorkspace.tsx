@@ -19,13 +19,13 @@ import {
   Page,
   Pill,
   type PillTone,
-  Row,
   Section,
 } from '@/components/platform-ui'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
+import { Disclosure, DisclosureContent, DisclosureTrigger } from '@/components/ui/disclosure'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,12 +78,15 @@ import {
   itemAccounts,
   pendingAccounts,
   plainTextDraft,
+  plannedText,
   postOn,
   queueTimings,
   readTiming,
   runOutcomes,
+  shortWhen,
   spreadHourOptions,
   spreadTimings,
+  stagedBody,
   stagedChecks,
   stagedVersions,
   waitingToRender,
@@ -101,7 +104,7 @@ import { groupFiles, isInFolder, storedFileName } from '@/lib/write/bulk-intake'
 import { CAPABILITIES } from '@/lib/write/capabilities'
 import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, VersionOptions } from '@/lib/write/document'
-import { importedBody, importedPosts } from '@/lib/write/import-text'
+import { importedBody } from '@/lib/write/import-text'
 import { blankDraftContext } from '@/lib/write/composing-session'
 import {
   countingChannelFor,
@@ -112,7 +115,9 @@ import {
 import { wallTime } from '@/lib/write/zoned-time'
 import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
+import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye'
 import { uploadByteLimit } from '@/lib/write/media-limits'
+import { clock } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { expandSpintax } from '@/lib/write/spintax'
@@ -121,8 +126,10 @@ import { VideoOptions } from '../composer/video-options'
 import { type PasteChoice } from '../paste-split'
 import { useKeys } from '../shortcuts'
 import { type Destination, DestinationSummary, destinationName } from '../destination-summary'
+import { BatchPreviewSheet } from './BatchPreview'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
+import { FileThumb, ImportReview, type Staged } from './ImportReview'
 import { GridCreator } from './GridCreator'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
@@ -136,14 +143,6 @@ const UPLOAD_CONCURRENCY = 3
 const VALIDATE_CHUNK = 25
 /** How often a running schedule's progress is read. */
 const SUBMIT_POLL_MS = 1500
-
-/** A row of the import preview; `files` holds each attachment's file, in order. */
-type Staged = {
-  files: (File | undefined)[]
-  input: BatchItemInput
-  line: number
-  problems: string[]
-}
 
 /** A saved attachment as an item's next save sends it. */
 function mediaInput({
@@ -168,18 +167,6 @@ type Upload = { progress: number; error?: string }
 function when(at: Date | string, zone: string) {
   const date = typeof at === 'string' ? new Date(at) : at
   return `${date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', timeZone: zone || undefined })}${zone ? ` (${zone})` : ''}`
-}
-
-/** A time beside a post, short because the batch names its zone once: 'Nov 3, 9:30 AM'. */
-function shortWhen(at: Date | string, zone: string) {
-  const date = typeof at === 'string' ? new Date(at) : at
-  return date.toLocaleString(undefined, {
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    month: 'short',
-    timeZone: zone || undefined,
-  })
 }
 
 /** A random retry key for an item and its draft. */
@@ -240,10 +227,6 @@ const FORMAT_NAMES: Record<string, string> = {
   'video/webm': 'WebM',
 }
 
-/** A length as minutes and seconds, such as 1:05. */
-const clock = (ms: number) =>
-  `${Math.floor(ms / 60_000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`
-
 /** One attachment of a post: its picture or kind, and where its upload stands. */
 function MediaTile({
   entry,
@@ -258,14 +241,7 @@ function MediaTile({
 }) {
   const type = entry.mediaType ?? file?.type ?? ''
   const stored = entry.assetId ?? (entry.status === 'UPLOADED' ? entry.uploadAssetId : undefined)
-  const [local, setLocal] = React.useState<string>()
-  React.useEffect(() => {
-    if (stored || !file || !type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setLocal(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file, stored, type])
-  const picture = type.startsWith('image/') ? (stored ? assetContentUrl(stored) : local) : undefined
+  const picture = stored && type.startsWith('image/') ? assetContentUrl(stored) : undefined
   const Icon =
     type === 'application/pdf' ? PdfIcon : type.startsWith('video/') ? VideoIcon : ImageIcon
   const problem = Boolean(upload?.error) || entry.status === 'FAILED'
@@ -286,6 +262,9 @@ function MediaTile({
       <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
         {picture ? (
           <img src={picture} alt="" className="size-full object-cover" />
+        ) : file ? (
+          // This tab's copy of the file, until the stored one can be shown.
+          <FileThumb badge={entry.status !== 'UPLOADED'} className="size-full" file={file} />
         ) : (
           <Icon aria-hidden className="size-7 text-muted-foreground" />
         )}
@@ -545,6 +524,12 @@ function itemStatus(item: BatchItem): { text: string; tone: PillTone } {
 /** A size people read: 1.2 MB. */
 const megabytes = (bytes: number) => `${(bytes / 1_000_000).toFixed(1)} MB`
 
+/** Move focus to a block that opened away from its control, and scroll it to the top. */
+function reveal(element: HTMLElement | null) {
+  element?.focus({ preventScroll: true })
+  element?.scrollIntoView({ block: 'start' })
+}
+
 /**
  * Bulk scheduling (RFC 042): many separate posts, each its own draft. The
  * batch lives in the backend, so a reload, a closed tab or another device
@@ -759,6 +744,13 @@ export function BatchWorkspace({
     staged: Staged[]
     unused: string[]
   } | null>(null)
+  // The preview and the grid creator open in the posts column, away from the
+  // rail controls that open them, so focus and the view move to them.
+  const previewRef = React.useRef<HTMLDivElement>(null)
+  const gridRef = React.useRef<HTMLDivElement>(null)
+  React.useEffect(() => {
+    if (preview) reveal(previewRef.current)
+  }, [preview])
   const dropzone = useDropzone({ noClick: true, noKeyboard: true, onDrop: setChosen })
   const folderChosen = chosen.some(isInFolder)
   const destinations = accounts.map((account) => ({
@@ -1020,9 +1012,13 @@ export function BatchWorkspace({
   /** The row to focus once the posts just added are on the page. */
   const focusRow = React.useRef<string | null>(null)
   const room = Math.max(0, BATCH_ITEM_LIMIT - items.length)
+  // A batch started for grid videos, or already holding them, leads with them, not the import.
+  const gridFirst = start === 'grid' || items.some((item) => item.grid)
   // Imports lead for a batch started from files, or one already holding them; text batches lead with writing.
   const importFirst =
-    start !== 'text' && !(items.length > 0 && items.every((item) => !item.media.length && !item.grid))
+    !gridFirst &&
+    start !== 'text' &&
+    !(items.length > 0 && items.every((item) => !item.media.length && !item.grid))
   const [importing, setImporting] = React.useState(importFirst)
   const addPasted = async (captions: string[], as: PasteChoice): Promise<boolean> => {
     if (!captions.length) return false
@@ -1153,6 +1149,8 @@ export function BatchWorkspace({
   const [rowErrors, setRowErrors] = React.useState<Record<string, string>>({})
   /** Posts whose time and accounts are open; the rest show one line of each. */
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
+  /** The post open in the preview sheet, by its id. */
+  const [previewing, setPreviewing] = React.useState<string | null>(null)
   const draftSaves = React.useRef(new Map<string, Promise<void>>())
   const recheck = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   const busyRef = React.useRef(busy)
@@ -1393,22 +1391,11 @@ export function BatchWorkspace({
       if (item.draftId || item.media.some((entry) => !entry.assetId) || waitingToRender(item))
         continue
       try {
-        const posts = importedPosts(item.caption)
-        const body = importedBody(posts.length ? posts : [''])
-        const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+        const body = stagedBody(item)
         const channels = accounts
           .filter((account) => item.channelConnectionIds.includes(account.id))
           .map((account) => account.channel)
         const platformVersions = stagedVersions(item, channels, videoOptions)
-        for (const entry of item.media)
-          body.push({
-            type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
-            assetId: entry.assetId!,
-            url: assetContentUrl(entry.assetId!),
-            ...(entry.mediaType ? { mimeType: entry.mediaType } : {}),
-            name: entry.fileName ?? '',
-            children: [{ text: '' }],
-          })
         replaceItem(
           await call<BatchItem>(`${base}/items/${encodeURIComponent(item.id)}/draft`, {
             method: 'POST',
@@ -1668,8 +1655,6 @@ export function BatchWorkspace({
   const checked = Object.keys(verdicts).length > 0
   // Smaller action buttons on phones, where the bar stays over the posts.
   const compact = useIsMobile() ? 'sm' : 'default'
-  // A batch started for grid videos, or already holding them, opens on them.
-  const gridFirst = start === 'grid' || items.some((item) => item.grid)
   const gridCreator = showGrid ? (
     <GridCreator
       disabled={busy !== null}
@@ -1747,8 +1732,10 @@ export function BatchWorkspace({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* Wide screens always show the import beside the posts. */}
           <Button
             aria-expanded={importing}
+            className="xl:hidden"
             onClick={() => setImporting((open) => !open)}
             variant={importing ? 'secondary' : 'outline'}
           >
@@ -1770,127 +1757,107 @@ export function BatchWorkspace({
         </>
       }
     >
+      {missingFiles.length > 0 ? (
+        <Alert role="status">
+          <UploadIcon />
+          <AlertTitle>
+            {missingFiles.length} file{missingFiles.length === 1 ? '' : 's'} did not finish
+            uploading before the page closed
+          </AlertTitle>
+          <AlertDescription className="grid gap-3">
+            <p>
+              {[...new Set(missingFiles.map(({ entry }) => entry.fileName))].join(', ')}. Select
+              the same files again to continue; large files resume where they stopped, and nothing
+              else is lost.
+            </p>
+            <FilePicker
+              accept={ACCEPT}
+              label="Select the files again"
+              multiple
+              onFiles={reselect}
+            />
+            <FilePicker
+              accept={IMAGE_ACCEPT}
+              directory
+              label="Select the folder again"
+              multiple
+              onFiles={reselect}
+            />
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <div
-        className="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6"
+        className="grid w-full grid-cols-[minmax(0,1fr)] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:gap-8"
         data-testid="bulk-batch"
       >
-        {missingFiles.length > 0 ? (
-          <Alert role="status">
-            <UploadIcon />
-            <AlertTitle>
-              {missingFiles.length} file{missingFiles.length === 1 ? '' : 's'} did not finish
-              uploading before the page closed
-            </AlertTitle>
-            <AlertDescription className="grid gap-3">
-              <p>
-                {[...new Set(missingFiles.map(({ entry }) => entry.fileName))].join(', ')}. Select
-                the same files again to continue; large files resume where they stopped, and nothing
-                else is lost.
-              </p>
-              <FilePicker
-                accept={ACCEPT}
-                label="Select the files again"
-                multiple
-                onFiles={reselect}
-              />
-              <FilePicker
-                accept={IMAGE_ACCEPT}
-                directory
-                label="Select the folder again"
-                multiple
-                onFiles={reselect}
-              />
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        {gridFirst ? gridCreator : null}
-
-        {importing ? (
-          <section
-            aria-label="Import"
-            className="grid gap-4 rounded-xl border border-border bg-card p-4 sm:p-5"
-          >
-            <div>
-              <h2 className="text-ui font-medium text-foreground">Import</h2>
-              <p className="text-label text-muted-foreground">
-                Photos, videos, folders or a CSV. Nothing is added until you review the preview.
-              </p>
-            </div>
-            <Group>
-              <Row
-                label={
-                  start === 'videos'
-                    ? 'Videos'
-                    : start === 'images'
-                      ? 'Image folders'
-                      : 'Photos, videos and folders'
-                }
-                description={
-                  start === 'videos'
-                    ? 'Each video becomes its own post, or matches a CSV row by its exact name. MP4, MOV and WebM; each destination’s own length and size limits are checked before scheduling.'
-                    : start === 'images'
-                      ? 'A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP and GIF.'
-                      : 'Each file becomes its own post, or matches a CSV row by its exact name. A folder of images becomes one post, and a parent folder makes one post per subfolder, in name order. JPEG, PNG, WebP, GIF, MP4, MOV and WebM; PDFs go to LinkedIn as documents.'
-                }
-              >
-                <div
-                  {...dropzone.getRootProps({
-                    className: cn(
-                      'flex w-full flex-col items-start gap-2 rounded-xl border border-dashed border-border p-4',
-                      dropzone.isDragActive && 'border-primary bg-muted'
-                    ),
-                  })}
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {start !== 'images' ? (
-                      <FilePicker
-                        accept={start === 'videos' ? VIDEO_ACCEPT : ACCEPT}
-                        label="Batch media files"
-                        multiple
-                        onFiles={setChosen}
-                      >
-                        {start === 'videos' ? 'Choose videos' : 'Choose files'}
-                      </FilePicker>
-                    ) : null}
-                    {start !== 'videos' ? (
-                      <FilePicker
-                        accept={IMAGE_ACCEPT}
-                        directory
-                        label="Batch image folder"
-                        multiple
-                        onFiles={setChosen}
-                      >
-                        Choose a folder
-                      </FilePicker>
-                    ) : null}
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      disabled={busy !== null}
-                      onClick={() => void addEmptyPost()}
-                    >
-                      Add an empty post
-                    </Button>
-                    {!showGrid ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setGridOpen(true)}
-                      >
-                        Create grid videos
-                      </Button>
-                    ) : null}
+        {/* Adding posts, and settings for all of them: first on phones, beside the posts on wide screens. */}
+        <aside
+          aria-label="Batch tools"
+          className={cn(
+            'grid min-w-0 content-start gap-6 xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:overflow-y-auto',
+            // The save bar, once there are posts, stays clear of the rail's last rows.
+            items.length ? 'xl:max-h-[calc(100dvh-18rem)]' : 'xl:max-h-[calc(100dvh-5rem)]',
+            !importing && !videoChannels.length && 'max-xl:hidden'
+          )}
+        >
+          <div className={cn('grid gap-6', !importing && 'max-xl:hidden')}>
+            <Section title="Add posts" description="Nothing is added until you review the preview.">
+              <Group>
+                <div className="grid gap-3 p-4">
+                  <div
+                    {...dropzone.getRootProps({
+                      className: cn(
+                        'grid justify-items-center gap-3 rounded-lg border border-dashed border-border px-4 py-7 text-center transition-colors',
+                        dropzone.isDragActive && 'border-primary bg-muted'
+                      ),
+                    })}
+                  >
+                    <UploadIcon aria-hidden className="size-5 text-muted-foreground" />
+                    <p className="text-ui font-medium text-foreground">
+                      {dropzone.isDragActive
+                        ? 'Drop to add'
+                        : start === 'videos'
+                          ? 'Drop videos here'
+                          : start === 'images'
+                            ? 'Drop image folders here'
+                            : 'Drop files or folders here'}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {start !== 'images' ? (
+                        <FilePicker
+                          accept={start === 'videos' ? VIDEO_ACCEPT : ACCEPT}
+                          label="Batch media files"
+                          multiple
+                          onFiles={setChosen}
+                        >
+                          {start === 'videos' ? 'Choose videos' : 'Choose files'}
+                        </FilePicker>
+                      ) : null}
+                      {start !== 'videos' ? (
+                        <FilePicker
+                          accept={IMAGE_ACCEPT}
+                          directory
+                          label="Batch image folder"
+                          multiple
+                          onFiles={setChosen}
+                        >
+                          Choose a folder
+                        </FilePicker>
+                      ) : null}
+                    </div>
+                    <p className="text-label text-pretty text-muted-foreground">
+                      {chosen.length
+                        ? `${chosen.length} file${chosen.length === 1 ? '' : 's'} · ${megabytes(chosen.reduce((sum, file) => sum + file.size, 0))}`
+                        : start === 'videos'
+                          ? 'MP4, MOV or WebM. Each video becomes one post.'
+                          : start === 'images'
+                            ? 'JPEG, PNG, WebP or GIF. A folder becomes one post; a parent folder makes one per subfolder.'
+                            : 'Images, videos, and PDFs for LinkedIn. Each file becomes one post; a folder of images becomes one.'}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {chosen.length
-                      ? `${chosen.length} file${chosen.length === 1 ? '' : 's'} · ${megabytes(chosen.reduce((sum, file) => sum + file.size, 0))}`
-                      : 'Or drop files or folders here.'}
-                  </p>
                   {start !== 'videos' && (folderChosen || start === 'images') ? (
-                    <Label className="font-normal">
+                    <Label className="justify-self-center font-normal">
                       <Checkbox
                         checked={perImage}
                         onCheckedChange={(checked) => setPerImage(checked === true)}
@@ -1898,61 +1865,143 @@ export function BatchWorkspace({
                       One post per image
                     </Label>
                   ) : null}
+                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                    <Button
+                      className="h-auto p-0 text-label text-muted-foreground hover:text-foreground"
+                      disabled={busy !== null}
+                      onClick={() => void addEmptyPost()}
+                      type="button"
+                      variant="link"
+                    >
+                      Add an empty post
+                    </Button>
+                    {!showGrid ? (
+                      <Button
+                        className="h-auto p-0 text-label text-muted-foreground hover:text-foreground"
+                        onClick={() => {
+                          setGridOpen(true)
+                          // The click commits the creator before the next frame.
+                          requestAnimationFrame(() => reveal(gridRef.current))
+                        }}
+                        type="button"
+                        variant="link"
+                      >
+                        Create grid videos
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
-              </Row>
-              <Row
-                label="CSV"
-                layout="stacked"
-                description={
-                  <>
-                    Optional. Columns: <code>caption</code>, <code>asset</code> (file names or
-                    workspace asset IDs, separated by <code>;</code>), <code>channels</code>,{' '}
-                    <code>time</code> (<code>2026-11-03 09:30</code>) and <code>timezone</code>.
-                    Other columns are ignored.
-                  </>
-                }
-              >
-                <Textarea
-                  aria-label="Batch CSV"
-                  rows={4}
-                  value={csv}
-                  placeholder={
-                    'caption,asset,channels,time\n"Launch day, finally",hero.png,x;linkedin,2026-11-03 09:30'
-                  }
-                  onChange={(event) => setCSV(event.target.value)}
-                  className="font-mono text-xs"
-                />
-                <FilePicker
-                  accept=".csv,text/csv"
-                  label="Batch CSV file"
-                  onFiles={([file]) => {
-                    if (file && file.size <= 1_000_000) void file.text().then(setCSV)
-                    else if (file) toast.error('CSV files must be smaller than 1 MB.')
-                  }}
-                >
-                  Load a CSV file
-                </FilePicker>
-              </Row>
-              <Row
-                label="Shared caption"
-                layout="stacked"
-                description="Used for posts whose row or file has no caption. {Hello|Hi} gives each post its own variation."
-              >
-                <Textarea
-                  aria-label="Shared caption"
-                  rows={2}
-                  value={sharedCaption}
-                  onChange={(event) => setSharedCaption(event.target.value)}
-                />
-              </Row>
-              <Row>
-                <Button onClick={() => void previewImport()} disabled={!chosen.length && !csv.trim()}>
-                  Preview import
-                </Button>
-              </Row>
-            </Group>
-            {preview ? (
-              <div className="grid gap-3" data-testid="import-preview">
+                <Disclosure>
+                  <DisclosureTrigger
+                    className="px-4 py-3 text-ui text-foreground focus-visible:ring-inset"
+                    summary={csv.trim() ? 'Added' : 'Optional'}
+                  >
+                    From a CSV
+                  </DisclosureTrigger>
+                  <DisclosureContent className="grid gap-2 px-4 pb-4">
+                    <p className="text-label text-pretty text-muted-foreground">
+                      Columns: <code>caption</code>, <code>asset</code>, <code>channels</code>,{' '}
+                      <code>time</code> and <code>timezone</code>. An asset is a file name or a
+                      workspace asset ID; separate several with <code>;</code>. Rows match files by
+                      their exact name.
+                    </p>
+                    <Textarea
+                      aria-label="Batch CSV"
+                      rows={4}
+                      value={csv}
+                      placeholder={
+                        'caption,asset,channels,time\n"Launch day, finally",hero.png,x;linkedin,2026-11-03 09:30'
+                      }
+                      onChange={(event) => setCSV(event.target.value)}
+                      className="font-mono text-xs"
+                    />
+                    <div>
+                      <FilePicker
+                        accept=".csv,text/csv"
+                        label="Batch CSV file"
+                        onFiles={([file]) => {
+                          if (file && file.size <= 1_000_000) void file.text().then(setCSV)
+                          else if (file) toast.error('CSV files must be smaller than 1 MB.')
+                        }}
+                      >
+                        Load a CSV file
+                      </FilePicker>
+                    </div>
+                  </DisclosureContent>
+                </Disclosure>
+                <Disclosure>
+                  <DisclosureTrigger
+                    className="px-4 py-3 text-ui text-foreground focus-visible:ring-inset"
+                    summary={sharedCaption.trim() ? 'Added' : 'Optional'}
+                  >
+                    Shared caption
+                  </DisclosureTrigger>
+                  <DisclosureContent className="grid gap-2 px-4 pb-4">
+                    <p className="text-label text-pretty text-muted-foreground">
+                      For posts whose row or file has no caption. <code>{'{Hello|Hi}'}</code> gives
+                      each post its own variation.
+                    </p>
+                    <Textarea
+                      aria-label="Shared caption"
+                      rows={2}
+                      value={sharedCaption}
+                      onChange={(event) => setSharedCaption(event.target.value)}
+                    />
+                  </DisclosureContent>
+                </Disclosure>
+                <div className="flex justify-end px-4 py-3">
+                  <Button
+                    disabled={!chosen.length && !csv.trim()}
+                    onClick={() => void previewImport()}
+                    size="sm"
+                  >
+                    Preview import
+                  </Button>
+                </div>
+              </Group>
+            </Section>
+            <BulkCaptionPanel
+              accounts={accounts}
+              disabled={busy !== null}
+              items={items}
+              onApply={applyCaptions}
+            />
+          </div>
+          {videoChannels.length ? (
+            <Section
+              title="Video options"
+              description={`YouTube and TikTok need these. They apply to the ${unsaved.length} post${unsaved.length === 1 ? '' : 's'} not saved as drafts yet. An empty YouTube title uses each post's first caption line, or its file name.`}
+            >
+              {videoChannels.map(({ channel, creator }) => (
+                <Group key={channel}>
+                  <VideoOptions
+                    channel={channel}
+                    creator={creator}
+                    disabled={busy !== null}
+                    options={videoOptions}
+                    onChange={setVideoOptions}
+                  />
+                </Group>
+              ))}
+            </Section>
+          ) : null}
+        </aside>
+
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 xl:col-start-1 xl:row-start-1">
+          {gridCreator ? (
+            <div className="scroll-mt-6 outline-none" ref={gridRef} tabIndex={-1}>
+              {gridCreator}
+            </div>
+          ) : null}
+
+          {preview ? (
+            <div
+              className="scroll-mt-6 outline-none"
+              data-testid="import-preview"
+              ref={previewRef}
+              tabIndex={-1}
+            >
+              <Section title="Review the import">
                 {preview.mapping ? (
                   <p className="text-xs text-muted-foreground">
                     Columns:{' '}
@@ -1978,64 +2027,8 @@ export function BatchWorkspace({
                     {preview.skipped.map((entry) => `${entry.name} (${entry.reason})`).join(', ')}
                   </p>
                 ) : null}
-                <Group>
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Row</TableHead>
-                        <TableHead>Caption</TableHead>
-                        <TableHead>Media</TableHead>
-                        <TableHead>Accounts</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.staged.map((row) => (
-                        <TableRow key={row.input.importKey} className="align-top">
-                          <TableCell>{row.line}</TableCell>
-                          <TableCell className="max-w-64 truncate">
-                            {row.input.caption || (
-                              <span className="text-muted-foreground">No caption</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="max-w-48 truncate">
-                            {row.input.media
-                              .map(
-                                (media) => ('assetId' in media && media.assetId) || media.fileName
-                              )
-                              .join(', ') || <span className="text-muted-foreground">None</span>}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.channelConnectionIds.map(accountName).join(', ') || (
-                              <span className="text-muted-foreground">None</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.timing.localTime
-                              ? `${row.input.timing.localTime.replace('T', ' ')} (${row.input.timing.timeZone})`
-                              : 'Set later'}
-                          </TableCell>
-                          <TableCell className="whitespace-normal">
-                            {row.problems.length ? (
-                              <div className="grid justify-items-start gap-1">
-                                <Pill tone="red">Needs fixing</Pill>
-                                {row.problems.map((problem) => (
-                                  <p key={problem} role="alert" className="text-destructive">
-                                    {problem}
-                                  </p>
-                                ))}
-                              </div>
-                            ) : (
-                              <Pill tone="green">Ready</Pill>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Group>
-                <div>
+                <ImportReview accountName={accountName} rows={preview.staged} />
+                <div className="flex flex-wrap gap-2">
                   <Button
                     disabled={
                       busy !== null || !preview.staged.some((row) => !row.problems.length)
@@ -2047,593 +2040,592 @@ export function BatchWorkspace({
                       ? ` (${preview.staged.filter((row) => row.problems.length).length} need fixing first)`
                       : ''}
                   </Button>
-                </div>
-              </div>
-            ) : null}
-            <BulkCaptionPanel
-              accounts={accounts}
-              disabled={busy !== null}
-              items={items}
-              onApply={applyCaptions}
-            />
-          </section>
-        ) : null}
-
-        {gridFirst ? null : gridCreator}
-
-        {videoChannels.length ? (
-          <Section
-            title="Video options"
-            description={`YouTube and TikTok need these before scheduling. They apply to the ${unsaved.length} post${unsaved.length === 1 ? '' : 's'} not yet saved as drafts; change one post's in its draft afterwards. An empty YouTube title uses each post's first caption line, or its file name.`}
-          >
-            {videoChannels.map(({ channel, creator }) => (
-              <Group key={channel}>
-                <VideoOptions
-                  channel={channel}
-                  creator={creator}
-                  disabled={busy !== null}
-                  options={videoOptions}
-                  onChange={setVideoOptions}
-                />
-              </Group>
-            ))}
-          </Section>
-        ) : null}
-
-        {/* The posts read as Write shows a post: who it goes out as, its words,
-            its length and when it is planned. The writing box ends the list. */}
-        <div className="overflow-hidden rounded-xl border border-border bg-card">
-          {items.length ? (
-            <ol aria-label="Batch items" className="divide-y divide-border">
-              {items.map((item, index) => {
-                const timing = readTiming(item.timing)
-                const accountIds = itemAccounts(item)
-                const staged = stagedChecks(item, accounts)
-                const status = itemStatus(item)
-                const channel = itemChannel(item)
-                const length = captionLength(item)
-                const remaining = pendingAccounts(item, accountIds).remaining
-                const live =
-                  accountIds.length > 0 && remaining.length === 0
-                    ? accountIds.map((id) => postOn(item, id)).find(Boolean)
-                    : undefined
-                // A proposal says Planned or Next queue slot; only the scheduler's answer says Scheduled.
-                const planned = live
-                  ? `${postState(live.status, live.scheduledFor)} · ${shortWhen(live.scheduledFor, live.scheduleTimeZone ?? zone)}`
-                  : timing.kind === 'at'
-                    ? item.timing.mode === 'queue'
-                      ? `Next queue slot: ${shortWhen(timing.at, zone)}`
-                      : `Planned for ${shortWhen(timing.at, timing.zone || zone)}`
-                    : timing.kind === 'problem'
-                      ? timing.text
-                      : 'No time yet'
-                const problems = accountIds.flatMap((id) => {
-                  const verdict = verdicts[verdictKey(item.id, id)]
-                  if (verdict) return verdict.valid ? [] : [verdict.error]
-                  return staged.get(id)?.problems ?? []
-                })
-                const checks = accountIds.map((id) => verdicts[verdictKey(item.id, id)])
-                const ready =
-                  accountIds.length > 0 && checks.every((verdict) => verdict?.valid === true)
-                const text = item.draft?.plainText ?? item.caption
-                // A saved text post is edited here, on its draft; one with media or a
-                // live post opens in its draft.
-                const editsDraft = Boolean(
-                  item.draftId &&
-                    item.draft &&
-                    !item.media.length &&
-                    !item.grid &&
-                    !hasLivePosts(item.posts)
-                )
-                const author = destinationsOf(accountIds)[0]
-                const otherAccounts = accounts.filter((account) => !accountIds.includes(account.id))
-                const open = Boolean(expanded[item.id])
-                const next = items[index + 1]
-                return (
-                  <li
-                    key={item.id}
-                    className="group/post relative grid grid-cols-[minmax(0,1fr)] gap-2 py-5 pe-4 ps-14 sm:ps-16"
-                    data-item-id={item.id}
-                    data-testid="batch-item"
-                    // Alt+Up and Alt+Down move between posts without leaving the keyboard.
-                    onKeyDown={(event) => {
-                      if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown'))
-                        return
-                      const target = items[index + (event.key === 'ArrowUp' ? -1 : 1)]
-                      if (!target) return
-                      event.preventDefault()
-                      document
-                        .querySelector<HTMLElement>(
-                          `[data-item-id="${target.id}"] textarea, [data-item-id="${target.id}"] [data-row-focus]`
-                        )
-                        ?.focus()
-                    }}
+                  <Button
+                    disabled={busy !== null}
+                    variant="ghost"
+                    onClick={() => setPreview(null)}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1">
-                        <PostAuthor
-                          avatarUrl={author?.avatarUrl}
-                          channel={author?.channel ?? channel}
-                          handle={author?.handle}
-                          name={author?.displayName ?? author?.handle ?? 'No account chosen'}
-                        />
-                      </div>
-                      <span className="shrink-0 text-label tabular-nums text-muted-foreground">
-                        {index + 1}
-                      </span>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            aria-label={`More for post ${index + 1}`}
-                            className="text-muted-foreground"
-                            size="icon-sm"
-                            variant="ghost"
-                          >
-                            <MoreIcon />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={() => setExpanded((current) => ({ ...current, [item.id]: true }))}
-                          >
-                            Change time or accounts
-                          </DropdownMenuItem>
-                          {item.draftId ? (
-                            <DropdownMenuItem asChild>
-                              <a href={`/publish/${item.draftId}`} rel="noreferrer" target="_blank">
-                                Open draft in a new tab
-                              </a>
-                            </DropdownMenuItem>
-                          ) : null}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={index === 0 || busy !== null}
-                            onSelect={() => void move(index, -1)}
-                          >
-                            Move up
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled={index === items.length - 1 || busy !== null}
-                            onSelect={() => void move(index, 1)}
-                          >
-                            Move down
-                          </DropdownMenuItem>
-                          {!item.draftId &&
-                          !item.grid &&
-                          !item.media.length &&
-                          next &&
-                          !next.draftId &&
-                          !next.grid &&
-                          !next.media.length ? (
-                            <DropdownMenuItem
-                              disabled={busy !== null}
-                              onSelect={() => void joinNext(index)}
-                            >
-                              Join with the next post
-                            </DropdownMenuItem>
-                          ) : null}
-                          {item.draftId ? null : (
-                            <>
+                    Cancel
+                  </Button>
+                </div>
+              </Section>
+            </div>
+          ) : null}
+
+          <Section
+            title="Posts"
+            description={
+              items.length
+                ? `${items.length} post${items.length === 1 ? '' : 's'} in this batch.`
+                : 'No posts yet. Write one below or add files.'
+            }
+            actions={
+              items.length ? (
+                <Button onClick={() => setPreviewing(items[0]!.id)} size="sm" variant="outline">
+                  <EyeIcon aria-hidden />
+                  Preview posts
+                </Button>
+              ) : null
+            }
+          >
+            {/* The posts read as Write shows a post: who it goes out as, its words,
+                its length and when it is planned. The writing box ends the list. */}
+            <div className="overflow-hidden rounded-xl border border-border bg-card">
+              {items.length ? (
+                <ol aria-label="Batch items" className="divide-y divide-border">
+                  {items.map((item, index) => {
+                    const timing = readTiming(item.timing)
+                    const accountIds = itemAccounts(item)
+                    const staged = stagedChecks(item, accounts)
+                    const status = itemStatus(item)
+                    const channel = itemChannel(item)
+                    const length = captionLength(item)
+                    const remaining = pendingAccounts(item, accountIds).remaining
+                    const live =
+                      accountIds.length > 0 && remaining.length === 0
+                        ? accountIds.map((id) => postOn(item, id)).find(Boolean)
+                        : undefined
+                    const planned = plannedText(item, zone)
+                    const problems = accountIds.flatMap((id) => {
+                      const verdict = verdicts[verdictKey(item.id, id)]
+                      if (verdict) return verdict.valid ? [] : [verdict.error]
+                      return staged.get(id)?.problems ?? []
+                    })
+                    const checks = accountIds.map((id) => verdicts[verdictKey(item.id, id)])
+                    const ready =
+                      accountIds.length > 0 && checks.every((verdict) => verdict?.valid === true)
+                    const text = item.draft?.plainText ?? item.caption
+                    // A saved text post is edited here, on its draft; one with media or a
+                    // live post opens in its draft.
+                    const editsDraft = Boolean(
+                      item.draftId &&
+                        item.draft &&
+                        !item.media.length &&
+                        !item.grid &&
+                        !hasLivePosts(item.posts)
+                    )
+                    const author = destinationsOf(accountIds)[0]
+                    const otherAccounts = accounts.filter((account) => !accountIds.includes(account.id))
+                    const open = Boolean(expanded[item.id])
+                    const next = items[index + 1]
+                    return (
+                      <li
+                        key={item.id}
+                        className="group/post relative grid grid-cols-[minmax(0,1fr)] gap-2 py-5 pe-4 ps-14 sm:ps-16"
+                        data-item-id={item.id}
+                        data-testid="batch-item"
+                        // Alt+Up and Alt+Down move between posts without leaving the keyboard.
+                        onKeyDown={(event) => {
+                          if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown'))
+                            return
+                          const target = items[index + (event.key === 'ArrowUp' ? -1 : 1)]
+                          if (!target) return
+                          event.preventDefault()
+                          document
+                            .querySelector<HTMLElement>(
+                              `[data-item-id="${target.id}"] textarea, [data-item-id="${target.id}"] [data-row-focus]`
+                            )
+                            ?.focus()
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <PostAuthor
+                              avatarUrl={author?.avatarUrl}
+                              channel={author?.channel ?? channel}
+                              handle={author?.handle}
+                              name={author?.displayName ?? author?.handle ?? 'No account chosen'}
+                            />
+                          </div>
+                          <span className="shrink-0 text-label tabular-nums text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                aria-label={`More for post ${index + 1}`}
+                                className="text-muted-foreground"
+                                size="icon-sm"
+                                variant="ghost"
+                              >
+                                <MoreIcon />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onSelect={() => setExpanded((current) => ({ ...current, [item.id]: true }))}
+                              >
+                                Change time or accounts
+                              </DropdownMenuItem>
+                              {item.draftId ? (
+                                <DropdownMenuItem asChild>
+                                  <a href={`/publish/${item.draftId}`} rel="noreferrer" target="_blank">
+                                    Open draft in a new tab
+                                  </a>
+                                </DropdownMenuItem>
+                              ) : null}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={() =>
-                                  void call(`${base}/items/${encodeURIComponent(item.id)}`, {
-                                    method: 'DELETE',
-                                  }).then(reload, (error: unknown) =>
-                                    toast.error(
-                                      error instanceof Error
-                                        ? error.message
-                                        : 'The post was not removed.'
-                                    )
-                                  )
-                                }
+                                disabled={index === 0 || busy !== null}
+                                onSelect={() => void move(index, -1)}
                               >
-                                <DeleteIcon aria-hidden />
-                                Remove post {index + 1}
+                                Move up
                               </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    {editsDraft ? (
-                      <Textarea
-                        key={item.id}
-                        aria-label={`Caption for item ${index + 1}`}
-                        className={POST_TEXT}
-                        data-slot="post-text"
-                        defaultValue={text}
-                        onBlur={(event) => void saveDraftText(item, event.target.value)}
-                      />
-                    ) : item.draftId || item.grid ? (
-                      <p className="draft-prose whitespace-pre-wrap text-body" data-row-focus tabIndex={-1}>
-                        {text || (item.grid ? 'Grid video' : 'No caption')}
-                      </p>
-                    ) : (
-                      <Textarea
-                        // A bulk caption replaces what this box first showed.
-                        key={item.caption}
-                        aria-label={`Caption for item ${index + 1}`}
-                        className={POST_TEXT}
-                        data-slot="post-text"
-                        defaultValue={item.caption}
-                        placeholder="Write the post"
-                        onBlur={(event) => {
-                          if (event.target.value !== item.caption)
-                            void updateItem(item, { caption: event.target.value })
-                        }}
-                      />
-                    )}
-                    {item.media.length ? (
-                      <ul className="flex flex-wrap content-start gap-2">
-                        {item.media.map((entry, at) => (
-                          <MediaTile
-                            key={`${entry.assetId ?? entry.fileName}-${at}`}
-                            entry={entry}
-                            file={files.current.get(`${item.id}/${at}`)}
-                            upload={uploads[`${item.id}/${at}`]}
-                            onRetry={() => retryUpload(item.id, at)}
-                          />
-                        ))}
-                      </ul>
-                    ) : null}
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                      <PostCount
-                        active={open}
-                        channel={channel}
-                        length={length}
-                        limit={CAPABILITIES[channel].captionLimit}
-                        number={index + 1}
-                        thread={false}
-                      />
-                      {accountIds.length > 1 ? (
-                        <DestinationSummary accounts={destinationsOf(accountIds)} />
-                      ) : null}
-                      <Button
-                        aria-expanded={open}
-                        className={cn(
-                          'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-label',
-                          timing.kind === 'problem' && !live
-                            ? 'border-destructive/40 text-destructive'
-                            : 'border-border text-muted-foreground hover:text-foreground'
-                        )}
-                        data-testid={`batch-item-time-${index + 1}`}
-                        onClick={() => setExpanded((current) => ({ ...current, [item.id]: !open }))}
-                        size={null}
-                        title="Change time or accounts"
-                        variant="custom"
-                      >
-                        <CalendarIcon aria-hidden className="size-3.5" />
-                        {planned}
-                      </Button>
-                      {/* A plain saved draft says so through Open draft; other states are named. */}
-                      {status.text === 'Draft' ? null : <Pill tone={status.tone}>{status.text}</Pill>}
-                      {problems.length ? (
-                        <Pill tone="red">Needs attention</Pill>
-                      ) : ready ? (
-                        <Pill tone="green">Ready</Pill>
-                      ) : null}
-                      {item.draftId ? (
-                        <a
-                          className="inline-flex items-center gap-1 text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-                          href={`/publish/${item.draftId}`}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Open draft
-                          <OutwardIcon aria-hidden className="size-3" />
-                        </a>
-                      ) : null}
-                    </div>
-                    {problems.length ? (
-                      <p className="text-label text-destructive">{problems[0]}</p>
-                    ) : null}
-                    {rowErrors[item.id] ? (
-                      <p className="text-label text-destructive" role="alert">
-                        {rowErrors[item.id]}
-                      </p>
-                    ) : null}
-                    {open ? (
-                      <div className="mt-1 grid gap-3 rounded-lg border border-border bg-foreground/[0.02] p-3 text-sm">
-                        <p className="text-label font-medium text-foreground">Time</p>
-                        <p className="-mt-2 text-label text-muted-foreground">
-                          {item.timing.mode === 'queue' && timing.kind === 'at'
-                            ? `In the next queue slot, ${shortWhen(timing.at, zone)}. To set an exact time instead (${zone}):`
-                            : `Time (${item.timing.timeZone || zone})`}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <LocalTimeFields
-                            key={timingRevision[item.id] ?? 0}
-                            disabled={busy !== null}
-                            onValidityChange={(valid) =>
-                              setTimeValidity((current) =>
-                                current[item.id] === valid
-                                  ? current
-                                  : { ...current, [item.id]: valid }
-                              )
-                            }
-                            label={`Item ${index + 1}`}
-                            value={item.timing.mode === 'time' ? (item.timing.localTime ?? '') : ''}
-                            onChange={(edit) =>
-                              void updateItem(item, (latest) => ({
-                                timing: {
-                                  mode: 'time',
-                                  localTime: edit(
-                                    latest.timing.mode === 'time'
-                                      ? (latest.timing.localTime ?? '')
-                                      : ''
-                                  ),
-                                  timeZone: latest.timing.timeZone || zone,
-                                },
-                              }))
-                            }
-                          />
-                          {timing.kind === 'problem' && /happens twice/.test(timing.text)
-                            ? (['earlier', 'later'] as const).map((choice) => (
-                                <Button
-                                  key={choice}
+                              <DropdownMenuItem
+                                disabled={index === items.length - 1 || busy !== null}
+                                onSelect={() => void move(index, 1)}
+                              >
+                                Move down
+                              </DropdownMenuItem>
+                              {!item.draftId &&
+                              !item.grid &&
+                              !item.media.length &&
+                              next &&
+                              !next.draftId &&
+                              !next.grid &&
+                              !next.media.length ? (
+                                <DropdownMenuItem
                                   disabled={busy !== null}
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() =>
-                                    void updateItem(item, (latest) => ({
-                                      timing: { ...latest.timing, disambiguation: choice },
-                                    }))
-                                  }
+                                  onSelect={() => void joinNext(index)}
                                 >
-                                  The {choice} one
-                                </Button>
-                              ))
-                            : null}
+                                  Join with the next post
+                                </DropdownMenuItem>
+                              ) : null}
+                              {item.draftId ? null : (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onSelect={() =>
+                                      void call(`${base}/items/${encodeURIComponent(item.id)}`, {
+                                        method: 'DELETE',
+                                      }).then(reload, (error: unknown) =>
+                                        toast.error(
+                                          error instanceof Error
+                                            ? error.message
+                                            : 'The post was not removed.'
+                                        )
+                                      )
+                                    }
+                                  >
+                                    <DeleteIcon aria-hidden />
+                                    Remove post {index + 1}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
-                        {item.draftId || item.grid ? null : (
-                          <div>
-                            <FilePicker
-                              accept={ACCEPT}
-                              label={`Add files to post ${index + 1}`}
-                              multiple
-                              onFiles={(selected) => void addToItem(item, selected)}
-                            >
-                              Add files
-                            </FilePicker>
-                          </div>
-                        )}
-                        <p className="mt-1 text-label font-medium text-foreground">Accounts</p>
-                        {accountIds.length ? (
-                          <Table className="text-xs">
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead className="w-1/4">Account</TableHead>
-                                <TableHead>Check</TableHead>
-                                <TableHead className="w-1/4">Result</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {accounts
-                                .filter((account) => accountIds.includes(account.id))
-                                .map((account) => {
-                                  const on = true
-                                  const key = verdictKey(item.id, account.id)
-                                  const verdict = verdicts[key]
-                                  const post = postOn(item, account.id)
-                                  const local = staged.get(account.id)
-                                  return (
-                                    <TableRow key={account.id} className="align-top">
-                                      <TableCell>
-                                        <Label className="text-xs font-normal">
-                                          <Checkbox
-                                            aria-label={`${account.name} for item ${index + 1}`}
-                                            disabled={Boolean(item.draftId) || busy !== null}
-                                            checked={on}
-                                            // Toggles made before the last save lands each apply in turn.
-                                            onCheckedChange={(checked) =>
-                                              void updateItem(item, (latest) => ({
-                                                channelConnectionIds: latest.channelConnectionIds
-                                                  .filter((id) => id !== account.id)
-                                                  .concat(checked === true ? [account.id] : []),
-                                              }))
-                                            }
-                                          />
-                                          {account.name}
-                                        </Label>
-                                      </TableCell>
-                                      <TableCell className="whitespace-normal">
-                                        {!on ? (
-                                          <span className="text-muted-foreground">Not chosen</span>
-                                        ) : verdict ? (
-                                          <Label className="items-start text-xs font-normal">
-                                            <Checkbox
-                                              aria-label={`Schedule item ${index + 1} on ${account.name}`}
-                                              disabled={!verdict.valid}
-                                              checked={Boolean(selected[key]) && verdict.valid}
-                                              onCheckedChange={(checked) =>
-                                                setSelected((current) => ({
-                                                  ...current,
-                                                  [key]: checked === true,
-                                                }))
-                                              }
-                                            />
-                                            <span className="grid justify-items-start gap-1">
-                                              <Pill tone={verdict.valid ? 'green' : 'red'}>
-                                                {verdict.valid ? 'Ready' : 'Needs attention'}
-                                              </Pill>
-                                              <span
-                                                className={
-                                                  verdict.valid
-                                                    ? 'text-muted-foreground'
-                                                    : 'text-destructive'
-                                                }
-                                              >
-                                                {verdict.valid
-                                                  ? verdict.scheduledFor
-                                                    ? when(verdict.scheduledFor, verdict.timeZone)
-                                                    : ''
-                                                  : verdict.error}
-                                              </span>
-                                            </span>
-                                          </Label>
-                                        ) : local?.problems.length ? (
-                                          <span className="grid justify-items-start gap-1">
-                                            <Pill tone="red">Needs attention</Pill>
-                                            <span className="text-destructive">
-                                              {local.problems.join(' ')}
-                                            </span>
-                                          </span>
-                                        ) : (
-                                          <span className="text-muted-foreground">
-                                            {local?.changes.join(' ') || 'Not checked yet'}
-                                          </span>
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="whitespace-normal">
-                                        {post ? (
-                                          <span className="grid justify-items-start gap-1">
-                                            <Pill
-                                              tone={
-                                                POST_STATE_TONE[
-                                                  postState(post.status, post.scheduledFor)
-                                                ]
-                                              }
-                                            >
-                                              {postState(post.status, post.scheduledFor)}
-                                            </Pill>
-                                            {postFailureReason(post.failureCode) ? (
-                                              <span className="text-destructive">
-                                                {postFailureReason(post.failureCode)}
-                                              </span>
-                                            ) : null}
-                                            <span className="text-muted-foreground">
-                                              {when(
-                                                post.scheduledFor,
-                                                post.scheduleTimeZone ?? zone
-                                              )}
-                                              {post.url ? (
-                                                <>
-                                                  {' · '}
-                                                  <a
-                                                    className="underline"
-                                                    href={post.url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                  >
-                                                    View
-                                                  </a>
-                                                </>
-                                              ) : null}
-                                            </span>
-                                          </span>
-                                        ) : on ? (
-                                          <span className="text-muted-foreground">
-                                            Not scheduled
-                                          </span>
-                                        ) : null}
-                                      </TableCell>
-                                    </TableRow>
-                                  )
-                                })}
-                            </TableBody>
-                          </Table>
-                        ) : accounts.length ? (
-                          <p className="text-xs text-muted-foreground">
-                            No account chosen. Choose one below.
+                        {editsDraft ? (
+                          <Textarea
+                            key={item.id}
+                            aria-label={`Caption for item ${index + 1}`}
+                            className={POST_TEXT}
+                            data-slot="post-text"
+                            defaultValue={text}
+                            onBlur={(event) => void saveDraftText(item, event.target.value)}
+                          />
+                        ) : item.draftId || item.grid ? (
+                          <p className="draft-prose whitespace-pre-wrap text-body" data-row-focus tabIndex={-1}>
+                            {text || (item.grid ? 'Grid video' : 'No caption')}
                           </p>
                         ) : (
-                          <p className="text-xs text-muted-foreground">
-                            This profile has no connected accounts.{' '}
-                            <Link className="underline" href="/settings/publishing-brands">
-                              Connect one
-                            </Link>{' '}
-                            to check and schedule posts.
-                          </p>
+                          <Textarea
+                            // A bulk caption replaces what this box first showed.
+                            key={item.caption}
+                            aria-label={`Caption for item ${index + 1}`}
+                            className={POST_TEXT}
+                            data-slot="post-text"
+                            defaultValue={item.caption}
+                            placeholder="Write the post"
+                            onBlur={(event) => {
+                              if (event.target.value !== item.caption)
+                                void updateItem(item, { caption: event.target.value })
+                            }}
+                          />
                         )}
-                        {otherAccounts.length ? (
-                          <div className="grid gap-1 text-xs">
-                            <p className="text-muted-foreground">
-                              {item.draftId
-                                ? 'Other accounts in this profile. Change a saved post’s accounts in its draft.'
-                                : 'Other accounts in this profile'}
+                        {item.media.length ? (
+                          <ul className="flex flex-wrap content-start gap-2">
+                            {item.media.map((entry, at) => (
+                              <MediaTile
+                                key={`${entry.assetId ?? entry.fileName}-${at}`}
+                                entry={entry}
+                                file={files.current.get(`${item.id}/${at}`)}
+                                upload={uploads[`${item.id}/${at}`]}
+                                onRetry={() => retryUpload(item.id, at)}
+                              />
+                            ))}
+                          </ul>
+                        ) : null}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                          <PostCount
+                            active={open}
+                            channel={channel}
+                            length={length}
+                            limit={CAPABILITIES[channel].captionLimit}
+                            number={index + 1}
+                            thread={false}
+                          />
+                          {accountIds.length > 1 ? (
+                            <DestinationSummary accounts={destinationsOf(accountIds)} />
+                          ) : null}
+                          <Button
+                            aria-expanded={open}
+                            className={cn(
+                              'inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 text-label',
+                              timing.kind === 'problem' && !live
+                                ? 'border-destructive/40 text-destructive'
+                                : 'border-border text-muted-foreground hover:text-foreground'
+                            )}
+                            data-testid={`batch-item-time-${index + 1}`}
+                            onClick={() => setExpanded((current) => ({ ...current, [item.id]: !open }))}
+                            size={null}
+                            title="Change time or accounts"
+                            variant="custom"
+                          >
+                            <CalendarIcon aria-hidden className="size-3.5" />
+                            {planned}
+                          </Button>
+                          {/* A plain saved draft says so through Open draft; other states are named. */}
+                          {status.text === 'Draft' ? null : <Pill tone={status.tone}>{status.text}</Pill>}
+                          {problems.length ? (
+                            <Pill tone="red">Needs attention</Pill>
+                          ) : ready ? (
+                            <Pill tone="green">Ready</Pill>
+                          ) : null}
+                          <Button
+                            aria-label={`Preview post ${index + 1}`}
+                            className="inline-flex items-center gap-1 text-label text-muted-foreground hover:text-foreground"
+                            onClick={() => setPreviewing(item.id)}
+                            size={null}
+                            variant="custom"
+                          >
+                            <EyeIcon aria-hidden className="size-3.5" />
+                            Preview
+                          </Button>
+                          {item.draftId ? (
+                            <a
+                              className="inline-flex items-center gap-1 text-label text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                              href={`/publish/${item.draftId}`}
+                              rel="noreferrer"
+                              target="_blank"
+                            >
+                              Open draft
+                              <OutwardIcon aria-hidden className="size-3" />
+                            </a>
+                          ) : null}
+                        </div>
+                        {problems.length ? (
+                          <p className="text-label text-destructive">{problems[0]}</p>
+                        ) : null}
+                        {rowErrors[item.id] ? (
+                          <p className="text-label text-destructive" role="alert">
+                            {rowErrors[item.id]}
+                          </p>
+                        ) : null}
+                        {open ? (
+                          <div className="mt-1 grid gap-3 rounded-lg border border-border bg-foreground/[0.02] p-3 text-sm">
+                            <p className="text-label font-medium text-foreground">Time</p>
+                            <p className="-mt-2 text-label text-muted-foreground">
+                              {item.timing.mode === 'queue' && timing.kind === 'at'
+                                ? `In the next queue slot, ${shortWhen(timing.at, zone)}. To set an exact time instead (${zone}):`
+                                : `Time (${item.timing.timeZone || zone})`}
                             </p>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1">
-                              {otherAccounts.map((account) => (
-                                <Label className="text-xs font-normal" key={account.id}>
-                                  <Checkbox
-                                    aria-label={`${account.name} for item ${index + 1}`}
-                                    checked={false}
-                                    disabled={Boolean(item.draftId) || busy !== null}
-                                    onCheckedChange={(checked) =>
-                                      checked === true &&
-                                      void updateItem(item, (latest) => ({
-                                        channelConnectionIds: [
-                                          ...latest.channelConnectionIds.filter(
-                                            (id) => id !== account.id
-                                          ),
-                                          account.id,
-                                        ],
-                                      }))
-                                    }
-                                  />
-                                  {account.name}
-                                </Label>
-                              ))}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <LocalTimeFields
+                                key={timingRevision[item.id] ?? 0}
+                                disabled={busy !== null}
+                                onValidityChange={(valid) =>
+                                  setTimeValidity((current) =>
+                                    current[item.id] === valid
+                                      ? current
+                                      : { ...current, [item.id]: valid }
+                                  )
+                                }
+                                label={`Item ${index + 1}`}
+                                value={item.timing.mode === 'time' ? (item.timing.localTime ?? '') : ''}
+                                onChange={(edit) =>
+                                  void updateItem(item, (latest) => ({
+                                    timing: {
+                                      mode: 'time',
+                                      localTime: edit(
+                                        latest.timing.mode === 'time'
+                                          ? (latest.timing.localTime ?? '')
+                                          : ''
+                                      ),
+                                      timeZone: latest.timing.timeZone || zone,
+                                    },
+                                  }))
+                                }
+                              />
+                              {timing.kind === 'problem' && /happens twice/.test(timing.text)
+                                ? (['earlier', 'later'] as const).map((choice) => (
+                                    <Button
+                                      key={choice}
+                                      disabled={busy !== null}
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        void updateItem(item, (latest) => ({
+                                          timing: { ...latest.timing, disambiguation: choice },
+                                        }))
+                                      }
+                                    >
+                                      The {choice} one
+                                    </Button>
+                                  ))
+                                : null}
                             </div>
+                            {item.draftId || item.grid ? null : (
+                              <div>
+                                <FilePicker
+                                  accept={ACCEPT}
+                                  label={`Add files to post ${index + 1}`}
+                                  multiple
+                                  onFiles={(selected) => void addToItem(item, selected)}
+                                >
+                                  Add files
+                                </FilePicker>
+                              </div>
+                            )}
+                            <p className="mt-1 text-label font-medium text-foreground">Accounts</p>
+                            {accountIds.length ? (
+                              <Table className="text-xs">
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead className="w-1/4">Account</TableHead>
+                                    <TableHead>Check</TableHead>
+                                    <TableHead className="w-1/4">Result</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {accounts
+                                    .filter((account) => accountIds.includes(account.id))
+                                    .map((account) => {
+                                      const on = true
+                                      const key = verdictKey(item.id, account.id)
+                                      const verdict = verdicts[key]
+                                      const post = postOn(item, account.id)
+                                      const local = staged.get(account.id)
+                                      return (
+                                        <TableRow key={account.id} className="align-top">
+                                          <TableCell>
+                                            <Label className="text-xs font-normal">
+                                              <Checkbox
+                                                aria-label={`${account.name} for item ${index + 1}`}
+                                                disabled={Boolean(item.draftId) || busy !== null}
+                                                checked={on}
+                                                // Toggles made before the last save lands each apply in turn.
+                                                onCheckedChange={(checked) =>
+                                                  void updateItem(item, (latest) => ({
+                                                    channelConnectionIds: latest.channelConnectionIds
+                                                      .filter((id) => id !== account.id)
+                                                      .concat(checked === true ? [account.id] : []),
+                                                  }))
+                                                }
+                                              />
+                                              {account.name}
+                                            </Label>
+                                          </TableCell>
+                                          <TableCell className="whitespace-normal">
+                                            {!on ? (
+                                              <span className="text-muted-foreground">Not chosen</span>
+                                            ) : verdict ? (
+                                              <Label className="items-start text-xs font-normal">
+                                                <Checkbox
+                                                  aria-label={`Schedule item ${index + 1} on ${account.name}`}
+                                                  disabled={!verdict.valid}
+                                                  checked={Boolean(selected[key]) && verdict.valid}
+                                                  onCheckedChange={(checked) =>
+                                                    setSelected((current) => ({
+                                                      ...current,
+                                                      [key]: checked === true,
+                                                    }))
+                                                  }
+                                                />
+                                                <span className="grid justify-items-start gap-1">
+                                                  <Pill tone={verdict.valid ? 'green' : 'red'}>
+                                                    {verdict.valid ? 'Ready' : 'Needs attention'}
+                                                  </Pill>
+                                                  <span
+                                                    className={
+                                                      verdict.valid
+                                                        ? 'text-muted-foreground'
+                                                        : 'text-destructive'
+                                                    }
+                                                  >
+                                                    {verdict.valid
+                                                      ? verdict.scheduledFor
+                                                        ? when(verdict.scheduledFor, verdict.timeZone)
+                                                        : ''
+                                                      : verdict.error}
+                                                  </span>
+                                                </span>
+                                              </Label>
+                                            ) : local?.problems.length ? (
+                                              <span className="grid justify-items-start gap-1">
+                                                <Pill tone="red">Needs attention</Pill>
+                                                <span className="text-destructive">
+                                                  {local.problems.join(' ')}
+                                                </span>
+                                              </span>
+                                            ) : (
+                                              <span className="text-muted-foreground">
+                                                {local?.changes.join(' ') || 'Not checked yet'}
+                                              </span>
+                                            )}
+                                          </TableCell>
+                                          <TableCell className="whitespace-normal">
+                                            {post ? (
+                                              <span className="grid justify-items-start gap-1">
+                                                <Pill
+                                                  tone={
+                                                    POST_STATE_TONE[
+                                                      postState(post.status, post.scheduledFor)
+                                                    ]
+                                                  }
+                                                >
+                                                  {postState(post.status, post.scheduledFor)}
+                                                </Pill>
+                                                {postFailureReason(post.failureCode) ? (
+                                                  <span className="text-destructive">
+                                                    {postFailureReason(post.failureCode)}
+                                                  </span>
+                                                ) : null}
+                                                <span className="text-muted-foreground">
+                                                  {when(
+                                                    post.scheduledFor,
+                                                    post.scheduleTimeZone ?? zone
+                                                  )}
+                                                  {post.url ? (
+                                                    <>
+                                                      {' · '}
+                                                      <a
+                                                        className="underline"
+                                                        href={post.url}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                      >
+                                                        View
+                                                      </a>
+                                                    </>
+                                                  ) : null}
+                                                </span>
+                                              </span>
+                                            ) : on ? (
+                                              <span className="text-muted-foreground">
+                                                Not scheduled
+                                              </span>
+                                            ) : null}
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })}
+                                </TableBody>
+                              </Table>
+                            ) : accounts.length ? (
+                              <p className="text-xs text-muted-foreground">
+                                No account chosen. Choose one below.
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                This profile has no connected accounts.{' '}
+                                <Link className="underline" href="/settings/publishing-brands">
+                                  Connect one
+                                </Link>{' '}
+                                to check and schedule posts.
+                              </p>
+                            )}
+                            {otherAccounts.length ? (
+                              <div className="grid gap-1 text-xs">
+                                <p className="text-muted-foreground">
+                                  {item.draftId
+                                    ? 'Other accounts in this profile. Change a saved post’s accounts in its draft.'
+                                    : 'Other accounts in this profile'}
+                                </p>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                  {otherAccounts.map((account) => (
+                                    <Label className="text-xs font-normal" key={account.id}>
+                                      <Checkbox
+                                        aria-label={`${account.name} for item ${index + 1}`}
+                                        checked={false}
+                                        disabled={Boolean(item.draftId) || busy !== null}
+                                        onCheckedChange={(checked) =>
+                                          checked === true &&
+                                          void updateItem(item, (latest) => ({
+                                            channelConnectionIds: [
+                                              ...latest.channelConnectionIds.filter(
+                                                (id) => id !== account.id
+                                              ),
+                                              account.id,
+                                            ],
+                                          }))
+                                        }
+                                      />
+                                      {account.name}
+                                    </Label>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         ) : null}
-                      </div>
-                    ) : null}
-                    {outcomes[item.id] ? (
-                      <p
-                        role={settledWell(outcomes[item.id]) ? 'status' : 'alert'}
-                        className={
-                          outcomes[item.id] === 'Scheduled'
-                            ? 'text-emerald-700 dark:text-emerald-300'
-                            : settledWell(outcomes[item.id])
-                              ? 'text-muted-foreground'
-                              : 'text-destructive'
-                        }
-                      >
-                        {outcomes[item.id]}
-                      </p>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ol>
-          ) : null}
-          <div className={cn(items.length > 0 && 'border-t border-border')}>
-            <PasteBox
-              author={destinationsOf(sharedAccounts)[0]}
-              busy={busy !== null}
-              channel={countingChannel}
-              focus={start === 'text' && items.length === 0}
-              hasPosts={items.length > 0}
-              onAdd={addPasted}
-              restore={restore}
-              room={room}
-            />
-            {lastImport && canUndoImport ? (
-              <p
-                className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2 text-label text-muted-foreground sm:ps-16"
-                role="status"
-              >
-                Added {lastImport.ids.length} post{lastImport.ids.length === 1 ? '' : 's'}.
-                <Button
-                  className="h-7 px-2"
-                  disabled={busy !== null}
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void undoImport()}
-                >
-                  Undo import
-                </Button>
-              </p>
-            ) : null}
-          </div>
+                        {outcomes[item.id] ? (
+                          <p
+                            role={settledWell(outcomes[item.id]) ? 'status' : 'alert'}
+                            className={
+                              outcomes[item.id] === 'Scheduled'
+                                ? 'text-emerald-700 dark:text-emerald-300'
+                                : settledWell(outcomes[item.id])
+                                  ? 'text-muted-foreground'
+                                  : 'text-destructive'
+                            }
+                          >
+                            {outcomes[item.id]}
+                          </p>
+                        ) : null}
+                      </li>
+                    )
+                  })}
+                </ol>
+              ) : null}
+              <div className={cn(items.length > 0 && 'border-t border-border')}>
+                <PasteBox
+                  author={destinationsOf(sharedAccounts)[0]}
+                  busy={busy !== null}
+                  channel={countingChannel}
+                  focus={start === 'text' && items.length === 0}
+                  hasPosts={items.length > 0}
+                  onAdd={addPasted}
+                  restore={restore}
+                  room={room}
+                />
+                {lastImport && canUndoImport ? (
+                  <p
+                    className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-2 text-label text-muted-foreground sm:ps-16"
+                    role="status"
+                  >
+                    Added {lastImport.ids.length} post{lastImport.ids.length === 1 ? '' : 's'}.
+                    <Button
+                      className="h-7 px-2"
+                      disabled={busy !== null}
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void undoImport()}
+                    >
+                      Undo import
+                    </Button>
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </Section>
         </div>
 
+        {/* Full width on wide screens: its actions sit clear of the bottom-centre toasts. */}
         {items.length ? (
           <section
-            className="sticky bottom-2 z-10 grid gap-3 rounded-xl border border-border bg-card/95 p-3 shadow-popover backdrop-blur sm:bottom-4 sm:p-4"
+            className="sticky bottom-2 z-10 grid gap-3 rounded-xl border border-border bg-card/95 p-3 shadow-popover backdrop-blur sm:bottom-4 sm:p-4 xl:col-span-2"
             aria-label="Save and schedule"
           >
             <div className="grid gap-0.5">
@@ -2871,6 +2863,14 @@ export function BatchWorkspace({
           </section>
         ) : null}
       </div>
+      <BatchPreviewSheet
+        accounts={accounts}
+        itemId={previewing}
+        items={items}
+        onItemChange={setPreviewing}
+        options={videoOptions}
+        zone={zone}
+      />
     </Page>
   )
 }

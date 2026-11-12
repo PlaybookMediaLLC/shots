@@ -63,6 +63,13 @@ test(
     await page.getByRole('button', { name: 'Preview import', exact: true }).click()
     const preview = page.getByTestId('import-preview')
     await expect(preview.getByText('Ready', { exact: true })).toHaveCount(2)
+    // Rows with files show as cards with their first picture, read from this browser's copy:
+    // its size shows once the browser has drawn it.
+    const cards = preview.getByRole('list', { name: 'Rows to add' }).getByRole('listitem')
+    await expect(cards).toHaveCount(2)
+    await expect(cards.first()).toContainText('320×240')
+    await preview.getByRole('button', { name: 'Table', exact: true }).click()
+    await expect(preview.getByRole('row')).toHaveCount(3)
     await expect(page.getByTestId('import-skipped')).toContainText('.DS_Store')
     await expect(page.getByTestId('import-skipped')).toContainText('notes.txt')
     // Nothing is added until the preview is accepted.
@@ -265,6 +272,31 @@ test(
     }
     expect(batch.items).toHaveLength(10)
 
+    // Each post previews as its platforms show it; the arrows step through the batch.
+    await page.getByRole('button', { name: 'Preview posts', exact: true }).click()
+    const sheet = page.getByTestId('batch-preview')
+    await expect(sheet.getByRole('heading', { name: 'Post 1 of 10' })).toBeVisible()
+    await expect(sheet.getByTestId('preview-panel')).toContainText('Post 1.')
+    await sheet.getByRole('button', { name: 'Next post', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 2 of 10' })).toBeVisible()
+    await page.keyboard.press('ArrowRight')
+    await expect(sheet.getByRole('heading', { name: 'Post 3 of 10' })).toBeVisible()
+    await expect(sheet.getByTestId('preview-panel')).toContainText('Post 3.')
+    // The feed shows every post on one platform, in order; a post opens on its own from it.
+    await sheet.getByRole('button', { name: 'Feed', exact: true }).click()
+    await expect(sheet.getByTestId('feed-post')).toHaveCount(10)
+    await expect(sheet.getByTestId('feed-post').first()).toContainText('Post 1.')
+    await sheet.getByRole('button', { name: 'Post 4', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 4 of 10' })).toBeVisible()
+    // Closed from the feed, the sheet opens again on one post.
+    await sheet.getByRole('button', { name: 'Feed', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+    await page.getByRole('button', { name: 'Preview posts', exact: true }).click()
+    await expect(sheet.getByRole('heading', { name: 'Post 1 of 10' })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sheet).toBeHidden()
+
     // Hourly from 09:00 to 11:00: three a day, the rest from 09:00 the next day.
     await chooseOption(page.getByRole('combobox', { name: 'Batch time mode' }), 'Every hour')
     const until = page.getByRole('textbox', { name: 'Hourly end of day' })
@@ -324,6 +356,17 @@ test(
     await expect(
       page.getByRole('textbox', { name: 'Caption for item 2', exact: true })
     ).toHaveValue('Post 2, edited in the batch.')
+    // A saved post previews its draft's words from its own row, and focus comes back to the row.
+    const previewSecond = page.getByRole('button', { name: 'Preview post 2', exact: true })
+    await previewSecond.click()
+    const savedSheet = page.getByTestId('batch-preview')
+    await expect(savedSheet.getByTestId('preview-panel')).toContainText(
+      'Post 2, edited in the batch.'
+    )
+    await expect(savedSheet).toContainText('Saved as a draft.')
+    await page.keyboard.press('Escape')
+    await expect(savedSheet).toBeHidden()
+    await expect(previewSecond).toBeFocused()
 
     // An edit made elsewhere is never overwritten: the row says so and keeps the words.
     const thirdHref = await items

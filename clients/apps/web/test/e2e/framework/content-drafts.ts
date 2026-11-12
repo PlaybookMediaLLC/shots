@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page } from '@playwright/test'
 import { db } from './services'
+import { openDisclosureFor } from './controls'
 import { type E2EIdentity, setupStep } from './flow'
 import { type HttpMockServer, startHttpMockServer } from './http-server'
 import { socialWorkerPort } from './social-mock'
@@ -309,6 +310,13 @@ export async function openNewBatch(
   return new URL(page.url()).pathname.split('/').pop() ?? ''
 }
 
+/** Type `csv` into the batch's CSV box, opening its section first when it is closed. */
+export async function fillBatchCSV(page: Page, csv: string): Promise<void> {
+  const box = page.getByLabel('Batch CSV', { exact: true })
+  if (!(await box.isVisible())) await openDisclosureFor(box)
+  await box.fill(csv)
+}
+
 /** Uploaded media shown on a batch item: its type, or why it is not stored yet. */
 const PENDING_MEDIA = /Uploading|Waiting to upload|Upload failed/
 
@@ -326,7 +334,7 @@ export async function addBatchRows(
   const before = await items.count()
   if (Array.isArray(files) ? files.length : files)
     await page.getByLabel('Batch media files').setInputFiles(files)
-  await page.getByLabel('Batch CSV', { exact: true }).fill(csv)
+  await fillBatchCSV(page, csv)
   await page.getByRole('button', { name: 'Preview import', exact: true }).click()
   const preview = page.getByTestId('import-preview')
   await expect(preview).toBeVisible()

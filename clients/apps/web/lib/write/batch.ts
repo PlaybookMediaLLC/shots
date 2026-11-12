@@ -1,9 +1,13 @@
 import type { BatchItem, BatchRun, BatchTiming } from '@/lib/api/contracts/content-batches'
+import { postState } from '@/lib/content-drafts/post-status'
 import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
+import { assetContentUrl } from '@/lib/editor/asset-url'
 import type { AccountStanding } from '@/lib/write/capabilities'
-import type { DraftChannel, VersionOptions } from '@/lib/write/document'
+import type { DraftChannel, PlateBody, VersionOptions } from '@/lib/write/document'
+import { importedBody, importedPosts } from '@/lib/write/import-text'
 import { LABELS, mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { buildPublication, type Publication } from '@/lib/write/publication'
 import { analyzeSpintax } from '@/lib/write/spintax'
 import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
@@ -26,6 +30,8 @@ export type BatchAccount = {
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
   tiktokCreator?: AccountStanding['tiktokCreator']
+  /** An X account's own limit, which the preview counts against. */
+  xCaptionLimit?: AccountStanding['maxWeightedCharacters']
 }
 
 /**
@@ -60,7 +66,7 @@ function documentProblems(channel: DraftChannel, facts: MediaFacts[]) {
  * For each chosen account: what blocks the item there, from the media rules
  * Go also applies, and what Shots would change before sending it.
  */
-export function stagedChecks(item: BatchItem, accounts: BatchAccount[]) {
+export function stagedChecks(item: BatchItem, accounts: readonly BatchAccount[]) {
   const facts = batchMediaFacts(item.media)
   const pdf = facts?.some((fact) => fact.mimeType === 'application/pdf')
   return new Map(
@@ -141,6 +147,75 @@ export function stagedVersions(
     changed = true
   }
   return changed ? versions : undefined
+}
+
+/**
+ * The body a staged item's draft starts with: its caption as posts (a line of
+ * --- starts the next), then each uploaded attachment. Saving and the preview
+ * both build it here, so the preview shows what the draft will hold.
+ */
+export function stagedBody(item: Pick<BatchItem, 'caption' | 'media'>): PlateBody {
+  const posts = importedPosts(item.caption)
+  const body = importedBody(posts.length ? posts : [''])
+  const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+  for (const entry of item.media)
+    if (entry.assetId)
+      body.push({
+        type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
+        assetId: entry.assetId,
+        url: assetContentUrl(entry.assetId),
+        ...(entry.mediaType ? { mimeType: entry.mediaType } : {}),
+        name: entry.fileName ?? '',
+        children: [{ text: '' }],
+      })
+  return body
+}
+
+/**
+ * What each of an item's accounts would show, built as saving its draft
+ * builds it: the same body, platform versions and publication. A caption a
+ * draft cannot hold, such as a thread of more than 25 posts, comes back as
+ * `problem`, as saving reports it. A saved draft may have changed in Write
+ * since; its own preview there is exact.
+ */
+export function previewPublications(
+  item: BatchItem,
+  accounts: readonly BatchAccount[],
+  options: VersionOptions
+): { cards: { account: BatchAccount; publication: Publication }[]; problem?: string } {
+  const ids = itemAccounts(item)
+  const chosen = accounts.filter((account) => ids.includes(account.id))
+  let body: PlateBody
+  try {
+    body = stagedBody({ caption: item.draft?.plainText ?? item.caption, media: item.media })
+  } catch (error) {
+    return { cards: [], problem: error instanceof Error ? error.message : String(error) }
+  }
+  const draft = {
+    article: null,
+    body,
+    kind: 'standard' as const,
+    platformVersions:
+      stagedVersions(
+        item,
+        chosen.map((account) => account.channel),
+        options
+      ) ?? readVersions(undefined),
+    target: null,
+  }
+  return {
+    cards: chosen.map((account) => ({
+      account,
+      publication: buildPublication(draft, {
+        channel: account.channel,
+        connectionId: account.id,
+        standing: {
+          maxWeightedCharacters: account.xCaptionLimit,
+          tiktokCreator: account.tiktokCreator,
+        },
+      }),
+    })),
+  }
 }
 
 /** The hours between posts that keep a day's posts inside its 24 hours. */
@@ -232,6 +307,82 @@ export type TimingView =
   | { kind: 'unset'; text: string }
   | { at: Date; kind: 'at'; text: string; zone: string }
   | { kind: 'problem'; text: string }
+
+/**
+ * A batch's posts on one platform, in list order, as its feed preview shows
+ * them: each post that goes to an account there, built as previewPublications
+ * builds it, with when it goes out there. A post the preview cannot build is
+ * left out and counted in `refused`.
+ */
+export function feedPublications(
+  items: readonly BatchItem[],
+  accounts: readonly BatchAccount[],
+  options: VersionOptions,
+  channel: DraftChannel,
+  zone: string
+) {
+  let refused = 0
+  const posts = items.flatMap((item, index) => {
+    const ids = itemAccounts(item)
+    const account = accounts.find(
+      (candidate) => candidate.channel === channel && ids.includes(candidate.id)
+    )
+    if (!account) return []
+    const [card] = previewPublications(item, [account], options).cards
+    if (!card) {
+      refused += 1
+      return []
+    }
+    return [
+      {
+        card,
+        key: item.id,
+        // A grid video has no picture until it is rendered: the feed says so beside it.
+        label: waitingToRender(item) ? 'Not rendered yet' : plannedText(item, zone, [account.id]),
+        name: `Post ${index + 1}`,
+      },
+    ]
+  })
+  return { posts, refused }
+}
+
+/** A moment as a short date and time in a zone, such as 'Nov 13, 9:30 AM'. */
+export function shortWhen(at: Date | string, zone: string) {
+  const date = typeof at === 'string' ? new Date(at) : at
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    timeZone: zone || undefined,
+  })
+}
+
+/**
+ * When an item goes out, as its row and the feed preview say it. Once every
+ * account given has a post, the scheduler's answer; else the proposal
+ * (Planned for, or the next queue slot), else what is missing. Only the
+ * scheduler's answer says Scheduled. The row asks about all its accounts; the
+ * feed asks about the one account it shows.
+ */
+export function plannedText(
+  item: BatchItem,
+  zone: string,
+  accountIds: string[] = itemAccounts(item)
+): string {
+  const live =
+    accountIds.length > 0 && pendingAccounts(item, accountIds).remaining.length === 0
+      ? accountIds.map((id) => postOn(item, id)).find(Boolean)
+      : undefined
+  if (live)
+    return `${postState(live.status, live.scheduledFor)} · ${shortWhen(live.scheduledFor, live.scheduleTimeZone ?? zone)}`
+  const timing = readTiming(item.timing)
+  if (timing.kind === 'at')
+    return item.timing.mode === 'queue'
+      ? `Next queue slot: ${shortWhen(timing.at, zone)}`
+      : `Planned for ${shortWhen(timing.at, timing.zone || zone)}`
+  return timing.kind === 'problem' ? timing.text : 'No time yet'
+}
 
 /** Read an item's intended time as the backend will, in its own zone. */
 export function readTiming(timing: BatchTiming, now = new Date()): TimingView {
