@@ -288,6 +288,9 @@ type PlatformOAuthJWK func(*sql.Selector)
 // PlatformOAuthRefreshToken is the predicate function for platformoauthrefreshtoken builders.
 type PlatformOAuthRefreshToken func(*sql.Selector)
 
+// PlatformSignupSource is the predicate function for platformsignupsource builders.
+type PlatformSignupSource func(*sql.Selector)
+
 // PlatformSlackConnection is the predicate function for platformslackconnection builders.
 type PlatformSlackConnection func(*sql.Selector)
 

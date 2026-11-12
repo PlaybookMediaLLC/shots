@@ -200,6 +200,8 @@ type Tx struct {
 	PlatformOAuthJWK *PlatformOAuthJWKClient
 	// PlatformOAuthRefreshToken is the client for interacting with the PlatformOAuthRefreshToken builders.
 	PlatformOAuthRefreshToken *PlatformOAuthRefreshTokenClient
+	// PlatformSignupSource is the client for interacting with the PlatformSignupSource builders.
+	PlatformSignupSource *PlatformSignupSourceClient
 	// PlatformSlackConnection is the client for interacting with the PlatformSlackConnection builders.
 	PlatformSlackConnection *PlatformSlackConnectionClient
 	// PlatformSlackInstallation is the client for interacting with the PlatformSlackInstallation builders.
@@ -531,6 +533,7 @@ func (tx *Tx) init() {
 	tx.PlatformOAuthConsent = NewPlatformOAuthConsentClient(tx.config)
 	tx.PlatformOAuthJWK = NewPlatformOAuthJWKClient(tx.config)
 	tx.PlatformOAuthRefreshToken = NewPlatformOAuthRefreshTokenClient(tx.config)
+	tx.PlatformSignupSource = NewPlatformSignupSourceClient(tx.config)
 	tx.PlatformSlackConnection = NewPlatformSlackConnectionClient(tx.config)
 	tx.PlatformSlackInstallation = NewPlatformSlackInstallationClient(tx.config)
 	tx.PlatformSlackPacing = NewPlatformSlackPacingClient(tx.config)

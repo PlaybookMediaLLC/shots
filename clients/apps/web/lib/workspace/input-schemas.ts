@@ -1,5 +1,9 @@
 import { z } from 'zod'
-import { workspaceNameInputSchema, workspaceNameSchema } from 'screenshot-studio-backend-sdk'
+import {
+  signupSourceInputSchema,
+  workspaceNameInputSchema,
+  workspaceNameSchema,
+} from 'screenshot-studio-backend-sdk'
 
 export { workspaceNameSchema }
 
@@ -27,4 +31,6 @@ export const workspaceCreateSchema = z.object({
       }
     }, 'Choose a valid time zone.')
     .optional(),
+  /** Where the creator heard about Shots; first onboarding asks, and the answer is optional. */
+  heardAbout: signupSourceInputSchema.optional(),
 })

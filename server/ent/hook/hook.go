@@ -1137,6 +1137,18 @@ func (f PlatformOAuthRefreshTokenFunc) Mutate(ctx context.Context, m ent.Mutatio
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformOAuthRefreshTokenMutation", m)
 }
 
+// The PlatformSignupSourceFunc type is an adapter to allow the use of ordinary
+// function as PlatformSignupSource mutator.
+type PlatformSignupSourceFunc func(context.Context, *ent.PlatformSignupSourceMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PlatformSignupSourceFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PlatformSignupSourceMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PlatformSignupSourceMutation", m)
+}
+
 // The PlatformSlackConnectionFunc type is an adapter to allow the use of ordinary
 // function as PlatformSlackConnection mutator.
 type PlatformSlackConnectionFunc func(context.Context, *ent.PlatformSlackConnectionMutation) (ent.Value, error)

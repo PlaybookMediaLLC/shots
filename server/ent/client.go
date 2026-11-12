@@ -109,6 +109,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthconsent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthjwk"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformoauthrefreshtoken"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsignupsource"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpacing"
@@ -357,6 +358,8 @@ type Client struct {
 	PlatformOAuthJWK *PlatformOAuthJWKClient
 	// PlatformOAuthRefreshToken is the client for interacting with the PlatformOAuthRefreshToken builders.
 	PlatformOAuthRefreshToken *PlatformOAuthRefreshTokenClient
+	// PlatformSignupSource is the client for interacting with the PlatformSignupSource builders.
+	PlatformSignupSource *PlatformSignupSourceClient
 	// PlatformSlackConnection is the client for interacting with the PlatformSlackConnection builders.
 	PlatformSlackConnection *PlatformSlackConnectionClient
 	// PlatformSlackInstallation is the client for interacting with the PlatformSlackInstallation builders.
@@ -568,6 +571,7 @@ func (c *Client) init() {
 	c.PlatformOAuthConsent = NewPlatformOAuthConsentClient(c.config)
 	c.PlatformOAuthJWK = NewPlatformOAuthJWKClient(c.config)
 	c.PlatformOAuthRefreshToken = NewPlatformOAuthRefreshTokenClient(c.config)
+	c.PlatformSignupSource = NewPlatformSignupSourceClient(c.config)
 	c.PlatformSlackConnection = NewPlatformSlackConnectionClient(c.config)
 	c.PlatformSlackInstallation = NewPlatformSlackInstallationClient(c.config)
 	c.PlatformSlackPacing = NewPlatformSlackPacingClient(c.config)
@@ -807,6 +811,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PlatformOAuthConsent:            NewPlatformOAuthConsentClient(cfg),
 		PlatformOAuthJWK:                NewPlatformOAuthJWKClient(cfg),
 		PlatformOAuthRefreshToken:       NewPlatformOAuthRefreshTokenClient(cfg),
+		PlatformSignupSource:            NewPlatformSignupSourceClient(cfg),
 		PlatformSlackConnection:         NewPlatformSlackConnectionClient(cfg),
 		PlatformSlackInstallation:       NewPlatformSlackInstallationClient(cfg),
 		PlatformSlackPacing:             NewPlatformSlackPacingClient(cfg),
@@ -973,6 +978,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PlatformOAuthConsent:            NewPlatformOAuthConsentClient(cfg),
 		PlatformOAuthJWK:                NewPlatformOAuthJWKClient(cfg),
 		PlatformOAuthRefreshToken:       NewPlatformOAuthRefreshTokenClient(cfg),
+		PlatformSignupSource:            NewPlatformSignupSourceClient(cfg),
 		PlatformSlackConnection:         NewPlatformSlackConnectionClient(cfg),
 		PlatformSlackInstallation:       NewPlatformSlackInstallationClient(cfg),
 		PlatformSlackPacing:             NewPlatformSlackPacingClient(cfg),
@@ -1084,8 +1090,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
 		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
 		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
-		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -1140,8 +1146,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PlatformNotificationInbox, c.PlatformNotificationPolicy,
 		c.PlatformNotificationPreference, c.PlatformNotificationSeenAction,
 		c.PlatformOAuthAccessToken, c.PlatformOAuthClient, c.PlatformOAuthConsent,
-		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSlackConnection,
-		c.PlatformSlackInstallation, c.PlatformSlackPacing,
+		c.PlatformOAuthJWK, c.PlatformOAuthRefreshToken, c.PlatformSignupSource,
+		c.PlatformSlackConnection, c.PlatformSlackInstallation, c.PlatformSlackPacing,
 		c.PlatformSlackPersonalConnection, c.PlatformSocialMention,
 		c.PlatformSocialObservation, c.PlatformWorkspaceCreation, c.PostAutomationRun,
 		c.ProductProfile, c.ProductSurface, c.Project, c.ProjectVersion,
@@ -1354,6 +1360,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PlatformOAuthJWK.mutate(ctx, m)
 	case *PlatformOAuthRefreshTokenMutation:
 		return c.PlatformOAuthRefreshToken.mutate(ctx, m)
+	case *PlatformSignupSourceMutation:
+		return c.PlatformSignupSource.mutate(ctx, m)
 	case *PlatformSlackConnectionMutation:
 		return c.PlatformSlackConnection.mutate(ctx, m)
 	case *PlatformSlackInstallationMutation:
@@ -14047,6 +14055,139 @@ func (c *PlatformOAuthRefreshTokenClient) mutate(ctx context.Context, m *Platfor
 	}
 }
 
+// PlatformSignupSourceClient is a client for the PlatformSignupSource schema.
+type PlatformSignupSourceClient struct {
+	config
+}
+
+// NewPlatformSignupSourceClient returns a client for the PlatformSignupSource from the given config.
+func NewPlatformSignupSourceClient(c config) *PlatformSignupSourceClient {
+	return &PlatformSignupSourceClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `platformsignupsource.Hooks(f(g(h())))`.
+func (c *PlatformSignupSourceClient) Use(hooks ...Hook) {
+	c.hooks.PlatformSignupSource = append(c.hooks.PlatformSignupSource, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `platformsignupsource.Intercept(f(g(h())))`.
+func (c *PlatformSignupSourceClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PlatformSignupSource = append(c.inters.PlatformSignupSource, interceptors...)
+}
+
+// Create returns a builder for creating a PlatformSignupSource entity.
+func (c *PlatformSignupSourceClient) Create() *PlatformSignupSourceCreate {
+	mutation := newPlatformSignupSourceMutation(c.config, OpCreate)
+	return &PlatformSignupSourceCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PlatformSignupSource entities.
+func (c *PlatformSignupSourceClient) CreateBulk(builders ...*PlatformSignupSourceCreate) *PlatformSignupSourceCreateBulk {
+	return &PlatformSignupSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PlatformSignupSourceClient) MapCreateBulk(slice any, setFunc func(*PlatformSignupSourceCreate, int)) *PlatformSignupSourceCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PlatformSignupSourceCreateBulk{err: fmt.Errorf("calling to PlatformSignupSourceClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PlatformSignupSourceCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PlatformSignupSourceCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PlatformSignupSource.
+func (c *PlatformSignupSourceClient) Update() *PlatformSignupSourceUpdate {
+	mutation := newPlatformSignupSourceMutation(c.config, OpUpdate)
+	return &PlatformSignupSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PlatformSignupSourceClient) UpdateOne(_m *PlatformSignupSource) *PlatformSignupSourceUpdateOne {
+	mutation := newPlatformSignupSourceMutation(c.config, OpUpdateOne, withPlatformSignupSource(_m))
+	return &PlatformSignupSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PlatformSignupSourceClient) UpdateOneID(id string) *PlatformSignupSourceUpdateOne {
+	mutation := newPlatformSignupSourceMutation(c.config, OpUpdateOne, withPlatformSignupSourceID(id))
+	return &PlatformSignupSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PlatformSignupSource.
+func (c *PlatformSignupSourceClient) Delete() *PlatformSignupSourceDelete {
+	mutation := newPlatformSignupSourceMutation(c.config, OpDelete)
+	return &PlatformSignupSourceDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PlatformSignupSourceClient) DeleteOne(_m *PlatformSignupSource) *PlatformSignupSourceDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PlatformSignupSourceClient) DeleteOneID(id string) *PlatformSignupSourceDeleteOne {
+	builder := c.Delete().Where(platformsignupsource.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PlatformSignupSourceDeleteOne{builder}
+}
+
+// Query returns a query builder for PlatformSignupSource.
+func (c *PlatformSignupSourceClient) Query() *PlatformSignupSourceQuery {
+	return &PlatformSignupSourceQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePlatformSignupSource},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PlatformSignupSource entity by its id.
+func (c *PlatformSignupSourceClient) Get(ctx context.Context, id string) (*PlatformSignupSource, error) {
+	return c.Query().Where(platformsignupsource.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PlatformSignupSourceClient) GetX(ctx context.Context, id string) *PlatformSignupSource {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PlatformSignupSourceClient) Hooks() []Hook {
+	return c.hooks.PlatformSignupSource
+}
+
+// Interceptors returns the client interceptors.
+func (c *PlatformSignupSourceClient) Interceptors() []Interceptor {
+	return c.inters.PlatformSignupSource
+}
+
+func (c *PlatformSignupSourceClient) mutate(ctx context.Context, m *PlatformSignupSourceMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PlatformSignupSourceCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PlatformSignupSourceUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PlatformSignupSourceUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PlatformSignupSourceDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PlatformSignupSource mutation op: %q", m.Op())
+	}
+}
+
 // PlatformSlackConnectionClient is a client for the PlatformSlackConnection schema.
 type PlatformSlackConnectionClient struct {
 	config
@@ -21173,8 +21314,8 @@ type (
 		PlatformNotificationInbox, PlatformNotificationPolicy,
 		PlatformNotificationPreference, PlatformNotificationSeenAction,
 		PlatformOAuthAccessToken, PlatformOAuthClient, PlatformOAuthConsent,
-		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSlackConnection,
-		PlatformSlackInstallation, PlatformSlackPacing,
+		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSignupSource,
+		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,
@@ -21217,8 +21358,8 @@ type (
 		PlatformNotificationInbox, PlatformNotificationPolicy,
 		PlatformNotificationPreference, PlatformNotificationSeenAction,
 		PlatformOAuthAccessToken, PlatformOAuthClient, PlatformOAuthConsent,
-		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSlackConnection,
-		PlatformSlackInstallation, PlatformSlackPacing,
+		PlatformOAuthJWK, PlatformOAuthRefreshToken, PlatformSignupSource,
+		PlatformSlackConnection, PlatformSlackInstallation, PlatformSlackPacing,
 		PlatformSlackPersonalConnection, PlatformSocialMention,
 		PlatformSocialObservation, PlatformWorkspaceCreation, PostAutomationRun,
 		ProductProfile, ProductSurface, Project, ProjectVersion, PublicationAttempt,

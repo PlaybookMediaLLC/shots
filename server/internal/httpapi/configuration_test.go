@@ -19,6 +19,7 @@ type fakeConfiguration struct {
 	ConfigurationStore
 	authorizationError  error
 	readError           error
+	createdWorkspace    product.CreateWorkspaceInput
 	profile             *ent.BrandProfile
 	profileOrganization string
 	actor               product.Actor
@@ -64,6 +65,7 @@ func (f *fakeConfiguration) AuthorizeSensitive(_ context.Context, actor product.
 	return f.authorizationError
 }
 func (f *fakeConfiguration) CreateWorkspace(_ context.Context, _ product.Actor, input product.CreateWorkspaceInput) (*product.Workspace, error) {
+	f.createdWorkspace = input
 	return &product.Workspace{ID: "workspace-1", Name: input.Name, Slug: input.Slug}, nil
 }
 func (f *fakeConfiguration) ListWorkspaces(context.Context, product.Actor) ([]product.ListedWorkspace, error) {
@@ -548,6 +550,16 @@ func TestWorkspaceRoutesRequireSessionAndRecheckUpdates(t *testing.T) {
 	invalid := configurationRequest(handler, http.MethodPost, "/v1/workspaces", `{"name":"New Workspace","slug":"UPPER"}`)
 	if invalid.Code != http.StatusBadRequest {
 		t.Fatalf("invalid slug status=%d", invalid.Code)
+	}
+	// Where the creator heard about Shots reaches the domain as sent; its fields stay closed.
+	answered := configurationRequest(handler, http.MethodPost, "/v1/workspaces", `{"name":"New Workspace","slug":"new-workspace","heardAbout":{"source":"other","detail":"A talk"}}`)
+	if answered.Code != http.StatusCreated || config.createdWorkspace.HeardAbout == nil ||
+		*config.createdWorkspace.HeardAbout != (product.SignupSourceInput{Source: "other", Detail: "A talk"}) {
+		t.Fatalf("answered create status=%d input=%+v", answered.Code, config.createdWorkspace.HeardAbout)
+	}
+	unknown := configurationRequest(handler, http.MethodPost, "/v1/workspaces", `{"name":"New Workspace","slug":"new-workspace","heardAbout":{"source":"x","campaign":"spring"}}`)
+	if unknown.Code != http.StatusBadRequest {
+		t.Fatalf("unknown answer field status=%d", unknown.Code)
 	}
 	denied := configurationRequest(handler, http.MethodPatch, "/v1/workspace", `{"name":"Workspace","slug":"workspace"}`)
 	if denied.Code != http.StatusForbidden {

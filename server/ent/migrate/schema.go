@@ -2792,6 +2792,28 @@ var (
 		Columns:    OauthRefreshTokenColumns,
 		PrimaryKey: []*schema.Column{OauthRefreshTokenColumns[0]},
 	}
+	// PlatformSignupSourceColumns holds the columns for the "platform_signup_source" table.
+	PlatformSignupSourceColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeString},
+		{Name: "userId", Type: field.TypeString},
+		{Name: "organizationId", Type: field.TypeString},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"search", "ai_assistant", "x", "linkedin", "youtube", "tiktok_instagram", "reddit", "product_hunt_hacker_news", "friend_colleague", "newsletter_blog_podcast", "event_community", "other"}},
+		{Name: "detail", Type: field.TypeString, Nullable: true},
+		{Name: "createdAt", Type: field.TypeTime},
+	}
+	// PlatformSignupSourceTable holds the schema information for the "platform_signup_source" table.
+	PlatformSignupSourceTable = &schema.Table{
+		Name:       "platform_signup_source",
+		Columns:    PlatformSignupSourceColumns,
+		PrimaryKey: []*schema.Column{PlatformSignupSourceColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "platformsignupsource_userId",
+				Unique:  true,
+				Columns: []*schema.Column{PlatformSignupSourceColumns[1]},
+			},
+		},
+	}
 	// PlatformSlackConnectionColumns holds the columns for the "platform_slack_connection" table.
 	PlatformSlackConnectionColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeString},
@@ -4509,6 +4531,7 @@ var (
 		OauthConsentTable,
 		JwksTable,
 		OauthRefreshTokenTable,
+		PlatformSignupSourceTable,
 		PlatformSlackConnectionTable,
 		PlatformSlackInstallationTable,
 		PlatformSlackPacingTable,
@@ -4849,6 +4872,9 @@ func init() {
 	}
 	OauthRefreshTokenTable.Annotation = &entsql.Annotation{
 		Table: "oauthRefreshToken",
+	}
+	PlatformSignupSourceTable.Annotation = &entsql.Annotation{
+		Table: "platform_signup_source",
 	}
 	PlatformSlackConnectionTable.Annotation = &entsql.Annotation{
 		Table: "platform_slack_connection",

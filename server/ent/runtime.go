@@ -91,6 +91,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpolicy"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationpreference"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformnotificationseenaction"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsignupsource"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackconnection"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackinstallation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformslackpersonalconnection"
@@ -1528,6 +1529,12 @@ func init() {
 	platformnotificationseenactionDescCreatedAt := platformnotificationseenactionFields[6].Descriptor()
 	// platformnotificationseenaction.DefaultCreatedAt holds the default value on creation for the created_at field.
 	platformnotificationseenaction.DefaultCreatedAt = platformnotificationseenactionDescCreatedAt.Default.(func() time.Time)
+	platformsignupsourceFields := schema.PlatformSignupSource{}.Fields()
+	_ = platformsignupsourceFields
+	// platformsignupsourceDescCreatedAt is the schema descriptor for created_at field.
+	platformsignupsourceDescCreatedAt := platformsignupsourceFields[5].Descriptor()
+	// platformsignupsource.DefaultCreatedAt holds the default value on creation for the created_at field.
+	platformsignupsource.DefaultCreatedAt = platformsignupsourceDescCreatedAt.Default.(func() time.Time)
 	platformslackconnectionFields := schema.PlatformSlackConnection{}.Fields()
 	_ = platformslackconnectionFields
 	// platformslackconnectionDescLegacySocialID is the schema descriptor for legacy_social_id field.
