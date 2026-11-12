@@ -304,6 +304,7 @@ export {
   editorMore,
   enableDraftTags,
   expectSaved,
+  fillBatchCSV,
   inPreview,
   openNewBatch,
   openNewDraft,
