@@ -115,6 +115,7 @@ import { CHANNEL_META, ChannelIcon } from '@/components/drafts/channel-meta'
 import { CaretDownIcon } from '@phosphor-icons/react/dist/ssr/CaretDown'
 import { EyeIcon } from '@phosphor-icons/react/dist/ssr/Eye'
 import { uploadByteLimit } from '@/lib/write/media-limits'
+import { clock } from '@/lib/write/media-rules'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
 import { expandSpintax } from '@/lib/write/spintax'
@@ -126,6 +127,7 @@ import { type Destination, DestinationSummary, destinationName } from '../destin
 import { BatchPreviewSheet } from './BatchPreview'
 import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
+import { FileThumb, ImportReview, type Staged } from './ImportReview'
 import { GridCreator } from './GridCreator'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
@@ -139,14 +141,6 @@ const UPLOAD_CONCURRENCY = 3
 const VALIDATE_CHUNK = 25
 /** How often a running schedule's progress is read. */
 const SUBMIT_POLL_MS = 1500
-
-/** A row of the import preview; `files` holds each attachment's file, in order. */
-type Staged = {
-  files: (File | undefined)[]
-  input: BatchItemInput
-  line: number
-  problems: string[]
-}
 
 /** A saved attachment as an item's next save sends it. */
 function mediaInput({
@@ -243,10 +237,6 @@ const FORMAT_NAMES: Record<string, string> = {
   'video/webm': 'WebM',
 }
 
-/** A length as minutes and seconds, such as 1:05. */
-const clock = (ms: number) =>
-  `${Math.floor(ms / 60_000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`
-
 /** One attachment of a post: its picture or kind, and where its upload stands. */
 function MediaTile({
   entry,
@@ -261,14 +251,7 @@ function MediaTile({
 }) {
   const type = entry.mediaType ?? file?.type ?? ''
   const stored = entry.assetId ?? (entry.status === 'UPLOADED' ? entry.uploadAssetId : undefined)
-  const [local, setLocal] = React.useState<string>()
-  React.useEffect(() => {
-    if (stored || !file || !type.startsWith('image/')) return
-    const url = URL.createObjectURL(file)
-    setLocal(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file, stored, type])
-  const picture = type.startsWith('image/') ? (stored ? assetContentUrl(stored) : local) : undefined
+  const picture = stored && type.startsWith('image/') ? assetContentUrl(stored) : undefined
   const Icon =
     type === 'application/pdf' ? PdfIcon : type.startsWith('video/') ? VideoIcon : ImageIcon
   const problem = Boolean(upload?.error) || entry.status === 'FAILED'
@@ -289,6 +272,9 @@ function MediaTile({
       <div className="relative flex size-24 items-center justify-center overflow-hidden rounded-xl border border-border bg-muted">
         {picture ? (
           <img src={picture} alt="" className="size-full object-cover" />
+        ) : file ? (
+          // This tab's copy of the file, until the stored one can be shown.
+          <FileThumb badge={entry.status !== 'UPLOADED'} className="size-full" file={file} />
         ) : (
           <Icon aria-hidden className="size-7 text-muted-foreground" />
         )}
@@ -2051,63 +2037,7 @@ export function BatchWorkspace({
                     {preview.skipped.map((entry) => `${entry.name} (${entry.reason})`).join(', ')}
                   </p>
                 ) : null}
-                <Group>
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Row</TableHead>
-                        <TableHead>Caption</TableHead>
-                        <TableHead>Media</TableHead>
-                        <TableHead>Accounts</TableHead>
-                        <TableHead>Time</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {preview.staged.map((row) => (
-                        <TableRow key={row.input.importKey} className="align-top">
-                          <TableCell>{row.line}</TableCell>
-                          <TableCell className="max-w-64 truncate">
-                            {row.input.caption || (
-                              <span className="text-muted-foreground">No caption</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="max-w-48 truncate">
-                            {row.input.media
-                              .map(
-                                (media) => ('assetId' in media && media.assetId) || media.fileName
-                              )
-                              .join(', ') || <span className="text-muted-foreground">None</span>}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.channelConnectionIds.map(accountName).join(', ') || (
-                              <span className="text-muted-foreground">None</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {row.input.timing.localTime
-                              ? `${row.input.timing.localTime.replace('T', ' ')} (${row.input.timing.timeZone})`
-                              : 'Set later'}
-                          </TableCell>
-                          <TableCell className="whitespace-normal">
-                            {row.problems.length ? (
-                              <div className="grid justify-items-start gap-1">
-                                <Pill tone="red">Needs fixing</Pill>
-                                {row.problems.map((problem) => (
-                                  <p key={problem} role="alert" className="text-destructive">
-                                    {problem}
-                                  </p>
-                                ))}
-                              </div>
-                            ) : (
-                              <Pill tone="green">Ready</Pill>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </Group>
+                <ImportReview accountName={accountName} rows={preview.staged} />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     disabled={
