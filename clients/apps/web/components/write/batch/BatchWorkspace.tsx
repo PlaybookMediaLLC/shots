@@ -1825,7 +1825,9 @@ export function BatchWorkspace({
         <aside
           aria-label="Batch tools"
           className={cn(
-            'grid min-w-0 content-start gap-6 xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:max-h-[calc(100dvh-5rem)] xl:overflow-y-auto',
+            'grid min-w-0 content-start gap-6 xl:sticky xl:top-6 xl:col-start-2 xl:row-start-1 xl:overflow-y-auto',
+            // The save bar, once there are posts, stays clear of the rail's last rows.
+            items.length ? 'xl:max-h-[calc(100dvh-18rem)]' : 'xl:max-h-[calc(100dvh-5rem)]',
             !importing && !videoChannels.length && 'max-xl:hidden'
           )}
         >
@@ -2695,247 +2697,248 @@ export function BatchWorkspace({
               </div>
             </div>
           </Section>
+        </div>
 
-          {items.length ? (
-            <section
-              className="sticky bottom-2 z-10 grid gap-3 rounded-xl border border-border bg-card/95 p-3 shadow-popover backdrop-blur sm:bottom-4 sm:p-4"
-              aria-label="Save and schedule"
-            >
-              <div className="grid gap-0.5">
-                <p className="text-ui font-medium text-foreground" data-testid="batch-readiness">
-                  {[
-                    `${drafted.length} draft${drafted.length === 1 ? '' : 's'} saved`,
-                    checked ? `${chosenPosts} ready` : null,
-                    audience,
-                    range ?? 'no times yet',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </p>
-                <p role="status" className="text-label text-muted-foreground">
-                  {checked
-                    ? `${chosenCount} selection${chosenCount === 1 ? '' : 's'} will be scheduled${
-                        attention
-                          ? `; ${attention} need${attention === 1 ? 's' : ''} attention and will not be`
-                          : ''
-                      }. `
-                    : `${drafted.length} of ${items.length} saved as drafts${
-                        notRendered
-                          ? `; ${notRendered} video${notRendered === 1 ? '' : 's'} not rendered yet`
-                          : ''
-                      }${
-                        unsaved.length - ready.length - notRendered > 0
-                          ? `; ${unsaved.length - ready.length - notRendered} still uploading or waiting for files`
-                          : ''
-                      }. `}
-                  Nothing goes out until you choose Schedule.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <Select
-                  value={timesMode}
-                  onValueChange={(value) => setTimesMode(value as 'queue' | 'hourly' | 'spread')}
-                >
-                  <SelectTrigger aria-label="Batch time mode">
-                    <CalendarIcon aria-hidden className="size-4 text-muted-foreground" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="queue">Next queue slots</SelectItem>
-                    <SelectItem value="hourly">Every hour</SelectItem>
-                    <SelectItem value="spread">Spread over days</SelectItem>
-                  </SelectContent>
-                </Select>
-                {timesMode === 'hourly' ? (
-                  <>
-                    <div className="grid gap-1 text-label text-muted-foreground">
-                      First post
-                      <LocalTimeFields
-                        onValidityChange={setHourlyValid}
-                        label="Hourly start"
-                        value={hourly.start}
-                        onChange={(edit) =>
-                          setHourly((current) => ({ ...current, start: edit(current.start) }))
-                        }
-                      />
-                    </div>
-                    <Label className="grid gap-1 text-label font-normal text-muted-foreground">
-                      Last post of the day by
-                      <TimePicker
-                        aria-label="Hourly end of day"
-                        value={hourly.until}
-                        onChange={(until) => setHourly((current) => ({ ...current, until }))}
-                      />
-                    </Label>
-                  </>
-                ) : null}
-                {timesMode === 'spread' ? (
-                  <>
-                    <div className="grid gap-1 text-sm">
-                      Start ({zone})
-                      <LocalTimeFields
-                        onValidityChange={setSpreadValid}
-                        label="Spread start"
-                        value={spread.start}
-                        onChange={(edit) =>
-                          setSpread((current) => ({ ...current, start: edit(current.start) }))
-                        }
-                      />
-                    </div>
+        {/* Full width on wide screens: its actions sit clear of the bottom-centre toasts. */}
+        {items.length ? (
+          <section
+            className="sticky bottom-2 z-10 grid gap-3 rounded-xl border border-border bg-card/95 p-3 shadow-popover backdrop-blur sm:bottom-4 sm:p-4 xl:col-span-2"
+            aria-label="Save and schedule"
+          >
+            <div className="grid gap-0.5">
+              <p className="text-ui font-medium text-foreground" data-testid="batch-readiness">
+                {[
+                  `${drafted.length} draft${drafted.length === 1 ? '' : 's'} saved`,
+                  checked ? `${chosenPosts} ready` : null,
+                  audience,
+                  range ?? 'no times yet',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+              <p role="status" className="text-label text-muted-foreground">
+                {checked
+                  ? `${chosenCount} selection${chosenCount === 1 ? '' : 's'} will be scheduled${
+                      attention
+                        ? `; ${attention} need${attention === 1 ? 's' : ''} attention and will not be`
+                        : ''
+                    }. `
+                  : `${drafted.length} of ${items.length} saved as drafts${
+                      notRendered
+                        ? `; ${notRendered} video${notRendered === 1 ? '' : 's'} not rendered yet`
+                        : ''
+                    }${
+                      unsaved.length - ready.length - notRendered > 0
+                        ? `; ${unsaved.length - ready.length - notRendered} still uploading or waiting for files`
+                        : ''
+                    }. `}
+                Nothing goes out until you choose Schedule.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <Select
+                value={timesMode}
+                onValueChange={(value) => setTimesMode(value as 'queue' | 'hourly' | 'spread')}
+              >
+                <SelectTrigger aria-label="Batch time mode">
+                  <CalendarIcon aria-hidden className="size-4 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="queue">Next queue slots</SelectItem>
+                  <SelectItem value="hourly">Every hour</SelectItem>
+                  <SelectItem value="spread">Spread over days</SelectItem>
+                </SelectContent>
+              </Select>
+              {timesMode === 'hourly' ? (
+                <>
+                  <div className="grid gap-1 text-label text-muted-foreground">
+                    First post
+                    <LocalTimeFields
+                      onValidityChange={setHourlyValid}
+                      label="Hourly start"
+                      value={hourly.start}
+                      onChange={(edit) =>
+                        setHourly((current) => ({ ...current, start: edit(current.start) }))
+                      }
+                    />
+                  </div>
+                  <Label className="grid gap-1 text-label font-normal text-muted-foreground">
+                    Last post of the day by
+                    <TimePicker
+                      aria-label="Hourly end of day"
+                      value={hourly.until}
+                      onChange={(until) => setHourly((current) => ({ ...current, until }))}
+                    />
+                  </Label>
+                </>
+              ) : null}
+              {timesMode === 'spread' ? (
+                <>
+                  <div className="grid gap-1 text-sm">
+                    Start ({zone})
+                    <LocalTimeFields
+                      onValidityChange={setSpreadValid}
+                      label="Spread start"
+                      value={spread.start}
+                      onChange={(edit) =>
+                        setSpread((current) => ({ ...current, start: edit(current.start) }))
+                      }
+                    />
+                  </div>
+                  <Label className="grid gap-1 font-normal">
+                    Posts per day
+                    <Input
+                      className="w-24"
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={spread.perDay}
+                      onChange={(event) => {
+                        const perDay = Math.min(24, Math.max(1, Number(event.target.value) || 1))
+                        // A day's posts must still fit, so the spacing follows the count.
+                        const fits = Math.max(...spreadHourOptions(perDay)) * 60
+                        setSpread({ ...spread, perDay, spacing: Math.min(spread.spacing, fits) })
+                      }}
+                    />
+                  </Label>
+                  {spread.perDay > 1 ? (
                     <Label className="grid gap-1 font-normal">
-                      Posts per day
-                      <Input
-                        className="w-24"
-                        type="number"
-                        min={1}
-                        max={24}
-                        value={spread.perDay}
-                        onChange={(event) => {
-                          const perDay = Math.min(24, Math.max(1, Number(event.target.value) || 1))
-                          // A day's posts must still fit, so the spacing follows the count.
-                          const fits = Math.max(...spreadHourOptions(perDay)) * 60
-                          setSpread({ ...spread, perDay, spacing: Math.min(spread.spacing, fits) })
-                        }}
-                      />
-                    </Label>
-                    {spread.perDay > 1 ? (
-                      <Label className="grid gap-1 font-normal">
-                        Time between posts
-                        <Select
-                          value={String(spread.spacing)}
-                          onValueChange={(value) =>
-                            setSpread({ ...spread, spacing: Number(value) })
-                          }
-                        >
-                          <SelectTrigger aria-label="Time between posts">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {spreadHourOptions(spread.perDay).map((hours) => (
-                              <SelectItem key={hours} value={String(hours * 60)}>
-                                {hours} hour{hours === 1 ? '' : 's'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </Label>
-                    ) : null}
-                    <Label className="font-normal">
-                      <Checkbox
-                        checked={spread.shift > 0}
-                        onCheckedChange={(checked) =>
-                          setSpread({ ...spread, shift: checked === true ? 55 : 0 })
+                      Time between posts
+                      <Select
+                        value={String(spread.spacing)}
+                        onValueChange={(value) =>
+                          setSpread({ ...spread, spacing: Number(value) })
                         }
-                      />
-                      Randomize times by 0–55 minutes
+                      >
+                        <SelectTrigger aria-label="Time between posts">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {spreadHourOptions(spread.perDay).map((hours) => (
+                            <SelectItem key={hours} value={String(hours * 60)}>
+                              {hours} hour{hours === 1 ? '' : 's'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </Label>
-                  </>
-                ) : null}
-                <Button
-                  disabled={busy !== null || !planReady || !items.length}
-                  onClick={() => void planAll()}
-                  title="Saves posts not yet saved as drafts, proposes their times and checks every post on its accounts"
-                  // The next step is the primary action: planning, then scheduling once checked.
-                  variant={checked ? 'outline' : 'default'}
-                >
-                  {busy === 'times'
-                    ? 'Planning…'
-                    : busy === 'drafts'
-                      ? 'Saving drafts…'
-                      : busy === 'check'
-                        ? 'Checking…'
-                        : 'Plan times'}
-                </Button>
-                <div className="ms-auto flex flex-wrap items-center gap-2">
-                  {ready.length ? (
-                    <Button
-                      size={compact}
-                      variant="outline"
-                      disabled={busy !== null || hasInvalidTimes}
-                      onClick={() => void saveDrafts()}
-                    >
-                      {busy === 'drafts' ? 'Saving drafts…' : 'Save ready items as drafts'}
-                    </Button>
                   ) : null}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-label="More batch actions" size="icon" variant="ghost">
-                        <MoreIcon />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {canPublish ? (
-                        <DropdownMenuItem
-                          disabled={busy !== null || hasInvalidTimes || !drafted.length}
-                          onSelect={() => void check()}
-                        >
-                          Check every item and account
-                        </DropdownMenuItem>
-                      ) : null}
+                  <Label className="font-normal">
+                    <Checkbox
+                      checked={spread.shift > 0}
+                      onCheckedChange={(checked) =>
+                        setSpread({ ...spread, shift: checked === true ? 55 : 0 })
+                      }
+                    />
+                    Randomize times by 0–55 minutes
+                  </Label>
+                </>
+              ) : null}
+              <Button
+                disabled={busy !== null || !planReady || !items.length}
+                onClick={() => void planAll()}
+                title="Saves posts not yet saved as drafts, proposes their times and checks every post on its accounts"
+                // The next step is the primary action: planning, then scheduling once checked.
+                variant={checked ? 'outline' : 'default'}
+              >
+                {busy === 'times'
+                  ? 'Planning…'
+                  : busy === 'drafts'
+                    ? 'Saving drafts…'
+                    : busy === 'check'
+                      ? 'Checking…'
+                      : 'Plan times'}
+              </Button>
+              <div className="ms-auto flex flex-wrap items-center gap-2">
+                {ready.length ? (
+                  <Button
+                    size={compact}
+                    variant="outline"
+                    disabled={busy !== null || hasInvalidTimes}
+                    onClick={() => void saveDrafts()}
+                  >
+                    {busy === 'drafts' ? 'Saving drafts…' : 'Save ready items as drafts'}
+                  </Button>
+                ) : null}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button aria-label="More batch actions" size="icon" variant="ghost">
+                      <MoreIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    {canPublish ? (
                       <DropdownMenuItem
                         disabled={busy !== null || hasInvalidTimes || !drafted.length}
-                        onSelect={() => void requestReviews()}
+                        onSelect={() => void check()}
                       >
-                        Request review for drafts
+                        Check every item and account
                       </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  {canPublish ? (
-                    <Button
-                      size={compact}
-                      variant={checked ? 'default' : 'outline'}
-                      disabled={busy !== null || submitting || (chosenCount === 0 && !unanswered.current)}
-                      onClick={() => void schedule()}
+                    ) : null}
+                    <DropdownMenuItem
+                      disabled={busy !== null || hasInvalidTimes || !drafted.length}
+                      onSelect={() => void requestReviews()}
                     >
-                      {busy === 'schedule'
-                        ? 'Scheduling…'
-                        : unanswered.current
-                          ? 'Try scheduling again'
-                          : `Schedule ${chosenPosts} post${chosenPosts === 1 ? '' : 's'}${
-                              chosenCount > chosenPosts ? ` (${chosenCount} in all)` : ''
-                            }`}
-                    </Button>
-                  ) : (
-                    <p className="self-center text-label text-muted-foreground">
-                      A publisher schedules these drafts after review.
-                    </p>
-                  )}
-                </div>
+                      Request review for drafts
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {canPublish ? (
+                  <Button
+                    size={compact}
+                    variant={checked ? 'default' : 'outline'}
+                    disabled={busy !== null || submitting || (chosenCount === 0 && !unanswered.current)}
+                    onClick={() => void schedule()}
+                  >
+                    {busy === 'schedule'
+                      ? 'Scheduling…'
+                      : unanswered.current
+                        ? 'Try scheduling again'
+                        : `Schedule ${chosenPosts} post${chosenPosts === 1 ? '' : 's'}${
+                            chosenCount > chosenPosts ? ` (${chosenCount} in all)` : ''
+                          }`}
+                  </Button>
+                ) : (
+                  <p className="self-center text-label text-muted-foreground">
+                    A publisher schedules these drafts after review.
+                  </p>
+                )}
               </div>
-              {timesMode === 'hourly' ? (
-                <p className="text-label text-muted-foreground" data-testid="hourly-explainer">
-                  {hourlyDay
-                    ? `One post an hour from ${hourly.start.slice(11, 16) || '…'} to ${hourly.until}: up to ${hourlyDay} a day. Posts past that continue the next day at ${hourly.start.slice(11, 16) || 'the start'}.`
-                    : 'The last post of the day must come after the first.'}
-                </p>
-              ) : null}
-              {summary.first && summary.last ? (
-                <p className="hidden text-label text-muted-foreground sm:block" data-testid="batch-summary">
-                  {batchAudience(items, accounts)}, first {shortWhen(summary.first, zone)}, last{' '}
-                  {shortWhen(summary.last, zone)}, on {summary.calendarDays} calendar day
-                  {summary.calendarDays === 1 ? '' : 's'}.
-                  {summary.withoutTime ? ` ${summary.withoutTime} still need a time.` : ''}
-                </p>
-              ) : null}
-              {submitting ? (
-                <p
-                  role="status"
-                  className="text-sm text-muted-foreground"
-                  data-testid="submit-running"
-                >
-                  Scheduling in the background. You can close this page: it carries on, and each
-                  post&rsquo;s result is here when you come back.
-                </p>
-              ) : null}
-              {postsLeft !== null && chosenCount > postsLeft ? (
-                <p role="status" className="text-sm text-destructive" data-testid="quota-warning">
-                  This schedules {chosenCount} posts and your plan has {postsLeft} left this month.
-                  Posts past the limit are refused with a reason, and the rest stay scheduled.
-                </p>
-              ) : null}
-            </section>
-          ) : null}
-        </div>
+            </div>
+            {timesMode === 'hourly' ? (
+              <p className="text-label text-muted-foreground" data-testid="hourly-explainer">
+                {hourlyDay
+                  ? `One post an hour from ${hourly.start.slice(11, 16) || '…'} to ${hourly.until}: up to ${hourlyDay} a day. Posts past that continue the next day at ${hourly.start.slice(11, 16) || 'the start'}.`
+                  : 'The last post of the day must come after the first.'}
+              </p>
+            ) : null}
+            {summary.first && summary.last ? (
+              <p className="hidden text-label text-muted-foreground sm:block" data-testid="batch-summary">
+                {batchAudience(items, accounts)}, first {shortWhen(summary.first, zone)}, last{' '}
+                {shortWhen(summary.last, zone)}, on {summary.calendarDays} calendar day
+                {summary.calendarDays === 1 ? '' : 's'}.
+                {summary.withoutTime ? ` ${summary.withoutTime} still need a time.` : ''}
+              </p>
+            ) : null}
+            {submitting ? (
+              <p
+                role="status"
+                className="text-sm text-muted-foreground"
+                data-testid="submit-running"
+              >
+                Scheduling in the background. You can close this page: it carries on, and each
+                post&rsquo;s result is here when you come back.
+              </p>
+            ) : null}
+            {postsLeft !== null && chosenCount > postsLeft ? (
+              <p role="status" className="text-sm text-destructive" data-testid="quota-warning">
+                This schedules {chosenCount} posts and your plan has {postsLeft} left this month.
+                Posts past the limit are refused with a reason, and the rest stay scheduled.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
       </div>
     </Page>
   )
