@@ -8,6 +8,7 @@ import {
   hourlyWindow,
   plainTextDraft,
   itemAccounts,
+  previewPublications,
   pendingAccounts,
   postOn,
   queueTimings,
@@ -15,6 +16,7 @@ import {
   readTiming,
   spreadHourOptions,
   spreadTimings,
+  stagedBody,
   stagedChecks,
   stagedVersions,
 } from '@/lib/write/batch'
@@ -301,4 +303,90 @@ test('only a plain single post can take new words from the batch', () => {
   )
   assert.equal(plainTextDraft([{ ...plain[0], poll: { options: [] } }, plain[1]]), false)
   assert.equal(plainTextDraft(null), false)
+})
+
+test('a staged body holds each post, then only the attachments already uploaded', () => {
+  const body = stagedBody({
+    caption: 'First post.\n---\nSecond post.',
+    media: [
+      {
+        assetId: 'img',
+        bytes: 1,
+        durationMs: null,
+        height: 1,
+        mediaType: 'image/png',
+        status: 'UPLOADED',
+        width: 1,
+      },
+      {
+        assetId: 'vid',
+        bytes: 1,
+        durationMs: 1000,
+        height: 1,
+        mediaType: 'video/mp4',
+        status: 'UPLOADED',
+        width: 1,
+      },
+      {
+        assetId: 'doc',
+        bytes: 1,
+        durationMs: null,
+        height: null,
+        mediaType: 'application/pdf',
+        status: 'UPLOADED',
+        width: null,
+      },
+      {
+        fileName: 'late.png',
+        bytes: 1,
+        durationMs: null,
+        height: null,
+        status: 'local',
+        width: null,
+      },
+    ],
+  })
+  // Each post's words in order, then the uploaded files; the file still uploading is left out.
+  assert.deepEqual(
+    body.map((node) =>
+      node.type === 'p' ? (node.children as { text: string }[])[0]!.text : node.type
+    ),
+    ['post_break', 'First post.', 'post_break', 'Second post.', 'img', 'video', 'file']
+  )
+  assert.deepEqual(
+    body.filter((node) => 'assetId' in node).map((node) => node.assetId),
+    ['img', 'vid', 'doc']
+  )
+  // An empty caption still makes one empty post, so the draft has a body.
+  assert.equal(stagedBody({ caption: '', media: [] }).length, 2)
+  // A thread longer than a draft holds is refused, as saving refuses it.
+  const long = Array.from({ length: 26 }, (_, at) => `Part ${at + 1}`).join('\n---\n')
+  assert.throws(() => stagedBody({ caption: long, media: [] }), /at most 25 posts/)
+})
+
+test('a preview builds each account publication as saving builds the draft', () => {
+  const post = item({
+    caption: 'Launch day.\n---\nThe details.',
+    channelConnectionIds: ['x', 'li'],
+  })
+  const { cards, problem } = previewPublications(post, accounts, {})
+  assert.equal(problem, undefined)
+  assert.deepEqual(
+    cards.map((card) => card.account.id),
+    ['li', 'x']
+  )
+  const x = cards.find((card) => card.account.id === 'x')!.publication
+  assert.equal(x.serialized.posts.length, 2)
+  // The files follow the last part, as in the saved draft: on X they go out with the reply.
+  assert.deepEqual(x.target.assetIds, [])
+  assert.deepEqual(x.target.replies?.[0]?.assetIds, ['a'])
+  // LinkedIn has no threads: the same words go out as one post.
+  const linkedin = cards.find((card) => card.account.id === 'li')!.publication
+  assert.equal(linkedin.serialized.posts.length, 1)
+  assert.deepEqual(linkedin.target.assetIds, ['a'])
+  // A caption a draft cannot hold is named, not thrown, so the page stays up.
+  const long = Array.from({ length: 26 }, (_, at) => `Part ${at + 1}`).join('\n---\n')
+  const refused = previewPublications(item({ caption: long }), accounts, {})
+  assert.deepEqual(refused.cards, [])
+  assert.match(refused.problem ?? '', /at most 25 posts/)
 })

@@ -47,6 +47,16 @@ const DEVICES = [
 /** One destination's preview: its account and its publication. */
 export type PreviewItem = { account: ComposerAccount; publication: Publication }
 
+/** What a preview shows of an account. Write passes its whole account; a bulk batch passes its own. */
+export type PreviewAccount = Pick<ComposerAccount, 'channel' | 'id'> & {
+  avatarUrl?: string | null
+  displayName?: string | null
+  handle?: string | null
+}
+
+/** One destination as the preview draws it: who it goes out as, and what it sends. */
+export type PreviewCard = { account: PreviewAccount; publication: Publication }
+
 /**
  * The platform and device a person picked. The composer keeps it: switching
  * between the side panel and the sheet remounts the panel, which reset it.
@@ -74,7 +84,7 @@ export function PreviewPanel({
   initialChannel?: DraftChannel
   onDescribe?: (media: SerializedMedia) => void
   onSelect: (selection: PreviewSelection) => void
-  items: PreviewItem[]
+  items: PreviewCard[]
   selection: PreviewSelection
   target: DraftTarget | null
 }) {
@@ -173,7 +183,7 @@ export function PreviewPanel({
  * account whose platform raised its limit also sees the standard count,
  * because that is the length everyone else is held to.
  */
-function PreviewLengths({ item }: { item: PreviewItem }) {
+function PreviewLengths({ item }: { item: PreviewCard }) {
   const { channel } = item.account
   const { limit, posts } = item.publication.serialized
   const standard = CAPABILITIES[channel].captionLimit
@@ -214,7 +224,7 @@ function PreviewLengths({ item }: { item: PreviewItem }) {
 }
 
 /** An account's avatar, or a face of its own when it has none or it fails to load. */
-function Avatar({ account, size = 'size-10' }: { account: ComposerAccount; size?: string }) {
+function Avatar({ account, size = 'size-10' }: { account: PreviewAccount; size?: string }) {
   return (
     <AccountAvatar aria-hidden className={cn(size, 'bg-foreground/5')}>
       {account.avatarUrl ? (
@@ -474,7 +484,7 @@ function TargetCard({ target }: { target: DraftTarget }) {
 }
 
 /** An X (or other thread platform) thread: one post under the other, joined by a line. */
-function ThreadPreview({ item, target }: { item: PreviewItem; target: DraftTarget | null }) {
+function ThreadPreview({ item, target }: { item: PreviewCard; target: DraftTarget | null }) {
   const { account, publication } = item
   const channel = account.channel
   const posts = publication.serialized.posts
@@ -559,7 +569,7 @@ function ThreadPreview({ item, target }: { item: PreviewItem; target: DraftTarge
 }
 
 /** A TikTok post: the video fills a vertical frame, with the account and caption over it. */
-function TikTokPost({ item }: { item: PreviewItem }) {
+function TikTokPost({ item }: { item: PreviewCard }) {
   const { account, publication } = item
   const post = publication.serialized.posts[0]
   const video = post?.media.find((media) => media.kind === 'video')
@@ -593,7 +603,7 @@ function TikTokPost({ item }: { item: PreviewItem }) {
 }
 
 /** A LinkedIn post: identity, text cut at "more", media, a poll or a PDF document. */
-function LinkedInPost({ item, target }: { item: PreviewItem; target: DraftTarget | null }) {
+function LinkedInPost({ item, target }: { item: PreviewCard; target: DraftTarget | null }) {
   const { account, publication } = item
   const post = publication.serialized.posts[0]
   const options = publication.target.options
@@ -634,7 +644,7 @@ function LinkedInPost({ item, target }: { item: PreviewItem; target: DraftTarget
 }
 
 /** The article body comes exclusively from articleContent's escaped allowlisted serializer. */
-function ArticlePreview({ item }: { item: PreviewItem }) {
+function ArticlePreview({ item }: { item: PreviewCard }) {
   const options = item.publication.target.options!
   const html = (options.articleHtml ?? '').replace(
     /data-asset-id="([a-z0-9-]+)"/g,

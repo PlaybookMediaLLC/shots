@@ -1,9 +1,12 @@
 import type { BatchItem, BatchRun, BatchTiming } from '@/lib/api/contracts/content-batches'
 import { DRAFT_CHANNEL_LIMITS, platformCaptionLength } from '@/lib/content-drafts/serialize'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
+import { assetContentUrl } from '@/lib/editor/asset-url'
 import type { AccountStanding } from '@/lib/write/capabilities'
-import type { DraftChannel, VersionOptions } from '@/lib/write/document'
+import type { DraftChannel, PlateBody, VersionOptions } from '@/lib/write/document'
+import { importedBody, importedPosts } from '@/lib/write/import-text'
 import { LABELS, mediaChanges, mediaProblems, type MediaFacts } from '@/lib/write/media-rules'
+import { buildPublication, type Publication } from '@/lib/write/publication'
 import { analyzeSpintax } from '@/lib/write/spintax'
 import { readVersions, withOptions } from '@/lib/write/versions'
 import { resolveLocalTime, wallTime } from '@/lib/write/zoned-time'
@@ -26,6 +29,8 @@ export type BatchAccount = {
   /** This account's own caption limit, when it differs from its channel's. */
   captionLimit?: number
   tiktokCreator?: AccountStanding['tiktokCreator']
+  /** An X account's own limit, which the preview counts against. */
+  xCaptionLimit?: AccountStanding['maxWeightedCharacters']
 }
 
 /**
@@ -60,7 +65,7 @@ function documentProblems(channel: DraftChannel, facts: MediaFacts[]) {
  * For each chosen account: what blocks the item there, from the media rules
  * Go also applies, and what Shots would change before sending it.
  */
-export function stagedChecks(item: BatchItem, accounts: BatchAccount[]) {
+export function stagedChecks(item: BatchItem, accounts: readonly BatchAccount[]) {
   const facts = batchMediaFacts(item.media)
   const pdf = facts?.some((fact) => fact.mimeType === 'application/pdf')
   return new Map(
@@ -141,6 +146,75 @@ export function stagedVersions(
     changed = true
   }
   return changed ? versions : undefined
+}
+
+/**
+ * The body a staged item's draft starts with: its caption as posts (a line of
+ * --- starts the next), then each uploaded attachment. Saving and the preview
+ * both build it here, so the preview shows what the draft will hold.
+ */
+export function stagedBody(item: Pick<BatchItem, 'caption' | 'media'>): PlateBody {
+  const posts = importedPosts(item.caption)
+  const body = importedBody(posts.length ? posts : [''])
+  const pdf = item.media.find((entry) => entry.mediaType === 'application/pdf')
+  for (const entry of item.media)
+    if (entry.assetId)
+      body.push({
+        type: entry === pdf ? 'file' : entry.mediaType?.startsWith('video/') ? 'video' : 'img',
+        assetId: entry.assetId,
+        url: assetContentUrl(entry.assetId),
+        ...(entry.mediaType ? { mimeType: entry.mediaType } : {}),
+        name: entry.fileName ?? '',
+        children: [{ text: '' }],
+      })
+  return body
+}
+
+/**
+ * What each of an item's accounts would show, built as saving its draft
+ * builds it: the same body, platform versions and publication. A caption a
+ * draft cannot hold, such as a thread of more than 25 posts, comes back as
+ * `problem`, as saving reports it. A saved draft may have changed in Write
+ * since; its own preview there is exact.
+ */
+export function previewPublications(
+  item: BatchItem,
+  accounts: readonly BatchAccount[],
+  options: VersionOptions
+): { cards: { account: BatchAccount; publication: Publication }[]; problem?: string } {
+  const ids = itemAccounts(item)
+  const chosen = accounts.filter((account) => ids.includes(account.id))
+  let body: PlateBody
+  try {
+    body = stagedBody({ caption: item.draft?.plainText ?? item.caption, media: item.media })
+  } catch (error) {
+    return { cards: [], problem: error instanceof Error ? error.message : String(error) }
+  }
+  const draft = {
+    article: null,
+    body,
+    kind: 'standard' as const,
+    platformVersions:
+      stagedVersions(
+        item,
+        chosen.map((account) => account.channel),
+        options
+      ) ?? readVersions(undefined),
+    target: null,
+  }
+  return {
+    cards: chosen.map((account) => ({
+      account,
+      publication: buildPublication(draft, {
+        channel: account.channel,
+        connectionId: account.id,
+        standing: {
+          maxWeightedCharacters: account.xCaptionLimit,
+          tiktokCreator: account.tiktokCreator,
+        },
+      }),
+    })),
+  }
 }
 
 /** The hours between posts that keep a day's posts inside its 24 hours. */

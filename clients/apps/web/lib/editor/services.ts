@@ -1,13 +1,11 @@
 import type { EditorServices, EditorUploadFile } from '@shots/platejs-editor/lib'
 import type { DraftChannel } from '@/lib/write/document'
 import { type SaveToWorkspaceInput, saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { assetContentUrl } from './asset-url'
+
+export { assetContentUrl }
 
 type TrpcClient = SaveToWorkspaceInput['trpcClient']
-
-/** The stable address of a workspace asset; it redirects to a signed URL. */
-export function assetContentUrl(assetId: string): string {
-  return `/api/v1/assets/${encodeURIComponent(assetId)}/content`
-}
 
 /**
  * Stores an editor upload as a workspace asset: signed upload to R2 through the
