@@ -450,29 +450,40 @@ test('⌘⇧↵ with the caret in the editor opens the publish review and adds n
   await expect(blocks.nth(1)).toContainText('Reviewed from the keyboard')
 })
 
-test('an old draft’s heading keeps its style, and markdown typed in a post stays text', async ({
+test('an old draft’s code block and heading keep the kit’s layout, and markdown typed in a post stays text', async ({
   page,
   startWorkspace,
 }) => {
   await startWorkspace({ channels: ['x'] })
-  await page.goto('/publish')
-  const created = await apiRequest(page, '/api/v1/content-drafts', {
-    method: 'POST',
-    body: {
-      body: [
-        { type: 'h1', children: [{ text: 'Old heading' }] },
-        { type: 'p', children: [{ text: 'Old text' }] },
-      ],
-    },
+  // Long enough to wrap in the post column, so the bold run after it starts on a later line.
+  const lead =
+    'An older heading that runs long enough to wrap onto another line of the post column, written before posts lost headings, and then'
+  await openNewDraft(page, {
+    body: [
+      { type: 'h1', children: [{ text: `${lead} ` }, { bold: true, text: 'a bold end' }] },
+      {
+        type: 'code_block',
+        lang: 'javascript',
+        children: [{ type: 'code_line', children: [{ text: 'const answer = 42' }] }],
+      },
+      { type: 'p', children: [{ text: 'Old text' }] },
+    ],
   })
-  expect(created.status, JSON.stringify(created.body)).toBe(201)
-  await page.goto(`/publish/${(created.body as { id: string }).id}`)
   const editor = draftEditor(page)
-  await expect(editor).toBeVisible({ timeout: 60_000 })
 
-  // Write turns off the heading's shortcut, not the kit's element, whose link control shows it.
-  await expect(editor.getByRole('heading', { level: 1 })).toContainText('Old heading')
-  await expect(editor.getByRole('button', { name: 'Copy link to heading' })).toHaveCount(1)
+  // Write turns off their shortcuts, not the kit's elements: old code keeps its bordered box.
+  const boxed = await editor.getByText('const answer = 42', { exact: true }).evaluate((code) => {
+    for (let node: Element | null = code; node; node = node.parentElement) {
+      if (node.hasAttribute('data-slate-editor')) return false
+      if (parseFloat(getComputedStyle(node).borderLeftWidth) > 0) return true
+    }
+    return false
+  })
+  expect(boxed).toBe(true)
+  // The heading's text flows as one paragraph; the kit's flex row would set the bold run beside it.
+  const leadBox = await editor.getByText(lead).boundingBox()
+  const endBox = await editor.getByText('a bold end', { exact: true }).boundingBox()
+  expect(endBox!.y).toBeGreaterThan(leadBox!.y)
 
   // A post cannot carry headings or quotes, so their markdown stays literal text.
   await caretAtEndOf(page, editor.getByText('Old text', { exact: true }))
@@ -480,9 +491,10 @@ test('an old draft’s heading keeps its style, and markdown typed in a post sta
   await page.keyboard.type('# Not a heading')
   await page.keyboard.press('Enter')
   await page.keyboard.type('> Not a quote')
-  await expectSaved(page)
   await expect(editor).toContainText('# Not a heading')
   await expect(editor).toContainText('> Not a quote')
+  await expect(editor.getByRole('heading')).toHaveCount(1)
+  await expect(editor.locator('blockquote')).toHaveCount(0)
 })
 
 test(
