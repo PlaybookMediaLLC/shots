@@ -410,6 +410,32 @@ func TestWorkerEnrichesReleasesBackfillsAndCaptures(t *testing.T) {
 		VALUES ($1,$2,$3,$4,'deployment',$5,now(),now())`, cuid.New(), org, surface.ID, partial.AssetIds[0], partial.ID); err == nil {
 		t.Fatal("a duplicate deployment receipt was stored")
 	}
+	// A staging event on the same origin captures only staging surfaces and
+	// leaves the production image and receipt current.
+	stagingSurface, err := repo.CreateProductSurface(ctx, owner, CreateProductSurfaceInput{Environment: "staging", Name: "Staging " + id,
+		FeatureTags: []string{}, ScreenshotAssetIDs: []string{}, URL: app + "/product"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	productionBefore := db.Client.ProductSurface.GetX(ctx, surface.ID)
+	staging, err := repo.IngestDeployment(ctx, Actor{OrganizationID: org, Kind: "webhook", Display: manual.ID},
+		IngestDeploymentInput{Environment: "staging", EventID: "staging", ExternalID: "staging-1", SourceAppID: manual.ID, URL: &live})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stagingDeployment := db.Client.DeploymentEvent.GetX(ctx, handle(staging.DeploymentID))
+	stagingCaptures := db.Client.SurfaceCapture.Query().Where(surfacecapture.SourceID(staging.DeploymentID)).AllX(ctx)
+	if stagingDeployment.Status != deploymentevent.StatusCAPTURED || len(stagingCaptures) != 1 || stagingCaptures[0].SurfaceID != stagingSurface.ID {
+		t.Fatalf("staging deployment=%+v captures=%+v", stagingDeployment, stagingCaptures)
+	}
+	productionAfter := db.Client.ProductSurface.GetX(ctx, surface.ID)
+	if !slices.Equal(productionBefore.ScreenshotAssetIds, productionAfter.ScreenshotAssetIds) || !productionBefore.LastCapturedAt.Equal(*productionAfter.LastCapturedAt) {
+		t.Fatal("staging capture changed the production surface")
+	}
+	productionReceipt := db.Client.SurfaceCapture.Query().Where(surfacecapture.SourceID(partial.ID), surfacecapture.SurfaceID(surface.ID)).OnlyX(ctx)
+	if productionReceipt.SupersededAt != nil {
+		t.Fatal("staging capture superseded the production receipt")
+	}
 	// An archived source captures nothing more.
 	pending := ingest("8", &live)
 	if err := db.Client.SourceApp.UpdateOneID(manual.ID).SetStatus("ARCHIVED").Exec(ctx); err != nil {

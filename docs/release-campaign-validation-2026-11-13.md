@@ -37,8 +37,8 @@ needed to prove original screenshot attachment without a render step.
 | RC-001 | P1 | Capture configuration | Open production Automate → Signed-in capture: "Signed-in capture is not set up" | Infisical `/screenshot-studio` lacks PLATFORM_CAPTURE_CDP_URL, PLATFORM_CAPTURE_CDP_TOKEN and PLATFORM_CAPTURE_STATE_KEY | Provisioned capture URL, encryption key and (explicitly authorized) renderer token in Infisical; verified read-back without exposing values | Real Cloudflare session test passed | Config deployment 43498556650 succeeded; production UI shows capture forms |
 | RC-002 | P1 | Feature navigation | Request a feature objective through authenticated capture | Runner supports fixed CSS recipes only; no model-guided navigation path | Extend existing bounded runner, preserving network, identity and write restrictions | Pending | Not available |
 | RC-003 | P1 | Campaign generation | Model returns missing, unknown, duplicate or invalid posts; node can complete | Response filtering silently drops invalid entries and accepts an empty generation | Reproduce and require complete validated output | Pending | Not tested |
-| RC-005 | P1 | Staging deployment attribution | A configured staging workflow accepts its deployment event, but capture cannot find its deployment record | CollectAutomationChange records only production deployments although configured intake accepts staging | Add a staging regression and preserve legacy source policy | Source confirmed; regression pending | Not tested |
-| RC-004 | P1 | Draft preservation | Edit a generated draft, then replay its incomplete generation receipt | Replay uses current copy as ExpectedCopy instead of the copy the generation was based on | Persist original copy and draft timestamp; conditionally apply through existing revision owner | PostgreSQL regressions passed for concurrent copy/title/review changes, receipt replay and legacy receipts | Not deployed |
+| RC-005 | P1 | Staging deployment attribution | A configured staging workflow accepts its deployment event, but capture cannot find its deployment record | CollectAutomationChange records only production deployments; downstream public capture hardcodes production and direct capture lacks an environment boundary | Record pinned automation-mode deployments through existing ingestion; preserve legacy production policy; scope public captures and release-tag lookup to the surface environment | Reproduced missing record, cross-environment capture and wrong release lookup; focused regressions and final full check pass; final independent review passed | Not deployed |
+| RC-004 | P1 | Draft preservation | Edit a generated draft, then replay its incomplete generation receipt | Replay uses current copy as ExpectedCopy instead of the copy the generation was based on | Persist original copy and draft timestamp; conditionally apply through existing revision owner | PostgreSQL regressions and full Go check passed; six independent reviews passed | Deployed at f6779502; campaign replay not yet verified |
 
 ## Production observations
 
@@ -129,3 +129,68 @@ isolated database with the same Founder Hub prerequisites used by CI.
   cannot supply the internal generation precondition.
 - Production draft preservation is still unverified. RC-002, RC-003 and RC-005
   remain open; this scoped Ship verdict is not whole-workflow acceptance.
+
+## Code deployment cycle 2: draft preservation
+
+- Work commit `d256c20fb8525214bd0d67ae075a1f52c1414687` in
+  https://github.com/PlaybookMediaLLC/shots/pull/583, merged into develop as
+  `d5c919a29601ade1e43f4758e428eb4e575c5a47`.
+- Intentional release https://github.com/PlaybookMediaLLC/shots/pull/584 merged
+  develop into main with merge commit `f6779502a8eeae14d0d547eabee260db9cb25d92`.
+  The complete release diff matched the validated work tree. No branch-protection
+  bypass was used; live rules required PRs and resolved review threads, with no
+  required CI contexts configured.
+- Both PRs were merged while CI was pending. Their close events canceled the
+  corresponding PR runs by the existing `ci.yml` concurrency rule. Those runs
+  are not passes. Push-to-develop run `43502097239` is the full-suite follow-up;
+  push-to-main run `43502323476` passed. The develop push failed browser shard
+  `integration (5/6)`; its other checks passed. The failed X OAuth test expects
+  an Add another link while the account-assignment modal menu is open. Both
+  attempts' captured page trees show that menu; the existing Channels effect
+  opens it for an unassigned account after OAuth. This is unrelated to the
+  Go-only draft-preservation change and needs a separate journey-test update.
+- Backend deployment https://github.com/PlaybookMediaLLC/shots/actions/runs/43502323413
+  succeeded, including the image-tag equality and ACTIVE deployment assertions
+  in deploy job `132153374206`. The deployed backend revision is `f6779502`.
+- Post-deployment health returned `{"status":"ok"}`. Real campaign replay and
+  the full production E2E remain unverified; health does not establish either.
+
+## Verifier fixture switch and access dependency
+
+- Existing Chrome session reached Verifier Home and read-only Insights at
+  `/app/analytics` as D Yoan L Mekontchou Yomba. No verification job was started.
+- Shots' GitHub repository chooser lists only the already-watched Eigenn repo.
+  Installation `178812766` (`shots-releases`) uses selected repositories and
+  read-only contents/deployments/metadata/pull-request permissions.
+- GitHub identifies Verifier as `Oppulence-Engineering/paperless-check-if-email-exists`,
+  repository ID `1086064039`; the local checkout remote confirms the same name.
+- Adding that repository through the GitHub API was refused with HTTP 403:
+  "You do not have permission to modify this app on Oppulence-Engineering.
+  Please contact an Organization Owner." Asked the user to add only this repo
+  through installation settings. No permission or authentication bypass.
+- Latest published Verifier release is v4.7.0 (October 29). Its notes include
+  infrastructure fixes and a paid Ask Verify assistant; these are not evidence
+  that the free fixture account can demonstrate that assistant. Feature claims
+  must be restricted to observed states and the release actually tested.
+
+## RC-005 validation and review corrections
+
+- Six reviewers ran: structure, perf, chaos, QA, lean and Go. Review found
+  three related environment-boundary defects in the expanded staging path.
+- New PostgreSQL regressions reproduced staging outbox capture changing
+  production surfaces on the same host, direct capture accepting a different
+  environment, and a published release binding to the newest staging deployment
+  even for a production surface. All three failed before correction.
+- Reused existing `automationDeployment` environment filtering and public
+  capture queries. No new schema, queue, dependency or permission was added.
+- Focused capture, legacy-policy, provenance, replay, release-tag environment
+  selection and outbox integration tests pass after the corrections. The
+  staging fixture now explicitly registers a staging surface.
+- The final complete Go check passed (exit 0), including PostgreSQL integration,
+  configured race tests, vet and generated-code/dependency drift checks. Final
+  independent structure/security, QA and Go reviews returned no findings and
+  scoped Ship verdicts after the corrections. No staging fix is deployed yet.
+- The user confirmed organization-owner access must be arranged for Verifier.
+  A separate manual capture connection is being set up through the production
+  UI to validate browser sign-in independently. It will not establish release
+  intake or whole-workflow acceptance.
