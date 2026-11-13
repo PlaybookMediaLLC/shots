@@ -25,6 +25,8 @@ func NewVideo(endpoint, platform string) *VideoProvider {
 }
 
 // fixturePages are the destinations a platform with page selection offers.
+// Each has its own id, fixturePageID, as real networks' pages do: a social
+// organization keeps one integration per id, so a shared id would merge them.
 var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page", "gmb": "Fixture business location"}
 
 func (p *VideoProvider) Info() integrations.Info {
@@ -43,16 +45,18 @@ func (p *VideoProvider) Functions() map[string]integrations.Function {
 		return nil
 	}
 	return map[string]integrations.Function{"pages": func(context.Context, string, json.RawMessage, string, *ent.Integration) (any, error) {
-		return []map[string]string{{"id": "fixture-channel", "name": name}}, nil
+		return []map[string]string{{"id": fixturePageID(p.platform), "name": name}}, nil
 	}}
 }
+
+func fixturePageID(platform string) string { return "fixture-" + platform }
 
 func (p *VideoProvider) FetchPageInformation(_ context.Context, token string, data json.RawMessage) (*integrations.FetchPageInformationResult, error) {
 	var selection struct {
 		ID string `json:"id"`
 	}
 	name, ok := fixturePages[p.platform]
-	if !ok || json.Unmarshal(data, &selection) != nil || selection.ID != "fixture-channel" {
+	if !ok || json.Unmarshal(data, &selection) != nil || selection.ID != fixturePageID(p.platform) {
 		return nil, errors.New("unknown fixture channel")
 	}
 	return &integrations.FetchPageInformationResult{ID: selection.ID, Name: name, Username: "fixture", AccessToken: token}, nil
