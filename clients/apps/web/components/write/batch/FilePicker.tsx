@@ -10,6 +10,7 @@ export function FilePicker({
   accept,
   children,
   directory,
+  disabled,
   label,
   multiple,
   onFiles,
@@ -18,6 +19,7 @@ export function FilePicker({
   children?: React.ReactNode
   /** Choose a folder; each file keeps its path inside it. */
   directory?: boolean
+  disabled?: boolean
   label: string
   multiple?: boolean
   onFiles: (files: File[]) => void
@@ -32,13 +34,20 @@ export function FilePicker({
         accept={accept}
         multiple={multiple}
         className="hidden"
+        disabled={disabled}
         {...(directory ? { webkitdirectory: '' } : {})}
         onChange={(event) => {
           onFiles(Array.from(event.target.files ?? []))
           event.target.value = ''
         }}
       />
-      <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()}>
+      <Button
+        disabled={disabled}
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => input.current?.click()}
+      >
         <UploadIcon />
         {children ?? label}
       </Button>

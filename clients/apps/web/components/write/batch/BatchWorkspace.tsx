@@ -132,6 +132,8 @@ import { BulkCaptionPanel } from './BulkCaptionPanel'
 import { FilePicker } from './FilePicker'
 import { FileThumb, ImportReview, type Staged } from './ImportReview'
 import { GridCreator } from './GridCreator'
+import { TemplateCreator } from './TemplateCreator'
+import { useConceptRender } from './use-concept-render'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
 const ACCEPT =
@@ -161,7 +163,7 @@ function mediaInput({
 const settledWell = (outcome?: string) => outcome === 'Scheduled' || Boolean(outcome?.endsWith('…'))
 
 /** Which tool a batch was started for; it narrows what the page offers first. */
-export type BatchStart = 'videos' | 'images' | 'grid' | 'text'
+export type BatchStart = 'videos' | 'images' | 'grid' | 'single' | 'ugc' | 'text'
 type Upload = { progress: number; error?: string }
 
 /** A path a person can read: '2026-11-03 09:30 (Europe/Paris)'. */
@@ -1026,8 +1028,9 @@ export function BatchWorkspace({
   /** The row to focus once the posts just added are on the page. */
   const focusRow = React.useRef<string | null>(null)
   const room = Math.max(0, BATCH_ITEM_LIMIT - items.length)
-  // A batch started for grid videos, or already holding them, leads with them, not the import.
-  const gridFirst = start === 'grid' || items.some((item) => item.grid)
+  // A batch started for template videos, or already holding them, leads with them, not the import.
+  const gridFirst =
+    start === 'grid' || start === 'single' || start === 'ugc' || items.some((item) => item.grid)
   // Imports lead for a batch started from files, or one already holding them; text batches lead with writing.
   const importFirst =
     !gridFirst &&
@@ -1310,7 +1313,11 @@ export function BatchWorkspace({
   }
 
   const [gridOpen, setGridOpen] = React.useState(start === 'grid')
-  const showGrid = gridOpen || items.some((item) => item.grid)
+  const showGrid = gridOpen || items.some((item) => item.grid && !item.grid.kind)
+  // Fade-in and UGC videos, for a batch started for them or holding them.
+  const templateKinds = (['single', 'ugc'] as const).filter(
+    (kind) => start === kind || items.some((item) => item.grid?.kind === kind)
+  )
 
   const [timeValidity, setTimeValidity] = React.useState<Record<string, boolean>>({})
   const [spreadValid, setSpreadValid] = React.useState(true)
@@ -1669,19 +1676,32 @@ export function BatchWorkspace({
   const checked = Object.keys(verdicts).length > 0
   // Smaller action buttons on phones, where the bar stays over the posts.
   const compact = useIsMobile() ? 'sm' : 'default'
+  // One renderer for the batch: the server keeps one render per batch, so two
+  // creators each starting their own would cancel each other's.
+  const renderer = useConceptRender({ base, lastRender: batch.render, onReload: reload, settled })
   const gridCreator = showGrid ? (
     <GridCreator
       disabled={busy !== null}
-      base={base}
       items={items}
-      lastRender={batch.render}
+      renderer={renderer}
       sharedAccounts={sharedAccounts}
       onAdd={addConcepts}
       onApply={applyGrids}
-      onReload={reload}
       onUpdate={updateItem}
     />
   ) : null
+  const templateCreators = templateKinds.map((kind) => (
+    <TemplateCreator
+      key={kind}
+      disabled={busy !== null}
+      items={items}
+      kind={kind}
+      renderer={renderer}
+      sharedAccounts={sharedAccounts}
+      onAdd={addConcepts}
+      onUpdate={updateItem}
+    />
+  ))
 
   return (
     <Page
@@ -2007,6 +2027,7 @@ export function BatchWorkspace({
               {gridCreator}
             </div>
           ) : null}
+          {templateCreators}
 
           {preview ? (
             <div
@@ -2241,7 +2262,12 @@ export function BatchWorkspace({
                           />
                         ) : item.draftId || item.grid ? (
                           <p className="draft-prose whitespace-pre-wrap text-body" data-row-focus tabIndex={-1}>
-                            {text || (item.grid ? 'Grid video' : 'No caption')}
+                            {text ||
+                              (item.grid
+                                ? { grid: 'Grid video', single: 'Fade-in video', ugc: 'UGC video' }[
+                                    item.grid.kind ?? 'grid'
+                                  ]
+                                : 'No caption')}
                           </p>
                         ) : (
                           <Textarea

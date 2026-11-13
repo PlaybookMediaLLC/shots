@@ -33,6 +33,7 @@ export default async function BatchPage({
     captionLimit: captionLimit(account.channel, { maxWeightedCharacters: account.xCaptionLimit }),
     tiktokCreator: account.tiktokCreator,
     xCaptionLimit: account.xCaptionLimit,
+    xVideoMaxSeconds: account.xVideoMaxSeconds,
     avatarUrl: account.avatarUrl,
     channel: account.channel,
     displayName: account.displayName,
@@ -60,6 +61,8 @@ export default async function BatchPage({
           query.start === 'videos' ||
           query.start === 'images' ||
           query.start === 'grid' ||
+          query.start === 'single' ||
+          query.start === 'ugc' ||
           query.start === 'text'
             ? query.start
             : undefined
