@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -291,14 +292,12 @@ func (r *Repository) IsEligible(ctx context.Context, organizationID, variantID, 
 	return r.isEligible(ctx, organizationID, variantID, connectionID)
 }
 
-// ListScheduledPosts reads the schedule, newest first. sharedOnly leaves out
-// private social sets, which are for sessions: an API key never reads them.
-func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID string, sharedOnly bool, limit int) ([]*ent.ScheduledPost, error) {
+// ListScheduledPosts reads the schedule, newest first, as viewer may see it:
+// a person sees their own private sets; an API key (viewer "") sees none.
+func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID, viewer string, limit int) ([]*ent.ScheduledPost, error) {
 	query := r.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID))
-	if sharedOnly {
-		if err := keepSharedPosts(ctx, r.client, query, organizationID); err != nil {
-			return nil, err
-		}
+	if err := keepVisiblePosts(ctx, r.client, query, organizationID, viewer); err != nil {
+		return nil, err
 	}
 	return query.WithChannelConnection().
 		Order(ent.Desc(scheduledpost.FieldScheduledFor), ent.Desc(scheduledpost.FieldID)).
@@ -306,14 +305,20 @@ func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID stri
 		All(ctx)
 }
 
-// keepSharedPosts limits query to posts outside the workspace's private sets.
-func keepSharedPosts(ctx context.Context, client *ent.Client, query *ent.ScheduledPostQuery, organizationID string) error {
-	private, err := client.SocialSet.Query().Where(socialset.OrganizationID(organizationID),
-		socialset.VisibilityEQ(socialset.VisibilityPRIVATE)).IDs(ctx)
+// keepVisiblePosts limits query to posts outside the private sets viewer does
+// not own, by the post's set and by its account's, which a campaign post
+// without a set still has. An API key (viewer "") sees no private set.
+func keepVisiblePosts(ctx context.Context, client *ent.Client, query *ent.ScheduledPostQuery, organizationID, viewer string) error {
+	sets := client.SocialSet.Query().Where(socialset.OrganizationID(organizationID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE))
+	if viewer != "" {
+		sets.Where(socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(viewer)))
+	}
+	private, err := sets.IDs(ctx)
 	if err != nil || len(private) == 0 {
 		return err
 	}
-	query.Where(scheduledpost.Or(scheduledpost.SocialSetIDIsNil(), scheduledpost.SocialSetIDNotIn(private...)))
+	query.Where(scheduledpost.Or(scheduledpost.SocialSetIDIsNil(), scheduledpost.SocialSetIDNotIn(private...)),
+		scheduledpost.HasChannelConnectionWith(channelconnection.Or(channelconnection.SocialSetIDIsNil(), channelconnection.SocialSetIDNotIn(private...))))
 	return nil
 }
 
@@ -342,8 +347,12 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 	}
 	defer tx.Rollback()
 	query := tx.ScheduledPost.Query().Where(scheduledpost.ID(id), scheduledpost.OrganizationID(actor.Organization))
-	if actor.Type != "USER" && actor.Type != "SUPPORT" {
-		if err := keepSharedPosts(ctx, tx.Client(), query, actor.Organization); err != nil {
+	if actor.Type != "SUPPORT" {
+		viewer := ""
+		if actor.Type == "USER" {
+			viewer = actor.UserID
+		}
+		if err := keepVisiblePosts(ctx, tx.Client(), query, actor.Organization, viewer); err != nil {
 			return nil, err
 		}
 	}
@@ -354,7 +363,7 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 	if err != nil {
 		return nil, err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusPROCESSING {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusPROCESSING {
 		return nil, ErrInvalidState
 	}
 	if post.Status != scheduledpost.StatusCANCELLED {
@@ -471,16 +480,20 @@ func (r *Repository) LoadPublishJob(ctx context.Context, id, runID string) (Publ
 	if err != nil {
 		return PublishJob{}, err
 	}
+	authorized, err := r.schedulerMayPublish(ctx, post, connection)
+	if err != nil {
+		return PublishJob{}, err
+	}
 	asset, err := variant.Edges.SourceAssetOrErr()
 	if err != nil {
-		reason := ineligibility(workspaceActive, connection, variantApproval(approved))
+		reason := ineligibility(workspaceActive, connection, authorized, variantApproval(approved))
 		if reason == "" {
 			reason = FailureMediaUnavailable
 		}
 		return PublishJob{Post: post, Connection: connection, WorkspaceActive: false, Ineligible: reason}, nil
 	}
 	approved = approved && asset.OrganizationID == post.OrganizationID
-	reason := ineligibility(workspaceActive, connection, variantApproval(approved))
+	reason := ineligibility(workspaceActive, connection, authorized, variantApproval(approved))
 	return PublishJob{
 		AssetObjectKey: asset.ObjectKey, AssetMediaType: asset.MediaType,
 		Assets:     []MediaAsset{{MediaType: asset.MediaType, ObjectKey: asset.ObjectKey}},
@@ -490,14 +503,45 @@ func (r *Repository) LoadPublishJob(ctx context.Context, id, runID string) (Publ
 
 // ineligibility is the first reason a job may not publish, or "". approval
 // is the review's reason, or "" when the content may publish.
-func ineligibility(workspaceActive bool, connection *ent.ChannelConnection, approval string) string {
+func ineligibility(workspaceActive bool, connection *ent.ChannelConnection, schedulerAuthorized bool, approval string) string {
 	switch {
 	case !workspaceActive:
 		return FailureWorkspaceInactive
 	case connection.Status != channelconnection.StatusACTIVE:
 		return FailureAccountUnavailable
+	case !schedulerAuthorized:
+		return FailureSchedulerUnauthorized
 	}
 	return approval
+}
+
+// schedulerMayPublish rechecks, when a post is due, whoever queued it: a
+// person must still be an active member whose role publishes, and own the
+// account's set when that set is private (RFC 024); an API key
+// ("api-key:<id>") must still be enabled and unexpired in this workspace, and
+// never reaches a private set. A post that records neither, from before
+// schedulers were recorded, publishes as it did.
+func (r *Repository) schedulerMayPublish(ctx context.Context, post *ent.ScheduledPost, connection *ent.ChannelConnection) (bool, error) {
+	if post.ScheduledByUserID == nil {
+		return true, nil
+	}
+	scheduler := *post.ScheduledByUserID
+	var err error
+	if key, ok := strings.CutPrefix(scheduler, "api-key:"); ok {
+		err = r.AuthorizeAPIKey(ctx, post.OrganizationID, key)
+	} else {
+		err = r.AuthorizePublishing(ForStartedRun(ctx), post.OrganizationID, scheduler, "")
+	}
+	if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) {
+		return false, nil
+	}
+	// The account's set, not the post's: a campaign post records none.
+	if err != nil || connection.SocialSetID == nil {
+		return err == nil, err
+	}
+	foreign, err := r.client.SocialSet.Query().Where(socialset.ID(*connection.SocialSetID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE),
+		socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(scheduler))).Exist(ctx)
+	return !foreign, err
 }
 
 // variantApproval is a campaign variant's review reason for ineligibility.
@@ -550,7 +594,11 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if sentBack {
 		approval = FailureChangesRequested
 	}
-	if reason := ineligibility(workspaceActive, connection, approval); reason != "" {
+	authorized, err := r.schedulerMayPublish(ctx, post, connection)
+	if err != nil {
+		return PublishJob{}, err
+	}
+	if reason := ineligibility(workspaceActive, connection, authorized, approval); reason != "" {
 		return PublishJob{Post: post, Connection: connection, WorkspaceActive: false, Ineligible: reason}, nil
 	}
 	job := PublishJob{Connection: connection, Post: post, WorkspaceActive: true}
@@ -568,16 +616,25 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if post.ReplyTo != nil {
 		job.ReplyTo = *post.ReplyTo
 	}
-	// A document or article cover that was deleted cancels the post too.
-	for _, id := range []string{post.PublishOptions.DocumentAssetID, post.PublishOptions.ArticleCoverAssetID} {
+	// A document or cover that was deleted cancels the post too. A YouTube
+	// thumbnail does not: it is a follow-up, and its step reports it missing.
+	options := post.PublishOptions
+	thumbnail := options.YouTube != nil && options.YouTube.ThumbnailAssetID != ""
+	for _, id := range []string{options.DocumentAssetID, options.ArticleCoverAssetID, postoptions.CoverAsset(options.YouTube, options.Instagram)} {
 		if id == "" {
 			continue
 		}
 		media, missing, err := r.draftMedia(ctx, post.OrganizationID, []string{id})
-		if err != nil || missing {
+		if err != nil {
 			return inactive, err
 		}
-		if id == post.PublishOptions.DocumentAssetID {
+		if missing && thumbnail && id == options.YouTube.ThumbnailAssetID {
+			continue
+		}
+		if missing {
+			return inactive, nil
+		}
+		if id == options.DocumentAssetID {
 			job.Document = &media[0]
 		} else {
 			job.Cover = &media[0]
@@ -701,7 +758,7 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	if err != nil {
 		return err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
 		return nil
 	}
 	updated, err := tx.ScheduledPost.Update().Where(
@@ -742,17 +799,31 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		return err
 	}
 	defer tx.Rollback()
-	updated, err := tx.ScheduledPost.Update().Where(
+	options, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).Select(scheduledpost.FieldPublishOptions).Only(ctx)
+	if err != nil {
+		return err
+	}
+	// A TikTok app draft reached the person's TikTok app, where they finish
+	// and post it: delivered, never published from here.
+	inApp := options.PublishOptions.TikTok != nil && options.PublishOptions.TikTok.SendToApp
+	status, event := scheduledpost.StatusPUBLISHED, "post.published"
+	update := tx.ScheduledPost.Update().Where(
 		scheduledpost.ID(post.ID),
 		scheduledpost.StatusEQ(scheduledpost.StatusPROCESSING),
 		scheduledpost.TriggerRunIDEQ(runID),
-	).SetStatus(scheduledpost.StatusPUBLISHED).SetPublishedAt(time.Now().UTC()).SetRemotePostID(providerPostID).Save(ctx)
+	).SetRemotePostID(providerPostID)
+	if inApp {
+		status, event = scheduledpost.StatusSENT_TO_APP, "post.sent_to_app"
+	} else {
+		update.SetPublishedAt(time.Now().UTC())
+	}
+	updated, err := update.SetStatus(status).Save(ctx)
 	if err != nil || updated != 1 {
 		if err != nil {
 			return err
 		}
 		published, queryErr := tx.ScheduledPost.Query().Where(
-			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED),
+			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(status),
 		).Exist(ctx)
 		if queryErr != nil {
 			return queryErr
@@ -771,8 +842,10 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		}
 		return ErrInvalidState
 	}
+	// The worker passes a partial post; the draft event needs the stored one.
 	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).
-		Select(scheduledpost.FieldID, scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
+		Select(scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldContentDraftID,
+			scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
 		WithChannelConnection(func(q *ent.ChannelConnectionQuery) {
 			q.Select(channelconnection.FieldID, channelconnection.FieldPlatform)
 		}).Only(ctx)
@@ -784,14 +857,17 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		SetNillableRemoteURL(postoptions.PostURL(platformOf(live), &providerPostID, live.ThreadProgress)).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.published", auditInput{
-		Action: "post.published", Actor: serviceActor(post), EntityID: post.ID,
+	if err := recordPostActivity(ctx, tx, event, auditInput{
+		Action: event, Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"providerPostId": providerPostID},
 	}); err != nil {
 		return err
 	}
-	if err := emitDraftPublished(ctx, tx, post, providerPostID); err != nil {
+	if inApp {
+		return tx.Commit()
+	}
+	if err := emitDraftPublished(ctx, tx, live, providerPostID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -848,11 +924,18 @@ func (r *Repository) Fail(ctx context.Context, post *ent.ScheduledPost, attempt 
 		SetNillableProviderMessage(nonEmpty(RedactProviderMessage(attempt.ProviderMessage))).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.publish_failed", auditInput{
+	failed := auditInput{
 		Action: "post.publish_failed", Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeFAILED,
 		Metadata: map[string]any{"failureCode": failureCode, "retry": retry},
-	}); err != nil {
+	}
+	// An automatic retry needs no one yet: only the attempt that gives up alerts.
+	if retry {
+		err = appendAudit(ctx, tx, failed)
+	} else {
+		err = recordPostActivity(ctx, tx, "post.publish_failed", failed)
+	}
+	if err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -999,7 +1082,7 @@ func serviceActor(post *ent.ScheduledPost) Actor {
 	if post.TriggerRunID != nil && *post.TriggerRunID != "" {
 		requestID = *post.TriggerRunID
 	}
-	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Type: "SERVICE"}
+	return Actor{Display: "publishing-orchestrator", Organization: post.OrganizationID, RequestID: requestID, Source: "workflow", Type: "SERVICE"}
 }
 
 func ProviderFailureCode(status int, unknown bool) string {

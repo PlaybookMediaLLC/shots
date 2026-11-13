@@ -7,8 +7,10 @@ import (
 	"slices"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -24,7 +26,29 @@ var ErrSocialSetSlotTaken = errors.New("this social set already has an account o
 
 // ErrAccountInAnotherSet refuses connecting an account that is already
 // active in a different social set of the workspace.
-var ErrAccountInAnotherSet = errors.New("this account is already in another social set of the workspace")
+var ErrAccountInAnotherSet = errors.New("this account is already connected to another social set in this workspace; manage it from that set")
+
+// ErrAccountRemovedFromAnotherSet refuses moving an account that another set
+// still holds while it is removed or revoked there: that set's drafts and
+// history name it.
+var ErrAccountRemovedFromAnotherSet = errors.New("this account is not active in another social set of this workspace; whoever manages that set can reconnect it")
+
+// holdingSocialSet locks and returns the set that still holds an account: its
+// live set, or a deleted private set of another person, whose history stays
+// theirs. An account no set holds may join the set it is connected to.
+func holdingSocialSet(ctx context.Context, tx *ent.Tx, actor Actor, connection *ent.ChannelConnection) (*string, error) {
+	if connection.SocialSetID == nil {
+		return nil, nil
+	}
+	holds := false
+	err := tx.PlatformQuery(ctx, `SELECT "deletedAt" IS NULL OR (visibility='PRIVATE' AND "ownerUserId" IS DISTINCT FROM $3)
+		FROM social_set WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, []any{*connection.SocialSetID, connection.OrganizationID, actor.UserID},
+		func(row entsql.ColumnScanner) error { return row.Scan(&holds) })
+	if err != nil || !holds {
+		return nil, err
+	}
+	return connection.SocialSetID, nil
+}
 
 // targetSocialSet picks the set a new or reconnected account joins: the one
 // the connection started from, or else the workspace's default set when it
@@ -109,7 +133,10 @@ func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 	if err != nil || !subscribed {
 		return err
 	}
-	draft, err := tx.ContentDraft.Get(ctx, *post.ContentDraftID)
+	// Only what the event carries: the full row holds collaboration state up to 5 MiB.
+	draft, err := tx.ContentDraft.Query().Where(contentdraft.ID(*post.ContentDraftID)).
+		Select(contentdraft.FieldID, contentdraft.FieldOrganizationID, contentdraft.FieldSocialSetID,
+			contentdraft.FieldStatus, contentdraft.FieldTagIds, contentdraft.FieldTitle).Only(ctx)
 	if err != nil {
 		return err
 	}

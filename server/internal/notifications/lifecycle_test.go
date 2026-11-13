@@ -159,6 +159,50 @@ func TestIndependentRecipientsDoNotResendSuccess(t *testing.T) {
 	}
 }
 
+// Automatic retries stop at their budget: the delivery ends DEAD, is not sent
+// again and writes no audit row. Only a person's recovery is audited, once.
+func TestSpentRetryBudgetEndsDeadWithoutAudit(t *testing.T) {
+	f := notificationFixture(t)
+	ctx := context.Background()
+	t.Setenv("RESEND_API_KEY", "fixture")
+	f.event(t, "campaign_posts.submitted", "")
+	sent := 0
+	f.s.Send = func(_ context.Context, d Delivery, _ Envelope) (Outcome, error) {
+		if d.Channel == "email" && d.Destination == f.owner.UserID {
+			sent++
+		}
+		return Outcome{Status: "PENDING", Code: "503", RetryAfter: time.Minute}, nil
+	}
+	audits := func() (n int) {
+		if err := f.s.DB.QueryRow(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1`, f.owner.OrganizationID).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	before := audits()
+	for range 12 {
+		if err := f.s.Process(ctx); err != nil {
+			t.Fatal(err)
+		}
+		execFixture(t, f, `UPDATE platform_notification_delivery SET next_attempt_at=now() WHERE "organizationId"=$1 AND status='PENDING'`, f.owner.OrganizationID)
+	}
+	var id, status string
+	if err := f.s.DB.QueryRow(`SELECT id,status FROM platform_notification_delivery WHERE "organizationId"=$1 AND channel='email' AND destination=$2`, f.owner.OrganizationID, f.owner.UserID).Scan(&id, &status); err != nil {
+		t.Fatal(err)
+	}
+	if status != "DEAD" || sent != 8 || audits() != before {
+		t.Fatalf("status=%s sends=%d audit rows added=%d", status, sent, audits()-before)
+	}
+	for range 2 {
+		if err := f.s.Recover(ctx, f.owner, id, "retry"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if audits() != before+1 {
+		t.Fatalf("recovery wrote %d audit rows", audits()-before)
+	}
+}
+
 type transportFunc func(*http.Request) (*http.Response, error)
 
 func (f transportFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

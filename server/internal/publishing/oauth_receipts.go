@@ -13,6 +13,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialoauthstart"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 )
 
 var ErrOAuthExchangeUncertain = errors.New("authorization is already being processed or its result is unknown; check the connection before starting a new authorization")
@@ -238,7 +239,7 @@ func (r *Repository) SaveOAuthExchange(ctx context.Context, actor Actor, session
 		if err != nil {
 			return err
 		}
-		if expected.ExternalAccountID != result.ID || expected.Platform != provider {
+		if expected.ExternalAccountID != result.ID || socialplatform.Adapter(expected.Platform) != provider {
 			return ErrOAuthIdentityMismatch
 		}
 	}

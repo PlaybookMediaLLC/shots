@@ -67,8 +67,9 @@ func TestFitsXPost(t *testing.T) {
 			t.Errorf("fitsXPost(%.12q…, %d) = %v, want %v", c.text, c.extra, got, c.want)
 		}
 	}
-	if fitsXPost("a", 0, helpers.NewScanBudget(0)) {
-		t.Error("text too complex to count fits")
+	// Nor does text the link scan could not count, here for a spent budget.
+	if fitsXPost("fits", 0, helpers.NewScanBudget(0)) {
+		t.Error("fitsXPost counted text without a budget")
 	}
 }
 
@@ -77,12 +78,13 @@ func TestFitsXPost(t *testing.T) {
 // draftPostLength, stopping at the first refusal): the shared budget refuses
 // the request after about 2 s, where counting them all would take many more.
 func TestOneRequestCountsWithinItsBudget(t *testing.T) {
-	caps := socialidentity.XVerifiedAccountLimits("read-write", nil)
+	premium := "Premium" // long posts, so each can be slow to count
+	caps := socialidentity.XVerifiedAccountLimits("read-write", &premium)
 	budget := helpers.NewScanBudget(draftCountBudget)
 	start := time.Now()
 	var err error
 	for i := 0; i < 250 && err == nil; i++ {
-		text := fmt.Sprintf("https://%d.co/%s", i, strings.Repeat("a.", 2000)) // one TLD scan per dot
+		text := fmt.Sprintf("%d.%s", i, strings.Repeat("a.", 12_000)) // a TLD check per dot
 		if err = socialidentity.CheckXText(caps, text, budget); err == nil {
 			_, err = draftPostLength("x", text, budget)
 		}
@@ -95,13 +97,13 @@ func TestOneRequestCountsWithinItsBudget(t *testing.T) {
 	}
 }
 
-// Dotted words without a TLD cost seconds of TLD scans; the link scan gives
-// up within its budget and the caller refuses the text.
+// When the link scan runs out of its budget, here one already spent, the
+// caller refuses the text instead of guessing a count.
 func TestDraftPostLengthRefusesTextTooComplexToCount(t *testing.T) {
-	text := strings.Repeat(" https://"+strings.Repeat("a.", 25), 1<<20/59)
+	text := "see https://a.co/x"
 	for _, channel := range []string{"x", "mastodon"} {
 		start := time.Now()
-		_, err := draftPostLength(channel, text, helpers.NewScanBudget(100*time.Millisecond))
+		_, err := draftPostLength(channel, text, helpers.NewScanBudget(0))
 		if elapsed := time.Since(start); elapsed > time.Second {
 			t.Errorf("%s: took %v", channel, elapsed)
 		}

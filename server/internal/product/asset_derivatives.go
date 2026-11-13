@@ -87,7 +87,12 @@ func (c *Configuration) prepareDraftImages(ctx context.Context, actor Actor, tar
 		if err != nil {
 			return err
 		}
-		profile, supported := medialimits.Limits.ImageProfiles[connection.Platform]
+		key := connection.Platform
+		// A story is a full-screen image: it keeps more pixels than a feed post.
+		if _, ok := medialimits.Limits.ImageProfiles[key+"-story"]; ok && target.Options.Story() {
+			key += "-story"
+		}
+		profile, supported := medialimits.Limits.ImageProfiles[key]
 		if !supported {
 			continue
 		}

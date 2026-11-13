@@ -2,6 +2,7 @@ package publishing
 
 import (
 	"context"
+	"maps"
 	"strings"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
@@ -54,8 +55,16 @@ func AppendAudit(ctx context.Context, tx *ent.Tx, input AuditInput) error {
 	if input.Actor.Display != "" {
 		builder.SetActorDisplay(input.Actor.Display)
 	}
-	if input.Metadata != nil {
-		builder.SetMetadata(input.Metadata)
+	metadata := input.Metadata
+	if input.Actor.Source != "" {
+		metadata = maps.Clone(metadata)
+		if metadata == nil {
+			metadata = map[string]any{}
+		}
+		metadata["actorSource"] = input.Actor.Source
+	}
+	if metadata != nil {
+		builder.SetMetadata(metadata)
 	}
 	if input.IPHash != "" {
 		builder.SetIPHash(input.IPHash)

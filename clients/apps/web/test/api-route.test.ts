@@ -3,6 +3,7 @@ import test from 'node:test'
 import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { defineContract, timestampSchema } from '@/lib/api/contract'
+import * as notificationContracts from '@/lib/api/contracts/notifications'
 import { platformErrorBodySchema } from '@/lib/api/platform-errors'
 import { type Authenticate, errorResponse, route, routeLogEntrySchema } from '@/lib/api/route'
 
@@ -224,6 +225,16 @@ test('a 204 contract sends no body', async (t) => {
   )
   assert.equal(response.status, 204)
   assert.equal(await response.text(), '')
+})
+
+test('every notification route is a shell route, so no API key or MCP agent reaches it', () => {
+  const contracts = Object.values(notificationContracts).flatMap((value) =>
+    typeof value === 'object' && value !== null && 'method' in value && 'name' in value
+      ? [{ name: String(value.name), shell: 'shell' in value ? value.shell : undefined }]
+      : []
+  )
+  assert.ok(contracts.length >= 17, `found ${contracts.length} notification contracts`)
+  for (const contract of contracts) assert.equal(contract.shell, true, contract.name)
 })
 
 test('shell routes refuse API keys before auth runs and log the shell event', async (t) => {

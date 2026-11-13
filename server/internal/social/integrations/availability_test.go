@@ -26,7 +26,7 @@ func configuredManager(t *testing.T) *Manager {
 	t.Setenv("HIDDEN_PROVIDERS", "")
 	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_ID", "")
 	t.Setenv("PLATFORM_LINKEDIN_PAGE_CLIENT_SECRET", "")
-	for _, key := range []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "X_API_KEY", "X_API_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "THREADS_APP_ID", "THREADS_APP_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"} {
+	for _, key := range []string{"TIKTOK_CLIENT_ID", "TIKTOK_CLIENT_SECRET", "YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET", "X_API_KEY", "X_API_SECRET", "LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET", "THREADS_APP_ID", "THREADS_APP_SECRET", "FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET", "INSTAGRAM_APP_ID", "INSTAGRAM_APP_SECRET", "MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET", "PINTEREST_CLIENT_ID", "PINTEREST_CLIENT_SECRET", "GOOGLE_GMB_CLIENT_ID", "GOOGLE_GMB_CLIENT_SECRET"} {
 		t.Setenv(key, "private-configuration-canary")
 	}
 	var providers []Provider
@@ -66,6 +66,9 @@ func TestConnectionReadinessRequiresCompleteConfiguration(t *testing.T) {
 		{"instagram", "FACEBOOK_APP_ID"}, {"instagram", "FACEBOOK_APP_SECRET"},
 		{"instagram-standalone", "INSTAGRAM_APP_ID"}, {"instagram-standalone", "INSTAGRAM_APP_SECRET"},
 		{"mastodon", "MASTODON_CLIENT_ID"}, {"mastodon", "MASTODON_CLIENT_SECRET"},
+		{"facebook", "FACEBOOK_APP_ID"}, {"facebook", "FACEBOOK_APP_SECRET"},
+		{"pinterest", "PINTEREST_CLIENT_ID"}, {"pinterest", "PINTEREST_CLIENT_SECRET"},
+		{"gmb", "GOOGLE_GMB_CLIENT_ID"}, {"gmb", "GOOGLE_GMB_CLIENT_SECRET"},
 	} {
 		t.Run(tc.key, func(t *testing.T) {
 			t.Setenv(tc.key, "  ")
