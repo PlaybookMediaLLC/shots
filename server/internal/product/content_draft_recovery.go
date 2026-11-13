@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialidentity"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/lucsky/cuid"
 )
 
@@ -25,7 +28,31 @@ var (
 	linkedInURN     = regexp.MustCompile(`urn:li:(?:share|ugcPost|activity):[0-9]{1,30}`)
 	tikTokVideoPath = regexp.MustCompile(`^/@([A-Za-z0-9_.]{1,24})/video/([1-9][0-9]{0,29})/?$`)
 	youTubeVideoID  = regexp.MustCompile(`^[A-Za-z0-9_-]{11}$`)
+	// postLinks are the links a person may give for a live post on platforms
+	// with no id parser here, kept as the post's id: its exact hosts (never a
+	// link-redirect host), a post's path (an optional first group names the
+	// account), and whether the query is part of the address or tracking.
+	postLinks = map[string]struct {
+		hosts []string
+		path  *regexp.Regexp
+		query bool
+	}{
+		"threads": {[]string{"threads.net", "www.threads.net", "threads.com", "www.threads.com"},
+			regexp.MustCompile(`^/@([A-Za-z0-9_.]{1,30})/post/[A-Za-z0-9_-]{1,64}/?$`), false},
+		"instagram": {[]string{"instagram.com", "www.instagram.com"},
+			regexp.MustCompile(`^/(?:[A-Za-z0-9_.]{1,30}/)?(?:p|reel|tv)/[A-Za-z0-9_-]{1,64}/?$`), false},
+		"facebook": {[]string{"facebook.com", "www.facebook.com", "m.facebook.com"},
+			regexp.MustCompile(`^/(?:[A-Za-z0-9.]{1,80}/(?:posts|videos)/[A-Za-z0-9]{1,64}|permalink\.php|story\.php|reel/[0-9]{1,30}|stories/[0-9]{1,30}|share/[prv]/[A-Za-z0-9]{1,32})/?$`), true},
+		"pinterest": {[]string{"pinterest.com", "www.pinterest.com"}, regexp.MustCompile(`^/pin/[0-9]{1,30}/?$`), false},
+		"gmb":       {[]string{"local.google.com", "business.google.com"}, regexp.MustCompile(`^/(?:place|locations/[0-9]{1,30})/?$`), true},
+	}
 )
+
+// namesOtherAccount reports whether a link names an account other than the
+// connection's, when its handle is known.
+func namesOtherAccount(connection *ent.ChannelConnection, name string) bool {
+	return connection.Handle != nil && *connection.Handle != "" && !strings.EqualFold(strings.TrimPrefix(*connection.Handle, "@"), name)
+}
 
 // draftPostForRecovery loads a draft post the actor may see, for a publisher.
 func (c *Configuration) draftPostForRecovery(ctx context.Context, tx *ent.Tx, actor Actor, postID string) (*ent.ScheduledPost, error) {
@@ -178,13 +205,13 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 		action = "post.reconciled_live"
 		update.SetStatus(scheduledpost.StatusPUBLISHED).SetPublishedAt(time.Now().UTC())
 		remote := ""
-		switch platform := post.Edges.ChannelConnection.Platform; {
+		switch platform := socialplatform.Canonical(post.Edges.ChannelConnection.Platform); {
 		case input.URL == "":
 		case platform == "x":
 			if match := xStatusID.FindStringSubmatch(input.URL); match != nil {
 				remote = match[1]
 			}
-		case platform == "linkedin" || platform == "linkedin-page":
+		case platform == "linkedin":
 			remote = linkedInURN.FindString(input.URL)
 		case platform == "tiktok" || platform == "youtube":
 			parsed, err := url.Parse(input.URL)
@@ -194,8 +221,7 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 			receipt := postoptions.PublicationReceipt{}
 			if platform == "tiktok" && (parsed.Host == "www.tiktok.com" || parsed.Host == "tiktok.com") {
 				if match := tikTokVideoPath.FindStringSubmatch(parsed.EscapedPath()); match != nil {
-					if handle := post.Edges.ChannelConnection.Handle; handle != nil && *handle != "" &&
-						!strings.EqualFold(strings.TrimPrefix(*handle, "@"), match[1]) {
+					if namesOtherAccount(post.Edges.ChannelConnection, match[1]) {
 						return nil, invalid("That URL is not a post on this channel.")
 					}
 					remote = match[2]
@@ -227,8 +253,34 @@ func (c *Configuration) ReconcileContentDraftPost(ctx context.Context, actor Act
 				progress.Publication = &receipt
 				update.SetThreadProgress(progress)
 			}
-		case strings.HasPrefix(input.URL, "https://"):
-			remote = input.URL
+		case platform == "bluesky":
+			// Kept as an at:// URI, as the worker keeps it. shortcut: a link naming
+			// the account by DID passes unchecked, as the connection records no DID.
+			if uri, err := socialidentity.BlueskyPostURI(input.URL); err == nil {
+				if actor, _, _ := strings.Cut(strings.TrimPrefix(uri, "at://"), "/"); socialidentity.BlueskyDID(actor) || !namesOtherAccount(post.Edges.ChannelConnection, actor) {
+					remote = uri
+				}
+			}
+		case platform == "mastodon":
+			// shortcut: any instance's status link passes, as the connection does not record its instance; check it once it does.
+			if parsed, err := url.Parse(input.URL); err == nil && socialidentity.MastodonStatusURL(input.URL) {
+				remote = parsed.String()
+			}
+		default:
+			link, known := postLinks[platform]
+			parsed, err := url.Parse(input.URL)
+			if !known || err != nil || parsed.Scheme != "https" || parsed.User != nil || !slices.Contains(link.hosts, strings.ToLower(parsed.Host)) {
+				break
+			}
+			match := link.path.FindStringSubmatch(parsed.EscapedPath())
+			if match == nil || len(match) > 1 && namesOtherAccount(post.Edges.ChannelConnection, match[1]) {
+				break
+			}
+			parsed.Host, parsed.Fragment, parsed.RawFragment = strings.ToLower(parsed.Host), "", ""
+			if !link.query {
+				parsed.RawQuery = ""
+			}
+			remote = parsed.String()
 		}
 		if input.URL != "" && remote == "" {
 			return nil, invalid("That URL is not a post on this channel.")
