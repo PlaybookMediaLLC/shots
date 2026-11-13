@@ -31,7 +31,7 @@ type WriteStore interface {
 	DuplicateContentDraftWithKey(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
 	CopyContentDraftToSet(context.Context, product.Actor, string, product.ContentDraftCopyInput) (*product.ContentDraftCopyResult, error)
 	RecoverContentDraftRevision(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
-	ListContentDraftActivity(context.Context, product.Actor, string) ([]product.ContentDraftActivity, error)
+	ListContentDraftActivity(context.Context, product.Actor, string, string) (*product.ContentDraftActivityPage, error)
 	ListPlannedContentDrafts(context.Context, product.Actor, time.Time, time.Time, string) ([]product.ContentDraftRecord, error)
 	RetryContentDraftPost(context.Context, product.Actor, string) (*product.MovedDraftPost, error)
 	ReconcileContentDraftPost(context.Context, product.Actor, string, product.ReconcileInput) (*product.ContentDraftPost, error)
@@ -234,8 +234,8 @@ func (s *Server) contentDraftActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id)
-	respond(w, http.StatusOK, map[string]any{"items": items}, err)
+	page, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id, r.URL.Query().Get("cursor"))
+	respond(w, http.StatusOK, page, err)
 }
 
 func (s *Server) listPlannedContentDrafts(w http.ResponseWriter, r *http.Request) {

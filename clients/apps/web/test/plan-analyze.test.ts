@@ -565,6 +565,12 @@ test('every recorded failure code reads as something a person can act on', () =>
   assert.equal(postFailureReason(null), null)
   assert.match(postFailureReason('MEDIA_UNAVAILABLE') ?? '', /nothing was sent/)
   assert.match(postFailureReason('MISSED_WINDOW') ?? '', /not sent.*Publish it now or reschedule/)
+  // A queued post stops when its scheduler lost access; someone who can publish sends it again.
+  assert.match(
+    postFailureReason('SCHEDULER_UNAUTHORIZED') ?? '',
+    /can no longer publish here, so it was not sent/
+  )
+  assert.equal(postFailureFix('SCHEDULER_UNAUTHORIZED'), 'reschedule')
   assert.match(postFailureReason('APPROVAL_REQUIRED') ?? '', /approved/)
   assert.match(postFailureReason('CHANGES_REQUESTED') ?? '', /asked for changes/)
   assert.match(postFailureReason('NOT_LIVE') ?? '', /not published\. Retry/)

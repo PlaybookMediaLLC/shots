@@ -14,8 +14,9 @@ import { ConfirmDialog } from '@/components/settings/ConfirmDialog'
 import { usePreferences } from '@/components/settings/PreferencesProvider'
 import {
   CONNECT_PROVIDERS,
-  HEALTH_GUIDANCE,
   connectHref,
+  HEALTH_GUIDANCE,
+  providerFor,
   useSocialSets,
 } from '@/components/settings/social-sets/api'
 import { useSocialSetScope } from '@/components/settings/social-sets/scope'
@@ -286,7 +287,8 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
   }
 
   const reconnectHref = (connection: ChannelConnection) => {
-    const provider = ROWS.find((row) => row.platform === rowOf(connection.platform))?.provider
+    // Reconnect through the account's own adapter: the backend refuses any other.
+    const provider = providerFor(connection.platform)
     // The start route refuses a provider the catalog says is not ready.
     if (!provider || comingSoon(provider)) return null
     return connection.socialSetId
@@ -589,7 +591,9 @@ export function ChannelConnections({ canManage }: { canManage: boolean }) {
                       </a>
                     </Button>
                   ) : hasAccount ? null : (
-                    <span className="text-sm text-muted-foreground sm:text-center">Coming soon</span>
+                    <span className="text-sm text-muted-foreground sm:text-center">
+                      Coming soon
+                    </span>
                   )}
                 </div>
               )

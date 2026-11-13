@@ -1,6 +1,7 @@
 package product
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -75,6 +76,27 @@ func TestOnboardingAgentFlagModes(t *testing.T) {
 		for i, entitlement := range []*ent.WorkspaceEntitlement{paid, granted, free} {
 			if _, _, features := evaluateBootstrapEntitlement(entitlement, now); features[OnboardingFeature] != want[i] {
 				t.Fatalf("mode %q workspace %d: %v", mode, i, features[OnboardingFeature])
+			}
+		}
+	}
+}
+
+// Every feature is granted on the plans at or above its minimum plan, the same
+// table the web prices and labels with, so the two never disagree.
+func TestFeaturesFollowTheirMinimumPlan(t *testing.T) {
+	t.Setenv("PLATFORM_CAMPAIGN_WORKFLOW", "")
+	t.Setenv("PLATFORM_ONBOARDING_AGENT", "")
+	rank := []string{"free", "pro", "business", "enterprise"}
+	now := time.Now().UTC()
+	for _, plan := range rank {
+		_, _, features := evaluateBootstrapEntitlement(&ent.WorkspaceEntitlement{Plan: plan, Status: "active"}, now)
+		for feature, minimum := range minimumFeaturePlan {
+			if feature == CreativeSetsFeature {
+				continue // An environment switch gates it as well as the plan.
+			}
+			want := plan != "free" && slices.Index(rank, plan) >= slices.Index(rank, minimum)
+			if features[feature] != want {
+				t.Fatalf("%s %s=%v, want %v", plan, feature, features[feature], want)
 			}
 		}
 	}

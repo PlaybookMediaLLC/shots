@@ -23,6 +23,7 @@ import (
 	socialintegration "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/database/integration"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent/integration"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -191,6 +192,15 @@ func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
 // must be checked for before any retry. The provider's message rides along
 // for the attempt record.
 func publicationOutcome(err error) *socialapi.Error {
+	if temporalx.FailureType(err) == "" && errors.Is(err, helpers.ErrTextTooComplex) {
+		// Shots, not the platform, ran out of time counting the text before it
+		// sent anything, most likely under load: the post retries, and stops
+		// with this cause if its text can never be counted.
+		retry := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherError,
+			"Shots could not finish checking this post's text in time, so nothing was sent. If this keeps happening, shorten the post or remove some links.")
+		retry.ProviderMessage = retry.Error()
+		return retry
+	}
 	var mapped *socialapi.Error
 	switch temporalx.FailureType(err) {
 	case temporalx.TypeRateLimited:

@@ -409,6 +409,39 @@ func TestRetentionHonorsLegalHoldAndDefaultPolicy(t *testing.T) {
 		t.Fatalf("repeated deletion %d", n)
 	}
 }
+
+// Notifications and their delivery records go 90 days after creation, read or
+// not. A legal hold keeps a workspace's, and a delivery a sender holds waits.
+func TestNotificationRetentionHonorsLegalHold(t *testing.T) {
+	s, _ := setup(t)
+	exec(t, s.DB, `INSERT INTO "user"(id,name,email,"updatedAt") VALUES('reader','Reader','reader@example.invalid',now())`)
+	exec(t, s.DB, `INSERT INTO audit_retention_policy("organizationId","legalHold","updatedAt") VALUES('b',true,now())`)
+	for _, row := range []struct {
+		id, org, age string
+		read         bool
+	}{{"old-unread", "a", "91 days", false}, {"old-read", "a", "120 days", true}, {"recent", "a", "89 days", false}, {"held", "b", "365 days", false}} {
+		exec(t, s.DB, `INSERT INTO platform_notification_inbox(id,"organizationId","userId",event_id,kind,resource_type,resource_id,description,href,created_at,read_at) VALUES($1,$2,'reader',$1,'test','test',$1,'d','',now()-$3::interval,CASE WHEN $4 THEN now() END)`, row.id, row.org, row.age, row.read)
+		exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) VALUES($1,$2,$1,'test','email','reader','SUCCEEDED',now()-$3::interval)`, row.id, row.org, row.age)
+	}
+	exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) VALUES('sending','a','sending','test','email','reader','CLAIMED',now()-interval '100 days')`)
+	// More than one batch of each, so the purge keeps going after a full batch.
+	exec(t, s.DB, `INSERT INTO platform_notification_inbox(id,"organizationId","userId",event_id,kind,resource_type,resource_id,description,href,created_at) SELECT 'bulk-'||g,'a','reader','bulk-'||g,'test','test','bulk','d','',now()-interval '200 days' FROM generate_series(1,1001) g`)
+	exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) SELECT 'bulk-'||g,'a','bulk-'||g,'test','in_app','reader','SUCCEEDED',now()-interval '200 days' FROM generate_series(1,1001) g`)
+	if n := run(t, s, "notification-retention"); n != 4+2*1001 {
+		t.Fatalf("deleted %d", n)
+	}
+	expect(t, s.DB, "held,recent", `SELECT string_agg(id, ',' ORDER BY id) FROM platform_notification_inbox`)
+	expect(t, s.DB, "held,recent,sending", `SELECT string_agg(id, ',' ORDER BY id) FROM platform_notification_delivery`)
+	if n := run(t, s, "notification-retention"); n != 0 {
+		t.Fatalf("second run deleted %d", n)
+	}
+	// Lifting the hold lets the next run purge the workspace's old notifications.
+	exec(t, s.DB, `UPDATE audit_retention_policy SET "legalHold"=false WHERE "organizationId"='b'`)
+	if n := run(t, s, "notification-retention"); n != 2 {
+		t.Fatalf("after the hold deleted %d", n)
+	}
+}
+
 func TestAuditLogIsAppendOnly(t *testing.T) {
 	s, _ := setup(t)
 	exec(t, s.DB, `INSERT INTO audit_log(id,"organizationId","requestId","actorType",action,"entityType") VALUES('kept','a','r','SERVICE','test','test')`)

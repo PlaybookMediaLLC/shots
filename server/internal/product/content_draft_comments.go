@@ -218,7 +218,7 @@ func (c *Configuration) MutateContentDraftComment(ctx context.Context, actor Act
 	if err != nil {
 		return nil, err
 	}
-	if err = appendConfigurationAudit(ctx, tx, actor, "product.content_draft_comment_"+input.Action, "content_draft", id, map[string]any{"commentId": input.CommentID, "threadId": input.ThreadID}); err != nil {
+	if err = appendConfigurationAudit(ctx, tx, actor, "product.content_draft_comment_"+input.Action, "content_draft", id, map[string]any{"commentId": input.CommentID, "threadId": input.ThreadID, "resolved": input.Resolved}); err != nil {
 		return nil, err
 	}
 	if err = tx.Commit(); err != nil {

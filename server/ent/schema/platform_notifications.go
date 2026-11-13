@@ -71,7 +71,7 @@ func (PlatformNotificationInbox) Fields() []ent.Field {
 }
 
 func (PlatformNotificationInbox) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("organization_id", "user_id", "created_at", "id"), index.Fields("organization_id", "user_id", "event_id").Unique()}
+	return []ent.Index{index.Fields("organization_id", "user_id", "created_at", "id"), index.Fields("organization_id", "user_id", "event_id").Unique(), index.Fields("created_at")}
 }
 
 type PlatformNotificationDelivery struct{ ent.Schema }
@@ -103,7 +103,7 @@ func (PlatformNotificationDelivery) Fields() []ent.Field {
 }
 
 func (PlatformNotificationDelivery) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("organization_id", "event_id", "channel", "destination").Unique(), index.Fields("status", "next_attempt_at")}
+	return []ent.Index{index.Fields("organization_id", "event_id", "channel", "destination").Unique(), index.Fields("status", "next_attempt_at"), index.Fields("created_at")}
 }
 
 type PlatformNotificationSeenAction struct{ ent.Schema }

@@ -93,6 +93,12 @@ func (b *privateBucket) Put(_ context.Context, key, mime string, body io.Reader)
 	b.mu.Unlock()
 	return err
 }
+func (b *privateBucket) Copy(_ context.Context, from, to string) error {
+	b.mu.Lock()
+	b.objects[to], b.types[to] = b.objects[from], b.types[from]
+	b.mu.Unlock()
+	return nil
+}
 func (b *privateBucket) Read(_ context.Context, key string) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

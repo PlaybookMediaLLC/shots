@@ -157,7 +157,10 @@ export const HEALTH_GUIDANCE: Record<SocialSetRecord['accounts'][number]['health
 
 /** The provider a connected platform reconnects through. */
 export function providerFor(platform: string): string | null {
-  if (platform === 'bluesky') return 'bluesky'
+  if (platform === 'bluesky' || platform === 'mastodon-custom') return platform
+  // Legacy names; the backend renames the account when it reconnects.
+  if (platform === 'twitter') return 'x'
+  if (platform === 'mastodoncustom') return 'mastodon-custom'
   return (
     CONNECT_PROVIDERS.find((provider) => provider.platform === platform)?.provider ??
     (platform === 'instagram' ? 'instagram' : null)
