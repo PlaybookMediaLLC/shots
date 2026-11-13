@@ -4,6 +4,7 @@
 package postoptions
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -47,6 +48,19 @@ type RetweetRule struct {
 	Days         int    `json:"days,omitempty"`
 	At           string `json:"at,omitempty"`
 	TimeZone     string `json:"timeZone,omitempty"`
+}
+
+// MarshalJSON keeps days on a wall-clock rule: 0 means the same day, and
+// omitting it would make the stored rule match neither form.
+func (r RetweetRule) MarshalJSON() ([]byte, error) {
+	type plain RetweetRule
+	if r.At == "" {
+		return json.Marshal(plain(r))
+	}
+	return json.Marshal(struct {
+		plain
+		Days int `json:"days"`
+	}{plain(r), r.Days})
 }
 
 // When is the rule's time for a post published at publishedAt. A wall-clock

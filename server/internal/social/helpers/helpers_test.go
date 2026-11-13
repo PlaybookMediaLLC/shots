@@ -80,6 +80,7 @@ func TestWeightedLength(t *testing.T) {
 // URL path of parenthesised groups: without the budget each took seconds, and
 // now each counts.
 func TestLinkScanStopsOnCraftedText(t *testing.T) {
+	liftTextBudget(t)
 	scans := map[string]func(string) error{
 		"WeightedLength": func(text string) error { _, err := WeightedLength(text); return err },
 		"LinkSpans":      func(text string) error { _, err := LinkSpans(text); return err },
@@ -109,6 +110,16 @@ func TestLinkScanStopsOnCraftedText(t *testing.T) {
 			}
 		}
 	}
+}
+
+// liftTextBudget lifts each text's link-scan budget for a test that checks
+// what a text counts, so a loaded machine cannot refuse a text that counts in
+// a fraction of its budget unloaded. The tests that check refusals keep it,
+// so a test that lifts it must not run in parallel.
+func liftTextBudget(t *testing.T) {
+	saved := linkScanPerUnit
+	linkScanPerUnit = time.Second
+	t.Cleanup(func() { linkScanPerUnit = saved })
 }
 
 // A text longer than any caption gets no more time than the longest one: 1 MiB
@@ -284,6 +295,7 @@ func TestURLMatchesAreTheFullScans(t *testing.T) {
 
 // X Articles run to 100,000 characters.
 func TestWeightedLengthOfLongText(t *testing.T) {
+	liftTextBudget(t)
 	prose := strings.Repeat("日本語の文章です。", 5556)
 	japanese := prose + "3.5 https://sample.com/a " + prose
 	var distinct strings.Builder // punycode's cost grows with distinct characters

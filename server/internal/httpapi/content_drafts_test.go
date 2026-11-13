@@ -189,3 +189,27 @@ func TestScheduleContentDraftNamesTheDuplicatesItFound(t *testing.T) {
 		t.Fatalf("status=%d body=%+v confirm=%v", response.Code, body, fake.input.ConfirmDuplicate)
 	}
 }
+
+// A share link's guest endpoints answer only the web app's service credential:
+// no session, API key or guessed token reads a shared draft or comments on it.
+func TestGuestShareEndpointsAdmitOnlyTheWebService(t *testing.T) {
+	// The embedded store is nil, so a request that got past authentication would panic.
+	handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", &fakeConfiguration{})
+	share := "/v1/internal/content-draft-shares/abcdefghijklmnopqrstuvwxyz012345"
+	for _, call := range []struct{ method, path string }{
+		{http.MethodGet, share}, {http.MethodGet, share + "/image"}, {http.MethodPost, share + "/comments"},
+	} {
+		for _, credential := range []string{"", "Bearer guessed", "Bearer shk_agentkey"} {
+			request := httptest.NewRequest(call.method, call.path, strings.NewReader(`{"name":"Ana","body":"Hi"}`))
+			if credential != "" {
+				request.Header.Set("Authorization", credential)
+			}
+			request.Header.Set("X-Organization-ID", "org-1")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("%s %s with %q: status=%d", call.method, call.path, credential, response.Code)
+			}
+		}
+	}
+}

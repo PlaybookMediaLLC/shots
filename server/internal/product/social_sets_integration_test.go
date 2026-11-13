@@ -357,6 +357,38 @@ func TestSocialSetsPlatform(t *testing.T) {
 				t.Fatal("the workspace owner sees another person's private set")
 			}
 		}
+		// Its accounts are listed for its owner alone, never for an API key.
+		connect("threads", &private.ID)
+		all, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org)).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`UPDATE channel_connection SET "socialSetId"=NULL WHERE id=$1`, ids["linkedin"])
+		defer exec(`UPDATE channel_connection SET "socialSetId"=$2 WHERE id=$1`, ids["linkedin"], defaultSet.ID)
+		all, err = db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org)).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// listed reports whether actor sees the private, shared (x) and set-less (linkedin) accounts.
+		listed := func(actor Actor) [3]bool {
+			t.Helper()
+			visible, err := repo.VisibleConnections(ctx, actor, all)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var seen [3]bool
+			for _, connection := range visible {
+				seen[0] = seen[0] || (connection.SocialSetID != nil && *connection.SocialSetID == private.ID)
+				seen[1] = seen[1] || connection.ID == ids["x"]
+				seen[2] = seen[2] || connection.ID == ids["linkedin"]
+			}
+			return seen
+		}
+		key := owner
+		key.Kind, key.UserID = "api_key", ""
+		if listed(admin) != [3]bool{true, true, true} || listed(owner) != [3]bool{false, true, true} || listed(key) != [3]bool{false, true, true} {
+			t.Fatalf("admin=%v owner=%v key=%v", listed(admin), listed(owner), listed(key))
+		}
 		if _, err := repo.GetSocialSet(ctx, owner, private.ID); !errors.Is(err, publishing.ErrNotFound) {
 			t.Fatalf("private set read by another member: %v", err)
 		}
@@ -503,7 +535,7 @@ func TestSocialSetsPlatform(t *testing.T) {
 			}
 		}
 		logged, err := db.Client.AuditLog.Query().Where(auditlog.Action("product.channel_account_revoked"), auditlog.EntityID(connection.ID)).Only(ctx)
-		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" {
+		if err != nil || logged.Metadata["confirmationCode"] != "CONFIRM-CODE" || logged.Metadata["actorSource"] != "callback" {
 			t.Fatalf("audit=%+v err=%v", logged, err)
 		}
 		if again, err := repo.RevokeProviderConnections(ctx, []string{connection.ExternalAccountID}, "SECOND"); err != nil || len(again) != 0 {
