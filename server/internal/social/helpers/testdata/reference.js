@@ -139,7 +139,7 @@ const texts = ['', 'hello', '日本語テキスト', '😀', '👨‍👩‍👧
   // Punycode and the bare-domain search use the domain as written, not its stand-ins.
   'https://\u0399' + 'a'.repeat(55) + '.com/x', 'see \u00C0a.comx\u0436\u2C65a.com now',
   // NFC past 30 combining marks in a row: no U+034F, and a mark of a higher class still composes.
-  'a' + '\u0301'.repeat(40), 'a' + '\u0316'.repeat(30) + '\u0301'];
+  'a' + '\u0301'.repeat(40), 'a' + '\u0316'.repeat(30) + '\u0301', 'x' + '\u0301'.repeat(31) + '\u1100\u1161\u11A8'];
 for (const t of texts) out.weighted.push({ text: t, want: weightedLength(t) });
 for (const [type, end, t] of [['x', 280, 'a'.repeat(300)], ['x', 10, '日本語日本語日本語'], ['x', 280, 'short'], ['linkedin', 3000, 'a'.repeat(4000)],
   ['x', 25, 'see https://example.com/a/b/c and more text here'], ['x', 5, '😀😀😀😀'], ['x', 4, 'ééééé'], ['x', 280, ''],
