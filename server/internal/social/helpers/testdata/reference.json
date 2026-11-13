@@ -1753,6 +1753,62 @@
   {
    "text": "mixed 日本 and emoji 🎉 and https://a.io",
    "want": 51
+  },
+  {
+   "text": "https://tr.wikipedia.org/w/index.php?search=İstanbul",
+   "want": 31
+  },
+  {
+   "text": "İhttps://example.com/a/long/path",
+   "want": 24
+  },
+  {
+   "text": "https://example.com/pathȾ",
+   "want": 23
+  },
+  {
+   "text": "https://example.com/aƦb",
+   "want": 23
+  },
+  {
+   "text": "https://el.wikipedia.org/wiki/Ιστορία",
+   "want": 29
+  },
+  {
+   "text": "https://пример.ᲃайт/x",
+   "want": 23
+  },
+  {
+   "text": "https://el.wikipedia.org/wiki/ιστορία",
+   "want": 29
+  },
+  {
+   "text": "https://παράδειγμα.ϵλ/a/long/path",
+   "want": 23
+  },
+  {
+   "text": "https://Ιaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/x",
+   "want": 70
+  },
+  {
+   "text": "see Àa.comxжⱥa.com now",
+   "want": 39
+  },
+  {
+   "text": "á́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́",
+   "want": 40
+  },
+  {
+   "text": "á̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖",
+   "want": 31
+  },
+  {
+   "text": "x́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́각",
+   "want": 34
+  },
+  {
+   "text": "a̖̖̖̖̖̖̖̖̖̖̖̖̖̖̖̍́́́́́́́́́́́́́́́",
+   "want": 32
   }
  ],
  "slicer": [
@@ -1803,6 +1859,12 @@
    "end": 280,
    "text": "",
    "want": 0
+  },
+  {
+   "type": "x",
+   "end": 30,
+   "text": "á́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́́bc",
+   "want": 30
   }
  ],
  "count": [

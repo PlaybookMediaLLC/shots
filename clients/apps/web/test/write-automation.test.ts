@@ -55,6 +55,27 @@ test('fenced content cannot close its fence', () => {
 })
 
 test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
+  const valid = {
+    match: 'any',
+    replies: true,
+    reposts: false,
+    requireFollow: false,
+    replyText: 'guide',
+    message: 'Hi {{first_name}}, here is {{post_url}}',
+  } as const
+  assert.ok(autoDmSchema.safeParse(valid).success)
+  // Go's TrimSpace keeps U+FEFF: a draft it stored must still load here.
+  assert.ok(autoDmSchema.safeParse({ ...valid, message: '\uFEFF' }).success)
+  for (const [name, change] of Object.entries({
+    variable: { message: 'Hi {{email}}' },
+    blank: { message: ' \u0085\u3000 ' },
+    'no action': { replies: false, reposts: false, replyText: '' },
+    'reply filter without replies': { replies: false, reposts: true },
+    'long message': { message: 'x'.repeat(10_001) },
+    'long reply filter': { replyText: 'x'.repeat(101) },
+  })) {
+    assert.equal(autoDmSchema.safeParse({ ...valid, ...change }).success, false, name)
+  }
   const base = { match: 'any', reposts: false, replies: true, requireFollow: false }
   const accepts = (value: object) => autoDmSchema.safeParse({ ...base, ...value }).success
   // Go counts runes. zod 4.5+ counts code points for string lengths, so an emoji
@@ -66,4 +87,12 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
   assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(100) }), true)
   assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(101) }), false)
   assert.equal(accepts({ message: 'Hi', replies: false }), false)
+  // The form shows the first problem when it stops a save: lengths are in characters.
+  const problem = (value: object) =>
+    autoDmSchema.safeParse({ ...base, ...value }).error?.issues[0].message
+  assert.equal(problem({ message: '😀'.repeat(10_001) }), 'Keep the message to 10,000 characters.')
+  assert.equal(
+    problem({ message: 'Hi', replyText: 'x'.repeat(101) }),
+    'Keep the reply text to 100 characters.'
+  )
 })
