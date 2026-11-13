@@ -159,6 +159,8 @@ function UgcPreview({
   text: string
 }) {
   const canvas = React.useRef<HTMLCanvasElement>(null)
+  const video = React.useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = React.useState(false)
   React.useEffect(() => {
     const context = canvas.current?.getContext('2d')
     if (!context) return
@@ -168,29 +170,53 @@ function UgcPreview({
     drawOverlay(context, text, position)
   }, [position, text])
   return (
-    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-black">
-      {clipId ? (
-        // Plays only when asked: a page of previews would otherwise decode every clip at once.
-        <video
-          aria-label={`Preview of ${name}`}
-          className="absolute inset-0 size-full object-cover"
-          controls
-          loop
-          muted
-          playsInline
-          preload="metadata"
-          src={assetContentUrl(clipId)}
+    <div className="grid gap-2">
+      <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-black">
+        {clipId ? (
+          // Plays only when asked: a page of previews would otherwise decode every clip at once.
+          // Its control sits below it, so nothing covers text at the bottom.
+          <video
+            ref={video}
+            aria-label={`Preview of ${name}`}
+            className="absolute inset-0 size-full object-cover"
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            src={assetContentUrl(clipId)}
+            onPause={() => setPlaying(false)}
+            onPlay={() => setPlaying(true)}
+          />
+        ) : (
+          <span className="absolute inset-x-0 top-4 text-center text-xs text-white/70">
+            No clip
+          </span>
+        )}
+        <canvas
+          ref={canvas}
+          aria-hidden
+          className="pointer-events-none absolute inset-0 size-full"
+          height={PREVIEW.height}
+          width={PREVIEW.width}
         />
-      ) : (
-        <span className="absolute inset-x-0 top-4 text-center text-xs text-white/70">No clip</span>
-      )}
-      <canvas
-        ref={canvas}
-        aria-hidden
-        className="pointer-events-none absolute inset-0 size-full"
-        height={PREVIEW.height}
-        width={PREVIEW.width}
-      />
+      </div>
+      {clipId ? (
+        <Button
+          aria-label={`${playing ? 'Pause' : 'Play'} preview of ${name}`}
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={() => {
+            const element = video.current
+            if (!element) return
+            if (element.paused)
+              void element.play().catch(() => toast.error('This browser could not play the clip.'))
+            else element.pause()
+          }}
+        >
+          {playing ? 'Pause' : 'Play'}
+        </Button>
+      ) : null}
     </div>
   )
 }

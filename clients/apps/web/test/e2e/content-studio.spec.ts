@@ -283,6 +283,14 @@ test(
       .getByLabel('Clip for video 1', { exact: true })
       .setInputFiles('test/e2e/fixtures/ugc-clip.mp4')
     await expect(concepts.getByText('Clip 3.0 s')).toBeVisible()
+    // The preview plays from a named control below it, not over the text.
+    await page.getByRole('button', { name: 'Play preview of video 1', exact: true }).click()
+    const pause = page.getByRole('button', { name: 'Pause preview of video 1', exact: true })
+    await expect(pause).toBeVisible()
+    await pause.click()
+    await expect(
+      page.getByRole('button', { name: 'Play preview of video 1', exact: true })
+    ).toBeVisible()
     await page
       .getByLabel('Closing clip for video 1', { exact: true })
       .setInputFiles('test/e2e/fixtures/ugc-short.mp4')
