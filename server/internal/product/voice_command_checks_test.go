@@ -118,6 +118,7 @@ func TestVoiceCommandProposalChecks(t *testing.T) {
 	}
 	at := time.Date(2026, 11, 11, 15, 0, 0, 0, time.UTC)
 	long := strings.Repeat("hard ", 57)
+	crafted := strings.Repeat("a.", 1000) // within the command limit, but too complex to count
 	for _, c := range []struct {
 		name        string
 		reply       voiceParse
@@ -147,6 +148,9 @@ func TestVoiceCommandProposalChecks(t *testing.T) {
 		{name: "one account when none was named", reply: with(func(r *voiceParse) { r.Platform = nil }), channels: []*ent.ChannelConnection{linkedin},
 			status: "proposed", action: "schedule_post", channel: "li", guessed: []string{"platform"}, scheduled: &at, expires: &at},
 		{name: "over the platform's limit (K6)", reply: with(func(r *voiceParse) { r.Text = text(long) }), transcript: long,
+			channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post", channel: "x1",
+			flags: []string{voiceFlagTextTooLong}, scheduled: &at, expires: &at},
+		{name: "text too complex to count is too long (K6)", reply: with(func(r *voiceParse) { r.Text = text(crafted) }), transcript: crafted,
 			channels: []*ent.ChannelConnection{x1}, status: "proposed", action: "schedule_post", channel: "x1",
 			flags: []string{voiceFlagTextTooLong}, scheduled: &at, expires: &at},
 		{name: "exactly the platform's limit (K6)", reply: with(func(r *voiceParse) { r.Text = text(strings.Repeat("a", 280)) }),

@@ -15,8 +15,15 @@ const xLinkLength = 23
 
 // xLength uses the same twitter-text v3 parser as the X adapter, including
 // NFC normalization, bare-domain URLs, and complete emoji sequences.
-func xLength(text string) int {
+func xLength(text string) (int, error) {
 	return helpers.WeightedLength(text)
+}
+
+// fitsXPost reports whether text, plus extra characters, fits in one X post.
+// Blank text does not, nor does text too complex to count.
+func fitsXPost(text string, extra int) bool {
+	length, err := xLength(text)
+	return strings.TrimSpace(text) != "" && err == nil && length+extra <= 280
 }
 
 // rubyWord is Ruby's [[:word:]]: Alphabetic, marks, decimal digits and
@@ -37,13 +44,17 @@ var mastodonMentionEndRe = regexp.MustCompile(`^(?:[@＠\x{C0}-\x{D6}\x{D8}-\x{F
 
 // mastodonLength is Mastodon's StatusLengthValidator: grapheme clusters once
 // each link with a protocol is 23 characters and each mention drops its domain.
-func mastodonLength(text string) int {
+func mastodonLength(text string) (int, error) {
 	type entity struct {
 		start, end int
 		text       string
 	}
 	var entities []entity
-	for _, span := range helpers.LinkSpans(text) {
+	spans, err := helpers.LinkSpans(text)
+	if err != nil {
+		return 0, err
+	}
+	for _, span := range spans {
 		entities = append(entities, entity{span[0], span[1], strings.Repeat("x", 23)})
 	}
 	for _, m := range mastodonMentionRe.FindAllStringSubmatchIndex(text, -1) {
@@ -67,14 +78,15 @@ func mastodonLength(text string) int {
 		at = e.end
 	}
 	countable.WriteString(text[at:])
-	return socialidentity.GraphemeLength(countable.String())
+	return socialidentity.GraphemeLength(countable.String()), nil
 }
 
 // draftPostLength is a draft post's length on its channel: X's own count on
 // X, Mastodon's on Mastodon, grapheme clusters on Bluesky, and UTF-16 units
 // elsewhere. The composer's platformCaptionLength is the same rule; both are
-// tested against testdata/caption-length-cases.json.
-func draftPostLength(channel, text string) int {
+// tested against testdata/caption-length-cases.json. X and Mastodon fail with
+// helpers.ErrTextTooComplex on text their link scan cannot finish in time.
+func draftPostLength(channel, text string) (int, error) {
 	if channel == "x" {
 		return xLength(strings.TrimSpace(text))
 	}
@@ -82,7 +94,7 @@ func draftPostLength(channel, text string) int {
 		return mastodonLength(text)
 	}
 	if channel == "bluesky" {
-		return socialidentity.GraphemeLength(text)
+		return socialidentity.GraphemeLength(text), nil
 	}
-	return len(utf16.Encode([]rune(text)))
+	return len(utf16.Encode([]rune(text))), nil
 }
