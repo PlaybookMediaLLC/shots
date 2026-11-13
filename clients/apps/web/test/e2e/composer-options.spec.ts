@@ -357,3 +357,71 @@ test(
     await expectSaved(page)
   }
 )
+
+// Google's sign-in and Picker scripts, standing in for the browser: the Picker
+// picks one PNG at once. Nothing reaches Google.
+const FAKE_GOOGLE_SIGN_IN = `window.google = window.google || {};
+window.google.accounts = { oauth2: { initTokenClient: (config) => ({
+  requestAccessToken: () => config.callback({ access_token: 'fixture-drive-token' }),
+}) } };`
+// gapi.load takes the callback in an options object, with its error handlers.
+const FAKE_GOOGLE_PICKER = `window.gapi = { load: (name, options) => {
+  const google = (window.google = window.google || {});
+  class Builder {
+    addView() { return this } enableFeature() { return this } setMaxItems() { return this }
+    setOAuthToken() { return this } setDeveloperKey() { return this } setAppId() { return this }
+    setCallback(callback) { this.callback = callback; return this }
+    build() { const callback = this.callback; return { setVisible: () => callback({ action: 'picked',
+      docs: [{ id: 'fixture-file', name: 'drive.png', mimeType: 'image/png', sizeBytes: 200 }] }) } }
+  }
+  class View { setIncludeFolders() { return this } setMimeTypes() { return this } }
+  google.picker = { Action: { PICKED: 'picked', CANCEL: 'cancel' }, DocsView: View,
+    Feature: { MULTISELECT_ENABLED: 'multiselect' }, PickerBuilder: Builder,
+    Response: { ACTION: 'action', DOCUMENTS: 'docs' } };
+  options.callback();
+} };`
+
+test(
+  'UI-17: a file picked from Google Drive uploads as a workspace asset on the post',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    await startWorkspace({ channels: ['x'] })
+    const id = await openNewDraft(page)
+    await draftEditor(page).click()
+    await settleSelection(page)
+    await page.keyboard.type('Straight from Drive.')
+    const png = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: '#00aa55' },
+    })
+      .png()
+      .toBuffer()
+    await page.route('https://accounts.google.com/gsi/client', (route) =>
+      route.fulfill({ body: FAKE_GOOGLE_SIGN_IN, contentType: 'text/javascript' })
+    )
+    await page.route('https://apis.google.com/js/api.js', (route) =>
+      route.fulfill({ body: FAKE_GOOGLE_PICKER, contentType: 'text/javascript' })
+    )
+    const downloads: (string | undefined)[] = []
+    await page.route(/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\//, (route) => {
+      downloads.push(route.request().headers().authorization)
+      return route.fulfill({ body: png, contentType: 'image/png' })
+    })
+
+    await editorMore(page, 'From Google Drive')
+    // Google's sign-in opens from this click, so no browser blocks its popup.
+    await page.getByRole('button', { name: 'Choose from Google Drive', exact: true }).click()
+    await expect(draftEditor(page).locator('figure')).toHaveCount(1)
+    await expectSaved(page)
+    // The person's token went to Drive, once.
+    expect(downloads).toEqual(['Bearer fixture-drive-token'])
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const image = z
+      .object({ body: z.array(z.record(z.string(), z.unknown())) })
+      .parse(saved.body)
+      .body.find((node) => node.type === 'img')
+    expect(image?.assetId).toEqual(expect.any(String))
+    const stored = await page.request.get(`/api/v1/assets/${String(image?.assetId)}/content`)
+    expect(stored.ok()).toBe(true)
+    expect(Buffer.from(await stored.body()).equals(png)).toBe(true)
+  }
+)
