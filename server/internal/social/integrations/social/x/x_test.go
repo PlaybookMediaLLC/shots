@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image"
 	"image/png"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -497,6 +499,25 @@ func TestFollowUps(t *testing.T) {
 	}
 }
 
+// A delete removes a post by DELETE; a post that is already gone reports 404.
+func TestDeletePost(t *testing.T) {
+	calls, done := fakePublishingX(t, func(r recorded) (int, string) {
+		if r.method == "DELETE" && r.path == "/2/tweets/42" {
+			return 200, `{"data":{"deleted":true}}`
+		}
+		return 404, `{"title":"Not Found Error"}`
+	})
+	defer done()
+	provider, account := New(), publishingAccount()
+	if err := provider.DeletePost(context.Background(), account, "42"); err != nil || len(*calls) != 1 {
+		t.Fatalf("delete = %v, calls %d", err, len(*calls))
+	}
+	var status interface{ HTTPStatus() int }
+	if err := provider.DeletePost(context.Background(), account, "43"); !errors.As(err, &status) || status.HTTPStatus() != 404 {
+		t.Fatalf("missing post = %v", err)
+	}
+}
+
 // An image's description is set on the media before the post that uses it.
 func TestAltTextGoesOnTheMedia(t *testing.T) {
 	t.Setenv("SOCIAL_PRIVATE_MEDIA", "false")
@@ -567,5 +588,14 @@ func TestCommunityBroadcastKeepsExplicitFalse(t *testing.T) {
 				t.Fatalf("broadcast intent lost: %v", body)
 			}
 		})
+	}
+}
+
+// A 429 keeps X's reset, so a delete waits for it instead of spending retries.
+func TestAPIErrorCarriesTheRateLimitReset(t *testing.T) {
+	header := http.Header{"X-Rate-Limit-Limit": {"50"}, "X-Rate-Limit-Reset": {"1794585600"}}
+	e := newAPIError(&http.Response{StatusCode: http.StatusTooManyRequests, Header: header}, nil)
+	if e.HTTPStatus() != http.StatusTooManyRequests || !e.RetryAt().Equal(time.Unix(1794585600, 0)) {
+		t.Fatalf("status %d reset %v", e.HTTPStatus(), e.RetryAt())
 	}
 }

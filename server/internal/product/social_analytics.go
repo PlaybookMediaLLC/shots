@@ -227,7 +227,7 @@ func (c *Configuration) CollectSocialAnalytics(ctx context.Context) (int, error)
 		return row.Status == observation.StatusFailed && now.Sub(row.ObservedAt) >= time.Hour, nil
 	}
 	for after := ""; count < 25; {
-		posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.IDGT(after), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED), scheduledpost.ContentDraftIDNotNil(), scheduledpost.RemotePostIDNotNil(), scheduledpost.PublishedAtGTE(now.AddDate(0, 0, -30))).WithChannelConnection().Order(ent.Asc(scheduledpost.FieldID)).Limit(100).All(ctx)
+		posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.IDGT(after), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED), scheduledpost.ContentDraftIDNotNil(), scheduledpost.RemotePostIDNotNil(), scheduledpost.DeletedAtIsNil(), scheduledpost.PublishedAtGTE(now.AddDate(0, 0, -30))).WithChannelConnection().Order(ent.Asc(scheduledpost.FieldID)).Limit(100).All(ctx)
 		if err != nil {
 			return count, err
 		}

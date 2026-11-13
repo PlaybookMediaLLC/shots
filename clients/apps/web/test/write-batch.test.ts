@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { BatchItem } from '@/lib/api/contracts/content-batches'
 import {
+  type BatchAccount,
   batchAudience,
   batchSummary,
   captionProblem,
@@ -54,6 +55,8 @@ const scheduledPost = (id: string, account: string, status: string, createdAt: s
   caption: 'c',
   channelConnectionId: account,
   createdAt,
+  deletedAt: null,
+  deletions: [],
   failureCode: null,
   id,
   metrics: null,
@@ -96,6 +99,39 @@ test('each chosen account is checked apart, with what Shots would change', () =>
   assert.match(deck.get('ig')!.problems.join(), /Only LinkedIn posts a PDF/)
   const mixed = stagedChecks(item({ media: [pdf, item().media[0]] }), accounts)
   assert.match(mixed.get('li')!.problems.join(), /goes alone/)
+})
+
+test("an X video longer than the account's verified length is refused in Go's words", () => {
+  const video = (durationMs: number) =>
+    item({
+      channelConnectionIds: ['x'],
+      media: [
+        { ...item().media[0], mediaType: 'video/mp4', durationMs, width: 1920, height: 1080 },
+      ],
+    })
+  const standard = [{ ...accounts[2], xVideoMaxSeconds: 1200 }]
+  assert.deepEqual(stagedChecks(video(600_000), standard).get('x')!.problems, [])
+  assert.deepEqual(stagedChecks(video(1_200_000), standard).get('x')!.problems, [])
+  assert.deepEqual(stagedChecks(video(1_200_999), standard).get('x')!.problems, [
+    'This X account takes videos up to 20 minutes; this one is 20:01. Trim it before scheduling.',
+  ])
+  // Premium length passes; the unverified case is refused by the publication check.
+  assert.deepEqual(
+    stagedChecks(video(3_600_000), [{ ...accounts[2], xVideoMaxSeconds: 7500 }]).get('x')!.problems,
+    []
+  )
+  // The batch preview card carries the account's verified length into that check.
+  const reconnect = "Reconnect X to verify this account's video limits."
+  const card = (account: BatchAccount) =>
+    previewPublications(video(600_000), [account], {}).cards[0]!.publication.problems
+  assert.ok(
+    card({ ...accounts[2], xCaptionLimit: 280, xVideoMaxSeconds: null }).includes(reconnect)
+  )
+  assert.ok(!card({ ...standard[0]!, xCaptionLimit: 280 }).includes(reconnect))
+  // An account whose standing could not be read is left to Go.
+  assert.ok(
+    !card({ ...accounts[2], xCaptionLimit: null, xVideoMaxSeconds: null }).includes(reconnect)
+  )
 })
 
 test('before upload, a file no account takes needs fixing; one some refuse carries a note', () => {

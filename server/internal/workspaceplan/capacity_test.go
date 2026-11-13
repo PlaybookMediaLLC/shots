@@ -37,3 +37,25 @@ func TestResolveSubscriptionStanding(t *testing.T) {
 		})
 	}
 }
+
+// No plan limits teams. A team is a workspace with its own subscription; the
+// plans the backend sells hold seats and social channels (storage and monthly
+// allowances live with assets and quotas), and none of them counts the teams a
+// person creates or joins: there is no Agency plan or team quota (Teams spec §8).
+func TestPlansHaveNoTeamLimit(t *testing.T) {
+	sold := []string{"free", "pro", "business", "enterprise"}
+	if len(limits) != len(sold) {
+		t.Fatalf("plans=%v", limits)
+	}
+	for _, plan := range sold {
+		named, ok := limits[plan]
+		if !ok || len(named) != 2 || named[Seats] < 1 {
+			t.Fatalf("%s limits %v", plan, named)
+		}
+		for name := range named {
+			if name != Seats && name != Channels {
+				t.Fatalf("%s limits %s", plan, name)
+			}
+		}
+	}
+}

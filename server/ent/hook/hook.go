@@ -1245,6 +1245,18 @@ func (f PostAutomationRunFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PostAutomationRunMutation", m)
 }
 
+// The PostDeletionFunc type is an adapter to allow the use of ordinary
+// function as PostDeletion mutator.
+type PostDeletionFunc func(context.Context, *ent.PostDeletionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PostDeletionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PostDeletionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PostDeletionMutation", m)
+}
+
 // The ProductProfileFunc type is an adapter to allow the use of ordinary
 // function as ProductProfile mutator.
 type ProductProfileFunc func(context.Context, *ent.ProductProfileMutation) (ent.Value, error)

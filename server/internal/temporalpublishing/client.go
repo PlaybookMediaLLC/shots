@@ -87,6 +87,23 @@ func (s *Scheduler) Start(ctx context.Context, input ScheduleInput) error {
 	return err
 }
 
+// StartDelete starts deleting a published post from its platform. A delete
+// already running for the post is joined; a finished one runs again, which
+// retries its refused parts.
+func (s *Scheduler) StartDelete(ctx context.Context, organizationID, postID, requestedBy string) error {
+	_, err := s.client.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
+		ID:                       DeleteWorkflowID(postID),
+		TaskQueue:                s.config.WorkflowTaskQueue,
+		WorkflowIDConflictPolicy: enumspb.WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING,
+		WorkflowIDReusePolicy:    enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+		Memo:                     map[string]any{"organizationId": organizationID, "postId": postID},
+	}, DeleteWorkflowName, DeleteWorkflowInput{
+		ActivityTaskQueue: s.config.ActivityTaskQueue, MainTaskQueue: s.config.WorkflowTaskQueue,
+		OrganizationID: organizationID, PostID: postID, RequestedBy: requestedBy,
+	})
+	return err
+}
+
 func (s *Scheduler) StartMissingWorkflow(ctx context.Context) error {
 	_, err := s.client.ExecuteWorkflow(ctx, client.StartWorkflowOptions{
 		ID:                       MissingWorkflowID,

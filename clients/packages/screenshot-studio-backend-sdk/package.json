@@ -1,13 +1,13 @@
 {
   "name": "screenshot-studio-backend-sdk",
-  "version": "0.1.43",
+  "version": "0.1.44",
   "description": "Typed server SDK for the Screenshot Studio Go backend",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PlaybookMediaLLC/screenshot-studio.git",
-    "directory": "packages/screenshot-studio-backend-sdk"
+    "url": "git+https://github.com/PlaybookMediaLLC/shots.git",
+    "directory": "clients/packages/screenshot-studio-backend-sdk"
   },
   "files": [
     "dist"
@@ -26,6 +26,6 @@
     "prepack": "npm run build"
   },
   "peerDependencies": {
-    "zod": "^4.1.12"
+    "zod": "^4.5.0"
   }
 }

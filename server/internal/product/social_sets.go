@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftsettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -86,6 +88,8 @@ type SocialAccount struct {
 	XCaptionLimit *int  `json:"xCaptionLimit"`
 	XArticles     *bool `json:"xArticles"`
 	XQuotes       bool  `json:"xQuotes"`
+	// XVideoMaxSeconds is the verified account's X video length; nil is unverified.
+	XVideoMaxSeconds *int `json:"xVideoMaxSeconds"`
 }
 
 // WritingAssistantRecord is a set's assistant with its derived status:
@@ -219,6 +223,27 @@ func (c *Configuration) visibleSocialSetIDs(ctx context.Context, actor Actor) ([
 	return ids, nil
 }
 
+// VisibleConnections drops the accounts of private sets the actor does not
+// own: a private set's accounts are its owner's alone, and an API key sees no
+// private set (RFC 024).
+func (c *Configuration) VisibleConnections(ctx context.Context, actor Actor, connections []*ent.ChannelConnection) ([]*ent.ChannelConnection, error) {
+	query := c.client.SocialSet.Query().Where(socialset.OrganizationID(actor.OrganizationID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE))
+	if actor.IsSession() {
+		query.Where(socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(actor.UserID)))
+	}
+	hidden, err := query.IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]*ent.ChannelConnection, 0, len(connections))
+	for _, connection := range connections {
+		if connection.SocialSetID == nil || !slices.Contains(hidden, *connection.SocialSetID) {
+			visible = append(visible, connection)
+		}
+	}
+	return visible, nil
+}
+
 // visibleSocialSet loads one set actor may see; any other set is not found.
 func visibleSocialSet(ctx context.Context, client *ent.Client, actor Actor, id string) (*ent.SocialSet, error) {
 	if !contentDraftRefPattern.MatchString(id) {
@@ -293,7 +318,12 @@ func (c *Configuration) defaultSocialSet(ctx context.Context, organizationID str
 		if oneOf(socialplatform.Canonical(connection.Platform), platforms...) {
 			continue
 		}
-		if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).SetSocialSetID(created.ID).Save(ctx); err != nil {
+		// An account a concurrent connection placed in a set since the read stays there.
+		_, err := tx.ChannelConnection.UpdateOneID(connection.ID).Where(channelconnection.SocialSetIDIsNil()).SetSocialSetID(created.ID).Save(ctx)
+		if ent.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
 			return nil, err
 		}
 		platforms = append(platforms, socialplatform.Canonical(connection.Platform))
@@ -519,7 +549,7 @@ func (c *Configuration) socialSetRecords(ctx context.Context, actor Actor, sets 
 				standing, account := c.accountStanding(ctx, connection), &built[i]
 				account.Premium, account.XCaptionLimit, account.XArticles, account.PollLimits = standing.Premium, standing.XCaptionLimit, standing.XArticles, standing.PollLimits
 				account.MastodonQuotes = standing.MastodonQuotes
-				account.XQuotes = standing.XQuotes
+				account.XQuotes, account.XVideoMaxSeconds = standing.XQuotes, standing.XVideoMaxSeconds
 				account.TikTokCreator = standing.TikTokCreator
 			})
 		}
@@ -816,7 +846,7 @@ func validEngagement(engagement schema.Engagement) (schema.Engagement, error) {
 	}
 	engagement.AutoRepost.Text = ""
 	engagement.AutoPlug.Text = strings.TrimSpace(engagement.AutoPlug.Text)
-	if engagement.AutoPlug.Enabled && (engagement.AutoPlug.Text == "" || xLength(engagement.AutoPlug.Text) > 280) {
+	if engagement.AutoPlug.Enabled && !fitsXPost(engagement.AutoPlug.Text, 0, nil) {
 		return engagement, invalid("The auto-plug needs text that fits in one X post.")
 	}
 	return engagement, nil
@@ -1060,16 +1090,25 @@ func cancelQueuedPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionI
 
 // cancelPosts cancels the posts still waiting to publish on these accounts.
 func cancelPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionIDs []string, reason string) ([]string, error) {
-	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
-		scheduledpost.ChannelConnectionIDIn(connectionIDs...),
+	return cancelQueued(ctx, tx, actor, scheduledpost.ChannelConnectionIDIn(connectionIDs...), reason, "")
+}
+
+// cancelQueued cancels the workspace's queued posts that match, with failureCode
+// when it is set. A cancelled post's workflow ends at its claim, which needs SCHEDULED.
+func cancelQueued(ctx context.Context, tx *ent.Tx, actor Actor, match predicate.ScheduledPost, reason, failureCode string) ([]string, error) {
+	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID), match,
 		scheduledpost.StatusIn(scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	cancelled := make([]string, 0, len(queued))
 	for _, post := range queued {
-		count, err := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
-			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED).Save(ctx)
+		update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
+			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED)
+		if failureCode != "" {
+			update.SetFailureCode(failureCode)
+		}
+		count, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1097,6 +1136,10 @@ func (c *Configuration) RemoveSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	defer tx.Rollback()
+	// Lock the set before its accounts, in the order connecting an account takes them.
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, setID); err != nil {
+		return nil, err
+	}
 	set, err := visibleSocialSet(ctx, tx.Client(), actor, setID)
 	if err != nil {
 		return nil, err
@@ -1164,6 +1207,13 @@ func dropAccountFromSetDefaults(ctx context.Context, tx *ent.Tx, connection *ent
 	return nil
 }
 
+// lockSocialSet takes a set's row lock, which connecting an account to it
+// also takes first (publishing.lockOAuthStart).
+func lockSocialSet(ctx context.Context, tx *ent.Tx, organizationID, id string) error {
+	_, err := tx.PlatformExec(ctx, `SELECT id FROM social_set WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, id, organizationID)
+	return err
+}
+
 // AssignSocialSetAccount puts an account that belongs to no set into a set.
 func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor, setID, connectionID string) (*SocialSetRecord, error) {
 	if err := c.authorizeSocialSetManage(ctx, actor); err != nil {
@@ -1174,6 +1224,9 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	defer tx.Rollback()
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, setID); err != nil {
+		return nil, err
+	}
 	set, err := visibleSocialSet(ctx, tx.Client(), actor, setID)
 	if err != nil {
 		return nil, err
@@ -1195,21 +1248,19 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 	if taken {
 		return nil, conflict("This social set already has a " + connection.Platform + " account. Remove it first.")
 	}
-	if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).SetSocialSetID(set.ID).Save(ctx); err != nil {
+	// The read was unlocked: an account a connection placed in a set since then stays there.
+	if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).Where(channelconnection.SocialSetIDIsNil(),
+		channelconnection.StatusEQ(channelconnection.StatusACTIVE)).SetSocialSetID(set.ID).Save(ctx); err != nil {
 		if ent.IsConstraintError(err) {
 			return nil, conflict("This social set already has a " + connection.Platform + " account. Remove it first.")
 		}
+		if ent.IsNotFound(err) {
+			return nil, notFound("That account is not available to add.")
+		}
 		return nil, err
 	}
-	platform := socialplatform.Canonical(connection.Platform)
-	if !oneOf(platform, set.DefaultPlatforms...) {
-		update := tx.SocialSet.UpdateOneID(set.ID).SetDefaultPlatforms(append(socialplatform.Defaults(set.DefaultPlatforms), platform)).AddVersion(1)
-		if set.PrimaryPlatform == nil {
-			update.SetPrimaryPlatform(platform)
-		}
-		if _, err := update.Save(ctx); err != nil {
-			return nil, err
-		}
+	if err := addAccountToSetDefaults(ctx, tx, connection, set); err != nil {
+		return nil, err
 	}
 	if err := appendConfigurationAudit(ctx, tx, actor, "product.social_set_account_added", "channel_connection", connection.ID,
 		map[string]any{"socialSetId": set.ID}); err != nil {
@@ -1223,6 +1274,19 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	return c.socialSetRecord(ctx, actor, saved)
+}
+
+func addAccountToSetDefaults(ctx context.Context, tx *ent.Tx, connection *ent.ChannelConnection, set *ent.SocialSet) error {
+	platform := socialplatform.Canonical(connection.Platform)
+	if oneOf(platform, set.DefaultPlatforms...) {
+		return nil
+	}
+	update := tx.SocialSet.UpdateOneID(set.ID).SetDefaultPlatforms(append(socialplatform.Defaults(set.DefaultPlatforms), platform)).AddVersion(1)
+	if set.PrimaryPlatform == nil {
+		update.SetPrimaryPlatform(platform)
+	}
+	_, err := update.Save(ctx)
+	return err
 }
 
 // DeleteSocialSet removes a set. It is refused while any of its posts is
@@ -1241,6 +1305,10 @@ func (c *Configuration) DeleteSocialSet(ctx context.Context, actor Actor, id, co
 		return nil, err
 	}
 	defer tx.Rollback()
+	// Lock the set before its accounts, in the order connecting an account takes them.
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, id); err != nil {
+		return nil, err
+	}
 	set, err := tx.SocialSet.Query().Where(socialset.ID(id), socialset.OrganizationID(actor.OrganizationID), socialset.DeletedAtIsNil()).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, notFound("Social set not found.")

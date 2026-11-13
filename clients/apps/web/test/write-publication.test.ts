@@ -1,14 +1,32 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
-import type { PlateBody } from '@/lib/write/document'
+import { z } from 'zod'
+import {
+  DRAFT_CHANNEL_LIMITS,
+  overflowAt,
+  platformCaptionLength,
+  POST_BREAK,
+  SOCIAL_MENTION,
+} from '@/lib/content-drafts/serialize'
+import {
+  type DraftChannel,
+  draftChannelSchema,
+  type PlateBody,
+  type VersionOptions,
+} from '@/lib/write/document'
 import {
   preparePublication,
   buildPublication,
+  type PublicationAccount,
   type PublicationDraft,
 } from '@/lib/write/publication'
 import { forkVersion, readVersions, withOptions } from '@/lib/write/versions'
+import type { AccountStanding } from '@/lib/write/capabilities'
 import { optionsSummary } from '@/components/write/composer/video-options'
+import { handlesFrom } from '@/components/write/composer/instagram-options'
+import { youtubeTagsLength } from '@/lib/write/capabilities'
+import type { InstagramOptions } from 'screenshot-studio-backend-sdk'
 
 const p = (text: string) => ({ children: [{ text }], type: 'p' })
 const brk = (extra: object = {}) => ({ children: [{ text: '' }], type: POST_BREAK, ...extra })
@@ -63,7 +81,7 @@ test('numbering is counted and applied for the X version only', () => {
 })
 
 test('a first comment reaches Instagram and stays off platforms without one', () => {
-  const commented = (channel: 'instagram' | 'threads') => {
+  const commented = (channel: 'instagram' | 'facebook' | 'threads') => {
     const versions = withOptions(readVersions(undefined), channel, { firstComment: ' #launch ' })
     return buildPublication(draft({ platformVersions: versions }), {
       channel,
@@ -71,6 +89,7 @@ test('a first comment reaches Instagram and stays off platforms without one', ()
     }).target.options?.firstComment
   }
   assert.equal(commented('instagram'), '#launch')
+  assert.equal(commented('facebook'), '#launch')
   assert.equal(commented('threads'), undefined)
 })
 
@@ -340,7 +359,7 @@ test('Threads polls use native single-choice text-only rules', () => {
   )
 })
 
-test('link preview removal is persisted and cannot be silently ignored by a provider', () => {
+test('link preview removal is persisted for Bluesky, the only provider that takes it', () => {
   const card = { url: 'https://example.com/story', title: 'Story', removed: true }
   let versions = withOptions(readVersions(undefined), 'bluesky', { linkPreviews: [card] })
   const value = draft({ body: [p('Read https://example.com/story')], platformVersions: versions })
@@ -349,18 +368,45 @@ test('link preview removal is persisted and cannot be silently ignored by a prov
       ?.linkPreview?.removed,
     true
   )
+  // X makes its own card; an old removal choice neither travels nor blocks scheduling.
   versions = withOptions(versions, 'x', { linkPreviews: [card] })
-  assert.ok(
-    buildPublication({ ...value, platformVersions: versions }, x).problems.some((problem) =>
-      problem.includes('preview removal')
-    )
-  )
+  const onX = buildPublication({ ...value, platformVersions: versions }, x)
+  assert.deepEqual(onX.problems, [])
+  assert.equal(onX.target.options?.linkPreview, undefined)
   const unrelated = draft({ body: [p('A different post')], platformVersions: versions })
   assert.equal(
     buildPublication(unrelated, { channel: 'bluesky', connectionId: 'cb0000000001' }).target.options
       ?.linkPreview,
     undefined
   )
+})
+
+test("X video needs the account's verified video length, as Go requires", () => {
+  const value = draft({
+    body: [p('Clip'), { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }],
+  })
+  const reconnect = "Reconnect X to verify this account's video limits."
+  const read = { maxWeightedCharacters: 280 as const }
+  const problems = (standing?: AccountStanding, body = value) =>
+    buildPublication(body, { ...x, standing }).accountProblems
+  // A read standing that reports no verified length refuses X video, as Go does.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 0 }), [reconnect])
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: 1200 }), [])
+  // Unknown is left to Go: an unread standing, an older API without the field, the preview.
+  assert.deepEqual(problems({ maxWeightedCharacters: null, xVideoMaxSeconds: null }), [])
+  assert.deepEqual(problems(read), [])
+  assert.deepEqual(problems(undefined), [])
+  // An X article refuses video for its own reason, never by asking to reconnect.
+  assert.deepEqual(
+    problems(
+      { ...read, articles: true, xVideoMaxSeconds: null },
+      draft({ ...value, kind: 'article' })
+    ),
+    []
+  )
+  // Images alone are not judged.
+  assert.deepEqual(problems({ ...read, xVideoMaxSeconds: null }, draft({ body: [p('Text')] })), [])
 })
 
 test('Mastodon quotes require a verified server and quote lookup scopes', () => {
@@ -619,6 +665,148 @@ test('video publication keeps explicit privacy and refuses missing choices', () 
   assert.ok(unavailable.problems.some((problem) => problem.includes('permissions are unavailable')))
 })
 
+test('YouTube tags, disclosure and thumbnail travel with the video, and tags count as YouTube counts them', () => {
+  assert.equal(youtubeTagsLength(['news', 'a b']), 10)
+  assert.equal(youtubeTagsLength([]), 0)
+  const youtube = {
+    title: 'Launch',
+    privacy: 'public' as const,
+    madeForKids: false,
+    tags: ['launch', 'product demo'],
+    containsSyntheticMedia: true,
+    thumbnailAssetId: 'cthumb000001',
+  }
+  const account = { channel: 'youtube' as const, connectionId: 'cy0000000001' }
+  const result = buildPublication(
+    draft({
+      body: [p('Video')],
+      platformVersions: withOptions(readVersions(undefined), 'youtube', { youtube }),
+    }),
+    account
+  )
+  assert.deepEqual(result.target.options?.youtube, youtube)
+  assert.deepEqual(result.optionProblems, [])
+  // 100 tags of four characters and 99 commas is 499; one more tag is over.
+  const tags = Array.from({ length: 101 }, (_, index) => `t${String(index).padStart(3, '0')}`)
+  const over = buildPublication(
+    draft({
+      body: [p('Video')],
+      platformVersions: withOptions(readVersions(undefined), 'youtube', {
+        youtube: { ...youtube, tags },
+      }),
+    }),
+    account
+  )
+  assert.ok(over.optionProblems.some((problem) => problem.includes('500 characters')))
+})
+
+test('Instagram settings go to Instagram only, and reel settings need one video', () => {
+  const instagram = { channel: 'instagram' as const, connectionId: 'ci0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const video = { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }
+  const build = (
+    media: PlateBody,
+    options: InstagramOptions,
+    account: PublicationAccount = instagram
+  ) =>
+    buildPublication(
+      draft({
+        body: [p('Caption'), ...media],
+        platformVersions: withOptions(readVersions(undefined), 'instagram', { instagram: options }),
+      }),
+      account
+    )
+  const reel = build([video], {
+    collaborators: ['partner'],
+    userTags: ['brand'],
+    coverAssetId: 'ccover000001',
+    shareToFeed: false,
+    trialReel: true,
+  })
+  assert.deepEqual(reel.target.options?.instagram, {
+    collaborators: ['partner'],
+    userTags: ['brand'],
+    coverAssetId: 'ccover000001',
+    shareToFeed: false,
+    trialReel: true,
+  })
+  assert.deepEqual(reel.optionProblems, [])
+  // Instagram's defaults send nothing.
+  assert.equal(
+    build([image], { shareToFeed: true, collaborators: [] }).target.options?.instagram,
+    undefined
+  )
+  assert.match(build([image], { trialReel: true }).optionProblems.join(), /for a reel/)
+  assert.match(
+    build([video, video], { userTags: ['brand'] }).optionProblems.join(),
+    /photo or a reel/
+  )
+  assert.deepEqual(build([image, video], { userTags: ['brand'] }).optionProblems, [])
+  assert.equal(
+    build(
+      [image],
+      { collaborators: ['partner'] },
+      { channel: 'threads', connectionId: 'ct0000000001' }
+    ).target.options?.instagram,
+    undefined
+  )
+})
+
+test('an Instagram story sends one image or video without text or feed settings', () => {
+  const instagram = { channel: 'instagram' as const, connectionId: 'ci0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const video = { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }
+  const build = (media: PlateBody, options: VersionOptions) =>
+    buildPublication(
+      draft({
+        body: [p('This text goes to the other platforms.'), ...media],
+        platformVersions: withOptions(readVersions(undefined), 'instagram', options),
+      }),
+      instagram
+    )
+  const story = build([image], { instagram: { placement: 'story' }, firstComment: '' })
+  assert.equal(story.target.caption, '')
+  assert.deepEqual(story.target.options?.instagram, { placement: 'story' })
+  assert.deepEqual(story.problems, [])
+  // One file only, in the story's own limits.
+  assert.match(
+    build([image, video], { instagram: { placement: 'story' } }).problems.join(),
+    /An Instagram story takes up to 1 attachment in one post/
+  )
+  assert.deepEqual(build([video], { instagram: { placement: 'story' } }).problems, [])
+  // A story needs no text, and says it needs media.
+  const imageOnly = buildPublication(
+    draft({
+      body: [image],
+      platformVersions: withOptions(readVersions(undefined), 'instagram', {
+        instagram: { placement: 'story' },
+      }),
+    }),
+    instagram
+  )
+  assert.deepEqual(imageOnly.problems, [])
+  assert.match(
+    build([], { instagram: { placement: 'story' } }).problems.join(),
+    /An Instagram story needs at least one image or video/
+  )
+  const commented = build([image], { instagram: { placement: 'story' }, firstComment: 'Link' })
+  assert.match(commented.optionProblems.join(), /A story takes no first comment/)
+  assert.equal(commented.target.options?.firstComment, undefined)
+})
+
+test('handles are typed with or without @, kept when Instagram takes them, and capped', () => {
+  assert.deepEqual(handlesFrom('@partner, maker brand', 3), {
+    handles: ['partner', 'maker', 'brand'],
+    refused: [],
+  })
+  assert.deepEqual(handlesFrom('@a @A b! c d', 2), { handles: ['a', 'c'], refused: ['b!', 'd'] })
+  // Instagram takes no dot first, last or twice in a row.
+  assert.deepEqual(handlesFrom('.x a..b x. ok.go', 3), {
+    handles: ['ok.go'],
+    refused: ['.x', 'a..b', 'x.'],
+  })
+})
+
 test('a platform chip names its options in words, and option problems open the options', () => {
   assert.equal(optionsSummary('tiktok', {}), 'Choose privacy')
   const tiktok = {
@@ -635,6 +823,10 @@ test('a platform chip names its options in words, and option problems open the o
   assert.equal(
     optionsSummary('tiktok', { tiktok: { ...tiktok, consent: true } }),
     'Only me · comments on'
+  )
+  assert.equal(
+    optionsSummary('tiktok', { tiktok: { ...tiktok, sendToApp: true } }),
+    'Draft in the TikTok app'
   )
   assert.equal(optionsSummary('youtube', {}), 'Title, privacy and audience needed')
   assert.equal(optionsSummary('x', {}), '')
@@ -654,6 +846,52 @@ test('a platform chip names its options in words, and option problems open the o
   })
   assert.ok(long.problems.length > 0)
   assert.deepEqual(long.optionProblems, [])
+})
+
+test('a TikTok app draft needs none of the settings TikTok asks for in the app', () => {
+  const tiktok = {
+    allowComments: false,
+    allowDuet: false,
+    allowStitch: false,
+    brandOrganic: false,
+    brandedContent: false,
+    consent: false,
+    madeWithAi: false,
+    privacy: '',
+    sendToApp: true,
+  } as const
+  const account = {
+    channel: 'tiktok' as const,
+    connectionId: 'ct0000000001',
+    standing: {
+      tiktokCreator: {
+        commentDisabled: false,
+        duetDisabled: false,
+        maxDurationSeconds: 60,
+        nickname: 'Creator',
+        privacyLevels: ['SELF_ONLY' as const],
+        stitchDisabled: false,
+      },
+    },
+  }
+  const sent = buildPublication(
+    draft({
+      body: [p('Finish me in TikTok')],
+      platformVersions: withOptions(readVersions(undefined), 'tiktok', { tiktok }),
+    }),
+    account
+  )
+  assert.deepEqual(sent.optionProblems, [])
+  assert.deepEqual(sent.target.options?.tiktok, tiktok)
+  // The account's permissions still decide whether the video fits.
+  const unread = buildPublication(
+    draft({
+      body: [p('Finish me in TikTok')],
+      platformVersions: withOptions(readVersions(undefined), 'tiktok', { tiktok }),
+    }),
+    { channel: 'tiktok', connectionId: 'ct0000000001' }
+  )
+  assert.ok(unread.problems.some((problem) => problem.includes('permissions are unavailable')))
 })
 
 test('rendered media stays bound to the flushed version for scheduling and publishing', async () => {
@@ -688,4 +926,128 @@ test('rendered media stays bound to the flushed version for scheduling and publi
     }),
     /changed while preparing/
   )
+})
+
+test('a pin needs its board, sends a trimmed title and link, and checks the link', () => {
+  const pinterest = { channel: 'pinterest' as const, connectionId: 'cp0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const build = (options: VersionOptions['pinterest']) =>
+    buildPublication(
+      draft({
+        body: [p('A pin description'), image],
+        platformVersions: withOptions(readVersions(undefined), 'pinterest', { pinterest: options }),
+      }),
+      pinterest
+    )
+  assert.match(build(undefined).optionProblems.join(), /Choose the Pinterest board/)
+  const pin = build({ boardId: '1001', title: ' Launch ', link: ' https://shots.example/launch ' })
+  assert.deepEqual(pin.optionProblems, [])
+  assert.deepEqual(pin.target.options?.pinterest, {
+    boardId: '1001',
+    title: 'Launch',
+    link: 'https://shots.example/launch',
+  })
+  assert.deepEqual(build({ boardId: '1001', title: '  ' }).target.options?.pinterest, {
+    boardId: '1001',
+  })
+  for (const link of [
+    'shots.example',
+    'https:shots.example',
+    'javascript:alert(1)',
+    'https://user:pass@shots.example',
+  ])
+    assert.match(build({ boardId: '1001', link }).optionProblems.join(), /web address/, link)
+  // Pinterest settings stay with Pinterest.
+  assert.equal(
+    buildPublication(
+      draft({
+        platformVersions: withOptions(readVersions(undefined), 'x', {
+          pinterest: { boardId: '1001' },
+        }),
+      }),
+      x
+    ).target.options?.pinterest,
+    undefined
+  )
+})
+
+test('a Facebook story sends one image or video without text or a first comment', () => {
+  const facebook = { channel: 'facebook' as const, connectionId: 'cf0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const build = (options: VersionOptions) =>
+    buildPublication(
+      draft({
+        body: [p('This text goes to the other platforms.'), image],
+        platformVersions: withOptions(readVersions(undefined), 'facebook', options),
+      }),
+      facebook
+    )
+  const story = build({ facebook: { placement: 'story' } })
+  assert.equal(story.target.caption, '')
+  assert.deepEqual(story.target.options?.facebook, { placement: 'story' })
+  assert.deepEqual(story.optionProblems, [])
+  assert.match(
+    build({ facebook: { placement: 'story' }, firstComment: 'Link' }).optionProblems.join(),
+    /takes no first comment/
+  )
+  // A feed post keeps its text and sends no placement.
+  const feed = build({})
+  assert.equal(feed.target.caption, 'This text goes to the other platforms.')
+  assert.equal(feed.target.options?.facebook, undefined)
+})
+
+// Go's draftPostLength reads the same cases (server/internal/product/x_length_test.go).
+// They live under server/ so that changing them runs both the Go and the web tests.
+const lengthCases = z
+  .strictObject({
+    limits: z.record(draftChannelSchema, z.number()),
+    cases: z.array(
+      z.strictObject({
+        label: z.string(),
+        text: z.string(),
+        lengths: z.record(draftChannelSchema, z.number()),
+      })
+    ),
+  })
+  .parse(
+    JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../../server/internal/product/testdata/caption-length-cases.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    )
+  )
+
+test('the counter uses the limits Go validates against', () => {
+  assert.deepEqual(lengthCases.limits, DRAFT_CHANNEL_LIMITS)
+})
+
+for (const entry of lengthCases.cases) {
+  test(`the counter counts as Go does: ${entry.label}`, () => {
+    for (const channel of draftChannelSchema.options)
+      assert.equal(platformCaptionLength(channel, entry.text), entry.lengths[channel], channel)
+  })
+}
+
+test('the over-limit mark starts where the counter passes the limit, on every channel', () => {
+  // The definition: step back one code point at a time until the text fits.
+  const reference = (channel: DraftChannel, caption: string, limit: number) => {
+    let at = caption.length
+    while (at > 0 && platformCaptionLength(channel, caption.slice(0, at)) > limit) {
+      const code = caption.charCodeAt(at - 1)
+      at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
+    }
+    return at
+  }
+  for (const { text } of lengthCases.cases)
+    for (const channel of draftChannelSchema.options)
+      for (const limit of [0, 1, 2, 5, 23, 40])
+        assert.equal(
+          overflowAt(channel, text, limit),
+          reference(channel, text, limit),
+          `${channel} ${limit} ${JSON.stringify(text)}`
+        )
 })

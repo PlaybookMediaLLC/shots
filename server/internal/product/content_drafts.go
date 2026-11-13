@@ -135,6 +135,9 @@ type ContentDraftRecord struct {
 	// PublishingPosts are the queued posts that are publishing now.
 	PublishingPosts int `json:"publishingPosts"`
 	QueuedPosts     int `json:"queuedPosts"`
+	// SentToAppPosts went to an app as drafts (a TikTok app draft), for the
+	// person to finish there; they are never published (lists only).
+	SentToAppPosts int `json:"sentToAppPosts"`
 }
 
 // ContentDraftPage is one page of a workspace's drafts in the asked order.
@@ -902,7 +905,7 @@ func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentD
 			where := []*sql.Predicate{
 				sql.ColumnsEQ(posts.C(scheduledpost.FieldContentDraftID), s.C(contentdraft.FieldID)),
 				sql.EQ(posts.C(scheduledpost.FieldOrganizationID), org),
-				sql.In(posts.C(scheduledpost.FieldStatus), "PUBLISHED", "SCHEDULED", "PROCESSING", "FAILED", "UNKNOWN_DELIVERY"),
+				sql.In(posts.C(scheduledpost.FieldStatus), "PUBLISHED", "SENT_TO_APP", "SCHEDULED", "PROCESSING", "FAILED", "UNKNOWN_DELIVERY"),
 			}
 			if criteria && query.ConnectionID != "" {
 				where = append(where, sql.EQ(posts.C(scheduledpost.FieldChannelConnectionID), query.ConnectionID))
@@ -959,9 +962,10 @@ func (c *Configuration) draftListFilters(ctx context.Context, actor Actor, query
 	switch query.View {
 	case "":
 	case "drafts":
-		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), contentdraft.Not(draftPostExists("PUBLISHED")), contentdraft.Not(draftNeedsAttention()))
+		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), contentdraft.Not(draftPostExists("PUBLISHED", "SENT_TO_APP")), contentdraft.Not(draftNeedsAttention()))
 	case "posted":
-		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), draftPostExists("PUBLISHED"))
+		// A post sent to an app left Shots too; the person finishes it there.
+		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), draftPostExists("PUBLISHED", "SENT_TO_APP"))
 	case "failed":
 		filters = append(filters, contentdraft.StatusNEQ(contentdraft.StatusArchived), draftNeedsAttention())
 	case "archived":
@@ -1092,8 +1096,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		return nil, err
 	}
 	type summary struct {
-		attention, check, published, publishing, queued int
-		next, attentionAt, lastPublished                *time.Time
+		attention, check, published, publishing, queued, sentToApp int
+		next, attentionAt, lastPublished                           *time.Time
 	}
 	byDraft := map[string]*summary{}
 	// A failure needs attention only while it is its destination's newest
@@ -1112,6 +1116,8 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 			if post.PublishedAt != nil && (item.lastPublished == nil || post.PublishedAt.After(*item.lastPublished)) {
 				item.lastPublished = post.PublishedAt
 			}
+		case scheduledpost.StatusSENT_TO_APP:
+			item.sentToApp++
 		case scheduledpost.StatusPROCESSING:
 			item.queued++
 			item.publishing++
@@ -1143,7 +1149,7 @@ func (c *Configuration) draftPostSummaries(ctx context.Context, actor Actor, row
 		record.SourceVoiceRemoved = row.SourceVoiceRevisionID != nil && removed[*row.SourceVoiceRevisionID]
 		if item := byDraft[row.ID]; item != nil {
 			record.AttentionPosts, record.CheckPosts, record.PublishedPosts, record.QueuedPosts, record.NextPostAt = item.attention, item.check, item.published, item.queued, item.next
-			record.PublishingPosts = item.publishing
+			record.PublishingPosts, record.SentToAppPosts = item.publishing, item.sentToApp
 			record.AttentionAt, record.LastPublishedAt = item.attentionAt, item.lastPublished
 		}
 		return record
@@ -1515,7 +1521,7 @@ func (c *Configuration) DeleteContentDraftAtVersion(ctx context.Context, actor A
 
 // liveOrFailedStatuses are the post statuses a draft's state reads: a
 // cancelled post (or one never queued) is not one of its outcomes.
-var liveOrFailedStatuses = []scheduledpost.Status{scheduledpost.StatusPUBLISHED, scheduledpost.StatusSCHEDULED,
+var liveOrFailedStatuses = []scheduledpost.Status{scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP, scheduledpost.StatusSCHEDULED,
 	scheduledpost.StatusPROCESSING, scheduledpost.StatusFAILED, scheduledpost.StatusUNKNOWN_DELIVERY}
 
 // replacedFailures names the failed posts that a newer post to the same

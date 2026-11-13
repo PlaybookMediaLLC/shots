@@ -82,6 +82,27 @@ test('LinkedIn uses the same session-bound callback exchange', async () => {
   assert.equal(result.status, 303)
 })
 
+for (const provider of ['facebook', 'gmb'] as const)
+  test(`a ${provider} page or location is chosen after sign-in, as a LinkedIn page is`, async () => {
+    process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
+    const url = `http://localhost/integrations/social/${provider}?code=code1&state=state1`
+    const choices: string[] = []
+    const picker = await completeSocialOAuth(new Request(url), provider, {
+      exchange: async () => ({ id: 'go-page', pages: [{ id: 'p1', pageId: 'p1', name: 'Acme' }] }),
+      onPageChoice: async (_state, id) => {
+        choices.push(id)
+      },
+    })
+    assert.equal(picker.status, 200)
+    assert.match(await picker.text(), /Acme/)
+    assert.deepEqual(choices, ['go-page'])
+    // A choice made in an earlier attempt completes without asking again.
+    const completed = await completeSocialOAuth(new Request(url), provider, {
+      exchange: async () => ({ completed: true, id: 'go-page' }),
+    })
+    assert.equal(completed.status, 303)
+  })
+
 test('Facebook Login requires a linked Instagram account selection', async () => {
   process.env.BETTER_AUTH_SECRET = 'test-picker-secret-at-least-thirty-two-characters'
   const url = 'http://localhost/integrations/social/instagram?code=code1&state=state1'
@@ -146,6 +167,8 @@ test('invalid OAuth callbacks make no backend request', async () => {
   for (const [url, provider] of [
     ['http://localhost/integrations/social/x?oauth_token=a&oauth_verifier=b&state=c', 'x'],
     ['http://localhost/integrations/social/x?denied=a', 'x'],
+    ['http://localhost/integrations/social/linkedin?error=access_denied&state=s', 'linkedin'],
+    ['http://localhost/integrations/social/threads?error=access_denied&code=c&state=s', 'threads'],
     ['http://localhost/integrations/social/instagram?code=c', 'instagram'],
     ['http://localhost/integrations/social/linkedin?code=c', 'linkedin'],
     ['http://localhost/integrations/social/unknown?code=c&state=s', 'unknown'],
@@ -157,6 +180,8 @@ test('invalid OAuth callbacks make no backend request', async () => {
       },
     })
     assert.ok(response.status >= 400)
+    if (url.includes('denied') || url.includes('error='))
+      assert.match(await response.text(), /Nothing was changed/)
   }
   assert.equal(exchanges, 0)
 })

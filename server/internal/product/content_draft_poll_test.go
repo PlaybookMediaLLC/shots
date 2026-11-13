@@ -36,12 +36,17 @@ func TestPollAndOptionFieldsCannotSilentlyDisappear(t *testing.T) {
 		t.Fatal("orphan document title accepted")
 	}
 	comment := postoptions.PublishOptions{FirstComment: "#launch"}
-	for _, channel := range []string{"linkedin", "instagram"} {
+	for _, channel := range []string{"linkedin", "instagram", "facebook"} {
 		if err := checkPostOptions(channel, &comment, true); err != nil {
 			t.Fatalf("%s first comment refused: %v", channel, err)
 		}
 	}
-	for _, channel := range []string{"x", "threads", "tiktok", "youtube", "bluesky", "mastodon"} {
+	board := postoptions.PinterestOptions{BoardID: "1001"}
+	for _, channel := range []string{"x", "threads", "tiktok", "youtube", "bluesky", "mastodon", "pinterest"} {
+		comment := comment
+		if channel == "pinterest" {
+			comment.Pinterest = &board
+		}
 		if checkPostOptions(channel, &comment, true) == nil {
 			t.Fatalf("%s first comment accepted", channel)
 		}

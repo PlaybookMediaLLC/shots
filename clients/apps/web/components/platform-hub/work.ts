@@ -18,6 +18,7 @@ const draftItem = z.object({
   checkPosts: z.number().default(0),
   publishedPosts: z.number().default(0),
   queuedPosts: z.number().default(0),
+  sentToAppPosts: z.number().default(0),
 })
 /** One page of the content draft list, as search reads it. */
 export const draftPage = z.object({ items: z.array(draftItem), pinned: z.array(draftItem) })

@@ -54,6 +54,8 @@ var (
 	openWorld   = sdk.ToolAnnotations{ReadOnlyHint: true, DestructiveHint: boolPtr(false), OpenWorldHint: boolPtr(true)}
 	// publishes marks a tool whose effect reaches a public social channel.
 	publishes = sdk.ToolAnnotations{DestructiveHint: boolPtr(false), OpenWorldHint: boolPtr(true)}
+	// unpublishes marks a tool that removes a post from a public social channel.
+	unpublishes = sdk.ToolAnnotations{DestructiveHint: boolPtr(true), IdempotentHint: true, OpenWorldHint: boolPtr(true)}
 )
 
 // toolTable is the tool surface of RFC 026. Each tool is named after the
@@ -99,6 +101,7 @@ var toolTable = []struct {
 	{"updateContentDraft", write, 0, updateContentDraft, ""},
 	{"deleteContentDraft", destructive, 0, deleteContentDraft, ""},
 	{"listContentDraftPosts", readOnly, 0, listContentDraftPosts, ""},
+	{"deleteContentDraftPost", unpublishes, 0, deleteContentDraftPost, ""},
 	{"planContentDraft", write, 0, planContentDraft, ""},
 	{"duplicateContentDraft", write, 0, duplicateContentDraft, ""},
 	{"updateContentDraftProperties", write, 0, updateContentDraftProperties, ""},
@@ -224,6 +227,8 @@ func failureFor(err error) *failure {
 		return failWith(http.StatusBadRequest, message(err))
 	case errors.Is(err, product.ErrRateLimited), errors.Is(err, product.ErrStorageQuota), errors.Is(err, product.ErrQuotaExceeded):
 		return failWith(http.StatusTooManyRequests, err.Error())
+	case errors.Is(err, product.ErrPostDeletionNotStarted):
+		return failWith(http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, product.ErrStorageUnavailable), errors.Is(err, context.DeadlineExceeded):
 		return failWith(http.StatusServiceUnavailable, "A required dependency is unavailable.")
 	default:
@@ -352,6 +357,7 @@ func (s *Server) execute(ctx context.Context, call principal, tool *shotsTool, r
 		}
 	}
 	actor := call.key.Actor(call.requestID)
+	actor.Source = "mcp"
 	if err := s.authorize(ctx, call, actor, tool.operation); err != nil {
 		return refuse(err)
 	}

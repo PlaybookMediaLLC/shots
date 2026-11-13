@@ -7,8 +7,11 @@ import { ArrowsLeftRightIcon } from '@phosphor-icons/react/dist/ssr/ArrowsLeftRi
 import { AsteriskIcon } from '@phosphor-icons/react/dist/ssr/Asterisk'
 import { AtIcon } from '@phosphor-icons/react/dist/ssr/At'
 import { ChartBarHorizontalIcon } from '@phosphor-icons/react/dist/ssr/ChartBarHorizontal'
+import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/ssr/ClockCounterClockwise'
 import { CopyIcon } from '@phosphor-icons/react/dist/ssr/Copy'
 import { GifIcon } from '@phosphor-icons/react/dist/ssr/Gif'
+import { GoogleDriveLogoIcon } from '@phosphor-icons/react/dist/ssr/GoogleDriveLogo'
+import { VideoCameraIcon } from '@phosphor-icons/react/dist/ssr/VideoCamera'
 import { HashIcon } from '@phosphor-icons/react/dist/ssr/Hash'
 import { ImageIcon } from '@phosphor-icons/react/dist/ssr/Image'
 import { ImagesIcon } from '@phosphor-icons/react/dist/ssr/Images'
@@ -34,11 +37,13 @@ import {
   deletePost,
   duplicatePost,
   insertPostBreak,
+  insertSnippet,
   postRanges,
   splitPostAtCaret,
 } from '@/components/drafts/thread'
 import { CAPABILITIES, pollRules } from '@/lib/write/capabilities'
 import type { DraftChannel } from '@/lib/write/document'
+import type { GoogleDriveConfig } from '@/lib/write/google-drive'
 import { DESTINATION_MEDIA } from '@/lib/write/media-rules'
 import { COMMAND_SHORTCUTS, type Shortcut } from '../shortcuts'
 import type { RefineApi } from './refine'
@@ -57,13 +62,16 @@ export type CommandGroup = 'AI' | 'Post' | 'Insert' | 'Snippets'
 /** The Write tools a command can open. */
 export type ComposerTool =
   | 'alt'
+  | 'drive'
   | 'emoji'
   | 'gif'
   | 'library'
   | 'link-image'
   | 'media'
   | 'mention'
+  | 'senja'
   | 'snippets'
+  | 'captions'
 
 /** A thread finisher, offered as a snippet. */
 export type Snippet = { id: string; name: string; text: string }
@@ -79,6 +87,10 @@ export type CommandContext = {
   ai: RefineApi | null
   /** Whether GIF search is available here. */
   giphy: boolean
+  /** Google Picker's keys, or null while Drive import is not set up. */
+  drive: GoogleDriveConfig | null
+  /** Whether the workspace saved its Senja API key. */
+  senja: boolean
   snippets: readonly Snippet[]
   addMedia: () => void
   openTool: (tool: ComposerTool) => void
@@ -232,6 +244,24 @@ export function commandsFor(context: CommandContext): Command[] {
       label: 'From Library',
       run: () => context.openTool('library'),
     },
+    {
+      aliases: ['drive', 'google'],
+      badge: context.drive ? undefined : 'Not set up',
+      group: 'Insert',
+      icon: GoogleDriveLogoIcon,
+      id: 'insert-drive',
+      label: 'From Google Drive',
+      run: () => context.openTool('drive'),
+    },
+    {
+      aliases: ['senja', 'testimonial'],
+      badge: context.senja ? undefined : 'Not set up',
+      group: 'Insert',
+      icon: VideoCameraIcon,
+      id: 'insert-senja',
+      label: 'From Senja',
+      run: () => context.openTool('senja'),
+    },
     context.giphy && {
       aliases: ['gif', 'giphy'],
       group: 'Insert',
@@ -348,9 +378,18 @@ export function commandsFor(context: CommandContext): Command[] {
         icon: StackIcon,
         id: `snippet-${snippet.id}`,
         label: snippet.name,
-        run: () => editor.tf.insertText(snippet.text),
+        run: () => insertSnippet(editor, snippet.text),
       })
     ),
+    {
+      aliases: ['caption', 'previous', 'reuse', 'history'],
+      group: 'Snippets',
+      hint: 'Search the text of this workspace’s drafts',
+      icon: ClockCounterClockwiseIcon,
+      id: 'past-captions',
+      label: 'Past captions…',
+      run: () => context.openTool('captions'),
+    },
     {
       aliases: ['snippet', 'cta', 'template', 'signature', 'finisher'],
       group: 'Snippets',

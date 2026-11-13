@@ -9,14 +9,21 @@ import type { PillTone } from '@/components/platform-ui'
 
 /** A post's stored status. */
 export type ScheduledPostStatus =
-  'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED' | 'UNKNOWN_DELIVERY'
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'PROCESSING'
+  | 'PUBLISHED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'UNKNOWN_DELIVERY'
+  | 'SENT_TO_APP'
 
 /**
  * The status filter's groups, which keep the names saved before the finer
  * states: overdue and publishing posts are scheduled; one that needs a check
  * is grouped with failures, as it was.
  */
-export const STATUS_GROUPS = ['Planned', 'Scheduled', 'Published', 'Failed'] as const
+export const STATUS_GROUPS = ['Planned', 'Scheduled', 'Published', 'Sent to app', 'Failed'] as const
 
 /** The filter group a card state belongs to. */
 export function statusGroup(state: string): string {
@@ -25,9 +32,20 @@ export function statusGroup(state: string): string {
   return state
 }
 
-/** What a person reads for one destination. */
+/**
+ * What a person reads for one destination. "Sent to app" went to the
+ * network's app as a draft (a TikTok app draft): the person finishes and posts
+ * it there, so it is never published from Shots.
+ */
 export type PostState =
-  'Scheduled' | 'Overdue' | 'Publishing' | 'Published' | 'Failed' | 'Needs check' | 'Cancelled'
+  | 'Scheduled'
+  | 'Overdue'
+  | 'Publishing'
+  | 'Published'
+  | 'Sent to app'
+  | 'Failed'
+  | 'Needs check'
+  | 'Cancelled'
 
 /**
  * A queued post this long past its time is overdue: the dispatcher starts
@@ -50,6 +68,8 @@ export function postState(
       return 'Publishing'
     case 'PUBLISHED':
       return 'Published'
+    case 'SENT_TO_APP':
+      return 'Sent to app'
     case 'FAILED':
       return 'Failed'
     case 'UNKNOWN_DELIVERY':
@@ -72,6 +92,7 @@ export const POST_STATE_TONE: Record<PostState, PillTone> = {
   Published: 'green',
   Publishing: 'blue',
   Scheduled: 'blue',
+  'Sent to app': 'purple',
 }
 
 /** Which state a draft shows first: the one that needs a person soonest. */
@@ -81,6 +102,8 @@ const ATTENTION: PostState[] = [
   'Overdue',
   'Publishing',
   'Scheduled',
+  // Ahead of what went live: the person still finishes it in the app.
+  'Sent to app',
   'Published',
 ]
 
@@ -160,13 +183,15 @@ export function listedAttention(counts: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
+  sentToAppPosts: number
 }): { state: PostState; count: number; total: number } | null {
   if (counts.attentionPosts === 0) return null
   const check = counts.checkPosts > 0
   return {
     count: check ? counts.checkPosts : counts.attentionPosts,
     state: check ? 'Needs check' : 'Failed',
-    total: counts.attentionPosts + counts.queuedPosts + counts.publishedPosts,
+    total:
+      counts.attentionPosts + counts.queuedPosts + counts.publishedPosts + counts.sentToAppPosts,
   }
 }
 
@@ -176,12 +201,15 @@ export function listedStatus(draft: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
+  sentToAppPosts: number
   status: string
 }): string {
   const attention = listedAttention(draft)
   if (attention) return attention.state
   if (draft.status === 'archived') return 'Archived'
   if (draft.queuedPosts > 0) return 'Scheduled'
+  // Posting it in the app is still to do, as in draftPostsState.
+  if (draft.sentToAppPosts > 0) return 'Sent to app'
   return draft.publishedPosts > 0 ? 'Published' : 'Draft'
 }
 
@@ -226,6 +254,11 @@ const POST_FAILURES: Record<string, { action: PostFailureAction | null; reason: 
     action: 'reconnect',
     reason:
       'The account was disconnected or removed, so it was not sent. Reconnect it, then schedule again.',
+  },
+  SCHEDULER_UNAUTHORIZED: {
+    action: 'reschedule',
+    reason:
+      'The person who scheduled it can no longer publish here, so it was not sent. Someone who can publish should schedule it again.',
   },
   WORKSPACE_INACTIVE: {
     action: null,

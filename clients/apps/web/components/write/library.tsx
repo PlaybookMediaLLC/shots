@@ -1029,6 +1029,14 @@ function RowStatus({ draft }: { draft: LibraryDraft }) {
       </span>
     )
   }
+  // Sent to the network's app as a draft: the person finishes it there.
+  if (draft.sentToAppPosts > 0)
+    parts.push(
+      <span className="text-violet-700 dark:text-violet-300" key="app">
+        Sent to the app to finish there
+        {draft.sentToAppPosts > 1 ? ` · ${draft.sentToAppPosts} accounts` : ''}
+      </span>
+    )
   if (draft.publishedPosts > 0)
     parts.push(
       <span key="live">

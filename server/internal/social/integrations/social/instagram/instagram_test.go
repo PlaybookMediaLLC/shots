@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
@@ -151,6 +152,101 @@ func TestSingleReelQuery(t *testing.T) {
 	}
 	if !strings.Contains(string(res[0].PendingData), `"postType":"single"`) {
 		t.Fatalf("%s", res[0].PendingData)
+	}
+}
+
+func TestReelTagsGridAndCover(t *testing.T) {
+	var query string
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+		query = r.URL.RawQuery
+		w.Write([]byte(`{"id":"c1"}`))
+	})
+	p := setup(t, mux)
+	_, err := p.PostPending(context.Background(), "ig1", "page", []integrations.PostDetails{{
+		ID: "post", Message: "a",
+		Settings: json.RawMessage(`{"post_type":"post","user_tags":["brand"],"share_to_feed":false}`),
+		Media:    []integrations.MediaContent{{Path: "https://cdn/v.mp4", Thumbnail: "https://cdn/cover.jpg"}},
+	}}, &ent.Integration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A reel's tags carry no position, and the cover replaces thumb_offset.
+	want := "video_url=https%3A%2F%2Fcdn%2Fv.mp4&media_type=REELS&cover_url=https%3A%2F%2Fcdn%2Fcover.jpg" +
+		"&user_tags=%5B%7B%22username%22%3A%22brand%22%7D%5D&share_to_feed=false&access_token=page&caption=a"
+	if query != want {
+		t.Fatalf("query\n got %s\nwant %s", query, want)
+	}
+}
+
+// A story is one container of media_type STORIES, with no caption and none
+// of a feed post's settings, whatever the settings ask.
+func TestStoryTakesNoCaptionOrFeedSettings(t *testing.T) {
+	for _, media := range []integrations.MediaContent{{Path: "https://cdn/s.jpg"}, {Path: "https://cdn/s.mp4", Type: "video", Thumbnail: "https://cdn/cover.jpg"}} {
+		var queries []string
+		mux := http.NewServeMux()
+		mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+			queries = append(queries, r.URL.RawQuery)
+			w.Write([]byte(`{"id":"c1"}`))
+		})
+		p := setup(t, mux)
+		res, err := p.PostPending(context.Background(), "ig1", "page", []integrations.PostDetails{{
+			ID: "post", Message: "not on a story",
+			Settings: json.RawMessage(`{"post_type":"story","user_tags":["brand"],"share_to_feed":false,"collaborators":[{"label":"partner"}]}`),
+			Media:    []integrations.MediaContent{media},
+		}}, &ent.Integration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(queries) != 1 || !strings.Contains(queries[0], "media_type=STORIES") {
+			t.Fatalf("story request: %v", queries)
+		}
+		for _, absent := range []string{"caption", "user_tags", "share_to_feed", "collaborators", "cover_url"} {
+			if strings.Contains(queries[0], absent) {
+				t.Fatalf("a story sent %s: %s", absent, queries[0])
+			}
+		}
+		if !strings.Contains(string(res[0].PendingData), `"postType":"single"`) {
+			t.Fatalf("pending: %s", res[0].PendingData)
+		}
+	}
+}
+
+func TestCarouselTagsTheFirstPhoto(t *testing.T) {
+	var queries []string
+	var mu sync.Mutex
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		queries = append(queries, r.URL.RawQuery)
+		mu.Unlock()
+		w.Write([]byte(`{"id":"c1"}`))
+	})
+	p := setup(t, mux)
+	_, err := p.PostPending(context.Background(), "ig1", "page", []integrations.PostDetails{{
+		ID: "post", Message: "a",
+		Settings: json.RawMessage(`{"post_type":"post","user_tags":["brand","maker"],"share_to_feed":false}`),
+		Media:    []integrations.MediaContent{{Path: "https://cdn/v.mp4", Type: "video"}, {Path: "https://cdn/p.jpg"}, {Path: "https://cdn/q.jpg"}},
+	}}, &ent.Integration{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tagged := 0
+	for _, query := range queries {
+		if strings.Contains(query, "share_to_feed") {
+			t.Fatalf("share_to_feed is for a reel only: %s", query)
+		}
+		if strings.Contains(query, "user_tags") {
+			tagged++
+			// Photos need a position for each tag.
+			if !strings.Contains(query, "image_url=https%3A%2F%2Fcdn%2Fp.jpg") ||
+				!strings.Contains(query, "user_tags=%5B%7B%22username%22%3A%22brand%22%2C%22x%22%3A0.1%2C%22y%22%3A0.125%7D%2C%7B%22username%22%3A%22maker%22%2C%22x%22%3A0.3%2C%22y%22%3A0.125%7D%5D") {
+				t.Fatalf("tags on the wrong item or without positions: %s", query)
+			}
+		}
+	}
+	if tagged != 1 {
+		t.Fatalf("tags sent on %d items, want the first photo only", tagged)
 	}
 }
 

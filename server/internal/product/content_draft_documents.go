@@ -36,7 +36,7 @@ var (
 	linkedInSharePath = regexp.MustCompile(`^/posts/[A-Za-z0-9_-]+-activity-([0-9]{1,30})(?:-[A-Za-z0-9_-]+)?/?$`)
 	// The kinds of draft and the channels each can be written for.
 	draftKindChannels = map[string][]string{
-		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "tiktok", "youtube"},
+		"standard": {"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "tiktok", "youtube", "facebook", "pinterest", "gmb"},
 		"reply":    {"x"},
 		"quote":    {"x", "linkedin", "bluesky", "mastodon"},
 		// A repurposed draft is a new post made from a published one.
@@ -228,6 +228,15 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	if err := postoptions.ValidateVideoOptions(channel, clean.YouTube, clean.TikTok, false); err != nil {
 		return nil, invalid(err.Error())
 	}
+	if err := postoptions.ValidateInstagramOptions(channel, clean.Instagram); err != nil {
+		return nil, invalid(err.Error())
+	}
+	if err := postoptions.ValidatePinterestOptions(channel, clean.Pinterest, false); err != nil {
+		return nil, invalid(err.Error())
+	}
+	if err := postoptions.ValidateFacebookOptions(channel, clean.Facebook); err != nil {
+		return nil, invalid(err.Error())
+	}
 	if len(clean.LinkPreviews) > 25 {
 		return nil, invalid("A draft can store at most 25 link previews.")
 	}
@@ -274,8 +283,8 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 	}
 	clean.FirstComment = strings.TrimSpace(clean.FirstComment)
 	if clean.FirstComment != "" {
-		if channel != "linkedin" && channel != "instagram" {
-			return nil, invalid("First comments are for LinkedIn and Instagram posts.")
+		if !firstCommentChannels[channel] {
+			return nil, invalid("First comments are for LinkedIn, Instagram and Facebook posts.")
 		}
 		if utf8.RuneCountInString(clean.FirstComment) > firstCommentLimit {
 			return nil, invalid(fmt.Sprintf("Keep the first comment under %d characters.", firstCommentLimit))
@@ -290,7 +299,7 @@ func versionOptions(channel string, options *draftdoc.VersionOptions) (*draftdoc
 		}
 	}
 	if clean.Automation != nil {
-		if err := checkDraftExtras(channel, ContentDraftScheduleTarget{AutoActions: clean.Automation}); err != nil {
+		if err := checkDraftExtras(channel, ContentDraftScheduleTarget{AutoActions: clean.Automation}, nil); err != nil {
 			return nil, err
 		}
 	}
@@ -304,6 +313,11 @@ func versionDocumentAssets(doc draftdoc.PlatformVersions) []string {
 	for _, version := range doc.Versions {
 		if version.Options != nil && version.Options.Document != nil {
 			ids = append(ids, version.Options.Document.AssetID)
+		}
+		if version.Options != nil {
+			if id := postoptions.CoverAsset(version.Options.YouTube, version.Options.Instagram); id != "" {
+				ids = append(ids, id)
+			}
 		}
 	}
 	return ids

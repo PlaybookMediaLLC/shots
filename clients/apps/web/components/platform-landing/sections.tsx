@@ -595,6 +595,23 @@ export function SecuritySection() {
           </li>
         ))}
       </ul>
+      <div className="mt-12 max-w-3xl">
+        <h3 className="text-lg text-white">Google connections, with your permission</h3>
+        <p className={cn('mt-3 text-base leading-relaxed', MUTED)}>
+          When enabled, Shots lets you connect YouTube to publish videos and view performance,
+          connect Google Business Profile to publish posts to your business locations and read their
+          performance, or import images and videos you select from Google Drive. Google asks for
+          your permission before you connect or import. Drive access is limited to the files you
+          select; imported copies are saved in your Shots workspace. You can revoke access in your
+          Google Account at any time.
+        </p>
+        <Link
+          className="mt-4 inline-block text-sm text-white underline underline-offset-4"
+          href="/privacy-policy#google-user-data"
+        >
+          How Shots uses, stores, shares, and deletes Google data
+        </Link>
+      </div>
     </Section>
   )
 }

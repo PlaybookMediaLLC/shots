@@ -1,3 +1,4 @@
+import twitterText from 'twitter-text'
 import { z } from 'zod'
 import { draftChannelSchema, type Numbering } from '@/lib/write/document'
 import { numberCaptions } from '@/lib/write/numbering'
@@ -89,6 +90,9 @@ export const DRAFT_CHANNEL_LIMITS: Record<DraftChannel, number> = {
   mastodon: 500,
   threads: 500,
   x: 280,
+  facebook: 63_206,
+  pinterest: 500,
+  gmb: 1500,
 }
 
 /** The block that starts the next post of a thread. */
@@ -130,6 +134,8 @@ export type SerializeOptions = {
   numbering?: Numbering
   /** The asset LinkedIn sends as the post's document; its file block is not an attachment. */
   documentAssetId?: string
+  /** A story: its media follow the story rules, and it needs no text. */
+  story?: boolean
 }
 
 /** A caption for one channel, with its limit and what it lost. */
@@ -172,6 +178,9 @@ const CONNECTION_CHANNELS: Record<string, DraftChannel> = {
   threads: 'threads',
   x: 'x',
   twitter: 'x',
+  facebook: 'facebook',
+  pinterest: 'pinterest',
+  gmb: 'gmb',
 }
 
 /** The draft channel a connection platform publishes to, or null. */
@@ -544,13 +553,107 @@ export function captionLength(caption: string): number {
   return caption.length
 }
 
-const blueskySegments = new Intl.Segmenter('en', { granularity: 'grapheme' })
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
-/** A caption's length as the platform counts it: weighted on X, graphemes on Bluesky. */
+/**
+ * Mastodon's Account::MENTION_RE (v4.7): `@user`, then an optional `@domain`.
+ * Ruby's [[:word:]] is an alphabetic character, a mark, a digit or a connector.
+ */
+const mastodonMention =
+  /(?<![=/\p{Alphabetic}\p{M}\p{Nd}\p{Pc}])@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)(?:@([\p{Alphabetic}\p{M}\p{Nd}\p{Pc}]+(?:[.-]+[\p{Alphabetic}\p{M}\p{Nd}\p{Pc}]+)*))?/giu
+
+/**
+ * The text Mastodon's StatusLengthValidator counts: each link with a protocol
+ * becomes 23 characters and each mention drops its domain.
+ */
+function mastodonCountable(caption: string): string {
+  // shortcut: stock twitter-text 3.1.0 finds the links; Mastodon's own regex also takes dat://, gemini:// and other protocols, any non-space path character and Unicode queries, and stops a path before a trailing '='. Port config/initializers/twitter_regex.rb on both sides if those links matter.
+  // Only a link with a protocol counts, and twitter-text's scan is slow on long CJK runs.
+  const links = caption.includes('://')
+    ? twitterText
+        .extractUrlsWithIndices(caption, { extractUrlsWithoutProtocol: false })
+        .map(({ indices: [start, end] }) => ({ start, end, text: 'x'.repeat(23) }))
+    : []
+  const mentions = [...caption.matchAll(mastodonMention)]
+    .map((match) => ({
+      start: match.index,
+      end: match.index + match[0].length,
+      text: `@${match[1]}`,
+      domain: match[2] ?? '',
+    }))
+    .filter(
+      ({ end, domain }) =>
+        // An at sign, a Latin accent or :// right after means it is not a mention.
+        !twitterText.regexen.endMentionMatch.test(caption.slice(end, end + 3)) &&
+        [...domain].length <= 253
+    )
+  let [countable, at] = ['', 0]
+  for (const entity of [...links, ...mentions].sort((a, b) => a.start - b.start)) {
+    if (entity.start < at) continue // overlaps the entity before, as remove_overlapping_entities drops it
+    countable += caption.slice(at, entity.start) + entity.text
+    at = entity.end
+  }
+  return countable + caption.slice(at)
+}
+
+/**
+ * A caption's length as the platform counts it: X's weighted count of the
+ * trimmed text (links are 23), Mastodon's (links with a protocol are 23,
+ * mentions drop their domain, then grapheme clusters), grapheme clusters on
+ * Bluesky, and UTF-16 units elsewhere. Go's `draftPostLength` is the same
+ * rule; both are tested against
+ * `server/internal/product/testdata/caption-length-cases.json`.
+ */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
-  if (channel === 'x') return xLength(caption)
-  if (channel === 'bluesky') return Array.from(blueskySegments.segment(caption)).length
+  // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption starts or ends with one.
+  if (channel === 'x') return xLength(caption.trim())
+  if (channel === 'bluesky' || channel === 'mastodon') {
+    const text = channel === 'mastodon' ? mastodonCountable(caption) : caption
+    // Each printable ASCII character, tab and line feed is a grapheme: skip the segmenter.
+    return /^[ -~\t\n]*$/.test(text) ? text.length : Array.from(graphemes.segment(text)).length
+  }
   return captionLength(caption)
+}
+
+/** Where a caption passes a platform's limit, counted as the platform counts it. */
+export function overflowAt(channel: DraftChannel, caption: string, limit: number): number {
+  const fits = (at: number) => platformCaptionLength(channel, caption.slice(0, at)) <= limit
+  if (channel !== 'x') {
+    // Units and graphemes only grow as a prefix grows by whole code points, so
+    // halve the range. X's link weighting can make a longer prefix count less.
+    // So can Mastodon's links and mentions, but only in two kinds of span: from
+    // the 'https' before a '://' to the end of its word, and from a mention's
+    // '@' to the character after it, which can turn it back into text. Halve
+    // the cuts outside those spans, then step back through the one span where
+    // the count passes the limit.
+    // shortcut: a long unspaced span (CJK text right after a link) steps back one code point at a time, like X; find tighter safe cuts if it gets slow.
+    const risky = new Uint8Array(caption.length) // the whole caption is always a cut
+    if (channel === 'mastodon') {
+      for (const link of caption.matchAll(/\S{0,5}:\/\/\S*/g))
+        risky.fill(1, link.index + 1, link.index + link[0].length)
+      for (const mention of caption.matchAll(mastodonMention))
+        risky.fill(1, mention.index + 1, mention.index + mention[0].length + 1)
+    }
+    const ends = [0]
+    for (const character of caption) ends.push(ends[ends.length - 1] + character.length)
+    const cuts = ends.filter((end) => !risky[end])
+    let [low, high] = [0, cuts.length - 1]
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2)
+      if (fits(cuts[middle])) low = middle
+      else high = middle - 1
+    }
+    if (low === cuts.length - 1) return cuts[low]
+    for (let index = ends.indexOf(cuts[low + 1]) - 1; ends[index] > cuts[low]; index--)
+      if (fits(ends[index])) return ends[index]
+    return cuts[low]
+  }
+  let at = caption.length
+  while (at > 0 && !fits(at)) {
+    const code = caption.charCodeAt(at - 1)
+    at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
+  }
+  return at
 }
 
 /**
@@ -660,7 +763,10 @@ export function serializeDraft(
     errors.push(
       'An attachment has invalid photo-tag metadata. Remove or replace its tags before scheduling.'
     )
-  if (posts.length === 0 || posts.every((post) => !post.caption && post.images === 0)) {
+  if (
+    !options.story &&
+    (posts.length === 0 || posts.every((post) => !post.caption && post.images === 0))
+  ) {
     errors.push('Write something to post.')
   }
   posts.forEach((post, index) => {
@@ -687,9 +793,11 @@ export function serializeDraft(
         media.mimeType ??
         (media.kind === 'gif' ? 'image/gif' : media.kind === 'video' ? 'video/*' : 'image/*'),
     }))
-    for (const problem of mediaProblems(channel, facts))
+    for (const problem of mediaProblems(channel, facts, options.story ? 'story' : undefined))
       errors.push(posts.length > 1 ? `Post ${index + 1}: ${problem}` : problem)
   })
+  // An empty story still says what it needs, as Go does.
+  if (options.story && posts.length === 0) errors.push(...mediaProblems(channel, [], 'story'))
   if (context.unpublishable > 0) {
     errors.push(
       `${CHANNEL_NAMES[channel]} can't post an uploaded file or audio as an attachment. Remove it from the post; a PDF goes to LinkedIn through the document option.`
@@ -722,6 +830,9 @@ const CHANNEL_NAMES: Record<DraftChannel, string> = {
   mastodon: 'Mastodon',
   threads: 'Threads',
   x: 'X',
+  facebook: 'Facebook',
+  pinterest: 'Pinterest',
+  gmb: 'Google Business',
 }
 
 /** Top-level blocks grouped into posts at each post break. */

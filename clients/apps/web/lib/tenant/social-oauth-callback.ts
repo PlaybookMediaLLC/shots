@@ -153,7 +153,10 @@ export async function completeSocialOAuth(
     return new Response('Provider not found.', { status: 404 })
   const params = new URL(request.url).searchParams
   if (params.has('error') || params.has('denied')) {
-    return new Response(`${providerName} connection was not completed.`, { status: 400 })
+    return new Response(
+      `${providerName} connection was not completed. Nothing was changed; start again when you are ready.`,
+      { status: 400 }
+    )
   }
 
   const state = providerName === 'x' ? params.get('oauth_token') : params.get('state')
@@ -171,11 +174,14 @@ export async function completeSocialOAuth(
   const connected = socialOAuthExchangeSchema.safeParse(await completion.exchange(state, code))
   if (!connected.success) return connectionFailed(providerName)
   if (
-    !['instagram', 'linkedin-page', 'youtube'].includes(providerName) ||
+    !['instagram', 'linkedin-page', 'youtube', 'facebook', 'gmb'].includes(providerName) ||
     connected.data.completed ||
     (providerName !== 'instagram' && !connected.data.pages)
   ) {
-    if (!connected.data.completed && ['linkedin-page', 'youtube'].includes(providerName))
+    if (
+      !connected.data.completed &&
+      ['linkedin-page', 'youtube', 'facebook', 'gmb'].includes(providerName)
+    )
       await completion.onPageChoice?.(state, connected.data.id)
     await completion.onConnected?.(state, connected.data.id)
     if (completion.redirect) return completion.redirect(state)

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import sharp from 'sharp'
 import {
   apiRequest,
   chooseOption,
@@ -19,15 +20,25 @@ import {
   type Page,
 } from './framework'
 import { z } from 'zod'
+import { importedBody } from '@/lib/write/import-text'
 
 const secretReference = 'SOCIAL_API_KEY_GATE'
 const fakeURL = process.env.E2E_SOCIAL_GATE_FAKE_URL ?? 'http://127.0.0.1:5680'
 
 const fakeStateSchema = z.object({
+  actions: z.array(
+    z.object({
+      kind: z.string(),
+      postId: z.string(),
+      media: z.object({ sha256: z.string() }).optional(),
+      text: z.string().optional(),
+    })
+  ),
   posts: z.array(
     z.object({
       caption: z.string(),
       id: z.string(),
+      platform: z.string().optional(),
       media: z.array(
         z.object({
           bytes: z.number(),
@@ -37,6 +48,17 @@ const fakeStateSchema = z.object({
           signedAt: z.string(),
         })
       ),
+      settings: z
+        .object({
+          board: z.string().optional(),
+          containsSyntheticMedia: z.boolean().optional(),
+          link: z.string().optional(),
+          postType: z.string().optional(),
+          postingMethod: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          title: z.string().optional(),
+        })
+        .optional(),
     })
   ),
   requests: z.number(),
@@ -46,7 +68,9 @@ async function fakeState() {
   return fakeStateSchema.parse(await (await fetch(`${fakeURL}/state`)).json())
 }
 
-async function resetFake(mode: 'normal' | 'throttle-once' | 'server-error-once'): Promise<void> {
+async function resetFake(
+  mode: 'normal' | 'throttle-once' | 'server-error-once' | 'refuse-thumbnail'
+): Promise<void> {
   const response = await fetch(`${fakeURL}/control`, {
     body: JSON.stringify({ mode }),
     headers: { 'Content-Type': 'application/json' },
@@ -68,7 +92,10 @@ async function readBootstrap() {
     .object({
       destinationId: z.string().min(1),
       expiredDestinationId: z.string().min(1),
+      facebookDestinationId: z.string().min(1),
+      gmbDestinationId: z.string().min(1),
       goOrganizationId: z.string().min(1),
+      pinterestDestinationId: z.string().min(1),
       tiktokDestinationId: z.string().min(1),
       youtubeDestinationId: z.string().min(1),
     })
@@ -337,7 +364,14 @@ test('the backend worker publishes draft photos, video, and ordered images once 
         media: [clip],
         connectionId: youtubeConnection,
         channel: 'youtube',
-        options: { youtube: { title: 'Fixture video', privacy: 'private', madeForKids: false } },
+        options: {
+          youtube: {
+            title: 'Fixture video',
+            privacy: 'private',
+            madeForKids: false,
+            thumbnailAssetId: expect.any(String),
+          },
+        },
       },
       // Not the upload order, so the post's order is the draft's.
       { caption: 'Three images, in order.', media: [first, photo, last] },
@@ -392,6 +426,11 @@ test('the backend worker publishes draft photos, video, and ordered images once 
           await page.getByRole('option', { name: 'Private', exact: true }).click()
           await page.getByRole('combobox', { name: 'YouTube audience' }).click()
           await page.getByRole('option', { name: 'Not made for kids', exact: true }).click()
+          // The thumbnail is chosen beside the other settings and set once the video is live.
+          await page
+            .getByLabel('Custom thumbnail')
+            .setInputFiles({ name: 'thumbnail.png', mimeType: 'image/png', buffer: png })
+          await expect(page.getByTestId('required-options')).toContainText('Custom thumbnail added')
         } else {
           await page.getByRole('combobox', { name: 'TikTok privacy' }).click()
           await page.getByRole('option', { name: 'Only me', exact: true }).click()
@@ -464,7 +503,430 @@ test('the backend worker publishes draft photos, video, and ordered images once 
       const [attempt, ...extraAttempts] = await attemptsOf(postIds[index]!)
       expect(extraAttempts).toHaveLength(0)
       expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+      if (draft.channel === 'youtube') {
+        // PB-03: the thumbnail follow-up set the uploaded image on the live video.
+        await expect
+          .poll(
+            async () =>
+              (
+                await db.row<{ status: string }>(
+                  `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+                  [postIds[index]]
+                )
+              )?.status,
+            { intervals: [1_000], timeout: 120_000 }
+          )
+          .toBe('done')
+        const set = (await fakeState()).actions.filter(
+          (action) => action.kind === 'thumbnail' && action.postId === received?.id
+        )
+        expect(set).toEqual([
+          expect.objectContaining({ media: expect.objectContaining({ sha256: sha256(png) }) }),
+        ])
+      }
     }
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('PB-03: a refused YouTube thumbnail leaves the video published and shows the failed follow-up', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('refuse-thumbnail')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const youtube = await connect(page, bootstrap.youtubeDestinationId, 'youtube')
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
+    const clip = await createUploadedAsset(page, mp4, 'video/mp4', 'clip.mp4')
+    const thumbnail = await createUploadedAsset(page, png, 'image/png', 'thumbnail.png')
+    const options = {
+      youtube: {
+        title: 'Fixture video',
+        privacy: 'private',
+        madeForKids: false,
+        tags: ['launch', 'product demo'],
+        containsSyntheticMedia: true,
+        thumbnailAssetId: thumbnail,
+      },
+    }
+    const caption = 'A video whose thumbnail YouTube refuses.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [clip],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: clip,
+            children: [{ text: '' }],
+            mimeType: 'video/mp4',
+            type: 'video',
+            url: `/api/v1/assets/${clip}/content`,
+          },
+        ],
+        channelConnectionIds: [youtube],
+        primaryPlatform: 'youtube',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [{ channel: 'youtube', mode: 'synced', options }],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const draft = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+    const response = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      body: {
+        channelConnectionIds: [youtube],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version: draft.version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const postId = z.object({ posts: z.array(z.object({ id: z.string() })) }).parse(response.body)
+      .posts[0]!.id
+    await awaitStatus(postId, 'PUBLISHED')
+    // The tags and disclosure went with the upload.
+    const received = (await fakeState()).posts.find((post) => post.caption === caption)
+    expect(received?.settings).toEqual({
+      containsSyntheticMedia: true,
+      tags: ['launch', 'product demo'],
+      title: 'Fixture video',
+    })
+    // The thumbnail is its own follow-up: refused and recorded, the video still live.
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.row<{ status: string }>(
+              `SELECT status FROM post_automation_run WHERE "scheduledPostId" = $1 AND kind = 'thumbnail'`,
+              [postId]
+            )
+          )?.status,
+        { intervals: [1_000], timeout: 120_000 }
+      )
+      .toBe('failed')
+    expect(await statusOf(postId)).toBe('PUBLISHED')
+    await page.goto(`/publish/${draft.id}`)
+    const followUp = page.getByTestId('follow-up').filter({ hasText: 'Custom thumbnail' })
+    await expect(followUp).toContainText('failed')
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a pin goes to the board chosen in the composer, and a Facebook Page post takes its first comment', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const pinterest = await connect(page, bootstrap.pinterestDestinationId, 'pinterest')
+    const image = await createUploadedAsset(page, png, 'image/png', 'pin.png')
+    const caption = 'Launch day, on the page and the board.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, pinterest],
+        primaryPlatform: 'facebook',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [
+            {
+              channel: 'facebook',
+              mode: 'synced',
+              options: { firstComment: 'Link in the comments' },
+            },
+            // A board saved earlier that the account no longer has.
+            { channel: 'pinterest', mode: 'synced', options: { pinterest: { boardId: '9999' } } },
+          ],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The board comes from the Pinterest account's own list, read through Go. A
+    // failed read says so and offers to try again; it never shows an empty list.
+    const boards = '**/api/v1/social-sets/*/pinterest-boards'
+    await page.route(boards, (route) =>
+      route.fulfill({ status: 502, json: { error: 'Pinterest did not answer.' } })
+    )
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-pinterest').click()
+    await page.getByTestId('options-chip').click()
+    const options = page.getByTestId('pinterest-options')
+    await expect(options.getByRole('alert')).toBeVisible()
+    await page.unroute(boards)
+    await options.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(options).toContainText('no longer on this Pinterest account')
+    await chooseOption(options.getByRole('combobox', { name: 'Pinterest board' }), 'Launch ideas')
+    await expect(options).not.toContainText('no longer on this Pinterest account')
+    await options.getByLabel('Pin title').fill('Launch day')
+    await options.getByLabel('Link').fill('https://shots.example/launch')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, pinterest],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const state = await fakeState()
+    const received = state.posts.filter((post) => post.caption === caption)
+    expect(received).toHaveLength(2)
+    expect(received.map((post) => post.media.length)).toEqual([1, 1])
+    const pin = received.find((post) => post.platform === 'pinterest')
+    const pagePost = received.find((post) => post.platform === 'facebook')
+    expect(pin?.settings).toEqual({
+      board: '1001',
+      link: 'https://shots.example/launch',
+      title: 'Launch day',
+    })
+    expect(pagePost?.settings).toEqual({})
+    // The first comment is the Page post's follow-up, on that live post only.
+    await expect
+      .poll(async () => (await fakeState()).actions.filter((action) => action.kind === 'comment'), {
+        intervals: [1_000],
+        timeout: 120_000,
+      })
+      .toEqual([expect.objectContaining({ postId: pagePost?.id, text: 'Link in the comments' })])
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a Facebook story chosen in the composer and a Google Business post publish once through Go', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const facebook = await connect(page, bootstrap.facebookDestinationId, 'facebook')
+    const gmb = await connect(page, bootstrap.gmbDestinationId, 'gmb')
+    // Google Business takes images at least 250 pixels wide; the shared fixture is 1×1.
+    const photo = await sharp({
+      create: { width: 400, height: 300, channels: 3, background: '#2e6f40' },
+    })
+      .png()
+      .toBuffer()
+    const image = await createUploadedAsset(page, photo, 'image/png', 'story.png')
+    const caption = 'Open late on Fridays.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [image],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: image,
+            children: [{ text: '' }],
+            mimeType: 'image/png',
+            type: 'img',
+            url: `/api/v1/assets/${image}/content`,
+          },
+        ],
+        channelConnectionIds: [facebook, gmb],
+        primaryPlatform: 'gmb',
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // The story is chosen in the Facebook version's settings, and the composer says what it leaves out.
+    await page.goto(`/publish/${id}`)
+    await page.getByTestId('platform-tab-facebook').click()
+    await page.getByTestId('options-chip').click()
+    await page.getByTestId('facebook-options').getByLabel('Post as a story').check()
+    await expect(page.getByTestId('story-notice')).toContainText('This Facebook post is a story')
+    await expectSaved(page)
+
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [facebook, gmb],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const posts = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    expect(posts).toHaveLength(2)
+    for (const post of posts) await awaitStatus(post.id, 'PUBLISHED')
+    const received = (await fakeState()).posts
+    const story = received.find((post) => post.platform === 'facebook')
+    const local = received.find((post) => post.platform === 'gmb')
+    // The story carries the image alone; the text went to the location's post.
+    expect(story).toMatchObject({ caption: '', settings: { postType: 'story' } })
+    expect(story?.media).toHaveLength(1)
+    expect(local?.caption).toBe(caption)
+    // Nothing story-like reached Google Business.
+    expect(local?.settings).toEqual({})
+    expect(local?.media).toHaveLength(1)
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('PB-05: a TikTok video sent to the app as a draft is never published, and says to finish it in TikTok', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const tiktok = await connect(page, bootstrap.tiktokDestinationId, 'tiktok')
+    const mp4 = await readFile('../../../server/internal/mediavideo/testdata/portrait.mp4')
+    const clip = await createUploadedAsset(page, mp4, 'video/mp4', 'clip.mp4')
+    const caption = 'Finish me in TikTok.'
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        assetIds: [clip],
+        body: [
+          { children: [{ text: caption }], type: 'p' },
+          {
+            assetId: clip,
+            children: [{ text: '' }],
+            mimeType: 'video/mp4',
+            type: 'video',
+            url: `/api/v1/assets/${clip}/content`,
+          },
+        ],
+        channelConnectionIds: [tiktok],
+        primaryPlatform: 'tiktok',
+        platformVersions: {
+          schemaVersion: 1,
+          versions: [{ channel: 'tiktok', mode: 'synced', options: {} }],
+        },
+        plainText: caption,
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const id = z.object({ id: z.string() }).parse(created.body).id
+
+    // Direct-post choices first, so turning the app draft on has something to clear.
+    await page.goto(`/publish/${id}`)
+    const privacy = page.getByRole('combobox', { name: 'TikTok privacy' })
+    await privacy.click()
+    await page.getByRole('option', { name: 'Only me', exact: true }).click()
+    await page
+      .getByRole('checkbox', {
+        name: 'I consent to send this video to TikTok at the scheduled time.',
+      })
+      .check()
+    await expectSaved(page)
+    // An app draft needs none of what TikTok asks for in the app: no privacy, no consent.
+    await page.getByLabel('Send to the TikTok app as a draft').check()
+    await expect(privacy).toHaveCount(0)
+    await expectSaved(page)
+    const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+    expect(saved.body).toMatchObject({
+      platformVersions: {
+        versions: [
+          {
+            channel: 'tiktok',
+            options: { tiktok: { sendToApp: true, privacy: '', consent: false } },
+          },
+        ],
+      },
+    })
+    const version = z.object({ version: z.number() }).parse(saved.body).version
+    const response = await apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+      body: {
+        channelConnectionIds: [tiktok],
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version,
+      },
+      method: 'POST',
+    })
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const [post] = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(response.body).posts
+    await awaitStatus(post!.id, 'SENT_TO_APP')
+
+    // TikTok got the video and caption alone, as an inbox upload, once.
+    const remote = await fakeState()
+    const sent = remote.posts.filter((item) => item.caption === caption)
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ platform: 'tiktok', settings: { postingMethod: 'UPLOAD' } })
+    expect(sent[0]?.media).toHaveLength(1)
+    expect(await attemptsOf(post!.id)).toEqual([
+      { outcome: 'SUCCEEDED', providerPostId: `v_inbox_file~v2.${sent[0]?.id}` },
+    ])
+    const stored = await db.row<{ publishedAt: Date | null }>(
+      'SELECT "publishedAt" FROM scheduled_post WHERE id = $1',
+      [post!.id]
+    )
+    expect(stored?.publishedAt).toBeNull()
+
+    // The draft says where it is and what is left to do.
+    await page.reload()
+    const row = page.getByTestId('draft-post')
+    await expect(row).toContainText('Sent to app')
+    await expect(row).toContainText('Sent to the TikTok app as a draft. Finish and post it there')
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,
@@ -615,6 +1077,106 @@ test('a grid video rendered in the browser and scheduled in the background publi
     const [attempt, ...extraAttempts] = await attemptsOf(postId!)
     expect(extraAttempts).toHaveLength(0)
     expect(attempt).toEqual({ outcome: 'SUCCEEDED', providerPostId: received?.id })
+  } finally {
+    await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
+      organizationId,
+    ])
+  }
+})
+
+test('a published thread is deleted through Shots once, part by part, and a repeat deletes nothing', async ({
+  identity,
+  page,
+}) => {
+  test.setTimeout(10 * 60_000)
+  const bootstrap = await readBootstrap()
+  await resetFake('normal')
+  await createWorkspace(identity, page)
+  await enableTwoFactor(page, identity.password)
+  const organizationId = await getActiveOrganizationId(page)
+  try {
+    await bindWorkspace(organizationId, bootstrap.goOrganizationId)
+    const connectionId = await connect(page, bootstrap.destinationId)
+    const created = await apiRequest(page, '/api/v1/content-drafts', {
+      body: {
+        body: importedBody(['Going away', 'Going away, part 2']),
+        channelConnectionIds: [connectionId],
+        plainText: 'Going away\n\nGoing away, part 2',
+        primaryPlatform: 'x',
+      },
+      method: 'POST',
+    })
+    expect(created.status, JSON.stringify(created.body)).toBe(201)
+    const draft = z.object({ id: z.string(), version: z.number() }).parse(created.body)
+    const scheduled = await apiRequest(page, `/api/v1/content-drafts/${draft.id}/schedule`, {
+      body: {
+        channelConnectionIds: [connectionId],
+        // The schedule takes a time at least 30 seconds away.
+        scheduledFor: new Date(Date.now() + 35_000).toISOString(),
+        version: draft.version,
+      },
+      method: 'POST',
+    })
+    expect(scheduled.status, JSON.stringify(scheduled.body)).toBe(201)
+    const [post] = z
+      .object({ posts: z.array(z.object({ id: z.string() })) })
+      .parse(scheduled.body).posts
+    await awaitStatus(post!.id, 'PUBLISHED')
+    // The root went to the fake as a post, and the second part answered it.
+    const root = (await fakeState()).posts.find((item) => item.caption === 'Going away')
+    expect(root).toBeDefined()
+    const partId = (
+      await db.row<{ remoteId: string }>(
+        `SELECT receipt->>'remoteId' AS "remoteId" FROM scheduled_post, jsonb_array_elements("threadProgress"->'receipts') AS receipt WHERE id = $1`,
+        [post!.id]
+      )
+    )?.remoteId
+    expect(partId).toBeTruthy()
+
+    await page.goto(`/publish/${draft.id}`)
+    const card = page.getByTestId('draft-post')
+    await card.getByRole('button', { name: 'Delete from e2e…' }).click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog).toContainText('stays up and is marked not supported')
+    await dialog.getByRole('button', { name: 'Delete from e2e', exact: true }).click()
+    // The thread part goes first and the post last, each once.
+    await expect
+      .poll(
+        async () =>
+          (await fakeState()).actions
+            .filter((action) => action.kind === 'delete')
+            .map((action) => action.postId),
+        { intervals: [1_000], timeout: 120_000 }
+      )
+      .toEqual([partId, root!.id])
+    await expect
+      .poll(
+        async () =>
+          (
+            await db.rows<{ key: string; status: string }>(
+              'SELECT key, status FROM post_deletion WHERE "scheduledPostId" = $1 ORDER BY key',
+              [post!.id]
+            )
+          ).map((row) => `${row.key}:${row.status}`),
+        { intervals: [1_000], timeout: 60_000 }
+      )
+      .toEqual(['root:done', 'thread:1:done'])
+
+    await page.reload()
+    await expect(card).toContainText('Deleted from e2e')
+    await expect(card.getByTestId('delete-parts').getByRole('listitem')).toHaveText([
+      /^Post\s*deleted$/,
+      /^Thread part\s*deleted$/,
+    ])
+    await expect(card.getByRole('button', { name: 'Delete from e2e…' })).toHaveCount(0)
+    await expect(card.getByRole('link', { name: 'View on e2e' })).toHaveCount(0)
+    await expect(page.getByTestId('live-notice')).toContainText('deleted from e2e')
+    // A repeated request is refused and sends nothing more to the platform.
+    const again = await apiRequest(page, `/api/v1/content-draft-posts/${post!.id}/delete`, {
+      method: 'POST',
+    })
+    expect(again.status, JSON.stringify(again.body)).toBe(409)
+    expect((await fakeState()).actions.filter((action) => action.kind === 'delete')).toHaveLength(2)
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

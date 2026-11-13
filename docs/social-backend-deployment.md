@@ -60,7 +60,14 @@ overlay or tokens.
 
 Threads uses `SOCIAL_THREADS_APP_ID` and `SOCIAL_THREADS_APP_SECRET`; the legacy
 mastodon.social branch uses `SOCIAL_MASTODON_CLIENT_ID` and
-`SOCIAL_MASTODON_CLIENT_SECRET`. The picker reads the adapter's current
+`SOCIAL_MASTODON_CLIENT_SECRET`. Pinterest uses `SOCIAL_PINTEREST_CLIENT_ID` and
+`SOCIAL_PINTEREST_CLIENT_SECRET`, from an app granted `boards:read`,
+`boards:write`, `pins:read`, `pins:write` and `user_accounts:read`. Google
+Business uses `SOCIAL_GOOGLE_GMB_CLIENT_ID` and `SOCIAL_GOOGLE_GMB_CLIENT_SECRET`,
+an OAuth client in a Google Cloud project approved for the Business Profile
+APIs, with the `business.manage` scope. The production deploy reads these
+names from Infisical, and each channel stays unavailable until both of its
+keys are set. The picker reads the adapter's current
 configuration and disables unavailable connections before asking for credentials.
 Bluesky and custom Mastodon require their rollout flag on both product and social
 APIs. Deploy the adapter availability endpoint before the product/web update;
@@ -74,7 +81,8 @@ The web's authenticated routes start OAuth at
 SDK. The backend binds one-use state to the workspace and session, exchanges
 the code through the social service, verifies the destination, and registers
 one canonical channel connection. The supported callback names are `x`,
-`linkedin`, `instagram`, `instagram-standalone`, and `threads`. Facebook Login's
+`linkedin`, `instagram`, `instagram-standalone`, `threads`, `pinterest` and
+`gmb` (Google Business). Facebook Login's
 Instagram flow includes Page selection.
 
 Register each exact HTTPS callback URL with its provider for live tests.

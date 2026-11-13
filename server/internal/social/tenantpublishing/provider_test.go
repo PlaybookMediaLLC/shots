@@ -15,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/instagram"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -66,16 +67,18 @@ type fakePoster struct {
 	calls      int
 	media      int
 	// replies records each reply as "message>answers", in order.
-	replies          []string
-	poll             *integrations.PollDetails
-	replyPolls       []*integrations.PollDetails
-	message          string
-	path             string
-	err              error
-	status           string
-	expectedNativeID string
-	afterPost        func()
-	afterReply       func()
+	replies               []string
+	poll                  *integrations.PollDetails
+	replyPolls            []*integrations.PollDetails
+	message               string
+	path                  string
+	thumbnail             string
+	err                   error
+	status                string
+	expectedNativeID      string
+	afterPost             func()
+	afterReply            func()
+	missingCommentReceipt bool
 }
 
 func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrations.PostDetails, _ *socialent.Integration) ([]integrations.PostResponse, error) {
@@ -89,7 +92,7 @@ func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrati
 	}
 	f.message, f.media, f.poll = posts[0].Message, len(posts[0].Media), posts[0].Poll
 	if len(posts[0].Media) > 0 {
-		f.path = posts[0].Media[0].Path
+		f.path, f.thumbnail = posts[0].Media[0].Path, posts[0].Media[0].Thumbnail
 	}
 	if f.err != nil {
 		return nil, f.err
@@ -113,6 +116,9 @@ func (f *fakePoster) Comment(_ context.Context, _, postID, lastCommentID, _ stri
 	f.replyPolls = append(f.replyPolls, posts[0].Poll)
 	if f.afterReply != nil {
 		f.afterReply()
+	}
+	if f.missingCommentReceipt {
+		return nil, nil
 	}
 	return []integrations.PostResponse{{PostID: fmt.Sprintf("reply-%d", len(f.replies)), QuoteState: f.quoteState}}, nil
 }
@@ -167,6 +173,27 @@ func TestThreadsKeepsTheProvidersLinkToTheLivePost(t *testing.T) {
 	receipt, err := p.PublishThread(context.Background(), input)
 	if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
 		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+}
+
+func TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard(t *testing.T) {
+	for _, platform := range []string{"facebook", "pinterest"} {
+		p, _, poster, input := directFixture()
+		poster.releaseURL = "https://www.pinterest.com/pin/77/"
+		p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: platform, InternalID: "remote-user", Token: "private-token"}}
+		input.Platform = platform
+		if platform == "pinterest" {
+			_, err := p.PublishThread(context.Background(), input)
+			var coded *socialapi.Error
+			if !errors.As(err, &coded) || coded.Code != publishing.FailurePostOptions || poster.calls != 0 {
+				t.Fatalf("a pin without a board: err=%v calls=%d", err, poster.calls)
+			}
+			input.Options = &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001"}}
+		}
+		receipt, err := p.PublishThread(context.Background(), input)
+		if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
+			t.Fatalf("%s receipt=%+v err=%v", platform, receipt, err)
+		}
 	}
 }
 
@@ -259,6 +286,39 @@ func TestDirectPublisherMarksAmbiguousProviderFailureUnknown(t *testing.T) {
 	var providerErr *socialapi.Error
 	if !errors.As(err, &providerErr) || !providerErr.UnknownDelivery || poster.calls != 1 {
 		t.Fatalf("err=%v providerCalls=%d", err, poster.calls)
+	}
+}
+
+// inboxTikTok is TikTok taking the video as an app-inbox draft (UPLOAD): its
+// receipt is "missing" with the publish id in a messages link, not a video.
+type inboxTikTok struct{ *fakePoster }
+
+func (p inboxTikTok) Post(ctx context.Context, id, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
+	if _, err := p.fakePoster.Post(ctx, id, token, posts, account); err != nil {
+		return nil, err
+	}
+	return []integrations.PostResponse{{PostID: "missing", ReleaseURL: "https://www.tiktok.com/messages?lang=en#v_inbox_file~1", Status: "completed"}}, nil
+}
+
+func (inboxTikTok) CreatorInfo(context.Context, string) (*postoptions.TikTokCreator, error) {
+	return &postoptions.TikTokCreator{PrivacyLevels: []string{"SELF_ONLY"}, MaxDurationSeconds: 300}, nil
+}
+
+// A video sent to the TikTok app as a draft is not live: recording it as
+// published would mark the post PUBLISHED and emit draft.published.
+func TestTikTokInboxDraftIsNotAPublishedReceipt(t *testing.T) {
+	p, _, fake, input := directFixture()
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "tiktok", InternalID: "remote-user", Token: "private-token"}}
+	p.resolve = func(string) poster { return inboxTikTok{fake} }
+	duration := 10_000
+	input.Platform, input.AssetObjectKey = "tiktok", ""
+	input.Assets = []publishing.MediaAsset{{MediaType: "video/mp4", ObjectKey: "org/product-org/clip.mp4", DurationMs: &duration}}
+	input.Options = &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "SELF_ONLY", Consent: true}}
+	receipt, err := p.PublishThread(context.Background(), input)
+	var providerErr *socialapi.Error
+	if !errors.As(err, &providerErr) || !providerErr.UnknownDelivery || !strings.Contains(err.Error(), "final video receipt") ||
+		receipt.PostID != "" || fake.calls != 1 {
+		t.Fatalf("receipt=%+v err=%v providerCalls=%d", receipt, err, fake.calls)
 	}
 }
 
@@ -411,19 +471,19 @@ func (p *analyticsPoster) PostAnalytics(context.Context, string, string, string,
 
 func TestAnalyticsCapabilitiesDoNotInheritPublishingRolloutRestrictions(t *testing.T) {
 	p, _, base, input := directFixture()
-	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "facebook"
+	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "tumblr"
 	p.resolve = func(string) poster { return &analyticsPoster{base} }
-	if !p.AnalyticsCapabilities("facebook").Posts {
+	if !p.AnalyticsCapabilities("tumblr").Posts {
 		t.Fatal("installed analytics capability hidden")
 	}
-	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", input.SecretReference, "remote-post")
+	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", input.SecretReference, "remote-post")
 	if err != nil || len(metrics) != 1 || metrics["impressions"] != 0 {
 		t.Fatalf("metrics=%v error=%v", metrics, err)
 	}
-	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", "another-tenant-secret", "remote-post"); err == nil {
+	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", "another-tenant-secret", "remote-post"); err == nil {
 		t.Fatal("analytics bypassed credential binding")
 	}
-	input.Platform = "facebook"
+	input.Platform = "tumblr"
 	if _, err := p.Publish(context.Background(), input); err == nil {
 		t.Fatal("analytics widened publication rollout")
 	}
@@ -439,6 +499,32 @@ func TestDirectPublisherPreservesDefiniteRejection(t *testing.T) {
 	}
 }
 
+type providerHTTPError struct{ error }
+
+func (providerHTTPError) HTTPStatus() int { return http.StatusForbidden }
+func (e providerHTTPError) Unwrap() error { return e.error }
+
+type deniedMentionPoster struct{ fakePoster }
+
+func (*deniedMentionPoster) Mention(context.Context, string, string, string, *socialent.Integration) ([]integrations.MentionResult, bool, error) {
+	return nil, false, providerHTTPError{temporalx.PublicationRejected("linkedin", "ACCESS_DENIED: lookup permission required")}
+}
+
+func TestProviderPermissionRefusalPreservesStatus(t *testing.T) {
+	p, _, provider, input := directFixture()
+	provider.err = providerHTTPError{temporalx.PublicationRejected("linkedin", "ACCESS_DENIED: permission required")}
+	_, err := p.Publish(context.Background(), input)
+	var refused *socialapi.Error
+	if !errors.As(err, &refused) || refused.UnknownDelivery || refused.Status != http.StatusForbidden || !strings.Contains(refused.ProviderMessage, "ACCESS_DENIED") || provider.calls != 1 {
+		t.Fatalf("publish refusal = %#v, calls=%d", err, provider.calls)
+	}
+	p.resolve = func(string) poster { return &deniedMentionPoster{} }
+	_, err = p.Mentions(context.Background(), input.OrganizationID, input.DestinationID, input.Platform, input.SecretReference, "solomon")
+	if !errors.As(err, &refused) || refused.Status != http.StatusForbidden || !strings.Contains(err.Error(), "approved mention lookup permissions") {
+		t.Fatalf("mention refusal = %#v", err)
+	}
+}
+
 // A lasting rate limit retries durably with the provider's guidance; a daily
 // cap fails definitely with its own code. Neither is an unknown delivery.
 func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
@@ -451,6 +537,18 @@ func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
 	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
 	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
 		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// Shots running out of time counting a post's text sent nothing and blames
+// neither the platform nor the text, which passed the same count when it was
+// scheduled: the post retries.
+func TestTextTooComplexToCountRetries(t *testing.T) {
+	var retry *socialapi.Error
+	err := publicationOutcome(fmt.Errorf("x: %w", helpers.ErrTextTooComplex))
+	if !errors.As(err, &retry) || retry.UnknownDelivery || retry.Status != http.StatusTooManyRequests ||
+		retry.Code != publishing.FailurePublisherError || !strings.Contains(retry.ProviderMessage, "nothing was sent") {
+		t.Fatalf("too complex = %#v", err)
 	}
 }
 
@@ -536,5 +634,21 @@ func TestPlatformLimitsReachTheirPublicationOutcome(t *testing.T) {
 				t.Fatalf("requests=%d result=%+v err=%v", requests.Load(), result, err)
 			}
 		})
+	}
+}
+
+// An Instagram reel's cover is signed and sent with the reel itself.
+func TestInstagramReelCarriesItsSignedCover(t *testing.T) {
+	p, signer, poster, input := directFixture()
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "instagram-standalone", InternalID: "remote-user", Token: "private-token"}}
+	input.Platform = "instagram-standalone"
+	input.AssetObjectKey, input.AssetMediaType = "org/product-org/reel.mp4", "video/mp4"
+	input.Cover = &publishing.MediaAsset{AssetID: "cover-1", MediaType: "image/jpeg", ObjectKey: "org/product-org/cover.jpg"}
+	input.Options = &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "cover-1"}}
+	if _, err := p.Publish(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	if signer.calls != 2 || poster.thumbnail != "https://r2.example/private/image.png?fresh-signature" {
+		t.Fatalf("signed=%d cover=%q", signer.calls, poster.thumbnail)
 	}
 }

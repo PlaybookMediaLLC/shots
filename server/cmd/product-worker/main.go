@@ -111,6 +111,9 @@ func main() {
 	workflowWorker.RegisterActivityWithOptions(activities.MarkUnknown, activity.RegisterOptions{Name: temporalpublishing.MarkUnknownActivityName})
 	workflowWorker.RegisterActivityWithOptions(activities.PlanAutomations, activity.RegisterOptions{Name: temporalpublishing.PlanAutomationsActivityName})
 	workflowWorker.RegisterActivityWithOptions(recovery.Recover, activity.RegisterOptions{Name: temporalpublishing.RecoverActivityName})
+	workflowWorker.RegisterWorkflowWithOptions(temporalpublishing.PostDeleteWorkflow, workflow.RegisterOptions{Name: temporalpublishing.DeleteWorkflowName})
+	workflowWorker.RegisterActivityWithOptions(activities.PlanDeletion, activity.RegisterOptions{Name: temporalpublishing.PlanDeletionActivityName})
+	workflowWorker.RegisterActivityWithOptions(activities.SettleDeletion, activity.RegisterOptions{Name: temporalpublishing.SettleDeletionActivityName})
 
 	var activityWorker, legacyActivityWorker worker.Worker
 	newActivityWorker := func(queue string) worker.Worker {
@@ -127,6 +130,7 @@ func main() {
 		activityWorker.RegisterActivityWithOptions(activities.Submit, activity.RegisterOptions{Name: temporalpublishing.SubmitActivityName})
 		activityWorker.RegisterActivityWithOptions(activities.RunAutoActions, activity.RegisterOptions{Name: temporalpublishing.AutoActionsActivityName})
 		activityWorker.RegisterActivityWithOptions(activities.RunAutomation, activity.RegisterOptions{Name: temporalpublishing.RunAutomationActivityName})
+		activityWorker.RegisterActivityWithOptions(activities.DeletePart, activity.RegisterOptions{Name: temporalpublishing.DeletePartActivityName})
 		activityWorker.RegisterActivityWithOptions(activities.Check, activity.RegisterOptions{Name: temporalpublishing.CheckActivityName})
 		return activityWorker
 	}

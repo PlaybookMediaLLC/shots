@@ -17,6 +17,23 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 )
 
+func TestStoreProviderErrorKeepsSafeReasonAndStatus(t *testing.T) {
+	provider := socialapi.NewError(http.StatusForbidden, false, "The platform refused mention lookup (HTTP 403).")
+	provider.ProviderMessage = "private provider body"
+	w := httptest.NewRecorder()
+	writeStoreError(w, fmt.Errorf("lookup: %w", provider))
+	if w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), provider.Error()) || strings.Contains(w.Body.String(), provider.ProviderMessage) {
+		t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+	}
+	for _, status := range []int{0, 200, 700} {
+		w = httptest.NewRecorder()
+		writeStoreError(w, socialapi.NewError(status, false, "Lookup failed"))
+		if w.Code != http.StatusBadGateway {
+			t.Fatalf("invalid provider status %d reached HTTP: %d", status, w.Code)
+		}
+	}
+}
+
 type fakeStore struct {
 	connections         []*ent.ChannelConnection
 	connection          publishing.CreateConnectionInput
@@ -320,7 +337,7 @@ func (f *fakeStore) CreateScheduledPost(_ context.Context, actor publishing.Acto
 	f.scheduled = input
 	return publishing.CreateScheduledPostResult{Created: true, Post: &ent.ScheduledPost{ID: "post-1", OrganizationID: actor.Organization, Caption: input.Caption, ScheduledFor: input.ScheduledFor, Status: "SCHEDULED"}}, nil
 }
-func (f *fakeStore) ListScheduledPosts(context.Context, string, bool, int) ([]*ent.ScheduledPost, error) {
+func (f *fakeStore) ListScheduledPosts(context.Context, string, string, int) ([]*ent.ScheduledPost, error) {
 	return nil, nil
 }
 func (f *fakeStore) CancelScheduledPost(_ context.Context, actor publishing.Actor, _ string) (*ent.ScheduledPost, error) {
@@ -390,7 +407,8 @@ func TestScheduledPostsAdmitAnAPIKeyWithTheScope(t *testing.T) {
 	if code := send(http.MethodPost, "/v1/scheduled-posts/post-1/cancel"); code != http.StatusOK || store.keyScope != "post:schedule" {
 		t.Fatalf("cancel status=%d scope=%q", code, store.keyScope)
 	}
-	if store.cancelActor.Type != "SERVICE" || store.cancelActor.Display != "Coding agent" || store.cancelActor.UserID != "" {
+	if store.cancelActor.Type != "SERVICE" || store.cancelActor.Display != "Coding agent" || store.cancelActor.UserID != "" ||
+		store.cancelActor.Source != "api" {
 		t.Fatalf("a key cancels as a named service: %#v", store.cancelActor)
 	}
 	store.authError = publishing.ErrForbidden
@@ -461,6 +479,28 @@ func TestCreateConnectionAppliesSocialDefaults(t *testing.T) {
 	}
 	if verifier.input.DestinationID != "account-1" || verifier.input.ExpectedGoOrganizationID != "go-org-1" {
 		t.Fatalf("destination was not verified against the tenant binding: %#v", verifier.input)
+	}
+	// Twitter is X's legacy name: it is verified and stored as the one X provider.
+	request = httptest.NewRequest(http.MethodPost, "/v1/channel-connections", strings.NewReader(`{"externalAccountId":"account-2","platform":"Twitter"}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	request.Header.Set("X-Organization-ID", "org-1")
+	request.Header.Set("X-User-ID", "user-1")
+	request.Header.Set("X-Session-ID", "session-1")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || store.connection.Platform != "x" || verifier.input.Platform != "x" {
+		t.Fatalf("twitter alias kept a second provider: status=%d stored=%q verified=%q", response.Code, store.connection.Platform, verifier.input.Platform)
+	}
+}
+
+func TestAccountConflictsAreExplicitAndNameNoSet(t *testing.T) {
+	for _, conflict := range []error{publishing.ErrAccountInAnotherSet, publishing.ErrAccountRemovedFromAnotherSet, publishing.ErrSocialSetSlotTaken} {
+		response := httptest.NewRecorder()
+		writeStoreError(response, fmt.Errorf("finish oauth: %w", conflict))
+		// The message is fixed text: it names neither the other set nor its owner.
+		if response.Code != http.StatusConflict || response.Body.String() != `{"error":"`+conflict.Error()+`"}`+"\n" {
+			t.Fatalf("%v: status=%d body=%q", conflict, response.Code, response.Body.String())
+		}
 	}
 }
 

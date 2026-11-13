@@ -21,7 +21,7 @@ import {
   type PlatformVersions,
 } from '@/lib/write/document'
 import { type ExportTarget, getSizePreset } from '@/lib/export/sizes'
-import { importedBody, importedPosts, splitThread } from '@/lib/write/import-text'
+import { importedBody } from '@/lib/write/import-text'
 import { DESTINATION_MEDIA, type MediaFacts, mediaProblems } from '@/lib/write/media-rules'
 import { WRITING_PROMPTS } from '@/lib/write/prompt-library'
 import { readVersions, withOptions } from '@/lib/write/versions'
@@ -55,20 +55,6 @@ export function withLeadMedia(body: PlateBody, media: readonly PostMedia[]): Pla
   const next = nodes.findIndex((node, index) => index > opening && node.type === POST_BREAK)
   nodes.splice(next === -1 ? nodes.length : next, 0, ...media)
   return nodes
-}
-
-/**
- * A longer explanation as thread posts: the writer's own `---` and blank-line
- * breaks, or an even split at `limit` characters when they asked for one.
- * Both come from the composer's paste-as-thread rules, so a thread prepared
- * here and one pasted there break in the same places.
- */
-export function explanationPosts(
-  text: string,
-  channel: DraftChannel,
-  limit?: number
-): string[] {
-  return limit === undefined ? importedPosts(text) : splitThread(text, channel, limit)
 }
 
 /**
@@ -353,6 +339,11 @@ const PLATFORM_SIZE_IDS: Record<DraftChannel, string> = {
   tiktok: 'instagram-story',
   x: 'x-post',
   youtube: 'youtube-thumbnail',
+  facebook: 'facebook-post',
+  // Pinterest favours tall pins, 2:3.
+  pinterest: 'pinterest-pin',
+  // Google Business shows a post's image at 4:3.
+  gmb: 'slide-4x3',
 }
 
 /** The export size a platform publishes a still image at. */

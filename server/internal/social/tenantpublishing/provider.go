@@ -23,6 +23,7 @@ import (
 	socialintegration "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/database/integration"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent/integration"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -191,6 +192,15 @@ func pollDetails(poll *postoptions.Poll) *integrations.PollDetails {
 // must be checked for before any retry. The provider's message rides along
 // for the attempt record.
 func publicationOutcome(err error) *socialapi.Error {
+	if temporalx.FailureType(err) == "" && errors.Is(err, helpers.ErrTextTooComplex) {
+		// Shots, not the platform, ran out of time counting the text before it
+		// sent anything, most likely under load: the post retries, and stops
+		// with this cause if its text can never be counted.
+		retry := socialapi.NewCodedError(http.StatusTooManyRequests, publishing.FailurePublisherError,
+			"Shots could not finish checking this post's text in time, so nothing was sent. If this keeps happening, shorten the post or remove some links.")
+		retry.ProviderMessage = retry.Error()
+		return retry
+	}
 	var mapped *socialapi.Error
 	switch temporalx.FailureType(err) {
 	case temporalx.TypeRateLimited:
@@ -200,6 +210,10 @@ func publicationOutcome(err error) *socialapi.Error {
 		mapped = socialapi.NewCodedError(http.StatusConflict, publishing.FailureProviderDailyLimit, "The account reached the platform's daily posting limit; nothing was created.")
 	case temporalx.TypePublicationRejected:
 		mapped = socialapi.NewError(http.StatusBadRequest, false, "The platform rejected the publication. Review its text, media and publishing configuration before retrying.")
+		var status interface{ HTTPStatus() int }
+		if errors.As(err, &status) && status.HTTPStatus() >= 400 && status.HTTPStatus() < 500 {
+			mapped.Status = status.HTTPStatus()
+		}
 	case temporalx.TypeAppAccess:
 		return appAccessRefused(err)
 	case temporalx.TypeRefreshToken, temporalx.TypeDisconnect:
@@ -238,10 +252,15 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	// LinkedIn document goes out as the post's one media (RFC 025).
 	var youtubeOptions *postoptions.YouTubeOptions
 	var tiktokOptions *postoptions.TikTokOptions
+	var pinterestOptions *postoptions.PinterestOptions
 	if input.Options != nil {
-		youtubeOptions, tiktokOptions = input.Options.YouTube, input.Options.TikTok
+		youtubeOptions, tiktokOptions, pinterestOptions = input.Options.YouTube, input.Options.TikTok, input.Options.Pinterest
 	}
 	if err := postoptions.ValidateVideoOptions(input.Platform, youtubeOptions, tiktokOptions, true); err != nil {
+		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailurePostOptions, err.Error())
+	}
+	// A pin without its board would be refused by Pinterest; nothing is sent.
+	if err := postoptions.ValidatePinterestOptions(input.Platform, pinterestOptions, true); err != nil {
 		return socialapi.Receipt{}, socialapi.NewCodedError(http.StatusBadRequest, publishing.FailurePostOptions, err.Error())
 	}
 	assets := input.Media()
@@ -288,6 +307,14 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 	}
 	if settings, err = p.articleCover(ctx, input, settings); err != nil {
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusServiceUnavailable, false, "article cover could not be signed")
+	}
+	if strings.HasPrefix(input.Platform, "instagram") && input.Cover != nil && len(media) == 1 {
+		// Instagram takes a reel's cover in the same request as the reel.
+		cover, err := p.signedMedia(ctx, input.OrganizationID, []publishing.MediaAsset{*input.Cover})
+		if err != nil || len(cover) == 0 {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusServiceUnavailable, false, "reel cover could not be signed")
+		}
+		media[0].Thumbnail = cover[0].Path
 	}
 	// Signing media can take time. Reload the grant immediately before handoff,
 	// allowing credential refresh but never a different destination identity.
@@ -357,6 +384,15 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		response[0].Status != "posted" && response[0].Status != "success" && response[0].Status != "completed" {
 		return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "provider returned no confirmed post receipt")
 	}
+	if input.Platform == "tiktok" && tiktokOptions.SendToApp {
+		// TikTok gives an app draft no post id until the person posts it in the
+		// app; its publish id rides in the inbox address instead.
+		_, publishID, _ := strings.Cut(response[0].ReleaseURL, "#")
+		if response[0].PostID != "missing" || !strings.Contains(publishID, "_inbox_") {
+			return socialapi.Receipt{}, socialapi.NewError(http.StatusBadGateway, true, "TikTok has not confirmed the draft reached the app")
+		}
+		return socialapi.Receipt{PostID: publishID}, nil
+	}
 	if input.Platform == "tiktok" {
 		id := response[0].PostID
 		if id == "" || strings.Trim(id, "0123456789") != "" || !strings.Contains(response[0].ReleaseURL, "/video/"+id) {
@@ -364,9 +400,10 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 	}
 	var publication *postoptions.PublicationReceipt
-	// Threads and Instagram ids do not make a link, so the provider's own address is kept.
+	// Threads, Instagram, Facebook, Pinterest and Google Business ids do not make
+	// a link, so the provider's own address is kept.
 	if input.Platform == "tiktok" || input.Platform == "youtube" || input.Platform == "threads" ||
-		input.Platform == "instagram" || input.Platform == "instagram-standalone" {
+		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" || input.Platform == "gmb" {
 		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
 	}
 	if input.Platform == "youtube" {

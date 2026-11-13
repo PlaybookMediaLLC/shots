@@ -36,10 +36,12 @@ type PostPart struct {
 
 // PostOptions are the settings a new post can carry on a platform.
 type PostOptions struct {
-	FirstComment string                      `json:"firstComment"`
-	TikTok       *postoptions.TikTokOptions  `json:"tiktok"`
-	Visibility   string                      `json:"visibility"`
-	YouTube      *postoptions.YouTubeOptions `json:"youtube"`
+	Facebook     *postoptions.FacebookOptions  `json:"facebook"`
+	FirstComment string                        `json:"firstComment"`
+	Pinterest    *postoptions.PinterestOptions `json:"pinterest"`
+	TikTok       *postoptions.TikTokOptions    `json:"tiktok"`
+	Visibility   string                        `json:"visibility"`
+	YouTube      *postoptions.YouTubeOptions   `json:"youtube"`
 }
 
 // PostPlatform is what one platform posts instead of the shared text, and its
@@ -97,6 +99,7 @@ var paragraphBreak = regexp.MustCompile(`\n{2,}`)
 // queued. Everything a schedule checks is checked before the draft exists, so a
 // refused post leaves nothing behind.
 func (c *Configuration) CreatePost(ctx context.Context, actor Actor, input CreatePostInput) (*CreatePostResult, error) {
+	ctx = withDraftCountBudget(ctx) // checkPost, then scheduleContentDraft
 	if err := c.authorizePublishing(ctx, actor); err != nil {
 		return nil, err
 	}
@@ -328,7 +331,7 @@ func (o *PostOptions) publish() *postoptions.PublishOptions {
 	if o == nil {
 		return nil
 	}
-	return &postoptions.PublishOptions{FirstComment: o.FirstComment, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &postoptions.PublishOptions{Facebook: o.Facebook, FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }
 
 // version is the options as a draft's platform version stores them.
@@ -336,5 +339,5 @@ func (o *PostOptions) version() *draftdoc.VersionOptions {
 	if o == nil {
 		return nil
 	}
-	return &draftdoc.VersionOptions{FirstComment: o.FirstComment, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
+	return &draftdoc.VersionOptions{Facebook: o.Facebook, FirstComment: o.FirstComment, Pinterest: o.Pinterest, TikTok: o.TikTok, Visibility: o.Visibility, YouTube: o.YouTube}
 }

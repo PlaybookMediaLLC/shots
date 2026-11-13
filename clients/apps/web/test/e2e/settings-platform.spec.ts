@@ -10,7 +10,7 @@ import {
   openWorkspaceSetting,
   test,
 } from './framework'
-import { socialSetSchema } from '../../lib/api/contracts/social-sets'
+import { socialSetListSchema, socialSetSchema } from '../../lib/api/contracts/social-sets'
 
 async function slotCount(setId: string): Promise<number> {
   const row = await db.row<{ count: number }>(
@@ -240,4 +240,92 @@ test('a public profile is served only while it is turned on', async ({
   } finally {
     await visitor.close()
   }
+})
+
+test('a connected account moves profiles without reconnecting or moving old drafts', async ({
+  app,
+  page,
+  startWorkspace,
+}) => {
+  const workspace = await startWorkspace({ channels: ['x', 'linkedin', 'linkedin-page'] })
+  const listed = await apiRequest(page, '/api/v1/social-sets')
+  expect(listed.status).toBe(200)
+  const source = socialSetListSchema
+    .parse(listed.body)
+    .items.find((item) =>
+      item.accounts.some((account) => account.id === workspace.channels.linkedin)
+    )!
+  const account = source.accounts.find((item) => item.id === workspace.channels.linkedin)!
+  const made = await apiRequest(page, '/api/v1/social-sets', {
+    method: 'POST',
+    body: { name: 'Cross-post profile' },
+  })
+  expect(made.status).toBe(201)
+  const destination = socialSetSchema.parse(made.body)
+  const occupiedResult = await apiRequest(page, '/api/v1/social-sets', {
+    method: 'POST',
+    body: { name: 'LinkedIn Page profile' },
+  })
+  expect(occupiedResult.status).toBe(201)
+  const occupied = socialSetSchema.parse(occupiedResult.body)
+  const assigned = await apiRequest(
+    page,
+    `/api/v1/social-sets/${occupied.id}/accounts/${workspace.channels['linkedin-page']}`,
+    { method: 'POST' }
+  )
+  expect(assigned.status).toBe(200)
+  const draft = await apiRequest(page, '/api/v1/content-drafts', {
+    method: 'POST',
+    body: { plainText: 'Keep my draft here', socialSetId: source.id },
+  })
+  expect(draft.status).toBe(201)
+  const endpoint = `/api/v1/social-sets/${source.id}/accounts/${account.id}/move`
+  const invalid = await apiRequest(page, endpoint, {
+    method: 'POST',
+    body: { destinationSocialSetId: source.id },
+  })
+  expect(invalid.status).toBe(400)
+  const slotTaken = await apiRequest(page, endpoint, {
+    method: 'POST',
+    body: { destinationSocialSetId: occupied.id },
+  })
+  expect(slotTaken.status).toBe(409)
+  await app.open(`/settings/publishing-brands/${source.id}`)
+  const name = account.handle ?? account.displayName ?? account.platform
+  const picker = page.getByRole('combobox', {
+    name: `Move ${name} to another profile`,
+    exact: true,
+  })
+  await picker.click()
+  await expect(page.getByRole('option', { name: occupied.name, exact: true })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await chooseOption(
+    page.getByRole('combobox', { name: `Move ${name} to another profile`, exact: true }),
+    destination.name
+  )
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText('stays connected')
+  await expect(dialog).toContainText('Existing drafts and publishing history stay')
+  await dialog.getByRole('button', { name: 'Move account', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  await expect(
+    page.getByRole('combobox', { name: `Move ${name} to another profile`, exact: true })
+  ).toHaveCount(0)
+  await app.open(`/settings/publishing-brands/${destination.id}`)
+  await expect(page.getByText(name, { exact: false }).first()).toBeVisible()
+  const stored = await db.row<{ socialSetId: string; status: string }>(
+    'SELECT "socialSetId",status FROM channel_connection WHERE id=$1',
+    [account.id]
+  )
+  expect(stored).toEqual({ socialSetId: destination.id, status: 'ACTIVE' })
+  const original = await db.row<{ socialSetId: string }>(
+    'SELECT "socialSetId" FROM content_draft WHERE "organizationId"=$1 AND "plainText"=$2',
+    [workspace.id, 'Keep my draft here']
+  )
+  expect(original?.socialSetId).toBe(source.id)
+  const replay = await apiRequest(page, endpoint, {
+    method: 'POST',
+    body: { destinationSocialSetId: destination.id },
+  })
+  expect(replay.status).toBe(200)
 })

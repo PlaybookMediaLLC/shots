@@ -35,6 +35,10 @@ test(
       await page.getByRole('button', { name: 'More draft actions' }).click()
       await page.getByRole('menuitem', { name: 'Paste as thread…' }).click()
       await page.getByLabel('Thread text').fill('Second post\n---\nThird post')
+      // Splitting by length runs in a worker; both posts fit in one.
+      await page.getByLabel('Split by post length').check()
+      await expect(page.getByRole('button', { name: 'Append 1 posts' })).toBeEnabled()
+      await page.getByLabel('Split by post length').uncheck()
       await page.getByRole('button', { name: 'Append 2 posts' }).click()
     }
     await paste()

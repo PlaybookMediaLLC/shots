@@ -35,6 +35,17 @@ const (
 	batchGridSlots         = 4
 	batchGridHeadlineLimit = 60
 	batchGridTopicLimit    = 100
+	// The single-image and UGC templates (Content Studio).
+	batchTemplateSingle  = "single"
+	batchTemplateUGC     = "ugc"
+	batchUGCTextLimit    = 150
+	batchMusicStartLimit = 10 * 60 * 1000
+)
+
+// Template media by type. Clips are the probed video types (probedVideo), so their length is known.
+var (
+	batchTemplateImageTypes = []string{"image/jpeg", "image/png", "image/webp"}
+	batchTemplateAudioTypes = []string{"audio/aac", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm"}
 )
 
 // ContentBatchInput starts a batch in a social set (the default set when empty).
@@ -404,15 +415,39 @@ func checkBatchMedia(ctx context.Context, client *ent.Client, organizationID str
 	return nil
 }
 
-// checkBatchGrid checks a grid concept: its text fits what renders, and its
-// images and music are uploaded assets of this workspace.
+// checkBatchGrid checks a template video concept: its text fits what renders,
+// it holds only its kind's fields, and its media are uploaded assets of this
+// workspace of the right type, with clips of an accepted length.
 func checkBatchGrid(ctx context.Context, client *ent.Client, organizationID string, grid *schema.BatchGrid) error {
-	headline := strings.TrimSpace(grid.Headline)
-	if headline == "" || utf8.RuneCountInString(headline) > batchGridHeadlineLimit {
-		return invalid(fmt.Sprintf("A grid video needs a headline of 1 to %d characters.", batchGridHeadlineLimit))
+	headline := utf8.RuneCountInString(strings.TrimSpace(grid.Headline))
+	slots, headlineLimit := batchGridSlots, batchGridHeadlineLimit
+	switch grid.Kind {
+	case "":
+		if grid.HideHeadline || grid.TextPosition != "" || grid.ClosingAssetID != "" {
+			return invalid("A grid video has no image-only mode, text position or closing clip.")
+		}
+	case batchTemplateSingle:
+		slots = 1
+		if grid.TextPosition != "" || grid.ClosingAssetID != "" {
+			return invalid("A fade-in video has no text position or closing clip.")
+		}
+	case batchTemplateUGC:
+		slots, headlineLimit = 1, batchUGCTextLimit
+		if grid.HideHeadline || !slices.Contains([]string{"", "top", "middle", "bottom"}, grid.TextPosition) {
+			return invalid("A UGC video's text is at the top, middle or bottom.")
+		}
+	default:
+		return invalid("Choose a grid, fade-in or UGC video.")
 	}
-	if len(grid.Slots) != batchGridSlots {
-		return invalid(fmt.Sprintf("A grid video has %d images.", batchGridSlots))
+	// Image only keeps the headline, which may then be empty.
+	if headline > headlineLimit || headline == 0 && !grid.HideHeadline {
+		return invalid(fmt.Sprintf("A video needs text of 1 to %d characters.", headlineLimit))
+	}
+	if len(grid.Slots) != slots {
+		return invalid(fmt.Sprintf("This video takes %d images or clips.", slots))
+	}
+	if grid.MusicStartMs < 0 || grid.MusicStartMs > batchMusicStartLimit || grid.MusicStartMs > 0 && grid.MusicAssetID == "" {
+		return invalid("Music starts within its first 10 minutes.")
 	}
 	assets := []schema.BatchMedia{}
 	for _, slot := range grid.Slots {
@@ -426,7 +461,55 @@ func checkBatchGrid(ctx context.Context, client *ent.Client, organizationID stri
 	if grid.MusicAssetID != "" {
 		assets = append(assets, schema.BatchMedia{AssetID: grid.MusicAssetID})
 	}
-	return checkBatchMedia(ctx, client, organizationID, assets, false)
+	if grid.ClosingAssetID != "" {
+		assets = append(assets, schema.BatchMedia{AssetID: grid.ClosingAssetID})
+	}
+	if err := checkBatchMedia(ctx, client, organizationID, assets, false); err != nil {
+		return err
+	}
+	if grid.MusicAssetID != "" {
+		if err := checkTemplateAsset(ctx, client, organizationID, grid.MusicAssetID, batchTemplateAudioTypes, 0, 0, "Music must be an MP3, M4A, AAC, WAV, Ogg or WebM audio file."); err != nil {
+			return err
+		}
+	}
+	media := grid.Slots[0].AssetID
+	switch {
+	case media == "":
+	case grid.Kind == batchTemplateSingle:
+		if err := checkTemplateAsset(ctx, client, organizationID, media, batchTemplateImageTypes, 0, 0, "The image must be a JPEG, PNG or WebP file."); err != nil {
+			return err
+		}
+	case grid.Kind == batchTemplateUGC:
+		if err := checkTemplateAsset(ctx, client, organizationID, media, nil, 3000, 60000, "The clip must be an MP4 or MOV video of 3 to 60 seconds."); err != nil {
+			return err
+		}
+	}
+	if grid.ClosingAssetID != "" {
+		return checkTemplateAsset(ctx, client, organizationID, grid.ClosingAssetID, nil, 3000, 15000, "The closing clip must be an MP4 or MOV video of 3 to 15 seconds.")
+	}
+	return nil
+}
+
+// checkTemplateAsset checks an uploaded asset's type (a clip: a probed video
+// type, nil types) and, with maxMs, its length, rounded to the tenth of a
+// second so an encoder's few extra milliseconds pass.
+func checkTemplateAsset(ctx context.Context, client *ent.Client, organizationID, id string, types []string, minMs, maxMs int, problem string) error {
+	row, err := client.Asset.Query().Where(asset.ID(id), asset.OrganizationID(organizationID)).Only(ctx)
+	if err != nil {
+		return err
+	}
+	if types == nil && !probedVideo[row.MediaType] || types != nil && !slices.Contains(types, row.MediaType) {
+		return invalid(problem)
+	}
+	if maxMs > 0 {
+		if row.DurationMs == nil {
+			return invalid(problem)
+		}
+		if length := (*row.DurationMs + 50) / 100 * 100; length < minMs || length > maxMs {
+			return invalid(problem)
+		}
+	}
+	return nil
 }
 
 func batchItemFingerprint(input ContentBatchItemInput) string {
@@ -604,6 +687,9 @@ func applyBatchItemUpdate(ctx context.Context, tx *ent.Tx, actor Actor, set *ent
 		}
 		if err := checkBatchGrid(ctx, tx.Client(), actor.OrganizationID, input.Grid); err != nil {
 			return err
+		}
+		if item.Grid.Kind != input.Grid.Kind {
+			return conflict("A video keeps its template. Make a new one instead.")
 		}
 		update.SetGrid(input.Grid)
 		// A rendered video no longer shows a concept that changed, so it must render again.
@@ -829,6 +915,7 @@ type BatchValidationResult struct {
 // resolved in its zone so a skipped or repeated hour is named per item; the
 // queue's slots are rechecked when each item is scheduled.
 func (c *Configuration) ValidateContentBatch(ctx context.Context, actor Actor, batchID string, rows []BatchValidationRow) ([]BatchValidationResult, error) {
+	ctx = withDraftCountBudget(ctx) // one check for each target of each row
 	if err := c.authorizeDecision(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
 	}

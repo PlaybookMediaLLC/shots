@@ -41,6 +41,7 @@ import * as onboardingRuns from '@/lib/api/contracts/onboarding-runs'
 import * as outboundWebhooks from '@/lib/api/contracts/outbound-webhooks'
 import * as releases from '@/lib/api/contracts/releases'
 import * as scheduledPosts from '@/lib/api/contracts/scheduled-posts'
+import * as senja from '@/lib/api/contracts/senja'
 import * as settingsPlatform from '@/lib/api/contracts/settings-platform'
 import * as sharing from '@/lib/api/contracts/sharing'
 import * as shell from '@/lib/api/contracts/shell'
@@ -50,6 +51,7 @@ import * as socialConnections from '@/lib/api/contracts/social-connections'
 import * as socialAvailability from '@/lib/api/contracts/social-availability'
 import * as socialInstances from '@/lib/api/contracts/social-instances'
 import * as socialSets from '@/lib/api/contracts/social-sets'
+import * as socialSetTransfer from '@/lib/api/contracts/social-set-transfer'
 import * as socialSetQueue from '@/lib/api/contracts/social-set-queue'
 import * as sourceApps from '@/lib/api/contracts/source-apps'
 import * as storePublishing from '@/lib/api/contracts/store-publishing'
@@ -105,6 +107,7 @@ const contracts = new Map<string, RouteContract>(
     notifications,
     releases,
     scheduledPosts,
+    senja,
     settingsPlatform,
     sharing,
     shell,
@@ -114,6 +117,7 @@ const contracts = new Map<string, RouteContract>(
     socialAvailability,
     socialInstances,
     socialSets,
+    socialSetTransfer,
     socialSetQueue,
     sourceApps,
     storePublishing,
@@ -279,6 +283,32 @@ test('approving is human-only; agents ask for review and schedule only with post
   assert.ok(!body.safeParse({ decision: 'approve', organizationId: 'org_2' }).success)
 })
 
+test('deleting a published post takes its own scope and the publishing permission', () => {
+  const contract = write.deleteDraftPostContract
+  assert.equal(contract.access.apiKeyScope, 'post:delete')
+  assert.equal(contract.access.permission, 'publish:manage')
+  assert.equal(contract.status, 202)
+  // A post read before any delete has no receipts; a receipt keeps its code.
+  const post = contentDrafts.contentDraftPostSchema.shape.deletions
+  assert.deepEqual(post.parse(undefined), [])
+  const receipt = {
+    attempts: 1,
+    failureCode: 'http_403',
+    key: 'root',
+    kind: 'post',
+    status: 'failed',
+  }
+  assert.equal(
+    post.parse([{ ...receipt, updatedAt: new Date('2026-11-13T04:20:00.000Z') }])[0]?.failureCode,
+    'http_403'
+  )
+  assert.ok(
+    !post.safeParse([
+      { ...receipt, status: 'gone', updatedAt: new Date('2026-11-13T04:20:00.000Z') },
+    ]).success
+  )
+})
+
 test('posting directly takes its own opt-in scope and an idempotency key', () => {
   const contract = posts.createPostContract
   assert.equal(contract.access.apiKeyScope, 'post:publish')
@@ -306,6 +336,16 @@ test('posting directly takes its own opt-in scope and an idempotency key', () =>
     !contract.body.safeParse({ ...body, platforms: { linkedin: { options: { automation: {} } } } })
       .success,
     'follow-ups are not part of this call'
+  )
+  // A Facebook story and a pin's board go through this call too.
+  assert.ok(
+    contract.body.safeParse({
+      ...body,
+      platforms: {
+        facebook: { options: { facebook: { placement: 'story' } } },
+        pinterest: { options: { pinterest: { boardId: '1001' } } },
+      },
+    }).success
   )
   assert.ok(!contract.headers?.safeParse({}).success, 'a retry must not be able to post twice')
   assert.ok(!contract.headers?.safeParse({ 'idempotency-key': 'short' }).success)

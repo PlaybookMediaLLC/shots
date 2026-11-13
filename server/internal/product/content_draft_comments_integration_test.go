@@ -89,6 +89,11 @@ func TestMemberCommentsPreserveContentAndAuthority(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The history tells a resolve from a reopen.
+	history, err := repo.ListContentDraftActivity(ctx, approver, draft.ID, "")
+	if err != nil || history.Items[0].Action != "product.content_draft_comment_resolve" || history.Items[0].Metadata["resolved"] != true {
+		t.Fatalf("history=%+v err=%v", history, err)
+	}
 	draft, err = repo.MutateContentDraftComment(ctx, viewer, draft.ID, ContentDraftCommentInput{Action: "delete", BaseVersion: draft.Version, ThreadID: "first", CommentID: "first"})
 	if err != nil {
 		t.Fatal(err)

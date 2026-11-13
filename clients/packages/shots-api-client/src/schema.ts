@@ -344,6 +344,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/integrations/senja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read whether Senja import is set up
+         * @description Whether the workspace saved a Senja API key. The key itself is never returned.
+         */
+        get: operations["getSenjaStatus"];
+        /**
+         * Save the workspace’s Senja API key
+         * @description Check a Senja project API key with Senja, then seal and save it as the workspace’s one Senja key.
+         */
+        put: operations["saveSenjaKey"];
+        post?: never;
+        /**
+         * Remove the workspace’s Senja API key
+         * @description Forget the workspace’s Senja API key. Imported videos stay in the workspace.
+         */
+        delete: operations["removeSenjaKey"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/content-drafts/senja": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Senja video testimonials to import
+         * @description The newest approved video testimonials of the workspace’s Senja project, up to 100.
+         */
+        get: operations["listSenjaVideos"];
+        put?: never;
+        /**
+         * Import a Senja video testimonial
+         * @description Re-read a testimonial from Senja and store its video through the workspace upload pipeline.
+         */
+        post: operations["importSenjaVideo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/mutations": {
         parameters: {
             query?: never;
@@ -1096,6 +1148,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/content-draft-posts/{id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a published post from its platform
+         * @description Deletes a post that Shots published from its platform, with its thread parts, the replies Shots posted and its reposts. Each part gets a receipt; a part the platform already removed counts as deleted. Platforms without a delete call record the part as unsupported. Requires the `post:delete` scope.
+         */
+        post: operations["deleteContentDraftPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posts": {
         parameters: {
             query?: never;
@@ -1225,7 +1297,7 @@ export interface paths {
         };
         /**
          * List a draft's activity
-         * @description Lists a draft's history, newest first: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who and when. Viewing a draft is never recorded.
+         * @description Lists a draft's history, newest first (by time, then id), 50 events a page: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who, through what, and when. Viewing a draft is never recorded. Pass `nextCursor` as `cursor` for the next page.
          */
         get: operations["listContentDraftActivity"];
         put?: never;
@@ -2072,7 +2144,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -2082,8 +2154,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -2094,6 +2170,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -2127,6 +2223,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -2158,6 +2255,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -2181,7 +2280,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -2210,7 +2309,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -2230,6 +2329,19 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
             undo: {
                 draftId: string;
@@ -2409,7 +2521,7 @@ export interface components {
             returnPath?: string;
             socialSetId?: string;
             /** @enum {string} */
-            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom";
+            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "facebook" | "pinterest" | "gmb";
             instanceServer?: string;
         };
         SocialConnectionAttemptResponse: {
@@ -2421,7 +2533,7 @@ export interface components {
             version: 1;
             providers: {
                 /** @enum {string} */
-                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
+                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack" | "facebook" | "pinterest" | "gmb";
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
@@ -2942,7 +3054,7 @@ export interface components {
                 scheduledAt: string | null;
                 scheduledPostId: string | null;
                 /** @description Delivery state of `scheduledPostId`. */
-                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                 specVersion: number | null;
                 /** @enum {string} */
                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3001,7 +3113,7 @@ export interface components {
                     scheduledAt: string | null;
                     scheduledPostId: string | null;
                     /** @description Delivery state of `scheduledPostId`. */
-                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                     specVersion: number | null;
                     /** @enum {string} */
                     status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3051,7 +3163,7 @@ export interface components {
                 /** @description RFC 3339 timestamp of the planned publication. */
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 /** @description The content draft the post came from, when it has no variant. */
                 contentDraftId: string | null;
                 /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -3184,7 +3296,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3194,8 +3306,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3206,6 +3322,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3239,6 +3375,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3270,6 +3407,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3393,7 +3532,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3403,8 +3542,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3415,6 +3558,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3448,6 +3611,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3479,6 +3643,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3508,7 +3674,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3518,8 +3684,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3530,6 +3700,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3563,6 +3753,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3622,7 +3813,7 @@ export interface components {
             /** @enum {string} */
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
-            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
             /** Format: uuid */
             releaseId?: string;
             scratchpad?: string;
@@ -3736,7 +3927,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3746,8 +3937,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3758,6 +3953,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3791,6 +4006,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3822,6 +4038,8 @@ export interface components {
                 }[];
             };
             queuedPosts: number;
+            /** @default 0 */
+            sentToAppPosts: number;
             scratchpad: string;
             sourceDraftId: string | null;
             tagIds: string[];
@@ -3850,7 +4068,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3860,8 +4078,12 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3872,6 +4094,26 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3905,6 +4147,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3965,7 +4208,7 @@ export interface components {
             /** @enum {string} */
             status?: "draft" | "archived";
             naturalPostingTime?: boolean;
-            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube") | "";
+            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb") | "";
             plannedFor?: string | "";
         };
         ContentDraftPostList: {
@@ -3977,7 +4220,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -4006,7 +4249,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -4026,7 +4269,28 @@ export interface components {
                 failureCode: string | null;
                 /** @default null */
                 publishedAt: string | null;
+                /** @default null */
+                deletedAt: string | null;
+                /** @default [] */
+                deletions: {
+                    attempts: number;
+                    failureCode: string | null;
+                    key: string;
+                    /** @enum {string} */
+                    kind: "post" | "repost";
+                    /** @enum {string} */
+                    status: "pending" | "done" | "failed" | "unsupported";
+                    updatedAt: string;
+                }[];
             }[];
+        };
+        PostDeletion: {
+            deletion: {
+                organizationId: string;
+                platform: string;
+                postId: string;
+                requestedBy: string;
+            };
         };
         PostCreateRequest: {
             /** @enum {string} */
@@ -4040,8 +4304,18 @@ export interface components {
             platforms?: {
                 [key: string]: {
                     options?: {
+                        facebook?: {
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
                         firstComment?: string;
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -4060,6 +4334,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                     };
                     posts?: {
@@ -4188,7 +4465,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -4198,8 +4475,12 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -4210,6 +4491,26 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
+                            };
+                            facebook?: {
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -4243,6 +4544,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -4274,6 +4576,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -4303,7 +4607,10 @@ export interface components {
                 metadata: {
                     [key: string]: unknown;
                 };
+                /** @enum {string} */
+                source: "person" | "api" | "mcp" | "workflow" | "callback" | "support" | "automation";
             }[];
+            nextCursor: string | null;
         };
         DraftTagList: {
             items: {
@@ -4458,7 +4765,7 @@ export interface components {
             threadId?: string;
             anchor: {
                 /** @enum {string} */
-                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube";
+                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                 postId: string;
                 quote?: string;
             };
@@ -5814,6 +6121,7 @@ export interface operations {
                                 xCaptionLimit?: (280 | 25000) | null;
                                 xArticles?: boolean | null;
                                 xQuotes?: boolean;
+                                xVideoMaxSeconds?: number | null;
                                 mastodonQuotes?: boolean | null;
                                 pollLimits?: {
                                     maxOptions: number;
@@ -5903,6 +6211,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6005,6 +6314,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6236,6 +6546,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6432,7 +6743,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -6461,7 +6772,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -6480,6 +6791,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                             campaignId?: string | null;
                             campaignTitle?: string;
                             version: number;
@@ -6710,6 +7034,327 @@ export interface operations {
                 };
             };
             /** @description Approval is not configured or GIPHY is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getSenjaStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Senja import status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        configured: boolean;
+                        sealable: boolean;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    saveSenjaKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    apiKey: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The key is saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        configured: boolean;
+                        sealable: boolean;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Senja refused the key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Senja is unreachable, or keys cannot be sealed here. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    removeSenjaKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The key is gone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        configured: boolean;
+                        sealable: boolean;
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listSenjaVideos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Video testimonials. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            customerName: string;
+                            durationSeconds: number | null;
+                            id: string;
+                            thumbnailUrl: string | null;
+                        }[];
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The workspace has no Senja key. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Senja refused the saved key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Senja is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    importSenjaVideo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The video is a workspace asset. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        assetId: string;
+                        /** @constant */
+                        mediaType: "video/mp4";
+                    };
+                };
+            };
+            /** @description A signed-in workspace session is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The member lacks the permission or plan, the sign-in is not fresh enough, or the request sent an API key. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The testimonial is no longer in Senja. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The workspace has no Senja key. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The testimonial has no usable video, or Senja refused the saved key. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Senja is unreachable. */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -8777,7 +9422,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -8878,7 +9523,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9412,7 +10057,7 @@ export interface operations {
                         scheduledAt: string | null;
                         scheduledPostId: string | null;
                         /** @description Delivery state of `scheduledPostId`. */
-                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                         specVersion: number | null;
                         /** @enum {string} */
                         status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9581,7 +10226,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9612,7 +10257,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9718,7 +10363,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -10217,6 +10862,73 @@ export interface operations {
             };
         };
     };
+    deleteContentDraftPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delete started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostDeletion"];
+                };
+            };
+            /** @description Authentication is required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The caller may not publish to this account, or the key lacks `post:delete`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post was not found in this workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The post is not live, or it was already deleted. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A required dependency is unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     createPost: {
         parameters: {
             query?: never;
@@ -10347,7 +11059,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10357,8 +11069,12 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10369,6 +11085,26 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
+                                        };
+                                        facebook?: {
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10402,6 +11138,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10433,6 +11170,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10456,7 +11195,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -10485,7 +11224,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10505,6 +11244,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */
@@ -10627,7 +11379,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest" | "gmb";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10637,8 +11389,12 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10649,6 +11405,26 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
+                                        };
+                                        facebook?: {
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10682,6 +11458,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10713,6 +11490,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10736,7 +11515,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -10765,7 +11544,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10785,6 +11564,19 @@ export interface operations {
                             failureCode: string | null;
                             /** @default null */
                             publishedAt: string | null;
+                            /** @default null */
+                            deletedAt: string | null;
+                            /** @default [] */
+                            deletions: {
+                                attempts: number;
+                                failureCode: string | null;
+                                key: string;
+                                /** @enum {string} */
+                                kind: "post" | "repost";
+                                /** @enum {string} */
+                                status: "pending" | "done" | "failed" | "unsupported";
+                                updatedAt: string;
+                            }[];
                         }[];
                         reviewPath?: string;
                         /** @enum {string} */
@@ -11205,7 +11997,9 @@ export interface operations {
     };
     listContentDraftActivity: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+            };
             header?: never;
             path: {
                 id: string;

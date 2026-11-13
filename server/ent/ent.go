@@ -115,6 +115,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformsocialobservation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/platformworkspacecreation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postautomationrun"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/postdeletion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productprofile"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/productsurface"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/project"
@@ -324,6 +325,7 @@ func checkColumn(t, c string) error {
 			platformsocialobservation.Table:       platformsocialobservation.ValidColumn,
 			platformworkspacecreation.Table:       platformworkspacecreation.ValidColumn,
 			postautomationrun.Table:               postautomationrun.ValidColumn,
+			postdeletion.Table:                    postdeletion.ValidColumn,
 			productprofile.Table:                  productprofile.ValidColumn,
 			productsurface.Table:                  productsurface.ValidColumn,
 			project.Table:                         project.ValidColumn,

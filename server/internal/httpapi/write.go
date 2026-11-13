@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type WriteStore interface {
 	LookupPeopleMentions(context.Context, product.Actor, string, string) ([]product.Mention, error)
 	LookupCommunities(context.Context, product.Actor, string, string) ([]product.Community, error)
+	LookupPinterestBoards(context.Context, product.Actor, string) ([]product.PinterestBoard, error)
 	LookupMentions(ctx context.Context, actor product.Actor, setID, channel, query string) ([]product.Mention, error)
 	SetAssetAltText(ctx context.Context, actor product.Actor, assetID, altText string) (*product.AssetAltText, error)
 	ListContentDraftTags(context.Context, product.Actor, string) ([]product.ContentDraftTagRecord, error)
@@ -30,16 +32,18 @@ type WriteStore interface {
 	DuplicateContentDraftWithKey(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
 	CopyContentDraftToSet(context.Context, product.Actor, string, product.ContentDraftCopyInput) (*product.ContentDraftCopyResult, error)
 	RecoverContentDraftRevision(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
-	ListContentDraftActivity(context.Context, product.Actor, string) ([]product.ContentDraftActivity, error)
+	ListContentDraftActivity(context.Context, product.Actor, string, string) (*product.ContentDraftActivityPage, error)
 	ListPlannedContentDrafts(context.Context, product.Actor, time.Time, time.Time, string) ([]product.ContentDraftRecord, error)
 	RetryContentDraftPost(context.Context, product.Actor, string) (*product.MovedDraftPost, error)
 	ReconcileContentDraftPost(context.Context, product.Actor, string, product.ReconcileInput) (*product.ContentDraftPost, error)
 	CancelContentDraftPostAutomations(context.Context, product.Actor, string) (*product.ContentDraftPost, error)
+	DeleteContentDraftPost(context.Context, product.Actor, string) (*product.DeletionRequest, error)
 }
 
 func (s *Server) registerWrite(mux *http.ServeMux) {
 	mux.Handle("GET /v1/social-sets/{id}/mentions", s.authenticateProduct(http.HandlerFunc(s.lookupMentions)))
 	mux.Handle("GET /v1/social-sets/{id}/communities", s.authenticateProduct(http.HandlerFunc(s.lookupCommunities)))
+	mux.Handle("GET /v1/social-sets/{id}/pinterest-boards", s.authenticateProduct(http.HandlerFunc(s.lookupPinterestBoards)))
 	mux.Handle("PUT /v1/assets/{id}/alt-text", s.authenticateProduct(http.HandlerFunc(s.setAssetAltText)))
 	mux.Handle("GET /v1/social-sets/{id}/tags", s.authenticateProduct(http.HandlerFunc(s.listDraftTags)))
 	mux.Handle("POST /v1/social-sets/{id}/tags", s.authenticateProduct(http.HandlerFunc(s.createDraftTag)))
@@ -59,6 +63,7 @@ func (s *Server) registerWrite(mux *http.ServeMux) {
 	mux.Handle("POST /v1/content-draft-posts/{id}/retry", s.authenticateProduct(http.HandlerFunc(s.retryContentDraftPost)))
 	mux.Handle("POST /v1/content-draft-posts/{id}/reconcile", s.authenticateProduct(http.HandlerFunc(s.reconcileContentDraftPost)))
 	mux.Handle("POST /v1/content-draft-posts/{id}/automations/cancel", s.authenticateProduct(http.HandlerFunc(s.cancelContentDraftPostAutomations)))
+	mux.Handle("POST /v1/content-draft-posts/{id}/delete", s.authenticateProduct(http.HandlerFunc(s.deleteContentDraftPost)))
 }
 
 // pathIDs reads path values that must be resource IDs.
@@ -232,8 +237,8 @@ func (s *Server) contentDraftActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id)
-	respond(w, http.StatusOK, map[string]any{"items": items}, err)
+	page, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id, r.URL.Query().Get("cursor"))
+	respond(w, http.StatusOK, page, err)
 }
 
 func (s *Server) listPlannedContentDrafts(w http.ResponseWriter, r *http.Request) {
@@ -295,6 +300,25 @@ func (s *Server) cancelContentDraftPostAutomations(w http.ResponseWriter, r *htt
 	respond(w, http.StatusOK, map[string]any{"post": post}, err)
 }
 
+// deleteContentDraftPost starts deleting a live post from its platform. The
+// workflow removes its parts with receipts; 202 means it was started.
+func (s *Server) deleteContentDraftPost(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	request, err := s.configuration.DeleteContentDraftPost(r.Context(), workspaceActor(r), ids[0])
+	if errors.Is(err, product.ErrPostDeletionNotStarted) {
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"deletion": request})
+}
+
 // lookupMentions finds what the set's account for a channel can mention.
 func (s *Server) lookupCommunities(w http.ResponseWriter, r *http.Request) {
 	ids, ok := pathIDs(w, r, "id")
@@ -307,6 +331,16 @@ func (s *Server) lookupCommunities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// lookupPinterestBoards lists the boards of the set's Pinterest account.
+func (s *Server) lookupPinterestBoards(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	items, err := s.configuration.LookupPinterestBoards(r.Context(), workspaceActor(r), ids[0])
+	respond(w, http.StatusOK, map[string]any{"items": items}, err)
 }
 
 func (s *Server) lookupMentions(w http.ResponseWriter, r *http.Request) {

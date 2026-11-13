@@ -21,8 +21,11 @@ type Actor struct {
 	Display      string
 	Organization string
 	RequestID    string
-	Type         string
-	UserID       string
+	// Source says how an automated change arrived: api, mcp, workflow or
+	// callback. It is a safe label for histories, never a credential.
+	Source string
+	Type   string
+	UserID string
 }
 
 type CreateConnectionInput struct {
@@ -86,7 +89,7 @@ type PublishJob struct {
 	// Options are the first post's settings beyond its text (RFC 025).
 	Options postoptions.PublishOptions
 	// Document is a LinkedIn PDF posted as a document carousel; Cover is an
-	// X article's cover image.
+	// X article's cover, an Instagram reel's cover or a YouTube thumbnail.
 	Document        *MediaAsset
 	Cover           *MediaAsset
 	Connection      *ent.ChannelConnection
@@ -103,6 +106,9 @@ const (
 	FailureWorkspaceInactive = "WORKSPACE_INACTIVE"
 	// The account was disconnected or removed from the workspace.
 	FailureAccountUnavailable = "ACCOUNT_UNAVAILABLE"
+	// The person who queued it can no longer publish there: they left, were
+	// removed, demoted or banned, or no longer own its private set.
+	FailureSchedulerUnauthorized = "SCHEDULER_UNAUTHORIZED"
 	// A campaign variant is no longer approved.
 	FailureApprovalRequired = "APPROVAL_REQUIRED"
 	// The workspace approves drafts and a reviewer sent this one back.

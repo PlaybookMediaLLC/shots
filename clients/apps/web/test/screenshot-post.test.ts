@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import { POST_BREAK } from '@/lib/content-drafts/serialize'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
-import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
+import { importedPosts, THREAD_POST_LIMIT } from '@/lib/write/import-text'
+import type { CaptionCountMessage, CaptionCountRequest } from '@/lib/write/caption-count.worker'
+import type { SplitMessage, SplitRequest } from '@/lib/write/import-text.worker'
 import { platformVersionsSchema } from '@/lib/write/document'
 import type { DesignCopy } from '@/lib/captions/channels'
 import {
@@ -14,7 +16,6 @@ import {
   captionFor,
   captionsOverLimit,
   carriedFollowUps,
-  explanationPosts,
   isCaptionedChannel,
   platformAcceptsSize,
   platformTarget,
@@ -73,18 +74,60 @@ test('media with no body to lead opens its own post', () => {
 test('a screenshot thread stays inside the one thread limit', () => {
   const posts = Array.from({ length: THREAD_POST_LIMIT }, (_, index) => `Post ${index + 1}`)
   assert.equal(THREAD_POST_LIMIT, 25)
-  assert.throws(() => explanationPosts(posts.concat('One too many').join('\n---\n'), 'x'))
-  assert.equal(explanationPosts(posts.join('\n---\n'), 'x').length, THREAD_POST_LIMIT)
+  assert.throws(() => importedPosts(posts.concat('One too many').join('\n---\n')))
+  assert.equal(importedPosts(posts.join('\n---\n')).length, THREAD_POST_LIMIT)
 })
 
-test('an explanation splits the way the composer splits a paste', () => {
-  assert.deepEqual(explanationPosts('First\n---\nSecond', 'x'), ['First', 'Second'])
-  assert.deepEqual(explanationPosts('alpha bravo charlie delta echo foxtrot', 'x', 23), [
-    'alpha bravo charlie',
-    'delta echo foxtrot',
-  ])
+/**
+ * Loads a worker module against a fake worker scope: what it posted on load,
+ * and a way to send it one request and read its reply.
+ */
+async function loadWorker<Request, Message>(t: TestContext, load: () => Promise<unknown>) {
+  const replies: Message[] = []
+  const scope = {
+    onmessage: null as ((event: { data: Request }) => void) | null,
+    postMessage: (message: Message) => replies.push(message),
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'self')
+  Object.defineProperty(globalThis, 'self', { configurable: true, value: scope })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'self', previous)
+    else Reflect.deleteProperty(globalThis, 'self')
+  })
+  await load()
+  const loaded = [...replies]
+  return {
+    loaded,
+    send(data: Request) {
+      scope.onmessage!({ data })
+      return replies.at(-1)
+    },
+  }
+}
+
+// Both screens split through useThreadPosts: `---` on the page, a length in
+// the composer's split worker, which answers each request by its id.
+test('an explanation splits the way the composer splits a paste', async (t) => {
+  const worker = await loadWorker<SplitRequest, SplitMessage>(
+    t,
+    () => import('@/lib/write/import-text.worker')
+  )
+  // It says when it has loaded, so the page knows a request will start at once.
+  assert.deepEqual(worker.loaded, [{ ready: true }])
+  const split = (id: number, text: string, limit: number) =>
+    worker.send({ channel: 'x', id, limit, text })
+  assert.deepEqual(importedPosts('First\n---\nSecond'), ['First', 'Second'])
+  assert.deepEqual(split(1, 'alpha bravo charlie delta echo foxtrot', 23), {
+    error: '',
+    id: 1,
+    posts: ['alpha bravo charlie', 'delta echo foxtrot'],
+  })
   // The composer's own bounds apply here too, rather than a second rule.
-  assert.throws(() => explanationPosts('alpha', 'x', 1))
+  assert.deepEqual(split(2, 'alpha', 1), {
+    error: 'Choose a post length between 23 and 25,000.',
+    id: 2,
+    posts: [],
+  })
 })
 
 test('kept follow-ups travel as the X version the backend already reads', () => {
@@ -160,11 +203,15 @@ const copy: DesignCopy = {
 }
 
 test('captions attach only where both a caption and a publisher exist', () => {
-  // Facebook has captions but no adapter; Mastodon, TikTok and YouTube
-  // publish but get no written caption.
-  assert.deepEqual([...CAPTIONED_CHANNELS], ['x', 'linkedin', 'instagram', 'threads', 'bluesky'])
-  assert.equal(isCaptionedChannel('facebook'), false)
+  // Mastodon, TikTok, YouTube and Pinterest publish but get no written caption.
+  assert.deepEqual(
+    [...CAPTIONED_CHANNELS],
+    ['x', 'linkedin', 'instagram', 'threads', 'bluesky', 'facebook']
+  )
+  assert.equal(isCaptionedChannel('facebook'), true)
+  assert.equal(isCaptionedChannel('pinterest'), false)
   assert.equal(captionFor(copy, 'mastodon'), '')
+  assert.equal(captionFor(copy, 'pinterest'), '')
 })
 
 // A provider platform is not a draft channel: company pages and standalone
@@ -183,12 +230,17 @@ test('every account a draft can post from is offered, under its channel', () => 
       account('old', 'twitter'),
       account('masto', 'mastodon'),
       account('fb', 'facebook'),
+      account('local', 'gmb'),
+      // Reddit is not a draft channel, so its account is not offered.
+      account('forum', 'reddit'),
     ]).map((item) => [item.id, item.channel]),
     [
       ['page', 'linkedin'],
       ['solo', 'instagram'],
       ['old', 'x'],
       ['masto', 'mastodon'],
+      ['fb', 'facebook'],
+      ['local', 'gmb'],
     ]
   )
   const accounts = postAccounts([account('a', 'x'), account('b', 'linkedin')])
@@ -212,8 +264,8 @@ test('the post opens with a caption written for a chosen platform', () => {
 })
 
 test('each platform is measured against the text it will post', () => {
-  const link = `Read it: https://${'a'.repeat(300)}.example.com`
-  // X counts any link as 23 characters, so this one fits despite its length.
+  const link = `Read it: https://example.com/${'a'.repeat(300)}`
+  // X counts any link it recognizes as 23 characters, so this one fits despite its length.
   assert.deepEqual(captionsOverLimit({ body: link, channels: ['x'], copy: null, primary: 'x' }), [])
   assert.deepEqual(
     captionsOverLimit({ body: 'x'.repeat(281), channels: ['x'], copy: null, primary: 'x' }),
@@ -238,6 +290,18 @@ test('each platform is measured against the text it will post', () => {
       primary: 'linkedin',
     }),
     []
+  )
+})
+
+test('the sheet counts its captions in a worker that answers the same way', async (t) => {
+  const worker = await loadWorker<CaptionCountRequest, CaptionCountMessage>(
+    t,
+    () => import('@/lib/write/caption-count.worker')
+  )
+  assert.deepEqual(worker.loaded, [{ ready: true }])
+  assert.deepEqual(
+    worker.send({ body: 'x'.repeat(281), channels: ['x'], copy: null, id: 7, primary: 'x' }),
+    { id: 7, overLimit: [{ channel: 'x', length: 281, limit: 280, reused: false }] }
   )
 })
 

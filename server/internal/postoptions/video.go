@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 )
 
@@ -13,10 +14,59 @@ type YouTubeOptions struct {
 	Title       string `json:"title"`
 	Privacy     string `json:"privacy"`
 	MadeForKids *bool  `json:"madeForKids,omitempty"`
+	// Tags are snippet.tags; YouTube caps them together (YouTubeTagsLength).
+	Tags []string `json:"tags,omitempty"`
+	// ContainsSyntheticMedia is status.containsSyntheticMedia: realistic
+	// altered or synthetic content.
+	ContainsSyntheticMedia bool `json:"containsSyntheticMedia,omitempty"`
+	// ThumbnailAssetID is set as the custom thumbnail once the video is live,
+	// a follow-up of its own: its failure never fails the video.
+	ThumbnailAssetID string `json:"thumbnailAssetId,omitempty"`
+}
+
+// YouTubeTagsLimit is YouTube's cap on all of a video's tags together.
+const YouTubeTagsLimit = 500
+
+// YouTubeTagsLength counts tags as YouTube does: UTF-16 units, plus two for
+// the quotes around a tag with a space, plus a comma between tags.
+func YouTubeTagsLength(tags []string) int {
+	total := max(len(tags)-1, 0)
+	for _, tag := range tags {
+		total += len(utf16.Encode([]rune(tag)))
+		if strings.ContainsFunc(tag, unicode.IsSpace) {
+			total += 2
+		}
+	}
+	return total
+}
+
+// checkYouTubeTags checks a scheduled snapshot's tags only, so a draft saves
+// while it is being edited: Go and the composer can read a tag's case and
+// spaces differently, and a draft must never stop saving over it.
+func checkYouTubeTags(tags []string, complete bool) error {
+	if !complete {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		key := strings.ToLower(tag)
+		if strings.TrimSpace(tag) != tag || tag == "" || strings.ContainsAny(tag, "<>,") || seen[key] {
+			return fmt.Errorf("YouTube tags are distinct words or phrases without commas or angle brackets")
+		}
+		seen[key] = true
+	}
+	if YouTubeTagsLength(tags) > YouTubeTagsLimit {
+		return fmt.Errorf("keep YouTube tags under %d characters together", YouTubeTagsLimit)
+	}
+	return nil
 }
 
 // TikTokOptions contains the consent and controls required for direct video posts.
 type TikTokOptions struct {
+	// SendToApp sends the video to the TikTok app as a draft (the Content
+	// Posting API's UPLOAD, under video.upload) for the person to finish and
+	// post there. TikTok ignores the controls below then, so none is set.
+	SendToApp         bool   `json:"sendToApp,omitempty"`
 	CommercialContent bool   `json:"commercialContent,omitempty"`
 	Privacy           string `json:"privacy"`
 	AllowComments     bool   `json:"allowComments"`
@@ -38,11 +88,18 @@ func ValidateVideoOptions(channel string, youtube *YouTubeOptions, tiktok *TikTo
 		if length > 100 || strings.ContainsAny(youtube.Title, "<>") || (youtube.Privacy != "" && !slices.Contains([]string{"public", "private", "unlisted"}, youtube.Privacy)) {
 			return fmt.Errorf("choose a YouTube title of 2 to 100 characters without angle brackets and a valid privacy setting")
 		}
+		if err := checkYouTubeTags(youtube.Tags, complete); err != nil {
+			return err
+		}
 		if complete && (length < 2 || youtube.Privacy == "" || youtube.MadeForKids == nil) {
 			return fmt.Errorf("choose a YouTube title, privacy and audience before scheduling")
 		}
 	}
-	if tiktok != nil {
+	if tiktok != nil && tiktok.SendToApp {
+		if *tiktok != (TikTokOptions{SendToApp: true}) {
+			return fmt.Errorf("a TikTok app draft takes its privacy, interactions and disclosures in the TikTok app")
+		}
+	} else if tiktok != nil {
 		if tiktok.Privacy != "" && !slices.Contains([]string{"PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR", "SELF_ONLY"}, tiktok.Privacy) {
 			return fmt.Errorf("choose a permitted TikTok privacy setting")
 		}
@@ -88,7 +145,8 @@ func (c *TikTokCreator) Check(o *TikTokOptions, durationMs int) error {
 	if c == nil || o == nil || c.MaxDurationSeconds <= 0 {
 		return ErrCreatorPermissions
 	}
-	if !slices.Contains(c.PrivacyLevels, o.Privacy) {
+	// An app draft's privacy is chosen in TikTok; its length still counts.
+	if !o.SendToApp && !slices.Contains(c.PrivacyLevels, o.Privacy) {
 		return fmt.Errorf("the TikTok account no longer offers the chosen privacy")
 	}
 	if durationMs <= 0 || durationMs > c.MaxDurationSeconds*1000 {

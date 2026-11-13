@@ -14,7 +14,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// A live post's follow-ups (RFC 025): its LinkedIn first comment, reposts at
+// A live post's follow-ups (RFC 025): its first comment or YouTube thumbnail, reposts at
 // set times and their removal, a plug reply once it has enough engagement,
 // and the RFC 013 like-gated repost and quote. Each step has a receipt keyed
 // by post and step, written before the step acts again, so a retried
@@ -34,6 +34,7 @@ const (
 	AutomationPlug          = "plug"
 	AutomationRepostAtLikes = "repost_at_likes"
 	AutomationQuote         = "quote"
+	AutomationThumbnail     = "thumbnail"
 )
 
 // Receipt states; they match post_automation_run.status.
@@ -89,7 +90,7 @@ type automationStore interface {
 	// RecordAutomation settles a pending receipt, or counts a try when
 	// status is pending. It reports false when the receipt was no longer
 	// pending (cancelled meanwhile), so the step's result is not recorded.
-	RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode string) (bool, error)
+	RecordAutomation(ctx context.Context, postID, key, status, remoteID, failureCode, providerMessage string) (bool, error)
 }
 
 // automator runs a step against the platform.
@@ -103,8 +104,11 @@ type automator interface {
 func automationPlan(job PreparedPublication, publishedAt time.Time) []AutomationStep {
 	var steps []AutomationStep
 	if job.Options != nil && strings.TrimSpace(job.Options.FirstComment) != "" &&
-		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram")) {
+		(strings.HasPrefix(job.Platform, "linkedin") || strings.HasPrefix(job.Platform, "instagram") || job.Platform == "facebook") {
 		steps = append(steps, AutomationStep{At: publishedAt, Key: "first-comment", Kind: AutomationFirstComment})
+	}
+	if job.Platform == "youtube" && job.Options != nil && job.Options.YouTube != nil && job.Options.YouTube.ThumbnailAssetID != "" {
+		steps = append(steps, AutomationStep{At: publishedAt, Key: "thumbnail", Kind: AutomationThumbnail})
 	}
 	actions := job.AutoActions
 	if actions == nil {
@@ -205,8 +209,9 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 	if status != ReceiptPending {
 		return AutomationResult{Settled: true}, nil
 	}
+	message := ""
 	settle := func(status, remoteID, code string) (AutomationResult, error) {
-		_, err := store.RecordAutomation(ctx, postID, step.Key, status, remoteID, code)
+		_, err := store.RecordAutomation(ctx, postID, step.Key, status, remoteID, code, message)
 		return AutomationResult{Settled: status != ReceiptPending}, err
 	}
 	if !hasActor {
@@ -222,6 +227,12 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 		if input.Job.Options != nil {
 			request.Text = input.Job.Options.FirstComment
 		}
+	case AutomationThumbnail:
+		if input.Job.Cover == nil {
+			// The image was gone when the post went out; the video is live without it.
+			return settle(ReceiptSkipped, "", "media_unavailable")
+		}
+		request.Media = input.Job.Cover
 	case AutomationUnretweet:
 		repost, _, err := store.AutomationReceipt(ctx, postID, "retweet:"+strconv.Itoa(step.Rule))
 		if err != nil {
@@ -248,6 +259,7 @@ func (a *Activities) RunAutomation(ctx context.Context, input AutomationInput) (
 		if errors.Is(err, socialapi.ErrUnsupported) {
 			return settle(ReceiptSkipped, "", "unsupported")
 		}
+		message = providerMessage(err)
 		return settle(ReceiptFailed, "", automationFailureCode(err))
 	}
 	if !result.Done {

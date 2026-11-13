@@ -42,10 +42,16 @@ type PlatformVersion struct {
 // VersionOptions are a platform version's settings. Each field belongs to
 // the platforms that support it; the backend refuses it anywhere else.
 type VersionOptions struct {
-	YouTube      *postoptions.YouTubeOptions `json:"youtube,omitempty"`
-	TikTok       *postoptions.TikTokOptions  `json:"tiktok,omitempty"`
-	LinkPreviews []postoptions.LinkPreview   `json:"linkPreviews,omitempty"`
-	AutoDM       *autodm.Config              `json:"autoDm,omitempty"`
+	YouTube *postoptions.YouTubeOptions `json:"youtube,omitempty"`
+	TikTok  *postoptions.TikTokOptions  `json:"tiktok,omitempty"`
+	// Instagram: collaborators, tags, and a reel's cover, grid and trial.
+	Instagram *postoptions.InstagramOptions `json:"instagram,omitempty"`
+	// Pinterest: the pin's board, title and link.
+	Pinterest *postoptions.PinterestOptions `json:"pinterest,omitempty"`
+	// Facebook: a Page story instead of a feed post.
+	Facebook     *postoptions.FacebookOptions `json:"facebook,omitempty"`
+	LinkPreviews []postoptions.LinkPreview    `json:"linkPreviews,omitempty"`
+	AutoDM       *autodm.Config               `json:"autoDm,omitempty"`
 	// Preferred length when making a thread; publication still checks account limits.
 	SplitLimit   int  `json:"splitLimit,omitempty"`
 	SplitOnPaste bool `json:"splitOnPaste,omitempty"`

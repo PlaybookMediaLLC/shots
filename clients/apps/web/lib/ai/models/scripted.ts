@@ -824,6 +824,7 @@ const SUBMIT_TOOLS = [
   'submitTranslations',
   'submitCopySuggestions',
   'submitGridLines',
+  'submitOverlayIdeas',
 ] as const
 
 // ------------------------------------------------- store screenshots --
@@ -886,6 +887,8 @@ export function createScriptedModel(modelId: string): LanguageModelV4 {
         const input =
           submit === 'submitGridLines'
             ? { lines: ['Scripted suggestion one', 'Scripted suggestion two'] }
+            : submit === 'submitOverlayIdeas'
+            ? { lines: [1, 2, 3, 4, 5].map((n) => `Scripted idea ${n}\nfor this product`) }
             : submit === 'submitRefinement'
             ? scriptRefinement(text, systemText(options))
             : submit === 'submitSpec'

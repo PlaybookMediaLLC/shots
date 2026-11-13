@@ -4,7 +4,7 @@ Inspected 13 October 2026. Four connected reports cover creation, media producti
 
 | Feature | Technical report | Supporting contract / checks |
 |---|---|---|
-| New Post: text, image, video, story | [Composer analysis](composer/post-bridge-new-post-technical-analysis.md) | [OpenAPI](composer/post-bridge-composer.openapi.json) · [Verification](composer/post-bridge-verification-matrix.csv) |
+| New Post: text, image, video, story | [Composer analysis](composer/post-bridge-new-post-technical-analysis.md) | [OpenAPI](composer/post-bridge-composer.openapi.json) · [Verification](composer/post-bridge-verification-matrix.csv) · [Shots implementation](composer/implementation.md) |
 | Studio / Content Studio | [Studio analysis](content-studio/post-bridge-content-studio-technical-analysis.md) | [Verification](content-studio/studio-verification-matrix.csv) · [Generated MP4](content-studio/studio-ugc-test.mp4) |
 | Bulk Tools | [Bulk analysis](bulk-tools/post-bridge-bulk-tools-technical-analysis.md) | [Observed contract](bulk-tools/bulk-tools-observed-contract.json) · [Verification](bulk-tools/bulk-tools-verification-matrix.csv) · [Generated MP4](bulk-tools/bulk-grid-test.mp4) |
 | Calendar, All, Scheduled, Posted, Drafts, Connections | [Post management analysis](post-management/post-bridge-post-management-technical-analysis.md) | [Observed contract](post-management/post-management-observed-contract.json) · [Public API](post-management/post-management-public.openapi.json) · [Verification](post-management/post-management-verification-matrix.csv) |

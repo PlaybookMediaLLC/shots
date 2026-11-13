@@ -89,7 +89,8 @@ type AutoActionResult struct {
 }
 
 // AutomationInput is one follow-up of a live post (RFC 025). Kind is a
-// temporalpublishing step kind; Threshold and Metric gate a plug or a
+// temporalpublishing step kind, or "delete" for a record of a post Shots
+// deletes (#557); Threshold and Metric gate a plug or a
 // like-gated repost; Text is a first comment, plug or quote.
 type AutomationInput struct {
 	DestinationID   string
@@ -101,6 +102,8 @@ type AutomationInput struct {
 	SecretReference string
 	Text            string
 	Threshold       int
+	// Media is the image a thumbnail step sets.
+	Media *publishing.MediaAsset
 }
 
 // AutomationResult is a follow-up's outcome: Done when it acted (RemoteID
@@ -204,7 +207,8 @@ func New(baseURL string, httpClient *http.Client, assetReader AssetReader) *Clie
 
 func (c *Client) BeginOAuth(ctx context.Context, input BeginOAuthInput) (string, error) {
 	switch input.Provider {
-	case "x", "instagram", "instagram-standalone", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom":
+	case "x", "instagram", "instagram-standalone", "linkedin", "linkedin-page", "tiktok", "youtube", "threads", "mastodon", "mastodon-custom",
+		"facebook", "pinterest", "gmb":
 	default:
 		return "", &Error{Status: http.StatusBadRequest, message: "unsupported social provider"}
 	}

@@ -81,7 +81,7 @@ export default function PrivacyPolicyPage() {
         >
           Privacy Policy
         </h1>
-        <p className="mb-12 text-sm text-muted-foreground">Last updated: September 27, 2026</p>
+        <p className="mb-12 text-sm text-muted-foreground">Last updated: November 13, 2026</p>
 
         <div className="max-w-none space-y-8">
           <Section title="Overview">
@@ -397,6 +397,79 @@ export default function PrivacyPolicyPage() {
             <p className="leading-relaxed text-muted-foreground">
               We update this policy when the site changes, for example when we add or remove a
               third-party service. Changes are reflected on this page with an updated date.
+            </p>
+          </Section>
+
+          <Section id="google-user-data" title="Google Account and API Data">
+            <p className="mb-3 leading-relaxed text-muted-foreground">
+              Google integrations are optional and available when enabled in your Shots deployment.
+              Google asks for your permission before you sign in, connect an account, or import
+              files. We use the data you authorize to provide the following features:
+            </p>
+            <ul className="mb-3 list-inside list-disc space-y-2 text-muted-foreground">
+              <li>
+                <strong>Google sign-in:</strong> your Google account ID, name, email address, and
+                profile picture identify your Shots account and let you sign in.
+              </li>
+              <li>
+                <strong>YouTube:</strong> channel IDs, names, profile images, video details, and
+                performance statistics identify the channel you connect and show its performance in
+                your workspace. Shots sends the videos, titles, descriptions, thumbnails, and
+                publishing settings you choose to YouTube to publish your posts.
+              </li>
+              <li>
+                <strong>Google Business Profile:</strong> account and location IDs, names,
+                addresses, profile images, and performance metrics let you select a business
+                location, publish posts to it, and view its performance. Shots sends your post
+                content and media to Google for the location you select.
+              </li>
+              <li>
+                <strong>Google Drive:</strong> the <Code>drive.file</Code> permission lets Shots
+                access only the files you select for the app. Shots reads their names, file types,
+                sizes, and contents to import images and videos. Your browser downloads the selected
+                files from Google and uploads copies to your Shots workspace. This import does not
+                edit or delete the original Drive files or read the rest of your Drive.
+              </li>
+            </ul>
+            <p className="mb-3 leading-relaxed text-muted-foreground">
+              <strong>Storage and retention.</strong> YouTube and Business Profile connections store
+              account and location details, publishing records, and collected analytics in your
+              workspace. Their access and refresh tokens are encrypted in our database so authorized
+              publishing and reporting can run without you keeping a browser open. Drive import
+              keeps its access token in your browser and does not send that token to Shots servers.
+              Imported file copies are stored as workspace assets. Stored connection data and
+              imported content follow the workspace retention described above; disconnecting alone
+              does not erase them.
+            </p>
+            <p className="mb-3 leading-relaxed text-muted-foreground">
+              <strong>Use and sharing.</strong> Authorized workspace members can use the connected
+              accounts, imported assets, and reports according to their roles. Content you publish
+              is sent to the destination you choose, and our hosting and storage providers process
+              data to operate Shots. If you choose an AI feature and include imported content, that
+              content is sent to OpenRouter and the selected model provider to produce the result
+              you request. We do not sell Google user data, use it for advertising, or use it to
+              train general-purpose AI models. Shots&apos; use and transfer of information received
+              from Google APIs adheres to the{' '}
+              <ExternalLink href="https://developers.google.com/terms/api-services-user-data-policy">
+                Google API Services User Data Policy
+              </ExternalLink>
+              , including its Limited Use requirements.
+            </p>
+            <p className="leading-relaxed text-muted-foreground">
+              <strong>Revocation and deletion.</strong> You can revoke Shots&apos; authorization in
+              your{' '}
+              <ExternalLink href="https://myaccount.google.com/connections">
+                Google Account connections
+              </ExternalLink>{' '}
+              to stop further authorized access to Google APIs. Removing a publishing account in
+              Shots disables it and cancels its queued posts, but does not automatically erase
+              stored connection details, tokens, analytics, imported file copies, or publishing
+              history. Revoking access also does not delete content already published on Google. To
+              request deletion of Google data stored by Shots, email{' '}
+              <Link href={`mailto:${CONTACT_EMAIL}`} className={linkClassName}>
+                {CONTACT_EMAIL}
+              </Link>
+              . The workspace retention and legal or security exceptions described above also apply.
             </p>
           </Section>
 

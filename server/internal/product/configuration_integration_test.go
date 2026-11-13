@@ -78,6 +78,10 @@ func (o *recordingAssetObjects) Put(_ context.Context, key, _ string, body io.Re
 	o.written = content
 	return err
 }
+func (o *recordingAssetObjects) Copy(_ context.Context, _, to string) error {
+	o.key = to
+	return nil
+}
 func (o *recordingAssetObjects) Read(_ context.Context, key string) ([]byte, error) {
 	o.key = key
 	return o.written, nil

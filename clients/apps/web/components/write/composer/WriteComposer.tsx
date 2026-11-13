@@ -101,7 +101,7 @@ import {
   primaryChannel,
   type VersionOptions,
 } from '@/lib/write/document'
-import { buildPublication } from '@/lib/write/publication'
+import { buildPublication, isStory } from '@/lib/write/publication'
 import { splitThread } from '@/lib/write/split-thread'
 import { convertLegacyBlocks, legacyCount } from '@/lib/write/legacy-blocks'
 import {
@@ -166,6 +166,7 @@ import { mediaSwitches } from '@/lib/write/platform-rules'
 import { CopyPollDialog } from './copy-poll'
 import { PasteThreadDialog } from './paste-thread'
 import type { PostPoll } from '@/lib/write/document'
+import type { GoogleDriveConfig } from '@/lib/write/google-drive'
 import { RefineMenu, RefineProvider } from './refine'
 import { ComposerCommandsContext, type ComposerTool, type Snippet } from './commands'
 import { ComposerToolbar } from './composer-toolbar'
@@ -263,7 +264,9 @@ export function WriteComposer({
   collabToken = null,
   collabUrl,
   draft: initial,
+  drive = null,
   giphy = false,
+  senja = false,
   layout = 'page',
   posts: initialPosts,
   requireApproval,
@@ -276,8 +279,12 @@ export function WriteComposer({
   collabToken?: DraftCollaboration['issued'] | null
   collabUrl: string | null
   draft: DraftWire
+  /** Google Picker's keys, or null while Drive import is not set up. */
+  drive?: GoogleDriveConfig | null
   /** Whether GIF search is approved and configured. */
   giphy?: boolean
+  /** Whether the workspace saved its Senja API key. */
+  senja?: boolean
   /**
    * `page`: the Publish page, where Preview takes the draft's place.
    * `workspace`: the publishing workspace over the screenshot editor, where
@@ -559,6 +566,7 @@ export function WriteComposer({
             maxWeightedCharacters: account.xCaptionLimit,
             articles: account.xArticles,
             xQuotes: account.xQuotes,
+            xVideoMaxSeconds: account.xVideoMaxSeconds,
             pollLimits: account.pollLimits,
             mastodonQuotes: account.mastodonQuotes,
           },
@@ -703,9 +711,12 @@ export function WriteComposer({
   }, [mediaState])
   const setOptions = (channel: DraftChannel, options: VersionOptions) =>
     update((current) => ({ versions: withOptions(current.versions, channel, options) }))
-  // A destination that is live is done: scheduling again would post it twice.
+  // A destination that is live, or sent to its app to finish, is done: scheduling
+  // again would post it twice (Go's liveDraftChannels refuses it too).
   const live = new Set(
-    posts.filter((post) => post.status === 'PUBLISHED').map((post) => post.channelConnectionId)
+    posts
+      .filter((post) => post.status === 'PUBLISHED' || post.status === 'SENT_TO_APP')
+      .map((post) => post.channelConnectionId)
   )
   const pending = items.filter((item) => !live.has(item.account.id))
   const locked = items.length > 0 && pending.length === 0
@@ -761,7 +772,9 @@ export function WriteComposer({
     // a cancel, needs no fresh sign-in. It refuses a draft with published
     // results, so such a draft offers no Undo. It keeps the posts' time as a
     // plan, so Undo puts back the plan the draft had before.
-    undoSchedule: posts.some((post) => post.status === 'PUBLISHED' || post.url)
+    undoSchedule: posts.some(
+      (post) => post.status === 'PUBLISHED' || post.status === 'SENT_TO_APP' || post.url
+    )
       ? undefined
       : async (before, postId) => {
           try {
@@ -1208,11 +1221,25 @@ export function WriteComposer({
     canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
   // A tab that follows the main platform has no editor of its own: its media lives on that tab.
   const ownEditor = active === primary || versionOfTab.mode === 'manual'
-  const liveOn = [
-    ...new Set(
-      posts.filter((post) => post.status === 'PUBLISHED').map((post) => platformLabel(post.platform))
-    ),
-  ].join(', ')
+  // A post deleted from its platform through Shots stays PUBLISHED, but is not live.
+  const doneOn = (status: string, deleted = false) =>
+    [
+      ...new Set(
+        posts
+          .filter((post) => post.status === status && Boolean(post.deletedAt) === deleted)
+          .map((post) => platformLabel(post.platform))
+      ),
+    ].join(', ')
+  const liveOn = doneOn('PUBLISHED')
+  const deletedFrom = doneOn('PUBLISHED', true)
+  const appOn = doneOn('SENT_TO_APP')
+  const done = [
+    liveOn && `live on ${liveOn}`,
+    deletedFrom && `deleted from ${deletedFrom}`,
+    appOn && `in the ${appOn} app to finish`,
+  ]
+    .filter(Boolean)
+    .join(' and ')
   const editorProps = {
     draftId: initial.id,
     extraPlugins: WRITE_PLUGINS,
@@ -1918,8 +1945,19 @@ export function WriteComposer({
                 disabled={!canEdit}
                 onChange={(options) => setOptions(active, options)}
                 options={versionOfTab.options ?? {}}
+                uploadFile={services.uploadFile}
               />
             </section>
+          ) : null}
+          {isStory(active, versionOfTab.options) ? (
+            <p
+              className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
+              data-testid="story-notice"
+              role="status"
+            >
+              This {CHANNEL_META[active].label} post is a story: one image or video, shown for 24
+              hours, without this text. The text goes to your other platforms.
+            </p>
           ) : null}
           {namedElsewhere ? (
             <p
@@ -1931,15 +1969,15 @@ export function WriteComposer({
               you mean to say here.
             </p>
           ) : null}
-          {liveOn ? (
+          {done ? (
             <p
               className="mx-4 mb-3 rounded-lg border border-border bg-foreground/[0.02] px-3 py-2 text-xs text-muted-foreground"
               data-testid="live-notice"
               role="status"
             >
               {locked
-                ? `This post is live on ${liveOn}. Changes here would not reach it, so its text is locked. To send a changed version, post it again as new.`
-                : `Already live on ${liveOn}. Changes here only reach the platforms not sent yet.`}
+                ? `This post is ${done}. Changes here would not reach it, so its text is locked. To send a changed version, post it again as new.`
+                : `Already ${done}. Changes here only reach the platforms not sent yet.`}
             </p>
           ) : null}
           <TargetBanner draft={server} />
@@ -2607,7 +2645,9 @@ export function WriteComposer({
           addMedia,
           channel: active,
           channels,
+          drive,
           giphy,
+          senja,
           openTool: setTool,
           postSetting: (number, setting) => setPostSetting({ at: Date.now(), number, setting }),
           snippets,

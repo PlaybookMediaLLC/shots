@@ -26,9 +26,15 @@ import { Input } from '@/components/ui/input'
 import { MobileDrawer } from '@/components/ui/responsive-popover'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import type { DocumentActions } from '@/components/drafts/DraftEditor'
+import { insertSnippet } from '@/components/drafts/thread'
 import type { DraftChannel } from '@/lib/write/document'
 import { useKeys, useShortcuts } from '../shortcuts'
 import { useWrite } from '../write-context'
+import { PastCaptions } from './past-captions'
+import { GoogleDriveImport } from './google-drive'
+import { SenjaImport } from './senja-import'
+import { draftAssetNode } from '@/lib/platform/asset-handoff'
+import { uploadFiles } from './media-strip'
 import { type Command, ComposerCommandsContext, type ComposerTool, commandsFor, rememberCommand } from './commands'
 import { DescribeImages } from './describe-images'
 import { insertAttachments } from '@/lib/write/media-operations'
@@ -273,6 +279,20 @@ export function ComposerToolbar({
           type="file"
         />
       ))}
+      {tool === 'drive' ? (
+        <GoogleDriveImport
+          config={composer?.drive ?? null}
+          onClose={close}
+          onFiles={(picked) => void uploadFiles(editor as PlateEditor, picked)}
+        />
+      ) : null}
+      {tool === 'senja' ? (
+        <SenjaImport
+          configured={composer?.senja ?? false}
+          onClose={close}
+          onImported={(asset) => insertAttachments(editor, [draftAssetNode(asset)])}
+        />
+      ) : null}
       <MediaTools
         channel={channel}
         draftId={draftId}
@@ -303,13 +323,22 @@ export function ComposerToolbar({
           onInsert={(nodes) => insertAttachments(editor as PlateEditor, nodes)}
         />
       ) : null}
-      {tool === 'snippets' && setId ? (
-        <FinisherDialog
+      {tool === 'captions' ? (
+        <PastCaptions
           channel={channel}
+          draftId={draftId}
           onApply={(text) => {
             if (!editor.selection) editor.tf.select(editor.api.end([]))
             editor.tf.insertText(text)
           }}
+          onClose={close}
+          setId={setId}
+        />
+      ) : null}
+      {tool === 'snippets' && setId ? (
+        <FinisherDialog
+          channel={channel}
+          onApply={(text) => insertSnippet(editor as PlateEditor, text)}
           onClose={() => {
             onSnippetsChange()
             close()
