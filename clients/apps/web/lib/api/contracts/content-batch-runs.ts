@@ -60,46 +60,71 @@ export const TEMPLATE_SHAPES = {
  * workspace's own clip, in its one slot, with an optional closing clip after.
  * Music is optional and plays from `musicStartMs`.
  */
-export const batchGridSchema = z
-  .object({
-    closingAssetId: contentDraftIdSchema.optional(),
-    headline: z.string().trim().max(UGC_TEXT_LIMIT),
-    hideHeadline: z.boolean().optional(),
-    kind: z.enum(['single', 'ugc']).optional(),
-    musicAssetId: contentDraftIdSchema.optional(),
-    musicStartMs: z.number().int().min(0).max(MUSIC_START_LIMIT_MS).optional(),
-    slots: z
-      .array(
-        z.object({
-          assetId: contentDraftIdSchema.optional(),
-          topic: z.string().max(GRID_TOPIC_LIMIT),
-        })
-      )
-      .min(1)
-      .max(4),
-    textPosition: overlayPositionSchema.optional(),
-  })
-  .superRefine((grid, context) => {
-    const shape = TEMPLATE_SHAPES[grid.kind ?? 'grid']
-    if (grid.slots.length !== shape.slots)
-      context.addIssue({
-        code: 'custom',
-        message: `This video takes ${shape.slots}.`,
-        path: ['slots'],
+const conceptSchema = z.object({
+  closingAssetId: contentDraftIdSchema.optional(),
+  // Counted in code points below, as Go counts runes; this only bounds parsing.
+  headline: z
+    .string()
+    .trim()
+    .max(UGC_TEXT_LIMIT * 4),
+  hideHeadline: z.boolean().optional(),
+  kind: z.enum(['single', 'ugc']).optional(),
+  musicAssetId: contentDraftIdSchema.optional(),
+  musicStartMs: z.number().int().min(0).max(MUSIC_START_LIMIT_MS).optional(),
+  slots: z
+    .array(
+      z.object({
+        assetId: contentDraftIdSchema.optional(),
+        topic: z.string().max(GRID_TOPIC_LIMIT),
       })
-    if (grid.headline.length > shape.text || (!grid.headline && !grid.hideHeadline))
-      context.addIssue({
-        code: 'custom',
-        message: `A video needs text of 1 to ${shape.text} characters.`,
-        path: ['headline'],
-      })
-    if (grid.musicStartMs && !grid.musicAssetId)
-      context.addIssue({
-        code: 'custom',
-        message: 'Music starts only with music.',
-        path: ['musicStartMs'],
-      })
-  })
+    )
+    .min(1)
+    .max(4),
+  textPosition: overlayPositionSchema.optional(),
+})
+
+type ConceptFields = z.infer<typeof conceptSchema>
+
+/** Fields of other templates, which Go refuses on this one. */
+const FOREIGN_FIELDS = {
+  grid: ['hideHeadline', 'textPosition', 'closingAssetId'],
+  single: ['textPosition', 'closingAssetId'],
+  ugc: ['hideHeadline'],
+} as const
+
+/** A concept's slots and text against its kind's shape: [field, message] pairs, as Go refuses them. */
+function shapeIssues(grid: ConceptFields): [string, string][] {
+  const kind = grid.kind ?? 'grid'
+  const shape = TEMPLATE_SHAPES[kind]
+  const noun = kind === 'ugc' ? 'clip' : shape.slots === 1 ? 'image' : 'images'
+  // Counted in code points, as Go counts runes.
+  const length = [...grid.headline].length
+  return [
+    ...(grid.slots.length === shape.slots
+      ? []
+      : [['slots', `This video takes ${shape.slots} ${noun}.`] as [string, string]]),
+    ...(length > shape.text || (!length && !grid.hideHeadline)
+      ? [['headline', `A video needs text of 1 to ${shape.text} characters.`] as [string, string]]
+      : []),
+  ]
+}
+
+/** Fields that belong to another kind, and a music start without music. */
+function fieldIssues(grid: ConceptFields): [string, string][] {
+  const foreign = FOREIGN_FIELDS[grid.kind ?? 'grid'].filter((field) => grid[field])
+  return [
+    ...foreign.map((field): [string, string] => [field, `This video has no ${field}.`]),
+    ...(grid.musicStartMs && !grid.musicAssetId
+      ? [['musicStartMs', 'Music starts only with music.'] as [string, string]]
+      : []),
+  ]
+}
+
+/** {@link conceptSchema} as the API takes it, checked per kind as Go checks it. */
+export const batchGridSchema = conceptSchema.superRefine((grid, context) => {
+  for (const [path, message] of [...shapeIssues(grid), ...fieldIssues(grid)])
+    context.addIssue({ code: 'custom', message, path: [path] })
+})
 
 /** One of {@link batchGridSchema}. */
 export type BatchGrid = z.infer<typeof batchGridSchema>

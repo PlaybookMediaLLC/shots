@@ -15,6 +15,8 @@ test('the latest start leaves a full video of music, on the tenth of a second', 
   assert.equal(latestStart(6000, 6000), 0)
   // A track shorter than the video cannot move: it plays once from its start.
   assert.equal(latestStart(4000, 6000), 0)
+  // Never past the ten minutes Go accepts.
+  assert.equal(latestStart(15 * 60_000, 6000), 600_000)
 })
 
 test('a start is kept within the track and on the step', () => {

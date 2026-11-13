@@ -138,7 +138,19 @@ test(
     await expect(concepts).toHaveCount(2)
     await expect(trim).toHaveText('Trim (from 0:04.0)')
     await expect(page.getByLabel('Headline for video 2', { exact: true })).toBeDisabled()
-    await expect(page.getByRole('img', { name: 'Preview of video 1', exact: true })).toBeVisible()
+    // The preview is the export's own frame: drawn, not left black.
+    const preview = page.getByRole('img', { name: 'Preview of video 1', exact: true })
+    await expect
+      .poll(() =>
+        preview.evaluate((canvas) => {
+          const element = canvas as HTMLCanvasElement
+          const [r, g, b] = element
+            .getContext('2d')!
+            .getImageData(element.width / 2, element.height / 2, 1, 1).data
+          return r! + g! + b!
+        })
+      )
+      .toBeGreaterThan(60)
 
     await page.getByRole('button', { name: 'Render 2 videos', exact: true }).click()
     await expect(concepts.getByText('Done', { exact: true })).toHaveCount(2, { timeout: 300_000 })
@@ -164,7 +176,10 @@ test(
       musicalTracks.find((track) => track.handler === 'vide')!
     )
     expect(decoded.decodedFrames).toBe(180)
-    expect(decoded.firstToMiddle).toBeGreaterThan(20)
+    // Frame 2 of a one-second fade is about a sixth as bright; the grid's shorter fade is over 0.4.
+    expect(decoded.firstLuma / decoded.middleLuma).toBeLessThan(0.3)
+    expect(decoded.firstLuma).toBeGreaterThan(0)
+    // The track is silent for its first four seconds: sound here means the trimmed start was used.
     expect(decoded.during).toBeGreaterThan(0.01)
     const quiet = readMp4Tracks(await assetBytes(page, silent!.assetId))
     expect(quiet.map((track) => track.codec)).toEqual(['avc1'])
@@ -191,13 +206,18 @@ test(
     const concepts = page.getByTestId('template-concept')
     const addVideo = page.getByRole('button', { name: 'Add video', exact: true })
     await expect(addVideo).toBeDisabled()
-    await page
-      .getByLabel('Text for the new video', { exact: true })
-      .fill('POV: you finally\nfound it')
+    // Blank text cannot make a video (ST-021).
+    const newText = page.getByLabel('Text for the new video', { exact: true })
+    await newText.fill('  \n ')
+    await expect(addVideo).toBeDisabled()
+    await newText.fill('POV: you finally\nfound it')
     await addVideo.click()
     await expect(concepts).toHaveCount(1)
     const text = page.getByRole('textbox', { name: 'Text for video 1', exact: true })
     await expect(text).toHaveValue('POV: you finally\nfound it')
+    // Without a clip there is nothing to render (ST-020).
+    await expect(concepts.getByText('Needs a clip', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Render \d video/ })).toHaveCount(0)
 
     // Text position is a named choice.
     const bottom = page
@@ -234,17 +254,26 @@ test(
     await expect(dialog).toHaveCount(0)
     await expect(text).toHaveValue('Scripted idea 3\nfor this product')
 
-    // An answer that arrives after Cancel changes nothing.
+    // An answer that arrives after Cancel changes nothing: it is held until the dialog is closed.
     await page.unroute(ideas)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
     await page.route(ideas, async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 2_000))
+      await held
       await route.continue()
     })
     await page.getByRole('button', { name: 'Write text for video 1 with AI', exact: true }).click()
-    const late = page.waitForResponse(ideas)
     await dialog.getByRole('button', { name: 'Generate', exact: true }).click()
+    await expect(dialog.getByRole('status')).toHaveText('Writing ideas…')
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
-    await late
+    await expect(dialog).toHaveCount(0)
+    const late = page.waitForResponse(ideas)
+    release()
+    await (await late).finished()
+    // Let the page handle the answer before looking.
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
     await expect(dialog).toHaveCount(0)
     await expect(text).toHaveValue('Scripted idea 3\nfor this product')
     await page.unroute(ideas)
@@ -258,11 +287,11 @@ test(
       .getByLabel('Closing clip for video 1', { exact: true })
       .setInputFiles('test/e2e/fixtures/ugc-short.mp4')
     await expect(concepts.getByRole('alert')).toContainText('must be 3 to 15 seconds long')
-    // A landscape closing clip at 25 fps still renders into the 9:16, 30 fps frame.
+    // A 4-second landscape closing clip at 25 fps still renders into the 9:16, 30 fps frame.
     await page
       .getByLabel('Closing clip for video 1', { exact: true })
       .setInputFiles('test/e2e/fixtures/ugc-closing.mp4')
-    await expect(concepts.getByText('Clip 3.0 s · closing clip 3.0 s')).toBeVisible()
+    await expect(concepts.getByText('Clip 3.0 s · closing clip 4.0 s')).toBeVisible()
 
     await app.reload()
     await expect(text).toHaveValue('Scripted idea 3\nfor this product')
@@ -274,10 +303,11 @@ test(
     await app.reload()
     await expect(concepts.getByText('Done', { exact: true })).toBeVisible()
 
+    // As long as its clips: 3 s, then 4 s, at 30 fps.
     const media = (await readBatch(page)).items[0]!.media[0]!
     expect([media.width, media.height]).toEqual([1080, 1920])
-    expect(media.durationMs).toBeGreaterThanOrEqual(5900)
-    expect(media.durationMs).toBeLessThanOrEqual(6100)
+    expect(media.durationMs).toBeGreaterThanOrEqual(6900)
+    expect(media.durationMs).toBeLessThanOrEqual(7100)
     const file = await assetBytes(page, media.assetId)
     const tracks = readMp4Tracks(file)
     // The clips' own sound is kept.
@@ -287,8 +317,11 @@ test(
       file,
       tracks.find((track) => track.handler === 'vide')!
     )
-    expect(decoded.decodedFrames).toBe(180)
+    expect(decoded.decodedFrames).toBe(210)
     expect(decoded.during).toBeGreaterThan(0.01)
+    // The middle and late frames are both from the moving closing clip: not a still, not black.
+    expect(decoded.middleToLast).toBeGreaterThan(5)
+    expect(decoded.middleLuma).toBeGreaterThan(0.1)
 
     const drafts = await saveBatchDrafts(page)
     expect(drafts).toHaveLength(1)

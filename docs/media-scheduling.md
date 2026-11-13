@@ -211,8 +211,8 @@ kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
 | --- | --- |
 | Images | Upload per slot, upload many (fills empty slots in order, naming leftovers), or AI (`editorAi.generateGridSlotImage`, two at a time). The page estimates credits before generating; a failed slot keeps its error and can be tried again |
 | Last grid cell | Sets the label or image of slot 4 on every video. It is a cell of the grid, not an extra slide |
-| Music | The person's own file (MP3, M4A/AAC, WAV, Ogg or WebM, up to 50 MB), decoded in the browser before it uploads, from a start the person trims to, or none. Trim keeps a draft start that Cancel drops. There is no built-in catalog: add one only with tracks bought outright |
-| Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, frame by frame with the same fade |
+| Music | The person's own file (MP3, M4A/AAC, WAV, Ogg or WebM, up to 50 MB and ten minutes), decoded in the browser before it uploads, from a start the person trims to, or none. Trim keeps a draft start that Cancel drops. There is no built-in catalog: add one only with tracks bought outright |
+| Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, which holds one still with no fade |
 | Recovery | Each video uploads and is recorded on its item when done. Closing the tab loses only the one in progress; reopening renders what is left |
 | Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |
 | Handoff | A finished video is the item's media, so captions, times, drafts, review and scheduling apply. Download one, or several as a ZIP |

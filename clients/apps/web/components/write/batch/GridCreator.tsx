@@ -19,15 +19,12 @@ import {
   type BatchGrid,
   type BatchItem,
   type BatchItemInput,
-  type BatchRun,
   BATCH_ITEM_LIMIT,
   GRID_HEADLINE_LIMIT,
   GRID_TOPIC_LIMIT,
 } from '@/lib/api/contracts/content-batches'
 import { assetContentUrl } from '@/lib/editor/services'
 import { runPool } from '@/lib/export/batch'
-import { zipFiles } from '@/lib/export/zip'
-import { downloadBlob } from '@/lib/image-tools/download'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
@@ -47,7 +44,7 @@ import { GRID_VIDEO } from '@/lib/write/grid-layout'
 import { GRID_PRESETS } from '@/lib/write/grid-presets'
 import { FilePicker } from './FilePicker'
 import { MusicTrim } from './MusicTrim'
-import { useConceptRender } from './use-concept-render'
+import type { ConceptRenderer } from './use-concept-render'
 
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
 /** Music files a template takes: what Go stores and browsers decode. */
@@ -127,32 +124,28 @@ function LineList({
  * video being rendered. From then on it is an ordinary post of the batch.
  */
 export function GridCreator({
-  base,
   disabled,
   items,
-  lastRender,
   onAdd,
   onApply,
-  onReload,
   onUpdate,
+  renderer,
   sharedAccounts,
 }: {
-  /** The batch's API path. */
-  base: string
   disabled: boolean
   items: BatchItem[]
-  /** The batch's latest render, so its failures survive a reload. */
-  lastRender?: BatchRun
-  onReload: () => Promise<void>
   onAdd: (inputs: BatchItemInput[]) => Promise<void>
   onApply: (changes: ({ itemId: string } & Record<string, unknown>)[]) => Promise<void>
   onUpdate: (
     item: BatchItem,
     body: (latest: BatchItem) => Record<string, unknown>
   ) => Promise<unknown>
+  /** The batch's one renderer. */
+  renderer: ConceptRenderer
   sharedAccounts: string[]
 }) {
   const trpc = useTRPCClient()
+  const { download, downloadAll, progress, render, running, stop } = renderer
   // Fade-in and UGC videos are template concepts too; they have their own creator.
   const concepts = items.filter((item): item is Saved =>
     Boolean(item.grid && !item.grid.kind && !item.draftId)
@@ -361,7 +354,7 @@ export function GridCreator({
     setUploading('Uploading music…')
     try {
       // Read as the renderer will, so a file this browser cannot play is refused now.
-      const { type } = await readAudioFile(file)
+      const type = await readAudioFile(file)
       const musicAssetId = await upload(new File([file], file.name, { type }))
       await onApply(
         targets.map(({ grid: { musicStartMs: _start, ...grid }, id }) => ({
@@ -385,37 +378,9 @@ export function GridCreator({
     )
 
   // Render: one video at a time, each saved on its item as soon as it is done.
-  const videoName = (item: BatchItem) => `grid-video-${item.position + 1}.mp4`
-  const { progress, render, running, stop } = useConceptRender({
-    base,
-    fileName: videoName,
-    lastRender,
-    onReload,
-  })
   const toRender = concepts.filter(
     (item) => gridReady(item.grid) && !item.media.some((entry) => entry.assetId)
   )
-
-  const fetchVideo = async (item: Saved) => {
-    const assetId = item.media.find((entry) => entry.assetId)?.assetId
-    const response = await fetch(assetContentUrl(assetId!))
-    if (!response.ok) throw new Error('A video could not be downloaded.')
-    return response.blob()
-  }
-  const downloadAll = async () => {
-    try {
-      if (finished.length === 1) {
-        downloadBlob(await fetchVideo(finished[0]!), videoName(finished[0]!))
-        return
-      }
-      const entries = await Promise.all(
-        finished.map(async (item) => ({ data: await fetchVideo(item), path: videoName(item) }))
-      )
-      downloadBlob(await zipFiles(entries), 'grid-videos.zip')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The videos could not be downloaded.')
-    }
-  }
 
   const stages: { key: Stage; label: string }[] = [
     { key: 'inputs', label: 'Captions and items' },
@@ -828,12 +793,7 @@ export function GridCreator({
                               size="sm"
                               type="button"
                               variant="ghost"
-                              onClick={() =>
-                                void fetchVideo(item).then(
-                                  (blob) => downloadBlob(blob, videoName(item)),
-                                  () => toast.error('The video could not be downloaded.')
-                                )
-                              }
+                              onClick={() => void download(item)}
                             >
                               Download
                             </Button>
@@ -873,7 +833,11 @@ export function GridCreator({
               </Button>
             )}
             {finished.length ? (
-              <Button disabled={running} variant="outline" onClick={() => void downloadAll()}>
+              <Button
+                disabled={running}
+                variant="outline"
+                onClick={() => void downloadAll(finished, 'grid-videos.zip')}
+              >
                 Download all ({finished.length})
               </Button>
             ) : null}

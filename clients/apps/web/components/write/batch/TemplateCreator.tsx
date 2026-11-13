@@ -12,7 +12,6 @@ import {
   type BatchGrid,
   type BatchItem,
   type BatchItemInput,
-  type BatchRun,
   BATCH_ITEM_LIMIT,
   type OverlayPosition,
   TEMPLATE_SHAPES,
@@ -20,10 +19,9 @@ import {
   UGC_CLOSING_MS,
 } from '@/lib/api/contracts/content-batches'
 import { assetContentUrl } from '@/lib/editor/services'
-import { zipFiles } from '@/lib/export/zip'
-import { downloadBlob } from '@/lib/image-tools/download'
 import { useTRPCClient } from '@/lib/trpc/react'
 import { safeAssetFileName, saveExportToWorkspace } from '@/lib/workspace/save-export'
+import { captureVideoFrame } from '@/lib/workspace/video-poster'
 import { readAudioFile } from '@/lib/write/audio-trim'
 import { clipLengthProblem, gridReady } from '@/lib/write/grid-concepts'
 import { GRID_VIDEO, ugcTimeline } from '@/lib/write/grid-layout'
@@ -33,7 +31,7 @@ import { FilePicker } from './FilePicker'
 import { AUDIO_ACCEPT } from './GridCreator'
 import { MusicTrim } from './MusicTrim'
 import { Segmented } from './Segmented'
-import { useConceptRender } from './use-concept-render'
+import type { ConceptRenderer } from './use-concept-render'
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const CLIP_ACCEPT = 'video/mp4,video/quicktime,.mp4,.mov'
@@ -67,65 +65,84 @@ type Saved = BatchItem & { grid: BatchGrid }
 /** The post's caption a video's text seeds: one line. */
 const captionOf = (text: string) => text.replace(/\s+/g, ' ').trim()
 
-/** A clip's length as this browser reads it, which is also whether it can play it. */
-function readClipLength(file: File) {
-  const url = URL.createObjectURL(file)
-  const video = document.createElement('video')
-  video.preload = 'metadata'
-  return new Promise<number>((resolve, reject) => {
-    video.addEventListener('loadedmetadata', () => resolve(video.duration * 1000), { once: true })
-    video.addEventListener(
-      'error',
-      () => reject(new Error('This browser cannot play the clip. Use an H.264 MP4 or MOV.')),
-      { once: true }
-    )
-    video.src = url
-  }).finally(() => URL.revokeObjectURL(url))
-}
+/** Previews draw the export's frame at a quarter of its size: what they show, for a fraction of the memory. */
+const PREVIEW = { height: GRID_VIDEO.height / 4, scale: 0.25, width: GRID_VIDEO.width / 4 }
 
-/** A clip asset's length, read from its metadata, for the music trim and the summary. */
-function useClipLength(assetId: string | undefined) {
+/**
+ * A clip asset's length, read from its metadata, for the music trim and the
+ * summary. `onError` must be stable, such as a state setter.
+ */
+function useClipLength(assetId: string | undefined, onError: (message: string) => void) {
   const [length, setLength] = React.useState<number | null>(null)
   React.useEffect(() => {
     setLength(null)
     if (!assetId) return
     const video = document.createElement('video')
     video.preload = 'metadata'
-    const done = () => setLength(video.duration * 1000)
-    video.addEventListener('loadedmetadata', done, { once: true })
-    video.src = assetContentUrl(assetId)
-    return () => {
-      video.removeEventListener('loadedmetadata', done)
+    const release = () => {
       video.removeAttribute('src')
+      video.load()
     }
-  }, [assetId])
+    video.addEventListener(
+      'loadedmetadata',
+      () => {
+        setLength(video.duration * 1000)
+        release()
+      },
+      { once: true }
+    )
+    video.addEventListener(
+      'error',
+      () => onError('This browser cannot read the clip. Use an H.264 MP4 or MOV.'),
+      { once: true }
+    )
+    video.src = assetContentUrl(assetId)
+    return release
+  }, [assetId, onError])
   return length
 }
 
-/** The fade-in's frame as it renders: the same drawing as the export. */
+/** The fade-in's frame as it renders: the same drawing as the export, redrawn only when what it shows changes. */
 function StillPreview({ grid, name }: { grid: BatchGrid; name: string }) {
   const canvas = React.useRef<HTMLCanvasElement>(null)
+  const [failed, setFailed] = React.useState(false)
+  const { headline, hideHeadline, kind } = grid
+  const image = grid.slots[0]?.assetId
   React.useEffect(() => {
     let live = true
-    void composeStill(grid).then(
+    setFailed(false)
+    void composeStill({
+      headline,
+      hideHeadline,
+      kind,
+      slots: [{ assetId: image, topic: '' }],
+    }).then(
       (still) => {
-        if (live) canvas.current?.getContext('2d')?.drawImage(still, 0, 0)
+        if (live)
+          canvas.current?.getContext('2d')?.drawImage(still, 0, 0, PREVIEW.width, PREVIEW.height)
       },
-      () => undefined
+      () => live && setFailed(true)
     )
     return () => {
       live = false
     }
-  }, [grid])
+  }, [headline, hideHeadline, image, kind])
   return (
-    <canvas
-      ref={canvas}
-      aria-label={`Preview of ${name}`}
-      className="aspect-[9/16] w-full rounded-lg bg-black"
-      height={GRID_VIDEO.height}
-      role="img"
-      width={GRID_VIDEO.width}
-    />
+    <div className="grid gap-1">
+      <canvas
+        ref={canvas}
+        aria-label={`Preview of ${name}`}
+        className="aspect-[9/16] w-full rounded-lg bg-black"
+        height={PREVIEW.height}
+        role="img"
+        width={PREVIEW.width}
+      />
+      {failed ? (
+        <p role="alert" className="text-xs text-destructive">
+          The preview could not be drawn: the image did not load.
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -145,23 +162,23 @@ function UgcPreview({
   React.useEffect(() => {
     const context = canvas.current?.getContext('2d')
     if (!context) return
-    context.clearRect(0, 0, GRID_VIDEO.width, GRID_VIDEO.height)
+    context.setTransform(1, 0, 0, 1, 0, 0)
+    context.clearRect(0, 0, PREVIEW.width, PREVIEW.height)
+    context.setTransform(PREVIEW.scale, 0, 0, PREVIEW.scale, 0, 0)
     drawOverlay(context, text, position)
   }, [position, text])
   return (
-    <div
-      aria-label={`Preview of ${name}`}
-      className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-black"
-      role="img"
-    >
+    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-lg bg-black">
       {clipId ? (
+        // Plays only when asked: a page of previews would otherwise decode every clip at once.
         <video
-          aria-hidden
-          autoPlay
+          aria-label={`Preview of ${name}`}
           className="absolute inset-0 size-full object-cover"
+          controls
           loop
           muted
           playsInline
+          preload="metadata"
           src={assetContentUrl(clipId)}
         />
       ) : (
@@ -169,9 +186,10 @@ function UgcPreview({
       )}
       <canvas
         ref={canvas}
-        className="absolute inset-0 size-full"
-        height={GRID_VIDEO.height}
-        width={GRID_VIDEO.width}
+        aria-hidden
+        className="pointer-events-none absolute inset-0 size-full"
+        height={PREVIEW.height}
+        width={PREVIEW.width}
       />
     </div>
   )
@@ -204,8 +222,8 @@ function ConceptCard({
   const imageOnly = Boolean(grid.hideHeadline) && !captionOn
   const [busy, setBusy] = React.useState('')
   const [problem, setProblem] = React.useState('')
-  const clipMs = useClipLength(kind === 'ugc' ? grid.slots[0]?.assetId : undefined)
-  const closingMs = useClipLength(grid.closingAssetId)
+  const clipMs = useClipLength(kind === 'ugc' ? grid.slots[0]?.assetId : undefined, setProblem)
+  const closingMs = useClipLength(grid.closingAssetId, setProblem)
   const videoMs =
     kind === 'single'
       ? GRID_VIDEO.seconds * 1000
@@ -259,6 +277,8 @@ function ConceptCard({
       }))
     )
   }
+  // One change at a time: a second upload finishing first would be overwritten by the first.
+  const locked = disabled || Boolean(busy)
   const media = grid.slots[0]?.assetId
   const chooseImage = (file: File | undefined) => {
     if (!file) return
@@ -279,33 +299,47 @@ function ConceptCard({
       return
     }
     void attempt(closing ? 'Uploading the closing clip…' : 'Uploading the clip…', async () => {
-      const length = await readClipLength(file)
+      // Read as the renderer will: no picture (a codec this browser lacks) is refused too.
+      const frame = await captureVideoFrame(file)
+      if (!frame || frame.durationMs === null)
+        throw new Error('This browser cannot show the clip. Use an H.264 MP4 or MOV.')
+      const length = frame.durationMs
       const wrong = closing
         ? clipLengthProblem(length, UGC_CLOSING_MS, 'The closing clip')
         : clipLengthProblem(length, UGC_CLIP_MS, 'The clip')
       if (wrong) throw new Error(wrong)
       const assetId = await upload(new File([file], file.name, { type }))
       await onUpdate((latest) =>
-        closing ? { ...latest, closingAssetId: assetId } : { ...latest, slots: [{ assetId, topic: '' }] }
+        closing
+          ? { ...latest, closingAssetId: assetId }
+          : { ...latest, slots: [{ assetId, topic: '' }] }
       )
     })
   }
   const chooseMusic = (file: File | undefined) => {
     if (!file) return
     void attempt('Uploading music…', async () => {
-      const { type } = await readAudioFile(file)
+      const type = await readAudioFile(file)
       const musicAssetId = await upload(new File([file], file.name, { type }))
       await onUpdate(({ musicStartMs: _start, ...latest }) => ({ ...latest, musicAssetId }))
     })
   }
 
   return (
-    <li className="grid gap-4 rounded-2xl border border-border p-4 sm:grid-cols-[160px_minmax(0,1fr)]" data-testid="template-concept">
+    <li
+      className="grid gap-4 rounded-2xl border border-border p-4 sm:grid-cols-[160px_minmax(0,1fr)]"
+      data-testid="template-concept"
+    >
       <div className="w-40 justify-self-center sm:justify-self-start">
         {kind === 'single' ? (
           <StillPreview grid={grid} name={name} />
         ) : (
-          <UgcPreview clipId={media} name={name} position={grid.textPosition ?? 'middle'} text={text} />
+          <UgcPreview
+            clipId={media}
+            name={name}
+            position={grid.textPosition ?? 'middle'}
+            text={text}
+          />
         )}
       </div>
       <div className="grid content-start gap-3">
@@ -336,7 +370,12 @@ function ConceptCard({
               No caption (image only)
             </Label>
             <div className="flex flex-wrap items-center gap-2">
-              <FilePicker accept={IMAGE_TYPES.join(',')} label={`Image for ${name}`} onFiles={([file]) => chooseImage(file)}>
+              <FilePicker
+                accept={IMAGE_TYPES.join(',')}
+                disabled={locked}
+                label={`Image for ${name}`}
+                onFiles={([file]) => chooseImage(file)}
+              >
                 {media ? 'Replace image' : 'Upload image'}
               </FilePicker>
             </div>
@@ -356,6 +395,7 @@ function ConceptCard({
             </Label>
             <div className="flex flex-wrap items-center gap-2">
               <Segmented
+                disabled={locked}
                 label={`Text position for ${name}`}
                 options={[
                   ['top', 'Top'],
@@ -368,7 +408,7 @@ function ConceptCard({
                 }
               />
               <CaptionAssistant
-                disabled={disabled}
+                disabled={locked}
                 label={`text for ${name}`}
                 onChoose={(choice) => {
                   setText(choice)
@@ -377,11 +417,17 @@ function ConceptCard({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <FilePicker accept={CLIP_ACCEPT} label={`Clip for ${name}`} onFiles={([file]) => chooseClip(file, false)}>
+              <FilePicker
+                accept={CLIP_ACCEPT}
+                disabled={locked}
+                label={`Clip for ${name}`}
+                onFiles={([file]) => chooseClip(file, false)}
+              >
                 {media ? 'Replace clip' : 'Choose clip'}
               </FilePicker>
               <FilePicker
                 accept={CLIP_ACCEPT}
+                disabled={locked}
                 label={`Closing clip for ${name}`}
                 onFiles={([file]) => chooseClip(file, true)}
               >
@@ -389,12 +435,14 @@ function ConceptCard({
               </FilePicker>
               {grid.closingAssetId ? (
                 <Button
-                  disabled={disabled}
+                  disabled={locked}
                   size="sm"
                   type="button"
                   variant="ghost"
                   onClick={() =>
-                    void attempt('', () => onUpdate(({ closingAssetId: _gone, ...latest }) => latest))
+                    void attempt('', () =>
+                      onUpdate(({ closingAssetId: _gone, ...latest }) => latest)
+                    )
                   }
                 >
                   Remove closing clip
@@ -408,14 +456,19 @@ function ConceptCard({
           </>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <FilePicker accept={AUDIO_ACCEPT} label={`Music for ${name}`} onFiles={([file]) => chooseMusic(file)}>
+          <FilePicker
+            accept={AUDIO_ACCEPT}
+            disabled={locked}
+            label={`Music for ${name}`}
+            onFiles={([file]) => chooseMusic(file)}
+          >
             {grid.musicAssetId ? 'Change music' : 'Add music'}
           </FilePicker>
           {grid.musicAssetId && videoMs !== null ? (
             <MusicTrim
               key={`${grid.musicAssetId}/${videoMs}`}
               assetId={grid.musicAssetId}
-              disabled={disabled}
+              disabled={locked}
               label={`music for ${name}`}
               startMs={grid.musicStartMs ?? 0}
               videoMs={videoMs}
@@ -424,7 +477,7 @@ function ConceptCard({
           ) : null}
           {grid.musicAssetId ? (
             <Button
-              disabled={disabled}
+              disabled={locked}
               size="sm"
               type="button"
               variant="ghost"
@@ -459,32 +512,28 @@ function ConceptCard({
  * loses only the video being rendered. From then on it is an ordinary post.
  */
 export function TemplateCreator({
-  base,
   disabled,
   items,
   kind,
-  lastRender,
   onAdd,
-  onReload,
   onUpdate,
+  renderer,
   sharedAccounts,
 }: {
-  /** The batch's API path. */
-  base: string
   disabled: boolean
   items: BatchItem[]
   kind: Kind
-  /** The batch's latest render, so its failures survive a reload. */
-  lastRender?: BatchRun
   onAdd: (inputs: BatchItemInput[]) => Promise<void>
-  onReload: () => Promise<void>
   onUpdate: (
     item: BatchItem,
     body: (latest: BatchItem) => Record<string, unknown>
   ) => Promise<unknown>
+  /** The batch's one renderer, shared with the other creators. */
+  renderer: ConceptRenderer
   sharedAccounts: string[]
 }) {
   const trpc = useTRPCClient()
+  const { download, downloadAll, progress, render, running, stop } = renderer
   const copy = COPY[kind]
   const ours = (item: BatchItem): item is Saved => item.grid?.kind === kind
   const concepts = items.filter((item): item is Saved => ours(item) && !item.draftId)
@@ -492,13 +541,6 @@ export function TemplateCreator({
   const finished = items.filter(
     (item): item is Saved => ours(item) && item.media.some((entry) => entry.assetId)
   )
-  const videoName = (item: BatchItem) => `${copy.file}-${item.position + 1}.mp4`
-  const { progress, render, running, stop } = useConceptRender({
-    base,
-    fileName: videoName,
-    lastRender,
-    onReload,
-  })
   const toRender = concepts.filter(
     (item) => gridReady(item.grid) && !item.media.some((entry) => entry.assetId)
   )
@@ -545,36 +587,19 @@ export function TemplateCreator({
     return assetId
   }
   // A caption still equal to the video's text follows it, as a grid's follows its headline.
-  const update = (item: Saved, change: (latest: BatchGrid) => BatchGrid) =>
-    onUpdate(item, (latest) => {
-      const grid = change(latest.grid ?? item.grid)
+  // The batch reports a failed save itself and answers false; the card then keeps its state.
+  const update = async (item: Saved, change: (latest: BatchGrid) => BatchGrid) => {
+    const saved = await onUpdate(item, (latest) => {
+      const before = latest.grid ?? item.grid
+      const grid = change(before)
       return {
         grid,
-        ...(latest.caption === captionOf(item.grid.headline)
+        ...(latest.caption === captionOf(before.headline)
           ? { caption: captionOf(grid.headline) }
           : {}),
       }
     })
-
-  const fetchVideo = async (item: Saved) => {
-    const assetId = item.media.find((entry) => entry.assetId)?.assetId
-    const response = await fetch(assetContentUrl(assetId!))
-    if (!response.ok) throw new Error('A video could not be downloaded.')
-    return response.blob()
-  }
-  const downloadAll = async () => {
-    try {
-      if (finished.length === 1) {
-        downloadBlob(await fetchVideo(finished[0]!), videoName(finished[0]!))
-        return
-      }
-      const entries = await Promise.all(
-        finished.map(async (item) => ({ data: await fetchVideo(item), path: videoName(item) }))
-      )
-      downloadBlob(await zipFiles(entries), `${copy.file}s.zip`)
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'The videos could not be downloaded.')
-    }
+    if (saved === false) throw new Error('The change was not saved. Try again.')
   }
 
   const status = (item: Saved) => {
@@ -588,12 +613,7 @@ export function TemplateCreator({
             size="sm"
             type="button"
             variant="ghost"
-            onClick={() =>
-              void fetchVideo(item).then(
-                (blob) => downloadBlob(blob, videoName(item)),
-                () => toast.error('The video could not be downloaded.')
-              )
-            }
+            onClick={() => void download(item)}
           >
             Download
           </Button>
@@ -702,7 +722,11 @@ export function TemplateCreator({
               </Button>
             ) : null}
             {finished.length ? (
-              <Button disabled={running} variant="outline" onClick={() => void downloadAll()}>
+              <Button
+                disabled={running}
+                variant="outline"
+                onClick={() => void downloadAll(finished, `${copy.file}s.zip`)}
+              >
                 Download all ({finished.length})
               </Button>
             ) : null}

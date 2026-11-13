@@ -132,6 +132,7 @@ import { FilePicker } from './FilePicker'
 import { FileThumb, ImportReview, type Staged } from './ImportReview'
 import { GridCreator } from './GridCreator'
 import { TemplateCreator } from './TemplateCreator'
+import { useConceptRender } from './use-concept-render'
 
 /** Files a batch takes: the formats some destination publishes; a PDF goes to LinkedIn as a document. */
 const ACCEPT =
@@ -1661,30 +1662,29 @@ export function BatchWorkspace({
   const checked = Object.keys(verdicts).length > 0
   // Smaller action buttons on phones, where the bar stays over the posts.
   const compact = useIsMobile() ? 'sm' : 'default'
+  // One renderer for the batch: the server keeps one render per batch, so two
+  // creators each starting their own would cancel each other's.
+  const renderer = useConceptRender({ base, lastRender: batch.render, onReload: reload, settled })
   const gridCreator = showGrid ? (
     <GridCreator
       disabled={busy !== null}
-      base={base}
       items={items}
-      lastRender={batch.render}
+      renderer={renderer}
       sharedAccounts={sharedAccounts}
       onAdd={addConcepts}
       onApply={applyGrids}
-      onReload={reload}
       onUpdate={updateItem}
     />
   ) : null
   const templateCreators = templateKinds.map((kind) => (
     <TemplateCreator
       key={kind}
-      base={base}
       disabled={busy !== null}
       items={items}
       kind={kind}
-      lastRender={batch.render}
+      renderer={renderer}
       sharedAccounts={sharedAccounts}
       onAdd={addConcepts}
-      onReload={reload}
       onUpdate={updateItem}
     />
   ))

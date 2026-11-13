@@ -1,5 +1,7 @@
+import { MIX_SAMPLE_RATE } from '@/lib/animation/audio-mix'
 import { normalizeAudioType } from '@/lib/animation/audio-type'
 import { type AudioMimeType, MAX_AUDIO_BYTES } from '@/lib/animation/motion-schema'
+import { MUSIC_START_LIMIT_MS } from '@/lib/api/contracts/content-batches'
 
 /**
  * A template's music: the person's own file, played for the video's length
@@ -9,10 +11,17 @@ import { type AudioMimeType, MAX_AUDIO_BYTES } from '@/lib/animation/motion-sche
 /** The slider's step: a tenth of a second. */
 export const TRIM_STEP_MS = 100
 
-/** The latest start that still fills the video, on the step; 0 when the track is shorter. */
+/**
+ * The latest start that still fills the video, on the step; 0 when the track is
+ * shorter. Never past the ten minutes Go accepts.
+ */
 export function latestStart(trackMs: number, videoMs: number) {
-  return Math.max(0, Math.floor((trackMs - videoMs) / TRIM_STEP_MS) * TRIM_STEP_MS)
+  const latest = Math.floor((trackMs - videoMs) / TRIM_STEP_MS) * TRIM_STEP_MS
+  return Math.max(0, Math.min(latest, MUSIC_START_LIMIT_MS))
 }
+
+/** The longest track a template takes: decoded, ten minutes of stereo is about 230 MB. */
+export const MUSIC_TRACK_LIMIT_MS = MUSIC_START_LIMIT_MS
 
 /** A start within the track, on the step. */
 export function clampStart(startMs: number, trackMs: number, videoMs: number) {
@@ -72,17 +81,36 @@ export function audioFileProblem(file: { name: string; size: number; type: strin
   return null
 }
 
+/** A track's length from its metadata, without decoding it; null when this browser cannot read it. */
+export function audioLength(src: string): Promise<number | null> {
+  const audio = document.createElement('audio')
+  audio.preload = 'metadata'
+  return new Promise<number | null>((resolve) => {
+    audio.addEventListener('loadedmetadata', () => resolve(audio.duration * 1000), { once: true })
+    audio.addEventListener('error', () => resolve(null), { once: true })
+    audio.src = src
+  }).finally(() => {
+    audio.removeAttribute('src')
+    audio.load()
+  })
+}
+
 /**
- * An audio file checked as the renderer will read it: its type, its size, and
- * that this browser decodes it to some sound. Returns its type and length.
+ * An audio file checked as the renderer will read it: its type, its size, a
+ * length the renderer can hold (read before decoding), and that this browser
+ * decodes it to some sound. Returns the type to upload it as.
  */
-export async function readAudioFile(file: File): Promise<{ durationMs: number; type: AudioMimeType }> {
+export async function readAudioFile(file: File): Promise<AudioMimeType> {
   const problem = audioFileProblem(file)
   if (problem) throw new Error(problem)
-  const context = new OfflineAudioContext(2, 1, 48_000)
+  const url = URL.createObjectURL(file)
+  const length = await audioLength(url).finally(() => URL.revokeObjectURL(url))
+  if (length !== null && length > MUSIC_TRACK_LIMIT_MS)
+    throw new Error(`Choose a track of up to ${MUSIC_TRACK_LIMIT_MS / 60_000} minutes.`)
+  const context = new OfflineAudioContext(2, 1, MIX_SAMPLE_RATE)
   const decoded = await context.decodeAudioData(await file.arrayBuffer()).catch(() => {
     throw new Error('This browser cannot decode the audio file. Use MP3, AAC, WAV, or Ogg.')
   })
   if (decoded.duration < 0.1) throw new Error('This audio file has no sound to play.')
-  return { durationMs: Math.round(decoded.duration * 1000), type: normalizeAudioType(file.type, file.name)! }
+  return normalizeAudioType(file.type, file.name)!
 }

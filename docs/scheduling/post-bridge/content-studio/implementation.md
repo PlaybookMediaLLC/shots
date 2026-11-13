@@ -42,7 +42,7 @@ The concept gains a `kind` (absent for the 2×2 grid, `single`, `ugc`) and these
 
 Clip lengths come from the upload probe (`asset."durationMs"`) and are compared to the tenth of a second, so an encoder's few extra milliseconds pass. A concept keeps its kind: changing it is a conflict.
 
-Rendering stays in the browser. One frame loop serves every kind, with the browser's H.264 and AAC encoders, or FFmpeg frame by frame where the browser has neither. That replaces the grid's FFmpeg still, so the fallback now fades too.
+Rendering stays in the browser. One frame loop serves every kind, with the browser's H.264 and AAC encoders, or FFmpeg frame by frame where the browser lacks them. A grid on FFmpeg keeps its previous single still with no fade, so a batch of grids stays quick there. The batch page holds one renderer for all its creators, because the server keeps one render per batch: a second creator cannot start a render that would cancel the first. A render waits for edits still being saved before the server freezes the concepts.
 
 | Kind | Output |
 | --- | --- |
@@ -52,7 +52,7 @@ Rendering stays in the browser. One frame loop serves every kind, with the brows
 
 The preview draws with the export's own functions, `composeStill` and `drawOverlay`, which use `wrapLines` and the layout in `grid-layout.ts`. That function keeps typed line breaks, breaks a word wider than a line between characters (CJK, long URLs) without splitting an emoji, and sets right-to-left lines from their first letter.
 
-The trim dialog moves a draft start; Save selection stores it as `musicStartMs`, and Cancel or closing drops it. The last start is the track's length less the video's, on 0.1-second steps. A track shorter than the video plays once from its start.
+The trim dialog moves a draft start; Save selection stores it as `musicStartMs`, and Cancel or closing drops it, as does a save that fails. The last start is the track's length less the video's, on 0.1-second steps, and never past ten minutes. A track shorter than the video plays once from its start. A track may be up to ten minutes long, read from its metadata before it is decoded, because decoded audio takes about 23 MB a minute. Decoded audio is released after each video renders.
 
 The caption assistant asks `editorAi.suggestOverlayIdeas` for five ideas from a product description, in the workspace's voice and charged as AI credits. Choosing one replaces the video's text. The post's caption follows the text only while the two are still equal, as a grid's caption follows its headline. Each request has a number, and only the waiting request's answer counts. A failure keeps the description so the person can try again, and an answer that arrives after Cancel changes nothing.
 
@@ -77,12 +77,16 @@ The caption assistant asks `editorAi.suggestOverlayIdeas` for five ideas from a 
 | Overlay text at the top, middle and bottom stays in the frame, for long, multiline, emoji, CJK and RTL text | 3 | `write-grid-layout.test.ts` |
 | Caption assistant failure, retry, empty answer and an answer after Cancel | 3 | `write-caption-assistant.test.ts`, `content-studio.spec.ts` |
 | A render survives a reload, and the video reaches its draft by asset ID | 1–3 | `content-studio.spec.ts` |
+| The fade-in's second frame is about a sixth as bright as its middle; the trimmed start is what plays | 1, 2 | decoded frames and audio in `content-studio.spec.ts` |
+| A UGC render is as long as its clips (3 s and 4 s give 210 frames), and the closing clip moves on screen | 3 | `content-studio.spec.ts` |
 | A concept keeps its kind, takes only its kind's fields, and holds only this workspace's assets | 1–3 | `TestContentBatches` |
 
 ### Known limits
 
 - Where the browser cannot encode H.264 and AAC, FFmpeg holds every frame in memory, so that fallback takes UGC videos of up to 20 seconds and says so.
-- A UGC render seeks the clip for every frame. A one-minute clip with sparse keyframes takes a minute or more.
+- A UGC render seeks the clip for every frame. In headless Chromium at 1080×1920 that took 48 ms a frame with a keyframe every second and 143 ms with x264's default spacing, so a 75-second video takes two to five minutes. Reading frames during playback would be close to real time and is the next step if this is too slow on real devices.
+- Previews draw the export's frame at a quarter of its size. A UGC clip plays in its preview only when asked, so a page of videos does not decode every clip at once.
+- A clip uploaded before upload-time probing has no stored length and is refused. The creator always uploads a fresh file, so this happens only through the API.
 - Text uses the device's system font, so emoji and CJK glyphs depend on the fonts the device has. Preview and export run on the same device, so they match each other.
 
 ## Outcome metric

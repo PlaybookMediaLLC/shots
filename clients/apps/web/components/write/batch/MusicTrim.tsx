@@ -12,9 +12,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Slider } from '@/components/ui/slider'
-import { decodeAudioSource, MIX_SAMPLE_RATE } from '@/lib/animation/audio-mix'
 import { assetContentUrl } from '@/lib/editor/services'
 import {
+  audioLength,
   clampStart,
   clock,
   excerptText,
@@ -54,11 +54,13 @@ export function MusicTrim({
   React.useEffect(() => {
     if (!open || trackMs !== null) return
     let live = true
-    decodeAudioSource(assetContentUrl(assetId), new OfflineAudioContext(2, 1, MIX_SAMPLE_RATE)).then(
-      (buffer) => live && setTrackMs(Math.round(buffer.duration * 1000)),
-      (error: unknown) =>
-        live && setProblem(error instanceof Error ? error.message : 'The music could not be read.')
-    )
+    // Its metadata is enough to place the start; the render decodes the track itself.
+    void audioLength(assetContentUrl(assetId)).then((length) => {
+      if (!live) return
+      if (length === null || !Number.isFinite(length))
+        setProblem('This browser cannot read the music.')
+      else setTrackMs(Math.round(length))
+    })
     return () => {
       live = false
     }
@@ -88,7 +90,8 @@ export function MusicTrim({
     if (trackMs === null) return
     setSaving(true)
     try {
-      await onSave(clampStart(draft, trackMs, videoMs))
+      // The batch reports a failed save itself and answers false; the draft then stays open.
+      if ((await onSave(clampStart(draft, trackMs, videoMs))) === false) return
       close()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The start could not be saved.')
@@ -135,15 +138,19 @@ export function MusicTrim({
                 min={0}
                 step={TRIM_STEP_MS}
                 value={[draft]}
-                onValueChange={([ms]) =>
-                  dispatch({ ms: ms ?? 0, trackMs, type: 'move', videoMs })
-                }
+                onValueChange={([ms]) => dispatch({ ms: ms ?? 0, trackMs, type: 'move', videoMs })}
               />
               <p className="text-sm" data-testid="trim-excerpt">
                 {excerptText(draft, trackMs, videoMs)}
               </p>
               <audio ref={audio} preload="auto" src={assetContentUrl(assetId)} />
-              <Button className="justify-self-start" size="sm" type="button" variant="outline" onClick={play}>
+              <Button
+                className="justify-self-start"
+                size="sm"
+                type="button"
+                variant="outline"
+                onClick={play}
+              >
                 Play selection
               </Button>
             </div>

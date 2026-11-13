@@ -99,14 +99,16 @@ export function overlayBlock(lines: number, position: OverlayPosition, { height,
 }
 
 /** A UGC video's frames: its clip, then its closing clip, at the frame rate. */
-export function ugcTimeline(clipMs: number, closingMs = 0, fps: number = GRID_VIDEO.fps) {
+export function ugcTimeline(clipMs: number, closingMs = 0) {
+  const { fps } = GRID_VIDEO
   const clipFrames = Math.round((clipMs / 1000) * fps)
   const frames = clipFrames + Math.round((closingMs / 1000) * fps)
   return { clipFrames, durationMs: Math.round((frames / fps) * 1000), frames }
 }
 
 /** Which clip a frame of a UGC video shows, and at what second of it. */
-export function frameSource(frame: number, clipFrames: number, fps: number = GRID_VIDEO.fps) {
+export function frameSource(frame: number, clipFrames: number) {
+  const { fps } = GRID_VIDEO
   return frame < clipFrames
     ? { closing: false, seconds: frame / fps }
     : { closing: true, seconds: (frame - clipFrames) / fps }

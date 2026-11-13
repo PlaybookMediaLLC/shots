@@ -187,3 +187,37 @@ test('a UGC video is its clip then its closing clip, at 30 fps', () => {
   assert.equal(ugcTimeline(3000, 3000).frames, 180)
   assert.equal(ugcTimeline(60_000, 15_000).frames, 2250)
 })
+
+test('overlay text of every kind wraps within the overlay and its block stays in the frame', () => {
+  // About as wide as the 64 px bold face: CJK and emoji take a full em, Latin and Arabic about half.
+  const measure = (line: string) =>
+    [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)].reduce(
+      (width, { segment }) =>
+        width +
+        (/[\p{Script=Han}\p{Script=Hiragana}\p{Extended_Pictographic}]/u.test(segment) ? 64 : 34),
+      0
+    )
+  const frame = { height: GRID_VIDEO.height, width: GRID_VIDEO.width, x: 0, y: 0 }
+  const texts = {
+    arabic: 'هذا هو المخطط الذي كنت أبحث عنه طوال الأسبوع\nجربه اليوم',
+    cjk: '四つの夕食が二十分でできる簡単な献立を毎週作っています',
+    emoji: '👨‍👩‍👧 family plan 🗓️✨ '.repeat(5),
+    long: 'a'.repeat(150),
+    multiline: 'POV:\nyou finally\nfound a planner\nthat fits\nyour week',
+  }
+  for (const position of ['top', 'middle', 'bottom'] as const) {
+    const width = overlayBlock(1, position).width - 10
+    for (const [kind, text] of Object.entries(texts)) {
+      const lines = wrapLines(text, width, OVERLAY.maxLines, measure)
+      assert.ok(lines.length >= 1 && lines.length <= OVERLAY.maxLines, kind)
+      for (const line of lines) assert.ok(measure(line) <= width, `${kind}: ${line}`)
+      assert.ok(inside(overlayBlock(lines.length, position), frame), `${kind} at ${position}`)
+      if (kind === 'arabic') assert.ok(lines.every(isRtl))
+    }
+  }
+  // Typed line breaks survive the wrap.
+  assert.deepEqual(
+    wrapLines(texts.multiline, overlayBlock(1, 'top').width, OVERLAY.maxLines, measure),
+    ['POV:', 'you finally', 'found a planner', 'that fits', 'your week']
+  )
+})

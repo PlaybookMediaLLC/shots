@@ -42,10 +42,9 @@ const (
 	batchMusicStartLimit = 10 * 60 * 1000
 )
 
-// Template media by type. Clips are the probed video types, so their length is known.
+// Template media by type. Clips are the probed video types (probedVideo), so their length is known.
 var (
 	batchTemplateImageTypes = []string{"image/jpeg", "image/png", "image/webp"}
-	batchTemplateClipTypes  = []string{"video/mp4", "video/quicktime"}
 	batchTemplateAudioTypes = []string{"audio/aac", "audio/mp4", "audio/mpeg", "audio/ogg", "audio/wav", "audio/webm"}
 )
 
@@ -481,24 +480,25 @@ func checkBatchGrid(ctx context.Context, client *ent.Client, organizationID stri
 			return err
 		}
 	case grid.Kind == batchTemplateUGC:
-		if err := checkTemplateAsset(ctx, client, organizationID, media, batchTemplateClipTypes, 3000, 60000, "The clip must be an MP4 or MOV video of 3 to 60 seconds."); err != nil {
+		if err := checkTemplateAsset(ctx, client, organizationID, media, nil, 3000, 60000, "The clip must be an MP4 or MOV video of 3 to 60 seconds."); err != nil {
 			return err
 		}
 	}
 	if grid.ClosingAssetID != "" {
-		return checkTemplateAsset(ctx, client, organizationID, grid.ClosingAssetID, batchTemplateClipTypes, 3000, 15000, "The closing clip must be an MP4 or MOV video of 3 to 15 seconds.")
+		return checkTemplateAsset(ctx, client, organizationID, grid.ClosingAssetID, nil, 3000, 15000, "The closing clip must be an MP4 or MOV video of 3 to 15 seconds.")
 	}
 	return nil
 }
 
-// checkTemplateAsset checks an uploaded asset's type and, with maxMs, its length,
-// rounded to the tenth of a second so an encoder's few extra milliseconds pass.
+// checkTemplateAsset checks an uploaded asset's type (a clip: a probed video
+// type, nil types) and, with maxMs, its length, rounded to the tenth of a
+// second so an encoder's few extra milliseconds pass.
 func checkTemplateAsset(ctx context.Context, client *ent.Client, organizationID, id string, types []string, minMs, maxMs int, problem string) error {
 	row, err := client.Asset.Query().Where(asset.ID(id), asset.OrganizationID(organizationID)).Only(ctx)
 	if err != nil {
 		return err
 	}
-	if !slices.Contains(types, row.MediaType) {
+	if types == nil && !probedVideo[row.MediaType] || types != nil && !slices.Contains(types, row.MediaType) {
 		return invalid(problem)
 	}
 	if maxMs > 0 {
