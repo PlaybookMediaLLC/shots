@@ -28,6 +28,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { DateRangePicker } from '@/components/ui/date-range-picker'
 import { datePreset, draftName } from '@/lib/write/library'
+import { useHydratedSession } from '@/lib/auth/client'
+import { trackPostManagementUse } from '@/lib/plan/feature-use'
 import { zonedDayKey } from '@/lib/settings/zoned-time'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -445,6 +447,12 @@ export function WriteRail() {
  */
 function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
   const { data, setQuery } = useWrite()
+  const workspaceId = useHydratedSession().data?.session.activeOrganizationId
+  // Setting an account or dates counts toward the post-management metric.
+  const filter = (next: Record<string, string | undefined>) => {
+    if (Object.values(next).some(Boolean)) trackPostManagementUse(workspaceId, 'library_filter')
+    setQuery(next)
+  }
   const queue = data.query.tab === 'queue'
   const { account, from, to } = data.query
   const accounts = data.activeSet?.accounts ?? []
@@ -501,7 +509,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
         <DropdownMenuContent align="end" className="max-h-[70dvh] w-64 overflow-y-auto">
           <DropdownMenuLabel>Account</DropdownMenuLabel>
           <DropdownMenuRadioGroup
-            onValueChange={(value) => setQuery({ account: value || undefined })}
+            onValueChange={(value) => filter({ account: value || undefined })}
             value={account ?? ''}
           >
             <DropdownMenuRadioItem value="">All accounts</DropdownMenuRadioItem>
@@ -517,7 +525,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
             onValueChange={(label) => {
               if (label === 'custom') return setCustomDates(true)
               setCustomDates(false)
-              setQuery(
+              filter(
                 label
                   ? datePreset(DATE_PRESETS[label as keyof typeof DATE_PRESETS], today, data.weekStart)
                   : { from: undefined, to: undefined }
@@ -605,7 +613,7 @@ function LibraryFilters({ onManageTags }: { onManageTags: () => void }) {
         <DateRangePicker
           aria-label="Dates"
           className="h-7 w-full min-w-0 text-xs"
-          onChange={(range) => setQuery(range)}
+          onChange={(range) => filter(range)}
           value={{ from: from ?? '', to: to ?? '' }}
         />
       </div>

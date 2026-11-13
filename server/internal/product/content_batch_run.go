@@ -440,13 +440,13 @@ func (c *Configuration) CreateContentBatchRender(ctx context.Context, actor Acto
 		}
 		switch {
 		case item.Grid == nil:
-			return nil, invalid("Only grid videos render.")
+			return nil, invalid("Only template videos render.")
 		case item.DraftID != nil:
 			return nil, conflict("This video is a draft now. Edit it in Write.")
 		}
 		for _, slot := range item.Grid.Slots {
 			if slot.AssetID == "" {
-				return nil, invalid("Fill every image of a video before it renders.")
+				return nil, invalid("Add every image or clip of a video before it renders.")
 			}
 		}
 		items = append(items, schema.BatchRunItem{Grid: item.Grid, ItemID: item.ID, Status: batchItemPending})
@@ -559,7 +559,7 @@ func (c *Configuration) attachRenderedVideo(ctx context.Context, actor Actor, ba
 		return err
 	}
 	if !strings.HasPrefix(video.MediaType, "video/") {
-		return invalid("A grid video's output must be a video.")
+		return invalid("A rendered template's output must be a video.")
 	}
 	if err := tx.ContentBatchItem.UpdateOneID(item.ID).SetMedia(media).Exec(ctx); err != nil {
 		return err

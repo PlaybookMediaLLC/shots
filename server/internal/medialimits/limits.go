@@ -27,6 +27,20 @@ type VideoRules struct {
 	MinMs    int      `json:"minMs"`
 	MaxMs    int      `json:"maxMs"`
 	MaxBytes int      `json:"maxBytes"`
+	// Accounts holds the provider's own limits per verified account tier;
+	// MaxBytes above stays Shots' upload ceiling.
+	Accounts struct {
+		Standard AccountVideo `json:"standard"`
+		Premium  AccountVideo `json:"premium"`
+	} `json:"accounts"`
+}
+
+// AccountVideo is one account tier's video limit at the provider. Stored X
+// capability snapshots must match it exactly (socialidentity XCapabilities.Validate),
+// so changing a value sends every connected X account back through reconnect.
+type AccountVideo struct {
+	MaxMs    int   `json:"maxMs"`
+	MaxBytes int64 `json:"maxBytes"`
 }
 
 // CoverRules are the images a destination takes as a video's cover.

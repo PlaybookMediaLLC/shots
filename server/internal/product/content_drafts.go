@@ -891,8 +891,10 @@ func draftNeedsAttention() predicate.ContentDraft {
 // draftPostsMatch matches a draft when one live post meets every criterion:
 // a draft with an X post last week and a LinkedIn post today does not match
 // "X, today". A draft with no live post matches on what it intends instead,
-// its destinations and planned time. Time is [From, To) on scheduledFor, as the
-// calendar reads it.
+// its destinations and planned time. Time is [From, To) on the instant the
+// calendar places a post at (PlanWorkspace's `at`): when it went out, else its
+// slot, else its time. A retry or natural offset moves scheduledFor past the
+// slot, sometimes past midnight, so scheduledFor alone could name another day.
 func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentDraft {
 	return func(s *sql.Selector) {
 		live := func(criteria bool) *sql.Predicate {
@@ -905,11 +907,14 @@ func draftPostsMatch(org string, query ContentDraftListQuery) predicate.ContentD
 			if criteria && query.ConnectionID != "" {
 				where = append(where, sql.EQ(posts.C(scheduledpost.FieldChannelConnectionID), query.ConnectionID))
 			}
+			// publishedAt is timestamptz and the others UTC timestamps: compare as UTC timestamps,
+			// whatever the session's time zone.
+			at := "COALESCE(" + posts.C(scheduledpost.FieldPublishedAt) + " AT TIME ZONE 'UTC', " + posts.C(scheduledpost.FieldSlotAt) + ", " + posts.C(scheduledpost.FieldScheduledFor) + ")"
 			if criteria && query.From != nil {
-				where = append(where, sql.GTE(posts.C(scheduledpost.FieldScheduledFor), *query.From))
+				where = append(where, sql.GTE(at, query.From.UTC()))
 			}
 			if criteria && query.To != nil {
-				where = append(where, sql.LT(posts.C(scheduledpost.FieldScheduledFor), *query.To))
+				where = append(where, sql.LT(at, query.To.UTC()))
 			}
 			return sql.Exists(sql.Select(posts.C(scheduledpost.FieldID)).From(posts).Where(sql.And(where...)))
 		}

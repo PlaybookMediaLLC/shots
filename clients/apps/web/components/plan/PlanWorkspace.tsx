@@ -393,6 +393,7 @@ export function PlanWorkspace({
             platform: p.platform,
             // Placed at its slot; publishAt is the instant after any natural offset.
             // A live post reads when it went out, as the Posted list dates it.
+            // The library's date filter uses this instant too: draftPostsMatch in Go.
             at: p.publishedAt ?? p.slotAt ?? p.scheduledFor,
             publishAt: p.publishedAt ?? p.scheduledFor,
             zone:
