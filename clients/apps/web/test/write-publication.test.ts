@@ -4,6 +4,7 @@ import test from 'node:test'
 import { z } from 'zod'
 import {
   DRAFT_CHANNEL_LIMITS,
+  mastodonEntities,
   overflowAt,
   platformCaptionLength,
   POST_BREAK,
@@ -735,15 +736,25 @@ for (const entry of lengthCases.cases) {
 }
 
 test('the over-limit mark starts where the counter passes the limit, on every channel', () => {
-  // The definition: step back one code point at a time until the text fits.
+  // The definition: step back one code point at a time until the text fits,
+  // never stopping inside a link or remote mention Mastodon counts as one.
   const reference = (channel: DraftChannel, caption: string, limit: number) => {
+    const spans = channel === 'mastodon' ? mastodonEntities(caption) : []
+    const inside = (at: number) => spans.some(([start, stop]) => at > start && at < stop)
     let at = caption.length
-    while (at > 0 && platformCaptionLength(channel, caption.slice(0, at)) > limit) {
+    while (at > 0 && (inside(at) || platformCaptionLength(channel, caption.slice(0, at)) > limit)) {
       const code = caption.charCodeAt(at - 1)
       at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
     }
     return at
   }
+  // Mastodon's whole spans, independent of how the code finds them: the mark
+  // starts before the mention or link, never inside it.
+  assert.equal(overflowAt('mastodon', 'Thanks @jane@mastodon.social!', 8), 7)
+  assert.equal(
+    overflowAt('mastodon', 'see https://example.com/a/very/long/path?with=query.', 23),
+    4
+  )
   for (const { text } of lengthCases.cases)
     for (const channel of draftChannelSchema.options)
       for (const limit of [0, 1, 2, 5, 23, 40])

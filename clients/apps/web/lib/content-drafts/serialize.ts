@@ -546,20 +546,51 @@ export function captionLength(caption: string): number {
 
 const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
+// Mastodon counts a remote mention by its local part and any link as 23
+// characters (StatusLengthValidator). Go's draftPostLength uses this pattern
+// too (x_length.go): one pass, the earlier match first, as Mastodon resolves
+// overlaps. A link is the scheme and the URL characters after it (RFC 3986),
+// less trailing punctuation; a word character is Ruby's [[:word:]].
+const MASTODON_WORD = String.raw`\p{L}\p{M}\p{Nd}\p{Nl}\p{Pc}\u24B6-\u24E9\u{1F130}-\u{1F149}\u{1F150}-\u{1F169}\u{1F170}-\u{1F189}`
+const MASTODON_HOST = String.raw`[${MASTODON_WORD}\u06FD\u06FE\u0F0B]+`
+const MASTODON_ENTITY = new RegExp(
+  String.raw`(https?://[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]*[A-Za-z0-9\-_~/#\[@$&(*+=%])|(^|[^=/${MASTODON_WORD}])@([a-z0-9_]+(?:[.-]+[a-z0-9_]+)*)@${MASTODON_HOST}(?:[.-]+${MASTODON_HOST})*`,
+  'giu'
+)
+
+/** Where Mastodon counts a whole span as one: each link and each remote mention. */
+export function mastodonEntities(caption: string): [number, number][] {
+  return [...caption.matchAll(MASTODON_ENTITY)].map((match): [number, number] => [
+    match.index + (match[1] ? 0 : match[2].length),
+    match.index + match[0].length,
+  ])
+}
+
 /**
  * A caption's length as the platform counts it: X's weighted count of the
- * trimmed text (links are 23), grapheme clusters on Bluesky and Mastodon, and
- * UTF-16 units elsewhere. Go's `draftPostLength` is the same rule; both are
- * tested against `server/internal/product/testdata/caption-length-cases.json`.
+ * trimmed text (links are 23); grapheme clusters on Bluesky, and on Mastodon
+ * with each link as 23 and a remote mention as its local part; UTF-16 units
+ * elsewhere. Go's `draftPostLength` is the same rule; both are tested against
+ * `server/internal/product/testdata/caption-length-cases.json`.
  */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
   // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption starts or ends with one.
   if (channel === 'x') return xLength(caption.trim())
-  if (channel === 'bluesky' || channel === 'mastodon')
-    // Each printable ASCII character, tab and line feed is a grapheme: skip the segmenter.
-    return /^[ -~\t\n]*$/.test(caption)
-      ? caption.length
-      : Array.from(graphemes.segment(caption)).length
+  if (channel === 'bluesky' || channel === 'mastodon') {
+    const text =
+      channel === 'mastodon'
+        ? caption.replace(
+            MASTODON_ENTITY,
+            (_match, link: string | undefined, before: string, user: string) =>
+              link ? 'x'.repeat(23) : `${before}@${user}`
+          )
+        : caption
+    // One UTF-16 unit, or printable ASCII, tabs and line feeds, are a grapheme
+    // each: skip the segmenter.
+    return text.length < 2 || /^[ -~\t\n]*$/.test(text)
+      ? text.length
+      : Array.from(graphemes.segment(text)).length
+  }
   return captionLength(caption)
 }
 
@@ -567,10 +598,18 @@ export function platformCaptionLength(channel: DraftChannel, caption: string): n
 export function overflowAt(channel: DraftChannel, caption: string, limit: number): number {
   const fits = (at: number) => platformCaptionLength(channel, caption.slice(0, at)) <= limit
   if (channel !== 'x') {
-    // Units and graphemes only grow as a prefix grows by whole code points, so
-    // halve the range. X's link weighting can make a longer prefix count less.
+    // Counts only grow as a prefix grows by whole code points, never ending
+    // inside a span Mastodon counts as one, so halve the range. X's link
+    // weighting can make a longer prefix count less: it steps back below.
+    const inside = new Uint8Array(caption.length + 1)
+    if (channel === 'mastodon')
+      for (const [start, stop] of mastodonEntities(caption)) inside.fill(1, start + 1, stop)
     const ends = [0]
-    for (const character of caption) ends.push(ends[ends.length - 1] + character.length)
+    let end = 0
+    for (const character of caption) {
+      end += character.length
+      if (!inside[end]) ends.push(end)
+    }
     let [low, high] = [0, ends.length - 1]
     while (low < high) {
       const middle = Math.ceil((low + high) / 2)

@@ -25,13 +25,13 @@
       }
     },
     {
-      "label": "a long URL counts 23 on X",
+      "label": "a long URL counts 23 on X and Mastodon",
       "text": "see https://example.com/a/very/long/path?with=query.",
       "lengths": {
         "bluesky": 52,
         "instagram": 52,
         "linkedin": 52,
-        "mastodon": 52,
+        "mastodon": 28,
         "threads": 52,
         "tiktok": 52,
         "x": 28,
@@ -269,7 +269,7 @@
         "bluesky": 85,
         "instagram": 86,
         "linkedin": 86,
-        "mastodon": 85,
+        "mastodon": 45,
         "threads": 86,
         "tiktok": 86,
         "x": 46,
@@ -288,6 +288,132 @@
         "tiktok": 18,
         "x": 18,
         "youtube": 18
+      }
+    },
+    {
+      "label": "a link shorter than 23 counts 23 on X and Mastodon",
+      "text": "https://t.co/abc",
+      "lengths": {
+        "bluesky": 16,
+        "instagram": 16,
+        "linkedin": 16,
+        "mastodon": 23,
+        "threads": 16,
+        "tiktok": 16,
+        "x": 23,
+        "youtube": 16
+      }
+    },
+    {
+      "label": "a remote mention counts its local part on Mastodon",
+      "text": "Thanks @jane@mastodon.social!",
+      "lengths": {
+        "bluesky": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 13,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    },
+    {
+      "label": "a link in parentheses leaves the closing one out",
+      "text": "(see https://example.com/a)",
+      "lengths": {
+        "bluesky": 27,
+        "instagram": 27,
+        "linkedin": 27,
+        "mastodon": 29,
+        "threads": 27,
+        "tiktok": 27,
+        "x": 29,
+        "youtube": 27
+      }
+    },
+    {
+      "label": "an @ inside a link stays part of the link",
+      "text": "a https://x.social/@u@h.c b",
+      "lengths": {
+        "bluesky": 27,
+        "instagram": 27,
+        "linkedin": 27,
+        "mastodon": 27,
+        "threads": 27,
+        "tiktok": 27,
+        "x": 27,
+        "youtube": 27
+      }
+    },
+    {
+      "label": "an address is not a mention; remote mentions are",
+      "text": "mail me@a.b @a@b.c, @c@d",
+      "lengths": {
+        "bluesky": 24,
+        "instagram": 24,
+        "linkedin": 24,
+        "mastodon": 18,
+        "threads": 24,
+        "tiktok": 24,
+        "x": 24,
+        "youtube": 24
+      }
+    },
+    {
+      "label": "a circled letter is a word character, so no mention follows it",
+      "text": "Ⓐ@jane@mastodon.social",
+      "lengths": {
+        "bluesky": 22,
+        "instagram": 22,
+        "linkedin": 22,
+        "mastodon": 22,
+        "threads": 22,
+        "tiktok": 22,
+        "x": 23,
+        "youtube": 22
+      }
+    },
+    {
+      "label": "a superscript digit ends a mention's host",
+      "text": "@jane@mastodon.social²",
+      "lengths": {
+        "bluesky": 22,
+        "instagram": 22,
+        "linkedin": 22,
+        "mastodon": 6,
+        "threads": 22,
+        "tiktok": 22,
+        "x": 22,
+        "youtube": 22
+      }
+    },
+    {
+      "label": "shortening a mention never makes a link",
+      "text": "@http@h.co://yyyyyyyyyyyyyyyyyyyy",
+      "lengths": {
+        "bluesky": 33,
+        "instagram": 33,
+        "linkedin": 33,
+        "mastodon": 28,
+        "threads": 33,
+        "tiktok": 33,
+        "x": 33,
+        "youtube": 33
+      }
+    },
+    {
+      "label": "a link stops where URL characters stop",
+      "text": "https://example.com/aをご覧ください",
+      "lengths": {
+        "bluesky": 28,
+        "instagram": 28,
+        "linkedin": 28,
+        "mastodon": 30,
+        "threads": 28,
+        "tiktok": 28,
+        "x": 37,
+        "youtube": 28
       }
     }
   ]
