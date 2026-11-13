@@ -70,9 +70,9 @@ function xVideoLength(account: BatchAccount, facts: MediaFacts[]) {
   if (account.channel !== 'x' || !max) return []
   const ms = facts.find((fact) => fact.mimeType.startsWith('video/'))?.durationMs
   if (!ms || ms <= max * 1000) return []
-  const seconds = Math.floor(ms / 1000)
+  const seconds = Math.ceil(ms / 1000)
   return [
-    `This X account takes videos up to ${Math.floor(max / 60)} minutes; this one is ${Math.floor(ms / 60000)}:${String(seconds % 60).padStart(2, '0')}. Trim it before scheduling.`,
+    `This X account takes videos up to ${Math.floor(max / 60)} minutes; this one is ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}. Trim it before scheduling.`,
   ]
 }
 

@@ -47,7 +47,7 @@ func TestXContentUsesVerifiedLimitsWithoutChangingContent(t *testing.T) {
 	}
 	// The composer repeats these words (clients/apps/web/lib/write/batch.ts, publication.ts).
 	if err := CheckXMedia(twenty, []XMedia{{MIME: "video/mp4", Bytes: 1, DurationMs: 1_200_999}}); err == nil ||
-		err.Error() != "This X account takes videos up to 20 minutes; this one is 20:00. Trim it before scheduling." {
+		err.Error() != "This X account takes videos up to 20 minutes; this one is 20:01. Trim it before scheduling." {
 		t.Fatalf("over-length wording: %v", err)
 	}
 	if err := CheckXMedia(XStandardPostLimits("read-write", nil), []XMedia{{MIME: "video/mp4", Bytes: 1}}); err == nil ||

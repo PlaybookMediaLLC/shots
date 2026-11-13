@@ -110,7 +110,7 @@ test("an X video longer than the account's verified length is refused in Go's wo
   assert.deepEqual(stagedChecks(video(600_000), standard).get('x')!.problems, [])
   assert.deepEqual(stagedChecks(video(1_200_000), standard).get('x')!.problems, [])
   assert.deepEqual(stagedChecks(video(1_200_999), standard).get('x')!.problems, [
-    'This X account takes videos up to 20 minutes; this one is 20:00. Trim it before scheduling.',
+    'This X account takes videos up to 20 minutes; this one is 20:01. Trim it before scheduling.',
   ])
   // Premium length passes; the unverified case is refused by the publication check.
   assert.deepEqual(
