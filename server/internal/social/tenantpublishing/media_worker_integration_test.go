@@ -478,6 +478,9 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+id) })
 		asset, _ := upload("hooked.png", "image/png", photo(240))
 		posts := schedule("Hooked", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: linkedin, Caption: "Hooked", AssetIDs: []string{asset}})
+		draft := db.Client.ContentDraft.GetX(ctx, *posts[0].ContentDraftID)
+		tag := db.Client.ContentDraftTag.Create().SetID("tag_" + id).SetOrganizationID(org).SetSocialSetID(*draft.SocialSetID).SetName("Launch").SaveX(ctx)
+		draft = db.Client.ContentDraft.UpdateOne(draft).SetTagIds([]string{tag.ID}).SaveX(ctx)
 		if result := run(posts[0].ID); result.Outcome != temporalpublishing.OutcomePublished {
 			t.Fatalf("result %+v", result)
 		}
@@ -496,6 +499,11 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		data, _ := event.Payload["data"].(map[string]any)
 		if post, _ := data["post"].(map[string]any); post["id"] != stored.ID || post["remotePostId"] != *stored.RemotePostID {
 			t.Fatalf("event data %+v", data)
+		}
+		wantDraft := map[string]any{"id": draft.ID, "socialSetId": *draft.SocialSetID, "status": string(draft.Status),
+			"tags": []any{map[string]any{"id": tag.ID, "name": "Launch"}}, "title": "Hooked"}
+		if !reflect.DeepEqual(data["draft"], wantDraft) {
+			t.Fatalf("event draft %+v, want %+v", data["draft"], wantDraft)
 		}
 	})
 
