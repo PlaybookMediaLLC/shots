@@ -95,8 +95,9 @@ expiration cleanup remains outstanding; this record does not claim it ran.
   profiles. A draft belongs to one profile. The owner subsequently authorized
   fixing this blocker. This branch adds a normal account-move control that keeps
   the existing connection active, with the same visibility and owner, and refuses
-  unfinished publishing work. It has not moved either live account. Deployment
-  to the connected local stack and the one-draft live check remain outstanding.
+  unfinished publishing work. The fix is installed on the connected local stack;
+  web, API and worker health checks passed. Browser control remains unavailable,
+  neither account has moved, and the one-draft live check remains outstanding.
   Separate successful publications do not prove the requested cross-post.
 - **Check 26 / TF-066 — Approved, blocked locally:** the owner explicitly
   approved the default caption and `shots-x-10min.mp4`: 600 seconds, 1280×720,
