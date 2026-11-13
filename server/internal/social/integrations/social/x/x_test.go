@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -587,5 +588,14 @@ func TestCommunityBroadcastKeepsExplicitFalse(t *testing.T) {
 				t.Fatalf("broadcast intent lost: %v", body)
 			}
 		})
+	}
+}
+
+// A 429 keeps X's reset, so a delete waits for it instead of spending retries.
+func TestAPIErrorCarriesTheRateLimitReset(t *testing.T) {
+	header := http.Header{"X-Rate-Limit-Limit": {"50"}, "X-Rate-Limit-Reset": {"1794585600"}}
+	e := newAPIError(&http.Response{StatusCode: http.StatusTooManyRequests, Header: header}, nil)
+	if e.HTTPStatus() != http.StatusTooManyRequests || !e.RetryAt().Equal(time.Unix(1794585600, 0)) {
+		t.Fatalf("status %d reset %v", e.HTTPStatus(), e.RetryAt())
 	}
 }
