@@ -41,6 +41,7 @@ const providers = [
   { id: 'instagram-standalone', label: 'Instagram' },
   { id: 'facebook', label: 'Facebook Page' },
   { id: 'pinterest', label: 'Pinterest' },
+  { id: 'gmb', label: 'Google Business' },
 ] as const
 
 /** A local provider step owns its request lifetime, so leaving it cannot navigate later. */

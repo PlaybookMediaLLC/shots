@@ -200,6 +200,7 @@ export const CAPABILITIES: Record<DraftChannel, PlatformCapabilities> = {
     settings: { ...simple('Facebook', 63_206, false).settings, firstComment: true },
   },
   pinterest: { ...simple('Pinterest', 500, false), kinds: ['standard'], mentions: 'none' },
+  gmb: { ...simple('Google Business', 1500, false), kinds: ['standard'], mentions: 'none' },
 }
 
 /** Publishing capabilities verified for the connected account. */

@@ -41,6 +41,11 @@ func checkPostOptions(channel string, options *postoptions.PublishOptions, first
 	if err := postoptions.ValidatePinterestOptions(channel, pinterest, first); err != nil {
 		return invalid(err.Error())
 	}
+	if options != nil {
+		if err := postoptions.ValidateFacebookOptions(channel, options.Facebook); err != nil {
+			return invalid(err.Error())
+		}
+	}
 	if options == nil || options.Empty() {
 		return nil
 	}

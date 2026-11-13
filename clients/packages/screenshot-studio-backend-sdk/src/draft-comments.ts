@@ -49,6 +49,7 @@ export const draftCommentInputSchema = z.xor([
         'youtube',
         'facebook',
         'pinterest',
+        'gmb',
       ]),
       postId: commentId,
       quote: z.string().min(1).max(5000).optional(),

@@ -20,7 +20,7 @@ import (
 
 var draftChannelLabels = map[string]string{
 	"tiktok": "TikTok", "youtube": "YouTube", "x": "X", "linkedin": "LinkedIn", "instagram": "Instagram", "threads": "Threads", "bluesky": "Bluesky", "mastodon": "Mastodon",
-	"facebook": "Facebook", "pinterest": "Pinterest",
+	"facebook": "Facebook", "pinterest": "Pinterest", "gmb": "Google Business",
 }
 
 // draftMediaLimit is how many attachments one post on a channel takes.

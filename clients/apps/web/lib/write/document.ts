@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  facebookOptionsSchema,
   instagramOptionsSchema,
   pinterestOptionsSchema,
   youtubeOptionsSchema,
@@ -24,6 +25,7 @@ export const draftChannelSchema = z.enum([
   'youtube',
   'facebook',
   'pinterest',
+  'gmb',
 ])
 
 /** One of {@link draftChannelSchema}. */
@@ -191,6 +193,8 @@ export const versionOptionsSchema = z.strictObject({
   instagram: instagramOptionsSchema.optional(),
   /** Pinterest: the pin's board, title and link. */
   pinterest: pinterestOptionsSchema.optional(),
+  /** Facebook: a Page story instead of a feed post. */
+  facebook: facebookOptionsSchema.optional(),
   autoDm: autoDmSchema.optional(),
   splitOnPaste: z.boolean().optional(),
   linkPreviews: z.array(linkPreviewSchema).max(25).optional(),

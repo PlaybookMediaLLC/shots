@@ -907,3 +907,28 @@ test('a pin needs its board, sends a trimmed title and link, and checks the link
     undefined
   )
 })
+
+test('a Facebook story sends one image or video without text or a first comment', () => {
+  const facebook = { channel: 'facebook' as const, connectionId: 'cf0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const build = (options: VersionOptions) =>
+    buildPublication(
+      draft({
+        body: [p('This text goes to the other platforms.'), image],
+        platformVersions: withOptions(readVersions(undefined), 'facebook', options),
+      }),
+      facebook
+    )
+  const story = build({ facebook: { placement: 'story' } })
+  assert.equal(story.target.caption, '')
+  assert.deepEqual(story.target.options?.facebook, { placement: 'story' })
+  assert.deepEqual(story.optionProblems, [])
+  assert.match(
+    build({ facebook: { placement: 'story' }, firstComment: 'Link' }).optionProblems.join(),
+    /takes no first comment/
+  )
+  // A feed post keeps its text and sends no placement.
+  const feed = build({})
+  assert.equal(feed.target.caption, 'This text goes to the other platforms.')
+  assert.equal(feed.target.options?.facebook, undefined)
+})

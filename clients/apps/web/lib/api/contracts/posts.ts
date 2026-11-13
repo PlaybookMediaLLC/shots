@@ -40,6 +40,7 @@ export const createPostSchema = scheduleTimingSchema
         z.strictObject({
           options: versionOptionsSchema
             .pick({
+              facebook: true,
               firstComment: true,
               pinterest: true,
               tiktok: true,

@@ -108,6 +108,7 @@ createServer(async (request, response) => {
         board: body.post?.settings?.board,
         containsSyntheticMedia: body.post?.settings?.containsSyntheticMedia,
         link: body.post?.settings?.link,
+        postType: body.post?.settings?.post_type,
         tags: body.post?.settings?.tags?.map((tag) => tag.value),
         title: body.post?.settings?.title,
       },

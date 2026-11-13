@@ -377,10 +377,10 @@ func (p *Publisher) PublishThread(ctx context.Context, input socialapi.PublishIn
 		}
 	}
 	var publication *postoptions.PublicationReceipt
-	// Threads, Instagram, Facebook and Pinterest ids do not make a link, so the
-	// provider's own address is kept.
+	// Threads, Instagram, Facebook, Pinterest and Google Business ids do not make
+	// a link, so the provider's own address is kept.
 	if input.Platform == "tiktok" || input.Platform == "youtube" || input.Platform == "threads" ||
-		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" {
+		input.Platform == "instagram" || input.Platform == "instagram-standalone" || input.Platform == "facebook" || input.Platform == "pinterest" || input.Platform == "gmb" {
 		publication = &postoptions.PublicationReceipt{RemoteID: response[0].PostID, URL: response[0].ReleaseURL}
 	}
 	if input.Platform == "youtube" {

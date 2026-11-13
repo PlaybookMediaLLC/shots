@@ -52,6 +52,10 @@ func (m *Manager) ConnectionStatus(id string, showHidden bool) (string, bool) {
 		keys = []string{"FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"}
 	case "pinterest":
 		keys = []string{"PINTEREST_CLIENT_ID", "PINTEREST_CLIENT_SECRET"}
+	case "gmb":
+		// Its own keys only: the adapter would borrow YouTube's, but the Business
+		// Profile API needs its own approval.
+		keys = []string{"GOOGLE_GMB_CLIENT_ID", "GOOGLE_GMB_CLIENT_SECRET"}
 	case "mastodon":
 		keys = []string{"MASTODON_CLIENT_ID", "MASTODON_CLIENT_SECRET"}
 		// The product's legacy callback only accepts mastodon.social. Other

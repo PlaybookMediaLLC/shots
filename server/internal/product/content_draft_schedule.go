@@ -35,7 +35,7 @@ var draftPlatformChannels = map[string]string{
 	"x": "x", "linkedin": "linkedin", "instagram": "instagram", "instagram-standalone": "instagram",
 	"threads": "threads", "bluesky": "bluesky", "mastodon": "mastodon",
 	"tiktok": "tiktok", "youtube": "youtube", "twitter": "x", "linkedin-page": "linkedin", "mastodon-custom": "mastodon", "mastodoncustom": "mastodon",
-	"facebook": "facebook", "pinterest": "pinterest",
+	"facebook": "facebook", "pinterest": "pinterest", "gmb": "gmb",
 }
 
 // EnableE2EDraftPlatform lets the local provider fixture's "e2e" connections
@@ -49,7 +49,7 @@ func EnableE2EDraftPlatform() {
 // same numbers (DRAFT_CHANNEL_LIMITS in lib/content-drafts/serialize.ts).
 var draftChannelLimits = map[string]int{
 	"tiktok": 2000, "youtube": 5000, "bluesky": 300, "instagram": 2200, "linkedin": 3000, "mastodon": 500, "threads": 500, "x": 280,
-	"facebook": 63206, "pinterest": 500,
+	"facebook": 63206, "pinterest": 500, "gmb": 1500,
 }
 
 // ContentDraftScheduleTarget is one channel and the caption serialized for it.
@@ -352,7 +352,7 @@ func validateDraftTargets(input ScheduleContentDraftInput) error {
 		}
 		seen[target.ChannelConnectionID] = true
 		// A story has no caption: its media check says what it needs.
-		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "" && !target.Options.Instagram.Story()) {
+		if strings.TrimSpace(target.Caption) == "" && len(target.AssetIDs) == 0 && (target.Options == nil || target.Options.DocumentAssetID == "" && !target.Options.Story()) {
 			return invalid("Every channel needs a caption.")
 		}
 	}
@@ -439,7 +439,7 @@ func (c *Configuration) draftTargetConnections(ctx context.Context, tx *ent.Tx, 
 		if err != nil {
 			return nil, nil, err
 		}
-		story := target.Options != nil && target.Options.Instagram.Story()
+		story := target.Options.Story()
 		if story {
 			if err := checkStory(channel, target); err != nil {
 				return nil, nil, err

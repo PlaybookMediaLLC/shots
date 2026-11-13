@@ -12748,7 +12748,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 10,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -12776,7 +12776,8 @@
                                       "tiktok",
                                       "youtube",
                                       "facebook",
-                                      "pinterest"
+                                      "pinterest",
+                                      "gmb"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -12945,6 +12946,18 @@
                                           "link": {
                                             "type": "string",
                                             "maxLength": 2048
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "facebook": {
+                                        "type": "object",
+                                        "properties": {
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
                                           }
                                         },
                                         "additionalProperties": false
@@ -14050,7 +14063,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 10,
+                              "maxItems": 11,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -14078,7 +14091,8 @@
                                       "tiktok",
                                       "youtube",
                                       "facebook",
-                                      "pinterest"
+                                      "pinterest",
+                                      "gmb"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -14247,6 +14261,18 @@
                                           "link": {
                                             "type": "string",
                                             "maxLength": 2048
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "facebook": {
+                                        "type": "object",
+                                        "properties": {
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
                                           }
                                         },
                                         "additionalProperties": false
@@ -22701,7 +22727,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 10,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -22729,7 +22755,8 @@
                               "tiktok",
                               "youtube",
                               "facebook",
-                              "pinterest"
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -22898,6 +22925,18 @@
                                   "link": {
                                     "type": "string",
                                     "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -24417,7 +24456,8 @@
               "mastodon",
               "mastodon-custom",
               "facebook",
-              "pinterest"
+              "pinterest",
+              "gmb"
             ]
           },
           "instanceServer": {
@@ -24453,8 +24493,8 @@
             "const": 1
           },
           "providers": {
-            "minItems": 14,
-            "maxItems": 14,
+            "minItems": 15,
+            "maxItems": 15,
             "type": "array",
             "items": {
               "type": "object",
@@ -24475,7 +24515,8 @@
                     "instagram-standalone",
                     "substack",
                     "facebook",
-                    "pinterest"
+                    "pinterest",
+                    "gmb"
                   ]
                 },
                 "status": {
@@ -27787,7 +27828,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 10,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -27815,7 +27856,8 @@
                               "tiktok",
                               "youtube",
                               "facebook",
-                              "pinterest"
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -27984,6 +28026,18 @@
                                   "link": {
                                     "type": "string",
                                     "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -28777,7 +28831,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 10,
+                      "maxItems": 11,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -28805,7 +28859,8 @@
                               "tiktok",
                               "youtube",
                               "facebook",
-                              "pinterest"
+                              "pinterest",
+                              "gmb"
                             ]
                           },
                           "forkedFromVersion": {
@@ -28974,6 +29029,18 @@
                                   "link": {
                                     "type": "string",
                                     "maxLength": 2048
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "facebook": {
+                                "type": "object",
+                                "properties": {
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
                                   }
                                 },
                                 "additionalProperties": false
@@ -29419,7 +29486,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 10,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -29447,7 +29514,8 @@
                         "tiktok",
                         "youtube",
                         "facebook",
-                        "pinterest"
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29616,6 +29684,18 @@
                             "link": {
                               "type": "string",
                               "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
                             }
                           },
                           "additionalProperties": false
@@ -29984,7 +30064,8 @@
                 "tiktok",
                 "youtube",
                 "facebook",
-                "pinterest"
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -30038,7 +30119,8 @@
               "tiktok",
               "youtube",
               "facebook",
-              "pinterest"
+              "pinterest",
+              "gmb"
             ]
           },
           "releaseId": {
@@ -30440,7 +30522,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 10,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -30468,7 +30550,8 @@
                         "tiktok",
                         "youtube",
                         "facebook",
-                        "pinterest"
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -30637,6 +30720,18 @@
                             "link": {
                               "type": "string",
                               "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
                             }
                           },
                           "additionalProperties": false
@@ -31073,7 +31168,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 10,
+                "maxItems": 11,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -31101,7 +31196,8 @@
                         "tiktok",
                         "youtube",
                         "facebook",
-                        "pinterest"
+                        "pinterest",
+                        "gmb"
                       ]
                     },
                     "forkedFromVersion": {
@@ -31270,6 +31366,18 @@
                             "link": {
                               "type": "string",
                               "maxLength": 2048
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "facebook": {
+                          "type": "object",
+                          "properties": {
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
                             }
                           },
                           "additionalProperties": false
@@ -31638,7 +31746,8 @@
                 "tiktok",
                 "youtube",
                 "facebook",
-                "pinterest"
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -31700,7 +31809,8 @@
                   "tiktok",
                   "youtube",
                   "facebook",
-                  "pinterest"
+                  "pinterest",
+                  "gmb"
                 ]
               },
               {
@@ -32070,7 +32180,8 @@
                 "tiktok",
                 "youtube",
                 "facebook",
-                "pinterest"
+                "pinterest",
+                "gmb"
               ]
             },
             "additionalProperties": {
@@ -32079,6 +32190,18 @@
                 "options": {
                   "type": "object",
                   "properties": {
+                    "facebook": {
+                      "type": "object",
+                      "properties": {
+                        "placement": {
+                          "type": "string",
+                          "enum": [
+                            "story"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "firstComment": {
                       "type": "string",
                       "maxLength": 1250
@@ -32655,7 +32778,7 @@
                     "const": 1
                   },
                   "versions": {
-                    "maxItems": 10,
+                    "maxItems": 11,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -32683,7 +32806,8 @@
                             "tiktok",
                             "youtube",
                             "facebook",
-                            "pinterest"
+                            "pinterest",
+                            "gmb"
                           ]
                         },
                         "forkedFromVersion": {
@@ -32852,6 +32976,18 @@
                                 "link": {
                                   "type": "string",
                                   "maxLength": 2048
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "facebook": {
+                              "type": "object",
+                              "properties": {
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "story"
+                                  ]
                                 }
                               },
                               "additionalProperties": false
@@ -34069,7 +34205,8 @@
                       "tiktok",
                       "youtube",
                       "facebook",
-                      "pinterest"
+                      "pinterest",
+                      "gmb"
                     ]
                   },
                   "postId": {

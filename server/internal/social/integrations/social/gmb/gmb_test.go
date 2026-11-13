@@ -159,3 +159,24 @@ func TestValidate(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestALocationChosenInShotsIsFoundByItsID(t *testing.T) {
+	p := setup(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/locations/10":
+			w.Write([]byte(`{"name":"locations/10","title":"Shop"}`))
+		default:
+			w.Write([]byte(`{}`))
+		}
+	})
+	// Shots passes the chosen location's id only; its location is in the path.
+	info, err := p.FetchPageInformation(context.Background(), "tok", json.RawMessage(`{"id":"accounts/1/locations/10","page":"accounts/1/locations/10"}`))
+	if err != nil || info.ID != "accounts/1/locations/10" || info.Name != "Shop" {
+		t.Fatalf("info=%+v err=%v", info, err)
+	}
+	for _, id := range []string{"", "accounts/1", "accounts/1/locations/10/extra"} {
+		if _, err := p.FetchPageInformation(context.Background(), "tok", json.RawMessage(`{"id":"`+id+`"}`)); err == nil {
+			t.Fatalf("%q was taken for a location", id)
+		}
+	}
+}

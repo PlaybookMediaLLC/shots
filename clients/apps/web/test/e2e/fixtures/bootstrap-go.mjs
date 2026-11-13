@@ -77,7 +77,7 @@ async function connect(code, provider = 'e2e') {
   if (!state) throw new Error('Fake provider returned no OAuth state')
   const { id } = await post('/v1/social-oauth/exchange', { code, provider, state })
   if (typeof id !== 'string' || !id) throw new Error('The product API returned no destination ID')
-  if (provider === 'youtube' || provider === 'facebook') {
+  if (provider === 'youtube' || provider === 'facebook' || provider === 'gmb') {
     await post('/v1/social-oauth/remember', { provider, state, integrationId: id })
     await post('/v1/social-oauth/page', {
       provider,
@@ -95,6 +95,7 @@ const tiktokDestinationId = await connect('valid', 'tiktok')
 const youtubeDestinationId = await connect('valid', 'youtube')
 const facebookDestinationId = await connect('valid', 'facebook')
 const pinterestDestinationId = await connect('valid', 'pinterest')
+const gmbDestinationId = await connect('valid', 'gmb')
 
 await writeFile(
   output,
@@ -102,6 +103,7 @@ await writeFile(
     destinationId,
     expiredDestinationId,
     facebookDestinationId,
+    gmbDestinationId,
     goOrganizationId,
     pinterestDestinationId,
     tiktokDestinationId,

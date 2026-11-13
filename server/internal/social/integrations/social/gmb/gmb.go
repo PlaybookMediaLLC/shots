@@ -351,6 +351,13 @@ func (p *Provider) FetchPageInformation(ctx context.Context, accessToken string,
 		LocationName string `json:"locationName"`
 	}
 	_ = json.Unmarshal(raw, &data)
+	// A choice made in Shots carries only the id; its location is in the path.
+	if _, location, ok := strings.Cut(data.ID, "/locations/"); data.LocationName == "" && ok && location != "" && !strings.Contains(location, "/") {
+		data.LocationName = "locations/" + location
+	}
+	if data.LocationName == "" {
+		return nil, errors.New("Location not found")
+	}
 
 	var location struct {
 		Title string `json:"title"`

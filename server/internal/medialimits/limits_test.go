@@ -19,7 +19,7 @@ func TestPlanAndTypeLimits(t *testing.T) {
 // Every draft channel has media rules with a source, and a video limit never
 // exceeds what Shots accepts for upload.
 func TestDestinationsAreComplete(t *testing.T) {
-	for _, channel := range []string{"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "facebook", "pinterest"} {
+	for _, channel := range []string{"x", "linkedin", "instagram", "threads", "bluesky", "mastodon", "facebook", "pinterest", "gmb"} {
 		rules, ok := Limits.Destinations[channel]
 		if !ok || rules.MaxMedia < 1 || len(rules.Images) == 0 || len(rules.Docs) == 0 || rules.VerifiedOn == "" {
 			t.Fatalf("%s: %+v", channel, rules)

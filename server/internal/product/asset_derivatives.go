@@ -89,7 +89,7 @@ func (c *Configuration) prepareDraftImages(ctx context.Context, actor Actor, tar
 		}
 		key := connection.Platform
 		// A story is a full-screen image: it keeps more pixels than a feed post.
-		if _, ok := medialimits.Limits.ImageProfiles[key+"-story"]; ok && target.Options != nil && target.Options.Instagram.Story() {
+		if _, ok := medialimits.Limits.ImageProfiles[key+"-story"]; ok && target.Options.Story() {
 			key += "-story"
 		}
 		profile, supported := medialimits.Limits.ImageProfiles[key]

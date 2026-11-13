@@ -25,7 +25,7 @@ func NewVideo(endpoint, platform string) *VideoProvider {
 }
 
 // fixturePages are the destinations a platform with page selection offers.
-var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page"}
+var fixturePages = map[string]string{"youtube": "Fixture YouTube channel", "facebook": "Fixture Facebook Page", "gmb": "Fixture business location"}
 
 func (p *VideoProvider) Info() integrations.Info {
 	_, pages := fixturePages[p.platform]

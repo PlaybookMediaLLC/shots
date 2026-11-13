@@ -3,6 +3,7 @@ import type {
   TikTokOptions,
   InstagramOptions,
   PinterestOptions,
+  FacebookOptions,
   PublicationReceipt,
 } from './video-publishing.ts'
 export {
@@ -12,6 +13,7 @@ export {
   tiktokCreatorSchema,
   instagramOptionsSchema,
   pinterestOptionsSchema,
+  facebookOptionsSchema,
   instagramUsernameSchema,
 } from './video-publishing.ts'
 export type {
@@ -19,6 +21,7 @@ export type {
   TikTokOptions,
   InstagramOptions,
   PinterestOptions,
+  FacebookOptions,
 } from './video-publishing.ts'
 import { z } from 'zod'
 import {
@@ -1356,6 +1359,7 @@ export type BackendPublishOptions = {
   tiktok?: TikTokOptions
   instagram?: InstagramOptions
   pinterest?: PinterestOptions
+  facebook?: FacebookOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string

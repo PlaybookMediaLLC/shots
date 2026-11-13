@@ -356,6 +356,8 @@ const PLATFORM_SIZE_IDS: Record<DraftChannel, string> = {
   facebook: 'facebook-post',
   // Pinterest favours tall pins, 2:3.
   pinterest: 'pinterest-pin',
+  // Google Business shows a post's image at 4:3.
+  gmb: 'slide-4x3',
 }
 
 /** The export size a platform publishes a still image at. */
