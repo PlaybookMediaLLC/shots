@@ -819,8 +819,10 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		}
 		return ErrInvalidState
 	}
+	// The worker passes a partial post; the draft event needs the stored one.
 	live, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).
-		Select(scheduledpost.FieldID, scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
+		Select(scheduledpost.FieldID, scheduledpost.FieldOrganizationID, scheduledpost.FieldContentDraftID,
+			scheduledpost.FieldThreadProgress, scheduledpost.FieldChannelConnectionID).
 		WithChannelConnection(func(q *ent.ChannelConnectionQuery) {
 			q.Select(channelconnection.FieldID, channelconnection.FieldPlatform)
 		}).Only(ctx)
@@ -839,7 +841,7 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 	}); err != nil {
 		return err
 	}
-	if err := emitDraftPublished(ctx, tx, post, providerPostID); err != nil {
+	if err := emitDraftPublished(ctx, tx, live, providerPostID); err != nil {
 		return err
 	}
 	return tx.Commit()

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	productent "github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/outboxevent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/publicationattempt"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/database"
@@ -32,6 +33,7 @@ import (
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/webhooks"
 	"github.com/lucsky/cuid"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/testsuite"
@@ -469,6 +471,25 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("a draft published by the worker notifies its webhook subscribers once", func(t *testing.T) {
+		db.Client.WebhookSubscription.Create().SetID("hook_" + id).SetOrganizationID(org).SetName("Hook").
+			SetURL("https://hooks.example.test/shots").SetEvents([]string{webhooks.DraftPublished}).SetEncryptedSecret("unused").SaveX(ctx)
+		t.Cleanup(func() { _, _ = db.SQL.ExecContext(ctx, `DELETE FROM webhook_subscription WHERE id=$1`, "hook_"+id) })
+		asset, _ := upload("hooked.png", "image/png", photo(240))
+		posts := schedule("Hooked", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: linkedin, Caption: "Hooked", AssetIDs: []string{asset}})
+		events := func() int {
+			return db.Client.OutboxEvent.Query().Where(outboxevent.OrganizationID(org), outboxevent.Type("webhook."+webhooks.DraftPublished),
+				outboxevent.AggregateID(*posts[0].ContentDraftID)).CountX(ctx)
+		}
+		if result := run(posts[0].ID); result.Outcome != temporalpublishing.OutcomePublished {
+			t.Fatalf("result %+v", result)
+		}
+		run(posts[0].ID)
+		if got := events(); got != 1 {
+			t.Fatalf("%d draft.published events, want 1", got)
+		}
+	})
 
 	t.Run("an unanswered submission is UNKNOWN_DELIVERY and is not retried", func(t *testing.T) {
 		asset, _ := upload("lost.png", "image/png", photo(200))
