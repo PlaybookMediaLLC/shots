@@ -894,6 +894,21 @@ test('the paste dialog splits in a reused worker, replaced only while busy, and 
   assert.equal(append().textContent, 'Append 1 posts')
   assert.equal(append().disabled, false)
 
+  // A browser that cannot start the worker gets the same refusal, not a crash.
+  Object.defineProperty(globalThis, 'Worker', {
+    configurable: true,
+    value: class {
+      constructor() {
+        throw new Error('blocked')
+      }
+    },
+  })
+  await toggle()
+  assert.equal(get('[role=alert]').textContent, 'The text could not be split.')
+  assert.equal(append().disabled, true)
+  await toggle()
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker })
+
   await toggle()
   assert.equal(workers.length, 4)
   await act(async () => root!.unmount())
@@ -1009,8 +1024,8 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
     [...document.querySelectorAll('[role="status"]')]
       .map((element) => element.textContent!)
       .filter((text) => /caption/.test(text))
-  // No count starts while the profile loads; once its accounts are chosen, the
-  // loading worker takes the latest request when it is ready.
+  // No count starts while the profile loads, and the worker gets its first
+  // request once it is ready.
   assert.equal(workers.length, 1)
   assert.equal(workers[0].requests.length, 0)
   await workers[0].ready()
@@ -1030,6 +1045,8 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
   const started = performance.now()
   await write('textarea[id$="-caption"]', long)
   const typed = performance.now() - started
+  // Counting it on the page took about a second; the render alone takes tens of ms.
+  assert.ok(typed < 500, `a keystroke took ${Math.round(typed)} ms`)
   // The idle worker takes it.
   assert.equal(workers.length, 1)
   assert.ok(workers[0].requests.at(-1)!.body === long)
@@ -1041,8 +1058,10 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
   ])
   const xWarning =
     'The X caption is 20001 characters; the limit is 280. Shorten it before scheduling.'
-  assert.equal(warnings().length, 2)
-  assert.equal(warnings()[0], xWarning)
+  assert.deepEqual(warnings(), [
+    xWarning,
+    'Bluesky would post this caption, which is 10001 characters there; its limit is 300. Shorten it, or write a Bluesky caption in the editor’s Captions panel.',
+  ])
 
   // Typing elsewhere in the sheet sends no new count, and keeps the warnings.
   const counts = workers[0].requests.length
@@ -1063,4 +1082,8 @@ test('the screenshot sheet counts its captions in a worker, only when the captio
   assert.equal(workers[0].terminated, true)
   assert.deepEqual(warnings(), ['The caption lengths could not be checked.'])
   t.diagnostic(`a keystroke with a 10,000-character caption rendered in ${Math.round(typed)} ms`)
+  await act(async () => root!.unmount())
+  root = null
+  // Radix's focus scope unmounts on a 0 ms timer: let it run before the globals go.
+  await new Promise((resolve) => setTimeout(resolve, 0))
 })

@@ -3,13 +3,13 @@
 import * as React from 'react'
 import type { DraftChannel } from './document'
 import { importedPosts } from './import-text'
-import type { SplitRequest } from './import-text.worker'
+import type { SplitRequest, SplitResult } from './import-text.worker'
 import { useWorkerAnswer } from './use-worker-answer'
 
 const startSplit = () =>
   new Worker(new URL('./import-text.worker.ts', import.meta.url), { type: 'module' })
 
-const SPLIT_FAILED = { error: 'The text could not be split.', posts: [] as string[] }
+const SPLIT_FAILED: Omit<SplitResult, 'id'> = { error: 'The text could not be split.', posts: [] }
 
 /** Thread posts, why the text cannot become them, and whether they are still for older text. */
 type ThreadPosts = { error: string; pending: boolean; posts: string[] }

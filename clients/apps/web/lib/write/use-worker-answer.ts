@@ -3,7 +3,7 @@
 import * as React from 'react'
 
 /** What a worker posts: that it has loaded, then each answer with its request's id. */
-export type WorkerMessage<Answer> = { ready: true } | (Answer & { id: number })
+type WorkerMessage<Answer> = { ready: true } | (Answer & { id: number })
 
 /**
  * What a Web Worker answers for `request`. The worker posts `{ ready: true }`

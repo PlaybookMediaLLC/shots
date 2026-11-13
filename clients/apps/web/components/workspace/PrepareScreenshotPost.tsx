@@ -62,14 +62,13 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { engagementAutomation, followUpLines } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import type { CaptionCountRequest } from '@/lib/write/caption-count.worker'
+import type { CaptionCountRequest, CaptionCountResult } from '@/lib/write/caption-count.worker'
 import type { DraftChannel } from '@/lib/write/document'
 import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
 import type { MediaFacts } from '@/lib/write/media-rules'
 import {
   accountsOn,
   captionChannelText,
-  type CaptionOverLimit,
   captionFor,
   carriedFollowUps,
   platformAcceptsSize,
@@ -173,7 +172,7 @@ const startCaptionCount = () =>
   })
 
 /** A count the worker could not make, reported rather than shown as no warnings. */
-const COUNT_FAILED: { overLimit: CaptionOverLimit[] | null } = { overLimit: null }
+const COUNT_FAILED: { overLimit: CaptionCountResult['overLimit'] | null } = { overLimit: null }
 
 /** "1 draft", "4 drafts". */
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
