@@ -1,7 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Value } from '@shots/platejs-editor/platejs'
 import type { PlateEditor } from '@shots/platejs-editor/platejs/react'
 import { Button } from '@/components/ui/button'
@@ -22,6 +22,7 @@ import {
   splitThread,
   THREAD_POST_LIMIT,
 } from '@/lib/write/import-text'
+import type { SplitResult } from '@/lib/write/import-text.worker'
 import type { DraftChannel } from '@/lib/write/document'
 import { withLeadMedia, type PostMedia } from '@/lib/write/screenshot-post'
 import { postRanges } from '@/components/drafts/thread'
@@ -53,16 +54,62 @@ export function PasteThreadDialog({
   // A screenshot belongs on the post that opens the explanation, not under it.
   const [lead, setLead] = useState<PostMedia[]>([])
   const [picking, setPicking] = useState(false)
-  const preview = useMemo(() => {
+  const explicit = useMemo(() => {
     try {
-      return {
-        posts: automatic ? splitThread(text, channel, length) : importedPosts(text),
-        error: '',
-      }
+      return { posts: importedPosts(text), error: '' }
     } catch (error) {
       return { posts: [], error: (error as Error).message }
     }
-  }, [text, channel, length, automatic])
+  }, [text])
+  // The split by length runs in a worker (see import-text.worker.ts). Starting
+  // one takes a few hundred milliseconds, so an idle one is reused and only a
+  // worker still busy with older text is replaced.
+  const request = useMemo(
+    (): Parameters<typeof splitThread> => [text, channel, length],
+    [text, channel, length]
+  )
+  const [split, setSplit] = useState<SplitResult & { request: typeof request }>()
+  const worker = useRef<{ worker: Worker; busy: boolean } | null>(null)
+  useEffect(() => {
+    if (worker.current?.busy) {
+      worker.current.worker.terminate()
+      worker.current = null
+    }
+    if (!automatic) return
+    const fail = () => setSplit({ request, posts: [], error: 'The split preview could not load.' })
+    try {
+      worker.current ??= {
+        worker: new Worker(new URL('../../../lib/write/import-text.worker.ts', import.meta.url), {
+          type: 'module',
+        }),
+        busy: false,
+      }
+    } catch {
+      fail()
+      return
+    }
+    const current = worker.current
+    current.busy = true
+    current.worker.onmessage = ({ data }: MessageEvent<SplitResult>) => {
+      current.busy = false
+      setSplit({ ...data, request })
+    }
+    current.worker.onerror = () => {
+      current.worker.terminate()
+      if (worker.current === current) worker.current = null
+      fail()
+    }
+    current.worker.postMessage(request)
+  }, [automatic, request])
+  useEffect(
+    () => () => {
+      worker.current?.worker.terminate()
+      worker.current = null
+    },
+    []
+  )
+  const splitting = automatic && split?.request !== request
+  const preview = automatic ? (split ?? { posts: [], error: '' }) : explicit
   const insert = () => {
     const current = editor.current
     if (!current || !preview.posts.length) return
@@ -151,10 +198,10 @@ export function PasteThreadDialog({
           ))}
         </ol>
         <Button
-          disabled={!preview.posts.length || Boolean(preview.error) || length > limit}
+          disabled={splitting || !preview.posts.length || Boolean(preview.error) || length > limit}
           onClick={insert}
         >
-          Append {preview.posts.length} posts
+          {splitting ? 'Splitting…' : `Append ${preview.posts.length} posts`}
         </Button>
       </DialogContent>
     </Dialog>
