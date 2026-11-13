@@ -22,6 +22,10 @@ func TestXContentUsesVerifiedLimitsWithoutChangingContent(t *testing.T) {
 	if CheckXText(premium, strings.Repeat("a", 25000)) != nil || CheckXText(premium, strings.Repeat("a", 25001)) == nil || premium.Articles == nil || *premium.Articles {
 		t.Fatal("long posts and Articles must be independent")
 	}
+	// 24,013 characters fit the premium limit; only the link scan refuses them.
+	if CheckXText(premium, "https://a.co/"+strings.Repeat("(a)", 8000)) == nil {
+		t.Fatal("text too complex to count must be refused")
+	}
 	for _, media := range [][]XMedia{
 		{{MIME: "image/png", Bytes: 5000001}},
 		{{MIME: "image/gif", Bytes: 1}, {MIME: "image/png", Bytes: 1}},
