@@ -14,8 +14,10 @@ function senjaFailure(error: unknown) {
   throw error
 }
 
-/** The newest approved video testimonials of the workspace's Senja project. */
-// Listing serves importing: the key opens only for those who may edit drafts.
+/**
+ * The newest approved video testimonials of the workspace's Senja project.
+ * Listing serves importing, so it needs draft editing, as reading the key does.
+ */
 export const GET = route(listSenjaVideosContract, {
   auth: organizationAccess('artifact:edit'),
   handler: async ({ access }) => {

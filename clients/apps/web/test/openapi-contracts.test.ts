@@ -41,6 +41,7 @@ import * as onboardingRuns from '@/lib/api/contracts/onboarding-runs'
 import * as outboundWebhooks from '@/lib/api/contracts/outbound-webhooks'
 import * as releases from '@/lib/api/contracts/releases'
 import * as scheduledPosts from '@/lib/api/contracts/scheduled-posts'
+import * as senja from '@/lib/api/contracts/senja'
 import * as settingsPlatform from '@/lib/api/contracts/settings-platform'
 import * as sharing from '@/lib/api/contracts/sharing'
 import * as shell from '@/lib/api/contracts/shell'
@@ -106,6 +107,7 @@ const contracts = new Map<string, RouteContract>(
     notifications,
     releases,
     scheduledPosts,
+    senja,
     settingsPlatform,
     sharing,
     shell,
