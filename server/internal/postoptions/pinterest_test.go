@@ -14,6 +14,15 @@ func TestPinterestOptionsNeedABoardOnlyWhenScheduled(t *testing.T) {
 			t.Fatalf("a scheduled pin without a board: %v", err)
 		}
 	}
+	// A link being typed saves; scheduling needs a whole address.
+	for _, typing := range []string{"shots.example", "https://", " https://shots.example"} {
+		if err := ValidatePinterestOptions("pinterest", &PinterestOptions{Link: typing}, false); err != nil {
+			t.Fatalf("%q did not save: %v", typing, err)
+		}
+	}
+	if err := ValidatePinterestOptions("pinterest", &PinterestOptions{Link: "https://" + strings.Repeat("é", PinterestLinkLimit)}, false); err == nil {
+		t.Fatal("a link over the limit saved")
+	}
 	ok := &PinterestOptions{BoardID: "1001", Title: strings.Repeat("é", PinterestTitleLimit), Link: "https://shots.example/launch?ref=pin"}
 	if err := ValidatePinterestOptions("pinterest", ok, true); err != nil {
 		t.Fatalf("valid pin refused: %v", err)

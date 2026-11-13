@@ -84,7 +84,12 @@ export function PinterestOptions({
             </Button>
           </div>
         ) : boards.boards.length === 0 ? (
-          <p>This Pinterest account has no boards. Create one on Pinterest, then try again.</p>
+          <div className="grid justify-items-start gap-2">
+            <p>This Pinterest account has no boards. Create one on Pinterest, then try again.</p>
+            <Button onClick={() => setAttempt((count) => count + 1)} size="sm" variant="outline">
+              Try again
+            </Button>
+          </div>
         ) : (
           <>
             <Select

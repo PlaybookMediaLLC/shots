@@ -4155,6 +4155,11 @@ export interface components {
                 [key: string]: {
                     options?: {
                         firstComment?: string;
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
                         tiktok?: {
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";

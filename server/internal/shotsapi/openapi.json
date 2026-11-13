@@ -32083,6 +32083,23 @@
                       "type": "string",
                       "maxLength": 1250
                     },
+                    "pinterest": {
+                      "type": "object",
+                      "properties": {
+                        "boardId": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,30}$"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string",
+                          "maxLength": 2048
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "tiktok": {
                       "type": "object",
                       "properties": {

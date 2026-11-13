@@ -172,6 +172,8 @@ function pinChoices(options: PinterestOptions | undefined): PinterestOptions {
 
 /** Whether a link is a web address Pinterest takes (Go: postoptions.pinterestLink). */
 function webAddress(value: string): boolean {
+  // The URL parser fills in what Go does not: `https:host` has no `//`.
+  if (!/^https?:\/\/[^/]/i.test(value)) return false
   try {
     const url = new URL(value)
     return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password

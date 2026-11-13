@@ -36,6 +36,7 @@ const fakeStateSchema = z.object({
     z.object({
       caption: z.string(),
       id: z.string(),
+      platform: z.string().optional(),
       media: z.array(
         z.object({
           bytes: z.number(),
@@ -660,6 +661,8 @@ test('a pin goes to the board chosen in the composer, and a Facebook Page post t
               mode: 'synced',
               options: { firstComment: 'Link in the comments' },
             },
+            // A board saved earlier that the account no longer has.
+            { channel: 'pinterest', mode: 'synced', options: { pinterest: { boardId: '9999' } } },
           ],
         },
         plainText: caption,
@@ -669,13 +672,22 @@ test('a pin goes to the board chosen in the composer, and a Facebook Page post t
     expect(created.status, JSON.stringify(created.body)).toBe(201)
     const id = z.object({ id: z.string() }).parse(created.body).id
 
-    // The board comes from the Pinterest account's own list, read through Go.
+    // The board comes from the Pinterest account's own list, read through Go. A
+    // failed read says so and offers to try again; it never shows an empty list.
+    const boards = '**/api/v1/social-sets/*/pinterest-boards'
+    await page.route(boards, (route) =>
+      route.fulfill({ status: 502, json: { error: 'Pinterest did not answer.' } })
+    )
     await page.goto(`/publish/${id}`)
     await page.getByTestId('platform-tab-pinterest').click()
     await page.getByTestId('options-chip').click()
     const options = page.getByTestId('pinterest-options')
-    await expect(page.getByTestId('blockers')).toContainText('Choose the Pinterest board')
+    await expect(options.getByRole('alert')).toBeVisible()
+    await page.unroute(boards)
+    await options.getByRole('button', { name: 'Try again', exact: true }).click()
+    await expect(options).toContainText('no longer on this Pinterest account')
     await chooseOption(options.getByRole('combobox', { name: 'Pinterest board' }), 'Launch ideas')
+    await expect(options).not.toContainText('no longer on this Pinterest account')
     await options.getByLabel('Pin title').fill('Launch day')
     await options.getByLabel('Link').fill('https://shots.example/launch')
     await expectSaved(page)
@@ -700,18 +712,21 @@ test('a pin goes to the board chosen in the composer, and a Facebook Page post t
     const received = state.posts.filter((post) => post.caption === caption)
     expect(received).toHaveLength(2)
     expect(received.map((post) => post.media.length)).toEqual([1, 1])
-    expect(received.map((post) => post.settings)).toContainEqual({
+    const pin = received.find((post) => post.platform === 'pinterest')
+    const pagePost = received.find((post) => post.platform === 'facebook')
+    expect(pin?.settings).toEqual({
       board: '1001',
       link: 'https://shots.example/launch',
       title: 'Launch day',
     })
-    // The first comment is the page post's follow-up, on the live post only.
+    expect(pagePost?.settings).toEqual({})
+    // The first comment is the Page post's follow-up, on that live post only.
     await expect
       .poll(async () => (await fakeState()).actions.filter((action) => action.kind === 'comment'), {
         intervals: [1_000],
         timeout: 120_000,
       })
-      .toEqual([expect.objectContaining({ text: 'Link in the comments' })])
+      .toEqual([expect.objectContaining({ postId: pagePost?.id, text: 'Link in the comments' })])
   } finally {
     await db.query('DELETE FROM social_tenant_binding WHERE "organizationId" = $1', [
       organizationId,

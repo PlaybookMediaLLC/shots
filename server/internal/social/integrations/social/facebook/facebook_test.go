@@ -257,3 +257,36 @@ func TestFacebookDTOValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestAPageTokenNeverExpires(t *testing.T) {
+	t.Setenv("FACEBOOK_APP_ID", "app")
+	t.Setenv("FACEBOOK_APP_SECRET", "secret")
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v25.0/oauth/access_token", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"access_token":"long-lived"}`))
+	})
+	mux.HandleFunc("GET /v25.0/me/permissions", func(w http.ResponseWriter, r *http.Request) {
+		granted := []map[string]string{}
+		for _, scope := range scopes {
+			granted = append(granted, map[string]string{"permission": scope, "status": "granted"})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": granted})
+	})
+	mux.HandleFunc("GET /v25.0/me", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"id":"user-1","name":"Jane"}`))
+	})
+	mux.HandleFunc("GET /v25.0/me/accounts", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"data":[{"id":"page-1","name":"Acme","access_token":"page-token"}]}`))
+	})
+	p := setup(t, mux)
+	// The user token only lists Pages; without an expiry the chosen Page's
+	// token, which Facebook never expires, is not refused after 59 days.
+	user, err := p.Authenticate(context.Background(), integrations.AuthenticateParams{Code: "c"}, nil)
+	if err != nil || !user.NonExpiring || user.ExpiresIn != 0 {
+		t.Fatalf("authenticate = %+v, %v", user, err)
+	}
+	page, err := p.ReConnect(context.Background(), "user-1", "page-1", "long-lived")
+	if err != nil || page.AccessToken != "page-token" || !page.NonExpiring {
+		t.Fatalf("reconnect = %+v, %v", page, err)
+	}
+}

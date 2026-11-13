@@ -39,7 +39,13 @@ export const createPostSchema = scheduleTimingSchema
         draftChannelSchema,
         z.strictObject({
           options: versionOptionsSchema
-            .pick({ firstComment: true, tiktok: true, visibility: true, youtube: true })
+            .pick({
+              firstComment: true,
+              pinterest: true,
+              tiktok: true,
+              visibility: true,
+              youtube: true,
+            })
             .optional(),
           posts: postPartsSchema.optional(),
         })

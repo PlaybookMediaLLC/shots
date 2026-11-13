@@ -19,10 +19,13 @@ func (p *Publisher) PinterestBoards(ctx context.Context, org, destination, secre
 	functions, ok := provider.(interface {
 		Functions() map[string]integrations.Function
 	})
-	if !ok || functions.Functions()["boards"] == nil {
+	var list integrations.Function
+	if ok {
+		list = functions.Functions()["boards"]
+	}
+	if list == nil {
 		return nil, fmt.Errorf("board listing is unavailable for this connection")
 	}
-	list := functions.Functions()["boards"]
 	found, err := list(ctx, account.Token, nil, "", account)
 	if err != nil {
 		return nil, err

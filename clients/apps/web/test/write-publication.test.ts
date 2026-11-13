@@ -887,7 +887,12 @@ test('a pin needs its board, sends a trimmed title and link, and checks the link
   assert.deepEqual(build({ boardId: '1001', title: '  ' }).target.options?.pinterest, {
     boardId: '1001',
   })
-  for (const link of ['shots.example', 'javascript:alert(1)', 'https://user:pass@shots.example'])
+  for (const link of [
+    'shots.example',
+    'https:shots.example',
+    'javascript:alert(1)',
+    'https://user:pass@shots.example',
+  ])
     assert.match(build({ boardId: '1001', link }).optionProblems.join(), /web address/, link)
   // Pinterest settings stay with Pinterest.
   assert.equal(

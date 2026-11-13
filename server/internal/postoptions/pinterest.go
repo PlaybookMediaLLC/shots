@@ -42,7 +42,9 @@ func (o *PinterestOptions) Validate(complete bool) error {
 		return fmt.Errorf("a Pinterest board is one of the account's boards, by its numeric id")
 	case utf8.RuneCountInString(o.Title) > PinterestTitleLimit:
 		return fmt.Errorf("keep the pin's title to %d characters", PinterestTitleLimit)
-	case o.Link != "" && !pinterestLink(o.Link):
+	case utf8.RuneCountInString(o.Link) > PinterestLinkLimit,
+		// A link being typed saves as it is; scheduling needs a whole address.
+		complete && o.Link != "" && !pinterestLink(o.Link):
 		return fmt.Errorf("a pin's link is a web address of up to %d characters, starting with https:// or http://", PinterestLinkLimit)
 	}
 	return nil
@@ -50,7 +52,7 @@ func (o *PinterestOptions) Validate(complete bool) error {
 
 func pinterestLink(raw string) bool {
 	u, err := url.Parse(raw)
-	return err == nil && len(raw) <= PinterestLinkLimit && strings.TrimSpace(raw) == raw &&
+	return err == nil && strings.TrimSpace(raw) == raw &&
 		(u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil
 }
 

@@ -137,15 +137,14 @@ test('a pin is one image; a Facebook Page post is text, photos or one video', ()
   ])
   assert.deepEqual(mediaProblems('pinterest', [photo]), [])
   assert.match(mediaProblems('pinterest', [photo, png]).join(), /up to 1 attachment/)
-  assert.ok(
-    mediaProblems('pinterest', [mp4]).length > 0,
-    'a video pin needs a cover Shots does not send yet'
-  )
+  // A video pin needs a cover Shots does not send yet.
+  assert.deepEqual(mediaProblems('pinterest', [mp4]), ["Pinterest doesn't take video here."])
   assert.deepEqual(mediaProblems('facebook', []), [])
   assert.deepEqual(mediaProblems('facebook', [photo, png]), [])
   assert.deepEqual(mediaProblems('facebook', [mp4]), [])
-  assert.ok(mediaProblems('facebook', [photo, mp4]).length > 0)
-  assert.ok(mediaProblems('facebook', [mov]).length > 0, 'the adapter recognizes MP4 only')
+  assert.match(mediaProblems('facebook', [photo, mp4]).join(), /on its own/)
+  // The adapter recognizes MP4 only.
+  assert.match(mediaProblems('facebook', [mov]).join(), /takes MP4 video; attachment 1 is MOV/)
 })
 
 test('a picture is named by the platform shape it is within 3% of, else by its size', () => {
