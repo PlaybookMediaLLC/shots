@@ -50,9 +50,13 @@ var surrogateEscapeRe = regexp.MustCompile(`\\u[dD][89a-fA-F][0-9a-fA-F]{2}`)
 // counted. Match the path by hand if such links must count.
 const (
 	linkScanBudget   = 200 * time.Millisecond
-	linkScanPerUnit  = 20 * time.Microsecond
 	linkScanMaxUnits = 100_000
 )
+
+// linkScanPerUnit is a variable only so tests that check what a text counts
+// can lift it: a loaded machine can spend a text's budget on work that takes
+// a fraction of it unloaded.
+var linkScanPerUnit = 20 * time.Microsecond
 
 // ErrTextTooComplex is a text whose links the URL scan could not find within
 // its budget. Callers refuse it, since any count would be a guess. It replaces
