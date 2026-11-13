@@ -246,6 +246,9 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 		}
 		return nil, err
 	}
+	if len(reply.Posts) != len(posts) {
+		return nil, platformai.ErrSchema
+	}
 	generation := &automation.Generation{Posts: []automation.GeneratedPost{}, Credits: creditsFor(usage, limit)}
 	for _, post := range posts {
 		for _, candidate := range reply.Posts {
@@ -253,6 +256,9 @@ func (c *Configuration) generateAutomationCopy(ctx context.Context, org string, 
 				generation.Posts = append(generation.Posts, automation.GeneratedPost{PostID: post.ID, Copy: strings.TrimSpace(candidate.Copy), OriginalCopy: &post.Copy, OriginalUpdatedAt: &post.UpdatedAt})
 			}
 		}
+	}
+	if len(generation.Posts) != len(posts) {
+		return nil, platformai.ErrSchema
 	}
 	return generation, nil
 }
