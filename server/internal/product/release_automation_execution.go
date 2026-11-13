@@ -18,6 +18,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/releaseautomationversion"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/sourcechange"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/githubapp"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/platformai"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	automation "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releaseautomation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/releasenotes"
@@ -544,6 +545,8 @@ func automationFailureCode(err error) string {
 		return "access_revoked"
 	case errors.Is(err, ErrAutomationModelUnavailable):
 		return "model_unavailable"
+	case errors.Is(err, platformai.ErrSchema):
+		return "model_output_invalid"
 	case errors.Is(err, ErrAutomationRendererUnavailable):
 		return "renderer_unavailable"
 	case errors.Is(err, ErrCaptureMissing):
