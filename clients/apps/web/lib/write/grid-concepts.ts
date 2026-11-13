@@ -128,3 +128,13 @@ export function redrawConcept(
     topics = draw(pool, GRID_SLOT_COUNT, random)
   return { ...grid, slots: topics.map((topic) => ({ topic })) }
 }
+
+/**
+ * Why a clip's length does not fit its place, or null. Lengths are compared to
+ * the tenth of a second, as Go does, so an encoder's few extra milliseconds pass.
+ */
+export function clipLengthProblem(durationMs: number, range: { max: number; min: number }, what: string) {
+  const length = Math.round(durationMs / 100) * 100
+  if (Number.isFinite(length) && length >= range.min && length <= range.max) return null
+  return `${what} must be ${range.min / 1000} to ${range.max / 1000} seconds long; this one is ${(durationMs / 1000).toFixed(1)}.`
+}

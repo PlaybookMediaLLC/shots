@@ -17,6 +17,7 @@ in [social publishing verification](social-publishing-verification.md).
 | A PDF to LinkedIn | Composer document option, bulk batch | Sent as the post's LinkedIn document; refused on every other destination. |
 | Many separate posts | Publish → Bulk tools (`/publish/batches`) | A durable batch of up to 100 items, each one post with its own media, caption, accounts and time. Files, folders and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
 | Grid videos | Publish → Bulk tools → Grid videos | Captions and content items assemble into concepts of four labelled images, filled by upload or AI, rendered to MP4 in the browser. Each video is then an ordinary post of the batch. See [bulk tools](#bulk-tools). |
+| Fade-in and UGC videos | Publish → Bulk tools → Fade-in videos, UGC videos | One image fading in under a headline, or the workspace's own clip with text over it and an optional closing clip. Template concepts like grids. See [Content Studio](scheduling/post-bridge/content-studio/implementation.md). |
 
 Every check that refuses media at scheduling time is shown in the composer
 and the batch before the person submits: the rules live in one JSON file
@@ -70,7 +71,7 @@ activity and never persisted, logged, or put in workflow history.
 | Draft media checks at scheduling | `server/internal/product/content_draft_media.go`, `content_draft_schedule.go` |
 | Bulk batches | `server/internal/product/content_batch.go`, `server/internal/httpapi/content_batches.go`; web `lib/tenant/content-batches.ts`, `lib/api/contracts/content-batches.ts`, `components/write/batch/` |
 | Background batch schedule | `server/internal/product/content_batch_run.go`, `server/internal/temporalbatches` |
-| Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts` |
+| Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts`, `lib/write/audio-trim.ts`, `lib/write/caption-assistant.ts` |
 | Browser uploads | `clients/apps/web/lib/workspace/save-export.ts` |
 | Publish-time checks | `server/internal/publishing/repository.go` (`LoadPublishJob`) |
 | Provider requests | `server/internal/social/integrations/social/<provider>` |
@@ -110,6 +111,7 @@ no queue table is added: Temporal stays the only scheduler.
 | `20261104100000_content_batch_source_key.sql` | `content_batch_item."sourceKey"`: the file or folder name an item came from, as the person knows it. |
 | `20261104101000_content_batch_grid.sql` | `content_batch_item.grid` for grid video concepts, and `platform_asset_in_use_v1` also counts a concept's images and music. |
 | `20261104102000_content_batch_run.sql` | `content_batch_run`: one schedule or render of a batch, what it froze and each item's outcome. |
+| `20261113090000_content_batch_template_clips.sql` | `platform_asset_in_use_v1` also counts a UGC concept's closing clip. |
 
 Why tables for batches: a batch must survive a reload, another device and a
 second editor, and an item must exist before its files finish uploading and
@@ -209,7 +211,7 @@ kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
 | --- | --- |
 | Images | Upload per slot, upload many (fills empty slots in order, naming leftovers), or AI (`editorAi.generateGridSlotImage`, two at a time). The page estimates credits before generating; a failed slot keeps its error and can be tried again |
 | Last grid cell | Sets the label or image of slot 4 on every video. It is a cell of the grid, not an extra slide |
-| Music | The person's own file, played from its start, or none. There is no built-in catalog: add one only with licensed tracks |
+| Music | The person's own file (MP3, M4A/AAC, WAV, Ogg or WebM, up to 50 MB and ten minutes), decoded in the browser before it uploads, from a start the person trims to, or none. Trim keeps a draft start that Cancel drops. There is no built-in catalog: add one only with tracks bought outright |
 | Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, which holds one still with no fade |
 | Recovery | Each video uploads and is recorded on its item when done. Closing the tab loses only the one in progress; reopening renders what is left |
 | Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |

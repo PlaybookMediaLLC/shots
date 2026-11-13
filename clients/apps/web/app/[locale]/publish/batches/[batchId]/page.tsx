@@ -60,6 +60,8 @@ export default async function BatchPage({
           query.start === 'videos' ||
           query.start === 'images' ||
           query.start === 'grid' ||
+          query.start === 'single' ||
+          query.start === 'ugc' ||
           query.start === 'text'
             ? query.start
             : undefined
