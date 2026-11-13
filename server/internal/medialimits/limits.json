@@ -61,10 +61,18 @@
         "formats": ["video/mp4"],
         "alone": true,
         "minMs": 500,
-        "maxBytes": 536870912
+        "maxBytes": 536870912,
+        "accounts": {
+          "standard": { "maxMs": 1200000, "maxBytes": 8000000000 },
+          "premium": { "maxMs": 7500000, "maxBytes": 16000000000 }
+        }
       },
-      "docs": ["https://docs.x.com/x-api/media/quickstart/best-practices"],
-      "verifiedOn": "2026-10-28"
+      "docs": [
+        "https://docs.x.com/x-api/media/introduction",
+        "https://docs.x.com/x-api/media/quickstart/best-practices",
+        "https://docs.x.com/changelog"
+      ],
+      "verifiedOn": "2026-11-13"
     },
     "linkedin": {
       "maxMedia": 20,
