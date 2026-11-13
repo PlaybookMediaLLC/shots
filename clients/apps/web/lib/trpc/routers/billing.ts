@@ -4,7 +4,7 @@ import { TRPCError } from '@trpc/server'
 
 import { monthlyUsagePeriod } from '@/lib/billing/display'
 import { backendSDK } from '@/lib/backend/sdk'
-import { type WorkspaceQuota, workspacePlanSchema } from '@/lib/billing/plans'
+import { includedAllowance, type WorkspaceQuota, workspacePlanSchema } from '@/lib/billing/plans'
 import { workspaceSubscriptionCycle } from '@/lib/billing/stripe'
 import { consumeWorkspaceQuota, WorkspaceQuotaError } from '@/lib/tenant/entitlements'
 import { router } from '../init'
@@ -14,22 +14,13 @@ import { organizationProcedure } from '../procedures'
 export const billingRouter = router({
   subscription: organizationProcedure('workspace:read').query(async ({ ctx }) => {
     if (!process.env.STRIPE_SECRET_KEY) {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message:
-          'Online billing is not configured. Contact your workspace administrator for subscription details.',
-      })
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Online billing is not configured. Contact your workspace administrator for subscription details.' })
     }
     try {
       return { cycle: await workspaceSubscriptionCycle(ctx.access.organizationId) }
     } catch (cause) {
       console.error('Stripe subscription lookup failed', cause)
-      throw new TRPCError({
-        code: 'SERVICE_UNAVAILABLE',
-        message:
-          'The billing provider could not be reached. Retry subscription details in a moment.',
-        cause,
-      })
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'The billing provider could not be reached. Retry subscription details in a moment.', cause })
     }
   }),
   summary: organizationProcedure('workspace:read').query(async ({ ctx }) => {
@@ -39,7 +30,7 @@ export const billingRouter = router({
     // The backend decides what the plan includes; an amount of 0 reads what is
     // left, and an exhausted allowance reads as 0.
     const allowance = async (quota: WorkspaceQuota) => ({
-      included: entitlements.allowances[quota] ?? 0,
+      included: includedAllowance(entitlements.allowances, plan, quota),
       left: await consumeWorkspaceQuota(ctx.access, quota, 0).catch((error: unknown) => {
         if (error instanceof WorkspaceQuotaError) return 0
         throw error

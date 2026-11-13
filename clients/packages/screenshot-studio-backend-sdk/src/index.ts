@@ -1704,8 +1704,8 @@ export type BackendCreativeApproval = {
 }
 
 export type BackendEntitlementSummary = {
-  /** Each monthly quota the plan includes; 0 while the plan does not stand. */
-  allowances: Record<string, number>
+  /** Each monthly quota the plan includes; 0 while the plan does not stand. An older backend omits it. */
+  allowances?: Record<string, number>
   /** What is left of the workspace's purchased credit packs. */
   creditBalance: number
   features: Record<string, boolean>

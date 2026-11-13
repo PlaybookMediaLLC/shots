@@ -40,26 +40,33 @@ increment does not claim to finish their separate transaction/capacity audit.
 
 A team is a workspace, and each workspace has its own subscription. No plan
 limits how many teams a person creates or joins; there is no Agency plan and no
-team quota (Teams spec §8). Plans limit seats and social channels only
-(`server/internal/workspaceplan/capacity.go`), and the web reads what a plan
-includes from the backend's entitlement summary rather than its own table. A
-plan the backend does not sell, such as a legacy Team or Agency subscription,
-resolves to no paid access everywhere, whatever its feature overrides.
+team quota (Teams spec §8). Plans cap seats and social channels
+(`server/internal/workspaceplan/capacity.go`) and stored bytes
+(`storageLimits`), and set the monthly allowances (`planQuotas`). The billing
+page shows what the backend's entitlement summary says a plan includes; pricing
+pages read the same tables from `lib/billing/plans.ts`, which parity tests pin
+to Go. A plan value the backend does not sell (billing sync refuses one) grants
+nothing, whatever its feature overrides.
 
-When a workspace downgrades, or its subscription lapses or is cancelled:
+When a workspace downgrades, or its subscription is cancelled or its past-due
+grace runs out:
 
 - Members stay. A new invitation, or accepting a pending one, needs a free seat
-  on the current plan; both check it under the workspace lock.
-- Connected accounts stay connected. A new account, or restoring a removed one,
-  needs a free channel slot, checked when the connection commits.
+  on the current plan.
+- Connected accounts stay connected, and an account the workspace holds renews
+  without a free slot while the plan stands. A new account, or restoring a
+  removed one, needs a free channel slot, checked when the connection commits.
+  While the plan does not stand, no account can be connected or reconnected.
+- Stored files stay; a new upload needs room under the plan's storage cap.
 - Posts already queued, which were charged against the monthly allowance when
-  they were scheduled, still publish. New posts need a plan that stands.
+  they were scheduled, still publish while their account's authorization holds.
+  New posts need a plan that stands.
 - Nothing is deleted or unscheduled automatically. Owners can remove members or
   accounts to get under a limit, and can unschedule posts themselves.
 
 Tests: `TestDowngradeKeepsWhatExistsAndRefusesMore`,
-`TestUnknownPlansResolveTheSameForUIAndServer`, `TestPlansLimitOnlySeatsAndChannels`,
-`TestInvitationConcurrentLastSeatAndTerminalStates`.
+`TestUnknownPlansResolveTheSameForUIAndServer`, `TestFeaturesFollowTheirMinimumPlan`,
+`TestPlansHaveNoTeamLimit`, `TestInvitationConcurrentLastSeatAndTerminalStates`.
 
 ## Compatibility and rollout
 

@@ -15,9 +15,11 @@ import {
 } from './framework'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
+import { getWorkspaceLimit } from '../../lib/billing/plans'
 import { socialSetListSchema } from '../../lib/api/contracts/social-sets'
 
-const limitMessage = 'The Pro plan includes 15 social channels. Upgrade the plan to add more.'
+const limit = getWorkspaceLimit('pro', 'channels') ?? 0
+const limitMessage = `The Pro plan includes ${limit} social channels. Upgrade the plan to add more.`
 
 test(
   'a workspace at its channel limit refuses another account when it starts and when it commits',
@@ -79,11 +81,11 @@ test(
       const profiles = async () => {
         const response = await apiRequest(page, '/api/v1/social-sets')
         expect(response.status).toBe(200)
-        // Listing gives the held accounts the workspace's default profile; compare IDs.
+        // Listing adopts the oldest held account into the default profile; compare IDs.
         return socialSetListSchema.parse(response.body).items.map((set) => set.id)
       }
       // One slot is left when the person starts connecting.
-      await hold(14)
+      await hold(limit - 1)
       const begun = await apiRequest(page, '/api/v1/social-connection-attempts', {
         method: 'POST',
         body: { provider: 'x', operation: 'CREATE_SET', creationVisibility: 'PRIVATE' },
@@ -101,6 +103,11 @@ test(
       expect(committed?.status()).toBe(403)
       await expect(page.getByText(limitMessage)).toBeVisible()
       expect(await profiles()).toEqual(before)
+      const active = await db.query(
+        `SELECT count(*)::int AS count FROM channel_connection WHERE "organizationId"=$1 AND status='ACTIVE'`,
+        [organizationId]
+      )
+      expect(z.array(z.object({ count: z.number() })).parse(active.rows)[0]?.count).toBe(limit)
       const receipt = await db.query(
         'SELECT "exchangeStatus" FROM social_oauth_start WHERE state=$1',
         [state]
@@ -115,17 +122,25 @@ test(
       await page.getByRole('button', { name: 'New workspace profile', exact: true }).click()
       const dialog = page.getByRole('dialog')
       await dialog.getByRole('button', { name: 'X / Twitter', exact: true }).click()
+      const authorizations = provider.calls.filter((call) =>
+        call.url.startsWith('/api/public/v1/social/x')
+      ).length
       await dialog.getByRole('button', { name: 'Connect X account', exact: true }).click()
       await expect(dialog.getByText(limitMessage)).toBeVisible()
+      // The provider was never asked for an authorization address.
+      expect(
+        provider.calls.filter((call) => call.url.startsWith('/api/public/v1/social/x'))
+      ).toHaveLength(authorizations)
       expect(new URL(page.url()).pathname).toBe('/settings/publishing-brands')
       expect(await profiles()).toEqual(before)
     } finally {
+      // The mock holds this worker's port; free it before any cleanup can fail.
+      await provider.close()
       await db.query(
         'DELETE FROM channel_connection WHERE "organizationId"=$1 AND "externalAccountId" LIKE $2',
         [organizationId, 'held-%']
       )
       await unbindTestGoOrganization(organizationId)
-      await provider.close()
     }
   }
 )
