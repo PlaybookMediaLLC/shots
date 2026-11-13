@@ -1392,11 +1392,22 @@ export type BackendBatchMedia = {
   uploadAssetId?: string
 }
 
-/** A 2x2 grid video concept: a headline above four labelled images, with optional music. */
+/**
+ * A template video concept, Go's `schema.BatchGrid`. Without `kind` it is the
+ * 2x2 grid (a headline above four labelled images); `single` fades one image in
+ * under a headline (`hideHeadline` leaves it out and keeps it); `ugc` writes its
+ * text over the workspace's clip in its one slot, with an optional closing clip.
+ * Music is optional and plays from `musicStartMs`.
+ */
 export type BackendBatchGrid = {
+  kind?: 'single' | 'ugc'
   headline: string
-  musicAssetId?: string
+  hideHeadline?: boolean
+  textPosition?: 'top' | 'middle' | 'bottom'
   slots: { assetId?: string; topic: string }[]
+  closingAssetId?: string
+  musicAssetId?: string
+  musicStartMs?: number
 }
 
 /** When a batch item is meant to go out: a local time in a zone, or the queue at a previewed slot. */
