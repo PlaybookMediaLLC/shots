@@ -151,6 +151,8 @@ export function MediaFrame({
         },
         { at: entry[1] }
       )
+      // A frame starts from the original, so an earlier crop no longer applies.
+      editor.tf.unsetNodes('cropSettings', { at: entry[1] })
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'The framed image did not save.')

@@ -7,6 +7,7 @@ import { ArrowsLeftRightIcon } from '@phosphor-icons/react/dist/ssr/ArrowsLeftRi
 import { AsteriskIcon } from '@phosphor-icons/react/dist/ssr/Asterisk'
 import { AtIcon } from '@phosphor-icons/react/dist/ssr/At'
 import { ChartBarHorizontalIcon } from '@phosphor-icons/react/dist/ssr/ChartBarHorizontal'
+import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/ssr/ClockCounterClockwise'
 import { CopyIcon } from '@phosphor-icons/react/dist/ssr/Copy'
 import { GifIcon } from '@phosphor-icons/react/dist/ssr/Gif'
 import { HashIcon } from '@phosphor-icons/react/dist/ssr/Hash'
@@ -64,6 +65,7 @@ export type ComposerTool =
   | 'media'
   | 'mention'
   | 'snippets'
+  | 'captions'
 
 /** A thread finisher, offered as a snippet. */
 export type Snippet = { id: string; name: string; text: string }
@@ -351,6 +353,15 @@ export function commandsFor(context: CommandContext): Command[] {
         run: () => editor.tf.insertText(snippet.text),
       })
     ),
+    {
+      aliases: ['caption', 'previous', 'reuse', 'history'],
+      group: 'Snippets',
+      hint: 'Search the text of this workspace’s drafts',
+      icon: ClockCounterClockwiseIcon,
+      id: 'past-captions',
+      label: 'Past captions…',
+      run: () => context.openTool('captions'),
+    },
     {
       aliases: ['snippet', 'cta', 'template', 'signature', 'finisher'],
       group: 'Snippets',

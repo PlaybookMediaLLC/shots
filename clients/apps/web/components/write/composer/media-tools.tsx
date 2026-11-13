@@ -29,6 +29,7 @@ import {
   removeAttachment,
 } from '@/lib/write/media-operations'
 import { DescribeImages } from './describe-images'
+import { MediaCrop } from './media-crop'
 import { MediaFrame } from './media-frame'
 import { MediaThumb } from './media-thumb'
 import { LinkImage } from './link-image'
@@ -58,6 +59,7 @@ export function MediaTools({
   const body = useEditorSelector((current) => current.children, [])
   const [alt, setAlt] = React.useState<string | null>(null)
   const [frame, setFrame] = React.useState<string | null>(null)
+  const [crop, setCrop] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string | null>(null)
   const managing = tool === 'media'
   React.useEffect(() => {
@@ -82,6 +84,7 @@ export function MediaTools({
         />
       ) : null}
       {frame ? <MediaFrame editor={editor} id={frame} onClose={() => setFrame(null)} /> : null}
+      {crop ? <MediaCrop editor={editor} id={crop} onClose={() => setCrop(null)} /> : null}
       {tags ? (
         <PhotoTags editor={editor} id={tags} setId={setId} onClose={() => setTags(null)} />
       ) : null}
@@ -155,6 +158,7 @@ export function MediaTools({
                     onDrop={(id) => moveAttachmentRelative(editor, id, String(node.id))}
                     onAlt={() => setAlt(String(node.id))}
                     onFrame={() => setFrame(String(node.id))}
+                    onCrop={() => setCrop(String(node.id))}
                     onTags={channel === 'x' ? () => setTags(String(node.id)) : undefined}
                     onClearTags={
                       channel !== 'x' && Array.isArray(node.photoTags) && node.photoTags.length
@@ -187,6 +191,7 @@ function AttachmentRow({
   onDrop,
   onAlt,
   onFrame,
+  onCrop,
   onTags,
   onClearTags,
 }: {
@@ -201,6 +206,7 @@ function AttachmentRow({
   onDrop: (id: string) => void
   onAlt: () => void
   onFrame: () => void
+  onCrop: () => void
   onTags?: () => void
   onClearTags?: () => void
 }) {
@@ -251,6 +257,14 @@ function AttachmentRow({
         <>
           <Button size="sm" variant="outline" onClick={onAlt}>
             {node.alt ? 'ALT' : '+ALT'}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onCrop}
+            disabled={node.mimeType === 'image/gif'}
+          >
+            Crop
           </Button>
           <Button
             size="sm"

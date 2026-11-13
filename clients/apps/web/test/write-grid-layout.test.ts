@@ -45,6 +45,28 @@ test('cells read left to right and top to bottom, at equal sizes', () => {
   assert.equal(cells[0]!.image.height, cells[3]!.image.height)
 })
 
+test('a crop focus places the shape along the side it does not fill', () => {
+  // A square from a 400×100 landscape: at the start, the end, and a quarter in.
+  assert.equal(
+    coverCrop({ height: 100, width: 400 }, { height: 1, width: 1 }, { x: 0, y: 0.5 }).x,
+    0
+  )
+  assert.equal(
+    coverCrop({ height: 100, width: 400 }, { height: 1, width: 1 }, { x: 1, y: 0.5 }).x,
+    300
+  )
+  assert.equal(
+    coverCrop({ height: 100, width: 400 }, { height: 1, width: 1 }, { x: 0.25, y: 0.5 }).x,
+    75
+  )
+  // A 9:16 story from a 1600×900 landscape keeps the full height.
+  const story = coverCrop({ height: 900, width: 1600 }, { height: 16, width: 9 }, { x: 0.5, y: 0 })
+  assert.deepEqual(
+    { height: story.height, width: Math.round(story.width), x: Math.round(story.x), y: story.y },
+    { height: 900, width: 506, x: 547, y: 0 }
+  )
+})
+
 test('a cover crop fills the target from the middle without stretching', () => {
   assert.deepEqual(coverCrop({ height: 100, width: 400 }, { height: 100, width: 100 }), {
     height: 100,

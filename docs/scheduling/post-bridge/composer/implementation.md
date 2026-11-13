@@ -19,7 +19,8 @@ Recorded with the owner on 13 November 2026.
 | ----- | ----- | ----- |
 | 1 | Instagram collaborators (3), tagged accounts (20), reel cover, grid choice and trial reels; YouTube tags (500 characters), custom thumbnail and synthetic-content disclosure; a failed thumbnail or first comment never fails the post (PB-03); the account switches' state and refusals reach a keyboard and a screen reader (UX-02) | `server/internal/postoptions`, `server/internal/product/content_draft_{options,media,documents}.go`, `server/internal/temporalpublishing/automation.go`, `components/write/composer/{instagram-options,video-options,platforms}.tsx` |
 | 2 | Instagram Stories: one image or video, no caption, Meta destinations only; Instagram accounts connected through Facebook Login stay blocked | `server/internal/postoptions`, `components/write/composer/` |
-| 3 | Manual crop in the composer; import from Google Drive and Senja; a searchable past-captions picker | `components/write/composer/media-tools.tsx`, `components/write/composer/media-import-dialog.tsx` |
+| 3a | Manual crop in the composer; a searchable past-captions picker | `components/write/composer/{media-crop,media-tools,past-captions}.tsx`, `lib/write/grid-layout.ts` (`coverCrop`) |
+| 3b | Import from Google Drive and Senja, once their secret references exist | `components/write/composer/media-import-dialog.tsx` |
 | 4 | Facebook Pages, Pinterest and Google Business as draft channels, with their limits, behind each channel's availability check; Facebook Stories | the channel lists in `lib/tenant/social-oauth-callback.ts`, `lib/content-drafts/serialize.ts`, `components/drafts/channel-meta.tsx`, `server/internal/product/content_draft_schedule.go`, `server/internal/medialimits/limits.json` |
 | 5 | Send a video to the TikTok app as a draft (PB-05), kept apart from a Shots draft | `server/internal/postoptions/video.go`, `server/internal/social/integrations/social/tiktok` |
 
@@ -31,6 +32,8 @@ Recorded with the owner on 13 November 2026.
 - An Instagram reel's cover travels in the same request as the reel, because Instagram takes no cover afterwards. Shots checks it before scheduling (JPEG up to 8 MB), so the provider either takes the reel with its cover or refuses both.
 - Instagram's trial-reel account rules (a public professional account, 1,000 followers, five a day) are shown beside the switch. Shots cannot read the daily count, so Instagram's refusal reaches the post as its failure reason.
 - A cover or thumbnail is an uploaded asset of the workspace and stays in use while a draft or an unfinished post names it.
+- A crop, like a frame, saves a new image from the attachment's original (`sourceAssetId`) and keeps its shape and position on the attachment (`cropSettings`), so cropping again starts from the original. Cropping replaces a frame, and framing starts from the original too. The original stays in the library.
+- Past captions use the drafts list's own `search`, within the draft's social set, so they read only what the person may already read.
 - A YouTube thumbnail missing when the video goes out never stops the video: its follow-up is recorded as skipped (`media_unavailable`). A missing Instagram cover cancels the reel, as a missing document cancels a LinkedIn post, because the cover is part of it.
 - Instagram refuses the whole post for a private or misspelled collaborator, because collaborators travel with the media. The composer says so beside the field.
 - A story is the Instagram version's `placement: "story"`. Its media follow the story rules in `limits.json` (`destinations.instagram.story`), not the feed's, and a story image keeps up to 1,920 pixels on its long edge (`imageProfiles.instagram-standalone-story`); it carries no caption, so the draft's text goes to its other platforms; and it takes no collaborators, tags, reel settings or first comment. Turning a story on clears those settings.
@@ -55,9 +58,9 @@ A thumbnail deleted in the moments between the video going live and its follow-u
 | The account switches toggle from the keyboard, the active tab reports `aria-pressed`, and a switch that is off says why | 1 |
 | A story takes one image or video and no caption; a second file or a caption is refused | 2 |
 | A story publishes with `media_type=STORIES` to Instagram Login accounts only | 2 |
-| A crop is kept as its own asset, and the original stays | 3 |
-| Drive and Senja imports show their unavailable state until their keys exist, and imported files are workspace assets | 3 |
-| Past captions search the workspace's own drafts only | 3 |
+| A crop is kept as its own asset, and the original stays | 3a |
+| Past captions search the workspace's own drafts only | 3a |
+| Drive and Senja imports show their unavailable state until their keys exist, and imported files are workspace assets | 3b |
 | Each new channel connects behind its availability check, schedules against the e2e social mock, and refuses a caption or media over its limit in the composer and in Go with the same numbers | 4 |
 | A TikTok app draft is sent with `video.upload`, never counts as published, and says the person finishes it in TikTok | 5 |
 
@@ -69,6 +72,7 @@ Weekly scheduled posts that use an Instagram or YouTube option, and the share of
 
 - Slice 1 rolls forward only. Deploy the migration, then the API and worker together, then the web. The previous code ignores the new options rather than refusing them: an older worker would publish a scheduled trial reel, or a reel kept off the grid, as an ordinary reel, and a YouTube video without its tags, disclosure or thumbnail; the previous web cannot read a post with a `thumbnail` follow-up. Before any redeploy of older code, hold the queued posts that set them (`"publishOptions" ? 'instagram'`, or `"publishOptions"->'youtube' ?| array['tags','containsSyntheticMedia','thumbnailAssetId']`). The migration's constraint and function can stay; the old constraint cannot be restored while `thumbnail` rows exist.
 - Slice 2 has no migration. It rolls forward only, for the same reasons as Slice 1: an older worker ignores `placement` and would publish a queued photo story as a feed post with no caption and a video story as a public Reel, and the older web cannot read a draft or post that holds `placement`. Before redeploying older code, hold the queued posts with `"publishOptions"->'instagram'->>'placement' = 'story'`.
+- Slice 3a is web only and additive: redeploy the previous web to roll back. Crops already saved stay ordinary images on their attachments.
 - Later slices: redeploy the previous web and API; each records its own migration order here when it has one.
 
 ## Verification
@@ -101,13 +105,13 @@ Every check from the [verification matrix](post-bridge-verification-matrix.csv),
 | UI-11 | Exists: with no free slot the dialog says so and offers no queue confirm. |
 | UI-12, UI-13 | Exists: per-destination formats and counts in `limits.json`. HEIC, HEIF and AVIF uploads are not offered. |
 | UI-14, UI-15 | Slice 2: one image or video, and the help says so. |
-| UI-16, UI-17 | Slice 3: imports offer what the destination takes; Drive and Senja show their unavailable state until configured. |
+| UI-16, UI-17 | Slice 3b: imports offer what the destination takes; Drive and Senja show their unavailable state until configured. |
 | UI-18 | Slice 1: reel cover, grid choice, trial rules and graduation. |
 | UI-19 | Skip: Shots asks for an explicit YouTube title rather than taking the caption's first 100 characters. |
 | UI-20 | Exists: a first comment is a follow-up with its own receipt; account health asks for a reconnect when a permission is missing. |
 | UP-01 | Exists for JPEG, PNG, WebP and GIF, with conversions listed before scheduling ([media scheduling](../../../media-scheduling.md#capabilities)). HEIC, HEIF and AVIF are skipped. |
 | UP-02 | Exists: each destination's media count, checked in the composer and in Go (`TestDraftMediaFollowsEachDestination`). |
-| UP-03 | Exists for reorder, replace and remove (`components/write/composer/media-tools.tsx`); crop is Slice 3. |
+| UP-03 | Exists for reorder, replace and remove (`components/write/composer/media-tools.tsx`); crop is Slice 3a. |
 | UP-04 | Exists: video length and format bounds from `limits.json`, checked in Go. |
 | UP-05 | Exists: resumable uploads and recovery ([media scheduling](../../../media-scheduling.md#recovery)). |
 | UP-06 | Slice 2. |

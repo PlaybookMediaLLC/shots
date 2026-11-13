@@ -10,6 +10,7 @@ import {
   rankCommands,
 } from '@/components/write/composer/commands'
 import type { RefineApi } from '@/components/write/composer/refine'
+import { captionChoices } from '@/components/write/composer/past-captions'
 import { convertLegacyBlocks, legacyCount, withoutLegacy } from '@/lib/write/legacy-blocks'
 import { normalizeMentions } from '@/lib/write/normalize-mentions'
 import { postBreak } from '@/lib/write/versions'
@@ -219,4 +220,25 @@ test('a paste keeps bold, italic, links and lists and loses headings, colors and
     p('Inside'),
     { type: 'p', indent: 1, listStyleType: 'disc', children: [{ text: 'Item', italic: true }] },
   ])
+})
+
+test('past captions open their tool and offer each other draft’s text once', () => {
+  const opened: string[] = []
+  const command = commandsFor(context({ openTool: (tool) => opened.push(tool) })).find(
+    (item) => item.id === 'past-captions'
+  )
+  command?.run()
+  assert.deepEqual(opened, ['captions'])
+  assert.deepEqual(
+    captionChoices(
+      [
+        { id: 'current00001', plainText: 'This draft', title: 'This draft' },
+        { id: 'other0000001', plainText: '  Launch day  ', title: 'Launch' },
+        { id: 'other0000002', plainText: 'Launch day', title: 'Again' },
+        { id: 'other0000003', plainText: '   ', title: 'Empty' },
+      ],
+      'current00001'
+    ),
+    [{ draftId: 'other0000001', text: 'Launch day', title: 'Launch' }]
+  )
 })
