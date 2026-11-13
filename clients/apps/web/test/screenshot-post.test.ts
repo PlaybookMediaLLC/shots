@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import { POST_BREAK } from '@/lib/content-drafts/serialize'
 import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
 import { importedPosts, THREAD_POST_LIMIT } from '@/lib/write/import-text'
+import type { CaptionCountMessage, CaptionCountRequest } from '@/lib/write/caption-count.worker'
 import type { SplitMessage, SplitRequest } from '@/lib/write/import-text.worker'
 import { platformVersionsSchema } from '@/lib/write/document'
 import type { DesignCopy } from '@/lib/captions/channels'
@@ -77,13 +78,15 @@ test('a screenshot thread stays inside the one thread limit', () => {
   assert.equal(importedPosts(posts.join('\n---\n')).length, THREAD_POST_LIMIT)
 })
 
-// Both screens split through useThreadPosts: `---` on the page, a length in
-// the composer's split worker, which answers each request by its id.
-test('an explanation splits the way the composer splits a paste', async (t) => {
-  const replies: SplitMessage[] = []
+/**
+ * Loads a worker module against a fake worker scope: what it posted on load,
+ * and a way to send it one request and read its reply.
+ */
+async function loadWorker<Request, Message>(t: TestContext, load: () => Promise<unknown>) {
+  const replies: Message[] = []
   const scope = {
-    onmessage: null as ((event: { data: SplitRequest }) => void) | null,
-    postMessage: (message: SplitMessage) => replies.push(message),
+    onmessage: null as ((event: { data: Request }) => void) | null,
+    postMessage: (message: Message) => replies.push(message),
   }
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'self')
   Object.defineProperty(globalThis, 'self', { configurable: true, value: scope })
@@ -91,13 +94,28 @@ test('an explanation splits the way the composer splits a paste', async (t) => {
     if (previous) Object.defineProperty(globalThis, 'self', previous)
     else Reflect.deleteProperty(globalThis, 'self')
   })
-  await import('@/lib/write/import-text.worker')
-  // It says when it has loaded, so the page knows a request will start at once.
-  assert.deepEqual(replies, [{ ready: true }])
-  const split = (id: number, text: string, limit: number) => {
-    scope.onmessage!({ data: { channel: 'x', id, limit, text } })
-    return replies.at(-1)
+  await load()
+  const loaded = [...replies]
+  return {
+    loaded,
+    send(data: Request) {
+      scope.onmessage!({ data })
+      return replies.at(-1)
+    },
   }
+}
+
+// Both screens split through useThreadPosts: `---` on the page, a length in
+// the composer's split worker, which answers each request by its id.
+test('an explanation splits the way the composer splits a paste', async (t) => {
+  const worker = await loadWorker<SplitRequest, SplitMessage>(
+    t,
+    () => import('@/lib/write/import-text.worker')
+  )
+  // It says when it has loaded, so the page knows a request will start at once.
+  assert.deepEqual(worker.loaded, [{ ready: true }])
+  const split = (id: number, text: string, limit: number) =>
+    worker.send({ channel: 'x', id, limit, text })
   assert.deepEqual(importedPosts('First\n---\nSecond'), ['First', 'Second'])
   assert.deepEqual(split(1, 'alpha bravo charlie delta echo foxtrot', 23), {
     error: '',
@@ -276,23 +294,15 @@ test('each platform is measured against the text it will post', () => {
 })
 
 test('the sheet counts its captions in a worker that answers the same way', async (t) => {
-  let listener: ((event: { data: unknown }) => void) | undefined
-  const replies: unknown[] = []
-  const worker = {
-    addEventListener: (_: 'message', handler: typeof listener) => (listener = handler),
-    postMessage: (message: unknown) => replies.push(message),
-  }
-  for (const [name, value] of Object.entries(worker)) {
-    const previous = Object.getOwnPropertyDescriptor(globalThis, name)
-    Object.defineProperty(globalThis, name, { configurable: true, value })
-    t.after(() => {
-      if (previous) Object.defineProperty(globalThis, name, previous)
-      else Reflect.deleteProperty(globalThis, name)
-    })
-  }
-  await import('@/lib/write/caption-count.worker')
-  listener!({ data: { body: 'x'.repeat(281), channels: ['x'], copy: null, primary: 'x' } })
-  assert.deepEqual(replies, [[{ channel: 'x', length: 281, limit: 280, reused: false }]])
+  const worker = await loadWorker<CaptionCountRequest, CaptionCountMessage>(
+    t,
+    () => import('@/lib/write/caption-count.worker')
+  )
+  assert.deepEqual(worker.loaded, [{ ready: true }])
+  assert.deepEqual(
+    worker.send({ body: 'x'.repeat(281), channels: ['x'], copy: null, id: 7, primary: 'x' }),
+    { id: 7, overLimit: [{ channel: 'x', length: 281, limit: 280, reused: false }] }
+  )
 })
 
 test('a shape a chosen platform refuses is reported before anything renders', () => {

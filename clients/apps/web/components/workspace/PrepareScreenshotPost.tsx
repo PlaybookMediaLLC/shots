@@ -62,14 +62,13 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { engagementAutomation, followUpLines } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
-import type { CaptionCountRequest } from '@/lib/write/caption-count.worker'
+import type { CaptionCountRequest, CaptionCountResult } from '@/lib/write/caption-count.worker'
 import type { DraftChannel } from '@/lib/write/document'
 import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
 import type { MediaFacts } from '@/lib/write/media-rules'
 import {
   accountsOn,
   captionChannelText,
-  type CaptionOverLimit,
   captionFor,
   carriedFollowUps,
   platformAcceptsSize,
@@ -171,6 +170,9 @@ const startCaptionCount = () =>
   new Worker(new URL('../../lib/write/caption-count.worker.ts', import.meta.url), {
     type: 'module',
   })
+
+/** A count the worker could not make, reported rather than shown as no warnings. */
+const COUNT_FAILED: { overLimit: CaptionCountResult['overLimit'] | null } = { overLimit: null }
 
 /** "1 draft", "4 drafts". */
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -379,15 +381,14 @@ export function PrepareScreenshotPost({
   // X's count of a long caption without spaces takes about a second. With no
   // platform chosen there is nothing to count, so none starts while they load.
   const countRequest = React.useMemo(
-    () => (open && channels.length > 0 ? { body, channels, copy, primary: channel } : undefined),
+    (): Omit<CaptionCountRequest, 'id'> | undefined =>
+      open && channels.length > 0 ? { body, channels, copy, primary: channel } : undefined,
     [body, channel, channels, copy, open]
   )
-  const captionCount = useWorkerAnswer<CaptionCountRequest, CaptionOverLimit[] | null>(
-    startCaptionCount,
-    countRequest,
-    null
-  )
-  const overLimit = countRequest ? captionCount.answer : []
+  const captionCount = useWorkerAnswer(startCaptionCount, countRequest, COUNT_FAILED)
+  // The last count stays shown while a newer one runs, but only for platforms still chosen.
+  const counted = countRequest ? captionCount.answer?.overLimit : []
+  const overLimit = counted && counted.filter((problem) => channels.includes(problem.channel))
   const limit = DRAFT_CHANNEL_LIMITS[channel]
   // A length typed for one profile must not block another: it applies only
   // while splitting by length, and the profile's own limit is the default.
