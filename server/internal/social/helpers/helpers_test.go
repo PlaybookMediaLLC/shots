@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"regexp"
 	"slices"
@@ -153,6 +154,105 @@ func TestURLRegexTimeoutIsTextTooComplex(t *testing.T) {
 	if _, err := urlMatches([]rune(strings.Repeat("a", 30)+".com"), time.Now().Add(time.Hour)); err != ErrTextTooComplex {
 		t.Fatalf("error = %v", err)
 	}
+}
+
+// The emoji scan checks the budget between its regex calls: one call over
+// 1 MiB of digits took 1.5 s, and 1 MiB of emoji 0.5 s, whatever the budget.
+func TestEmojiScanStopsWithinItsBudget(t *testing.T) {
+	for name, text := range map[string]string{
+		"digits": strings.Repeat("7", 1<<20),
+		"emoji":  strings.Repeat("\U0001F600", 1<<18),
+	} {
+		start := time.Now()
+		if _, _, err := NewScanBudget(100*time.Millisecond).ParseTweet(text, 280); !errors.Is(err, ErrTextTooComplex) {
+			t.Errorf("%s: error = %v", name, err)
+		}
+		if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+			t.Errorf("%s took %v of a 100 ms budget", name, elapsed)
+		}
+	}
+}
+
+// emojiMatches must find what one scan of the twemoji regex finds, whatever
+// the window.
+func TestEmojiMatchesAreTheFullScan(t *testing.T) {
+	if n := longestMatch(t, twemojiSource); n > twemojiMaxLength {
+		t.Fatalf("a twemoji match spans up to %d units, over twemojiMaxLength", n)
+	}
+	tokens := []string{"\U0001F600", "\U0001F44D\U0001F3FD", "\U0001F1EB\U0001F1F7", "#\ufe0f\u20e3",
+		"\U0001F468\u200d\U0001F469\u200d\U0001F467\u200d\U0001F466",             // a family, 11 units
+		"\U0001F3F4\U000E0067\U000E0062\U000E0065\U000E006E\U000E0067\U000E007F", // England's flag, 14
+		"\U0001F468\u200d\u2764\ufe0f\u200d\U0001F468", "\u2764", "\u2642", "\u00a9", "7", "#",
+		"\u20e3", "\ufe0f", "\ufe0e", "\u200d", "a", " "}
+	rng := rand.New(rand.NewPCG(3, 4))
+	found := 0
+	for range 2000 {
+		var b strings.Builder
+		for range 1 + rng.IntN(40) {
+			b.WriteString(tokens[rng.IntN(len(tokens))])
+		}
+		text := shiftSurrogates(utf16Units(b.String()))
+		want := map[int]int{}
+		for m, _ := twemojiRe.FindRunesMatch(text); m != nil; m, _ = twemojiRe.FindNextMatch(m) {
+			want[m.Index] = m.Length
+		}
+		for _, window := range []int{twemojiMaxLength + 2, 23, 40, emojiScanWindow} {
+			if got, err := emojiMatches(text, window, time.Now().Add(time.Hour)); err != nil || !maps.Equal(got, want) {
+				t.Fatalf("emojiMatches(%q, %d) = %v, %v, want %v", b.String(), window, got, err, want)
+			}
+		}
+		found += len(want)
+	}
+	if found < 10000 {
+		t.Fatalf("only %d matches: the tokens miss the regex", found)
+	}
+}
+
+// longestMatch is the most units a match of source can span, for a regex of
+// \u escapes, classes, groups, alternation, ? and negative lookaheads only,
+// as twemojiSource is: with no repetition, its longest path.
+func longestMatch(t *testing.T, source string) int {
+	i := 0
+	var alternation func() int
+	alternation = func() int {
+		longest, n := 0, 0
+		for i < len(source) {
+			switch {
+			case source[i] == '|':
+				longest, n = max(longest, n), 0
+				i++
+			case source[i] == ')':
+				i++
+				return max(longest, n)
+			case source[i] == '?':
+				i++ // optional: no longer
+			case strings.HasPrefix(source[i:], "(?!"):
+				i += 3
+				alternation() // spans nothing
+			case strings.HasPrefix(source[i:], "(?:"):
+				i += 3
+				n += alternation()
+			case source[i] == '(':
+				i++
+				n += alternation()
+			case source[i] == '[':
+				for i++; source[i] != ']'; i++ {
+					if source[i] == '\\' {
+						i++
+					}
+				}
+				i++
+				n++
+			case strings.HasPrefix(source[i:], `\u`):
+				i += len(`\u0000`)
+				n++
+			default:
+				t.Fatalf("longestMatch cannot read %q", source[i:min(i+10, len(source))])
+			}
+		}
+		return max(longest, n)
+	}
+	return alternation()
 }
 
 // Mastodon counts only links with a protocol, so a dotted word without one is
