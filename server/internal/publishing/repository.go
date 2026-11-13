@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"regexp"
 	"strconv"
 	"strings"
@@ -471,16 +472,20 @@ func (r *Repository) LoadPublishJob(ctx context.Context, id, runID string) (Publ
 	if err != nil {
 		return PublishJob{}, err
 	}
+	authorized, err := r.schedulerMayPublish(ctx, post)
+	if err != nil {
+		return PublishJob{}, err
+	}
 	asset, err := variant.Edges.SourceAssetOrErr()
 	if err != nil {
-		reason := ineligibility(workspaceActive, connection, variantApproval(approved))
+		reason := ineligibility(workspaceActive, connection, authorized, variantApproval(approved))
 		if reason == "" {
 			reason = FailureMediaUnavailable
 		}
 		return PublishJob{Post: post, Connection: connection, WorkspaceActive: false, Ineligible: reason}, nil
 	}
 	approved = approved && asset.OrganizationID == post.OrganizationID
-	reason := ineligibility(workspaceActive, connection, variantApproval(approved))
+	reason := ineligibility(workspaceActive, connection, authorized, variantApproval(approved))
 	return PublishJob{
 		AssetObjectKey: asset.ObjectKey, AssetMediaType: asset.MediaType,
 		Assets:     []MediaAsset{{MediaType: asset.MediaType, ObjectKey: asset.ObjectKey}},
@@ -490,14 +495,37 @@ func (r *Repository) LoadPublishJob(ctx context.Context, id, runID string) (Publ
 
 // ineligibility is the first reason a job may not publish, or "". approval
 // is the review's reason, or "" when the content may publish.
-func ineligibility(workspaceActive bool, connection *ent.ChannelConnection, approval string) string {
+func ineligibility(workspaceActive bool, connection *ent.ChannelConnection, schedulerAuthorized bool, approval string) string {
 	switch {
 	case !workspaceActive:
 		return FailureWorkspaceInactive
 	case connection.Status != channelconnection.StatusACTIVE:
 		return FailureAccountUnavailable
+	case !schedulerAuthorized:
+		return FailureSchedulerUnauthorized
 	}
 	return approval
+}
+
+// schedulerMayPublish rechecks, when a post is due, the person who queued it:
+// an active member whose role publishes, who owns its set when that set is
+// private (RFC 024). A post an API key queued names no person; its key was
+// checked when it was queued.
+func (r *Repository) schedulerMayPublish(ctx context.Context, post *ent.ScheduledPost) (bool, error) {
+	if post.ScheduledByUserID == nil {
+		return true, nil
+	}
+	scheduler := *post.ScheduledByUserID
+	err := r.AuthorizeRole(ForStartedRun(ctx), post.OrganizationID, scheduler, "", "owner", "admin", "publisher")
+	if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) {
+		return false, nil
+	}
+	if err != nil || post.SocialSetID == nil {
+		return err == nil, err
+	}
+	foreign, err := r.client.SocialSet.Query().Where(socialset.ID(*post.SocialSetID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE),
+		socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(scheduler))).Exist(ctx)
+	return !foreign, err
 }
 
 // variantApproval is a campaign variant's review reason for ineligibility.
@@ -550,7 +578,11 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if sentBack {
 		approval = FailureChangesRequested
 	}
-	if reason := ineligibility(workspaceActive, connection, approval); reason != "" {
+	authorized, err := r.schedulerMayPublish(ctx, post)
+	if err != nil {
+		return PublishJob{}, err
+	}
+	if reason := ineligibility(workspaceActive, connection, authorized, approval); reason != "" {
 		return PublishJob{Post: post, Connection: connection, WorkspaceActive: false, Ineligible: reason}, nil
 	}
 	job := PublishJob{Connection: connection, Post: post, WorkspaceActive: true}

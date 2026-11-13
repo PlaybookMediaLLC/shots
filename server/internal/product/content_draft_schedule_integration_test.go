@@ -329,4 +329,59 @@ func TestContentDraftScheduling(t *testing.T) {
 			t.Fatalf("delete err=%v", err)
 		}
 	})
+
+	t.Run("a due post rechecks the person who queued it", func(t *testing.T) {
+		writer := "writer_" + id
+		exec(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Writer',$2,true,now(),now())`, writer, writer+"@example.test")
+		exec(`INSERT INTO session (id,"expiresAt",token,"createdAt","updatedAt","userId","activeOrganizationId") VALUES ($1,now()+interval '1 hour',$1,now(),now(),$2,$3)`, "session_"+writer, writer, org)
+		exec(`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'writer_publisher',now())`, "member_"+writer, org, writer)
+		defer exec(`DELETE FROM "user" WHERE id=$1`, writer)
+		actor := Actor{OrganizationID: org, UserID: writer, SessionID: "session_" + writer, RequestID: "request_" + writer}
+		queued, err := repo.CreateContentDraft(ctx, actor, ContentDraftInput{PlainText: "Queued by a writer", Title: "Writer"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := repo.ScheduleContentDraft(ctx, actor, queued.ID, ScheduleContentDraftInput{ScheduledFor: at, Version: queued.Version,
+			Targets: []ContentDraftScheduleTarget{{Caption: "Queued by a writer", ChannelConnectionID: linkedinChannel}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		post := result.Posts[0].ID
+		store := publishing.NewRepository(db.Client)
+		if claimed, err := store.Claim(ctx, post, "run-"+post, at.Add(time.Minute)); err != nil || !claimed {
+			t.Fatalf("claimed=%v err=%v", claimed, err)
+		}
+		reason := func() string {
+			t.Helper()
+			job, err := store.LoadPublishJob(ctx, post, "run-"+post)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return job.Ineligible
+		}
+		if got := reason(); got != "" {
+			t.Fatalf("an authorized writer's post was refused: %q", got)
+		}
+		exec(`UPDATE member SET role='viewer' WHERE id=$1`, "member_"+writer)
+		if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("demoted writer's post=%q", got)
+		}
+		exec(`DELETE FROM member WHERE id=$1`, "member_"+writer)
+		if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("removed writer's post=%q", got)
+		}
+		exec(`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'writer_publisher',now())`, "member_"+writer, org, writer)
+		if got := reason(); got != "" {
+			t.Fatalf("restored writer's post=%q", got)
+		}
+		// A private set's posts publish only for its owner.
+		private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Owner only", Visibility: "PRIVATE"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`UPDATE scheduled_post SET "socialSetId"=$2 WHERE id=$1`, post, private.ID)
+		if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("a post in another person's private set=%q", got)
+		}
+	})
 }

@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -217,6 +218,27 @@ func (c *Configuration) visibleSocialSetIDs(ctx context.Context, actor Actor) ([
 		ids = append(ids, set.ID)
 	}
 	return ids, nil
+}
+
+// VisibleConnections drops the accounts of private sets the actor does not
+// own: a private set's accounts are its owner's alone, and an API key sees no
+// private set (RFC 024).
+func (c *Configuration) VisibleConnections(ctx context.Context, actor Actor, connections []*ent.ChannelConnection) ([]*ent.ChannelConnection, error) {
+	query := c.client.SocialSet.Query().Where(socialset.OrganizationID(actor.OrganizationID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE))
+	if actor.IsSession() {
+		query.Where(socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(actor.UserID)))
+	}
+	hidden, err := query.IDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	visible := make([]*ent.ChannelConnection, 0, len(connections))
+	for _, connection := range connections {
+		if connection.SocialSetID == nil || !slices.Contains(hidden, *connection.SocialSetID) {
+			visible = append(visible, connection)
+		}
+	}
+	return visible, nil
 }
 
 // visibleSocialSet loads one set actor may see; any other set is not found.

@@ -32,6 +32,7 @@ type SettingsPlatformStore interface {
 	AssignSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRecord, error)
 	RemoveSocialSetAccount(context.Context, product.Actor, string, string) (*product.SocialSetRemoval, error)
 	ChannelAccountStates(context.Context, string, []*ent.ChannelConnection) (map[string]product.ChannelAccountState, error)
+	VisibleConnections(context.Context, product.Actor, []*ent.ChannelConnection) ([]*ent.ChannelConnection, error)
 	RemoveChannelAccount(context.Context, product.Actor, string) (*product.SocialSetRemoval, error)
 	AuthorizeChannelManage(context.Context, product.Actor) error
 	AuthorizeSocialSetConnection(context.Context, product.Actor, string) error

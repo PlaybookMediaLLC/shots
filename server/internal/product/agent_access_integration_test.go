@@ -107,3 +107,63 @@ func TestAgentConsentAndCodeExchange(t *testing.T) {
 	}
 	t.Cleanup(func() { _, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM apikey WHERE "referenceId"=$1`, w.org) })
 }
+
+// An agent acts for the member who consented to it: when they are removed or
+// leave, the keys their consents minted stop working, and a code they approved
+// can no longer be exchanged. Keys of members who stay keep working.
+func TestAgentKeysLeaveWithTheMemberWhoConsented(t *testing.T) {
+	w := newTestWorkspace(t)
+	t.Cleanup(func() { _, _ = w.db.SQL.ExecContext(w.ctx, `DELETE FROM apikey WHERE "referenceId"=$1`, w.org) })
+	w.addMember(t, "removed", "admin")
+	w.addMember(t, "leaver", "admin")
+	w.addMember(t, "deprovisioned", "admin")
+	w.repo.WithAgentClients(fakeAgentClients{
+		"pcd_claude": {ClientID: "pcd_claude", Name: "Claude", Dynamic: true, Public: true, RedirectURIs: []string{"https://claude.ai/api/mcp/auth_callback"}},
+	})
+	s256 := "S256"
+	request := AgentAuthorizationRequest{ClientID: "pcd_claude", RedirectURI: "https://claude.ai/api/mcp/auth_callback",
+		CodeChallenge: pkce("verifier"), CodeChallengeMethod: &s256, Scopes: []string{"artifact:read"}}
+	connect := func(actor Actor) string {
+		t.Helper()
+		code, err := w.repo.ApproveAgentAccess(w.ctx, actor, request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		token, err := w.repo.ExchangeAgentCode(w.ctx, "pcd_claude", code.Code, "verifier", request.RedirectURI)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return token.AccessToken
+	}
+	works := func(token string) bool {
+		_, err := w.repo.VerifyAPIKey(w.ctx, token)
+		return err == nil
+	}
+	ownerKey, removedKey, leaverKey := connect(w.owner), connect(w.actor("removed")), connect(w.actor("leaver"))
+	provisionedKey := connect(w.actor("deprovisioned"))
+	pending, err := w.repo.ApproveAgentAccess(w.ctx, w.actor("removed"), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.RemoveMember(w.ctx, w.owner, "member_removed_"+w.id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.repo.LeaveWorkspace(w.ctx, w.actor("leaver")); err != nil {
+		t.Fatal(err)
+	}
+	// SCIM and enterprise provisioning remove the row through Better Auth, then report it.
+	w.exec(t, `DELETE FROM member WHERE id=$1`, "member_deprovisioned_"+w.id)
+	if err := w.repo.RecordAuthEvent(w.ctx, AuthEvent{Action: "product.member_removed", EntityID: "member_deprovisioned_" + w.id,
+		EntityType: "member", OrganizationID: w.org, RemovedUserID: "user_deprovisioned_" + w.id}); err != nil {
+		t.Fatal(err)
+	}
+	if works(removedKey) || works(leaverKey) || works(provisionedKey) || !works(ownerKey) {
+		t.Fatalf("removed=%v leaver=%v deprovisioned=%v owner=%v", works(removedKey), works(leaverKey), works(provisionedKey), works(ownerKey))
+	}
+	if _, err := w.repo.ExchangeAgentCode(w.ctx, "pcd_claude", pending.Code, "verifier", request.RedirectURI); !errors.Is(err, ErrInvalidGrant) {
+		t.Fatalf("a removed member's consent minted a key: %v", err)
+	}
+	if n := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.agent_keys_revoked")).CountX(w.ctx); n != 3 {
+		t.Fatalf("revocation audits=%d", n)
+	}
+}

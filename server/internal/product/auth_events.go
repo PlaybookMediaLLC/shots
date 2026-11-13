@@ -71,6 +71,11 @@ func (c *Configuration) RecordAuthEvent(ctx context.Context, event AuthEvent) er
 			session.UserID(event.RemovedUserID)).Exec(ctx); err != nil {
 			return err
 		}
+		// So do the keys their AI agent consents minted (SCIM and enterprise removals).
+		service := Actor{OrganizationID: event.OrganizationID, Kind: "service", RequestID: event.RequestID, Display: "membership provisioning"}
+		if err := revokeAgentKeys(ctx, tx, service, event.OrganizationID, event.RemovedUserID, event.EntityID); err != nil {
+			return err
+		}
 	}
 	actor := publishing.Actor{Organization: event.OrganizationID, RequestID: event.RequestID, Type: "SERVICE"}
 	if event.ActorUserID != "" {

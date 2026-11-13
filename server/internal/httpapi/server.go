@@ -586,8 +586,14 @@ func (s *Server) listConnections(w http.ResponseWriter, r *http.Request) {
 		writeStoreError(w, err)
 		return
 	}
-	connections = s.fillProfiles(r.Context(), organizationID, connections)
 	var states map[string]product.ChannelAccountState
+	if s.configuration != nil {
+		if connections, err = s.configuration.VisibleConnections(r.Context(), requestActor(r), connections); err != nil {
+			writeStoreError(w, err)
+			return
+		}
+	}
+	connections = s.fillProfiles(r.Context(), organizationID, connections)
 	if s.configuration != nil {
 		if states, err = s.configuration.ChannelAccountStates(r.Context(), organizationID, connections); err != nil {
 			writeStoreError(w, err)

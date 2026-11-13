@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/agentauthorization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/invitation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
@@ -191,6 +193,9 @@ func (c *Configuration) RemoveMember(ctx context.Context, actor Actor, memberID 
 	if _, err := tx.Session.Delete().Where(session.ActiveOrganizationID(actor.OrganizationID), session.UserID(current.UserID)).Exec(ctx); err != nil {
 		return nil, err
 	}
+	if err := revokeAgentKeys(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
+		return nil, err
+	}
 	if err := recordProductActivity(ctx, tx, actor, "member.removed", "product.member_removed", "member", memberID); err != nil {
 		return nil, err
 	}
@@ -200,6 +205,24 @@ func (c *Configuration) RemoveMember(ctx context.Context, actor Actor, memberID 
 	}
 	c.collabAccessChanged(ctx, actor.OrganizationID)
 	return result, nil
+}
+
+// revokeAgentKeys disables the workspace keys a departing member's AI agent
+// consents minted: an agent acts for the person who consented, so it leaves
+// with them. Keys an admin created in API settings belong to the workspace.
+func revokeAgentKeys(ctx context.Context, tx *ent.Tx, actor Actor, organizationID, userID, memberID string) error {
+	keys, err := tx.AgentAuthorization.Query().Where(agentauthorization.OrganizationID(organizationID),
+		agentauthorization.UserID(userID), agentauthorization.APIKeyIDNotNil()).
+		Select(agentauthorization.FieldAPIKeyID).Strings(ctx)
+	if err != nil || len(keys) == 0 {
+		return err
+	}
+	disabled, err := tx.Apikey.Update().Where(apikey.IDIn(keys...), apikey.ReferenceID(organizationID), apikey.Enabled(true)).
+		SetEnabled(false).SetUpdatedAt(time.Now().UTC()).Save(ctx)
+	if err != nil || disabled == 0 {
+		return err
+	}
+	return appendConfigurationAudit(ctx, tx, actor, "product.agent_keys_revoked", "member", memberID, map[string]any{"keys": disabled})
 }
 
 func (c *Configuration) LeaveWorkspace(ctx context.Context, actor Actor) (*WorkspaceMember, error) {
@@ -240,6 +263,9 @@ func (c *Configuration) LeaveWorkspace(ctx context.Context, actor Actor) (*Works
 		return nil, conflict("Member role changed. Please retry.")
 	}
 	if _, err := tx.Session.Delete().Where(session.ActiveOrganizationID(actor.OrganizationID), session.UserID(actor.UserID)).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := revokeAgentKeys(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
 		return nil, err
 	}
 	if err := recordProductActivity(ctx, tx, actor, "member.left", "product.member_left", "member", current.ID); err != nil {

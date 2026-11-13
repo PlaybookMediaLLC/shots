@@ -357,6 +357,30 @@ func TestSocialSetsPlatform(t *testing.T) {
 				t.Fatal("the workspace owner sees another person's private set")
 			}
 		}
+		// Its accounts are listed for its owner alone, never for an API key.
+		connect("threads", &private.ID)
+		all, err := db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org)).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		listedIn := func(actor Actor) bool {
+			t.Helper()
+			visible, err := repo.VisibleConnections(ctx, actor, all)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, connection := range visible {
+				if connection.SocialSetID != nil && *connection.SocialSetID == private.ID {
+					return true
+				}
+			}
+			return false
+		}
+		key := owner
+		key.Kind, key.UserID = "api_key", ""
+		if !listedIn(admin) || listedIn(owner) || listedIn(key) {
+			t.Fatal("a private set's account was listed for someone other than its owner")
+		}
 		if _, err := repo.GetSocialSet(ctx, owner, private.ID); !errors.Is(err, publishing.ErrNotFound) {
 			t.Fatalf("private set read by another member: %v", err)
 		}

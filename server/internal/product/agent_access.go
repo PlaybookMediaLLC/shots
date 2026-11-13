@@ -18,6 +18,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/agentauthorization"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
@@ -241,6 +242,12 @@ func (c *Configuration) ExchangeAgentCode(ctx context.Context, clientID, code, c
 	if subtle.ConstantTimeCompare([]byte(grant.ClientID), []byte(clientID)) != 1 ||
 		!time.Now().UTC().Before(grant.ExpiresAt) || (redirectURI != "" && redirectURI != grant.RedirectURI) ||
 		!verifierMatches(grant.CodeChallenge, codeVerifier) {
+		return nil, ErrInvalidGrant
+	}
+	// The consenting member may have left since: their consent leaves with them.
+	if current, err := tx.Member.Query().Where(member.OrganizationID(grant.OrganizationID), member.UserID(grant.UserID)).Exist(ctx); err != nil {
+		return nil, err
+	} else if !current {
 		return nil, ErrInvalidGrant
 	}
 	var expiresAt *time.Time

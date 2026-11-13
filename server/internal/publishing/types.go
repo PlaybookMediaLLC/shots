@@ -103,6 +103,9 @@ const (
 	FailureWorkspaceInactive = "WORKSPACE_INACTIVE"
 	// The account was disconnected or removed from the workspace.
 	FailureAccountUnavailable = "ACCOUNT_UNAVAILABLE"
+	// The person who queued it can no longer publish there: they left, were
+	// removed, demoted or banned, or no longer own its private set.
+	FailureSchedulerUnauthorized = "SCHEDULER_UNAUTHORIZED"
 	// A campaign variant is no longer approved.
 	FailureApprovalRequired = "APPROVAL_REQUIRED"
 	// The workspace approves drafts and a reviewer sent this one back.
