@@ -11,7 +11,8 @@ import (
 
 func e2eProviders() []integrations.Provider {
 	if endpoint := os.Getenv("SOCIAL_E2E_URL"); endpoint != "" {
-		return []integrations.Provider{e2eprovider.New(endpoint), e2eprovider.NewVideo(endpoint, "tiktok"), e2eprovider.NewVideo(endpoint, "youtube")}
+		return []integrations.Provider{e2eprovider.New(endpoint), e2eprovider.NewVideo(endpoint, "tiktok"), e2eprovider.NewVideo(endpoint, "youtube"),
+			e2eprovider.NewVideo(endpoint, "facebook"), e2eprovider.NewVideo(endpoint, "pinterest")}
 	}
 	return nil
 }

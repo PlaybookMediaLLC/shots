@@ -15,6 +15,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	socialent "github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/ent"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations/social/instagram"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
@@ -71,6 +72,7 @@ type fakePoster struct {
 	replyPolls       []*integrations.PollDetails
 	message          string
 	path             string
+	thumbnail        string
 	err              error
 	status           string
 	expectedNativeID string
@@ -89,7 +91,7 @@ func (f *fakePoster) Post(_ context.Context, id, token string, posts []integrati
 	}
 	f.message, f.media, f.poll = posts[0].Message, len(posts[0].Media), posts[0].Poll
 	if len(posts[0].Media) > 0 {
-		f.path = posts[0].Media[0].Path
+		f.path, f.thumbnail = posts[0].Media[0].Path, posts[0].Media[0].Thumbnail
 	}
 	if f.err != nil {
 		return nil, f.err
@@ -167,6 +169,27 @@ func TestThreadsKeepsTheProvidersLinkToTheLivePost(t *testing.T) {
 	receipt, err := p.PublishThread(context.Background(), input)
 	if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
 		t.Fatalf("receipt=%+v err=%v", receipt, err)
+	}
+}
+
+func TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard(t *testing.T) {
+	for _, platform := range []string{"facebook", "pinterest"} {
+		p, _, poster, input := directFixture()
+		poster.releaseURL = "https://www.pinterest.com/pin/77/"
+		p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: platform, InternalID: "remote-user", Token: "private-token"}}
+		input.Platform = platform
+		if platform == "pinterest" {
+			_, err := p.PublishThread(context.Background(), input)
+			var coded *socialapi.Error
+			if !errors.As(err, &coded) || coded.Code != publishing.FailurePostOptions || poster.calls != 0 {
+				t.Fatalf("a pin without a board: err=%v calls=%d", err, poster.calls)
+			}
+			input.Options = &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001"}}
+		}
+		receipt, err := p.PublishThread(context.Background(), input)
+		if err != nil || receipt.Thread.Publication == nil || receipt.Thread.Publication.URL != poster.releaseURL {
+			t.Fatalf("%s receipt=%+v err=%v", platform, receipt, err)
+		}
 	}
 }
 
@@ -411,19 +434,19 @@ func (p *analyticsPoster) PostAnalytics(context.Context, string, string, string,
 
 func TestAnalyticsCapabilitiesDoNotInheritPublishingRolloutRestrictions(t *testing.T) {
 	p, _, base, input := directFixture()
-	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "facebook"
+	p.integrations.(fakeIntegrations).item.ProviderIdentifier = "tumblr"
 	p.resolve = func(string) poster { return &analyticsPoster{base} }
-	if !p.AnalyticsCapabilities("facebook").Posts {
+	if !p.AnalyticsCapabilities("tumblr").Posts {
 		t.Fatal("installed analytics capability hidden")
 	}
-	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", input.SecretReference, "remote-post")
+	metrics, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", input.SecretReference, "remote-post")
 	if err != nil || len(metrics) != 1 || metrics["impressions"] != 0 {
 		t.Fatalf("metrics=%v error=%v", metrics, err)
 	}
-	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "facebook", "another-tenant-secret", "remote-post"); err == nil {
+	if _, err := p.PostMetrics(context.Background(), input.OrganizationID, input.DestinationID, "tumblr", "another-tenant-secret", "remote-post"); err == nil {
 		t.Fatal("analytics bypassed credential binding")
 	}
-	input.Platform = "facebook"
+	input.Platform = "tumblr"
 	if _, err := p.Publish(context.Background(), input); err == nil {
 		t.Fatal("analytics widened publication rollout")
 	}
@@ -451,6 +474,18 @@ func TestRateLimitsAndDailyCapsAreDefiniteOutcomes(t *testing.T) {
 	err = publicationOutcome(temporalx.DailyLimit("instagram", "25 posts per day"))
 	if !errors.As(err, &capped) || capped.UnknownDelivery || capped.Status == 429 || capped.Code != publishing.FailureProviderDailyLimit || capped.ProviderMessage != "25 posts per day" {
 		t.Fatalf("daily limit = %#v", err)
+	}
+}
+
+// Shots running out of time counting a post's text sent nothing and blames
+// neither the platform nor the text, which passed the same count when it was
+// scheduled: the post retries.
+func TestTextTooComplexToCountRetries(t *testing.T) {
+	var retry *socialapi.Error
+	err := publicationOutcome(fmt.Errorf("x: %w", helpers.ErrTextTooComplex))
+	if !errors.As(err, &retry) || retry.UnknownDelivery || retry.Status != http.StatusTooManyRequests ||
+		retry.Code != publishing.FailurePublisherError || !strings.Contains(retry.ProviderMessage, "nothing was sent") {
+		t.Fatalf("too complex = %#v", err)
 	}
 }
 
@@ -536,5 +571,21 @@ func TestPlatformLimitsReachTheirPublicationOutcome(t *testing.T) {
 				t.Fatalf("requests=%d result=%+v err=%v", requests.Load(), result, err)
 			}
 		})
+	}
+}
+
+// An Instagram reel's cover is signed and sent with the reel itself.
+func TestInstagramReelCarriesItsSignedCover(t *testing.T) {
+	p, signer, poster, input := directFixture()
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "instagram-standalone", InternalID: "remote-user", Token: "private-token"}}
+	input.Platform = "instagram-standalone"
+	input.AssetObjectKey, input.AssetMediaType = "org/product-org/reel.mp4", "video/mp4"
+	input.Cover = &publishing.MediaAsset{AssetID: "cover-1", MediaType: "image/jpeg", ObjectKey: "org/product-org/cover.jpg"}
+	input.Options = &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{CoverAssetID: "cover-1"}}
+	if _, err := p.Publish(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	if signer.calls != 2 || poster.thumbnail != "https://r2.example/private/image.png?fresh-signature" {
+		t.Fatalf("signed=%d cover=%q", signer.calls, poster.thumbnail)
 	}
 }

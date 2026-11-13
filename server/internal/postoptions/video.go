@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode"
 	"unicode/utf16"
 )
 
@@ -13,6 +14,51 @@ type YouTubeOptions struct {
 	Title       string `json:"title"`
 	Privacy     string `json:"privacy"`
 	MadeForKids *bool  `json:"madeForKids,omitempty"`
+	// Tags are snippet.tags; YouTube caps them together (YouTubeTagsLength).
+	Tags []string `json:"tags,omitempty"`
+	// ContainsSyntheticMedia is status.containsSyntheticMedia: realistic
+	// altered or synthetic content.
+	ContainsSyntheticMedia bool `json:"containsSyntheticMedia,omitempty"`
+	// ThumbnailAssetID is set as the custom thumbnail once the video is live,
+	// a follow-up of its own: its failure never fails the video.
+	ThumbnailAssetID string `json:"thumbnailAssetId,omitempty"`
+}
+
+// YouTubeTagsLimit is YouTube's cap on all of a video's tags together.
+const YouTubeTagsLimit = 500
+
+// YouTubeTagsLength counts tags as YouTube does: UTF-16 units, plus two for
+// the quotes around a tag with a space, plus a comma between tags.
+func YouTubeTagsLength(tags []string) int {
+	total := max(len(tags)-1, 0)
+	for _, tag := range tags {
+		total += len(utf16.Encode([]rune(tag)))
+		if strings.ContainsFunc(tag, unicode.IsSpace) {
+			total += 2
+		}
+	}
+	return total
+}
+
+// checkYouTubeTags checks a scheduled snapshot's tags only, so a draft saves
+// while it is being edited: Go and the composer can read a tag's case and
+// spaces differently, and a draft must never stop saving over it.
+func checkYouTubeTags(tags []string, complete bool) error {
+	if !complete {
+		return nil
+	}
+	seen := map[string]bool{}
+	for _, tag := range tags {
+		key := strings.ToLower(tag)
+		if strings.TrimSpace(tag) != tag || tag == "" || strings.ContainsAny(tag, "<>,") || seen[key] {
+			return fmt.Errorf("YouTube tags are distinct words or phrases without commas or angle brackets")
+		}
+		seen[key] = true
+	}
+	if YouTubeTagsLength(tags) > YouTubeTagsLimit {
+		return fmt.Errorf("keep YouTube tags under %d characters together", YouTubeTagsLimit)
+	}
+	return nil
 }
 
 // TikTokOptions contains the consent and controls required for direct video posts.
@@ -37,6 +83,9 @@ func ValidateVideoOptions(channel string, youtube *YouTubeOptions, tiktok *TikTo
 		length := len(utf16.Encode([]rune(strings.TrimSpace(youtube.Title))))
 		if length > 100 || strings.ContainsAny(youtube.Title, "<>") || (youtube.Privacy != "" && !slices.Contains([]string{"public", "private", "unlisted"}, youtube.Privacy)) {
 			return fmt.Errorf("choose a YouTube title of 2 to 100 characters without angle brackets and a valid privacy setting")
+		}
+		if err := checkYouTubeTags(youtube.Tags, complete); err != nil {
+			return err
 		}
 		if complete && (length < 2 || youtube.Privacy == "" || youtube.MadeForKids == nil) {
 			return fmt.Errorf("choose a YouTube title, privacy and audience before scheduling")

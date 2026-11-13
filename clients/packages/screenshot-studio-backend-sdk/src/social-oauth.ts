@@ -13,6 +13,8 @@ export const socialOAuthProviderSchema = z.enum([
   'threads',
   'mastodon',
   'mastodon-custom',
+  'facebook',
+  'pinterest',
 ])
 
 /** Intent is immutable even when the active workspace changes during authorization. */

@@ -2497,6 +2497,18 @@
                                 "xQuotes": {
                                   "type": "boolean"
                                 },
+                                "xVideoMaxSeconds": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
                                 "mastodonQuotes": {
                                   "type": [
                                     "boolean",
@@ -2991,6 +3003,18 @@
                           "xQuotes": {
                             "type": "boolean"
                           },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "mastodonQuotes": {
                             "type": [
                               "boolean",
@@ -3331,6 +3355,18 @@
                           },
                           "xQuotes": {
                             "type": "boolean"
+                          },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "mastodonQuotes": {
                             "type": [
@@ -4067,6 +4103,18 @@
                           "xQuotes": {
                             "type": "boolean"
                           },
+                          "xVideoMaxSeconds": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "mastodonQuotes": {
                             "type": [
                               "boolean",
@@ -4789,7 +4837,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -12699,7 +12748,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 10,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -12725,7 +12774,9 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -12761,6 +12812,20 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -12817,6 +12882,71 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -12959,6 +13089,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -13384,7 +13515,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -13919,7 +14051,7 @@
                               "const": 1
                             },
                             "versions": {
-                              "maxItems": 8,
+                              "maxItems": 10,
                               "type": "array",
                               "items": {
                                 "type": "object",
@@ -13945,7 +14077,9 @@
                                       "bluesky",
                                       "mastodon",
                                       "tiktok",
-                                      "youtube"
+                                      "youtube",
+                                      "facebook",
+                                      "pinterest"
                                     ]
                                   },
                                   "forkedFromVersion": {
@@ -13981,6 +14115,20 @@
                                           },
                                           "madeForKids": {
                                             "type": "boolean"
+                                          },
+                                          "tags": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string"
+                                            }
+                                          },
+                                          "containsSyntheticMedia": {
+                                            "type": "boolean"
+                                          },
+                                          "thumbnailAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
                                           }
                                         },
                                         "required": [
@@ -14037,6 +14185,71 @@
                                           "madeWithAi",
                                           "consent"
                                         ],
+                                        "additionalProperties": false
+                                      },
+                                      "instagram": {
+                                        "type": "object",
+                                        "properties": {
+                                          "collaborators": {
+                                            "maxItems": 3,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "userTags": {
+                                            "maxItems": 20,
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "maxLength": 30,
+                                              "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                            }
+                                          },
+                                          "coverAssetId": {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "maxLength": 64
+                                          },
+                                          "shareToFeed": {
+                                            "type": "boolean"
+                                          },
+                                          "trialReel": {
+                                            "type": "boolean"
+                                          },
+                                          "trialGraduation": {
+                                            "type": "string",
+                                            "enum": [
+                                              "MANUAL",
+                                              "SS_PERFORMANCE"
+                                            ]
+                                          },
+                                          "placement": {
+                                            "type": "string",
+                                            "enum": [
+                                              "story"
+                                            ]
+                                          }
+                                        },
+                                        "additionalProperties": false
+                                      },
+                                      "pinterest": {
+                                        "type": "object",
+                                        "properties": {
+                                          "boardId": {
+                                            "type": "string",
+                                            "pattern": "^[0-9]{1,30}$"
+                                          },
+                                          "title": {
+                                            "type": "string"
+                                          },
+                                          "link": {
+                                            "type": "string",
+                                            "maxLength": 2048
+                                          }
+                                        },
                                         "additionalProperties": false
                                       },
                                       "autoDm": {
@@ -14179,6 +14392,7 @@
                                                       "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                                     },
                                                     "days": {
+                                                      "default": 0,
                                                       "type": "integer",
                                                       "minimum": 0,
                                                       "maximum": 30
@@ -14604,7 +14818,8 @@
                                     "unretweet",
                                     "plug",
                                     "repost_at_likes",
-                                    "quote"
+                                    "quote",
+                                    "thumbnail"
                                   ]
                                 },
                                 "remoteId": {
@@ -15434,7 +15649,7 @@
           "feature": "content:drafts",
           "minimumPlan": "pro"
         },
-        "description": "Lists a draft's history, newest first: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who and when. Viewing a draft is never recorded.",
+        "description": "Lists a draft's history, newest first (by time, then id), 50 events a page: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who, through what, and when. Viewing a draft is never recorded. Pass `nextCursor` as `cursor` for the next page.",
         "operationId": "listContentDraftActivity",
         "parameters": [
           {
@@ -15444,6 +15659,15 @@
             "schema": {
               "type": "string",
               "pattern": "^(?:[a-z0-9]{10,32}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 500
             }
           }
         ],
@@ -22488,7 +22712,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -22514,7 +22738,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -22550,6 +22776,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -22606,6 +22846,71 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -22748,6 +23053,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -23174,7 +23480,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -24120,7 +24427,9 @@
               "youtube",
               "threads",
               "mastodon",
-              "mastodon-custom"
+              "mastodon-custom",
+              "facebook",
+              "pinterest"
             ]
           },
           "instanceServer": {
@@ -24156,8 +24465,8 @@
             "const": 1
           },
           "providers": {
-            "minItems": 12,
-            "maxItems": 12,
+            "minItems": 14,
+            "maxItems": 14,
             "type": "array",
             "items": {
               "type": "object",
@@ -24176,7 +24485,9 @@
                     "bluesky",
                     "instagram",
                     "instagram-standalone",
-                    "substack"
+                    "substack",
+                    "facebook",
+                    "pinterest"
                   ]
                 },
                 "status": {
@@ -27488,7 +27799,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -27514,7 +27825,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -27550,6 +27863,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -27606,6 +27933,71 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -27748,6 +28140,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -28397,7 +28790,7 @@
                       "const": 1
                     },
                     "versions": {
-                      "maxItems": 8,
+                      "maxItems": 10,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -28423,7 +28816,9 @@
                               "bluesky",
                               "mastodon",
                               "tiktok",
-                              "youtube"
+                              "youtube",
+                              "facebook",
+                              "pinterest"
                             ]
                           },
                           "forkedFromVersion": {
@@ -28459,6 +28854,20 @@
                                   },
                                   "madeForKids": {
                                     "type": "boolean"
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "containsSyntheticMedia": {
+                                    "type": "boolean"
+                                  },
+                                  "thumbnailAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
                                   }
                                 },
                                 "required": [
@@ -28515,6 +28924,71 @@
                                   "madeWithAi",
                                   "consent"
                                 ],
+                                "additionalProperties": false
+                              },
+                              "instagram": {
+                                "type": "object",
+                                "properties": {
+                                  "collaborators": {
+                                    "maxItems": 3,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "userTags": {
+                                    "maxItems": 20,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "maxLength": 30,
+                                      "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                    }
+                                  },
+                                  "coverAssetId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 64
+                                  },
+                                  "shareToFeed": {
+                                    "type": "boolean"
+                                  },
+                                  "trialReel": {
+                                    "type": "boolean"
+                                  },
+                                  "trialGraduation": {
+                                    "type": "string",
+                                    "enum": [
+                                      "MANUAL",
+                                      "SS_PERFORMANCE"
+                                    ]
+                                  },
+                                  "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                      "story"
+                                    ]
+                                  }
+                                },
+                                "additionalProperties": false
+                              },
+                              "pinterest": {
+                                "type": "object",
+                                "properties": {
+                                  "boardId": {
+                                    "type": "string",
+                                    "pattern": "^[0-9]{1,30}$"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "link": {
+                                    "type": "string",
+                                    "maxLength": 2048
+                                  }
+                                },
                                 "additionalProperties": false
                               },
                               "autoDm": {
@@ -28657,6 +29131,7 @@
                                               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                             },
                                             "days": {
+                                              "default": 0,
                                               "type": "integer",
                                               "minimum": 0,
                                               "maximum": 30
@@ -28958,7 +29433,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -28984,7 +29459,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29020,6 +29497,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -29076,6 +29567,71 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -29218,6 +29774,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -29230,7 +29787,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -29440,7 +29996,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -29492,7 +30050,9 @@
               "bluesky",
               "mastodon",
               "tiktok",
-              "youtube"
+              "youtube",
+              "facebook",
+              "pinterest"
             ]
           },
           "releaseId": {
@@ -29894,7 +30454,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -29920,7 +30480,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -29956,6 +30518,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -30012,6 +30588,71 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -30154,6 +30795,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30446,7 +31088,7 @@
                 "const": 1
               },
               "versions": {
-                "maxItems": 8,
+                "maxItems": 10,
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -30472,7 +31114,9 @@
                         "bluesky",
                         "mastodon",
                         "tiktok",
-                        "youtube"
+                        "youtube",
+                        "facebook",
+                        "pinterest"
                       ]
                     },
                     "forkedFromVersion": {
@@ -30508,6 +31152,20 @@
                             },
                             "madeForKids": {
                               "type": "boolean"
+                            },
+                            "tags": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "containsSyntheticMedia": {
+                              "type": "boolean"
+                            },
+                            "thumbnailAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
                             }
                           },
                           "required": [
@@ -30564,6 +31222,71 @@
                             "madeWithAi",
                             "consent"
                           ],
+                          "additionalProperties": false
+                        },
+                        "instagram": {
+                          "type": "object",
+                          "properties": {
+                            "collaborators": {
+                              "maxItems": 3,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "userTags": {
+                              "maxItems": 20,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 30,
+                                "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                              }
+                            },
+                            "coverAssetId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "shareToFeed": {
+                              "type": "boolean"
+                            },
+                            "trialReel": {
+                              "type": "boolean"
+                            },
+                            "trialGraduation": {
+                              "type": "string",
+                              "enum": [
+                                "MANUAL",
+                                "SS_PERFORMANCE"
+                              ]
+                            },
+                            "placement": {
+                              "type": "string",
+                              "enum": [
+                                "story"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "pinterest": {
+                          "type": "object",
+                          "properties": {
+                            "boardId": {
+                              "type": "string",
+                              "pattern": "^[0-9]{1,30}$"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "link": {
+                              "type": "string",
+                              "maxLength": 2048
+                            }
+                          },
                           "additionalProperties": false
                         },
                         "autoDm": {
@@ -30706,6 +31429,7 @@
                                         "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                       },
                                       "days": {
+                                        "default": 0,
                                         "type": "integer",
                                         "minimum": 0,
                                         "maximum": 30
@@ -30718,7 +31442,6 @@
                                     },
                                     "required": [
                                       "at",
-                                      "days",
                                       "timeZone"
                                     ],
                                     "additionalProperties": false
@@ -30928,7 +31651,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -30988,7 +31713,9 @@
                   "bluesky",
                   "mastodon",
                   "tiktok",
-                  "youtube"
+                  "youtube",
+                  "facebook",
+                  "pinterest"
                 ]
               },
               {
@@ -31179,7 +31906,8 @@
                           "unretweet",
                           "plug",
                           "repost_at_likes",
-                          "quote"
+                          "quote",
+                          "thumbnail"
                         ]
                       },
                       "remoteId": {
@@ -31355,7 +32083,9 @@
                 "bluesky",
                 "mastodon",
                 "tiktok",
-                "youtube"
+                "youtube",
+                "facebook",
+                "pinterest"
               ]
             },
             "additionalProperties": {
@@ -31367,6 +32097,23 @@
                     "firstComment": {
                       "type": "string",
                       "maxLength": 1250
+                    },
+                    "pinterest": {
+                      "type": "object",
+                      "properties": {
+                        "boardId": {
+                          "type": "string",
+                          "pattern": "^[0-9]{1,30}$"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string",
+                          "maxLength": 2048
+                        }
+                      },
+                      "additionalProperties": false
                     },
                     "tiktok": {
                       "type": "object",
@@ -31443,6 +32190,20 @@
                         },
                         "madeForKids": {
                           "type": "boolean"
+                        },
+                        "tags": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "containsSyntheticMedia": {
+                          "type": "boolean"
+                        },
+                        "thumbnailAssetId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
                         }
                       },
                       "required": [
@@ -31909,7 +32670,7 @@
                     "const": 1
                   },
                   "versions": {
-                    "maxItems": 8,
+                    "maxItems": 10,
                     "type": "array",
                     "items": {
                       "type": "object",
@@ -31935,7 +32696,9 @@
                             "bluesky",
                             "mastodon",
                             "tiktok",
-                            "youtube"
+                            "youtube",
+                            "facebook",
+                            "pinterest"
                           ]
                         },
                         "forkedFromVersion": {
@@ -31971,6 +32734,20 @@
                                 },
                                 "madeForKids": {
                                   "type": "boolean"
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "containsSyntheticMedia": {
+                                  "type": "boolean"
+                                },
+                                "thumbnailAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
                                 }
                               },
                               "required": [
@@ -32027,6 +32804,71 @@
                                 "madeWithAi",
                                 "consent"
                               ],
+                              "additionalProperties": false
+                            },
+                            "instagram": {
+                              "type": "object",
+                              "properties": {
+                                "collaborators": {
+                                  "maxItems": 3,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                  }
+                                },
+                                "userTags": {
+                                  "maxItems": 20,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 30,
+                                    "pattern": "^[A-Za-z0-9_](?:[A-Za-z0-9_]|\\.[A-Za-z0-9_])*$"
+                                  }
+                                },
+                                "coverAssetId": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 64
+                                },
+                                "shareToFeed": {
+                                  "type": "boolean"
+                                },
+                                "trialReel": {
+                                  "type": "boolean"
+                                },
+                                "trialGraduation": {
+                                  "type": "string",
+                                  "enum": [
+                                    "MANUAL",
+                                    "SS_PERFORMANCE"
+                                  ]
+                                },
+                                "placement": {
+                                  "type": "string",
+                                  "enum": [
+                                    "story"
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "pinterest": {
+                              "type": "object",
+                              "properties": {
+                                "boardId": {
+                                  "type": "string",
+                                  "pattern": "^[0-9]{1,30}$"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "link": {
+                                  "type": "string",
+                                  "maxLength": 2048
+                                }
+                              },
                               "additionalProperties": false
                             },
                             "autoDm": {
@@ -32169,6 +33011,7 @@
                                             "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
                                           },
                                           "days": {
+                                            "default": 0,
                                             "type": "integer",
                                             "minimum": 0,
                                             "maximum": 30
@@ -32487,6 +33330,18 @@
                     "type": "string"
                   },
                   "additionalProperties": {}
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "person",
+                    "api",
+                    "mcp",
+                    "workflow",
+                    "callback",
+                    "support",
+                    "automation"
+                  ]
                 }
               },
               "required": [
@@ -32497,14 +33352,22 @@
                 "at",
                 "entityId",
                 "id",
-                "metadata"
+                "metadata",
+                "source"
               ],
               "additionalProperties": false
             }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
-          "items"
+          "items",
+          "nextCursor"
         ],
         "additionalProperties": false
       },
@@ -33240,7 +34103,9 @@
                       "bluesky",
                       "instagram",
                       "tiktok",
-                      "youtube"
+                      "youtube",
+                      "facebook",
+                      "pinterest"
                     ]
                   },
                   "postId": {

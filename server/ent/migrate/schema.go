@@ -2581,6 +2581,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{PlatformNotificationDeliveryColumns[6], PlatformNotificationDeliveryColumns[14]},
 			},
+			{
+				Name:    "platformnotificationdelivery_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformNotificationDeliveryColumns[19]},
+			},
 		},
 	}
 	// PlatformNotificationInboxColumns holds the columns for the "platform_notification_inbox" table.
@@ -2614,6 +2619,11 @@ var (
 				Name:    "platformnotificationinbox_organizationId_userId_event_id",
 				Unique:  true,
 				Columns: []*schema.Column{PlatformNotificationInboxColumns[1], PlatformNotificationInboxColumns[2], PlatformNotificationInboxColumns[3]},
+			},
+			{
+				Name:    "platformnotificationinbox_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformNotificationInboxColumns[12]},
 			},
 		},
 	}
@@ -3001,7 +3011,7 @@ var (
 		{Name: "organizationId", Type: field.TypeString},
 		{Name: "scheduledPostId", Type: field.TypeString},
 		{Name: "key", Type: field.TypeString},
-		{Name: "kind", Type: field.TypeEnum, Enums: []string{"first_comment", "retweet", "unretweet", "plug", "repost_at_likes", "quote"}},
+		{Name: "kind", Type: field.TypeEnum, Enums: []string{"first_comment", "retweet", "unretweet", "plug", "repost_at_likes", "quote", "thumbnail"}},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "done", "failed", "skipped", "cancelled", "expired"}, Default: "pending"},
 		{Name: "dueAt", Type: field.TypeTime},
 		{Name: "remoteId", Type: field.TypeString, Nullable: true},

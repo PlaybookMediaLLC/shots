@@ -40,6 +40,45 @@ func (f *automatingPoster) ReplyTo(_ context.Context, _ *socialent.Integration, 
 	return "plug-reply-1", nil
 }
 
+type thumbnailPoster struct {
+	fakePoster
+	set []string
+	err error
+}
+
+func (f *thumbnailPoster) SetThumbnail(_ context.Context, token, videoID, thumbnail string) error {
+	f.set = append(f.set, token+">"+videoID+">"+thumbnail)
+	return f.err
+}
+
+// A thumbnail is set on the live video with a freshly signed image, and a
+// provider without thumbnails or a step without an image says so.
+func TestAutomateSetsAThumbnail(t *testing.T) {
+	p, _, _, _ := directFixture()
+	provider := &thumbnailPoster{}
+	p.resolve = func(string) poster { return provider }
+	p.integrations = fakeIntegrations{&socialent.Integration{ID: "destination", OrganizationID: "social-org", ProviderIdentifier: "youtube", InternalID: "remote-user", Token: "private-token"}}
+	input := socialapi.AutomationInput{DestinationID: "destination", OrganizationID: "product-org", Platform: "youtube", Kind: "thumbnail",
+		RemotePostID: "vid1", SecretReference: "SOCIAL_API_KEY", Media: &publishing.MediaAsset{MediaType: "image/png", ObjectKey: "org/product-org/thumb.png"}}
+	if result, err := p.Automate(context.Background(), input); err != nil || !result.Done ||
+		len(provider.set) != 1 || provider.set[0] != "private-token>vid1>https://r2.example/private/image.png?fresh-signature" {
+		t.Fatalf("result=%+v err=%v set=%v", result, err, provider.set)
+	}
+	provider.err = errors.New("youtube.thumbnail")
+	if _, err := p.Automate(context.Background(), input); err == nil {
+		t.Fatal("a refused thumbnail reported success")
+	}
+	input.Media = nil
+	if _, err := p.Automate(context.Background(), input); !errors.Is(err, socialapi.ErrUnsupported) {
+		t.Fatalf("no image = %v", err)
+	}
+	p.resolve = func(string) poster { return &fakePoster{} }
+	input.Media = &publishing.MediaAsset{MediaType: "image/png", ObjectKey: "org/product-org/thumb.png"}
+	if _, err := p.Automate(context.Background(), input); !errors.Is(err, socialapi.ErrUnsupported) {
+		t.Fatalf("no thumbnails = %v", err)
+	}
+}
+
 func TestAutomateRunsEachFollowUpOnTheProvider(t *testing.T) {
 	p, _, _, _ := directFixture()
 	provider := &automatingPoster{likes: 120, reposts: 4}

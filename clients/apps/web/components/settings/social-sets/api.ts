@@ -129,6 +129,8 @@ export const CONNECT_PROVIDERS = [
   { label: 'Instagram', platform: 'instagram-standalone', provider: 'instagram-standalone' },
   { label: 'Threads', platform: 'threads', provider: 'threads' },
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },
+  { label: 'Facebook Page', platform: 'facebook', provider: 'facebook' },
+  { label: 'Pinterest', platform: 'pinterest', provider: 'pinterest' },
 ] as const
 
 /**
@@ -154,7 +156,10 @@ export const HEALTH_GUIDANCE: Record<SocialSetRecord['accounts'][number]['health
 
 /** The provider a connected platform reconnects through. */
 export function providerFor(platform: string): string | null {
-  if (platform === 'bluesky') return 'bluesky'
+  if (platform === 'bluesky' || platform === 'mastodon-custom') return platform
+  // Legacy names; the backend renames the account when it reconnects.
+  if (platform === 'twitter') return 'x'
+  if (platform === 'mastodoncustom') return 'mastodon-custom'
   return (
     CONNECT_PROVIDERS.find((provider) => provider.platform === platform)?.provider ??
     (platform === 'instagram' ? 'instagram' : null)

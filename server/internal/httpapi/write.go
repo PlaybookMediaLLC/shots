@@ -14,6 +14,7 @@ import (
 type WriteStore interface {
 	LookupPeopleMentions(context.Context, product.Actor, string, string) ([]product.Mention, error)
 	LookupCommunities(context.Context, product.Actor, string, string) ([]product.Community, error)
+	LookupPinterestBoards(context.Context, product.Actor, string) ([]product.PinterestBoard, error)
 	LookupMentions(ctx context.Context, actor product.Actor, setID, channel, query string) ([]product.Mention, error)
 	SetAssetAltText(ctx context.Context, actor product.Actor, assetID, altText string) (*product.AssetAltText, error)
 	ListContentDraftTags(context.Context, product.Actor, string) ([]product.ContentDraftTagRecord, error)
@@ -30,7 +31,7 @@ type WriteStore interface {
 	DuplicateContentDraftWithKey(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
 	CopyContentDraftToSet(context.Context, product.Actor, string, product.ContentDraftCopyInput) (*product.ContentDraftCopyResult, error)
 	RecoverContentDraftRevision(context.Context, product.Actor, string, string) (*product.ContentDraftCopyResult, error)
-	ListContentDraftActivity(context.Context, product.Actor, string) ([]product.ContentDraftActivity, error)
+	ListContentDraftActivity(context.Context, product.Actor, string, string) (*product.ContentDraftActivityPage, error)
 	ListPlannedContentDrafts(context.Context, product.Actor, time.Time, time.Time, string) ([]product.ContentDraftRecord, error)
 	RetryContentDraftPost(context.Context, product.Actor, string) (*product.MovedDraftPost, error)
 	ReconcileContentDraftPost(context.Context, product.Actor, string, product.ReconcileInput) (*product.ContentDraftPost, error)
@@ -40,6 +41,7 @@ type WriteStore interface {
 func (s *Server) registerWrite(mux *http.ServeMux) {
 	mux.Handle("GET /v1/social-sets/{id}/mentions", s.authenticateProduct(http.HandlerFunc(s.lookupMentions)))
 	mux.Handle("GET /v1/social-sets/{id}/communities", s.authenticateProduct(http.HandlerFunc(s.lookupCommunities)))
+	mux.Handle("GET /v1/social-sets/{id}/pinterest-boards", s.authenticateProduct(http.HandlerFunc(s.lookupPinterestBoards)))
 	mux.Handle("PUT /v1/assets/{id}/alt-text", s.authenticateProduct(http.HandlerFunc(s.setAssetAltText)))
 	mux.Handle("GET /v1/social-sets/{id}/tags", s.authenticateProduct(http.HandlerFunc(s.listDraftTags)))
 	mux.Handle("POST /v1/social-sets/{id}/tags", s.authenticateProduct(http.HandlerFunc(s.createDraftTag)))
@@ -232,8 +234,8 @@ func (s *Server) contentDraftActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id)
-	respond(w, http.StatusOK, map[string]any{"items": items}, err)
+	page, err := s.configuration.ListContentDraftActivity(r.Context(), workspaceActor(r), id, r.URL.Query().Get("cursor"))
+	respond(w, http.StatusOK, page, err)
 }
 
 func (s *Server) listPlannedContentDrafts(w http.ResponseWriter, r *http.Request) {
@@ -307,6 +309,16 @@ func (s *Server) lookupCommunities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// lookupPinterestBoards lists the boards of the set's Pinterest account.
+func (s *Server) lookupPinterestBoards(w http.ResponseWriter, r *http.Request) {
+	ids, ok := pathIDs(w, r, "id")
+	if !ok {
+		return
+	}
+	items, err := s.configuration.LookupPinterestBoards(r.Context(), workspaceActor(r), ids[0])
+	respond(w, http.StatusOK, map[string]any{"items": items}, err)
 }
 
 func (s *Server) lookupMentions(w http.ResponseWriter, r *http.Request) {

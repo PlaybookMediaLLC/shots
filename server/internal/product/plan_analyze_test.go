@@ -506,6 +506,22 @@ func TestPlanAnalyzeDatabase(t *testing.T) {
 			t.Fatalf("late receipt was never reconciled: %d %v", count, e)
 		}
 	})
+	t.Run("a published story is never imported for post analytics", func(t *testing.T) {
+		d := draft("story fixture")
+		live := time.Now().UTC().Add(-time.Hour).Truncate(time.Millisecond)
+		id := cuid.New()
+		if _, e := repo.client.ScheduledPost.Create().SetID(id).SetOrganizationID(w.org).SetContentDraftID(d.ID).SetChannelConnectionID(x.ID).SetStatus(scheduledpost.StatusPUBLISHED).
+			SetScheduledFor(live).SetCaption("").SetIdempotencyKey(id).SetRemotePostID(id).SetPublishedAt(live).
+			SetPublishOptions(postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}}).Save(ctx); e != nil {
+			t.Fatal(e)
+		}
+		if e := repo.importCanonicalAnalyticsPosts(ctx, x); e != nil {
+			t.Fatal(e)
+		}
+		if count, e := repo.client.AnalyticsPost.Query().Where(analyticspost.ConnectionID(x.ID), analyticspost.RemoteID(id)).Count(ctx); e != nil || count != 0 {
+			t.Fatalf("a story was imported: %d %v", count, e)
+		}
+	})
 	t.Run("Analyze counts a post confirmed live without waiting for a provider read", func(t *testing.T) {
 		d := draft("confirmed by a person")
 		live := time.Date(2026, 5, 5, 16, 0, 0, 0, time.UTC)

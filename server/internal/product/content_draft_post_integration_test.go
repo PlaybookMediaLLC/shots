@@ -102,7 +102,8 @@ func TestPublishScopeDoesNotOpenDraftScheduling(t *testing.T) {
 
 func TestCreatePostSchedulesAndARetryPostsOnce(t *testing.T) {
 	f := newPostFixture(t)
-	input := f.input("Shipped the new editor", f.x, f.li)
+	// LinkedIn first: neither the idempotency keys' order nor the table's may decide the answer.
+	input := f.input("Shipped the new editor", f.li, f.x)
 	first, err := f.repo.CreatePost(f.ctx, f.key, input)
 	if err != nil {
 		t.Fatal(err)
@@ -119,11 +120,13 @@ func TestCreatePostSchedulesAndARetryPostsOnce(t *testing.T) {
 		t.Fatalf("draft: %+v", first.Draft)
 	}
 	charged := f.meter.used
+	// A post written since, as its workflow starting does, moves in the table but not in the answer.
+	f.exec(t, `UPDATE scheduled_post SET "updatedAt"=now() WHERE id=$1`, first.Posts[0].ID)
 	retry, err := f.repo.CreatePost(f.ctx, f.key, input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if retry.Created || retry.Draft.ID != first.Draft.ID || len(retry.Posts) != 2 || retry.Posts[0].ID != first.Posts[0].ID {
+	if retry.Created || retry.Draft.ID != first.Draft.ID || len(retry.Posts) != 2 || retry.Posts[0].ID != first.Posts[0].ID || retry.Posts[1].ID != first.Posts[1].ID {
 		t.Fatalf("retry: %+v", retry)
 	}
 	total := 0
@@ -343,5 +346,35 @@ func TestCancellingTheLastPostReopensItsDraft(t *testing.T) {
 	}
 	if retry.Created || len(retry.Scheduled) != 0 {
 		t.Fatalf("retry revived cancelled posts: %+v", retry)
+	}
+}
+
+// A post an API key queued publishes while the key stands, and stops once the
+// key is disabled: the key, not a person, is its scheduler.
+func TestKeyQueuedPostRechecksItsKeyWhenDue(t *testing.T) {
+	f := newPostFixture(t)
+	created, err := f.repo.CreatePost(f.ctx, f.key, f.input("Queued by an agent", f.li))
+	if err != nil || len(created.Scheduled) != 1 {
+		t.Fatalf("created=%+v err=%v", created, err)
+	}
+	post := created.Scheduled[0].ID
+	store := publishing.NewRepository(f.db.Client)
+	if claimed, err := store.Claim(f.ctx, post, "run-"+post, f.future.Add(time.Minute)); err != nil || !claimed {
+		t.Fatalf("claimed=%v err=%v", claimed, err)
+	}
+	reason := func() string {
+		t.Helper()
+		job, err := store.LoadPublishJob(f.ctx, post, "run-"+post)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return job.Ineligible
+	}
+	if got := reason(); got != "" {
+		t.Fatalf("a live key's post was refused: %q", got)
+	}
+	f.exec(t, `UPDATE apikey SET enabled=false WHERE id=$1`, f.key.KeyID)
+	if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+		t.Fatalf("a disabled key's post=%q", got)
 	}
 }

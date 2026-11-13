@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 
 /**
  * Social captions per platform: each platform's length limit and the
@@ -57,14 +58,9 @@ export const CAPTION_CHANNELS: Record<
   },
 }
 
-/** Characters X counts for any link. */
-const X_LINK_LENGTH = 23
-
-/** A caption's length as its platform counts it. */
+/** A caption's length as its platform counts it: the composer's rule, UTF-16 units on Facebook. */
 export function captionLength(text: string, channel: CaptionChannel): number {
-  const chars = [...text]
-  if (channel !== 'x') return chars.length
-  return [...text.replace(/https?:\/\/\S+/g, 'x'.repeat(X_LINK_LENGTH))].length
+  return channel === 'facebook' ? text.length : platformCaptionLength(channel, text)
 }
 
 /**

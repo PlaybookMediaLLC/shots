@@ -1225,7 +1225,7 @@ export interface paths {
         };
         /**
          * List a draft's activity
-         * @description Lists a draft's history, newest first: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who and when. Viewing a draft is never recorded.
+         * @description Lists a draft's history, newest first (by time, then id), 50 events a page: creation, edits, renames, destinations, tags, review, sharing, planning, scheduling, publication and recovery, with who, through what, and when. Viewing a draft is never recorded. Pass `nextCursor` as `cursor` for the next page.
          */
         get: operations["listContentDraftActivity"];
         put?: never;
@@ -2072,7 +2072,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -2082,6 +2082,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -2094,6 +2097,22 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -2127,6 +2146,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -2210,7 +2230,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -2409,7 +2429,7 @@ export interface components {
             returnPath?: string;
             socialSetId?: string;
             /** @enum {string} */
-            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom";
+            provider: "x" | "instagram" | "instagram-standalone" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "facebook" | "pinterest";
             instanceServer?: string;
         };
         SocialConnectionAttemptResponse: {
@@ -2421,7 +2441,7 @@ export interface components {
             version: 1;
             providers: {
                 /** @enum {string} */
-                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack";
+                provider: "x" | "linkedin" | "linkedin-page" | "tiktok" | "youtube" | "threads" | "mastodon" | "mastodon-custom" | "bluesky" | "instagram" | "instagram-standalone" | "substack" | "facebook" | "pinterest";
                 /** @enum {string} */
                 status: "available" | "not_configured" | "disabled" | "unsupported";
             }[];
@@ -3184,7 +3204,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3194,6 +3214,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -3206,6 +3229,22 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3239,6 +3278,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3393,7 +3433,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -3403,6 +3443,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -3415,6 +3458,22 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3448,6 +3507,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -3508,7 +3568,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3518,6 +3578,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3530,6 +3593,22 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3563,6 +3642,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3622,7 +3702,7 @@ export interface components {
             /** @enum {string} */
             kind?: "standard" | "reply" | "quote" | "repurpose" | "article";
             /** @enum {string} */
-            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+            primaryPlatform?: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
             /** Format: uuid */
             releaseId?: string;
             scratchpad?: string;
@@ -3736,7 +3816,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3746,6 +3826,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3758,6 +3841,22 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3791,6 +3890,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3850,7 +3950,7 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     /** @enum {string} */
-                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                     forkedFromVersion?: number;
                     /** @enum {string} */
                     mode: "synced" | "manual";
@@ -3860,6 +3960,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                         tiktok?: {
                             /** @enum {string} */
@@ -3872,6 +3975,22 @@ export interface components {
                             brandedContent: boolean;
                             madeWithAi: boolean;
                             consent: boolean;
+                        };
+                        instagram?: {
+                            collaborators?: string[];
+                            userTags?: string[];
+                            coverAssetId?: string;
+                            shareToFeed?: boolean;
+                            trialReel?: boolean;
+                            /** @enum {string} */
+                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
+                        };
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3905,6 +4024,7 @@ export interface components {
                                 afterMinutes: number;
                             } | {
                                 at: string;
+                                /** @default 0 */
                                 days: number;
                                 timeZone: string;
                             })[];
@@ -3965,7 +4085,7 @@ export interface components {
             /** @enum {string} */
             status?: "draft" | "archived";
             naturalPostingTime?: boolean;
-            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube") | "";
+            primaryPlatform?: ("x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest") | "";
             plannedFor?: string | "";
         };
         ContentDraftPostList: {
@@ -4006,7 +4126,7 @@ export interface components {
                     failureCode: string | null;
                     key: string;
                     /** @enum {string} */
-                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                    kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                     remoteId: string | null;
                     /** @enum {string} */
                     status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -4041,6 +4161,11 @@ export interface components {
                 [key: string]: {
                     options?: {
                         firstComment?: string;
+                        pinterest?: {
+                            boardId?: string;
+                            title?: string;
+                            link?: string;
+                        };
                         tiktok?: {
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
@@ -4060,6 +4185,9 @@ export interface components {
                             /** @enum {string} */
                             privacy: "" | "public" | "private" | "unlisted";
                             madeForKids?: boolean;
+                            tags?: string[];
+                            containsSyntheticMedia?: boolean;
+                            thumbnailAssetId?: string;
                         };
                     };
                     posts?: {
@@ -4188,7 +4316,7 @@ export interface components {
                             [key: string]: unknown;
                         }[];
                         /** @enum {string} */
-                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                        channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                         forkedFromVersion?: number;
                         /** @enum {string} */
                         mode: "synced" | "manual";
@@ -4198,6 +4326,9 @@ export interface components {
                                 /** @enum {string} */
                                 privacy: "" | "public" | "private" | "unlisted";
                                 madeForKids?: boolean;
+                                tags?: string[];
+                                containsSyntheticMedia?: boolean;
+                                thumbnailAssetId?: string;
                             };
                             tiktok?: {
                                 /** @enum {string} */
@@ -4210,6 +4341,22 @@ export interface components {
                                 brandedContent: boolean;
                                 madeWithAi: boolean;
                                 consent: boolean;
+                            };
+                            instagram?: {
+                                collaborators?: string[];
+                                userTags?: string[];
+                                coverAssetId?: string;
+                                shareToFeed?: boolean;
+                                trialReel?: boolean;
+                                /** @enum {string} */
+                                trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
+                            };
+                            pinterest?: {
+                                boardId?: string;
+                                title?: string;
+                                link?: string;
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -4243,6 +4390,7 @@ export interface components {
                                     afterMinutes: number;
                                 } | {
                                     at: string;
+                                    /** @default 0 */
                                     days: number;
                                     timeZone: string;
                                 })[];
@@ -4303,7 +4451,10 @@ export interface components {
                 metadata: {
                     [key: string]: unknown;
                 };
+                /** @enum {string} */
+                source: "person" | "api" | "mcp" | "workflow" | "callback" | "support" | "automation";
             }[];
+            nextCursor: string | null;
         };
         DraftTagList: {
             items: {
@@ -4458,7 +4609,7 @@ export interface components {
             threadId?: string;
             anchor: {
                 /** @enum {string} */
-                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube";
+                platform: "x" | "linkedin" | "threads" | "mastodon" | "bluesky" | "instagram" | "tiktok" | "youtube" | "facebook" | "pinterest";
                 postId: string;
                 quote?: string;
             };
@@ -5814,6 +5965,7 @@ export interface operations {
                                 xCaptionLimit?: (280 | 25000) | null;
                                 xArticles?: boolean | null;
                                 xQuotes?: boolean;
+                                xVideoMaxSeconds?: number | null;
                                 mastodonQuotes?: boolean | null;
                                 pollLimits?: {
                                     maxOptions: number;
@@ -5903,6 +6055,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6005,6 +6158,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6236,6 +6390,7 @@ export interface operations {
                             xCaptionLimit?: (280 | 25000) | null;
                             xArticles?: boolean | null;
                             xQuotes?: boolean;
+                            xVideoMaxSeconds?: number | null;
                             mastodonQuotes?: boolean | null;
                             pollLimits?: {
                                 maxOptions: number;
@@ -6461,7 +6616,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10347,7 +10502,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10357,6 +10512,9 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
                                             /** @enum {string} */
@@ -10369,6 +10527,22 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10402,6 +10576,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10485,7 +10660,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -10627,7 +10802,7 @@ export interface operations {
                                         [key: string]: unknown;
                                     }[];
                                     /** @enum {string} */
-                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube";
+                                    channel: "x" | "linkedin" | "instagram" | "threads" | "bluesky" | "mastodon" | "tiktok" | "youtube" | "facebook" | "pinterest";
                                     forkedFromVersion?: number;
                                     /** @enum {string} */
                                     mode: "synced" | "manual";
@@ -10637,6 +10812,9 @@ export interface operations {
                                             /** @enum {string} */
                                             privacy: "" | "public" | "private" | "unlisted";
                                             madeForKids?: boolean;
+                                            tags?: string[];
+                                            containsSyntheticMedia?: boolean;
+                                            thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
                                             /** @enum {string} */
@@ -10649,6 +10827,22 @@ export interface operations {
                                             brandedContent: boolean;
                                             madeWithAi: boolean;
                                             consent: boolean;
+                                        };
+                                        instagram?: {
+                                            collaborators?: string[];
+                                            userTags?: string[];
+                                            coverAssetId?: string;
+                                            shareToFeed?: boolean;
+                                            trialReel?: boolean;
+                                            /** @enum {string} */
+                                            trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
+                                        };
+                                        pinterest?: {
+                                            boardId?: string;
+                                            title?: string;
+                                            link?: string;
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10682,6 +10876,7 @@ export interface operations {
                                                 afterMinutes: number;
                                             } | {
                                                 at: string;
+                                                /** @default 0 */
                                                 days: number;
                                                 timeZone: string;
                                             })[];
@@ -10765,7 +10960,7 @@ export interface operations {
                                 failureCode: string | null;
                                 key: string;
                                 /** @enum {string} */
-                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote";
+                                kind: "first_comment" | "retweet" | "unretweet" | "plug" | "repost_at_likes" | "quote" | "thumbnail";
                                 remoteId: string | null;
                                 /** @enum {string} */
                                 status: "pending" | "done" | "failed" | "skipped" | "cancelled" | "expired";
@@ -11205,7 +11400,9 @@ export interface operations {
     };
     listContentDraftActivity: {
         parameters: {
-            query?: never;
+            query?: {
+                cursor?: string;
+            };
             header?: never;
             path: {
                 id: string;

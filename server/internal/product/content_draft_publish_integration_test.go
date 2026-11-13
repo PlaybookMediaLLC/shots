@@ -24,7 +24,12 @@ import (
 type standings map[string]bool
 
 func (s standings) AccountStanding(_ context.Context, _, destinationID, _, _ string) (AccountStanding, error) {
-	return AccountStanding{Premium: s[destinationID]}, nil
+	standing := AccountStanding{Premium: s[destinationID]}
+	if s[destinationID] {
+		seconds := 7500
+		standing.XVideoMaxSeconds = &seconds
+	}
+	return standing, nil
 }
 
 // Mentions answers with the account and query it was asked with.
@@ -83,14 +88,19 @@ func TestWritePublishing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	listedPremium := map[string]bool{}
+	listedPremium, listedVideo := map[string]bool{}, map[string]bool{}
 	for _, set := range listed.Items {
 		for _, account := range set.Accounts {
 			listedPremium[account.ID] = account.Premium
+			listedVideo[account.ID] = account.XVideoMaxSeconds != nil && *account.XVideoMaxSeconds == 7500
 		}
 	}
 	if !listedPremium[x] || !listedPremium[premium] || listedPremium[linkedin] || listedPremium[premiumLinkedIn] {
 		t.Fatalf("listed standings=%v", listedPremium)
+	}
+	// The verified X video length reaches the listed account, which the composer reads.
+	if !listedVideo[x] || !listedVideo[premium] || listedVideo[linkedin] || listedVideo[premiumLinkedIn] {
+		t.Fatalf("listed video lengths=%v", listedVideo)
 	}
 	draft := func(input ContentDraftInput) *ContentDraftRecord {
 		t.Helper()
@@ -579,6 +589,59 @@ func TestWritePublishing(t *testing.T) {
 		count, e := w.db.Client.ScheduledPost.Query().Where(scheduledpost.ContentDraftID(d.ID), scheduledpost.ChannelConnectionID(x), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED), scheduledpost.RemotePostID("confirmed-x-receipt")).Count(ctx)
 		if e != nil || count != 1 {
 			t.Fatalf("successful publication changed count=%d %v", count, e)
+		}
+	})
+
+	t.Run("an automatic retry that fails again alerts once", func(t *testing.T) {
+		d := draft(ContentDraftInput{PlainText: "retried publication"})
+		result, e := repo.ScheduleContentDraft(ctx, owner, d.ID, ScheduleContentDraftInput{PublishNow: true, Version: d.Version, Targets: target("LinkedIn retried", linkedin)})
+		if e != nil || len(result.Scheduled) != 1 {
+			t.Fatalf("scheduled=%+v %v", result, e)
+		}
+		post := result.Scheduled[0]
+		queue := publishing.NewRepository(w.db.Client)
+		count := func(query string) int {
+			var n int
+			if err := w.db.SQL.QueryRow(query, w.org, post.ID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		alerts := func() int {
+			return count(`SELECT count(*) FROM outbox_event WHERE "organizationId"=$1 AND type='activity.post.publish_failed' AND "aggregateId"=$2`)
+		}
+		audits := func() int {
+			// Each is labelled as the publishing workflow's in the draft's history.
+			return count(`SELECT count(*) FROM audit_log WHERE "organizationId"=$1 AND action='post.publish_failed' AND "entityId"=$2 AND metadata->>'actorSource'='workflow'`)
+		}
+		fail := func(run string, number int, retryAt *time.Time) func() error {
+			claimed, e := queue.Claim(ctx, post.ID, run, time.Now().Add(time.Hour))
+			if e != nil || !claimed {
+				t.Fatalf("claim=%v %v", claimed, e)
+			}
+			attempt, e := queue.StartAttempt(ctx, post, run, number)
+			if e != nil {
+				t.Fatal(e)
+			}
+			return func() error { return queue.Fail(ctx, post, attempt, "RATE_LIMITED", retryAt, run) }
+		}
+		retryAt := time.Now().Add(time.Minute)
+		if e = fail("retry-first-"+post.ID, 1, &retryAt)(); e != nil {
+			t.Fatal(e)
+		}
+		// The retry is recorded; no one is told while it can still go out.
+		if alerts() != 0 || audits() != 1 {
+			t.Fatalf("after the automatic retry: alerts=%d audits=%d", alerts(), audits())
+		}
+		final := fail("retry-last-"+post.ID, 2, nil)
+		// A worker that reports the same final failure twice alerts once.
+		for range 2 {
+			if e = final(); e != nil {
+				t.Fatal(e)
+			}
+		}
+		if alerts() != 1 || audits() != 2 {
+			t.Fatalf("after giving up: alerts=%d audits=%d", alerts(), audits())
 		}
 	})
 

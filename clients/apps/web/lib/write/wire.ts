@@ -110,6 +110,7 @@ export const postAutomationKindSchema = z.enum([
   'plug',
   'repost_at_likes',
   'quote',
+  'thumbnail',
 ])
 
 /** Where a follow-up is: waiting, settled one way or another. */

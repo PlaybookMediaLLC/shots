@@ -17,6 +17,7 @@ in [social publishing verification](social-publishing-verification.md).
 | A PDF to LinkedIn | Composer document option, bulk batch | Sent as the post's LinkedIn document; refused on every other destination. |
 | Many separate posts | Publish → Bulk tools (`/publish/batches`) | A durable batch of up to 100 items, each one post with its own media, caption, accounts and time. Files, folders and a CSV are matched and previewed before anything is added; uploads run three at a time; items become drafts, can wait for review, are checked per item and account, and the person schedules the selections they choose. |
 | Grid videos | Publish → Bulk tools → Grid videos | Captions and content items assemble into concepts of four labelled images, filled by upload or AI, rendered to MP4 in the browser. Each video is then an ordinary post of the batch. See [bulk tools](#bulk-tools). |
+| Fade-in and UGC videos | Publish → Bulk tools → Fade-in videos, UGC videos | One image fading in under a headline, or the workspace's own clip with text over it and an optional closing clip. Template concepts like grids. See [Content Studio](scheduling/post-bridge/content-studio/implementation.md). |
 
 Every check that refuses media at scheduling time is shown in the composer
 and the batch before the person submits: the rules live in one JSON file
@@ -70,7 +71,7 @@ activity and never persisted, logged, or put in workflow history.
 | Draft media checks at scheduling | `server/internal/product/content_draft_media.go`, `content_draft_schedule.go` |
 | Bulk batches | `server/internal/product/content_batch.go`, `server/internal/httpapi/content_batches.go`; web `lib/tenant/content-batches.ts`, `lib/api/contracts/content-batches.ts`, `components/write/batch/` |
 | Background batch schedule | `server/internal/product/content_batch_run.go`, `server/internal/temporalbatches` |
-| Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts` |
+| Bulk tools logic | `lib/write/bulk-intake.ts`, `lib/write/bulk-import.ts`, `lib/write/spintax.ts`, `lib/write/batch.ts`, `lib/write/grid-concepts.ts`, `lib/write/grid-layout.ts`, `lib/write/grid-render.ts`, `lib/write/audio-trim.ts`, `lib/write/caption-assistant.ts` |
 | Browser uploads | `clients/apps/web/lib/workspace/save-export.ts` |
 | Publish-time checks | `server/internal/publishing/repository.go` (`LoadPublishJob`) |
 | Provider requests | `server/internal/social/integrations/social/<provider>` |
@@ -110,6 +111,7 @@ no queue table is added: Temporal stays the only scheduler.
 | `20261104100000_content_batch_source_key.sql` | `content_batch_item."sourceKey"`: the file or folder name an item came from, as the person knows it. |
 | `20261104101000_content_batch_grid.sql` | `content_batch_item.grid` for grid video concepts, and `platform_asset_in_use_v1` also counts a concept's images and music. |
 | `20261104102000_content_batch_run.sql` | `content_batch_run`: one schedule or render of a batch, what it froze and each item's outcome. |
+| `20261113090000_content_batch_template_clips.sql` | `platform_asset_in_use_v1` also counts a UGC concept's closing clip. |
 
 Why tables for batches: a batch must survive a reload, another device and a
 second editor, and an item must exist before its files finish uploading and
@@ -209,7 +211,7 @@ kept from cleanup while the batch is open (`platform_asset_in_use_v1`).
 | --- | --- |
 | Images | Upload per slot, upload many (fills empty slots in order, naming leftovers), or AI (`editorAi.generateGridSlotImage`, two at a time). The page estimates credits before generating; a failed slot keeps its error and can be tried again |
 | Last grid cell | Sets the label or image of slot 4 on every video. It is a cell of the grid, not an extra slide |
-| Music | The person's own file, played from its start, or none. There is no built-in catalog: add one only with licensed tracks |
+| Music | The person's own file (MP3, M4A/AAC, WAV, Ogg or WebM, up to 50 MB and ten minutes), decoded in the browser before it uploads, from a start the person trims to, or none. Trim keeps a draft start that Cancel drops. There is no built-in catalog: add one only with tracks bought outright |
 | Render | In the browser, one at a time: the frame is composed once and encoded as 1080×1920, 30 fps, 6 s, H.264 with AAC when there is music. `WebCodecsVideoEncoder` where the browser can encode both, otherwise `FFmpegVideoEncoder`, which holds one still with no fade |
 | Recovery | Each video uploads and is recorded on its item when done. Closing the tab loses only the one in progress; reopening renders what is left |
 | Changes | Changing a concept drops its video, in Go, so a stale video cannot be scheduled. A concept with no video cannot become a draft |
@@ -219,7 +221,7 @@ The analysis's remaining checks ([verification matrix](scheduling/post-bridge/bu
 
 | Matrix | Where Shots proves it |
 | --- | --- |
-| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts` |
+| BULK-009, 010, 054: folders and file limits | `test/write-bulk-intake.test.ts`; destination limits at intake in `test/write-batch.test.ts` |
 | BULK-018 to 022: variations and overflow | `test/write-spintax.test.ts`, `test/write-batch.test.ts` |
 | BULK-023, 055: CSV matching | `test/write-bulk-import.test.ts` |
 | BULK-025 to 030: schedule | `TestSpreadTimes`, `test/write-batch.test.ts` |
@@ -269,9 +271,14 @@ the batch's others. "Regenerate video" also redraws its four items from the batc
 content items, in a new order, and clears its images, keeping its music; it asks
 first, and keeps the headline if AI gives nothing back. Either drops a rendered video.
 
-Deliberately not built from the analysis: global format and length caps and a
-120-day horizon (destination rules decide), and an hourly AI image cap (AI credits
-decide).
+**What the analysis proposed and Shots left out, decided 13 November 2026.** The owner approved these:
+
+| Proposal | Decision | Why |
+| --- | --- | --- |
+| Global file-size and length caps | Not built. The import preview checks each file's type and size against its row's accounts before upload (`intakeChecks` in `lib/write/batch.ts`). A row no account takes needs fixing. A row only some refuse is added, with a note saying what they refuse. | The per-type upload caps in `limits.json` stay. A tighter global cap would refuse files some destinations take, such as LinkedIn's 30-minute, 500 MB videos. Length and shape are known once a file uploads, so Check judges them. |
+| A 120-day scheduling limit | Not built | Nothing needs one. Temporal holds a post on a durable timer. Shots, not the provider, publishes at the due time. Quota is charged in the month a post is scheduled. At publish time, a post whose account, media or approval changed is refused. |
+| An hourly cap on AI images | Not built | Grid images already pass the per-workspace AI limit (`LAUNCH_AI_RATE_LIMIT`, 20 actions a minute shared with every AI action) and the AI credit meter. |
+| A music library | Not here | The Content Studio work owns it. |
 
 ## Scheduling semantics
 
@@ -299,13 +306,17 @@ Evidence levels: **Uploadable** (accepted and verified at upload),
 **Implemented** (the adapter sends it), **Test-verified** (automated test
 against the adapter's request shape or the worker), **Live-verified** (a real
 provider post on the current architecture), **Blocked**. Provider documents
-were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
+were read on 2026-10-28 (X on 2026-11-13); links are in `limits.json` (`docs`,
+`verifiedOn`). X's per-tier video limits are in `x.video.accounts`; stored X
+account snapshots must match them, so changing them sends every connected X
+account back through reconnect.
 
 | Destination | Content | Uploadable | Convertible | Implemented | Test-verified | Live-verified |
 | --- | --- | --- | --- | --- | --- | --- |
 | X | 1–4 images (JPEG, PNG, WebP) | Yes | Larger than 5 MB → resized derivative | Yes | Adapter (`TestMediaUploadsOriginalBytesAndCategory`), worker | Yes: scheduled image on `@yoanyombax`, 2026-11-03; receipt and public native post verified, then deleted. Two images with alt text on `@yoanyombax`, 2026-11-13: a 7.9 MB PNG went as a recorded 4.08 MB resized derivative, then a 13 KB PNG. Draft order and ALT text verified, then deleted. |
 | X | GIF, alone, ≤ 15 MB | Yes | — | Yes | Adapter (`TestGIFFullAnimationLimits`) | No |
-| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
+| X | Photos and a video in one post | — | — | No | Refused before scheduling, with the reason (`write-media-rules.test.ts`, `TestDraftMediaFollowsEachDestination`) | Blocked: the X API takes 4 photos, 1 GIF or 1 video (read 2026-11-13) |
+| X | MP4 video, alone, ≥ 0.5 s, within the account's verified length (20 min standard, 125 min Premium; 1080p sent unchanged) | Yes | — | Yes | Adapter (`TestPendingMediaNeedsFactsAndCurrentVideoAllowance`, `TestTenMinute1080pSourcePreservedWithoutPremium`), worker | Yes: scheduled 8-second video on `@yoanyombax`, 2026-11-03; native receipt and playback verified, then deleted. |
 | LinkedIn | 1–20 images (JPEG, PNG; WebP) | Yes | WebP → PNG | Yes | Adapter (`TestPostImage`, `TestPostPendingCarousel`) | Yes: image on `yoanyomba`, 2026-11-03; receipt and deletion recorded |
 | LinkedIn | MP4 video, alone, 3 s–30 min, ≤ 500 MB | Yes | — | Yes | Adapter (`TestVideoUpload`), worker | Yes: 8-second video on `yoanyomba`, 2026-11-03; playback and deletion verified |
 | LinkedIn | PDF document, alone, ≤ 100 MB, ≤ 300 pages | Yes | — | Yes | Upload checks; publish via the document option | Yes: 2-page PDF titled "Shots live test PDF" on `yoanyomba`, 2026-11-13; both pages shown, then deleted |
@@ -313,6 +324,8 @@ were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
 | Instagram (Instagram Login) | Image, aspect 4:5–1.91:1, width ≥ 320 | Yes | PNG/WebP → JPEG, transparency to white | Yes | Adapter (`TestCarouselPendingFlow`), `TestJPEGOnlyProfileFlattensTransparency` | Yes: feed image on `@get.eigenn`, 2026-11-03; receipt and deletion recorded |
 | Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | Yes: 8-second Reel on `@get.eigenn`, 2026-11-03; playback and deletion verified |
 | Instagram | Carousel of up to 20, images and videos mixed | Yes | As above | Yes | Adapter, worker (order and mixed MOV) | No |
+| Instagram | Reel cover (JPEG ≤ 8 MB), grid choice, trial reel; collaborators (3) and tagged accounts (20) on photos, carousels and reels | Yes | — | Yes: with the reel's container; tags on the reel or the first photo | Adapter (`TestReelTagsGridAndCover`, `TestCarouselTagsTheFirstPhoto`), options, `TestOptionMediaFollowsEachDestination` | No |
+| Instagram | Story: one image (JPEG; PNG/WebP converted, any aspect) or one MP4/MOV of 3–60 s ≤ 100 MB; no caption, collaborators, tags, cover or first comment | Yes | As the feed | Yes: `media_type=STORIES` | Adapter (`TestStoryTakesNoCaptionOrFeedSettings`), `TestStoriesFollowTheirOwnRules`, `TestMediaScheduling` | No |
 | Instagram | GIF | Yes | — | No | — | Blocked: no animated GIF in the API |
 | Instagram (Facebook Login) | Any | Yes | — | Adapter exists | — | Blocked: refused at scheduling until the account reconnects with Instagram Login |
 | Threads | Up to 20, images and videos mixed; video MP4/MOV ≤ 5 min, ≤ 1 GB | Yes (uploads stop at 512 MiB) | WebP → PNG | Yes | Adapter (`TestCarouselFlow`, `TestMixedCarouselSendsVideoByType`) | No |
@@ -323,7 +336,9 @@ were read on 2026-10-28; links are in `limits.json` (`docs`, `verifiedOn`).
 | Any | Audio, or a file other than a PDF, as an attachment | Uploadable for design timelines | — | No | Refused before scheduling, with the reason | Blocked |
 | TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
 | YouTube | One MP4, ≤ 512 MiB; explicit title, privacy and audience | Yes | — | Resumable upload with processing confirmation | Adapter, options, worker and social gate | No: @getconduitt private video scheduled for 2026-11-04 00:20 UTC; receipt and playback pending |
-| Pinterest, Facebook Pages | — | — | — | Not in the direct publishing path | — | Blocked for drafts |
+| YouTube | Tags (500 characters together), synthetic-content disclosure; custom thumbnail (JPEG or PNG ≤ 2 MB) set after the video is live, as a follow-up whose failure never fails the video | Yes | — | Yes | Adapter (`TestSetThumbnailReportsARefusal`), `TestYouTubeThumbnailIsAFollowUp`, social gate | No. A thumbnail needs a verified channel; Shorts ignore it. |
+| Facebook Pages | Text, up to 10 images (JPEG, PNG; WebP → PNG; > 4 MB or 2,048 px → derivative), or one MP4 ≤ 20 min, ≤ 1 GB; first comment as a follow-up | Yes | WebP → PNG | Yes | `TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard`, social gate | No. Behind its availability check until the Meta app's Pages permissions are deployed. |
+| Pinterest | One image per pin (JPEG, PNG; WebP → PNG), on a board of the account, with an optional title (100) and link | Yes | WebP → PNG | Yes | `TestPinterestOptionsRefuseWhatPinterestWould`, `TestPinterestBoardsUseTheAccountsOwnAuthorization`, social gate | No. Video pins need a separate cover and are refused before scheduling. Behind its availability check until the Pinterest app's keys are deployed. |
 
 Nothing is silently dropped. Content a destination cannot take is refused
 before scheduling with the reason and the fix; conversions are listed per

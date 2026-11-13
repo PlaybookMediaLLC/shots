@@ -38,7 +38,7 @@ export async function POST(request: Request, context: Context): Promise<Response
   const { provider } = await context.params
   if (
     !isSocialOAuthProvider(provider) ||
-    !['instagram', 'linkedin-page', 'youtube'].includes(provider)
+    !['instagram', 'linkedin-page', 'youtube', 'facebook'].includes(provider)
   )
     return new Response('Provider not found.', { status: 404 })
   try {

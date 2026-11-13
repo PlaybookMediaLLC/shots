@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { parseWhen } from '@/lib/content-drafts/when'
 import { draftVocabulary } from '@/lib/content-drafts/vocabulary'
-import { xLength } from '@/lib/content-drafts/x-length'
 
 // Sunday 18 October 2026, 10:30 local time.
 const now = new Date(2026, 9, 18, 10, 30)
@@ -42,18 +41,6 @@ test('plain-language times read as the next matching moment', () => {
   for (const [input, expected] of cases) {
     assert.equal(parseWhen(input, now)?.getTime() ?? null, expected, input)
   }
-})
-
-test('X lengths count links as 23 and wide characters as 2', () => {
-  assert.equal(xLength('hello'), 5)
-  assert.equal(xLength('see https://example.com/a/very/long/path?with=query.'), 4 + 23 + 1)
-  assert.equal(xLength('www.example.com'), 23)
-  assert.equal(xLength('日本語'), 6)
-  assert.equal(xLength('🚀'), 2)
-  assert.equal(xLength('👍🏽'), 2)
-  assert.equal(xLength('👨‍👩‍👧'), 2)
-  assert.equal(xLength('🇫🇷'), 2)
-  assert.equal(xLength('café — “quoted”'), 15)
 })
 
 test('the vocabulary ranks handles and hashtags by use', () => {

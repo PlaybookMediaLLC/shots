@@ -22,6 +22,8 @@ export type Staged = {
   files: (File | undefined)[]
   input: BatchItemInput
   line: number
+  /** What some of its accounts refuse; the row is still added for the rest. */
+  notes: string[]
   problems: string[]
 }
 
@@ -149,8 +151,13 @@ function RowStatus({ row }: { row: Staged }) {
       ))}
     </div>
   ) : (
-    <div>
+    <div className="grid justify-items-start gap-1">
       <Pill tone="green">Ready</Pill>
+      {row.notes.map((note) => (
+        <p key={note} className="text-label text-muted-foreground">
+          {note}
+        </p>
+      ))}
     </div>
   )
 }

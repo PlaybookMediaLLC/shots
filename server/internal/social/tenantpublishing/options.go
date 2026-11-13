@@ -49,6 +49,30 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 			if *options.YouTube.MadeForKids {
 				settings["selfDeclaredMadeForKids"] = "yes"
 			}
+			if len(options.YouTube.Tags) > 0 {
+				tags := make([]map[string]string, len(options.YouTube.Tags))
+				for i, tag := range options.YouTube.Tags {
+					tags[i] = map[string]string{"value": tag, "label": tag}
+				}
+				settings["tags"] = tags
+			}
+			settings["containsSyntheticMedia"] = options.YouTube.ContainsSyntheticMedia
+		case "instagram", "instagram-standalone":
+			if err := instagramSettings(platform, settings, options.Instagram); err != nil {
+				return nil, err
+			}
+		case "pinterest":
+			o := options.Pinterest
+			if err := postoptions.ValidatePinterestOptions(platform, o, true); err != nil {
+				return nil, err
+			}
+			settings["board"] = o.BoardID
+			if o.Title != "" {
+				settings["title"] = o.Title
+			}
+			if o.Link != "" {
+				settings["link"] = o.Link
+			}
 		case "tiktok":
 			o := options.TikTok
 			settings["content_posting_method"] = "DIRECT_POST"
@@ -91,6 +115,41 @@ func postSettings(platform string, base map[string]any, options *postoptions.Pub
 	return json.Marshal(settings)
 }
 
+// instagramSettings writes a post's Instagram options as the adapter reads
+// them; the cover travels with the media (Publish).
+func instagramSettings(platform string, settings map[string]any, o *postoptions.InstagramOptions) error {
+	if err := postoptions.ValidateInstagramOptions(platform, o); err != nil {
+		return err
+	}
+	if o == nil {
+		return nil
+	}
+	if o.Story() {
+		settings["post_type"] = "story"
+	}
+	if len(o.Collaborators) > 0 {
+		labels := make([]map[string]string, len(o.Collaborators))
+		for i, name := range o.Collaborators {
+			labels[i] = map[string]string{"label": name}
+		}
+		settings["collaborators"] = labels
+	}
+	if len(o.UserTags) > 0 {
+		settings["user_tags"] = o.UserTags
+	}
+	if o.ShareToFeed != nil {
+		settings["share_to_feed"] = *o.ShareToFeed
+	}
+	if o.TrialReel {
+		// Without a graduation the adapter sends MANUAL, Instagram's default.
+		settings["is_trial_reel"] = true
+		if o.TrialGraduation != "" {
+			settings["graduation_strategy"] = o.TrialGraduation
+		}
+	}
+	return nil
+}
+
 func xSettings(settings map[string]any, options postoptions.PublishOptions, rootID string) {
 	if len(options.TaggedUserIDs) == 0 {
 		options.TaggedUserIDs = options.PhotoTagIDs
@@ -128,7 +187,7 @@ func xSettings(settings map[string]any, options postoptions.PublishOptions, root
 
 // articleCover signs an article's cover for the X adapter, which uploads it.
 func (p *Publisher) articleCover(ctx context.Context, input socialapi.PublishInput, settings json.RawMessage) (json.RawMessage, error) {
-	if input.Cover == nil {
+	if input.Cover == nil || input.Options == nil || input.Options.ArticleCoverAssetID == "" {
 		return settings, nil
 	}
 	media, err := p.signedMedia(ctx, input.OrganizationID, []publishing.MediaAsset{*input.Cover})
@@ -185,7 +244,7 @@ func (p *Publisher) AccountStanding(ctx context.Context, organizationID, destina
 	}
 	caps := account.VerifiedCapabilities.X
 	limit := caps.PostTextLimit()
-	return product.AccountStanding{Premium: caps.LongPostMaxWeightedCharacters != nil, XCaptionLimit: &limit, XArticles: caps.Articles, XQuotes: socialidentity.XEnterpriseQuotesEnabled()}, nil
+	return product.AccountStanding{Premium: caps.LongPostMaxWeightedCharacters != nil, XCaptionLimit: &limit, XArticles: caps.Articles, XQuotes: socialidentity.XEnterpriseQuotesEnabled(), XVideoMaxSeconds: caps.VideoMaxDurationSeconds}, nil
 }
 
 // Mentions looks a mention up with the account (RFC 025): an X user by

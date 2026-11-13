@@ -51,7 +51,22 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		options  *postoptions.PublishOptions
 		want     map[string]any
 	}{
-		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "unlisted", MadeForKids: &audience}}, map[string]any{"title": "Explicit title", "type": "unlisted", "selfDeclaredMadeForKids": "no"}},
+		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "unlisted", MadeForKids: &audience}}, map[string]any{"title": "Explicit title", "type": "unlisted", "selfDeclaredMadeForKids": "no", "containsSyntheticMedia": false}},
+		{"youtube", &postoptions.PublishOptions{YouTube: &postoptions.YouTubeOptions{Title: "Explicit title", Privacy: "public", MadeForKids: &audience,
+			Tags: []string{"launch", "screen shots"}, ContainsSyntheticMedia: true, ThumbnailAssetID: "thumb"}},
+			map[string]any{"title": "Explicit title", "type": "public", "selfDeclaredMadeForKids": "no", "containsSyntheticMedia": true,
+				"tags": []any{map[string]any{"value": "launch", "label": "launch"}, map[string]any{"value": "screen shots", "label": "screen shots"}}}},
+		{"instagram-standalone", &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Collaborators: []string{"partner"},
+			UserTags: []string{"brand", "maker"}, ShareToFeed: &audience, TrialReel: true, CoverAssetID: "cover"}},
+			map[string]any{"collaborators": []any{map[string]any{"label": "partner"}}, "user_tags": []any{"brand", "maker"},
+				"share_to_feed": false, "is_trial_reel": true}},
+		{"instagram-standalone", &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{TrialReel: true, TrialGraduation: "SS_PERFORMANCE"}},
+			map[string]any{"is_trial_reel": true, "graduation_strategy": "SS_PERFORMANCE"}},
+		{"instagram-standalone", &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{Placement: "story"}},
+			map[string]any{"post_type": "story"}},
+		{"pinterest", &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001", Title: "Launch", Link: "https://shots.example"}},
+			map[string]any{"board": "1001", "title": "Launch", "link": "https://shots.example"}},
+		{"pinterest", &postoptions.PublishOptions{Pinterest: &postoptions.PinterestOptions{BoardID: "1001"}}, map[string]any{"board": "1001"}},
 		{"tiktok", &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{Privacy: "PUBLIC_TO_EVERYONE", AllowComments: true, AllowStitch: true, CommercialContent: true, BrandOrganic: true, MadeWithAI: true, Consent: true}}, map[string]any{"content_posting_method": "DIRECT_POST", "privacy_level": "PUBLIC_TO_EVERYONE", "comment": true, "duet": false, "stitch": true, "brand_organic_toggle": true, "brand_content_toggle": false, "video_made_with_ai": true, "autoAddMusic": "no"}},
 	} {
 		if got := decode(t, must(postSettings(tc.platform, nil, tc.options, ""))); !reflect.DeepEqual(got, tc.want) {
@@ -59,6 +74,23 @@ func TestPostSettingsMapEachPlatformsFields(t *testing.T) {
 		}
 	}
 
+}
+
+func TestInstagramSettingsRefuseInvalidOptions(t *testing.T) {
+	// A stored snapshot is checked again before it reaches the adapter.
+	if _, err := postSettings("instagram-standalone", nil, &postoptions.PublishOptions{Instagram: &postoptions.InstagramOptions{
+		Collaborators: []string{"a", "b", "c", "d"}}}, ""); err == nil {
+		t.Fatal("four collaborators reached the adapter")
+	}
+}
+
+func TestPinterestSettingsNeedTheBoard(t *testing.T) {
+	// A pin without its board never reaches the adapter, whose request Pinterest would refuse.
+	for _, options := range []*postoptions.PublishOptions{{}, {Pinterest: &postoptions.PinterestOptions{Title: "No board"}}} {
+		if _, err := postSettings("pinterest", nil, options, ""); err == nil {
+			t.Fatalf("pin without a board reached the adapter: %+v", options)
+		}
+	}
 }
 
 func TestAFinisherQuotesTheFirstPostOnlyOnceItIsLive(t *testing.T) {
@@ -88,13 +120,14 @@ func TestAccountStandingRequiresVerifiedCapabilities(t *testing.T) {
 			editable := `[{"title":"Verified","value":true}]`
 			account.AdditionalSettings = &editable
 			standing, err := p.AccountStanding(context.Background(), "product-org", "destination", "x", "SOCIAL_API_KEY")
-			if err != nil || standing.Premium || standing.XCaptionLimit == nil || *standing.XCaptionLimit != 280 || standing.XArticles != nil {
+			if err != nil || standing.Premium || standing.XCaptionLimit == nil || *standing.XCaptionLimit != 280 || standing.XArticles != nil || standing.XVideoMaxSeconds != nil {
 				t.Fatalf("editable settings granted access: %+v %v", standing, err)
 			}
 			caps := socialidentity.XVerifiedAccountLimits("read-write", &subscription)
 			account.VerifiedCapabilities.X = &caps
 			standing, err = p.AccountStanding(context.Background(), "product-org", "destination", "x", "SOCIAL_API_KEY")
-			if err != nil || standing.Premium != (subscription != "None") || standing.XCaptionLimit == nil || *standing.XCaptionLimit != caps.PostTextLimit() || standing.XArticles == nil || *standing.XArticles != (subscription == "Premium" || subscription == "PremiumPlus") {
+			if err != nil || standing.Premium != (subscription != "None") || standing.XCaptionLimit == nil || *standing.XCaptionLimit != caps.PostTextLimit() || standing.XArticles == nil || *standing.XArticles != (subscription == "Premium" || subscription == "PremiumPlus") ||
+				standing.XVideoMaxSeconds == nil || *standing.XVideoMaxSeconds != *caps.VideoMaxDurationSeconds {
 				t.Fatalf("verified capabilities lost: %+v %v", standing, err)
 			}
 		})

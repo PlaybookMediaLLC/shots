@@ -14,6 +14,8 @@ export const connectionProviderSchema = z.enum([
   'instagram',
   'instagram-standalone',
   'substack',
+  'facebook',
+  'pinterest',
 ])
 
 /** Readiness is configuration only; it does not establish account authorization. */
