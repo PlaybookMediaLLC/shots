@@ -224,38 +224,46 @@ func nfcLikeJS(text string) string {
 	if out := norm.NFC.String(text); strings.Count(out, norm.GraphemeJoiner) == strings.Count(text, norm.GraphemeJoiner) {
 		return out
 	}
-	ccc := func(r rune) uint8 { return norm.NFD.PropertiesString(string(r)).CCC() }
-	var runes []rune
+	type unit struct {
+		r     rune
+		class uint8
+	}
+	var units []unit
 	for _, r := range text {
-		runes = append(runes, []rune(norm.NFD.String(string(r)))...)
+		for _, d := range norm.NFD.String(string(r)) {
+			units = append(units, unit{d, norm.NFD.PropertiesString(string(d)).CCC()})
+		}
 	}
 	// Canonical order: each run of combining marks sorted by class.
-	for i := 0; i < len(runes); i++ {
+	for i := 0; i < len(units); i++ {
 		j := i
-		for j < len(runes) && ccc(runes[j]) != 0 {
+		for j < len(units) && units[j].class != 0 {
 			j++
 		}
-		slices.SortStableFunc(runes[i:j], func(a, b rune) int { return int(ccc(a)) - int(ccc(b)) })
+		slices.SortStableFunc(units[i:j], func(a, b unit) int { return int(a.class) - int(b.class) })
 		i = j
 	}
 	// Canonical composition: a character joins the last starter unless a
 	// character of class 0, or of its class or higher, stands between them.
-	out := runes[:0] // in place: out never passes the rune being read
+	out := units[:0] // in place: out never passes the unit being read
 	starter := -1
-	for _, r := range runes {
-		class := ccc(r)
-		if starter >= 0 && (starter == len(out)-1 || class != 0 && ccc(out[len(out)-1]) < class) {
-			if composed := []rune(norm.NFC.String(string([]rune{out[starter], r}))); len(composed) == 1 {
-				out[starter] = composed[0]
+	for _, u := range units {
+		if starter >= 0 && (starter == len(out)-1 || u.class != 0 && out[len(out)-1].class < u.class) {
+			if composed := []rune(norm.NFC.String(string([]rune{out[starter].r, u.r}))); len(composed) == 1 {
+				out[starter].r = composed[0]
 				continue
 			}
 		}
-		out = append(out, r)
-		if class == 0 {
+		out = append(out, u)
+		if u.class == 0 {
 			starter = len(out) - 1
 		}
 	}
-	return string(out)
+	var b strings.Builder
+	for _, u := range out {
+		b.WriteRune(u.r)
+	}
+	return b.String()
 }
 
 func isSurrogatePair(text []rune, i int) bool {
