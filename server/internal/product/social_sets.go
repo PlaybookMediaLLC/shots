@@ -295,7 +295,12 @@ func (c *Configuration) defaultSocialSet(ctx context.Context, organizationID str
 		if oneOf(socialplatform.Canonical(connection.Platform), platforms...) {
 			continue
 		}
-		if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).SetSocialSetID(created.ID).Save(ctx); err != nil {
+		// An account a concurrent connection placed in a set since the read stays there.
+		_, err := tx.ChannelConnection.UpdateOneID(connection.ID).Where(channelconnection.SocialSetIDIsNil()).SetSocialSetID(created.ID).Save(ctx)
+		if ent.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
 			return nil, err
 		}
 		platforms = append(platforms, socialplatform.Canonical(connection.Platform))
@@ -1099,6 +1104,10 @@ func (c *Configuration) RemoveSocialSetAccount(ctx context.Context, actor Actor,
 		return nil, err
 	}
 	defer tx.Rollback()
+	// Lock the set before its accounts, in the order connecting an account takes them.
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, setID); err != nil {
+		return nil, err
+	}
 	set, err := visibleSocialSet(ctx, tx.Client(), actor, setID)
 	if err != nil {
 		return nil, err
@@ -1166,6 +1175,13 @@ func dropAccountFromSetDefaults(ctx context.Context, tx *ent.Tx, connection *ent
 	return nil
 }
 
+// lockSocialSet takes a set's row lock, which connecting an account to it
+// also takes first (publishing.lockOAuthStart).
+func lockSocialSet(ctx context.Context, tx *ent.Tx, organizationID, id string) error {
+	_, err := tx.PlatformExec(ctx, `SELECT id FROM social_set WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, id, organizationID)
+	return err
+}
+
 // AssignSocialSetAccount puts an account that belongs to no set into a set.
 func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor, setID, connectionID string) (*SocialSetRecord, error) {
 	if err := c.authorizeSocialSetManage(ctx, actor); err != nil {
@@ -1197,9 +1213,14 @@ func (c *Configuration) AssignSocialSetAccount(ctx context.Context, actor Actor,
 	if taken {
 		return nil, conflict("This social set already has a " + connection.Platform + " account. Remove it first.")
 	}
-	if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).SetSocialSetID(set.ID).Save(ctx); err != nil {
+	// The read was unlocked: an account a connection placed in a set since then stays there.
+	if _, err := tx.ChannelConnection.UpdateOneID(connection.ID).Where(channelconnection.SocialSetIDIsNil(),
+		channelconnection.StatusEQ(channelconnection.StatusACTIVE)).SetSocialSetID(set.ID).Save(ctx); err != nil {
 		if ent.IsConstraintError(err) {
 			return nil, conflict("This social set already has a " + connection.Platform + " account. Remove it first.")
+		}
+		if ent.IsNotFound(err) {
+			return nil, notFound("That account is not available to add.")
 		}
 		return nil, err
 	}
@@ -1243,6 +1264,10 @@ func (c *Configuration) DeleteSocialSet(ctx context.Context, actor Actor, id, co
 		return nil, err
 	}
 	defer tx.Rollback()
+	// Lock the set before its accounts, in the order connecting an account takes them.
+	if err := lockSocialSet(ctx, tx, actor.OrganizationID, id); err != nil {
+		return nil, err
+	}
 	set, err := tx.SocialSet.Query().Where(socialset.ID(id), socialset.OrganizationID(actor.OrganizationID), socialset.DeletedAtIsNil()).Only(ctx)
 	if ent.IsNotFound(err) {
 		return nil, notFound("Social set not found.")

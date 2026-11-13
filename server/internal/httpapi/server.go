@@ -24,6 +24,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialapi"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/socialplatform"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/whitelabel"
 )
@@ -513,7 +514,7 @@ func (s *Server) createConnection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input.ExternalAccountID = strings.TrimSpace(input.ExternalAccountID)
-	input.Platform = strings.ToLower(strings.TrimSpace(input.Platform))
+	input.Platform = socialplatform.Adapter(strings.ToLower(strings.TrimSpace(input.Platform)))
 	input.SecretReference = strings.TrimSpace(input.SecretReference)
 	if input.Platform == "" {
 		input.Platform = "x"
@@ -843,8 +844,12 @@ func writeStoreError(w http.ResponseWriter, err error) {
 		})
 	case errors.Is(err, product.ErrWebhooksUnavailable):
 		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "webhooks_unavailable", "error": err.Error()})
-	case errors.Is(err, publishing.ErrSocialSetSlotTaken), errors.Is(err, publishing.ErrAccountInAnotherSet):
-		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, publishing.ErrSocialSetSlotTaken):
+		writeError(w, http.StatusConflict, publishing.ErrSocialSetSlotTaken.Error())
+	case errors.Is(err, publishing.ErrAccountInAnotherSet):
+		writeError(w, http.StatusConflict, publishing.ErrAccountInAnotherSet.Error())
+	case errors.Is(err, publishing.ErrAccountRemovedFromAnotherSet):
+		writeError(w, http.StatusConflict, publishing.ErrAccountRemovedFromAnotherSet.Error())
 	case errors.Is(err, publishing.ErrUnauthorized):
 		writeError(w, http.StatusUnauthorized, err.Error())
 	case errors.Is(err, publishing.ErrForbidden):

@@ -153,7 +153,10 @@ export async function completeSocialOAuth(
     return new Response('Provider not found.', { status: 404 })
   const params = new URL(request.url).searchParams
   if (params.has('error') || params.has('denied')) {
-    return new Response(`${providerName} connection was not completed.`, { status: 400 })
+    return new Response(
+      `${providerName} connection was not completed. Nothing was changed; start again when you are ready.`,
+      { status: 400 }
+    )
   }
 
   const state = providerName === 'x' ? params.get('oauth_token') : params.get('state')
