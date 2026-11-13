@@ -106,15 +106,21 @@ func (s *Store) Outbox(ctx context.Context) (int, error) {
 // their keys. The outbox_event_retention index has the same predicate.
 const prunableOutbox = `"deliveredAt" IS NOT NULL AND "deadLetteredAt" IS NULL AND (type LIKE 'webhook.%' OR type IN ('github.observation','capture_job.dispatch','capture_connection.finish','release_automation.dispatch','release_automation.cancel','asset.deleted'))`
 
-const outboxRetentionBatch = 1000
+const retentionBatch = 1000
 
 // OutboxRetention deletes prunable events delivered more than 30 days ago,
 // a batch at a time; the audit log keeps each dispatch. Undelivered and
 // dead-lettered events stay, as do events notification fan-out has not read.
 func (s *Store) OutboxRetention(ctx context.Context) (int, error) {
+	return s.deleteBatches(ctx, `DELETE FROM outbox_event WHERE id IN (SELECT id FROM outbox_event WHERE `+prunableOutbox+` AND "deliveredAt" < now() - interval '30 days' AND (notification_version=0 OR notification_fanned) LIMIT $1)`)
+}
+
+// deleteBatches runs a delete limited to retentionBatch rows by its $1 until a
+// batch deletes fewer, and reports how many rows it deleted.
+func (s *Store) deleteBatches(ctx context.Context, statement string) (int, error) {
 	deleted := 0
 	for {
-		result, err := s.DB.ExecContext(ctx, `DELETE FROM outbox_event WHERE id IN (SELECT id FROM outbox_event WHERE `+prunableOutbox+` AND "deliveredAt" < now() - interval '30 days' AND (notification_version=0 OR notification_fanned) LIMIT $1)`, outboxRetentionBatch)
+		result, err := s.DB.ExecContext(ctx, statement, retentionBatch)
 		if err != nil {
 			return deleted, err
 		}
@@ -123,7 +129,7 @@ func (s *Store) OutboxRetention(ctx context.Context) (int, error) {
 			return deleted, err
 		}
 		deleted += int(count)
-		if count < outboxRetentionBatch {
+		if count < retentionBatch {
 			return deleted, nil
 		}
 	}

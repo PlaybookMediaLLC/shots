@@ -424,7 +424,10 @@ func TestNotificationRetentionHonorsLegalHold(t *testing.T) {
 		exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) VALUES($1,$2,$1,'test','email','reader','SUCCEEDED',now()-$3::interval)`, row.id, row.org, row.age)
 	}
 	exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) VALUES('sending','a','sending','test','email','reader','CLAIMED',now()-interval '100 days')`)
-	if n := run(t, s, "notification-retention"); n != 4 {
+	// More than one batch of each, so the purge keeps going after a full batch.
+	exec(t, s.DB, `INSERT INTO platform_notification_inbox(id,"organizationId","userId",event_id,kind,resource_type,resource_id,description,href,created_at) SELECT 'bulk-'||g,'a','reader','bulk-'||g,'test','test','bulk','d','',now()-interval '200 days' FROM generate_series(1,1001) g`)
+	exec(t, s.DB, `INSERT INTO platform_notification_delivery(id,"organizationId",event_id,kind,channel,destination,status,created_at) SELECT 'bulk-'||g,'a','bulk-'||g,'test','in_app','reader','SUCCEEDED',now()-interval '200 days' FROM generate_series(1,1001) g`)
+	if n := run(t, s, "notification-retention"); n != 4+2*1001 {
 		t.Fatalf("deleted %d", n)
 	}
 	expect(t, s.DB, "held,recent", `SELECT string_agg(id, ',' ORDER BY id) FROM platform_notification_inbox`)

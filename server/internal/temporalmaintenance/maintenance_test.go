@@ -159,6 +159,9 @@ func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 	if f.creates != len(Jobs) {
 		t.Fatalf("called Create %d times for %d schedules", f.creates, len(Jobs))
 	}
+	if _, ok := f.created["platform-maintenance-notification-retention"]; !ok {
+		t.Fatal("notification retention is not scheduled")
+	}
 	for id, o := range f.created {
 		if o.Overlap != enumspb.SCHEDULE_OVERLAP_POLICY_SKIP {
 			t.Fatal("overlap enabled")

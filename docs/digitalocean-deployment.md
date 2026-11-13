@@ -203,7 +203,7 @@ is described below.
 
 ## Temporal maintenance
 
-The tenant orchestrator inside `screenshot-studio-backend` owns durable schedules, among them these, in
+The tenant orchestrator inside `screenshot-studio-backend` owns these durable schedules, among others, in
 `screenshot-studio-publishing.kpisa`, on task queue `platform-maintenance`:
 
 | Schedule ID | Cadence (UTC) | Go handler |

@@ -15,7 +15,7 @@ campaign, not every creator in the workspace. Human actors are excluded.
 
 In-app defaults on for every entry. Email defaults on only for the two existing
 campaign review categories (marked *); other email and Slack require workspace
-configuration. Personal opt-outs and global channel availability take precedence.
+configuration. [Delivery precedence](#delivery-precedence) sets which choice wins.
 
 Social sets (RFC 024) add three gates. Activity on a private set's drafts and
 posts reaches only the set's owner and never a shared Slack channel. A person
@@ -28,14 +28,14 @@ the thread's participants; the draft's author hears about new comments as
 
 ## Delivery precedence
 
-Each personal delivery is decided once, after the recipient's membership and
+Each personal delivery is decided after the recipient's membership and
 resource access are checked (`personalDecision` in
 `server/internal/notifications/decisions.go`). The first rule that applies wins,
 and its code is stored on the delivery as `decision_code`:
 
 1. The workspace turned the channel off: skipped, `WORKSPACE_CHANNEL_DISABLED`.
-2. The workspace's policy for this event leaves the channel out:
-   `WORKSPACE_EVENT_DISABLED`.
+2. In-app and email only: the workspace's policy for this event leaves the
+   channel out, `WORKSPACE_EVENT_DISABLED`.
 3. Email only: the person's email switch is off, `EMAIL_TURNED_OFF`.
 4. Slack DM only: the person's Slack switch is off, `SLACK_TURNED_OFF`.
 5. A required failure alert (`post.publish_failed`,
@@ -46,16 +46,14 @@ and its code is stored on the delivery as `decision_code`:
 7. Otherwise it is sent: `SELECTED`.
 
 A channel that cannot deliver never sends, even a required alert. An expired
-Slack connection holds the delivery as `BLOCKED` (`SLACK_RECONNECT_REQUIRED`)
-until it is reconnected; a disconnected one skips it (`SLACK_NOT_CONNECTED`).
+Slack connection leaves the delivery `BLOCKED` (`SLACK_RECONNECT_REQUIRED`);
+after reconnecting, the person retries it. A disconnected one skips it
+(`SLACK_NOT_CONNECTED`).
 The sender rechecks the policy, preference and connection generations before it
 sends.
 
 The person who acted is not told about their own action. A background action,
 such as a scheduled publish, and a required failure alert still reach them.
-
-`TestRequiredFailurePrecedenceAndIndependentChannelStates` asserts each step for
-in-app, email and Slack DM.
 
 | Canonical event                   | Committed emitter                                                           | Recipients      | Sensitivity / permitted channels | Summary                         | Destination                           |
 | --------------------------------- | --------------------------------------------------------------------------- | --------------- | -------------------------------- | ------------------------------- | ------------------------------------- |
@@ -91,7 +89,7 @@ in-app, email and Slack DM.
 | `post.published`                  | `publishing.Repository.Complete`                                            | publishers      | coarse; in-app, email, Slack     | Post published                  | draft calendar or campaign            |
 | `post.auto_repost_published`      | `publishing.Repository.RecordAutoAction`                                    | publishers      | coarse; in-app, email, Slack     | Auto-retweet published          | draft calendar or campaign            |
 | `post.auto_plug_published`        | `publishing.Repository.RecordAutoAction`                                    | publishers      | coarse; in-app, email, Slack     | Auto-plug published             | draft calendar or campaign            |
-| `post.publish_failed`             | `publishing.Repository.Fail`                                                | operators       | restricted; in-app, email        | Publishing needs attention      | draft calendar or campaign            |
+| `post.publish_failed`             | `publishing.Repository.Fail` (final failure only), `FailUnsent`             | operators       | restricted; in-app, email        | Publishing needs attention      | draft calendar or campaign            |
 | `post.publish_recovery_required`  | `publishing.Repository.MarkUnknown`                                         | operators       | restricted; in-app, email        | Publishing result needs review  | draft calendar or campaign            |
 | `integration.connected`           | `SaveIntegration / FinishOAuth / Slack callback / provider health recovery` | admins          | coarse; in-app, email, Slack     | Integration connected           | integration or source settings        |
 | `integration.disconnected`        | `DeleteIntegration / Slack Disconnect`                                      | admins          | restricted; in-app, email        | Integration disconnected        | integration or source settings        |

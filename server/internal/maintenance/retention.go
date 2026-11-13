@@ -50,28 +50,15 @@ const heldNotification = `EXISTS (SELECT 1 FROM audit_retention_policy p WHERE p
 
 // NotificationRetention deletes notifications and their delivery records 90
 // days after they were created, read or not, a batch at a time. A workspace
-// legal hold pauses it, as it pauses the audit purge. A delivery a sender holds
-// right now waits for the next run.
+// legal hold pauses it, as it pauses the audit purge. Rows another transaction
+// holds, such as a delivery a sender is claiming, wait for the next run, and
+// a claimed delivery is never deleted. Deliveries go first: a delivery without
+// its inbox row is normal, an inbox row without its delivery cannot be opened.
 func (s *Store) NotificationRetention(ctx context.Context) (int, error) {
-	deleted := 0
-	for _, statement := range []string{
-		`DELETE FROM platform_notification_inbox WHERE id IN (SELECT n.id FROM platform_notification_inbox n WHERE n.created_at < now() - interval '90 days' AND NOT ` + heldNotification + ` LIMIT $1)`,
-		`DELETE FROM platform_notification_delivery WHERE id IN (SELECT n.id FROM platform_notification_delivery n WHERE n.created_at < now() - interval '90 days' AND n.status <> 'CLAIMED' AND NOT ` + heldNotification + ` LIMIT $1)`,
-	} {
-		for {
-			result, err := s.DB.ExecContext(ctx, statement, outboxRetentionBatch)
-			if err != nil {
-				return deleted, err
-			}
-			count, err := result.RowsAffected()
-			if err != nil {
-				return deleted, err
-			}
-			deleted += int(count)
-			if count < outboxRetentionBatch {
-				break
-			}
-		}
+	deliveries, err := s.deleteBatches(ctx, `DELETE FROM platform_notification_delivery WHERE status <> 'CLAIMED' AND id IN (SELECT n.id FROM platform_notification_delivery n WHERE n.created_at < now() - interval '90 days' AND n.status <> 'CLAIMED' AND NOT `+heldNotification+` LIMIT $1 FOR UPDATE SKIP LOCKED)`)
+	if err != nil {
+		return deliveries, err
 	}
-	return deleted, nil
+	inbox, err := s.deleteBatches(ctx, `DELETE FROM platform_notification_inbox WHERE id IN (SELECT n.id FROM platform_notification_inbox n WHERE n.created_at < now() - interval '90 days' AND NOT `+heldNotification+` LIMIT $1 FOR UPDATE SKIP LOCKED)`)
+	return deliveries + inbox, err
 }

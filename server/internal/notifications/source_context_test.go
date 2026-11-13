@@ -2,8 +2,10 @@ package notifications
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
 
@@ -146,18 +148,22 @@ func TestStaleNotificationsResolveToNothing(t *testing.T) {
 	execFixture(t, f, `INSERT INTO scheduled_post(id,"organizationId","channelConnectionId","scheduledFor",caption,"idempotencyKey","updatedAt","socialSetId","contentDraftId") VALUES($1,$2,$3,now(),'post',$1,now(),$4,$5)`, post, org, connection, setID, draft)
 	invitation := cuid.New()
 	execFixture(t, f, `INSERT INTO invitation(id,"organizationId",email,"inviterId","expiresAt") VALUES($1,$2,'invitee@example.test',$3,now()+interval '1 day')`, invitation, org, f.owner.UserID)
-	var creatorMember string
-	if err := f.s.DB.QueryRow(`SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2`, org, f.creator.UserID).Scan(&creatorMember); err != nil {
-		t.Fatal(err)
+	memberOf := func(user string) (id string) {
+		if err := f.s.DB.QueryRow(`SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2`, org, user).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
 	}
+	creatorMember, ownerMember := memberOf(f.creator.UserID), memberOf(f.owner.UserID)
 	execFixture(t, f, `UPDATE member SET role='admin' WHERE id=$1`, creatorMember)
 
 	campaign := notify(f.creator, "campaign", f.campaign)
 	posted := notify(f.creator, "scheduled_post", post)
 	invited := notify(f.creator, "invitation", invitation)
 	ownMembership := notify(f.creator, "member", creatorMember)
+	otherMembership := notify(f.creator, "member", ownerMember)
 	workspace := notify(f.creator, "workspace", org)
-	for delivery, want := range map[string]string{campaign: "/campaigns/" + f.campaign + "/copy", posted: "/publish/" + draft, invited: "/settings/members", ownMembership: "/settings/members", workspace: "/settings/members"} {
+	for delivery, want := range map[string]string{campaign: "/campaigns/" + f.campaign + "/copy", posted: "/publish/" + draft, invited: "/settings/members", ownMembership: "/settings/members", otherMembership: "/settings/members", workspace: "/settings/members"} {
 		if got := resolves(f.creator, delivery); got != want {
 			t.Fatalf("control: %s resolved to %q, want %q", delivery, got, want)
 		}
@@ -168,7 +174,7 @@ func TestStaleNotificationsResolveToNothing(t *testing.T) {
 	execFixture(t, f, `DELETE FROM campaign WHERE id=$1`, f.campaign)
 	execFixture(t, f, `UPDATE social_set SET visibility='PRIVATE',"ownerUserId"=$2 WHERE id=$1`, setID, f.owner.UserID)
 	execFixture(t, f, `UPDATE member SET role='creator' WHERE id=$1`, creatorMember)
-	for name, delivery := range map[string]string{"deleted campaign": campaign, "post in another person's private set": posted, "invitation after a downgrade": invited, "workspace settings after a downgrade": workspace} {
+	for name, delivery := range map[string]string{"deleted campaign": campaign, "post in another person's private set": posted, "invitation after a downgrade": invited, "workspace settings after a downgrade": workspace, "another member after a downgrade": otherMembership} {
 		if got := resolves(f.creator, delivery); got != "" {
 			t.Errorf("%s resolved to %q", name, got)
 		}
@@ -177,12 +183,12 @@ func TestStaleNotificationsResolveToNothing(t *testing.T) {
 	if got := resolves(f.creator, ownMembership); got != "/settings/members" {
 		t.Errorf("own membership resolved to %q", got)
 	}
-	if got := resolves(f.owner, notify(f.owner, "scheduled_post", post)); got == "" {
-		t.Error("the set's owner lost the post")
+	if got := resolves(f.owner, notify(f.owner, "scheduled_post", post)); got != "/publish/"+draft {
+		t.Errorf("the set's owner opened the post at %q", got)
 	}
 	// Once removed, nothing resolves for the former member.
 	execFixture(t, f, `DELETE FROM member WHERE id=$1`, creatorMember)
-	if got, err := f.s.Resolve(ctx, f.creator, ownMembership); err == nil && got != "" {
-		t.Errorf("a removed member resolved %q", got)
+	if got, err := f.s.Resolve(ctx, f.creator, ownMembership); !errors.Is(err, publishing.ErrForbidden) || got != "" {
+		t.Errorf("a removed member resolved %q: %v", got, err)
 	}
 }
