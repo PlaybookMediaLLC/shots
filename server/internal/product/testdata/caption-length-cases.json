@@ -457,6 +457,62 @@
         "x": 29,
         "youtube": 29
       }
+    },
+    {
+      "label": "İ is not the letter i in a link's query",
+      "text": "https://tr.wikipedia.org/w/index.php?search=İstanbul",
+      "lengths": {
+        "bluesky": 52,
+        "instagram": 52,
+        "linkedin": 52,
+        "mastodon": 31,
+        "threads": 52,
+        "tiktok": 52,
+        "x": 31,
+        "youtube": 52
+      }
+    },
+    {
+      "label": "İ before a protocol is not the letter i",
+      "text": "İhttps://example.com/a/long/path",
+      "lengths": {
+        "bluesky": 32,
+        "instagram": 32,
+        "linkedin": 32,
+        "mastodon": 24,
+        "threads": 32,
+        "tiktok": 32,
+        "x": 24,
+        "youtube": 32
+      }
+    },
+    {
+      "label": "the Kelvin sign before a protocol is not the letter k",
+      "text": "a \u212ahttps://example.com/path b",
+      "lengths": {
+        "bluesky": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 28,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    },
+    {
+      "label": "a Greek capital iota continues a link's path",
+      "text": "https://el.wikipedia.org/wiki/Ιστορία",
+      "lengths": {
+        "bluesky": 37,
+        "instagram": 37,
+        "linkedin": 37,
+        "mastodon": 29,
+        "threads": 37,
+        "tiktok": 37,
+        "x": 29,
+        "youtube": 37
+      }
     }
   ]
 }

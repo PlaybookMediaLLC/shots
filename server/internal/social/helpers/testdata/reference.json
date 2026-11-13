@@ -1753,6 +1753,30 @@
   {
    "text": "mixed 日本 and emoji 🎉 and https://a.io",
    "want": 51
+  },
+  {
+   "text": "https://tr.wikipedia.org/w/index.php?search=İstanbul",
+   "want": 31
+  },
+  {
+   "text": "İhttps://example.com/a/long/path",
+   "want": 24
+  },
+  {
+   "text": "https://example.com/pathȾ",
+   "want": 23
+  },
+  {
+   "text": "https://example.com/aƦb",
+   "want": 23
+  },
+  {
+   "text": "https://el.wikipedia.org/wiki/Ιστορία",
+   "want": 29
+  },
+  {
+   "text": "https://пример.ᲃайт/x",
+   "want": 23
   }
  ],
  "slicer": [

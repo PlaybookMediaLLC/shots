@@ -67,6 +67,25 @@ func unshiftSurrogates(runes []rune) []rune {
 	return out
 }
 
+// regexp2's IgnoreCase compares Unicode lowercase forms; a JavaScript /i
+// regex without u compares uppercase forms and never folds a non-ASCII
+// character onto ASCII. jsCaseStandIns maps each BMP unit on which the two
+// disagree in the three case-insensitive regexes below to a unit regexp2
+// matches as JavaScript matches the original, checked atom by atom against
+// twitter-text 3.1.0 on Node 22. One unit for one, so indices hold.
+var jsCaseStandIns = map[rune]rune{
+	// Match only where a Latin accent letter does: İ, Ʀ, Ⱥ, Ⱦ, Ʌ, ʀ, ʌ, ⱥ, ⱦ, Ƛ,
+	// and the iotas (Ι, ι, ι), which JavaScript folds onto the combining ͅ.
+	0x0130: 'À', 0x01a6: 'À', 0x023a: 'À', 0x023e: 'À', 0x0245: 'À', 0x0280: 'À',
+	0x028c: 'À', 0x2c65: 'À', 0x2c66: 'À', 0xa7dc: 'À', 0x0399: 'À', 0x03b9: 'À',
+	0x1fbe: 'À',
+	// The Kelvin and Angstrom signs are no letter at all.
+	0x212a: '×', 0x212b: '×',
+	// Variant forms JavaScript folds onto the letter of a Greek or Cyrillic TLD.
+	0x03f5: 'ε', 0x1c80: 'в', 0x1c81: 'д', 0x1c82: 'о', 0x1c83: 'с', 0x1c84: 'т',
+	0x1c85: 'т', 0x1c86: 'ъ', 0x1c87: 'ѣ',
+}
+
 var (
 	extractURLRe             = jsRegexp(extractURLSource, regexp2.IgnoreCase)
 	validASCIIDomainRe       = jsRegexp(validASCIIDomainSource, regexp2.IgnoreCase)
@@ -211,12 +230,20 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 		return nil
 	}
 
+	folded := slices.Clone(text)
+	for i, c := range folded {
+		if standIn, ok := jsCaseStandIns[c]; ok {
+			folded[i] = standIn
+		}
+	}
+
 	var urls []*urlEntity
-	for m, _ := extractURLRe.FindRunesMatch(text); m != nil; m, _ = extractURLRe.FindNextMatch(m) {
+	for m, _ := extractURLRe.FindRunesMatch(folded); m != nil; m, _ = extractURLRe.FindNextMatch(m) {
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
-		domain := m.GroupByNumber(5).Runes()
+		domainGroup := m.GroupByNumber(5)
+		domain := domainGroup.Runes()
 		path := m.GroupByNumber(7).Runes()
 		endPosition := m.Index + m.Length
 		startPosition := endPosition - len(url)
@@ -225,7 +252,7 @@ func extractURLsWithIndices(text []rune, withoutProtocol bool) []*urlEntity {
 		if protocolLen == 0 {
 			protocolLen = len("https://")
 		}
-		if !isValidTweetURL(url, protocolLen, domain) {
+		if !isValidTweetURL(url, protocolLen, domain, text[domainGroup.Index:domainGroup.Index+domainGroup.Length]) {
 			continue
 		}
 
@@ -292,14 +319,16 @@ func indexRunes(s, sub []rune, from int) int {
 // isValidTweetURL is extractUrlsWithIndices' isValidUrl. twitter-text's
 // idna.toAscii returns the domain unchanged when every label punycodes to
 // 1..63 characters, so only the label check and the total length matter.
-func isValidTweetURL(url []rune, protocolLen int, domain []rune) bool {
+// domain carries the stand-ins the regexes need; written is the same span
+// as written, which punycode encodes.
+func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) bool {
 	if len(domain) >= 4 && string(domain[:4]) == "xn--" {
 		// Punycode encoded url cannot contain non ASCII characters
 		if ok, _ := validASCIIDomainRe.MatchRunes(domain); !ok {
 			return false
 		}
 	}
-	for _, label := range splitRunes(domain, func(r rune) bool { return r == '.' }) {
+	for _, label := range splitRunes(written, func(r rune) bool { return r == '.' }) {
 		if n := punycodeToASCIILength(unshiftSurrogates(label)); n < 1 || n > 63 {
 			return false
 		}
