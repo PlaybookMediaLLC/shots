@@ -846,3 +846,123 @@ test('the paste dialog splits in a reused worker and enables Append only for the
   root = null
   assert.equal(workers[2].terminated, true)
 })
+
+test('the screenshot sheet counts its captions in a worker, only when the caption or platforms change', async (t) => {
+  type CaptionCountRequest = import('@/lib/write/caption-count.worker').CaptionCountRequest
+  const workers: FakeCountWorker[] = []
+  class FakeCountWorker {
+    onmessage: ((event: { data: unknown }) => void) | null = null
+    onerror: (() => void) | null = null
+    requests: CaptionCountRequest[] = []
+    terminated = false
+    constructor() {
+      workers.push(this)
+    }
+    postMessage(request: CaptionCountRequest) {
+      this.requests.push(request)
+    }
+    terminate() {
+      this.terminated = true
+    }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeCountWorker })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'Worker', previous)
+    else Reflect.deleteProperty(globalThis, 'Worker')
+  })
+  // One workspace profile with one X account; nothing else the sheet reads has data.
+  t.mock.method(globalThis, 'fetch', async (input: string) =>
+    Response.json(
+      input === '/api/v1/social-sets'
+        ? {
+            items: [
+              {
+                accounts: [{ displayName: null, handle: '@shots', id: 'account-x', platform: 'x' }],
+                defaultPlatforms: ['x'],
+                engagementDefaults: null,
+                id: 'set-a',
+                name: 'Shots',
+                primaryPlatform: 'x',
+                timeZone: 'UTC',
+                visibility: 'WORKSPACE',
+              },
+            ],
+          }
+        : { batches: [], items: [] }
+    )
+  )
+  const [{ createTRPCClient, httpLink }, { AppRouterContext }, { TRPCProvider }, sheet] =
+    await Promise.all([
+      import('@trpc/client'),
+      import('next/dist/shared/lib/app-router-context.shared-runtime'),
+      import('@/lib/trpc/react'),
+      import('@/components/workspace/PrepareScreenshotPost'),
+    ])
+  const queryClient = new QueryClient()
+  const trpcClient = createTRPCClient<import('@/lib/trpc/router').AppRouter>({
+    links: [httpLink({ url: 'http://localhost/api/trpc' })],
+  })
+  const router = { back() {}, forward() {}, prefetch() {}, push() {}, refresh() {}, replace() {} }
+  await mount(
+    jsx(AppRouterContext.Provider, {
+      value: router,
+      children: jsx(TRPCProvider, {
+        queryClient,
+        trpcClient,
+        children: jsx(sheet.PrepareScreenshotPost, { onOpenChange: () => {}, open: true }),
+      }),
+    })
+  )
+  // Let the profile list arrive and its X account be chosen.
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+  const write = (selector: string, text: string) =>
+    act(async () => {
+      const area = get<HTMLTextAreaElement>(selector)
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        area,
+        text
+      )
+      area.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+  const warnings = () =>
+    [...document.querySelectorAll('[role="status"]')]
+      .map((element) => element.textContent!)
+      .filter((text) => /caption/.test(text))
+  // No count starts while the profile loads, only once its X account is chosen.
+  assert.equal(workers.length, 1)
+  assert.deepEqual(workers[0].requests, [{ body: '', channels: ['x'], copy: null, primary: 'x' }])
+  await act(async () => workers[0].onmessage?.({ data: [] }))
+
+  // 10,000 CJK characters and a '.': about a second for X's count on the page.
+  const long = '漢'.repeat(10_000) + '.'
+  const started = performance.now()
+  await write('textarea[id$="-caption"]', long)
+  const typed = performance.now() - started
+  // The idle worker takes it.
+  assert.equal(workers.length, 1)
+  assert.ok(workers[0].requests.at(-1)!.body === long)
+  // Nothing was counted on the page: no warning until the worker answers.
+  assert.deepEqual(warnings(), [])
+  await act(async () =>
+    workers[0].onmessage?.({
+      data: [{ channel: 'x', length: 20_001, limit: 280, reused: false }],
+    })
+  )
+  assert.deepEqual(warnings(), [
+    'The X caption is 20001 characters; the limit is 280. Shorten it before scheduling.',
+  ])
+
+  // Typing elsewhere in the sheet sends no new count, and keeps the warning.
+  const counts = workers[0].requests.length
+  await write('textarea[aria-label="Longer explanation"]', 'More detail')
+  assert.equal(workers[0].requests.length, counts)
+  assert.equal(warnings().length, 1)
+
+  // A worker that crashes is reported and dropped, rather than hiding the check.
+  await write('textarea[id$="-caption"]', `${long}!`)
+  await act(async () => workers[0].onerror?.())
+  assert.equal(workers[0].terminated, true)
+  assert.deepEqual(warnings(), ['The caption lengths could not be checked.'])
+  t.diagnostic(`a keystroke with a 10,000-character caption rendered in ${Math.round(typed)} ms`)
+})
