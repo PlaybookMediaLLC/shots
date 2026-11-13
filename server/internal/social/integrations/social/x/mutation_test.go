@@ -3,6 +3,7 @@ package x
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/helpers"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/integrations"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/temporalx"
 )
@@ -192,6 +194,23 @@ func TestArticleDraftReceiptPrecedesPublishAndSurvivesFailure(t *testing.T) {
 	}
 	if !strings.Contains(string(ready.PendingData), `"articleDraftId":"91"`) {
 		t.Fatal("known draft lost after publish failure")
+	}
+}
+
+// Once an Article's draft is saved on X, a count that runs out of time must not
+// become a whole-post retry, which would save a second draft.
+func TestArticleCountTimeoutAfterItsDraftIsNotRetried(t *testing.T) {
+	_, done := fakePublishingX(t, func(r recorded) (int, string) {
+		t.Errorf("unexpected mutation %s", r.path)
+		return 500, `{}`
+	})
+	defer done()
+	in := publishingAccount()
+	pending := pendingData{Message: "https://a.co/" + strings.Repeat("(a)", 8000), ArticleDraftID: "91", Attempting: true, Confirmed: true,
+		Settings: pendingSettings{PostType: ptr("article"), ArticleTitle: ptr("Title"), ArticleStatus: ptr("published")}}
+	_, err := New().FinalizePost(context.Background(), in.Token, marshal(pending), in)
+	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || errors.Is(err, helpers.ErrTextTooComplex) {
+		t.Fatalf("err = %v", err)
 	}
 }
 

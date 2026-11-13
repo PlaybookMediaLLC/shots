@@ -1,17 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Value } from '@shots/platejs-editor/platejs'
-import { createPlateEditor } from '@shots/platejs-editor/platejs/react'
 import {
+  createPlatePlugin,
+  createPlateEditor,
+  type PlateEditor,
+} from '@shots/platejs-editor/platejs/react'
+import { YjsPlugin } from '@shots/platejs-editor/collaboration'
+import {
+  appendPost,
+  asUndoStep,
   deletePost,
+  insertMention,
   insertPostBreak,
+  insertSnippet,
   movePost,
   PostBreakPlugin,
   postRanges,
+  setPostSettings,
   splitPostAtCaret,
 } from '@/components/drafts/thread'
 import { postBreak } from '@/lib/write/versions'
-import { POST_BREAK } from '@/lib/content-drafts/serialize'
+import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
 
 const p = (text = '') => ({ type: 'p', children: [{ text }] })
 
@@ -89,4 +99,119 @@ for (const selected of ['all', 'header'] as const) {
     assert.equal(editor.api.string([1]), 'Replacement 🚀')
     assert.equal(editor.selection?.anchor.path[0], 1)
   })
+}
+
+/** The composer's mention node (social-mention.tsx), without its UI. */
+const SocialMentionPlugin = createPlatePlugin({
+  key: SOCIAL_MENTION,
+  node: { isElement: true, isInline: true, isVoid: true },
+})
+
+/** A provider that never connects: the live session's history without a server. */
+const offlineProvider = {
+  awareness: null,
+  connect() {},
+  destroy() {},
+  disconnect() {},
+  document: null,
+  isConnected: false,
+  isConnectionPending: false,
+  isSynced: true,
+  isSyncPending: false,
+  type: 'test',
+}
+
+/** An editor on Plate's own history, or on a live session's Yjs history, which merges edits within 500 ms. */
+const histories: Record<string, (value: Value) => Promise<PlateEditor>> = {
+  'Plate history': async (value) =>
+    createPlateEditor({ plugins: [PostBreakPlugin, SocialMentionPlugin], value }),
+  'live session history': async (value) => {
+    const editor = createPlateEditor({
+      plugins: [
+        PostBreakPlugin,
+        SocialMentionPlugin,
+        YjsPlugin.configure({ options: { providers: [offlineProvider as never] } }),
+      ],
+      skipInitialization: true,
+    })
+    await editor.getApi(YjsPlugin).yjs.init({ autoConnect: false, id: 'undo-steps', value })
+    return editor
+  },
+}
+
+/** Let the editor's change handler run, as it does between keystrokes. */
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+/**
+ * The document without Plate's generated block ids: a live session's redo
+ * rebuilds nodes from Yjs and Plate ids them anew. Post ids, on the breaks, stay.
+ */
+const content = (editor: PlateEditor): unknown =>
+  JSON.parse(
+    JSON.stringify(editor.children, function (key, value) {
+      return key === 'id' && this.type !== POST_BREAK ? undefined : value
+    })
+  )
+
+const actions: Record<string, (editor: PlateEditor) => void> = {
+  split: (editor) => splitPostAtCaret(editor),
+  mention: (editor) =>
+    insertMention(editor, 'x', { handle: 'jane', kind: 'person', label: 'Jane', providerId: '42' }),
+  poll: (editor) =>
+    setPostSettings(editor, 1, { poll: { durationMinutes: 1_440, options: ['', ''] } }),
+  'setting applied to every post': (editor) =>
+    asUndoStep(editor, () => {
+      for (const post of [1, 2]) setPostSettings(editor, post, { replySettings: 'following' })
+    }),
+  snippet: (editor) => insertSnippet(editor, ' Follow for more.'),
+  'closing-post template': (editor) => appendPost(editor, 'Thanks for reading.'),
+}
+
+// The action happens where typing stopped (where Plate's history would merge
+// text into the typing) or with the caret moved back between the words.
+for (const [history, create] of Object.entries(histories)) {
+  for (const [name, act] of Object.entries(actions)) {
+    for (const offset of [11, 5])
+      test(`${history}: a ${name} at ${offset} undoes and redoes as one step and puts the caret back`, async () => {
+        const editor = await create([postBreak(), p('Hello'), postBreak(), p('Two')])
+        try {
+          editor.tf.select({ path: [1, 0], offset: 5 })
+          editor.tf.insertText(' world')
+          await settle()
+          editor.tf.select({ path: [1, 0], offset })
+          await settle()
+          const before = content(editor)
+          const caret = structuredClone(editor.selection)
+          act(editor)
+          await settle()
+          const after = content(editor)
+          const caretAfter = structuredClone(editor.selection)
+          assert.notDeepEqual(after, before)
+          // Typing right after the action is a step of its own.
+          editor.tf.insertText('!')
+          await settle()
+          editor.undo()
+          assert.deepEqual(content(editor), after)
+          editor.undo()
+          assert.deepEqual(content(editor), before)
+          assert.deepEqual(editor.selection, caret)
+          editor.redo()
+          assert.deepEqual(content(editor), after)
+          assert.deepEqual(editor.selection, caretAfter)
+          editor.undo()
+          assert.deepEqual(content(editor), before)
+          assert.deepEqual(editor.selection, caret)
+          // Typing right before the action stays a step of its own.
+          editor.undo()
+          assert.equal(editor.api.string([1]), 'Hello')
+          assert.equal(editor.children.length, 4)
+        } finally {
+          if ('undoManager' in editor) {
+            const { awareness, ydoc } = editor.getOptions(YjsPlugin)
+            awareness.destroy()
+            ydoc.destroy()
+          }
+        }
+      })
+  }
 }
