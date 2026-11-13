@@ -62,16 +62,16 @@ import { useTRPCClient } from '@/lib/trpc/react'
 import { cn } from '@/lib/utils'
 import { engagementAutomation, followUpLines } from '@/lib/write/automation'
 import { CAPABILITIES } from '@/lib/write/capabilities'
+import type { CaptionCountRequest } from '@/lib/write/caption-count.worker'
 import type { DraftChannel } from '@/lib/write/document'
 import { THREAD_POST_LIMIT } from '@/lib/write/import-text'
 import type { MediaFacts } from '@/lib/write/media-rules'
 import {
   accountsOn,
   captionChannelText,
+  type CaptionOverLimit,
   captionFor,
-  captionsOverLimit,
   carriedFollowUps,
-  explanationPosts,
   platformAcceptsSize,
   type PostMedia,
   postRenders,
@@ -82,6 +82,8 @@ import {
   screenshotPostVersions,
   screenshotPrompts,
 } from '@/lib/write/screenshot-post'
+import { useThreadPosts } from '@/lib/write/use-thread-posts'
+import { useWorkerAnswer } from '@/lib/write/use-worker-answer'
 import { buildExportFileName, WorkspaceSaveError } from '@/lib/workspace/save-export'
 
 /**
@@ -164,6 +166,11 @@ function timeLabel(at: string, timeZone: string): string {
     return new Date(at).toLocaleString(undefined, options)
   }
 }
+
+const startCaptionCount = () =>
+  new Worker(new URL('../../lib/write/caption-count.worker.ts', import.meta.url), {
+    type: 'module',
+  })
 
 /** "1 draft", "4 drafts". */
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
@@ -352,8 +359,15 @@ export function PrepareScreenshotPost({
   }, [open, releaseId, trpcClient])
 
   const accounts = set?.accounts ?? []
-  const chosen = accounts.filter((account) => selected.includes(account.id))
-  const channels: DraftChannel[] = [...new Set(chosen.map((account) => account.channel))]
+  // Kept between renders, so the caption count below reruns only when the choice changes.
+  const chosen = React.useMemo(
+    () => (set?.accounts ?? []).filter((account) => selected.includes(account.id)),
+    [selected, set]
+  )
+  const channels = React.useMemo(
+    (): DraftChannel[] => [...new Set(chosen.map((account) => account.channel))],
+    [chosen]
+  )
   // The platform that opens the post: its caption is the body, and its
   // length is the thread's.
   const channel = primaryFor(channels, copy, set?.primaryChannel)
@@ -361,7 +375,19 @@ export function PrepareScreenshotPost({
   // Every other chosen platform the editor wrote a caption for posts that.
   const channelText = captionChannelText(copy, channels, channel)
   const ownCaptions = Object.keys(channelText) as DraftChannel[]
-  const overLimit = captionsOverLimit({ body, channels, copy, primary: channel })
+  // Counted in a worker, and only when the caption, platforms or copy change:
+  // X's count of a long caption without spaces takes about a second. With no
+  // platform chosen there is nothing to count, so none starts while they load.
+  const countRequest = React.useMemo(
+    () => (open && channels.length > 0 ? { body, channels, copy, primary: channel } : undefined),
+    [body, channel, channels, copy, open]
+  )
+  const captionCount = useWorkerAnswer<CaptionCountRequest, CaptionOverLimit[] | null>(
+    startCaptionCount,
+    countRequest,
+    null
+  )
+  const overLimit = countRequest ? captionCount.answer : []
   const limit = DRAFT_CHANNEL_LIMITS[channel]
   // A length typed for one profile must not block another: it applies only
   // while splitting by length, and the profile's own limit is the default.
@@ -426,20 +452,13 @@ export function PrepareScreenshotPost({
         )
       )
     : []
-  const thread = React.useMemo(() => {
-    if (!explanation.trim()) return { error: '', posts: [] as string[] }
-    try {
-      return {
-        error: '',
-        posts: explanationPosts(explanation, channel, bySize ? length : undefined),
-      }
-    } catch (failure) {
-      return {
-        error: failure instanceof Error ? failure.message : 'This text cannot be split.',
-        posts: [] as string[],
-      }
-    }
-  }, [bySize, channel, explanation, length])
+  // The composer's paste-as-thread split, so both break a thread in the same
+  // places. A blank explanation has nothing to split by length.
+  const thread = useThreadPosts(
+    explanation,
+    channel,
+    bySize && explanation.trim() ? length : undefined
+  )
   // A batch item is one caption and its media; a thread belongs to a draft.
   const threading = destination === 'draft' && thread.posts.length > 0
   // The caption is the opening post, so the explanation fills the rest.
@@ -852,13 +871,23 @@ export function PrepareScreenshotPost({
                     panel; the others post this one.
                   </p>
                 ) : null}
-                {overLimit.map((problem) => (
-                  <p className="text-caption text-destructive" key={problem.channel} role="status">
-                    {problem.reused
-                      ? `${CAPABILITIES[problem.channel].label} would post this caption, which is ${problem.length} characters there; its limit is ${problem.limit}. Shorten it, or write a ${CAPABILITIES[problem.channel].label} caption in the editor’s Captions panel.`
-                      : `The ${CAPABILITIES[problem.channel].label} caption is ${problem.length} characters; the limit is ${problem.limit}. Shorten it before scheduling.`}
+                {overLimit === null ? (
+                  <p className="text-caption text-destructive" role="status">
+                    The caption lengths could not be checked.
                   </p>
-                ))}
+                ) : (
+                  overLimit?.map((problem) => (
+                    <p
+                      className="text-caption text-destructive"
+                      key={problem.channel}
+                      role="status"
+                    >
+                      {problem.reused
+                        ? `${CAPABILITIES[problem.channel].label} would post this caption, which is ${problem.length} characters there; its limit is ${problem.limit}. Shorten it, or write a ${CAPABILITIES[problem.channel].label} caption in the editor’s Captions panel.`
+                        : `The ${CAPABILITIES[problem.channel].label} caption is ${problem.length} characters; the limit is ${problem.limit}. Shorten it before scheduling.`}
+                    </p>
+                  ))
+                )}
               </div>
               {!exports && versions.length > 0 ? (
                 <Label className="flex items-start gap-3 rounded-xl border border-border p-4 text-ui font-normal leading-normal">
@@ -915,6 +944,11 @@ export function PrepareScreenshotPost({
                         </Label>
                       ) : null}
                     </div>
+                    {thread.pending ? (
+                      <p className="text-caption text-muted-foreground" role="status">
+                        Splitting into posts…
+                      </p>
+                    ) : null}
                     {thread.posts.length > 0 ? (
                       <div className="grid gap-2">
                         <p className="text-caption text-muted-foreground">
@@ -1223,6 +1257,8 @@ export function PrepareScreenshotPost({
               disabled={
                 Boolean(busy) ||
                 Boolean(blocked) ||
+                // Until the explanation's split arrives, its posts are an older text's.
+                thread.pending ||
                 (destination === 'batch' && chosenBatch === NEW_BATCH && !batchTitle.trim())
               }
               onClick={() => void submit()}
