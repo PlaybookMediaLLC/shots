@@ -28,4 +28,8 @@ func TestDestinationsAreComplete(t *testing.T) {
 			t.Fatalf("%s video: %+v", channel, rules.Video)
 		}
 	}
+	// X's per-tier limits feed every verified X account; a zero would refuse all X video.
+	if x := Limits.Destinations["x"].Video.Accounts; x.Standard.MaxMs < 1 || x.Standard.MaxBytes < 1 || x.Premium.MaxMs < x.Standard.MaxMs || x.Premium.MaxBytes < x.Standard.MaxBytes {
+		t.Fatalf("x account video tiers: %+v", x)
+	}
 }
