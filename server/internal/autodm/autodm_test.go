@@ -168,7 +168,10 @@ func TestLimitsNeverExceedTheProductCaps(t *testing.T) {
 		"per hour":   func(l *Limits) { l.PerHour = 101 },
 		"per day":    func(l *Limits) { l.PerDay = 501 },
 		"campaigns":  func(l *Limits) { l.ActiveCampaigns = 4 },
-		"no quota":   func(l *Limits) { l.PerDay = 0 },
+		"no daily":   func(l *Limits) { l.PerDay = 0 },
+		"no minute":  func(l *Limits) { l.PerMinute = 0 },
+		"no hourly":  func(l *Limits) { l.PerHour = 0 },
+		"none":       func(l *Limits) { l.ActiveCampaigns = 0 },
 	} {
 		limits := ProductLimits
 		change(&limits)

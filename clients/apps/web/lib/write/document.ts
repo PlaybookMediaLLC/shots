@@ -175,8 +175,10 @@ export const autoDmSchema = z
     replyText: z.string().max(100).optional(),
     message: z
       .string()
+      .min(1)
       .max(10_000)
-      .refine((message) => message.trim() !== '', 'Write the message.')
+      // Not blank by Go's strings.TrimSpace: U+0085 is space there, U+FEFF is not.
+      .refine((message) => /[^\s\u0085]|\uFEFF/.test(message), 'Write the message.')
       .refine(
         (message) =>
           [...message.matchAll(/\{\{([^{}]+)\}\}/g)].every(([, name]) =>

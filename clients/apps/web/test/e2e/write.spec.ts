@@ -327,6 +327,27 @@ test('closing a dialog opened from a dialog returns focus to each launcher in tu
   await page.keyboard.press('Escape')
   await expect(review).toHaveCount(0)
   await expect(publish).toBeFocused()
+
+  // The schedule sheet does the same for its button.
+  const schedule = page.getByTestId('schedule-button')
+  await schedule.click()
+  const sheet = page.getByTestId('schedule-dialog')
+  await holdsFocus(sheet)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  await expect(schedule).toBeFocused()
+
+  // Opened by its shortcut (next free slot) while writing, it puts the caret back where it was.
+  const editor = draftEditor(page)
+  await caretAtEndOf(page, editor.getByText('Focus goes back where it came from'))
+  for (let step = 0; step < 4; step += 1) await page.keyboard.press('ArrowLeft')
+  await settleSelection(page)
+  await page.keyboard.press('ControlOrMeta+Alt+Enter')
+  await holdsFocus(sheet)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toHaveCount(0)
+  await page.keyboard.type('right ')
+  await expect(editor).toContainText('Focus goes back where it came right from')
 })
 
 test(

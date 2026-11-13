@@ -550,14 +550,41 @@ const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
  * A caption's length as the platform counts it: X's weighted count of the
  * trimmed text (links are 23), grapheme clusters on Bluesky and Mastodon, and
  * UTF-16 units elsewhere. Go's `draftPostLength` is the same rule; both are
- * tested against `test/caption-length-cases.json`.
+ * tested against `server/internal/product/testdata/caption-length-cases.json`.
  */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
-  // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption ever ends in one.
+  // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption starts or ends with one.
   if (channel === 'x') return xLength(caption.trim())
   if (channel === 'bluesky' || channel === 'mastodon')
-    return Array.from(graphemes.segment(caption)).length
+    // Each printable ASCII character, tab and line feed is a grapheme: skip the segmenter.
+    return /^[ -~\t\n]*$/.test(caption)
+      ? caption.length
+      : Array.from(graphemes.segment(caption)).length
   return captionLength(caption)
+}
+
+/** Where a caption passes a platform's limit, counted as the platform counts it. */
+export function overflowAt(channel: DraftChannel, caption: string, limit: number): number {
+  const fits = (at: number) => platformCaptionLength(channel, caption.slice(0, at)) <= limit
+  if (channel !== 'x') {
+    // Units and graphemes only grow as a prefix grows by whole code points, so
+    // halve the range. X's link weighting can make a longer prefix count less.
+    const ends = [0]
+    for (const character of caption) ends.push(ends[ends.length - 1] + character.length)
+    let [low, high] = [0, ends.length - 1]
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2)
+      if (fits(ends[middle])) low = middle
+      else high = middle - 1
+    }
+    return ends[low]
+  }
+  let at = caption.length
+  while (at > 0 && !fits(at)) {
+    const code = caption.charCodeAt(at - 1)
+    at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
+  }
+  return at
 }
 
 /**

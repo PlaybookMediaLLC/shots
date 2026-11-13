@@ -161,54 +161,57 @@ const actions: Record<string, (editor: PlateEditor) => void> = {
     setPostSettings(editor, 1, { poll: { durationMinutes: 1_440, options: ['', ''] } }),
   'setting applied to every post': (editor) =>
     asUndoStep(editor, () => {
-      setPostSettings(editor, 1, { replySettings: 'following' })
-      setPostSettings(editor, 1, { disclosures: { madeWithAi: true } })
+      for (const post of [1, 2]) setPostSettings(editor, post, { replySettings: 'following' })
     }),
   snippet: (editor) => insertSnippet(editor, ' Follow for more.'),
   'closing-post template': (editor) => appendPost(editor, 'Thanks for reading.'),
 }
 
+// The action happens where typing stopped (where Plate's history would merge
+// text into the typing) or with the caret moved back between the words.
 for (const [history, create] of Object.entries(histories)) {
   for (const [name, act] of Object.entries(actions)) {
-    test(`${history}: a ${name} undoes and redoes as one step and puts the caret back`, async () => {
-      const editor = await create([postBreak(), p('Hello')])
-      try {
-        editor.tf.select({ path: [1, 0], offset: 5 })
-        editor.tf.insertText(' world')
-        await settle()
-        // The caret goes back between the words, where the action happens.
-        editor.tf.select({ path: [1, 0], offset: 5 })
-        await settle()
-        const before = content(editor)
-        const caret = structuredClone(editor.selection)
-        act(editor)
-        await settle()
-        const after = content(editor)
-        assert.notDeepEqual(after, before)
-        // Typing right after the action is a step of its own.
-        editor.tf.insertText('!')
-        await settle()
-        editor.undo()
-        assert.deepEqual(content(editor), after)
-        editor.undo()
-        assert.deepEqual(content(editor), before)
-        assert.deepEqual(editor.selection, caret)
-        editor.redo()
-        assert.deepEqual(content(editor), after)
-        editor.undo()
-        assert.deepEqual(content(editor), before)
-        assert.deepEqual(editor.selection, caret)
-        // Typing right before the action stays a step of its own.
-        editor.undo()
-        assert.equal(editor.api.string([1]), 'Hello')
-        assert.equal(editor.children.length, 2)
-      } finally {
-        if ('undoManager' in editor) {
-          const { awareness, ydoc } = editor.getOptions(YjsPlugin)
-          awareness.destroy()
-          ydoc.destroy()
+    for (const offset of [11, 5])
+      test(`${history}: a ${name} at ${offset} undoes and redoes as one step and puts the caret back`, async () => {
+        const editor = await create([postBreak(), p('Hello'), postBreak(), p('Two')])
+        try {
+          editor.tf.select({ path: [1, 0], offset: 5 })
+          editor.tf.insertText(' world')
+          await settle()
+          editor.tf.select({ path: [1, 0], offset })
+          await settle()
+          const before = content(editor)
+          const caret = structuredClone(editor.selection)
+          act(editor)
+          await settle()
+          const after = content(editor)
+          const caretAfter = structuredClone(editor.selection)
+          assert.notDeepEqual(after, before)
+          // Typing right after the action is a step of its own.
+          editor.tf.insertText('!')
+          await settle()
+          editor.undo()
+          assert.deepEqual(content(editor), after)
+          editor.undo()
+          assert.deepEqual(content(editor), before)
+          assert.deepEqual(editor.selection, caret)
+          editor.redo()
+          assert.deepEqual(content(editor), after)
+          assert.deepEqual(editor.selection, caretAfter)
+          editor.undo()
+          assert.deepEqual(content(editor), before)
+          assert.deepEqual(editor.selection, caret)
+          // Typing right before the action stays a step of its own.
+          editor.undo()
+          assert.equal(editor.api.string([1]), 'Hello')
+          assert.equal(editor.children.length, 4)
+        } finally {
+          if ('undoManager' in editor) {
+            const { awareness, ydoc } = editor.getOptions(YjsPlugin)
+            awareness.destroy()
+            ydoc.destroy()
+          }
         }
-      }
-    })
+      })
   }
 }

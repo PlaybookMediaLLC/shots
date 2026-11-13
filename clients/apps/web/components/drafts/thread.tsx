@@ -180,11 +180,23 @@ export function asUndoStep(editor: PlateEditor, change: () => void): void {
     change()
     return
   }
-  const live = 'undoManager' in editor ? (editor as unknown as LiveHistory) : null
+  const live =
+    'undoManager' in editor && 'flushLocalChanges' in editor
+      ? (editor as unknown as LiveHistory)
+      : null
+  let thrown = null as { error: unknown } | null
   stepping.add(editor)
   try {
     live?.undoManager.stopCapturing()
-    editor.tf.withNewBatch(change)
+    // withNewBatch does not restore its merging state when its callback throws.
+    editor.tf.withNewBatch(() => {
+      try {
+        change()
+      } catch (error) {
+        thrown = { error }
+      }
+    })
+    if (thrown) throw thrown.error
     editor.tf.setSplittingOnce(true)
     if (!live) return
     live.flushLocalChanges()

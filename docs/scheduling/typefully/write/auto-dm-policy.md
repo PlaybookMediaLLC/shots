@@ -60,7 +60,9 @@ One DM per person per campaign, ever. The send is claimed in the database,
 under a lock on the X account, before anything is sent; a replayed event, a
 retry, a restart or a second matching action finds the claim and sends
 nothing. A send whose outcome is unknown (a timeout, an unclear answer) is
-never retried automatically: a person checks X and records what happened.
+never retried automatically: it stays unknown until a person reconciles it
+with X. Not built yet: the screen or tool that records that reconciliation
+(`SQLLedger.Complete` has no caller).
 
 Tests: `TestDeliveryGateConcurrentDedupeAndUnknownOutcome`,
 `TestDurableClaimsSurviveConcurrencyRestartAndUnknownOutcome`.

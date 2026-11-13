@@ -10,7 +10,7 @@ import (
 // The composer's platformCaptionLength reads the same cases
 // (clients/apps/web/test/write-publication.test.ts): both sides must agree.
 func TestDraftPostLengthMatchesTheComposer(t *testing.T) {
-	data, err := os.ReadFile("../../../clients/apps/web/test/caption-length-cases.json")
+	data, err := os.ReadFile("testdata/caption-length-cases.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestDraftPostLengthMatchesTheComposer(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !maps.Equal(fixture.Limits, draftChannelLimits) {
-		t.Fatalf("limits %v, composer %v", draftChannelLimits, fixture.Limits)
+		t.Fatalf("Go limits %v, fixture %v", draftChannelLimits, fixture.Limits)
 	}
 	for _, item := range fixture.Cases {
 		t.Run(item.Label, func(t *testing.T) {

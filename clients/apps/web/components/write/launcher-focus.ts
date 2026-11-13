@@ -27,7 +27,9 @@ export function useLauncherFocus(): { remember: () => void; restore: () => void 
   const restore = React.useCallback(() => {
     // Once the dialog's focus trap has released, not while it still holds focus.
     setTimeout(() => {
-      if (!launcher.current?.isConnected) return
+      // Another dialog opened as this one closed (Preview, on a phone): leave it focused.
+      if (!launcher.current?.isConnected || document.activeElement?.closest('[role="dialog"]'))
+        return
       launcher.current.focus({ preventScroll: true })
       const saved = range.current
       if (saved?.startContainer.isConnected && saved.endContainer.isConnected) {

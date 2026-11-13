@@ -31,7 +31,9 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  const length = (value: string) => platformCaptionLength(channel, value)
+  // No count is above UTF-16 units but X's: within the limit in units, a text fits without measuring.
+  const fits = (value: string) =>
+    (channel !== 'x' && value.length <= limit) || platformCaptionLength(channel, value) <= limit
   const posts: string[] = []
   let current = ''
   const push = () => {
@@ -43,21 +45,21 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
       )
   }
   for (const token of text.replace(/\r\n?/g, '\n').match(/\S+\s*/g) ?? []) {
-    if (length((current + token).trim()) <= limit) {
+    if (fits((current + token).trim())) {
       current += token
       continue
     }
     push()
-    if (length(token.trim()) <= limit) {
+    if (fits(token.trim())) {
       current = token
       continue
     }
     for (const { segment } of new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(
       token
     )) {
-      if (length(segment) > limit)
+      if (!fits(segment))
         throw new Error('A character sequence exceeds the selected limit.')
-      if (length((current + segment).trim()) > limit) push()
+      if (!fits((current + segment).trim())) push()
       current += segment
     }
   }

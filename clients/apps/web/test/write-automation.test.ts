@@ -64,11 +64,15 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
     message: 'Hi {{first_name}}, here is {{post_url}}',
   } as const
   assert.ok(autoDmSchema.safeParse(valid).success)
+  // Go's TrimSpace keeps U+FEFF: a draft it stored must still load here.
+  assert.ok(autoDmSchema.safeParse({ ...valid, message: '\uFEFF' }).success)
   for (const [name, change] of Object.entries({
     variable: { message: 'Hi {{email}}' },
-    blank: { message: '   ' },
+    blank: { message: ' \u0085\u3000 ' },
     'no action': { replies: false, reposts: false, replyText: '' },
     'reply filter without replies': { replies: false, reposts: true },
+    'long message': { message: 'x'.repeat(10_001) },
+    'long reply filter': { replyText: 'x'.repeat(101) },
   })) {
     assert.equal(autoDmSchema.safeParse({ ...valid, ...change }).success, false, name)
   }

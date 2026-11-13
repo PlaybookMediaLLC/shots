@@ -21,7 +21,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { autoDmSchema, type AutoDm } from '@/lib/write/document'
+import { AUTO_DM_VARIABLES, autoDmSchema, type AutoDm } from '@/lib/write/document'
 
 /** Prepare and persist a campaign while making the unavailable delivery state explicit. */
 export function AutoDmDraft({
@@ -143,7 +143,7 @@ export function AutoDmDraft({
             />
           </Label>
           <p className="text-xs">
-            Variables: {'{{first_name}}, {{full_name}}, {{username}}, {{action}}, {{post_url}}'}. An
+            Variables: {AUTO_DM_VARIABLES.map((name) => `{{${name}}}`).join(', ')}. An
             opt-out instruction is appended. Following or engaging alone is not consent.
           </p>
           {error ? <p role="alert">{error}</p> : null}
