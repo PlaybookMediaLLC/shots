@@ -6,8 +6,8 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PlaybookMediaLLC/screenshot-studio.git",
-    "directory": "packages/screenshot-studio-backend-sdk"
+    "url": "git+https://github.com/PlaybookMediaLLC/shots.git",
+    "directory": "clients/packages/screenshot-studio-backend-sdk"
   },
   "files": [
     "dist"

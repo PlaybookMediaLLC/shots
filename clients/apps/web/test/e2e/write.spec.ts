@@ -418,7 +418,9 @@ test(
     await snap(page, 'write-failed-destinations')
 
     // Retrying one destination makes one new post for it; the other stays as it is.
-    await failed.first().getByRole('button', { name: 'Retry this destination' }).click()
+    // A running worker can fail the LinkedIn fixture as needing a reconnect. Its account
+    // then blocks a retry, so retry the first destination that offers one.
+    await failed.getByRole('button', { name: 'Retry this destination' }).first().click()
     await expect.poll(async () => (await draftPosts(draftId)).length, { timeout: 30_000 }).toBe(3)
   }
 )
