@@ -84,4 +84,10 @@ func TestChannelConnectionRefreshReadsTheProfileAgain(t *testing.T) {
 	if missing := configurationRequest(handler, http.MethodPost, "/v1/channel-connections/connection02/refresh", ""); missing.Code != http.StatusNotFound {
 		t.Fatalf("an unknown account refreshed: %d", missing.Code)
 	}
+	// Another member's private account is not found, as in the list.
+	private := "private-set"
+	store.connections = append(store.connections, &ent.ChannelConnection{ID: "connection03", ExternalAccountID: "social-private", Platform: "linkedin", Status: "ACTIVE", SocialSetID: &private})
+	if hidden := configurationRequest(handler, http.MethodPost, "/v1/channel-connections/connection03/refresh", ""); hidden.Code != http.StatusNotFound {
+		t.Fatalf("another member's private account refreshed: %d %s", hidden.Code, hidden.Body.String())
+	}
 }

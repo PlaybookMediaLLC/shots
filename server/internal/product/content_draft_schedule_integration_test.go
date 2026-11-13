@@ -374,14 +374,92 @@ func TestContentDraftScheduling(t *testing.T) {
 		if got := reason(); got != "" {
 			t.Fatalf("restored writer's post=%q", got)
 		}
-		// A private set's posts publish only for its owner.
-		private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Owner only", Visibility: "PRIVATE"})
+		exec(`UPDATE "user" SET banned=true WHERE id=$1`, writer)
+		if got := reason(); got != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("banned writer's post=%q", got)
+		}
+		exec(`UPDATE "user" SET banned=false WHERE id=$1`, writer)
+		// The account's private set publishes only for its owner.
+		private, err := repo.CreateSocialSet(ctx, owner, SocialSetInput{Name: "Writer only", Visibility: "PRIVATE"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		exec(`UPDATE scheduled_post SET "socialSetId"=$2 WHERE id=$1`, post, private.ID)
+		home := db.Client.ChannelConnection.GetX(ctx, linkedinChannel).SocialSetID
+		defer exec(`UPDATE channel_connection SET "socialSetId"=$2 WHERE id=$1`, linkedinChannel, *home)
+		exec(`UPDATE channel_connection SET "socialSetId"=$2 WHERE id=$1`, linkedinChannel, private.ID)
+		exec(`UPDATE social_set SET "ownerUserId"=$2 WHERE id=$1`, private.ID, writer)
+		if got := reason(); got != "" {
+			t.Fatalf("a post on the writer's own private account=%q", got)
+		}
+		// Only the set's owner lists its posts.
+		listed := func(viewer Actor) bool {
+			t.Helper()
+			posts, err := repo.ListScheduledPosts(ctx, viewer, 200)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, row := range posts {
+				if row.ID == post {
+					return true
+				}
+			}
+			return false
+		}
+		if !listed(actor) || listed(owner) {
+			t.Fatalf("writer lists=%v owner lists=%v", listed(actor), listed(owner))
+		}
+		exec(`UPDATE social_set SET "ownerUserId"=$2 WHERE id=$1`, private.ID, owner.UserID)
 		if got := reason(); got != publishing.FailureSchedulerUnauthorized {
-			t.Fatalf("a post in another person's private set=%q", got)
+			t.Fatalf("a post on another person's private account=%q", got)
+		}
+		// The refusal is kept: the post is cancelled with its reason, unsent.
+		job, err := store.LoadPublishJob(ctx, post, "run-"+post)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := store.CancelIneligible(ctx, job.Post, job.Ineligible, "run-"+post); err != nil {
+			t.Fatal(err)
+		}
+		if row := db.Client.ScheduledPost.GetX(ctx, post); row.Status != scheduledpost.StatusCANCELLED || row.FailureCode == nil ||
+			*row.FailureCode != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("refused post=%+v", row)
+		}
+	})
+
+	t.Run("removing a member cancels the posts they queued", func(t *testing.T) {
+		writer := "leaving_" + id
+		exec(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Leaving',$2,true,now(),now())`, writer, writer+"@example.test")
+		exec(`INSERT INTO session (id,"expiresAt",token,"createdAt","updatedAt","userId","activeOrganizationId") VALUES ($1,now()+interval '1 hour',$1,now(),now(),$2,$3)`, "session_"+writer, writer, org)
+		exec(`INSERT INTO member (id,"organizationId","userId",role,"createdAt") VALUES ($1,$2,$3,'writer_publisher',now())`, "member_"+writer, org, writer)
+		defer exec(`DELETE FROM "user" WHERE id=$1`, writer)
+		actor := Actor{OrganizationID: org, UserID: writer, SessionID: "session_" + writer, RequestID: "request_" + writer}
+		theirs, err := repo.CreateContentDraft(ctx, actor, ContentDraftInput{PlainText: "Theirs", Title: "Theirs"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		queued, err := repo.ScheduleContentDraft(ctx, actor, theirs.ID, ScheduleContentDraftInput{ScheduledFor: at, Version: theirs.Version,
+			Targets: []ContentDraftScheduleTarget{{Caption: "Theirs", ChannelConnectionID: linkedinChannel}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		mine, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{PlainText: "Mine", Title: "Mine"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		kept, err := repo.ScheduleContentDraft(ctx, owner, mine.ID, ScheduleContentDraftInput{ScheduledFor: at, Version: mine.Version,
+			Targets: []ContentDraftScheduleTarget{{Caption: "Mine", ChannelConnectionID: linkedinChannel}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repo.RemoveMember(ctx, owner, "member_"+writer); err != nil {
+			t.Fatal(err)
+		}
+		if row := db.Client.ScheduledPost.GetX(ctx, queued.Posts[0].ID); row.Status != scheduledpost.StatusCANCELLED || row.FailureCode == nil ||
+			*row.FailureCode != publishing.FailureSchedulerUnauthorized {
+			t.Fatalf("a removed member's queued post=%+v", row)
+		}
+		if row := db.Client.ScheduledPost.GetX(ctx, kept.Posts[0].ID); row.Status != scheduledpost.StatusSCHEDULED {
+			t.Fatalf("someone else's queued post=%s", row.Status)
 		}
 	})
 }

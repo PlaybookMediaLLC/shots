@@ -15,10 +15,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/agentauthorization"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
-	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/lucsky/cuid"
 )
@@ -245,9 +245,13 @@ func (c *Configuration) ExchangeAgentCode(ctx context.Context, clientID, code, c
 		return nil, ErrInvalidGrant
 	}
 	// The consenting member may have left since: their consent leaves with them.
-	if current, err := tx.Member.Query().Where(member.OrganizationID(grant.OrganizationID), member.UserID(grant.UserID)).Exist(ctx); err != nil {
+	// The row lock orders this exchange with a removal, which revokes the key it mints.
+	current := false
+	if err := tx.PlatformQuery(ctx, `SELECT id FROM member WHERE "organizationId"=$1 AND "userId"=$2 FOR SHARE`, []any{grant.OrganizationID, grant.UserID},
+		func(row entsql.ColumnScanner) error { current = true; var id string; return row.Scan(&id) }); err != nil {
 		return nil, err
-	} else if !current {
+	}
+	if !current {
 		return nil, ErrInvalidGrant
 	}
 	var expiresAt *time.Time

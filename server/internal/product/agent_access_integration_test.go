@@ -139,6 +139,9 @@ func TestAgentKeysLeaveWithTheMemberWhoConsented(t *testing.T) {
 		_, err := w.repo.VerifyAPIKey(w.ctx, token)
 		return err == nil
 	}
+	// A key an admin created in API settings belongs to the workspace, not to them.
+	w.exec(t, `INSERT INTO apikey (id,name,"referenceId",key,enabled,"createdAt","updatedAt") VALUES ($1,'Settings key',$2,$3,true,now(),now())`,
+		"key_settings_"+w.id, w.org, "hashed-settings-"+w.id)
 	ownerKey, removedKey, leaverKey := connect(w.owner), connect(w.actor("removed")), connect(w.actor("leaver"))
 	provisionedKey := connect(w.actor("deprovisioned"))
 	pending, err := w.repo.ApproveAgentAccess(w.ctx, w.actor("removed"), request)
@@ -162,6 +165,19 @@ func TestAgentKeysLeaveWithTheMemberWhoConsented(t *testing.T) {
 	}
 	if _, err := w.repo.ExchangeAgentCode(w.ctx, "pcd_claude", pending.Code, "verifier", request.RedirectURI); !errors.Is(err, ErrInvalidGrant) {
 		t.Fatalf("a removed member's consent minted a key: %v", err)
+	}
+	if settings := w.db.Client.Apikey.Query().Where(apikey.ID("key_settings_" + w.id)).OnlyX(w.ctx); settings.Enabled == nil || !*settings.Enabled {
+		t.Fatal("removal disabled a key that belongs to the workspace")
+	}
+	// A late removal event for someone who rejoined revokes nothing.
+	w.addMember(t, "rejoined", "admin")
+	rejoinedKey := connect(w.actor("rejoined"))
+	if err := w.repo.RecordAuthEvent(w.ctx, AuthEvent{Action: "product.member_removed", EntityID: "member_rejoined_" + w.id,
+		EntityType: "member", OrganizationID: w.org, RemovedUserID: "user_rejoined_" + w.id}); err != nil {
+		t.Fatal(err)
+	}
+	if !works(rejoinedKey) {
+		t.Fatal("a late removal event revoked a current member's key")
 	}
 	if n := w.db.Client.AuditLog.Query().Where(auditlog.OrganizationID(w.org), auditlog.Action("product.agent_keys_revoked")).CountX(w.ctx); n != 3 {
 		t.Fatalf("revocation audits=%d", n)

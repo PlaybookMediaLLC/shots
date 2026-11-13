@@ -26,6 +26,7 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftsettings"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/organization"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/predicate"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/schema"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
@@ -1087,16 +1088,25 @@ func cancelQueuedPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionI
 
 // cancelPosts cancels the posts still waiting to publish on these accounts.
 func cancelPosts(ctx context.Context, tx *ent.Tx, actor Actor, connectionIDs []string, reason string) ([]string, error) {
-	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
-		scheduledpost.ChannelConnectionIDIn(connectionIDs...),
+	return cancelQueued(ctx, tx, actor, scheduledpost.ChannelConnectionIDIn(connectionIDs...), reason, "")
+}
+
+// cancelQueued cancels the workspace's queued posts that match, with failureCode
+// when it is set. A cancelled post's workflow ends at its claim, which needs SCHEDULED.
+func cancelQueued(ctx context.Context, tx *ent.Tx, actor Actor, match predicate.ScheduledPost, reason, failureCode string) ([]string, error) {
+	queued, err := tx.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID), match,
 		scheduledpost.StatusIn(scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	cancelled := make([]string, 0, len(queued))
 	for _, post := range queued {
-		count, err := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
-			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED).Save(ctx)
+		update := tx.ScheduledPost.Update().Where(scheduledpost.ID(post.ID), scheduledpost.StatusIn(
+			scheduledpost.StatusDRAFT, scheduledpost.StatusSCHEDULED)).SetStatus(scheduledpost.StatusCANCELLED)
+		if failureCode != "" {
+			update.SetFailureCode(failureCode)
+		}
+		count, err := update.Save(ctx)
 		if err != nil {
 			return nil, err
 		}

@@ -193,7 +193,11 @@ func (c *Configuration) ListScheduledPosts(ctx context.Context, actor Actor, lim
 	if err := c.authorizeRoles(ctx, actor, "owner", "admin", "publisher"); err != nil {
 		return nil, err
 	}
-	return c.auth.ListScheduledPosts(ctx, actor.OrganizationID, !actor.IsSession(), limit)
+	viewer := ""
+	if actor.IsSession() {
+		viewer = actor.UserID
+	}
+	return c.auth.ListScheduledPosts(ctx, actor.OrganizationID, viewer, limit)
 }
 
 // CancelScheduledPost cancels a post that has not started publishing. Its

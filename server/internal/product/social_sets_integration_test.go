@@ -363,23 +363,31 @@ func TestSocialSetsPlatform(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		listedIn := func(actor Actor) bool {
+		exec(`UPDATE channel_connection SET "socialSetId"=NULL WHERE id=$1`, ids["linkedin"])
+		defer exec(`UPDATE channel_connection SET "socialSetId"=$2 WHERE id=$1`, ids["linkedin"], defaultSet.ID)
+		all, err = db.Client.ChannelConnection.Query().Where(channelconnection.OrganizationID(org)).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// listed reports whether actor sees the private, shared (x) and set-less (linkedin) accounts.
+		listed := func(actor Actor) [3]bool {
 			t.Helper()
 			visible, err := repo.VisibleConnections(ctx, actor, all)
 			if err != nil {
 				t.Fatal(err)
 			}
+			var seen [3]bool
 			for _, connection := range visible {
-				if connection.SocialSetID != nil && *connection.SocialSetID == private.ID {
-					return true
-				}
+				seen[0] = seen[0] || (connection.SocialSetID != nil && *connection.SocialSetID == private.ID)
+				seen[1] = seen[1] || connection.ID == ids["x"]
+				seen[2] = seen[2] || connection.ID == ids["linkedin"]
 			}
-			return false
+			return seen
 		}
 		key := owner
 		key.Kind, key.UserID = "api_key", ""
-		if !listedIn(admin) || listedIn(owner) || listedIn(key) {
-			t.Fatal("a private set's account was listed for someone other than its owner")
+		if listed(admin) != [3]bool{true, true, true} || listed(owner) != [3]bool{false, true, true} || listed(key) != [3]bool{false, true, true} {
+			t.Fatalf("admin=%v owner=%v key=%v", listed(admin), listed(owner), listed(key))
 		}
 		if _, err := repo.GetSocialSet(ctx, owner, private.ID); !errors.Is(err, publishing.ErrNotFound) {
 			t.Fatalf("private set read by another member: %v", err)

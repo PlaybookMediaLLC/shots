@@ -295,6 +295,10 @@ func (s *Server) refreshChannelConnection(w http.ResponseWriter, r *http.Request
 		return
 	}
 	connections, err := s.store.ListConnections(r.Context(), actor.OrganizationID)
+	if err == nil {
+		// Another member's private account is not found, as in the list.
+		connections, err = s.configuration.VisibleConnections(r.Context(), actor, connections)
+	}
 	if err != nil {
 		writeStoreError(w, err)
 		return

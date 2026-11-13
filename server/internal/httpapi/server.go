@@ -48,7 +48,7 @@ type Store interface {
 	ListConnections(context.Context, string) ([]*ent.ChannelConnection, error)
 	SetConnectionProfile(ctx context.Context, id, name, handle, avatar string) (*ent.ChannelConnection, error)
 	CreateScheduledPost(context.Context, publishing.Actor, publishing.CreateScheduledPostInput) (publishing.CreateScheduledPostResult, error)
-	ListScheduledPosts(context.Context, string, bool, int) ([]*ent.ScheduledPost, error)
+	ListScheduledPosts(context.Context, string, string, int) ([]*ent.ScheduledPost, error)
 	CancelScheduledPost(context.Context, publishing.Actor, string) (*ent.ScheduledPost, error)
 }
 
@@ -727,7 +727,11 @@ func (s *Server) listScheduledPosts(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = parsed
 	}
-	posts, err := s.store.ListScheduledPosts(r.Context(), r.Header.Get("X-Organization-ID"), !requestActor(r).IsSession(), limit)
+	viewer := ""
+	if actor := requestActor(r); actor.IsSession() {
+		viewer = actor.UserID
+	}
+	posts, err := s.store.ListScheduledPosts(r.Context(), r.Header.Get("X-Organization-ID"), viewer, limit)
 	if err != nil {
 		writeStoreError(w, err)
 		return

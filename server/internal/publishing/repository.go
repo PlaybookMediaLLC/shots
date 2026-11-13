@@ -292,14 +292,12 @@ func (r *Repository) IsEligible(ctx context.Context, organizationID, variantID, 
 	return r.isEligible(ctx, organizationID, variantID, connectionID)
 }
 
-// ListScheduledPosts reads the schedule, newest first. sharedOnly leaves out
-// private social sets, which are for sessions: an API key never reads them.
-func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID string, sharedOnly bool, limit int) ([]*ent.ScheduledPost, error) {
+// ListScheduledPosts reads the schedule, newest first, as viewer may see it:
+// a person sees their own private sets; an API key (viewer "") sees none.
+func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID, viewer string, limit int) ([]*ent.ScheduledPost, error) {
 	query := r.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(organizationID))
-	if sharedOnly {
-		if err := keepSharedPosts(ctx, r.client, query, organizationID); err != nil {
-			return nil, err
-		}
+	if err := keepVisiblePosts(ctx, r.client, query, organizationID, viewer); err != nil {
+		return nil, err
 	}
 	return query.WithChannelConnection().
 		Order(ent.Desc(scheduledpost.FieldScheduledFor), ent.Desc(scheduledpost.FieldID)).
@@ -307,14 +305,20 @@ func (r *Repository) ListScheduledPosts(ctx context.Context, organizationID stri
 		All(ctx)
 }
 
-// keepSharedPosts limits query to posts outside the workspace's private sets.
-func keepSharedPosts(ctx context.Context, client *ent.Client, query *ent.ScheduledPostQuery, organizationID string) error {
-	private, err := client.SocialSet.Query().Where(socialset.OrganizationID(organizationID),
-		socialset.VisibilityEQ(socialset.VisibilityPRIVATE)).IDs(ctx)
+// keepVisiblePosts limits query to posts outside the private sets viewer does
+// not own, by the post's set and by its account's, which a campaign post
+// without a set still has. An API key (viewer "") sees no private set.
+func keepVisiblePosts(ctx context.Context, client *ent.Client, query *ent.ScheduledPostQuery, organizationID, viewer string) error {
+	sets := client.SocialSet.Query().Where(socialset.OrganizationID(organizationID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE))
+	if viewer != "" {
+		sets.Where(socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(viewer)))
+	}
+	private, err := sets.IDs(ctx)
 	if err != nil || len(private) == 0 {
 		return err
 	}
-	query.Where(scheduledpost.Or(scheduledpost.SocialSetIDIsNil(), scheduledpost.SocialSetIDNotIn(private...)))
+	query.Where(scheduledpost.Or(scheduledpost.SocialSetIDIsNil(), scheduledpost.SocialSetIDNotIn(private...)),
+		scheduledpost.HasChannelConnectionWith(channelconnection.Or(channelconnection.SocialSetIDIsNil(), channelconnection.SocialSetIDNotIn(private...))))
 	return nil
 }
 
@@ -343,8 +347,12 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 	}
 	defer tx.Rollback()
 	query := tx.ScheduledPost.Query().Where(scheduledpost.ID(id), scheduledpost.OrganizationID(actor.Organization))
-	if actor.Type != "USER" && actor.Type != "SUPPORT" {
-		if err := keepSharedPosts(ctx, tx.Client(), query, actor.Organization); err != nil {
+	if actor.Type != "SUPPORT" {
+		viewer := ""
+		if actor.Type == "USER" {
+			viewer = actor.UserID
+		}
+		if err := keepVisiblePosts(ctx, tx.Client(), query, actor.Organization, viewer); err != nil {
 			return nil, err
 		}
 	}
@@ -472,7 +480,7 @@ func (r *Repository) LoadPublishJob(ctx context.Context, id, runID string) (Publ
 	if err != nil {
 		return PublishJob{}, err
 	}
-	authorized, err := r.schedulerMayPublish(ctx, post)
+	authorized, err := r.schedulerMayPublish(ctx, post, connection)
 	if err != nil {
 		return PublishJob{}, err
 	}
@@ -507,23 +515,31 @@ func ineligibility(workspaceActive bool, connection *ent.ChannelConnection, sche
 	return approval
 }
 
-// schedulerMayPublish rechecks, when a post is due, the person who queued it:
-// an active member whose role publishes, who owns its set when that set is
-// private (RFC 024). A post an API key queued names no person; its key was
-// checked when it was queued.
-func (r *Repository) schedulerMayPublish(ctx context.Context, post *ent.ScheduledPost) (bool, error) {
+// schedulerMayPublish rechecks, when a post is due, whoever queued it: a
+// person must still be an active member whose role publishes, and own the
+// account's set when that set is private (RFC 024); an API key
+// ("api-key:<id>") must still be enabled and unexpired in this workspace, and
+// never reaches a private set. A post that records neither, from before
+// schedulers were recorded, publishes as it did.
+func (r *Repository) schedulerMayPublish(ctx context.Context, post *ent.ScheduledPost, connection *ent.ChannelConnection) (bool, error) {
 	if post.ScheduledByUserID == nil {
 		return true, nil
 	}
 	scheduler := *post.ScheduledByUserID
-	err := r.AuthorizeRole(ForStartedRun(ctx), post.OrganizationID, scheduler, "", "owner", "admin", "publisher")
+	var err error
+	if key, ok := strings.CutPrefix(scheduler, "api-key:"); ok {
+		err = r.AuthorizeAPIKey(ctx, post.OrganizationID, key)
+	} else {
+		err = r.AuthorizePublishing(ForStartedRun(ctx), post.OrganizationID, scheduler, "")
+	}
 	if errors.Is(err, ErrForbidden) || errors.Is(err, ErrUnauthorized) {
 		return false, nil
 	}
-	if err != nil || post.SocialSetID == nil {
+	// The account's set, not the post's: a campaign post records none.
+	if err != nil || connection.SocialSetID == nil {
 		return err == nil, err
 	}
-	foreign, err := r.client.SocialSet.Query().Where(socialset.ID(*post.SocialSetID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE),
+	foreign, err := r.client.SocialSet.Query().Where(socialset.ID(*connection.SocialSetID), socialset.VisibilityEQ(socialset.VisibilityPRIVATE),
 		socialset.Or(socialset.OwnerUserIDIsNil(), socialset.OwnerUserIDNEQ(scheduler))).Exist(ctx)
 	return !foreign, err
 }
@@ -578,7 +594,7 @@ func (r *Repository) loadDraftPublishJob(ctx context.Context, post *ent.Schedule
 	if sentBack {
 		approval = FailureChangesRequested
 	}
-	authorized, err := r.schedulerMayPublish(ctx, post)
+	authorized, err := r.schedulerMayPublish(ctx, post, connection)
 	if err != nil {
 		return PublishJob{}, err
 	}

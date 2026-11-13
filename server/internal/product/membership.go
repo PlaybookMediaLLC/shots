@@ -9,7 +9,9 @@ import (
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/apikey"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/invitation"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/member"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/session"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 )
 
 type MemberUser struct {
@@ -193,7 +195,7 @@ func (c *Configuration) RemoveMember(ctx context.Context, actor Actor, memberID 
 	if _, err := tx.Session.Delete().Where(session.ActiveOrganizationID(actor.OrganizationID), session.UserID(current.UserID)).Exec(ctx); err != nil {
 		return nil, err
 	}
-	if err := revokeAgentKeys(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
+	if err := revokeDeparted(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
 		return nil, err
 	}
 	if err := recordProductActivity(ctx, tx, actor, "member.removed", "product.member_removed", "member", memberID); err != nil {
@@ -207,10 +209,15 @@ func (c *Configuration) RemoveMember(ctx context.Context, actor Actor, memberID 
 	return result, nil
 }
 
-// revokeAgentKeys disables the workspace keys a departing member's AI agent
-// consents minted: an agent acts for the person who consented, so it leaves
-// with them. Keys an admin created in API settings belong to the workspace.
-func revokeAgentKeys(ctx context.Context, tx *ent.Tx, actor Actor, organizationID, userID, memberID string) error {
+// revokeDeparted ends what a departing member queued or delegated: their
+// queued posts are cancelled, and the workspace keys their AI agent consents
+// minted are disabled, since an agent acts for the person who consented. Keys
+// an admin created in API settings belong to the workspace and stay.
+func revokeDeparted(ctx context.Context, tx *ent.Tx, actor Actor, organizationID, userID, memberID string) error {
+	if _, err := cancelQueued(ctx, tx, actor, scheduledpost.ScheduledByUserID(userID), "member_removed",
+		publishing.FailureSchedulerUnauthorized); err != nil {
+		return err
+	}
 	keys, err := tx.AgentAuthorization.Query().Where(agentauthorization.OrganizationID(organizationID),
 		agentauthorization.UserID(userID), agentauthorization.APIKeyIDNotNil()).
 		Select(agentauthorization.FieldAPIKeyID).Strings(ctx)
@@ -265,7 +272,7 @@ func (c *Configuration) LeaveWorkspace(ctx context.Context, actor Actor) (*Works
 	if _, err := tx.Session.Delete().Where(session.ActiveOrganizationID(actor.OrganizationID), session.UserID(actor.UserID)).Exec(ctx); err != nil {
 		return nil, err
 	}
-	if err := revokeAgentKeys(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
+	if err := revokeDeparted(ctx, tx, actor, current.OrganizationID, current.UserID, current.ID); err != nil {
 		return nil, err
 	}
 	if err := recordProductActivity(ctx, tx, actor, "member.left", "product.member_left", "member", current.ID); err != nil {

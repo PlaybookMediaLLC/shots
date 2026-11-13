@@ -2,12 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import {
   browserRequest,
+  db,
   expect,
   getE2EUrl,
   grantWorkspacePlan,
   requestJson,
   signUpViaApi,
   test,
+  trpcQuery,
   type E2EIdentity,
   type Page,
 } from './framework'
@@ -27,7 +29,7 @@ async function workspaceOf(person: E2EIdentity, page: Page): Promise<string> {
 }
 
 test(
-  'internal draft links grant nothing, a share link only reads and comments, and removal ends access',
+  'internal draft links grant nothing, a share link only reads, and removal ends access',
   { tag: '@journey' },
   async ({ browser, identity, page }) => {
     const org = await workspaceOf(identity, page)
@@ -56,21 +58,30 @@ test(
       const outsider = await outsiderContext.newPage()
       // A paid workspace of their own, so a refusal is isolation and not a missing plan.
       await grantWorkspacePlan(
-        await workspaceOf({ ...identity, email: `outsider-${identity.email}` }, outsider),
+        await workspaceOf(
+          {
+            ...identity,
+            email: `outsider-${identity.email}`,
+            workspaceName: `Outsider ${identity.workspaceName}`,
+          },
+          outsider
+        ),
         'business'
       )
       expect((await browserRequest(outsider, `/api/v1/content-drafts/${id}`)).status).toBe(404)
-      await outsider.goto(`/publish/${id}`)
+      expect((await outsider.goto(`/publish/${id}`))?.status()).toBe(404)
       await expect(outsider.getByText(text)).toHaveCount(0)
-      // The share link reads the draft and takes a comment, and grants nothing more.
+      // The share link reads the draft and grants nothing more; commenting through it is
+      // covered by content-drafts-platform.spec.ts.
       await outsider.goto(`/d/${token}`)
       await expect(outsider.getByTestId('shared-draft')).toContainText(text)
       expect((await browserRequest(outsider, `/api/v1/content-drafts/${id}`)).status).toBe(404)
       const joined = await requestJson(outsider, '/api/auth/organization/accept-invitation', {
         invitationId: token,
       })
-      expect(joined.status).toBeGreaterThanOrEqual(400)
+      expect([400, 403, 404]).toContain(joined.status)
       const organizations = await browserRequest(outsider, '/api/auth/organization/list')
+      expect(organizations.status).toBe(200)
       expect(JSON.stringify(organizations.body)).not.toContain(org)
 
       // Without a session, the share link cannot schedule or read the internal draft.
@@ -104,6 +115,27 @@ test(
       })
       expect(accepted.status).toBe(200)
       expect((await browserRequest(member, `/api/v1/content-drafts/${id}`)).status).toBe(200)
+
+      // An account in the owner's private profile is listed for the owner alone.
+      const session = await browserRequest(page, '/api/auth/get-session')
+      const ownerId = z.object({ user: idSchema }).parse(session.body).user.id
+      const suffix = randomUUID().replaceAll('-', '').slice(0, 24)
+      await db.query(
+        `INSERT INTO social_set (id,"organizationId",name,visibility,"ownerUserId","publicSlug") VALUES ($1,$2,'Private profile','PRIVATE',$3,$4)`,
+        [`cs${suffix}`, org, ownerId, `private-${suffix}`]
+      )
+      await db.query(
+        `INSERT INTO channel_connection (id,"organizationId",provider,"externalAccountId",platform,"secretReference",status,"socialSetId","createdByUserId","updatedAt")
+         VALUES ($1,$2,'social',$3,'x','SOCIAL_API_KEY','ACTIVE',$4,$5,now())`,
+        [`cc${suffix}`, org, `private-account-${suffix}`, `cs${suffix}`, ownerId]
+      )
+      const listed = async (viewer: Page) => {
+        const response = await trpcQuery(viewer, 'channelConnection.list')
+        expect(response.status).toBe(200)
+        return JSON.stringify(response.body).includes(`cc${suffix}`)
+      }
+      expect(await listed(page)).toBe(true)
+      expect(await listed(member)).toBe(false)
       const memberId = z.object({ member: idSchema }).parse(accepted.body).member.id
       const removed = await requestJson(page, '/api/auth/organization/remove-member', {
         organizationId: org,
@@ -115,7 +147,7 @@ test(
         password: identity.password,
       })
       expect(signedIn.status).toBe(200)
-      expect((await browserRequest(member, `/api/v1/content-drafts/${id}`)).status).not.toBe(200)
+      expect((await browserRequest(member, `/api/v1/content-drafts/${id}`)).status).toBe(403)
       await member.goto(`/publish/${id}`)
       await expect(member.getByText(text)).toHaveCount(0)
     } finally {
