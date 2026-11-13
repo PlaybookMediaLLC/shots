@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.51.0](https://github.com/PlaybookMediaLLC/shots/compare/v2.50.1...v2.51.0) (2026-11-13)
+
+
+### Features
+
+* **bulk-tools:** fade-in and UGC template videos with music trim ([01f971f](https://github.com/PlaybookMediaLLC/shots/commit/01f971f11344b2464ee28faa388d4164186ceaab))
+* **social:** check X video tier in the composer and offer only real link-card controls ([#527](https://github.com/PlaybookMediaLLC/shots/issues/527)) ([51099c7](https://github.com/PlaybookMediaLLC/shots/commit/51099c769c8cc74be05715b194d494fed2ada876))
+
 ## [2.50.1](https://github.com/PlaybookMediaLLC/shots/compare/v2.50.0...v2.50.1) (2026-11-13)
 
 
