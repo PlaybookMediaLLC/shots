@@ -127,9 +127,10 @@ export function AutoDmDraft({
           ))}
           <Label className="block">
             Reply must contain
+            {/* No maxLength here or below: it counts UTF-16 units, an emoji as two;
+                the form checks lengths in characters, as Go does, when saving. */}
             <Input
               disabled={!form.replies}
-              maxLength={100}
               value={form.replyText ?? ''}
               onChange={(event) => setForm({ ...form, replyText: event.target.value })}
             />
@@ -137,7 +138,6 @@ export function AutoDmDraft({
           <Label className="block">
             Direct message
             <Textarea
-              maxLength={10_000}
               value={form.message}
               onChange={(event) => setForm({ ...form, message: event.target.value })}
             />
