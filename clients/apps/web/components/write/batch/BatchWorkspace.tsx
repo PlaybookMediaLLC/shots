@@ -75,6 +75,7 @@ import {
   batchSummary,
   hasLivePosts,
   hourlyWindow,
+  intakeChecks,
   itemAccounts,
   pendingAccounts,
   plainTextDraft,
@@ -801,22 +802,29 @@ export function BatchWorkspace({
           mapping: null,
           skipped,
           unused: [],
-          staged: posts.map((post, index) => ({
-            files: post.files,
-            line: index + 1,
-            problems: post.problems,
-            input: {
-              importKey: importKey(),
-              caption: expandSpintax(sharedCaption),
-              media: post.files.map((file, at) => ({
-                bytes: file.size,
-                fileName: post.storedNames[at]!,
-              })),
-              channelConnectionIds: sharedAccounts,
-              sourceKey: post.sourceKey,
-              timing: {},
-            },
-          })),
+          staged: posts.map((post, index) => {
+            const checked = intakeChecks(
+              destinationsOf(sharedAccounts).map((account) => account.channel),
+              post.files
+            )
+            return {
+              files: post.files,
+              line: index + 1,
+              notes: checked.notes,
+              problems: [...post.problems, ...checked.problems],
+              input: {
+                importKey: importKey(),
+                caption: expandSpintax(sharedCaption),
+                media: post.files.map((file, at) => ({
+                  bytes: file.size,
+                  fileName: post.storedNames[at]!,
+                })),
+                channelConnectionIds: sharedAccounts,
+                sourceKey: post.sourceKey,
+                timing: {},
+              },
+            }
+          }),
         })
         return
       }
@@ -872,14 +880,20 @@ export function BatchWorkspace({
               .filter((account) => row.channels.includes(account.channel))
               .map((account) => account.id)
           : sharedAccounts
+        const checked = intakeChecks(
+          destinationsOf(chosenAccounts).map((account) => account.channel),
+          rowFiles
+        )
         return {
           files: rowFiles,
           line: row.line,
+          notes: checked.notes,
           problems: [
             ...row.problems,
             ...matched.problems,
             ...tooLarge,
             ...(channelIssue ? [channelIssue] : []),
+            ...checked.problems,
           ],
           input: {
             importKey: importKey(),

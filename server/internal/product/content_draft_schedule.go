@@ -681,7 +681,7 @@ func replayDraftSchedule(ctx context.Context, tx *ent.Tx, draft *ent.ContentDraf
 			return nil, conflict("This version was already scheduled for another time. Reload to see the current schedule, then change it.")
 		}
 	}
-	// A replay answers in the targets' order, as the first call did; the query has none.
+	// A replay answers in the targets' order, as the first answer did; the query has none.
 	slices.SortFunc(existing, func(a, b *ent.ScheduledPost) int {
 		return slices.Index(keys, a.IdempotencyKey) - slices.Index(keys, b.IdempotencyKey)
 	})
