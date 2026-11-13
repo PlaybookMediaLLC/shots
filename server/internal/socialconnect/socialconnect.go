@@ -326,6 +326,15 @@ func (c *Connector) ExchangeOAuth(ctx context.Context, name, code, state string)
 		return fail, scopes("Choose the same account already connected to this social set.")
 	}
 
+	// A provider with a destination step lists them before anything is saved:
+	// with none, nothing is connected, rather than an account that cannot post.
+	var pages []socialapi.OAuthPage
+	if info.IsBetweenSteps && refresh == "" {
+		if pages, err = destinationPages(ctx, provider, name, auth.AccessToken); err != nil {
+			return fail, err
+		}
+	}
+
 	validName := auth.Name
 	if validName == "" {
 		if auth.Username != "" {
@@ -406,32 +415,37 @@ func (c *Connector) ExchangeOAuth(ctx context.Context, name, code, state string)
 	// The social refreshTokenWorkflow is not started: token refresh moves to a
 	// product-worker job.
 
-	result := socialapi.OAuthExchange{ID: created.ID}
-	if info.IsBetweenSteps && refresh == "" {
-		fetch := provider.Functions()["pages"]
-		if fetch == nil {
-			fetch = provider.Functions()["companies"]
-		}
-		if fetch != nil {
-			if loaded, err := fetch(ctx, auth.AccessToken, nil, "", nil); err != nil {
-				return fail, socialapi.NewError(http.StatusBadGateway, false, "provider account discovery failed")
-			} else if loaded != nil {
-				data, err := json.Marshal(loaded)
-				if err == nil {
-					err = json.Unmarshal(data, &result.Pages)
-					if err == nil && (name == "linkedin-page" || name == "youtube") {
-						for i := range result.Pages {
-							result.Pages[i].PageID = result.Pages[i].ID
-						}
-					}
-				}
-				if err != nil {
-					return fail, socialapi.NewError(http.StatusBadGateway, false, "social adapter returned invalid pages")
-				}
-			}
+	result := socialapi.OAuthExchange{ID: created.ID, Pages: pages}
+	return result, nil
+}
+
+// destinationPages lists the pages, channels or companies a provider's account
+// can post as. An account with none cannot be connected.
+func destinationPages(ctx context.Context, provider integrations.Provider, name, token string) ([]socialapi.OAuthPage, error) {
+	fetch := provider.Functions()["pages"]
+	if fetch == nil {
+		fetch = provider.Functions()["companies"]
+	}
+	if fetch == nil {
+		return nil, nil
+	}
+	loaded, err := fetch(ctx, token, nil, "", nil)
+	if err != nil {
+		return nil, socialapi.NewError(http.StatusBadGateway, false, "provider account discovery failed")
+	}
+	var pages []socialapi.OAuthPage
+	if data, err := json.Marshal(loaded); err != nil || json.Unmarshal(data, &pages) != nil {
+		return nil, socialapi.NewError(http.StatusBadGateway, false, "social adapter returned invalid pages")
+	}
+	if len(pages) == 0 {
+		return nil, socialapi.NewError(http.StatusConflict, false, "no eligible account was found for this provider")
+	}
+	if name == "linkedin-page" || name == "youtube" || name == "facebook" || name == "gmb" {
+		for i := range pages {
+			pages[i].PageID = pages[i].ID
 		}
 	}
-	return result, nil
+	return pages, nil
 }
 
 // authenticate resolves the provider's tokens, folding every failure into

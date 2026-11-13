@@ -51,11 +51,24 @@ one workspace.
 - **Sharing.** "Move to team" shares a private set with its workspace. Only the
   set's owner can do it, holding `publish:manage`, after a confirmation that
   lists the accounts and drafts that become visible. It is one-way and audited.
-  Moving a set to a different workspace is not offered: channel connections are
-  bound to their workspace's social tenant (`social_tenant_binding`), so a
-  cross-workspace move would break tenant isolation. A set can instead be
-  copied to another workspace where the actor also holds `publish:manage`; the
-  copy takes the configuration and the accounts are connected again there.
+  A set can also be copied to another workspace where the actor also holds
+  `publish:manage`; the copy takes the configuration and the accounts are
+  connected again there.
+- **Moving to another workspace** (decided 2026-11-13, replacing the earlier
+  copy-only rule). The set's owner, or a workspace owner or admin for a shared
+  set, moves it to another workspace they own or administer whose plan
+  includes drafts, after a preview of what moves and what breaks. The set keeps
+  its ID and settings, and its drafts move with their comments, backups, tags,
+  finishers and writing samples; their files are copied into the destination's
+  library. Channel connections stay bound to their workspace's social tenant
+  (`social_tenant_binding`): they stay behind, disconnected, and are connected
+  again in the destination. Queued posts are cancelled and their drafts arrive
+  unscheduled. The move is refused while a post is publishing or may already
+  be live, while the set has bulk batches, and for a workspace's last shared
+  set. Published history, analytics and audit stay in the source, in a deleted
+  copy of the set that keeps their visibility; the destination's history starts
+  with a moved-in entry. The set row is locked and its previewed version
+  checked, so a repeat or a race moves it once. API keys cannot move a set.
 - **Deletion.** Deleting a set is refused while any of its posts is queued or
   publishing. Otherwise its accounts are disabled (so nothing further publishes
   through them), its drafts are archived, its row is soft-deleted, and the

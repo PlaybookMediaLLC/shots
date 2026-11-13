@@ -557,7 +557,7 @@ func (c *Configuration) ListContentDraftPostsBetween(ctx context.Context, actor 
 	posts, err := c.client.ScheduledPost.Query().Where(scheduledpost.OrganizationID(actor.OrganizationID),
 		scheduledpost.Or(scheduledpost.And(inSets, scheduledpost.ContentDraftIDNotNil()), scheduledpost.And(scheduledpost.ContentDraftIDIsNil(), scheduledpost.HasChannelConnectionWith(channelconnection.OrganizationID(actor.OrganizationID), channelconnection.SocialSetIDIn(visible...)))), scheduledpost.ScheduledForGTE(from), scheduledpost.ScheduledForLT(to),
 		scheduledpost.StatusIn(scheduledpost.StatusSCHEDULED, scheduledpost.StatusPROCESSING,
-			scheduledpost.StatusPUBLISHED, scheduledpost.StatusFAILED, scheduledpost.StatusUNKNOWN_DELIVERY)).
+			scheduledpost.StatusPUBLISHED, scheduledpost.StatusSENT_TO_APP, scheduledpost.StatusFAILED, scheduledpost.StatusUNKNOWN_DELIVERY)).
 		WithChannelConnection().Order(ent.Asc(scheduledpost.FieldScheduledFor)).All(ctx)
 	if err != nil {
 		return nil, err

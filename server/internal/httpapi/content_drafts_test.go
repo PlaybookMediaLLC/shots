@@ -13,6 +13,7 @@ import (
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/product"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/publishing"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/temporalpublishing"
 )
 
@@ -133,6 +134,38 @@ func TestSubmitContentBatchSaysARetryIsSafeWhenTheWorkflowDoesNotStart(t *testin
 		`{"requestKey":"submit-request-key-0001","items":[{"itemId":"c123456789012345678901235","refusal":"No."}]}`)
 	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "nothing is scheduled twice") {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+type postDeletionFake struct {
+	fakeConfiguration
+	err error
+}
+
+func (f *postDeletionFake) DeleteContentDraftPost(_ context.Context, actor product.Actor, id string) (*product.DeletionRequest, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return &product.DeletionRequest{OrganizationID: actor.OrganizationID, PostID: id, Platform: "x"}, nil
+}
+
+// A started delete answers 202 with its request; one whose workflow did not
+// start says a retry is safe; a refused one keeps its status.
+func TestDeleteContentDraftPostAnswers(t *testing.T) {
+	for _, tc := range []struct {
+		err    error
+		status int
+		body   string
+	}{
+		{nil, http.StatusAccepted, `"postId":"c123456789012345678901234"`},
+		{product.ErrPostDeletionNotStarted, http.StatusServiceUnavailable, "deleted only once"},
+		{publishing.ErrConflict, http.StatusConflict, ""},
+	} {
+		handler := NewWithConfiguration(&fakeStore{}, &fakeScheduler{}, &fakeVerifier{}, "secret", &postDeletionFake{err: tc.err})
+		response := configurationRequest(handler, http.MethodPost, "/v1/content-draft-posts/c123456789012345678901234/delete", "")
+		if response.Code != tc.status || !strings.Contains(response.Body.String(), tc.body) {
+			t.Fatalf("%v: status=%d body=%s", tc.err, response.Code, response.Body.String())
+		}
 	}
 }
 

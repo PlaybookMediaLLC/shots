@@ -390,7 +390,8 @@ func TestScheduledPostsAdmitAnAPIKeyWithTheScope(t *testing.T) {
 	if code := send(http.MethodPost, "/v1/scheduled-posts/post-1/cancel"); code != http.StatusOK || store.keyScope != "post:schedule" {
 		t.Fatalf("cancel status=%d scope=%q", code, store.keyScope)
 	}
-	if store.cancelActor.Type != "SERVICE" || store.cancelActor.Display != "Coding agent" || store.cancelActor.UserID != "" {
+	if store.cancelActor.Type != "SERVICE" || store.cancelActor.Display != "Coding agent" || store.cancelActor.UserID != "" ||
+		store.cancelActor.Source != "api" {
 		t.Fatalf("a key cancels as a named service: %#v", store.cancelActor)
 	}
 	store.authError = publishing.ErrForbidden

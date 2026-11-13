@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/social/database/dbtest"
@@ -191,5 +192,45 @@ func TestListingAndVerificationStayInTheTenantOrganization(t *testing.T) {
 	input.ExpectedGoOrganizationID = orgB.ID
 	if err := connector.VerifyDestination(ctx, input); err == nil {
 		t.Fatal("a reference verified another organization's destinations")
+	}
+}
+
+type pagesProvider struct {
+	*fakeProvider
+	pages any
+	err   error
+}
+
+func (p pagesProvider) Functions() map[string]integrations.Function {
+	return map[string]integrations.Function{"pages": func(context.Context, string, json.RawMessage, string, *ent.Integration) (any, error) {
+		return p.pages, p.err
+	}}
+}
+
+func TestAnAccountWithNoPageIsNotConnected(t *testing.T) {
+	ctx := context.Background()
+	base := &fakeProvider{Base: integrations.NewBase("facebook", nil)}
+	for name, provider := range map[string]pagesProvider{
+		"no pages":  {fakeProvider: base, pages: []map[string]string{}},
+		"nil pages": {fakeProvider: base},
+	} {
+		var refused *socialapi.Error
+		if _, err := destinationPages(ctx, provider, "facebook", "token"); !errors.As(err, &refused) || refused.Status != http.StatusConflict {
+			t.Fatalf("%s: err = %v, want a conflict before anything is saved", name, err)
+		}
+	}
+	var failed *socialapi.Error
+	if _, err := destinationPages(ctx, pagesProvider{fakeProvider: base, err: errors.New("graph down")}, "facebook", "token"); !errors.As(err, &failed) || failed.Status != http.StatusBadGateway {
+		t.Fatalf("discovery failure = %v", err)
+	}
+	for _, name := range []string{"facebook", "gmb"} {
+		pages, err := destinationPages(ctx, pagesProvider{fakeProvider: base, pages: []map[string]string{{"id": "page-1", "name": "Acme", "access_token": "secret"}}}, name, "token")
+		if err != nil || len(pages) != 1 || pages[0].ID != "page-1" || pages[0].PageID != "page-1" {
+			t.Fatalf("%s pages = %+v, %v", name, pages, err)
+		}
+	}
+	pages, _ := destinationPages(ctx, pagesProvider{fakeProvider: base, pages: []map[string]string{{"id": "page-1", "access_token": "secret"}}}, "facebook", "token")
+	if data, _ := json.Marshal(pages); strings.Contains(string(data), "secret") {
+		t.Fatal("a page token left Go")
 	}
 }

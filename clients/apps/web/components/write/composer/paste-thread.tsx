@@ -49,10 +49,12 @@ export function PasteThreadDialog({
   // A screenshot belongs on the post that opens the explanation, not under it.
   const [lead, setLead] = useState<PostMedia[]>([])
   const [picking, setPicking] = useState(false)
+  // The split by length runs in a worker (see useThreadPosts).
   const preview = useThreadPosts(text, channel, automatic ? length : undefined)
+  const splitting = preview.pending
   const insert = () => {
     const current = editor.current
-    if (!current || preview.pending || !preview.posts.length) return
+    if (!current || !preview.posts.length) return
     if (postRanges(current.children).length + preview.posts.length > THREAD_POST_LIMIT) {
       toast.error(`The combined thread would exceed ${THREAD_POST_LIMIT} posts.`)
       return
@@ -124,13 +126,7 @@ export function PasteThreadDialog({
             onInsert={setLead}
           />
         ) : null}
-        {preview.pending ? (
-          <p className="text-muted-foreground" role="status">
-            Splitting…
-          </p>
-        ) : (
-          preview.error && <p role="alert">{preview.error}</p>
-        )}
+        {preview.error && <p role="alert">{preview.error}</p>}
         <ol className="grid max-h-60 gap-3 overflow-auto text-sm">
           {preview.posts.map((post, index) => (
             <li className="whitespace-pre-wrap rounded border p-2" key={index}>
@@ -144,12 +140,10 @@ export function PasteThreadDialog({
           ))}
         </ol>
         <Button
-          disabled={
-            preview.pending || !preview.posts.length || Boolean(preview.error) || length > limit
-          }
+          disabled={splitting || !preview.posts.length || Boolean(preview.error) || length > limit}
           onClick={insert}
         >
-          Append {preview.posts.length} posts
+          {splitting ? 'Splitting…' : `Append ${preview.posts.length} posts`}
         </Button>
       </DialogContent>
     </Dialog>

@@ -37,6 +37,8 @@ for earlier designs, not instructions to rebuild superseded architecture.
 
 **Scoped authorization (2026-11-11):** [Voice capture](../plans/voice-capture-and-evidence-plan.md) records a private voice note on iPhone, transcribes it on the device, syncs it, and turns it into a draft or, after a confirming tap, a scheduled post. It reuses content drafts, approval, `ScheduleContentDraft`, the private media store and the Go model client rather than adding a schema, editor or scheduler; [its implementation plan](../plans/voice-capture-implementation.md) records the owner decisions taken. Its outcome metric is weekly active recorders in pilot workspaces and the drafts and scheduled posts made from their notes. Capture hardening, staying signed in and capture at scale (sections 5.5–5.7 of the plan) stay conditional under RFC 007.
 
+**Scoped authorization (2026-11-13):** [Delete a published post](../scheduling/post-delete/implementation.md) removes what Shots published, from every adapter whose network has a delete call, through the REST API, the web app and MCP. It amends RFC 030, which had no unpublish. It reuses the scheduled post, its receipts, the publish permission and the Temporal worker, and adds one receipt table. Each delete is audited, and an API key needs the new `post:delete` scope.
+
 ## Build order and exit gates
 
 Each milestone produces usable customer value. Begin assisted pilots now;

@@ -763,10 +763,16 @@ func (s *Server) cancelScheduledPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) (publishing.Actor, bool) {
-	userID, actorType := r.Header.Get("X-User-ID"), "USER"
-	if !requestActor(r).IsSession() {
+	userID, actorType, source := r.Header.Get("X-User-ID"), "USER", ""
+	if principal := requestActor(r); !principal.IsSession() {
 		// An API key has no user; the audit records it as a service by its name.
 		requireUser, actorType = false, "SERVICE"
+		switch principal.Kind {
+		case "api_key":
+			source = "api"
+		case "support":
+			actorType = "SUPPORT"
+		}
 	}
 	if requireUser && userID == "" {
 		writeError(w, http.StatusBadRequest, "X-User-ID is required")
@@ -780,7 +786,7 @@ func actorFromRequest(w http.ResponseWriter, r *http.Request, requireUser bool) 
 	// rows (post.scheduled, post.cancelled) record it.
 	return publishing.Actor{
 		Display: r.Header.Get("X-Principal-Display"), Organization: r.Header.Get("X-Organization-ID"),
-		RequestID: requestID, Type: actorType, UserID: userID,
+		RequestID: requestID, Source: source, Type: actorType, UserID: userID,
 	}, true
 }
 

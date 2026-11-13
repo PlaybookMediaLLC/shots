@@ -370,7 +370,16 @@ func (c *client) retweet(ctx context.Context, userID, tweetID string) error {
 
 // unretweet is DELETE /2/users/:id/retweets/:source_tweet_id.
 func (c *client) unretweet(ctx context.Context, userID, tweetID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, v2("users/"+userID+"/retweets/"+tweetID), nil)
+	return c.delete(ctx, v2("users/"+userID+"/retweets/"+tweetID))
+}
+
+// deleteTweet is DELETE /2/tweets/:id. An already deleted post answers 404.
+func (c *client) deleteTweet(ctx context.Context, tweetID string) error {
+	return c.delete(ctx, v2("tweets/"+url.PathEscape(tweetID)))
+}
+
+func (c *client) delete(ctx context.Context, endpoint string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return err
 	}

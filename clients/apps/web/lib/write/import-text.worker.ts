@@ -1,25 +1,20 @@
-import type { DraftChannel } from './document'
 import { splitThread } from './import-text'
 
-/** One split by post length, numbered so its answer can be matched to it. */
-export type SplitRequest = { channel: DraftChannel; id: number; limit: number; text: string }
+/** The worker's answer to one split request. */
+export type SplitResult = { posts: string[]; error: string }
 
-/** The posts for request `id`, or why its text cannot be split. */
-export type SplitResult = { error: string; id: number; posts: string[] }
-
-/** What the worker posts: that it has loaded, then one result per request. */
+/** What the worker posts: that it has loaded, then one answer per request. */
 export type SplitMessage = SplitResult | { ready: true }
 
-// Counting X's links is quadratic in a run without spaces (seconds for long
-// CJK text), so the split runs here instead of on the page that is typing.
-self.onmessage = ({ data }: MessageEvent<SplitRequest>) => {
-  let result: SplitResult
+// Thread screens split here, off the main thread: X's and Mastodon's link
+// scan (twitter-text) is quadratic in a run without spaces, seconds on a long one.
+addEventListener('message', ({ data }: MessageEvent<Parameters<typeof splitThread>>) => {
   try {
-    result = { error: '', id: data.id, posts: splitThread(data.text, data.channel, data.limit) }
+    postMessage({ posts: splitThread(...data), error: '' } satisfies SplitResult)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'This text cannot be split.'
-    result = { error: message, id: data.id, posts: [] }
+    postMessage({ posts: [], error: (error as Error).message } satisfies SplitResult)
   }
-  self.postMessage(result)
-}
-self.postMessage({ ready: true } satisfies SplitMessage)
+})
+// Loading this module takes a moment; a worker that has not said so yet has
+// started nothing, so the page gives it the latest request instead of replacing it.
+postMessage({ ready: true } satisfies SplitMessage)

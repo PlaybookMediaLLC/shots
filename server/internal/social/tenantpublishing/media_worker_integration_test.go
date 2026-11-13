@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image"
@@ -92,6 +93,12 @@ func (b *privateBucket) Put(_ context.Context, key, mime string, body io.Reader)
 	b.mu.Unlock()
 	return err
 }
+func (b *privateBucket) Copy(_ context.Context, from, to string) error {
+	b.mu.Lock()
+	b.objects[to], b.types[to] = b.objects[from], b.types[from]
+	b.mu.Unlock()
+	return nil
+}
 func (b *privateBucket) Read(_ context.Context, key string) ([]byte, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -123,6 +130,8 @@ type receivedMedia struct {
 type receivedPost struct {
 	caption string
 	media   []receivedMedia
+	// settings are the provider settings the post carried.
+	settings map[string]any
 }
 
 // testProvider is the provider peer: it fetches each signed URL the way
@@ -133,12 +142,14 @@ type testProvider struct {
 	posts []receivedPost
 	calls int
 	fail  error
+	// live answers an app draft (UPLOAD) with a live video receipt, as TikTok must not.
+	live bool
 }
 
 func (p *testProvider) Post(ctx context.Context, _, token string, posts []integrations.PostDetails, account *socialent.Integration) ([]integrations.PostResponse, error) {
 	p.mu.Lock()
 	p.calls++
-	fail := p.fail
+	fail, live := p.fail, p.live
 	p.mu.Unlock()
 	if token != "valid" || len(posts) != 1 {
 		return nil, errors.New("unexpected provider input")
@@ -147,6 +158,9 @@ func (p *testProvider) Post(ctx context.Context, _, token string, posts []integr
 		return nil, fail
 	}
 	received := receivedPost{caption: posts[0].Message}
+	if err := json.Unmarshal(posts[0].Settings, &received.settings); err != nil {
+		return nil, err
+	}
 	for _, media := range posts[0].Media {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, media.Path, nil)
 		if err != nil {
@@ -172,6 +186,10 @@ func (p *testProvider) Post(ctx context.Context, _, token string, posts []integr
 	if account.ProviderIdentifier == "tiktok" {
 		id = "7234567890123456789"
 		receiptURL = "https://www.tiktok.com/@fixture/video/" + id
+		// TikTok's receipt for a draft sent to the app (the adapter's SEND_TO_USER_INBOX).
+		if received.settings["content_posting_method"] == "UPLOAD" && !live {
+			id, receiptURL = "missing", "https://www.tiktok.com/messages?lang=en#v_inbox_file~v2.7234567890123456789"
+		}
 	}
 	if account.ProviderIdentifier == "youtube" {
 		receiptURL = "https://www.youtube.com/watch?v=" + id
@@ -251,8 +269,12 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 	repository := publishing.NewRepository(db.Client)
+	connected := map[string]string{}
 	connect := func(platform string) string {
 		t.Helper()
+		if id, ok := connected[platform]; ok {
+			return id
+		}
 		external := platform + "-" + id
 		exec(`INSERT INTO "Integration" (id,"internalId","organizationId",name,"providerIdentifier",type,token) VALUES ($1,$1,$2,'Test account',$3,'social','valid')`, external, remote, platform)
 		connection, err := repository.CreateConnection(ctx, publishing.Actor{Organization: org, UserID: user, RequestID: owner.RequestID, Type: "USER"},
@@ -260,6 +282,7 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		connected[platform] = connection.ID
 		return connection.ID
 	}
 	linkedin, threads := connect("linkedin"), connect("threads")
@@ -463,6 +486,62 @@ func TestScheduledMediaReachesTheProviderThroughTheWorker(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("a TikTok app draft is sent to the app and never published", func(t *testing.T) {
+		connection := connect("tiktok")
+		asset, digest := upload("draft.mp4", "video/mp4", read("portrait.mp4"))
+		posts := schedule("App draft", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: connection, Caption: "Finish me in TikTok",
+			AssetIDs: []string{asset}, Options: &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{SendToApp: true}}})
+		run(posts[0].ID)
+		got := last()
+		// TikTok takes only the caption with an app draft: no privacy or consent goes out.
+		if got.caption != "Finish me in TikTok" || len(got.media) != 1 || got.media[0].sha256 != digest ||
+			!reflect.DeepEqual(got.settings, map[string]any{"content_posting_method": "UPLOAD"}) {
+			t.Fatalf("provider received %+v", got)
+		}
+		current := db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+		attempts := db.Client.PublicationAttempt.Query().Where(publicationattempt.ScheduledPostID(posts[0].ID)).AllX(ctx)
+		if current.Status != scheduledpost.StatusSENT_TO_APP || current.PublishedAt != nil || current.RemotePostID == nil ||
+			*current.RemotePostID != "v_inbox_file~v2.7234567890123456789" || current.ThreadProgress.Publication != nil ||
+			len(attempts) != 1 || *attempts[0].Outcome != publicationattempt.OutcomeSUCCEEDED || attempts[0].RemoteURL != nil {
+			t.Fatalf("app draft: status=%s published=%v remote=%v progress=%+v attempts=%+v", current.Status, current.PublishedAt, current.RemotePostID, current.ThreadProgress, attempts)
+		}
+		var sent, published int
+		if err := db.SQL.QueryRowContext(ctx, `SELECT count(*) FILTER (WHERE type='activity.post.sent_to_app'), count(*) FILTER (WHERE type='activity.post.published')
+			FROM outbox_event WHERE "organizationId"=$1 AND "aggregateId"=$2`, org, posts[0].ID).Scan(&sent, &published); err != nil || sent != 1 || published != 0 {
+			t.Fatalf("activity sent=%d published=%d err=%v", sent, published, err)
+		}
+		before := provider.calls
+		run(posts[0].ID)
+		if provider.calls != before {
+			t.Fatal("an app draft was sent twice")
+		}
+		// It is delivered: it cannot be cancelled, and the account cannot be added again.
+		if _, err := repository.CancelScheduledPost(ctx, publishing.Actor{Organization: org, UserID: user, RequestID: owner.RequestID, Type: "USER"}, posts[0].ID); !errors.Is(err, publishing.ErrInvalidState) {
+			t.Fatalf("cancel err=%v", err)
+		}
+		draft := db.Client.ContentDraft.GetX(ctx, *posts[0].ContentDraftID)
+		if _, err := store.ScheduleContentDraft(ctx, owner, draft.ID, product.ScheduleContentDraftInput{Add: true, Version: draft.Version, ScheduledFor: time.Now().Add(2 * time.Minute),
+			Targets: []product.ContentDraftScheduleTarget{{ChannelConnectionID: connection, Caption: "Finish me in TikTok", AssetIDs: []string{asset}, Options: &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{SendToApp: true}}}}}); !errors.Is(err, publishing.ErrConflict) {
+			t.Fatalf("adding the account again err=%v", err)
+		}
+	})
+
+	t.Run("an app draft TikTok answers with a live video is of unknown delivery", func(t *testing.T) {
+		connection := connect("tiktok")
+		asset, _ := upload("live.mp4", "video/mp4", read("portrait.mp4"))
+		posts := schedule("Not a draft", []string{asset}, product.ContentDraftScheduleTarget{ChannelConnectionID: connection, Caption: "Answered as live",
+			AssetIDs: []string{asset}, Options: &postoptions.PublishOptions{TikTok: &postoptions.TikTokOptions{SendToApp: true}}})
+		provider.mu.Lock()
+		provider.live, provider.calls = true, 0
+		provider.mu.Unlock()
+		t.Cleanup(func() { provider.live = false })
+		run(posts[0].ID)
+		current := db.Client.ScheduledPost.GetX(ctx, posts[0].ID)
+		if current.Status != scheduledpost.StatusUNKNOWN_DELIVERY || current.PublishedAt != nil || provider.calls != 1 {
+			t.Fatalf("status=%s published=%v calls=%d", current.Status, current.PublishedAt, provider.calls)
+		}
+	})
 
 	t.Run("an unanswered submission is UNKNOWN_DELIVERY and is not retried", func(t *testing.T) {
 		asset, _ := upload("lost.png", "image/png", photo(200))

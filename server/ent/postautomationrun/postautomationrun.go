@@ -88,6 +88,7 @@ const (
 	KindPlug          Kind = "plug"
 	KindRepostAtLikes Kind = "repost_at_likes"
 	KindQuote         Kind = "quote"
+	KindThumbnail     Kind = "thumbnail"
 )
 
 func (k Kind) String() string {
@@ -97,7 +98,7 @@ func (k Kind) String() string {
 // KindValidator is a validator for the "kind" field enum values. It is called by the builders before save.
 func KindValidator(k Kind) error {
 	switch k {
-	case KindFirstComment, KindRetweet, KindUnretweet, KindPlug, KindRepostAtLikes, KindQuote:
+	case KindFirstComment, KindRetweet, KindUnretweet, KindPlug, KindRepostAtLikes, KindQuote, KindThumbnail:
 		return nil
 	default:
 		return fmt.Errorf("postautomationrun: invalid enum value for kind field: %q", k)

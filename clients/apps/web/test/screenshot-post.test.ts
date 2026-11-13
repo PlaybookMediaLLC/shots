@@ -5,7 +5,7 @@ import { draftAssetNode } from '@/lib/platform/asset-handoff'
 import { editorHref, readEditorBrandKit, readEditorReturn } from '@/lib/platform/editor-handoff'
 import { batchItemInputSchema } from '@/lib/api/contracts/content-batches'
 import { importedPosts, THREAD_POST_LIMIT } from '@/lib/write/import-text'
-import type { SplitMessage, SplitRequest } from '@/lib/write/import-text.worker'
+import type { SplitMessage } from '@/lib/write/import-text.worker'
 import { platformVersionsSchema } from '@/lib/write/document'
 import type { DesignCopy } from '@/lib/captions/channels'
 import {
@@ -78,36 +78,37 @@ test('a screenshot thread stays inside the one thread limit', () => {
 })
 
 // Both screens split through useThreadPosts: `---` on the page, a length in
-// the composer's split worker, which answers each request by its id.
+// the composer's split worker.
 test('an explanation splits the way the composer splits a paste', async (t) => {
   const replies: SplitMessage[] = []
+  let listener: ((event: { data: unknown[] }) => void) | undefined
   const scope = {
-    onmessage: null as ((event: { data: SplitRequest }) => void) | null,
+    addEventListener: (_: 'message', handle: typeof listener) => (listener = handle),
     postMessage: (message: SplitMessage) => replies.push(message),
   }
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'self')
-  Object.defineProperty(globalThis, 'self', { configurable: true, value: scope })
-  t.after(() => {
-    if (previous) Object.defineProperty(globalThis, 'self', previous)
-    else Reflect.deleteProperty(globalThis, 'self')
-  })
+  for (const [name, value] of Object.entries(scope)) {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, name)
+    Object.defineProperty(globalThis, name, { configurable: true, value })
+    t.after(() => {
+      if (previous) Object.defineProperty(globalThis, name, previous)
+      else Reflect.deleteProperty(globalThis, name)
+    })
+  }
   await import('@/lib/write/import-text.worker')
   // It says when it has loaded, so the page knows a request will start at once.
   assert.deepEqual(replies, [{ ready: true }])
-  const split = (id: number, text: string, limit: number) => {
-    scope.onmessage!({ data: { channel: 'x', id, limit, text } })
+  const split = (text: string, limit: number) => {
+    listener!({ data: [text, 'x', limit] })
     return replies.at(-1)
   }
   assert.deepEqual(importedPosts('First\n---\nSecond'), ['First', 'Second'])
-  assert.deepEqual(split(1, 'alpha bravo charlie delta echo foxtrot', 23), {
+  assert.deepEqual(split('alpha bravo charlie delta echo foxtrot', 23), {
     error: '',
-    id: 1,
     posts: ['alpha bravo charlie', 'delta echo foxtrot'],
   })
   // The composer's own bounds apply here too, rather than a second rule.
-  assert.deepEqual(split(2, 'alpha', 1), {
+  assert.deepEqual(split('alpha', 1), {
     error: 'Choose a post length between 23 and 25,000.',
-    id: 2,
     posts: [],
   })
 })
@@ -185,11 +186,15 @@ const copy: DesignCopy = {
 }
 
 test('captions attach only where both a caption and a publisher exist', () => {
-  // Facebook has captions but no adapter; Mastodon, TikTok and YouTube
-  // publish but get no written caption.
-  assert.deepEqual([...CAPTIONED_CHANNELS], ['x', 'linkedin', 'instagram', 'threads', 'bluesky'])
-  assert.equal(isCaptionedChannel('facebook'), false)
+  // Mastodon, TikTok, YouTube and Pinterest publish but get no written caption.
+  assert.deepEqual(
+    [...CAPTIONED_CHANNELS],
+    ['x', 'linkedin', 'instagram', 'threads', 'bluesky', 'facebook']
+  )
+  assert.equal(isCaptionedChannel('facebook'), true)
+  assert.equal(isCaptionedChannel('pinterest'), false)
   assert.equal(captionFor(copy, 'mastodon'), '')
+  assert.equal(captionFor(copy, 'pinterest'), '')
 })
 
 // A provider platform is not a draft channel: company pages and standalone
@@ -208,12 +213,17 @@ test('every account a draft can post from is offered, under its channel', () => 
       account('old', 'twitter'),
       account('masto', 'mastodon'),
       account('fb', 'facebook'),
+      account('local', 'gmb'),
+      // Reddit is not a draft channel, so its account is not offered.
+      account('forum', 'reddit'),
     ]).map((item) => [item.id, item.channel]),
     [
       ['page', 'linkedin'],
       ['solo', 'instagram'],
       ['old', 'x'],
       ['masto', 'mastodon'],
+      ['fb', 'facebook'],
+      ['local', 'gmb'],
     ]
   )
   const accounts = postAccounts([account('a', 'x'), account('b', 'linkedin')])

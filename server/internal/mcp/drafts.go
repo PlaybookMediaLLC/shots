@@ -50,6 +50,10 @@ func listContentDraftPosts(ctx context.Context, s *Server, actor product.Actor, 
 	posts, err := s.config.Product.ListContentDraftPosts(ctx, actor, stringArg(args, "id"))
 	return map[string]any{"posts": posts}, err
 }
+func deleteContentDraftPost(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
+	deletion, err := s.config.Product.DeleteContentDraftPost(ctx, actor, stringArg(args, "id"))
+	return map[string]any{"deletion": deletion}, err
+}
 func planContentDraft(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
 	var input product.ContentDraftPlanInput
 	if err := decode(args, &input); err != nil {
@@ -68,8 +72,7 @@ func updateContentDraftProperties(ctx context.Context, s *Server, actor product.
 	return s.config.Product.UpdateContentDraftProperties(ctx, actor, stringArg(args, "id"), input)
 }
 func listContentDraftActivity(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {
-	items, err := s.config.Product.ListContentDraftActivity(ctx, actor, stringArg(args, "id"))
-	return map[string]any{"items": items}, err
+	return s.config.Product.ListContentDraftActivity(ctx, actor, stringArg(args, "id"), stringArg(args, "cursor"))
 }
 
 func listSocialSets(ctx context.Context, s *Server, actor product.Actor, args map[string]any) (any, error) {

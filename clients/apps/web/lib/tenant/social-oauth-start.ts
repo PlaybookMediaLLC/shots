@@ -99,7 +99,9 @@ export async function registerSocialOAuthDestination(
     headers,
     provider,
     state,
-    ['instagram', 'linkedin-page', 'youtube'].includes(provider) ? integrationId : undefined
+    ['instagram', 'linkedin-page', 'youtube', 'facebook', 'gmb'].includes(provider)
+      ? integrationId
+      : undefined
   )
   await access.completeSocialOAuth(provider, state, integrationId)
 }

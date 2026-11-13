@@ -32,6 +32,10 @@ type InstagramDTO struct {
 	GraduationStrategy *string         `json:"graduation_strategy,omitempty"` // MANUAL | SS_PERFORMANCE
 	Collaborators      []Collaborators `json:"collaborators,omitempty"`
 	Audio              *InstagramAudio `json:"audio,omitempty"`
+	// UserTags are usernames tagged on the reel or on the first photo.
+	UserTags []string `json:"user_tags,omitempty"`
+	// ShareToFeed false keeps a reel off the profile grid.
+	ShareToFeed *bool `json:"share_to_feed,omitempty"`
 }
 
 // Validate returns the class-validator messages (flattened, nested

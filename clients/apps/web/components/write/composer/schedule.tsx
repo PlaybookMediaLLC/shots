@@ -1356,7 +1356,12 @@ function DuplicateWarning({
                 ? (account.displayName ?? CHANNEL_META[account.channel].label)
                 : 'An account'}
               <span className="text-muted-foreground">
-                · {post.status === 'PUBLISHED' ? 'published' : 'queued'}{' '}
+                ·{' '}
+                {post.status === 'PUBLISHED'
+                  ? 'published'
+                  : post.status === 'SENT_TO_APP'
+                    ? 'sent to the app'
+                    : 'queued'}{' '}
                 <LocalTime value={post.at} zone={timeZone} />
               </span>
             </li>

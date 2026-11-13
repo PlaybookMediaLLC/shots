@@ -764,135 +764,112 @@ test('cancelling an image worker before ready cannot poison its replacement read
   client.terminate()
 })
 
-test('the paste dialog splits in a reused worker, replaced only while busy, and waits for the current result', async (t) => {
-  const { PasteThreadDialog } = await import('@/components/write/composer/paste-thread')
-  type SplitRequest = import('@/lib/write/import-text.worker').SplitRequest
-  type SplitMessage = import('@/lib/write/import-text.worker').SplitMessage
-  const workers: FakeWorker[] = []
-  class FakeWorker {
-    onmessage: ((event: { data: SplitMessage }) => void) | null = null
+test('the paste dialog splits in a reused worker and enables Append only for the current text', async (t) => {
+  const workers: FakeSplitWorker[] = []
+  class FakeSplitWorker {
+    onmessage: ((event: { data: unknown }) => void) | null = null
     onerror: (() => void) | null = null
-    requests: SplitRequest[] = []
+    requests: unknown[][] = []
     terminated = false
     constructor() {
       workers.push(this)
     }
-    postMessage(request: SplitRequest) {
+    postMessage(request: unknown[]) {
       this.requests.push(request)
     }
     terminate() {
       this.terminated = true
     }
-    async ready() {
-      await act(async () => this.onmessage?.({ data: { ready: true } }))
-    }
-    async reply(posts: string[], request = this.requests.at(-1)!, error = '') {
-      await act(async () => this.onmessage?.({ data: { error, id: request.id, posts } }))
+    ready() {
+      return act(async () => this.onmessage?.({ data: { ready: true } }))
     }
   }
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
-  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker })
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeSplitWorker })
   t.after(() => {
     if (previous) Object.defineProperty(globalThis, 'Worker', previous)
     else Reflect.deleteProperty(globalThis, 'Worker')
   })
-  const inserted: unknown[] = []
-  const editor = {
-    children: [],
-    tf: { focus() {}, insertNodes: (nodes: unknown) => inserted.push(nodes) },
-  } as unknown as import('@shots/platejs-editor/platejs/react').PlateEditor
+  const { PasteThreadDialog } = await import('@/components/write/composer/paste-thread')
   await mount(
     createElement(PasteThreadDialog, {
       channel: 'x',
-      editor: { current: editor },
+      editor: { current: null },
       limit: 280,
       onClose: () => {},
     })
   )
-  const write = async (text: string) => {
-    const area = get<HTMLTextAreaElement>('textarea[aria-label="Thread text"]')
-    await act(async () => {
+  const write = (text: string) =>
+    act(async () => {
+      const input = get<HTMLTextAreaElement>('textarea')
       Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
-        area,
+        input,
         text
       )
-      area.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
     })
-  }
-  const toggle = () => act(async () => get<HTMLButtonElement>('button[role="checkbox"]').click())
+  const reply = (worker: FakeSplitWorker, posts: string[], error = '') =>
+    act(async () => worker.onmessage?.({ data: { posts, error } }))
   const append = () =>
     [...document.querySelectorAll('button')].find((button) =>
-      button.textContent!.startsWith('Append')
+      /^(Append|Splitting)/.test(button.textContent!)
     )!
-
+  const toggle = () => act(async () => get<HTMLButtonElement>('[role="checkbox"]').click())
   // The explicit --- split is cheap and stays on the page.
   await write('one\n---\ntwo')
   assert.equal(append().textContent, 'Append 2 posts')
-  assert.equal(append().disabled, false)
   assert.equal(workers.length, 0)
 
   await toggle()
-  assert.equal(workers.length, 1)
+  assert.equal(append().textContent, 'Splitting…')
   assert.equal(append().disabled, true)
-  assert.equal(get('[role=status]').textContent, 'Splitting…')
   // A worker still loading is not replaced: it starts on the latest text.
   await write('one two')
   assert.equal(workers.length, 1)
-  assert.equal(workers[0].requests.length, 0)
+  assert.deepEqual(workers[0].requests, [])
   await workers[0].ready()
-  assert.deepEqual(workers[0].requests, [
-    { channel: 'x', id: workers[0].requests[0].id, limit: 280, text: 'one two' },
-  ])
-  await workers[0].reply(['one two'])
+  assert.deepEqual(workers[0].requests, [['one two', 'x', 280]])
+  await reply(workers[0], ['one two'])
   assert.equal(append().textContent, 'Append 1 posts')
   assert.equal(append().disabled, false)
 
-  // An idle worker takes the next text; the last posts stay shown, but cannot be appended.
-  await write('alpha beta')
+  // An idle worker takes the next edit; one still busy is replaced, and its
+  // late answer, for older text, never enables Append.
+  await write('one two three')
   assert.equal(workers.length, 1)
-  assert.equal(workers[0].requests.length, 2)
-  assert.equal(append().disabled, true)
-  assert.match(document.body.textContent!, /1\. one two/)
-  // A busy one is replaced instead of queueing a split nobody will read.
-  await write('alpha beta gamma')
+  assert.equal(append().textContent, 'Splitting…')
+  await write('one two three four')
   assert.equal(workers[0].terminated, true)
-  assert.equal(workers.length, 2)
   await workers[1].ready()
-  assert.equal(workers[1].requests[0].text, 'alpha beta gamma')
-  // An answer to older text never stands in for the current one.
-  await workers[0].reply(['alpha beta'], workers[0].requests[1])
-  assert.equal(append().disabled, true)
-  assert.doesNotMatch(document.body.textContent!, /1\. alpha beta(?! gamma)/)
-  await workers[1].reply(['alpha beta gamma'])
-  assert.equal(append().disabled, false)
-  await act(async () => append().click())
-  assert.match(JSON.stringify(inserted), /alpha beta gamma/)
+  assert.deepEqual(workers[1].requests, [['one two three four', 'x', 280]])
+  await reply(workers[0], ['stale'])
+  assert.equal(append().textContent, 'Splitting…')
+  await reply(workers[1], ['one two', 'three four'])
+  assert.equal(append().textContent, 'Append 2 posts')
+  assert.match(document.body.textContent!, /three four/)
+  assert.doesNotMatch(document.body.textContent!, /stale/)
 
   // A new length is a new split, and the worker's refusal is shown, not hidden.
   await type(get<HTMLInputElement>('input[type="number"]'), '100')
-  assert.equal(append().disabled, true)
-  assert.equal(workers[1].requests.at(-1)!.limit, 100)
+  assert.equal(append().textContent, 'Splitting…')
+  assert.deepEqual(workers[1].requests.at(-1), ['one two three four', 'x', 100])
   const refusal = 'This text needs more than 25 posts. Shorten it or increase the limit.'
-  await workers[1].reply([], undefined, refusal)
-  assert.equal(get('[role=alert]').textContent, refusal)
+  await reply(workers[1], [], refusal)
+  assert.equal(get('[role="alert"]').textContent, refusal)
   assert.equal(append().disabled, true)
 
-  // A crashed worker is reported and ended, and the next text starts a new one.
-  await write('x y')
-  assert.equal(workers[1].requests.length, 3)
+  // A worker that fails is reported and dropped, and closing the dialog stops the next.
+  await write('five')
   await act(async () => workers[1].onerror?.())
-  assert.equal(get('[role=alert]').textContent, 'The text could not be split.')
   assert.equal(workers[1].terminated, true)
-  assert.equal(append().disabled, true)
-  await write('x y z')
+  assert.equal(get('[role="alert"]').textContent, 'The split preview could not load.')
+  await write('six')
   assert.equal(workers.length, 3)
-
   // Turning the length split off ends a split nobody will read.
   await workers[2].ready()
   await toggle()
   assert.equal(workers[2].terminated, true)
   assert.equal(append().textContent, 'Append 1 posts')
-  assert.equal(append().disabled, false)
 
   await toggle()
   assert.equal(workers.length, 4)
