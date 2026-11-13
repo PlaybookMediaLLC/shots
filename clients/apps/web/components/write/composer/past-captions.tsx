@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { listContentDraftsContract } from '@/lib/api/contracts/content-drafts'
 import { serializeDraft } from '@/lib/content-drafts/serialize'
+import { readWire } from '@/lib/plan/wire'
 import type { DraftChannel } from '@/lib/write/document'
 
 /** One caption to reuse: a draft's text, and where it came from. */
@@ -70,7 +71,8 @@ export function PastCaptions({
         .then(async (response) => {
           if (!response.ok)
             throw new Error(`The drafts could not be searched (${response.status}).`)
-          const page = listContentDraftsContract.output.parse(await response.json())
+          // The list's timestamps are ISO strings on the wire, read back through their codecs.
+          const page = readWire(listContentDraftsContract.output, await response.json())
           setState({
             status: 'ready',
             captions: captionChoices([...page.pinned, ...page.items], draftId, channel),
