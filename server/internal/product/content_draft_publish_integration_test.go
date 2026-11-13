@@ -580,27 +580,39 @@ func TestWritePublishing(t *testing.T) {
 	// on its own platform, never an arbitrary page or a link with credentials.
 	t.Run("a live post's link must point at its own platform", func(t *testing.T) {
 		for _, item := range []struct {
-			platform, link, remoteID string
-			invalid                  []string
+			platform, handle, link, remoteID, liveURL string
+			invalid                                   []string
 		}{
-			{"threads", "https://www.threads.net/@canary/post/C8abc", "https://www.threads.net/@canary/post/C8abc",
+			// Stored without its tracking query or fragment, in canonical form.
+			{"threads", "@canary", "HTTPS://WWW.Threads.com/@canary/post/C8abc?igsh=share#top", "https://www.threads.com/@canary/post/C8abc", "https://www.threads.com/@canary/post/C8abc",
 				[]string{"https://example.com/@canary/post/C8abc", "https://www.threads.net.evil.test/@canary/post/C8abc", "https://evilthreads.net/@canary/post/C8abc",
-					"https://user:pw@www.threads.net/@canary/post/C8abc", "http://www.threads.net/@canary/post/C8abc", "https://www.threads.net:8443/@canary/post/C8abc"}},
-			{"instagram-standalone", "https://www.instagram.com/p/C8abc/", "https://www.instagram.com/p/C8abc/",
-				[]string{"https://instagram.com.evil.test/p/C8abc/", "https://user@www.instagram.com/p/C8abc/"}},
-			{"facebook", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "https://www.facebook.com/permalink.php?story_fbid=1&id=2",
-				[]string{"https://facebook.evil.test/permalink.php?story_fbid=1&id=2"}},
-			{"pinterest", "https://www.pinterest.com/pin/123/", "https://www.pinterest.com/pin/123/", []string{"https://example.com/pin/123/"}},
-			{"gmb", "https://business.google.com/locations/123", "https://business.google.com/locations/123",
+					"https://user:pw@www.threads.net/@canary/post/C8abc", "http://www.threads.net/@canary/post/C8abc", "https://www.threads.net:8443/@canary/post/C8abc",
+					"https://[::ffff:169.254.169.254%25.threads.net]/@canary/post/C8abc", "https://l.threads.com/?u=https://evil.test", "https://www.threads.net/",
+					"https://www.threads.net/@someone/post/C8abc", `https://www.threads.net/@canary/post/C8abc"><svg>`}},
+			{"instagram-standalone", "", "https://www.instagram.com/reel/C8abc/?igsh=share", "https://www.instagram.com/reel/C8abc/", "",
+				[]string{"https://instagram.com.evil.test/p/C8abc/", "https://user@www.instagram.com/p/C8abc/", "https://l.instagram.com/?u=https://evil.test",
+					"https://www.instagram.com/accounts/login/"}},
+			// The query is the post's address here, so it stays.
+			{"facebook", "", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "https://www.facebook.com/permalink.php?story_fbid=1&id=2", "",
+				[]string{"https://facebook.evil.test/permalink.php?story_fbid=1&id=2", "https://l.facebook.com/l.php?u=https://evil.test", "https://www.facebook.com/l.php?u=https://evil.test"}},
+			{"pinterest", "", "https://www.pinterest.com/pin/123/", "https://www.pinterest.com/pin/123/", "", []string{"https://example.com/pin/123/", "https://www.pinterest.com/canary/"}},
+			{"gmb", "", "https://local.google.com/place?id=1&use=posts&lpsid=2", "https://local.google.com/place?id=1&use=posts&lpsid=2", "",
 				[]string{"https://www.google.com/url?q=https://evil.test"}},
-			{"bluesky", "https://bsky.app/profile/canary.bsky.social/post/3kabc", "at://canary.bsky.social/app.bsky.feed.post/3kabc",
-				[]string{"https://example.com/profile/canary.bsky.social/post/3kabc", "https://bsky.app/profile/canary.bsky.social"}},
-			{"mastodon", "https://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233",
+			{"bluesky", "canary.bsky.social", "https://bsky.app/profile/canary.bsky.social/post/3kabc", "at://canary.bsky.social/app.bsky.feed.post/3kabc", "https://bsky.app/profile/canary.bsky.social/post/3kabc",
+				[]string{"https://example.com/profile/canary.bsky.social/post/3kabc", "https://bsky.app/profile/canary.bsky.social", "https://bsky.app/profile/someone.bsky.social/post/3kabc"}},
+			{"mastodon", "", "HTTPS://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233",
 				[]string{"https://mastodon.social/about", "https://user@mastodon.social/@canary/112233", "https://mastodon.social/@canary/112233?ref=x"}},
+			// Legacy names of a platform take its rules.
+			{"mastodon-custom", "", "https://fixture.social/@canary/112233", "https://fixture.social/@canary/112233", "", []string{"https://example.com/about"}},
+			{"twitter", "", "https://x.com/canary/status/1234567890", "1234567890", "", []string{"https://x.com/canary"}},
 		} {
 			t.Run(item.platform, func(t *testing.T) {
+				connection := connect(item.platform, "link-"+item.platform+"-"+w.id, nil)
+				if item.handle != "" {
+					w.db.Client.ChannelConnection.UpdateOneID(connection).SetHandle(item.handle).ExecX(ctx)
+				}
 				post := w.db.Client.ScheduledPost.Create().SetID(cuid.New()).SetOrganizationID(w.org).
-					SetContentDraftID(draft(ContentDraftInput{}).ID).SetChannelConnectionID(connect(item.platform, "link-"+item.platform+"-"+w.id, nil)).
+					SetContentDraftID(draft(ContentDraftInput{}).ID).SetChannelConnectionID(connection).
 					SetScheduledFor(time.Now().UTC()).SetStatus(scheduledpost.StatusUNKNOWN_DELIVERY).SetCaption("Link canary").
 					SetIdempotencyKey(cuid.New()).SetFailureCode(publishing.FailureUnknownDelivery).SaveX(ctx)
 				for _, bad := range item.invalid {
@@ -608,8 +620,9 @@ func TestWritePublishing(t *testing.T) {
 						t.Fatalf("accepted %q: %v", bad, err)
 					}
 				}
-				if _, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.link}); err != nil {
-					t.Fatal(err)
+				live, err := repo.ReconcileContentDraftPost(ctx, owner, post.ID, ReconcileInput{Live: true, URL: item.link})
+				if err != nil || item.liveURL != "" && (live.URL == nil || *live.URL != item.liveURL) {
+					t.Fatalf("live=%+v err=%v", live, err)
 				}
 				if stored := w.db.Client.ScheduledPost.GetX(ctx, post.ID); stored.RemotePostID == nil || *stored.RemotePostID != item.remoteID {
 					t.Fatalf("stored remote id %v, want %q", stored.RemotePostID, item.remoteID)
