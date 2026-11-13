@@ -544,12 +544,19 @@ export function captionLength(caption: string): number {
   return caption.length
 }
 
-const blueskySegments = new Intl.Segmenter('en', { granularity: 'grapheme' })
+const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' })
 
-/** A caption's length as the platform counts it: weighted on X, graphemes on Bluesky. */
+/**
+ * A caption's length as the platform counts it: X's weighted count of the
+ * trimmed text (links are 23), grapheme clusters on Bluesky and Mastodon, and
+ * UTF-16 units elsewhere. Go's `draftPostLength` is the same rule; both are
+ * tested against `test/caption-length-cases.json`.
+ */
 export function platformCaptionLength(channel: DraftChannel, caption: string): number {
-  if (channel === 'x') return xLength(caption)
-  if (channel === 'bluesky') return Array.from(blueskySegments.segment(caption)).length
+  // shortcut: JS trim() also strips U+FEFF and keeps U+0085, unlike Go's TrimSpace; align both if a caption ever ends in one.
+  if (channel === 'x') return xLength(caption.trim())
+  if (channel === 'bluesky' || channel === 'mastodon')
+    return Array.from(graphemes.segment(caption)).length
   return captionLength(caption)
 }
 

@@ -15,10 +15,17 @@ test('thread split uses weighted URLs and preserves grapheme sequences', () => {
   assert.ok(posts.includes(url))
   assert.ok(posts.every((post) => xLength(post) <= 25))
   const family = '👩‍👩‍👧‍👦'
-  assert.deepEqual(splitThread(family.repeat(10), 'bluesky', 28), [
-    family.repeat(4),
-    family.repeat(4),
+  // Bluesky counts graphemes: a family is one.
+  assert.deepEqual(splitThread(family.repeat(60), 'bluesky', 25), [
+    family.repeat(25),
+    family.repeat(25),
+    family.repeat(10),
+  ])
+  // LinkedIn counts UTF-16 units: a family is 11, and is never cut.
+  assert.deepEqual(splitThread(family.repeat(5), 'linkedin', 23), [
     family.repeat(2),
+    family.repeat(2),
+    family,
   ])
 })
 test('imports enforce the thread and input size limits', () => {

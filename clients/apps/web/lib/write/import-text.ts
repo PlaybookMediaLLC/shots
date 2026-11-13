@@ -1,4 +1,4 @@
-import { xLength } from '@/lib/content-drafts/x-length'
+import { platformCaptionLength } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, PlateBody } from './document'
 import { postBreak } from './versions'
 
@@ -31,7 +31,7 @@ export function splitThread(text: string, channel: DraftChannel, limit: number):
   if (!Number.isInteger(limit) || limit < 23 || limit > 25_000)
     throw new Error('Choose a post length between 23 and 25,000.')
   if (text.length > 100_000) throw new Error('Import at most 100,000 characters.')
-  const length = channel === 'x' ? xLength : (value: string) => [...value].length
+  const length = (value: string) => platformCaptionLength(channel, value)
   const posts: string[] = []
   let current = ''
   const push = () => {

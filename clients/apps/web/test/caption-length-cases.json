@@ -1,0 +1,294 @@
+{
+  "limits": {
+    "bluesky": 300,
+    "instagram": 2200,
+    "linkedin": 3000,
+    "mastodon": 500,
+    "threads": 500,
+    "tiktok": 2000,
+    "x": 280,
+    "youtube": 5000
+  },
+  "cases": [
+    {
+      "label": "plain text",
+      "text": "hello",
+      "lengths": {
+        "bluesky": 5,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 5,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 5,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "a long URL counts 23 on X",
+      "text": "see https://example.com/a/very/long/path?with=query.",
+      "lengths": {
+        "bluesky": 52,
+        "instagram": 52,
+        "linkedin": 52,
+        "mastodon": 52,
+        "threads": 52,
+        "tiktok": 52,
+        "x": 28,
+        "youtube": 52
+      }
+    },
+    {
+      "label": "a bare domain is a link on X",
+      "text": "www.example.com",
+      "lengths": {
+        "bluesky": 15,
+        "instagram": 15,
+        "linkedin": 15,
+        "mastodon": 15,
+        "threads": 15,
+        "tiktok": 15,
+        "x": 23,
+        "youtube": 15
+      }
+    },
+    {
+      "label": "a domain without www is a link on X",
+      "text": "example.com",
+      "lengths": {
+        "bluesky": 11,
+        "instagram": 11,
+        "linkedin": 11,
+        "mastodon": 11,
+        "threads": 11,
+        "tiktok": 11,
+        "x": 23,
+        "youtube": 11
+      }
+    },
+    {
+      "label": "CJK weighs two on X",
+      "text": "日本語",
+      "lengths": {
+        "bluesky": 3,
+        "instagram": 3,
+        "linkedin": 3,
+        "mastodon": 3,
+        "threads": 3,
+        "tiktok": 3,
+        "x": 6,
+        "youtube": 3
+      }
+    },
+    {
+      "label": "emoji",
+      "text": "🚀",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 2,
+        "linkedin": 2,
+        "mastodon": 1,
+        "threads": 2,
+        "tiktok": 2,
+        "x": 2,
+        "youtube": 2
+      }
+    },
+    {
+      "label": "emoji with a skin tone",
+      "text": "👍🏽",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 1,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 2,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "ZWJ family emoji",
+      "text": "👨‍👩‍👧",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 8,
+        "linkedin": 8,
+        "mastodon": 1,
+        "threads": 8,
+        "tiktok": 8,
+        "x": 2,
+        "youtube": 8
+      }
+    },
+    {
+      "label": "a flag",
+      "text": "🇫🇷",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 1,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 2,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "two flags",
+      "text": "🇫🇷🇺🇸",
+      "lengths": {
+        "bluesky": 2,
+        "instagram": 8,
+        "linkedin": 8,
+        "mastodon": 2,
+        "threads": 8,
+        "tiktok": 8,
+        "x": 4,
+        "youtube": 8
+      }
+    },
+    {
+      "label": "keycap emoji",
+      "text": "#️⃣",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 3,
+        "linkedin": 3,
+        "mastodon": 1,
+        "threads": 3,
+        "tiktok": 3,
+        "x": 2,
+        "youtube": 3
+      }
+    },
+    {
+      "label": "punctuation X weighs one",
+      "text": "café — “quoted”",
+      "lengths": {
+        "bluesky": 15,
+        "instagram": 15,
+        "linkedin": 15,
+        "mastodon": 15,
+        "threads": 15,
+        "tiktok": 15,
+        "x": 15,
+        "youtube": 15
+      }
+    },
+    {
+      "label": "combining acute, normalized on X",
+      "text": "café",
+      "lengths": {
+        "bluesky": 4,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 4,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 4,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "stacked combining marks",
+      "text": "Z͑ͫ̓ͪ",
+      "lengths": {
+        "bluesky": 1,
+        "instagram": 5,
+        "linkedin": 5,
+        "mastodon": 1,
+        "threads": 5,
+        "tiktok": 5,
+        "x": 5,
+        "youtube": 5
+      }
+    },
+    {
+      "label": "Devanagari conjunct (Unicode 15.1)",
+      "text": "नमस्ते",
+      "lengths": {
+        "bluesky": 3,
+        "instagram": 6,
+        "linkedin": 6,
+        "mastodon": 3,
+        "threads": 6,
+        "tiktok": 6,
+        "x": 6,
+        "youtube": 6
+      }
+    },
+    {
+      "label": "multiline",
+      "text": "line one\nline two\n\nline three",
+      "lengths": {
+        "bluesky": 29,
+        "instagram": 29,
+        "linkedin": 29,
+        "mastodon": 29,
+        "threads": 29,
+        "tiktok": 29,
+        "x": 29,
+        "youtube": 29
+      }
+    },
+    {
+      "label": "CRLF is one grapheme",
+      "text": "a\r\nb",
+      "lengths": {
+        "bluesky": 3,
+        "instagram": 4,
+        "linkedin": 4,
+        "mastodon": 3,
+        "threads": 4,
+        "tiktok": 4,
+        "x": 4,
+        "youtube": 4
+      }
+    },
+    {
+      "label": "X trims surrounding whitespace",
+      "text": "  hello\n\n",
+      "lengths": {
+        "bluesky": 9,
+        "instagram": 9,
+        "linkedin": 9,
+        "mastodon": 9,
+        "threads": 9,
+        "tiktok": 9,
+        "x": 5,
+        "youtube": 9
+      }
+    },
+    {
+      "label": "multiline post with a link and an emoji",
+      "text": "Launch day 🚀\n\nhttps://shots.example.com/launch?utm_source=x&utm_medium=social\nThanks!",
+      "lengths": {
+        "bluesky": 85,
+        "instagram": 86,
+        "linkedin": 86,
+        "mastodon": 85,
+        "threads": 86,
+        "tiktok": 86,
+        "x": 46,
+        "youtube": 86
+      }
+    },
+    {
+      "label": "mention and hashtag",
+      "text": "@shots_app #launch",
+      "lengths": {
+        "bluesky": 18,
+        "instagram": 18,
+        "linkedin": 18,
+        "mastodon": 18,
+        "threads": 18,
+        "tiktok": 18,
+        "x": 18,
+        "youtube": 18
+      }
+    }
+  ]
+}

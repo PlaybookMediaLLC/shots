@@ -17,13 +17,15 @@ func xLength(text string) int {
 }
 
 // draftPostLength is a draft post's length on its channel: X's own count on
-// X, grapheme clusters on Bluesky, and UTF-16 units elsewhere.
+// X, grapheme clusters on Bluesky and Mastodon, and UTF-16 units elsewhere.
+// The composer's platformCaptionLength is the same rule; both are tested
+// against clients/apps/web/test/caption-length-cases.json.
 func draftPostLength(channel, text string) int {
 	if channel == "x" {
 		return xLength(strings.TrimSpace(text))
 	}
-	if channel == "bluesky" {
-		return socialidentity.BlueskyTextLength(text)
+	if channel == "bluesky" || channel == "mastodon" {
+		return socialidentity.GraphemeLength(text)
 	}
 	return len(utf16.Encode([]rune(text)))
 }

@@ -1,26 +1,43 @@
 package product
 
-import "testing"
+import (
+	"encoding/json"
+	"maps"
+	"os"
+	"testing"
+)
 
-// The same cases as test/content-draft-when.test.ts: both sides must agree.
-func TestXLengthMatchesTheComposer(t *testing.T) {
-	cases := map[string]int{
-		"hello": 5,
-		"see https://example.com/a/very/long/path?with=query.": 4 + 23 + 1,
-		"www.example.com": 23,
-		"日本語":             6,
-		"🚀":               2,
-		"👍🏽":              2,
-		"👨‍👩‍👧":           2,
-		"🇫🇷":              2,
-		"café — “quoted”": 15,
-		"cafe\u0301":      4,
-		"example.com":     23,
-		"🇫🇷🇺🇸":            4,
+// The composer's platformCaptionLength reads the same cases
+// (clients/apps/web/test/write-publication.test.ts): both sides must agree.
+func TestDraftPostLengthMatchesTheComposer(t *testing.T) {
+	data, err := os.ReadFile("../../../clients/apps/web/test/caption-length-cases.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for text, want := range cases {
-		if got := xLength(text); got != want {
-			t.Errorf("xLength(%q) = %d, want %d", text, got, want)
+	var fixture struct {
+		Limits map[string]int
+		Cases  []struct {
+			Label   string
+			Text    string
+			Lengths map[string]int
 		}
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(fixture.Limits, draftChannelLimits) {
+		t.Fatalf("limits %v, composer %v", draftChannelLimits, fixture.Limits)
+	}
+	for _, item := range fixture.Cases {
+		t.Run(item.Label, func(t *testing.T) {
+			if len(item.Lengths) != len(draftChannelLimits) {
+				t.Fatalf("case covers %d of %d channels", len(item.Lengths), len(draftChannelLimits))
+			}
+			for channel, want := range item.Lengths {
+				if got := draftPostLength(channel, item.Text); got != want {
+					t.Errorf("%s: draftPostLength(%q) = %d, want %d", channel, item.Text, got, want)
+				}
+			}
+		})
 	}
 }

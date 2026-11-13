@@ -162,6 +162,9 @@ export const automationSchema = z.strictObject({
 /** One of {@link automationSchema}. */
 export type Automation = z.infer<typeof automationSchema>
 
+/** The variables an Auto-DM message may use; Go's `autodm.Config.Validate` allows the same. */
+export const AUTO_DM_VARIABLES = ['first_name', 'full_name', 'username', 'action', 'post_url']
+
 /** Prepared Auto-DM settings. Delivery is disabled until authorized provider access is configured. */
 export const autoDmSchema = z
   .strictObject({
@@ -170,9 +173,20 @@ export const autoDmSchema = z
     replies: z.boolean(),
     requireFollow: z.boolean(),
     replyText: z.string().max(100).optional(),
-    message: z.string().min(1).max(10_000),
+    message: z
+      .string()
+      .max(10_000)
+      .refine((message) => message.trim() !== '', 'Write the message.')
+      .refine(
+        (message) =>
+          [...message.matchAll(/\{\{([^{}]+)\}\}/g)].every(([, name]) =>
+            AUTO_DM_VARIABLES.includes(name)
+          ),
+        'Use only the listed variables.'
+      ),
   })
   .refine((value) => value.replies || value.reposts, 'Choose replies or reposts.')
+  .refine((value) => !value.replyText || value.replies, 'A reply filter needs replies.')
 /** One prepared campaign configuration. */
 export type AutoDm = z.infer<typeof autoDmSchema>
 

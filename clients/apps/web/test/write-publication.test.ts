@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
-import type { PlateBody } from '@/lib/write/document'
+import { z } from 'zod'
+import {
+  DRAFT_CHANNEL_LIMITS,
+  platformCaptionLength,
+  POST_BREAK,
+  SOCIAL_MENTION,
+} from '@/lib/content-drafts/serialize'
+import { draftChannelSchema, type PlateBody } from '@/lib/write/document'
 import {
   preparePublication,
   buildPublication,
@@ -689,3 +696,28 @@ test('rendered media stays bound to the flushed version for scheduling and publi
     /changed while preparing/
   )
 })
+
+// Go's draftPostLength reads the same cases (server/internal/product/x_length_test.go).
+const lengthCases = z
+  .strictObject({
+    limits: z.record(draftChannelSchema, z.number()),
+    cases: z.array(
+      z.strictObject({
+        label: z.string(),
+        text: z.string(),
+        lengths: z.record(draftChannelSchema, z.number()),
+      })
+    ),
+  })
+  .parse(JSON.parse(readFileSync(new URL('./caption-length-cases.json', import.meta.url), 'utf8')))
+
+test('the counter uses the limits Go validates against', () => {
+  assert.deepEqual(lengthCases.limits, DRAFT_CHANNEL_LIMITS)
+})
+
+for (const entry of lengthCases.cases) {
+  test(`the counter counts as Go does: ${entry.label}`, () => {
+    for (const channel of draftChannelSchema.options)
+      assert.equal(platformCaptionLength(channel, entry.text), entry.lengths[channel], channel)
+  })
+}

@@ -33,8 +33,10 @@ import {
   useReadOnly,
 } from '@shots/platejs-editor/platejs/react'
 import { KEYS, type Value } from '@shots/platejs-editor/platejs'
-import { POST_BREAK } from '@/lib/content-drafts/serialize'
-import type { PostSettings } from '@/lib/write/document'
+import type { z } from 'zod'
+import type { socialMentionSchema } from '@/lib/api/contracts/social-mentions'
+import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
+import type { DraftChannel, PostSettings } from '@/lib/write/document'
 import { newPostId, postBreak } from '@/lib/write/versions'
 import { cn } from '@/lib/utils'
 import { POST_COLUMN } from './layout'
@@ -153,25 +155,60 @@ export function setPostSettings(editor: PlateEditor, number: number, settings: P
     .filter(([, value]) => value === undefined)
     .map(([key]) => key)
   const set = Object.fromEntries(Object.entries(settings).filter(([, value]) => value !== undefined))
-  editor.tf.withoutNormalizing(() => {
-    if (Object.keys(set).length > 0) editor.tf.setNodes(set, { at: [index] })
-    if (unset.length > 0) editor.tf.unsetNodes(unset, { at: [index] })
-  })
+  asUndoStep(editor, () =>
+    editor.tf.withoutNormalizing(() => {
+      if (Object.keys(set).length > 0) editor.tf.setNodes(set, { at: [index] })
+      if (unset.length > 0) editor.tf.unsetNodes(unset, { at: [index] })
+    })
+  )
+}
+
+/** A live session's history (Yjs), which merges every edit made within 500 ms into one step. */
+type LiveHistory = { flushLocalChanges(): void; undoManager: { stopCapturing(): void } }
+
+const stepping = new WeakSet<PlateEditor>()
+
+/**
+ * Apply `change` as one undo step of its own: undo removes all of it and puts
+ * the caret back where it was, and redo applies it again. Plate's history
+ * starts a batch for it and makes the next edit start another; a live
+ * session's history stops capturing on both sides of it. A step taken inside
+ * another is part of it.
+ */
+export function asUndoStep(editor: PlateEditor, change: () => void): void {
+  if (stepping.has(editor)) {
+    change()
+    return
+  }
+  const live = 'undoManager' in editor ? (editor as unknown as LiveHistory) : null
+  stepping.add(editor)
+  try {
+    live?.undoManager.stopCapturing()
+    editor.tf.withNewBatch(change)
+    editor.tf.setSplittingOnce(true)
+    if (!live) return
+    live.flushLocalChanges()
+    live.undoManager.stopCapturing()
+  } finally {
+    stepping.delete(editor)
+  }
 }
 
 /** Split the post at the caret: what follows the caret starts the next post, with no settings. */
 export function splitPostAtCaret(editor: PlateEditor): void {
   if (!editor.selection) return
-  editor.tf.splitNodes({ always: true, mode: 'highest' })
-  const entry = editor.api.block({ highest: true })
-  if (!entry) return
-  editor.tf.insertNodes(postBreak(), { at: [entry[1][0]] })
-  const path = [entry[1][0] + 1]
-  const start = editor.api.start(path)
-  const leading = editor.api.string(path).match(/^\s+/)?.[0].length ?? 0
-  const end = start && leading ? editor.api.after(start, { distance: leading, unit: 'offset' }) : null
-  if (start && end) editor.tf.delete({ at: { anchor: start, focus: end } })
-  editor.tf.select(editor.api.start(path))
+  asUndoStep(editor, () => {
+    editor.tf.splitNodes({ always: true, mode: 'highest' })
+    const entry = editor.api.block({ highest: true })
+    if (!entry) return
+    editor.tf.insertNodes(postBreak(), { at: [entry[1][0]] })
+    const path = [entry[1][0] + 1]
+    const start = editor.api.start(path)
+    const leading = editor.api.string(path).match(/^\s+/)?.[0].length ?? 0
+    const end = start && leading ? editor.api.after(start, { distance: leading, unit: 'offset' }) : null
+    if (start && end) editor.tf.delete({ at: { anchor: start, focus: end } })
+    editor.tf.select(editor.api.start(path))
+  })
 }
 
 /** Start a new post after the post holding the caret's block, and move into it. */
@@ -194,7 +231,38 @@ export function insertPostAfter(editor: PlateEditor, number: number): void {
 /** Append a post with text, such as a thread finisher, as one undoable step. */
 export function appendPost(editor: PlateEditor, text: string, settings: PostSettings = {}): void {
   const paragraphs = text.split(/\n{2,}/).map((paragraph) => ({ children: [{ text: paragraph }], type: 'p' }))
-  editor.tf.insertNodes([postBreak(settings), ...paragraphs], { at: [editor.children.length] })
+  asUndoStep(editor, () => editor.tf.insertNodes([postBreak(settings), ...paragraphs], { at: [editor.children.length] }))
+}
+
+/** Insert a saved snippet at the caret (the end when there is none), as one undoable step. */
+export function insertSnippet(editor: PlateEditor, text: string): void {
+  asUndoStep(editor, () => {
+    if (!editor.selection) editor.tf.select(editor.api.end([]))
+    editor.tf.insertText(text)
+  })
+}
+
+/** Put a mention at the caret (the end when there is none), then a space after it, as one undoable step. */
+export function insertMention(
+  editor: PlateEditor,
+  channel: DraftChannel,
+  mention: z.output<typeof socialMentionSchema>
+): void {
+  asUndoStep(editor, () => {
+    if (!editor.selection) editor.tf.select(editor.api.end([]))
+    editor.tf.insertNodes({
+      children: [{ text: '' }],
+      handle: mention.handle,
+      label: mention.label,
+      kind: mention.kind,
+      platform: channel,
+      providerId: mention.providerId,
+      type: SOCIAL_MENTION,
+    })
+    editor.tf.move({ unit: 'offset' })
+    editor.tf.insertText(' ')
+  })
+  editor.tf.focus()
 }
 
 function isEmptyParagraph(node: unknown): boolean {
