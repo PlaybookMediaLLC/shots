@@ -1,8 +1,7 @@
-import { POST_BREAK, serializeDraft } from '@/lib/content-drafts/serialize'
+import { platformCaptionLength, POST_BREAK, serializeDraft } from '@/lib/content-drafts/serialize'
 import type { DraftChannel, Numbering, PlateBody } from './document'
 import { threadLabels } from './numbering'
 import { postBreak } from './versions'
-import { xLength } from '@/lib/content-drafts/x-length'
 
 type Node = { [key: string]: unknown; text?: string; type?: string; children?: Node[] }
 
@@ -30,7 +29,7 @@ export function splitThread(
     throw new Error('Choose a post length from 25 to 25,000.')
   const label = threadLabels(25, numbering).filter((item): item is string => item !== null)
   const reserve = label.length
-    ? Math.max(...label.map((item) => (channel === 'x' ? xLength(item) : [...item].length))) + 1
+    ? Math.max(...label.map((item) => platformCaptionLength(channel, item))) + 1
     : 0
   const budget = limit - reserve
   const posts: Node[][] = []

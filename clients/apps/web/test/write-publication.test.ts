@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { POST_BREAK, SOCIAL_MENTION } from '@/lib/content-drafts/serialize'
-import type { PlateBody } from '@/lib/write/document'
+import { z } from 'zod'
+import {
+  DRAFT_CHANNEL_LIMITS,
+  overflowAt,
+  platformCaptionLength,
+  POST_BREAK,
+  SOCIAL_MENTION,
+} from '@/lib/content-drafts/serialize'
+import { type DraftChannel, draftChannelSchema, type PlateBody } from '@/lib/write/document'
 import {
   preparePublication,
   buildPublication,
@@ -820,4 +828,60 @@ test('rendered media stays bound to the flushed version for scheduling and publi
     }),
     /changed while preparing/
   )
+})
+
+// Go's draftPostLength reads the same cases (server/internal/product/x_length_test.go).
+// They live under server/ so that changing them runs both the Go and the web tests.
+const lengthCases = z
+  .strictObject({
+    limits: z.record(draftChannelSchema, z.number()),
+    cases: z.array(
+      z.strictObject({
+        label: z.string(),
+        text: z.string(),
+        lengths: z.record(draftChannelSchema, z.number()),
+      })
+    ),
+  })
+  .parse(
+    JSON.parse(
+      readFileSync(
+        new URL(
+          '../../../../server/internal/product/testdata/caption-length-cases.json',
+          import.meta.url
+        ),
+        'utf8'
+      )
+    )
+  )
+
+test('the counter uses the limits Go validates against', () => {
+  assert.deepEqual(lengthCases.limits, DRAFT_CHANNEL_LIMITS)
+})
+
+for (const entry of lengthCases.cases) {
+  test(`the counter counts as Go does: ${entry.label}`, () => {
+    for (const channel of draftChannelSchema.options)
+      assert.equal(platformCaptionLength(channel, entry.text), entry.lengths[channel], channel)
+  })
+}
+
+test('the over-limit mark starts where the counter passes the limit, on every channel', () => {
+  // The definition: step back one code point at a time until the text fits.
+  const reference = (channel: DraftChannel, caption: string, limit: number) => {
+    let at = caption.length
+    while (at > 0 && platformCaptionLength(channel, caption.slice(0, at)) > limit) {
+      const code = caption.charCodeAt(at - 1)
+      at -= code >= 0xdc00 && code <= 0xdfff && at > 1 ? 2 : 1
+    }
+    return at
+  }
+  for (const { text } of lengthCases.cases)
+    for (const channel of draftChannelSchema.options)
+      for (const limit of [0, 1, 2, 5, 23, 40])
+        assert.equal(
+          overflowAt(channel, text, limit),
+          reference(channel, text, limit),
+          `${channel} ${limit} ${JSON.stringify(text)}`
+        )
 })

@@ -137,7 +137,7 @@ func fitsChannel(channel, copy string) bool {
 		return false
 	}
 	if channel == "x" {
-		return xLength(copy) <= 280
+		return fitsXPost(copy, 0)
 	}
 	return utf8.RuneCountInString(copy) <= channelLimit(channel)
 }
