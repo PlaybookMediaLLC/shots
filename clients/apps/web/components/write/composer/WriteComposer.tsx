@@ -1214,15 +1214,23 @@ export function WriteComposer({
     canPublish && server.status !== 'archived' && !locked && (!focus || blockers.length > 0)
   // A tab that follows the main platform has no editor of its own: its media lives on that tab.
   const ownEditor = active === primary || versionOfTab.mode === 'manual'
-  const doneOn = (status: string) =>
+  // A post deleted from its platform through Shots stays PUBLISHED, but is not live.
+  const doneOn = (status: string, deleted = false) =>
     [
       ...new Set(
-        posts.filter((post) => post.status === status).map((post) => platformLabel(post.platform))
+        posts
+          .filter((post) => post.status === status && Boolean(post.deletedAt) === deleted)
+          .map((post) => platformLabel(post.platform))
       ),
     ].join(', ')
   const liveOn = doneOn('PUBLISHED')
+  const deletedFrom = doneOn('PUBLISHED', true)
   const appOn = doneOn('SENT_TO_APP')
-  const done = [liveOn && `live on ${liveOn}`, appOn && `in the ${appOn} app to finish`]
+  const done = [
+    liveOn && `live on ${liveOn}`,
+    deletedFrom && `deleted from ${deletedFrom}`,
+    appOn && `in the ${appOn} app to finish`,
+  ]
     .filter(Boolean)
     .join(' and ')
   const editorProps = {

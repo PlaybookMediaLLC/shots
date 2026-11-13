@@ -147,6 +147,13 @@ func (p *Provider) UnretweetPost(ctx context.Context, _ *ent.Integration, postID
 	return err
 }
 
+// DeletePost asks the fake to record that a post, thread part or reply was
+// deleted (#557).
+func (p *Provider) DeletePost(ctx context.Context, _ *ent.Integration, postID string) error {
+	_, err := p.action(ctx, "delete", postID, "")
+	return err
+}
+
 func (p *Provider) ReplyTo(ctx context.Context, _ *ent.Integration, postID, text string) (string, error) {
 	return p.action(ctx, "reply", postID, text)
 }

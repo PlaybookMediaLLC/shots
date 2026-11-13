@@ -15,9 +15,10 @@ test('an owner creates an agent key whose snippets carry it, and the key cannot 
   await expect(page.getByLabel(/artifact:read/)).toBeChecked()
   await expect(page.getByLabel(/draft:write/)).toBeChecked()
   await expect(page.getByLabel(/asset:write/)).toBeChecked()
-  // Scheduling and posting are opt-in per key.
+  // Scheduling, posting and deleting posts are opt-in per key.
   await expect(page.getByLabel(/post:schedule/)).not.toBeChecked()
   await expect(page.getByLabel(/post:publish/)).not.toBeChecked()
+  await expect(page.getByLabel(/post:delete/)).not.toBeChecked()
 
   await page.getByRole('button', { name: 'Create agent key' }).click()
   await expect(page.getByText('Copy this key now')).toBeVisible()
@@ -43,6 +44,13 @@ test('an owner creates an agent key whose snippets carry it, and the key cannot 
     }
   )
   expect(approve.status).toBe(403)
+  // Nor can it delete a published post: that takes post:delete.
+  const remove = await browserRequest(
+    page,
+    '/api/v1/content-draft-posts/cl00000000000000000000000/delete',
+    { headers: { 'x-api-key': key }, method: 'POST' }
+  )
+  expect(remove.status).toBe(403)
 })
 
 test('the consent page refuses an unregistered client without redirecting', async ({
