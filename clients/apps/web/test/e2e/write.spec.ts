@@ -423,6 +423,31 @@ test(
   }
 )
 
+test('⌘⇧↵ with the caret in the editor opens the publish review and adds no block', async ({
+  page,
+  startWorkspace,
+}) => {
+  await startWorkspace({ channels: ['x'] })
+  await newDraft(page)
+  const editor = draftEditor(page)
+  await editor.click()
+  await settleSelection(page)
+  await page.keyboard.type('Reviewed from the keyboard')
+  await expectSaved(page)
+  const blocks = editor.locator('[data-slate-node="element"]')
+  const before = await blocks.count()
+
+  // The editor kit's exit break also binds this chord; in Write it belongs to the review.
+  await page.keyboard.press('ControlOrMeta+Shift+Enter')
+  await expect(page.getByTestId('publish-review')).toBeVisible()
+  // The modal review hides the editor from the accessibility tree; count once it closes.
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('publish-review')).toHaveCount(0)
+  await expect(blocks).toHaveCount(before)
+  // The post header comes first; the exit break used to put an empty block between it and the text.
+  await expect(blocks.nth(1)).toContainText('Reviewed from the keyboard')
+})
+
 test(
   'on a phone the library is the page, panels are sheets, and the review keeps the account identity',
   { tag: '@journey' },
