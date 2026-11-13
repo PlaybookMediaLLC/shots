@@ -38,6 +38,12 @@ func TestInstagramOptionsLimits(t *testing.T) {
 		{"graduation without a trial", &InstagramOptions{TrialGraduation: "MANUAL"}, false},
 		{"unknown graduation", &InstagramOptions{TrialReel: true, TrialGraduation: "AUTO"}, false},
 		{"off the grid", &InstagramOptions{ShareToFeed: &off}, true},
+		{"story", &InstagramOptions{Placement: "story"}, true},
+		{"unknown placement", &InstagramOptions{Placement: "reel"}, false},
+		{"story with collaborators", &InstagramOptions{Placement: "story", Collaborators: []string{"partner"}}, false},
+		{"story with tags", &InstagramOptions{Placement: "story", UserTags: []string{"brand"}}, false},
+		{"story with a trial", &InstagramOptions{Placement: "story", TrialReel: true}, false},
+		{"story off the grid", &InstagramOptions{Placement: "story", ShareToFeed: &off}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := tc.options.Validate(); (err == nil) != tc.valid {

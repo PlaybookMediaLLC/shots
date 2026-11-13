@@ -2106,6 +2106,8 @@ export interface components {
                                 trialReel?: boolean;
                                 /** @enum {string} */
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3231,6 +3233,8 @@ export interface components {
                                 trialReel?: boolean;
                                 /** @enum {string} */
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3453,6 +3457,8 @@ export interface components {
                                 trialReel?: boolean;
                                 /** @enum {string} */
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -3581,6 +3587,8 @@ export interface components {
                             trialReel?: boolean;
                             /** @enum {string} */
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3822,6 +3830,8 @@ export interface components {
                             trialReel?: boolean;
                             /** @enum {string} */
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -3949,6 +3959,8 @@ export interface components {
                             trialReel?: boolean;
                             /** @enum {string} */
                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                            /** @enum {string} */
+                            placement?: "story";
                         };
                         autoDm?: {
                             /** @enum {string} */
@@ -4303,6 +4315,8 @@ export interface components {
                                 trialReel?: boolean;
                                 /** @enum {string} */
                                 trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                /** @enum {string} */
+                                placement?: "story";
                             };
                             autoDm?: {
                                 /** @enum {string} */
@@ -10482,6 +10496,8 @@ export interface operations {
                                             trialReel?: boolean;
                                             /** @enum {string} */
                                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */
@@ -10775,6 +10791,8 @@ export interface operations {
                                             trialReel?: boolean;
                                             /** @enum {string} */
                                             trialGraduation?: "MANUAL" | "SS_PERFORMANCE";
+                                            /** @enum {string} */
+                                            placement?: "story";
                                         };
                                         autoDm?: {
                                             /** @enum {string} */

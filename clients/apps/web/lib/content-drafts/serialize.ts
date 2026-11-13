@@ -131,6 +131,8 @@ export type SerializeOptions = {
   numbering?: Numbering
   /** The asset LinkedIn sends as the post's document; its file block is not an attachment. */
   documentAssetId?: string
+  /** A story: its media follow the story rules, and it needs no text. */
+  story?: boolean
 }
 
 /** A caption for one channel, with its limit and what it lost. */
@@ -755,7 +757,10 @@ export function serializeDraft(
     errors.push(
       'An attachment has invalid photo-tag metadata. Remove or replace its tags before scheduling.'
     )
-  if (posts.length === 0 || posts.every((post) => !post.caption && post.images === 0)) {
+  if (
+    !options.story &&
+    (posts.length === 0 || posts.every((post) => !post.caption && post.images === 0))
+  ) {
     errors.push('Write something to post.')
   }
   posts.forEach((post, index) => {
@@ -782,9 +787,11 @@ export function serializeDraft(
         media.mimeType ??
         (media.kind === 'gif' ? 'image/gif' : media.kind === 'video' ? 'video/*' : 'image/*'),
     }))
-    for (const problem of mediaProblems(channel, facts))
+    for (const problem of mediaProblems(channel, facts, options.story ? 'story' : undefined))
       errors.push(posts.length > 1 ? `Post ${index + 1}: ${problem}` : problem)
   })
+  // An empty story still says what it needs, as Go does.
+  if (options.story && posts.length === 0) errors.push(...mediaProblems(channel, [], 'story'))
   if (context.unpublishable > 0) {
     errors.push(
       `${CHANNEL_NAMES[channel]} can't post an uploaded file or audio as an attachment. Remove it from the post; a PDF goes to LinkedIn through the document option.`

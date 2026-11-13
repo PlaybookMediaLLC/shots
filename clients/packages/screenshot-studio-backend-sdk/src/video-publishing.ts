@@ -32,6 +32,8 @@ export const instagramOptionsSchema = z.strictObject({
   shareToFeed: z.boolean().optional(),
   trialReel: z.boolean().optional(),
   trialGraduation: z.enum(['MANUAL', 'SS_PERFORMANCE']).optional(),
+  /** "story": one image or video as a story, with no caption and none of the above. */
+  placement: z.enum(['story']).optional(),
 })
 
 /** Instagram metadata stored with a scheduled snapshot. */

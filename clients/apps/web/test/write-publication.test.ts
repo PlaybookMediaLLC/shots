@@ -9,7 +9,12 @@ import {
   POST_BREAK,
   SOCIAL_MENTION,
 } from '@/lib/content-drafts/serialize'
-import { type DraftChannel, draftChannelSchema, type PlateBody } from '@/lib/write/document'
+import {
+  type DraftChannel,
+  draftChannelSchema,
+  type PlateBody,
+  type VersionOptions,
+} from '@/lib/write/document'
 import {
   preparePublication,
   buildPublication,
@@ -744,6 +749,48 @@ test('Instagram settings go to Instagram only, and reel settings need one video'
     ).target.options?.instagram,
     undefined
   )
+})
+
+test('an Instagram story sends one image or video without text or feed settings', () => {
+  const instagram = { channel: 'instagram' as const, connectionId: 'ci0000000001' }
+  const image = { type: 'img', assetId: 'cimage000001', children: [{ text: '' }] }
+  const video = { type: 'video', assetId: 'cvideo000001', children: [{ text: '' }] }
+  const build = (media: PlateBody, options: VersionOptions) =>
+    buildPublication(
+      draft({
+        body: [p('This text goes to the other platforms.'), ...media],
+        platformVersions: withOptions(readVersions(undefined), 'instagram', options),
+      }),
+      instagram
+    )
+  const story = build([image], { instagram: { placement: 'story' }, firstComment: '' })
+  assert.equal(story.target.caption, '')
+  assert.deepEqual(story.target.options?.instagram, { placement: 'story' })
+  assert.deepEqual(story.problems, [])
+  // One file only, in the story's own limits.
+  assert.match(
+    build([image, video], { instagram: { placement: 'story' } }).problems.join(),
+    /An Instagram story takes up to 1 attachment in one post/
+  )
+  assert.deepEqual(build([video], { instagram: { placement: 'story' } }).problems, [])
+  // A story needs no text, and says it needs media.
+  const imageOnly = buildPublication(
+    draft({
+      body: [image],
+      platformVersions: withOptions(readVersions(undefined), 'instagram', {
+        instagram: { placement: 'story' },
+      }),
+    }),
+    instagram
+  )
+  assert.deepEqual(imageOnly.problems, [])
+  assert.match(
+    build([], { instagram: { placement: 'story' } }).problems.join(),
+    /An Instagram story needs at least one image or video/
+  )
+  const commented = build([image], { instagram: { placement: 'story' }, firstComment: 'Link' })
+  assert.match(commented.optionProblems.join(), /A story takes no first comment/)
+  assert.equal(commented.target.options?.firstComment, undefined)
 })
 
 test('handles are typed with or without @, kept when Instagram takes them, and capped', () => {

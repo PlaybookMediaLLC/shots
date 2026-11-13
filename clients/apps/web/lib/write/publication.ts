@@ -162,6 +162,8 @@ function instagramChoices(
   options: InstagramOptions | undefined
 ): InstagramOptions | undefined {
   if (!options) return undefined
+  // A story takes none of the feed's settings (Go: InstagramOptions.Validate).
+  if (options.placement === 'story') return { placement: 'story' }
   const chosen: InstagramOptions = {}
   if (options.collaborators?.length) chosen.collaborators = options.collaborators
   if (options.userTags?.length) chosen.userTags = options.userTags
@@ -242,8 +244,11 @@ export function buildPublication(
   const groups = groupSettings(body)
   const options = version.options ?? {}
   const article = draft.kind === 'article'
+  // A story carries no text: the draft's text goes to its other platforms.
+  const story = channel === 'instagram' && options.instagram?.placement === 'story'
   const serialized = serializeDraft(body, channel, blockImages, undefined, {
-    limit: article ? 100_000 : captionLimit(channel, account.standing),
+    story,
+    limit: article || story ? 100_000 : captionLimit(channel, account.standing),
     numbering: CAPABILITIES[channel].thread ? options.numbering : undefined,
     documentAssetId: channel === 'linkedin' ? options.document?.assetId : undefined,
   })
@@ -265,7 +270,9 @@ export function buildPublication(
   if (channel === 'youtube' && youtubeTagsLength(options.youtube?.tags ?? []) > YOUTUBE_TAGS_LIMIT)
     optionProblems.push(`Keep YouTube tags under ${YOUTUBE_TAGS_LIMIT} characters together.`)
   const instagram = channel === 'instagram' ? instagramChoices(options.instagram) : undefined
-  if (instagram) {
+  if (story && options.firstComment?.trim())
+    optionProblems.push('A story takes no first comment. Remove it, or post to the feed.')
+  if (instagram && !story) {
     const media = first?.media ?? []
     const reel = media.length === 1 && media[0]?.kind === 'video'
     // A cover, the grid choice and a trial need a reel (Go: InstagramOptions.Reel).
@@ -407,7 +414,7 @@ export function buildPublication(
   }
   const firstCard = cardFor(first?.caption ?? '', (first?.images ?? 0) + (first?.videos ?? 0))
   if (firstCard) firstOptions.linkPreview = firstCard
-  if (CAPABILITIES[channel].settings.firstComment && options.firstComment?.trim())
+  if (CAPABILITIES[channel].settings.firstComment && options.firstComment?.trim() && !story)
     firstOptions.firstComment = options.firstComment.trim()
   if (channel === 'linkedin') {
     if (options.visibility) firstOptions.visibility = options.visibility
@@ -451,7 +458,7 @@ export function buildPublication(
   }
   const target: PublicationTarget = {
     assetIds: first?.assetIds ?? [],
-    caption: first?.caption ?? '',
+    caption: story ? '' : (first?.caption ?? ''),
     channelConnectionId: account.connectionId,
     ...(compact(firstOptions) ? { options: compact(firstOptions) } : {}),
     ...(automation ? { autoActions: automation } : {}),

@@ -72,9 +72,11 @@ type Destination struct {
 	} `json:"gif"`
 	Video *VideoRules `json:"video"`
 	// Cover is the image a video post takes as its cover or thumbnail.
-	Cover      *CoverRules `json:"cover"`
-	Docs       []string    `json:"docs"`
-	VerifiedOn string      `json:"verifiedOn"`
+	Cover *CoverRules `json:"cover"`
+	// Story is what one story takes, where the destination has stories.
+	Story      *Destination `json:"story"`
+	Docs       []string     `json:"docs"`
+	VerifiedOn string       `json:"verifiedOn"`
 }
 
 var Limits struct {

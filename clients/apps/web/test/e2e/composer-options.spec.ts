@@ -2,6 +2,7 @@ import sharp from 'sharp'
 import { z } from 'zod'
 import {
   apiRequest,
+  db,
   draftEditor,
   expect,
   expectSaved,
@@ -168,5 +169,66 @@ test(
     await expect(refused).toBeFocused()
     await page.keyboard.press('Space')
     await expect(refused).toHaveAttribute('aria-checked', 'false')
+  }
+)
+
+test(
+  'an Instagram story takes a 9:16 photo the feed refuses, and goes out without the text',
+  { tag: '@journey' },
+  async ({ page, startWorkspace }) => {
+    const workspace = await startWorkspace({ channels: ['instagram-standalone'] })
+    const id = await openNewDraft(page)
+    await draftEditor(page).click()
+    await settleSelection(page)
+    await page.keyboard.type('This text goes to the other platforms.')
+    const portrait = await sharp({
+      create: { width: 1080, height: 1920, channels: 3, background: '#335577' },
+    })
+      .jpeg()
+      .toBuffer()
+    await page
+      .locator('input[type=file][aria-label="Insert media"]')
+      .setInputFiles({ name: 'story.jpg', mimeType: 'image/jpeg', buffer: portrait })
+    await expect(draftEditor(page).locator('figure')).toHaveCount(1)
+    await expectSaved(page)
+    const schedule = async () => {
+      const saved = await apiRequest(page, `/api/v1/content-drafts/${id}`)
+      const { version } = z.object({ version: z.number() }).parse(saved.body)
+      return apiRequest(page, `/api/v1/content-drafts/${id}/schedule`, {
+        body: {
+          channelConnectionIds: [workspace.channels['instagram-standalone']],
+          scheduledFor: new Date(Date.now() + 86_400_000).toISOString(),
+          version,
+        },
+        method: 'POST',
+      })
+    }
+    // The feed takes 4:5 to 1.91:1, so the backend refuses the 9:16 photo there.
+    const refused = await schedule()
+    expect(refused.status).toBe(409)
+    expect(JSON.stringify(refused.body)).toContain('4:5 portrait')
+
+    await page.getByTestId('platform-tab-instagram').click()
+    await page.getByTestId('options-chip').click()
+    const options = page.getByTestId('instagram-options')
+    await options.getByLabel('Collaborators').fill('@partner')
+    await expectSaved(page)
+    // A story takes no collaborators: turning it on clears them, so the draft still saves.
+    await options.getByLabel('Post as a story').check()
+    await expect(page.getByTestId('story-notice')).toBeVisible()
+    await expect(options.getByLabel('Collaborators')).toHaveCount(0)
+    await expectSaved(page)
+    expect((await savedOptions(page, id, 'instagram'))?.instagram).toEqual({ placement: 'story' })
+
+    const response = await schedule()
+    expect(response.status, JSON.stringify(response.body)).toBe(201)
+    const postId = z.object({ posts: z.array(z.object({ id: z.string() })) }).parse(response.body)
+      .posts[0]!.id
+    expect(
+      await db.row(
+        `SELECT caption, "publishOptions"->'instagram'->>'placement' AS placement FROM scheduled_post WHERE id = $1`,
+        [postId]
+      )
+    ).toEqual({ caption: '', placement: 'story' })
   }
 )

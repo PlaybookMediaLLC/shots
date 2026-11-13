@@ -325,6 +325,7 @@ account back through reconnect.
 | Instagram | Reel: MP4 or MOV, 3 s–15 min, ≤ 300 MB | Yes | — | Yes | Adapter (`TestSingleReelQuery`, QuickTime case), worker | Yes: 8-second Reel on `@get.eigenn`, 2026-11-03; playback and deletion verified |
 | Instagram | Carousel of up to 20, images and videos mixed | Yes | As above | Yes | Adapter, worker (order and mixed MOV) | No |
 | Instagram | Reel cover (JPEG ≤ 8 MB), grid choice, trial reel; collaborators (3) and tagged accounts (20) on photos, carousels and reels | Yes | — | Yes: with the reel's container; tags on the reel or the first photo | Adapter (`TestReelTagsGridAndCover`, `TestCarouselTagsTheFirstPhoto`), options, `TestOptionMediaFollowsEachDestination` | No |
+| Instagram | Story: one image (JPEG; PNG/WebP converted, any aspect) or one MP4/MOV of 3–60 s ≤ 100 MB; no caption, collaborators, tags, cover or first comment | Yes | As the feed | Yes: `media_type=STORIES` | Adapter (`TestStoryTakesNoCaptionOrFeedSettings`), `TestStoriesFollowTheirOwnRules`, `TestMediaScheduling` | No |
 | Instagram | GIF | Yes | — | No | — | Blocked: no animated GIF in the API |
 | Instagram (Facebook Login) | Any | Yes | — | Adapter exists | — | Blocked: refused at scheduling until the account reconnects with Instagram Login |
 | Threads | Up to 20, images and videos mixed; video MP4/MOV ≤ 5 min, ≤ 1 GB | Yes (uploads stop at 512 MiB) | WebP → PNG | Yes | Adapter (`TestCarouselFlow`, `TestMixedCarouselSendsVideoByType`) | No |

@@ -27,6 +27,11 @@
       "maxEdge": 1440,
       "formats": ["image/jpeg"]
     },
+    "instagram-standalone-story": {
+      "maxBytes": 8000000,
+      "maxEdge": 1920,
+      "formats": ["image/jpeg"]
+    },
     "threads": {
       "maxBytes": 8000000,
       "maxEdge": 1440,
@@ -104,6 +109,23 @@
         "minMs": 3000,
         "maxMs": 900000,
         "maxBytes": 300000000
+      },
+      "story": {
+        "maxMedia": 1,
+        "requiresMedia": true,
+        "mixed": false,
+        "images": ["image/jpeg", "image/png", "image/webp"],
+        "video": {
+          "formats": ["video/mp4", "video/quicktime"],
+          "alone": true,
+          "minMs": 3000,
+          "maxMs": 60000,
+          "maxBytes": 100000000
+        },
+        "docs": [
+          "https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media"
+        ],
+        "verifiedOn": "2026-11-13"
       },
       "cover": {
         "formats": ["image/jpeg"],

@@ -179,6 +179,39 @@ func TestReelTagsGridAndCover(t *testing.T) {
 	}
 }
 
+// A story is one container of media_type STORIES, with no caption and none
+// of a feed post's settings, whatever the settings ask.
+func TestStoryTakesNoCaptionOrFeedSettings(t *testing.T) {
+	for _, media := range []integrations.MediaContent{{Path: "https://cdn/s.jpg"}, {Path: "https://cdn/s.mp4", Type: "video", Thumbnail: "https://cdn/cover.jpg"}} {
+		var queries []string
+		mux := http.NewServeMux()
+		mux.HandleFunc("POST /v25.0/ig1/media", func(w http.ResponseWriter, r *http.Request) {
+			queries = append(queries, r.URL.RawQuery)
+			w.Write([]byte(`{"id":"c1"}`))
+		})
+		p := setup(t, mux)
+		res, err := p.PostPending(context.Background(), "ig1", "page", []integrations.PostDetails{{
+			ID: "post", Message: "not on a story",
+			Settings: json.RawMessage(`{"post_type":"story","user_tags":["brand"],"share_to_feed":false,"collaborators":[{"label":"partner"}]}`),
+			Media:    []integrations.MediaContent{media},
+		}}, &ent.Integration{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(queries) != 1 || !strings.Contains(queries[0], "media_type=STORIES") {
+			t.Fatalf("story request: %v", queries)
+		}
+		for _, absent := range []string{"caption", "user_tags", "share_to_feed", "collaborators", "cover_url"} {
+			if strings.Contains(queries[0], absent) {
+				t.Fatalf("a story sent %s: %s", absent, queries[0])
+			}
+		}
+		if !strings.Contains(string(res[0].PendingData), `"postType":"single"`) {
+			t.Fatalf("pending: %s", res[0].PendingData)
+		}
+	}
+}
+
 func TestCarouselTagsTheFirstPhoto(t *testing.T) {
 	var queries []string
 	var mu sync.Mutex
