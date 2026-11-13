@@ -90,7 +90,10 @@ test(
       )
       .toBe(100)
     expect(seen).toEqual([...seen].sort((a, b) => a - b))
-    await expect(page.getByRole('status')).toContainText('Done')
+    // Scoped: the review shows other status lines, such as "Loading findings…", as the read ends.
+    await expect(
+      page.getByRole('region', { name: 'Background read' }).getByRole('status')
+    ).toContainText('Done')
 
     // The background run read the pricing page and derived the ideal customer.
     await expect(page.getByLabel('Pricing', { exact: true })).toHaveText(/\$9 a month/)

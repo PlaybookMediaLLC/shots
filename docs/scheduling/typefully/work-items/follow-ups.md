@@ -40,7 +40,7 @@ Persist action kind, due time, attempts, cancellation and confirmed/failed/unkno
 
 Current `develop` adds `server/internal/autodm` and the X direct-message adapter, superseding the earlier unimplemented status. The ledger tracks consent, opt-out, unique delivery attempts and uncertain outcomes. `20261102100000_platform_auto_dm.sql` is additive. Ordinary reply/repost grants confer no direct-message permission.
 
-**Dependencies:** Accepted consent and abuse policy, verified X DM grants and explicit `PLATFORM_X_AUTO_DM_DELIVERY_ENABLED` activation. Live delivery remains disabled. No composer or agent action may implicitly enable the adapter.
+**Dependencies:** Accepted [consent and abuse policy](../write/auto-dm-policy.md) (approved 2026-11-13), verified X DM grants and explicit `PLATFORM_X_AUTO_DM_DELIVERY_ENABLED` activation. Live delivery remains disabled. No composer or agent action may implicitly enable the adapter.
 
 **Acceptance and failure:** Default-off and missing-grant requests never mutate the provider. Consent and opt-outs govern recipient eligibility; duplicate events cannot send twice. A timeout/ambiguous response records an uncertain result and cannot automatically resend. Definite pre-send rejection stays distinct from a successful or unknown send.
 
