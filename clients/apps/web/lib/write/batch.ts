@@ -91,9 +91,9 @@ export function stagedChecks(item: BatchItem, accounts: readonly BatchAccount[])
 /**
  * A preview row's files against its accounts' platforms before anything
  * uploads, on the facts the browser has: type and size. A row no account can
- * take needs fixing; one that only some refuse is added, with a note naming
- * them. Length and shape are known once uploaded, so Check judges those, and
- * a row with a library asset or an untyped file is left to it.
+ * take needs fixing; one that only some refuse is added, with a note saying
+ * what they refuse. Length and shape are known once uploaded, so Check judges
+ * those, and a row with a library asset or an untyped file is left to it.
  */
 export function intakeChecks(
   channels: readonly DraftChannel[],
@@ -111,9 +111,11 @@ export function intakeChecks(
         (pdf ? documentProblems(channel, facts) : mediaProblems(channel, facts)).slice(0, 1)
       )
     : []
+  // A PDF's refusal reads the same for every platform but LinkedIn: say it once.
+  const said = [...new Set(refusals)]
   return refusals.length && refusals.length === platforms.length
-    ? { notes: [], problems: refusals }
-    : { notes: refusals, problems: [] }
+    ? { notes: [], problems: said }
+    : { notes: said, problems: [] }
 }
 
 /**

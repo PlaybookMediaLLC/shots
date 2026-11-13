@@ -118,6 +118,8 @@ test('before upload, a file no account takes needs fixing; one some refuse carri
   const pdf = { size: 1000, type: 'application/pdf' }
   assert.deepEqual(intakeChecks(['linkedin'], [pdf]).problems, [])
   assert.match(intakeChecks(['x'], [pdf]).problems.join(), /Only LinkedIn posts a PDF/)
+  assert.equal(intakeChecks(['x', 'threads'], [pdf]).problems.length, 1)
+  assert.equal(intakeChecks(['linkedin', 'x', 'threads'], [pdf]).notes.length, 1)
   // A library asset or a file the browser could not type is left to Check, as is a text row.
   const unknown = { notes: [], problems: [] }
   assert.deepEqual(intakeChecks(['bluesky'], [video, undefined]), unknown)
