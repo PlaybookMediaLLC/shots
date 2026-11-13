@@ -96,7 +96,8 @@ func stageMedia(ctx context.Context, source string, caps socialidentity.XCapabil
 			if ctx.Err() != nil {
 				return stagedMedia{}, ctx.Err()
 			}
-			return stagedMedia{}, errors.New("The X media source is unavailable")
+			// Shots could not read its own media, before any X call: no post was sent.
+			return stagedMedia{}, publishRejected("The X media source is unavailable. Nothing was sent to X; retry when the media can be read.")
 		}
 		reader = res.Body
 		if res.StatusCode != http.StatusOK {

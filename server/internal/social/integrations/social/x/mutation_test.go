@@ -206,7 +206,7 @@ func TestArticleCountTimeoutAfterItsDraftIsNotRetried(t *testing.T) {
 	})
 	defer done()
 	in := publishingAccount()
-	pending := pendingData{Message: "https://a.co/" + strings.Repeat("(a)", 8000), ArticleDraftID: "91", Attempting: true, Confirmed: true,
+	pending := pendingData{Message: strings.Repeat("a.", 1<<19), ArticleDraftID: "91", Attempting: true, Confirmed: true,
 		Settings: pendingSettings{PostType: ptr("article"), ArticleTitle: ptr("Title"), ArticleStatus: ptr("published")}}
 	_, err := New().FinalizePost(context.Background(), in.Token, marshal(pending), in)
 	if temporalx.FailureType(err) != temporalx.TypeUnknownDelivery || errors.Is(err, helpers.ErrTextTooComplex) {

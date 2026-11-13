@@ -29,6 +29,7 @@ const browser = {
       'MouseEvent',
       'MutationObserver',
       'Node',
+      'NodeFilter',
       'CustomEvent',
       'DocumentFragment',
     ].map((name) => [name, dom.window[name]])
@@ -761,4 +762,270 @@ test('cancelling an image worker before ready cannot poison its replacement read
   assert.equal((await client.process(new Blob(['third']), imagePlan().options)).bytes, 2)
   assert.equal(instances[1].posts, 2)
   client.terminate()
+})
+
+test('the paste dialog splits in a reused worker, replaced only while busy, and waits for the current result', async (t) => {
+  const { PasteThreadDialog } = await import('@/components/write/composer/paste-thread')
+  type SplitRequest = import('@/lib/write/import-text.worker').SplitRequest
+  type SplitMessage = import('@/lib/write/import-text.worker').SplitMessage
+  const workers: FakeWorker[] = []
+  class FakeWorker {
+    onmessage: ((event: { data: SplitMessage }) => void) | null = null
+    onerror: (() => void) | null = null
+    requests: SplitRequest[] = []
+    terminated = false
+    constructor() {
+      workers.push(this)
+    }
+    postMessage(request: SplitRequest) {
+      this.requests.push(request)
+    }
+    terminate() {
+      this.terminated = true
+    }
+    async ready() {
+      await act(async () => this.onmessage?.({ data: { ready: true } }))
+    }
+    async reply(posts: string[], request = this.requests.at(-1)!, error = '') {
+      await act(async () => this.onmessage?.({ data: { error, id: request.id, posts } }))
+    }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeWorker })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'Worker', previous)
+    else Reflect.deleteProperty(globalThis, 'Worker')
+  })
+  const inserted: unknown[] = []
+  const editor = {
+    children: [],
+    tf: { focus() {}, insertNodes: (nodes: unknown) => inserted.push(nodes) },
+  } as unknown as import('@shots/platejs-editor/platejs/react').PlateEditor
+  await mount(
+    createElement(PasteThreadDialog, {
+      channel: 'x',
+      editor: { current: editor },
+      limit: 280,
+      onClose: () => {},
+    })
+  )
+  const write = async (text: string) => {
+    const area = get<HTMLTextAreaElement>('textarea[aria-label="Thread text"]')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        area,
+        text
+      )
+      area.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+  }
+  const toggle = () => act(async () => get<HTMLButtonElement>('button[role="checkbox"]').click())
+  const append = () =>
+    [...document.querySelectorAll('button')].find((button) =>
+      button.textContent!.startsWith('Append')
+    )!
+
+  // The explicit --- split is cheap and stays on the page.
+  await write('one\n---\ntwo')
+  assert.equal(append().textContent, 'Append 2 posts')
+  assert.equal(append().disabled, false)
+  assert.equal(workers.length, 0)
+
+  await toggle()
+  assert.equal(workers.length, 1)
+  assert.equal(append().disabled, true)
+  assert.equal(get('[role=status]').textContent, 'Splitting…')
+  // A worker still loading is not replaced: it starts on the latest text.
+  await write('one two')
+  assert.equal(workers.length, 1)
+  assert.equal(workers[0].requests.length, 0)
+  await workers[0].ready()
+  assert.deepEqual(workers[0].requests, [
+    { channel: 'x', id: workers[0].requests[0].id, limit: 280, text: 'one two' },
+  ])
+  await workers[0].reply(['one two'])
+  assert.equal(append().textContent, 'Append 1 posts')
+  assert.equal(append().disabled, false)
+
+  // An idle worker takes the next text; the last posts stay shown, but cannot be appended.
+  await write('alpha beta')
+  assert.equal(workers.length, 1)
+  assert.equal(workers[0].requests.length, 2)
+  assert.equal(append().disabled, true)
+  assert.match(document.body.textContent!, /1\. one two/)
+  // A busy one is replaced instead of queueing a split nobody will read.
+  await write('alpha beta gamma')
+  assert.equal(workers[0].terminated, true)
+  assert.equal(workers.length, 2)
+  await workers[1].ready()
+  assert.equal(workers[1].requests[0].text, 'alpha beta gamma')
+  // An answer to older text never stands in for the current one.
+  await workers[0].reply(['alpha beta'], workers[0].requests[1])
+  assert.equal(append().disabled, true)
+  assert.doesNotMatch(document.body.textContent!, /1\. alpha beta(?! gamma)/)
+  await workers[1].reply(['alpha beta gamma'])
+  assert.equal(append().disabled, false)
+  await act(async () => append().click())
+  assert.match(JSON.stringify(inserted), /alpha beta gamma/)
+
+  // A new length is a new split, and the worker's refusal is shown, not hidden.
+  await type(get<HTMLInputElement>('input[type="number"]'), '100')
+  assert.equal(append().disabled, true)
+  assert.equal(workers[1].requests.at(-1)!.limit, 100)
+  const refusal = 'This text needs more than 25 posts. Shorten it or increase the limit.'
+  await workers[1].reply([], undefined, refusal)
+  assert.equal(get('[role=alert]').textContent, refusal)
+  assert.equal(append().disabled, true)
+
+  // A crashed worker is reported and ended, and the next text starts a new one.
+  await write('x y')
+  assert.equal(workers[1].requests.length, 3)
+  await act(async () => workers[1].onerror?.())
+  assert.equal(get('[role=alert]').textContent, 'The text could not be split.')
+  assert.equal(workers[1].terminated, true)
+  assert.equal(append().disabled, true)
+  await write('x y z')
+  assert.equal(workers.length, 3)
+
+  // Turning the length split off ends a split nobody will read.
+  await workers[2].ready()
+  await toggle()
+  assert.equal(workers[2].terminated, true)
+  assert.equal(append().textContent, 'Append 1 posts')
+  assert.equal(append().disabled, false)
+
+  await toggle()
+  assert.equal(workers.length, 4)
+  await act(async () => root!.unmount())
+  root = null
+  // Radix's focus scope dispatches its unmount event from a 0 ms timer: run it
+  // while jsdom's globals are still installed, not after the file restores them.
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(workers[3].terminated, true)
+})
+
+test('the screenshot sheet counts its captions in a worker, only when the caption or platforms change', async (t) => {
+  type CaptionCountRequest = import('@/lib/write/caption-count.worker').CaptionCountRequest
+  const workers: FakeCountWorker[] = []
+  class FakeCountWorker {
+    onmessage: ((event: { data: unknown }) => void) | null = null
+    onerror: (() => void) | null = null
+    requests: CaptionCountRequest[] = []
+    terminated = false
+    constructor() {
+      workers.push(this)
+    }
+    postMessage(request: CaptionCountRequest) {
+      this.requests.push(request)
+    }
+    terminate() {
+      this.terminated = true
+    }
+  }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'Worker')
+  Object.defineProperty(globalThis, 'Worker', { configurable: true, value: FakeCountWorker })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'Worker', previous)
+    else Reflect.deleteProperty(globalThis, 'Worker')
+  })
+  // One workspace profile with one X account; nothing else the sheet reads has data.
+  t.mock.method(globalThis, 'fetch', async (input: string) =>
+    Response.json(
+      input === '/api/v1/social-sets'
+        ? {
+            items: [
+              {
+                accounts: [{ displayName: null, handle: '@shots', id: 'account-x', platform: 'x' }],
+                defaultPlatforms: ['x'],
+                engagementDefaults: null,
+                id: 'set-a',
+                name: 'Shots',
+                primaryPlatform: 'x',
+                timeZone: 'UTC',
+                visibility: 'WORKSPACE',
+              },
+            ],
+          }
+        : { batches: [], items: [] }
+    )
+  )
+  const [
+    { createTRPCClient, httpLink },
+    { default: superjson },
+    { AppRouterContext },
+    { TRPCProvider },
+    sheet,
+  ] = await Promise.all([
+    import('@trpc/client'),
+    import('superjson'),
+    import('next/dist/shared/lib/app-router-context.shared-runtime'),
+    import('@/lib/trpc/react'),
+    import('@/components/workspace/PrepareScreenshotPost'),
+  ])
+  const queryClient = new QueryClient()
+  const trpcClient = createTRPCClient<import('@/lib/trpc/router').AppRouter>({
+    links: [httpLink({ url: 'http://localhost/api/trpc', transformer: superjson })],
+  })
+  const router = { back() {}, forward() {}, prefetch() {}, push() {}, refresh() {}, replace() {} }
+  await mount(
+    jsx(AppRouterContext.Provider, {
+      value: router,
+      children: jsx(TRPCProvider, {
+        queryClient,
+        trpcClient,
+        children: jsx(sheet.PrepareScreenshotPost, { onOpenChange: () => {}, open: true }),
+      }),
+    })
+  )
+  // Let the profile list arrive and its X account be chosen.
+  await act(async () => new Promise((resolve) => setTimeout(resolve, 0)))
+  const write = (selector: string, text: string) =>
+    act(async () => {
+      const area = get<HTMLTextAreaElement>(selector)
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(
+        area,
+        text
+      )
+      area.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+    })
+  const warnings = () =>
+    [...document.querySelectorAll('[role="status"]')]
+      .map((element) => element.textContent!)
+      .filter((text) => /caption/.test(text))
+  // No count starts while the profile loads, only once its X account is chosen.
+  assert.equal(workers.length, 1)
+  assert.deepEqual(workers[0].requests, [{ body: '', channels: ['x'], copy: null, primary: 'x' }])
+  await act(async () => workers[0].onmessage?.({ data: [] }))
+
+  // 10,000 CJK characters and a '.': about a second for X's count on the page.
+  const long = '漢'.repeat(10_000) + '.'
+  const started = performance.now()
+  await write('textarea[id$="-caption"]', long)
+  const typed = performance.now() - started
+  // The idle worker takes it.
+  assert.equal(workers.length, 1)
+  assert.ok(workers[0].requests.at(-1)!.body === long)
+  // Nothing was counted on the page: no warning until the worker answers.
+  assert.deepEqual(warnings(), [])
+  await act(async () =>
+    workers[0].onmessage?.({
+      data: [{ channel: 'x', length: 20_001, limit: 280, reused: false }],
+    })
+  )
+  assert.deepEqual(warnings(), [
+    'The X caption is 20001 characters; the limit is 280. Shorten it before scheduling.',
+  ])
+
+  // Typing elsewhere in the sheet sends no new count, and keeps the warning.
+  const counts = workers[0].requests.length
+  await write('textarea[aria-label="Longer explanation"]', 'More detail')
+  assert.equal(workers[0].requests.length, counts)
+  assert.equal(warnings().length, 1)
+
+  // A worker that crashes is reported and dropped, rather than hiding the check.
+  await write('textarea[id$="-caption"]', `${long}!`)
+  await act(async () => workers[0].onerror?.())
+  assert.equal(workers[0].terminated, true)
+  assert.deepEqual(warnings(), ['The caption lengths could not be checked.'])
+  t.diagnostic(`a keystroke with a 10,000-character caption rendered in ${Math.round(typed)} ms`)
 })

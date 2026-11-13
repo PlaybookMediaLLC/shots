@@ -10,6 +10,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/channelconnection"
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraft"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/scheduledpost"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/socialset"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/webhooksubscription"
@@ -132,7 +133,10 @@ func emitDraftPublished(ctx context.Context, tx *ent.Tx, post *ent.ScheduledPost
 	if err != nil || !subscribed {
 		return err
 	}
-	draft, err := tx.ContentDraft.Get(ctx, *post.ContentDraftID)
+	// Only what the event carries: the full row holds collaboration state up to 5 MiB.
+	draft, err := tx.ContentDraft.Query().Where(contentdraft.ID(*post.ContentDraftID)).
+		Select(contentdraft.FieldID, contentdraft.FieldOrganizationID, contentdraft.FieldSocialSetID,
+			contentdraft.FieldStatus, contentdraft.FieldTagIds, contentdraft.FieldTitle).Only(ctx)
 	if err != nil {
 		return err
 	}

@@ -326,8 +326,9 @@ returns `409` from `PROCESSING` and `PUBLISHED`, because the provider call may
 already be in flight or complete. Cancelling an already-`CANCELLED` post
 returns the post unchanged rather than erroring, so a repeated cancel is safe.
 
-There is no unpublish. Removing a published post is done in the social network,
-not here.
+Amended 2026-11-13: Shots can delete a post it published. A delete is a
+separate, audited action with its own receipts; cancellation still refuses a
+`PUBLISHED` post. See [delete a published post](../scheduling/post-delete/implementation.md).
 
 ## Media handling
 

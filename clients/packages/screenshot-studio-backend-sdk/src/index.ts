@@ -1,11 +1,28 @@
-import type { YouTubeOptions, TikTokOptions, PublicationReceipt } from './video-publishing.ts'
+import type {
+  YouTubeOptions,
+  TikTokOptions,
+  InstagramOptions,
+  PinterestOptions,
+  FacebookOptions,
+  PublicationReceipt,
+} from './video-publishing.ts'
 export {
   publicationReceiptSchema,
   youtubeOptionsSchema,
   tiktokOptionsSchema,
   tiktokCreatorSchema,
+  instagramOptionsSchema,
+  pinterestOptionsSchema,
+  facebookOptionsSchema,
+  instagramUsernameSchema,
 } from './video-publishing.ts'
-export type { YouTubeOptions, TikTokOptions } from './video-publishing.ts'
+export type {
+  YouTubeOptions,
+  TikTokOptions,
+  InstagramOptions,
+  PinterestOptions,
+  FacebookOptions,
+} from './video-publishing.ts'
 import { z } from 'zod'
 import {
   founderHubProfileSchema,
@@ -283,8 +300,16 @@ export type ScheduledPost = {
   variantId: string | null
 }
 
+/** SENT_TO_APP: sent to the network's app as a draft; the person posts it there. */
 export type ScheduledPostStatus =
-  'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED' | 'UNKNOWN_DELIVERY'
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'PROCESSING'
+  | 'PUBLISHED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'UNKNOWN_DELIVERY'
+  | 'SENT_TO_APP'
 
 export type ChannelConnection = {
   createdAt: string
@@ -1033,6 +1058,8 @@ export type BackendContentDraft = {
   platformVersions: BackendPlatformVersions
   /** Posts waiting to go out (lists only). */
   queuedPosts: number
+  /** Posts sent to an app as drafts, finished there; never published (lists only). */
+  sentToAppPosts: number
   /** Internal notes; never part of a post. */
   scratchpad: string
   sourceDraftId: string | null
@@ -1231,7 +1258,7 @@ export type BackendPostAutomation = {
   dueAt: string
   failureCode: string | null
   key: string
-  kind: 'first_comment' | 'retweet' | 'unretweet' | 'plug' | 'repost_at_likes' | 'quote'
+  kind: 'first_comment' | 'retweet' | 'unretweet' | 'plug' | 'repost_at_likes' | 'quote' | 'thumbnail'
   remoteId: string | null
   status: 'pending' | 'done' | 'failed' | 'skipped' | 'cancelled' | 'expired'
   updatedAt: string
@@ -1342,6 +1369,9 @@ export type BackendContentDraftScheduleTarget = {
 export type BackendPublishOptions = {
   youtube?: YouTubeOptions
   tiktok?: TikTokOptions
+  instagram?: InstagramOptions
+  pinterest?: PinterestOptions
+  facebook?: FacebookOptions
   photoTagIds?: string[]
   taggedUserIds?: string[]
   articleCoverAssetId?: string
@@ -3348,6 +3378,13 @@ export class ScreenshotStudioBackendSDK {
     )
   }
 
+  /** The boards of the social set's Pinterest account, for choosing where a pin is saved. */
+  async listSocialSetPinterestBoards(id: string) {
+    return this.request<{ items: { id: string; name: string }[] }>(
+      `v1/social-sets/${encodeURIComponent(id)}/pinterest-boards`
+    )
+  }
+
   async listDraftTags(setId: string) {
     return this.request<{ items: BackendDraftTag[] }>(
       `v1/social-sets/${encodeURIComponent(setId)}/tags`
@@ -3669,6 +3706,13 @@ export class ScreenshotStudioBackendSDK {
       `v1/content-draft-posts/${encodeURIComponent(id)}/reconcile`,
       { body: input, method: 'POST' }
     )
+  }
+
+  /** Start deleting a published post from its platform; the workflow keeps receipts. */
+  async deleteContentDraftPost(id: string) {
+    return this.request<{
+      deletion: { organizationId: string; platform: string; postId: string; requestedBy: string }
+    }>(`v1/content-draft-posts/${encodeURIComponent(id)}/delete`, { body: {}, method: 'POST' })
   }
 
   /** Stop a live post's pending follow-ups; removals of automatic reposts still run. */

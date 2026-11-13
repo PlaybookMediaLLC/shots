@@ -129,6 +129,9 @@ export const CONNECT_PROVIDERS = [
   { label: 'Instagram', platform: 'instagram-standalone', provider: 'instagram-standalone' },
   { label: 'Threads', platform: 'threads', provider: 'threads' },
   { label: 'Mastodon', platform: 'mastodon', provider: 'mastodon' },
+  { label: 'Facebook Page', platform: 'facebook', provider: 'facebook' },
+  { label: 'Pinterest', platform: 'pinterest', provider: 'pinterest' },
+  { label: 'Google Business', platform: 'gmb', provider: 'gmb' },
 ] as const
 
 /**

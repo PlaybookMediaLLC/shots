@@ -20,6 +20,7 @@ const SCOPE_NOTES: Record<ApiKeyScope, string> = {
   'draft:write': 'Create, update, and delete content drafts.',
   'artifact:read': 'Read releases, assets, and generated artifacts.',
   'onboarding:run': 'Read a product site into its profile and follow the run.',
+  'post:delete': 'Delete posts Shots published from their platforms. Off unless someone ticks it.',
   'post:publish': 'Write and publish new posts directly. Off unless someone ticks it.',
   'post:schedule': 'Schedule approved campaign posts. People still approve.',
   'queue:write': 'Change future queue slots without moving or publishing posts.',

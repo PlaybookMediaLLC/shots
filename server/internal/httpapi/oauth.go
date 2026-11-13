@@ -66,7 +66,8 @@ func oauthIdentity(w http.ResponseWriter, r *http.Request) (publishing.Actor, st
 
 func validOAuthProvider(provider string) bool {
 	return provider == "x" || provider == "instagram" || provider == "instagram-standalone" || provider == "linkedin" || provider == "linkedin-page" || provider == "tiktok" || provider == "youtube" ||
-		provider == "threads" || provider == "mastodon" || provider == "mastodon-custom" || e2eAuthorizationHost(provider) != ""
+		provider == "threads" || provider == "mastodon" || provider == "mastodon-custom" || provider == "facebook" || provider == "pinterest" || provider == "gmb" ||
+		e2eAuthorizationHost(provider) != ""
 }
 
 func decodeOAuthRequest(w http.ResponseWriter, r *http.Request, requireState, requireIntegration bool) (oauthRequest, bool) {
@@ -89,7 +90,7 @@ func validatedAuthorizationURL(raw, provider string, instanceOrigin ...string) (
 	host := map[string]string{
 		"x": "api.x.com", "instagram": "www.facebook.com", "instagram-standalone": "www.instagram.com", "linkedin": "www.linkedin.com",
 		"linkedin-page": "www.linkedin.com", "tiktok": "www.tiktok.com", "youtube": "accounts.google.com",
-		"threads": "www.threads.net", "mastodon": "mastodon.social", "e2e": e2eHost,
+		"threads": "www.threads.net", "mastodon": "mastodon.social", "facebook": "www.facebook.com", "pinterest": "www.pinterest.com", "gmb": "accounts.google.com", "e2e": e2eHost,
 	}[provider]
 	if e2eHost != "" {
 		host = e2eHost

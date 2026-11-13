@@ -25,6 +25,8 @@ export const scheduledPostStatusSchema = z.enum([
   'FAILED',
   'CANCELLED',
   'UNKNOWN_DELIVERY',
+  /** Sent to the network's app as a draft; the person finishes and posts it there. */
+  'SENT_TO_APP',
 ])
 
 /** A post scheduled to a channel connection. */

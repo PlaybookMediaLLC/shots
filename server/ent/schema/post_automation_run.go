@@ -26,7 +26,7 @@ func (PostAutomationRun) Fields() []ent.Field {
 		field.String("organization_id").StorageKey("organizationId").Immutable(),
 		field.String("scheduled_post_id").StorageKey("scheduledPostId").Immutable(),
 		field.String("key").StorageKey("key").Immutable(),
-		field.Enum("kind").StorageKey("kind").Values("first_comment", "retweet", "unretweet", "plug", "repost_at_likes", "quote").Immutable(),
+		field.Enum("kind").StorageKey("kind").Values("first_comment", "retweet", "unretweet", "plug", "repost_at_likes", "quote", "thumbnail").Immutable(),
 		field.Enum("status").StorageKey("status").Values("pending", "done", "failed", "skipped", "cancelled", "expired").Default("pending"),
 		field.Time("due_at").StorageKey("dueAt"),
 		field.String("remote_id").StorageKey("remoteId").Optional().Nillable(),

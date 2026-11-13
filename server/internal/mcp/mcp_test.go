@@ -74,13 +74,13 @@ func TestToolsMirrorTheirOpenAPIOperations(t *testing.T) {
 			t.Errorf("%s readOnlyHint=%v", tool.spec.Name, tool.spec.Annotations.ReadOnlyHint)
 		}
 		destructive := *tool.spec.Annotations.DestructiveHint
-		if destructive != (operation.Method == http.MethodDelete || tool.spec.Name == "cancelScheduledPost" || tool.spec.Name == "mutateDraftComment") {
+		if destructive != (operation.Method == http.MethodDelete || tool.spec.Name == "cancelScheduledPost" || tool.spec.Name == "mutateDraftComment" || tool.spec.Name == "deleteContentDraftPost") {
 			t.Errorf("%s destructiveHint=%v", tool.spec.Name, destructive)
 		}
 	}
 	want := []string{"listReleases", "createRelease", "createAssetUploadUrl", "completeAssetUpload", "createAssetDownloadUrl",
 		"deleteAsset", "captureScreenshot", "listCampaigns", "getCampaign", "createCampaign", "listApprovals", "requestCampaignReview",
-		"scheduleCampaignPost", "listScheduledPosts", "createScheduledPost", "cancelScheduledPost", "listSocialSets", "getSocialSet", "updateSocialSetQueue", "lookupSocialSetMentions", "listCalendarPosts", "bestPostingTimes", "listContentDrafts", "getContentDraft", "createContentDraft", "createPost", "updateContentDraft", "deleteContentDraft", "listContentDraftPosts", "planContentDraft", "duplicateContentDraft", "updateContentDraftProperties", "listContentDraftActivity", "listDraftComments", "mutateDraftComment"}
+		"scheduleCampaignPost", "listScheduledPosts", "createScheduledPost", "cancelScheduledPost", "listSocialSets", "getSocialSet", "updateSocialSetQueue", "lookupSocialSetMentions", "listCalendarPosts", "bestPostingTimes", "listContentDrafts", "getContentDraft", "createContentDraft", "createPost", "updateContentDraft", "deleteContentDraft", "listContentDraftPosts", "deleteContentDraftPost", "planContentDraft", "duplicateContentDraft", "updateContentDraftProperties", "listContentDraftActivity", "listDraftComments", "mutateDraftComment"}
 	if !slices.Equal(names, want) {
 		t.Fatalf("tools=%v", names)
 	}
@@ -95,7 +95,10 @@ func TestToolsMirrorTheirOpenAPIOperations(t *testing.T) {
 		if tool.spec.Name == "createPost" && tool.operation.Scope != product.PostPublishScope {
 			t.Errorf("createPost scope=%q", tool.operation.Scope)
 		}
-		if publishes := tool.spec.Name == "scheduleCampaignPost" || tool.spec.Name == "createScheduledPost" || tool.spec.Name == "createPost"; publishes && !*tool.spec.Annotations.OpenWorldHint {
+		if tool.spec.Name == "deleteContentDraftPost" && tool.operation.Scope != product.PostDeleteScope {
+			t.Errorf("deleteContentDraftPost scope=%q", tool.operation.Scope)
+		}
+		if publishes := tool.spec.Name == "scheduleCampaignPost" || tool.spec.Name == "createScheduledPost" || tool.spec.Name == "createPost" || tool.spec.Name == "deleteContentDraftPost"; publishes && !*tool.spec.Annotations.OpenWorldHint {
 			t.Errorf("%s must carry openWorldHint", tool.spec.Name)
 		}
 	}
@@ -230,7 +233,7 @@ func TestPerKeyLimit(t *testing.T) {
 func TestDomainErrorsUseTheRESTEnvelope(t *testing.T) {
 	for err, want := range map[error]string{
 		publishing.ErrNotFound: "not_found", publishing.ErrForbidden: "forbidden", publishing.ErrConflict: "conflict",
-		product.ErrInvalidInput: "invalid_request", product.ErrStorageUnavailable: "upstream_unavailable",
+		product.ErrInvalidInput: "invalid_request", product.ErrStorageUnavailable: "upstream_unavailable", product.ErrPostDeletionNotStarted: "upstream_unavailable",
 		&product.FeatureNotEntitledError{Feature: "asset:delete", CurrentPlan: "free", RequiredPlan: "pro"}:      "workspace_feature_not_entitled",
 		&product.QuotaExceededError{Limit: 300, Quota: "api:write:minute", ResetAt: time.Now().Add(time.Minute)}: "workspace_quota_exceeded",
 		errors.New("boom"): "internal_error",

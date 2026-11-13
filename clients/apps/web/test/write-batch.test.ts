@@ -55,6 +55,8 @@ const scheduledPost = (id: string, account: string, status: string, createdAt: s
   caption: 'c',
   channelConnectionId: account,
   createdAt,
+  deletedAt: null,
+  deletions: [],
   failureCode: null,
   id,
   metrics: null,
