@@ -69,6 +69,12 @@ export type FacebookOptions = z.infer<typeof facebookOptionsSchema>
 
 /** TikTok settings selected by the creator for direct publishing. */
 export const tiktokOptionsSchema = z.strictObject({
+  /**
+   * Send the video to the TikTok app as a draft, for the person to finish and
+   * post there. TikTok takes only the caption then, so the controls below
+   * stay unset.
+   */
+  sendToApp: z.boolean().optional(),
   privacy: z.enum([
     '',
     'PUBLIC_TO_EVERYONE',

@@ -33,6 +33,8 @@ export const draftWriteFieldsSchema = z.object({
   platformVersions: platformVersionsSchema,
   /** Posts waiting to go out (lists only). */
   queuedPosts: z.number().int(),
+  /** Posts sent to an app as drafts, finished there; never published (lists only). */
+  sentToAppPosts: z.number().int().default(0),
   /** Internal notes; never part of a post. */
   scratchpad: z.string(),
   /** The draft it was duplicated, copied or recovered from. */

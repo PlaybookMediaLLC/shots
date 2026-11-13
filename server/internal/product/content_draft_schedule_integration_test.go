@@ -324,6 +324,35 @@ func TestContentDraftScheduling(t *testing.T) {
 		t.Fatalf("draft %s not listed", counted.ID)
 	})
 
+	t.Run("a post sent to an app counts apart: posted, never published or failed", func(t *testing.T) {
+		sent, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{PlainText: "Sent", Title: "Sent to app"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		exec(`INSERT INTO scheduled_post (id,"organizationId","channelConnectionId","contentDraftId","scheduledFor",status,caption,"idempotencyKey","remotePostId","updatedAt")
+			VALUES ($1,$2,$3,$4,now()-interval '1 hour','SENT_TO_APP','x',$1,'v_inbox_file~v2.1',now())`, cuid.New(), org, xChannel, sent.ID)
+		listed := func(view string) *ContentDraftRecord {
+			t.Helper()
+			page, err := repo.ListContentDrafts(ctx, owner, ContentDraftListQuery{Limit: 100, View: view})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for i := range page.Items {
+				if page.Items[i].ID == sent.ID {
+					return &page.Items[i]
+				}
+			}
+			return nil
+		}
+		item := listed("")
+		if item == nil || item.SentToAppPosts != 1 || item.PublishedPosts != 0 || item.AttentionPosts != 0 || item.QueuedPosts != 0 || item.LastPublishedAt != nil {
+			t.Fatalf("listed %+v", item)
+		}
+		if listed("posted") == nil || listed("drafts") != nil || listed("failed") != nil {
+			t.Fatal("a draft sent to an app belongs with the posted drafts")
+		}
+	})
+
 	t.Run("a draft with posts cannot be deleted", func(t *testing.T) {
 		if err := repo.DeleteContentDraft(ctx, owner, draft.ID); !errors.Is(err, publishing.ErrConflict) {
 			t.Fatalf("delete err=%v", err)

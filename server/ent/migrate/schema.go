@@ -3499,7 +3499,7 @@ var (
 		{Name: "poll", Type: field.TypeJSON, Nullable: true},
 		{Name: "publishOptions", Type: field.TypeJSON, Nullable: true},
 		{Name: "scheduledFor", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "SCHEDULED", "PROCESSING", "PUBLISHED", "FAILED", "CANCELLED", "UNKNOWN_DELIVERY"}, Default: "DRAFT"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "SCHEDULED", "PROCESSING", "PUBLISHED", "FAILED", "CANCELLED", "UNKNOWN_DELIVERY", "SENT_TO_APP"}, Default: "DRAFT"},
 		{Name: "caption", Type: field.TypeString},
 		{Name: "idempotencyKey", Type: field.TypeString},
 		{Name: "triggerRunId", Type: field.TypeString, Nullable: true},

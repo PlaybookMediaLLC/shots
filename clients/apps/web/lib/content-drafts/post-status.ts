@@ -9,14 +9,21 @@ import type { PillTone } from '@/components/platform-ui'
 
 /** A post's stored status. */
 export type ScheduledPostStatus =
-  'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED' | 'UNKNOWN_DELIVERY'
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'PROCESSING'
+  | 'PUBLISHED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'UNKNOWN_DELIVERY'
+  | 'SENT_TO_APP'
 
 /**
  * The status filter's groups, which keep the names saved before the finer
  * states: overdue and publishing posts are scheduled; one that needs a check
  * is grouped with failures, as it was.
  */
-export const STATUS_GROUPS = ['Planned', 'Scheduled', 'Published', 'Failed'] as const
+export const STATUS_GROUPS = ['Planned', 'Scheduled', 'Published', 'Sent to app', 'Failed'] as const
 
 /** The filter group a card state belongs to. */
 export function statusGroup(state: string): string {
@@ -25,9 +32,20 @@ export function statusGroup(state: string): string {
   return state
 }
 
-/** What a person reads for one destination. */
+/**
+ * What a person reads for one destination. "Sent to app" went to the
+ * network's app as a draft (a TikTok app draft): the person finishes and posts
+ * it there, so it is never published from Shots.
+ */
 export type PostState =
-  'Scheduled' | 'Overdue' | 'Publishing' | 'Published' | 'Failed' | 'Needs check' | 'Cancelled'
+  | 'Scheduled'
+  | 'Overdue'
+  | 'Publishing'
+  | 'Published'
+  | 'Sent to app'
+  | 'Failed'
+  | 'Needs check'
+  | 'Cancelled'
 
 /**
  * A queued post this long past its time is overdue: the dispatcher starts
@@ -50,6 +68,8 @@ export function postState(
       return 'Publishing'
     case 'PUBLISHED':
       return 'Published'
+    case 'SENT_TO_APP':
+      return 'Sent to app'
     case 'FAILED':
       return 'Failed'
     case 'UNKNOWN_DELIVERY':
@@ -72,6 +92,8 @@ export const POST_STATE_TONE: Record<PostState, PillTone> = {
   Published: 'green',
   Publishing: 'blue',
   Scheduled: 'blue',
+  // The person still has to post it in the app.
+  'Sent to app': 'yellow',
 }
 
 /** Which state a draft shows first: the one that needs a person soonest. */
@@ -79,6 +101,8 @@ const ATTENTION: PostState[] = [
   'Needs check',
   'Failed',
   'Overdue',
+  // The person still has to post it in the app.
+  'Sent to app',
   'Publishing',
   'Scheduled',
   'Published',
@@ -160,13 +184,18 @@ export function listedAttention(counts: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
+  sentToAppPosts?: number
 }): { state: PostState; count: number; total: number } | null {
   if (counts.attentionPosts === 0) return null
   const check = counts.checkPosts > 0
   return {
     count: check ? counts.checkPosts : counts.attentionPosts,
     state: check ? 'Needs check' : 'Failed',
-    total: counts.attentionPosts + counts.queuedPosts + counts.publishedPosts,
+    total:
+      counts.attentionPosts +
+      counts.queuedPosts +
+      counts.publishedPosts +
+      (counts.sentToAppPosts ?? 0),
   }
 }
 
@@ -176,11 +205,14 @@ export function listedStatus(draft: {
   checkPosts: number
   publishedPosts: number
   queuedPosts: number
+  sentToAppPosts?: number
   status: string
 }): string {
   const attention = listedAttention(draft)
   if (attention) return attention.state
   if (draft.status === 'archived') return 'Archived'
+  // Posting it in the app is still to do, as in draftPostsState.
+  if ((draft.sentToAppPosts ?? 0) > 0) return 'Sent to app'
   if (draft.queuedPosts > 0) return 'Scheduled'
   return draft.publishedPosts > 0 ? 'Published' : 'Draft'
 }

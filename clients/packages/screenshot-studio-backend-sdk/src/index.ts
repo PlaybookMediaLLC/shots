@@ -300,8 +300,16 @@ export type ScheduledPost = {
   variantId: string | null
 }
 
+/** SENT_TO_APP: sent to the network's app as a draft; the person posts it there. */
 export type ScheduledPostStatus =
-  'DRAFT' | 'SCHEDULED' | 'PROCESSING' | 'PUBLISHED' | 'FAILED' | 'CANCELLED' | 'UNKNOWN_DELIVERY'
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'PROCESSING'
+  | 'PUBLISHED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'UNKNOWN_DELIVERY'
+  | 'SENT_TO_APP'
 
 export type ChannelConnection = {
   createdAt: string
@@ -1050,6 +1058,8 @@ export type BackendContentDraft = {
   platformVersions: BackendPlatformVersions
   /** Posts waiting to go out (lists only). */
   queuedPosts: number
+  /** Posts sent to an app as drafts, finished there; never published (lists only). */
+  sentToAppPosts: number
   /** Internal notes; never part of a post. */
   scratchpad: string
   sourceDraftId: string | null

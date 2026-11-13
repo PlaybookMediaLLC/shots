@@ -2219,6 +2219,12 @@ function PlanDetail({
                       Retry failed destination
                     </Button>
                   ) : null}
+                  {post.status === 'SENT_TO_APP' ? (
+                    <p>
+                      Sent to the {platformLabel(post.platform)} app as a draft. Finish and post it
+                      there.
+                    </p>
+                  ) : null}
                   {post.status === 'UNKNOWN_DELIVERY' ? (
                     <p>
                       Check the live provider result before retrying. Open the editor to reconcile

@@ -824,6 +824,10 @@ test('a platform chip names its options in words, and option problems open the o
     optionsSummary('tiktok', { tiktok: { ...tiktok, consent: true } }),
     'Only me · comments on'
   )
+  assert.equal(
+    optionsSummary('tiktok', { tiktok: { ...tiktok, sendToApp: true } }),
+    'Draft in the TikTok app'
+  )
   assert.equal(optionsSummary('youtube', {}), 'Title, privacy and audience needed')
   assert.equal(optionsSummary('x', {}), '')
   // TikTok privacy and consent are separate problems, each named and each in the options.
@@ -842,6 +846,52 @@ test('a platform chip names its options in words, and option problems open the o
   })
   assert.ok(long.problems.length > 0)
   assert.deepEqual(long.optionProblems, [])
+})
+
+test('a TikTok app draft needs none of the settings TikTok asks for in the app', () => {
+  const tiktok = {
+    allowComments: false,
+    allowDuet: false,
+    allowStitch: false,
+    brandOrganic: false,
+    brandedContent: false,
+    consent: false,
+    madeWithAi: false,
+    privacy: '',
+    sendToApp: true,
+  } as const
+  const account = {
+    channel: 'tiktok' as const,
+    connectionId: 'ct0000000001',
+    standing: {
+      tiktokCreator: {
+        commentDisabled: false,
+        duetDisabled: false,
+        maxDurationSeconds: 60,
+        nickname: 'Creator',
+        privacyLevels: ['SELF_ONLY' as const],
+        stitchDisabled: false,
+      },
+    },
+  }
+  const sent = buildPublication(
+    draft({
+      body: [p('Finish me in TikTok')],
+      platformVersions: withOptions(readVersions(undefined), 'tiktok', { tiktok }),
+    }),
+    account
+  )
+  assert.deepEqual(sent.optionProblems, [])
+  assert.deepEqual(sent.target.options?.tiktok, tiktok)
+  // The account's permissions still decide whether the video fits.
+  const unread = buildPublication(
+    draft({
+      body: [p('Finish me in TikTok')],
+      platformVersions: withOptions(readVersions(undefined), 'tiktok', { tiktok }),
+    }),
+    { channel: 'tiktok', connectionId: 'ct0000000001' }
+  )
+  assert.ok(unread.problems.some((problem) => problem.includes('permissions are unavailable')))
 })
 
 test('rendered media stays bound to the flushed version for scheduling and publishing', async () => {

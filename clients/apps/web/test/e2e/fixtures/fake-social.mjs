@@ -109,11 +109,20 @@ createServer(async (request, response) => {
         containsSyntheticMedia: body.post?.settings?.containsSyntheticMedia,
         link: body.post?.settings?.link,
         postType: body.post?.settings?.post_type,
+        postingMethod: body.post?.settings?.content_posting_method,
         tags: body.post?.settings?.tags?.map((tag) => tag.value),
         title: body.post?.settings?.title,
       },
       sourceId: body.id,
     })
+    // A TikTok app draft (UPLOAD) has no post until the person posts it in the
+    // app: TikTok answers with its inbox publish id, as the adapter reports it.
+    if (body.platform === 'tiktok' && body.post?.settings?.content_posting_method === 'UPLOAD') {
+      return reply(response, 201, {
+        postId: 'missing',
+        releaseURL: `https://www.tiktok.com/messages?lang=en#v_inbox_file~v2.${remoteId}`,
+      })
+    }
     return reply(response, 201, {
       postId: remoteId,
       releaseURL:

@@ -2087,6 +2087,7 @@ export interface components {
                                 thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -2181,6 +2182,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -2204,7 +2207,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -2965,7 +2968,7 @@ export interface components {
                 scheduledAt: string | null;
                 scheduledPostId: string | null;
                 /** @description Delivery state of `scheduledPostId`. */
-                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                 specVersion: number | null;
                 /** @enum {string} */
                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3024,7 +3027,7 @@ export interface components {
                     scheduledAt: string | null;
                     scheduledPostId: string | null;
                     /** @description Delivery state of `scheduledPostId`. */
-                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                    scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                     specVersion: number | null;
                     /** @enum {string} */
                     status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -3074,7 +3077,7 @@ export interface components {
                 /** @description RFC 3339 timestamp of the planned publication. */
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 /** @description The content draft the post came from, when it has no variant. */
                 contentDraftId: string | null;
                 /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -3222,6 +3225,7 @@ export interface components {
                                 thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3316,6 +3320,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3454,6 +3460,7 @@ export interface components {
                                 thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -3548,6 +3555,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -3592,6 +3601,7 @@ export interface components {
                             thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3843,6 +3853,7 @@ export interface components {
                             thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -3937,6 +3948,8 @@ export interface components {
                 }[];
             };
             queuedPosts: number;
+            /** @default 0 */
+            sentToAppPosts: number;
             scratchpad: string;
             sourceDraftId: string | null;
             tagIds: string[];
@@ -3980,6 +3993,7 @@ export interface components {
                             thumbnailAssetId?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -4115,7 +4129,7 @@ export interface components {
                 platform: string;
                 scheduledFor: string;
                 /** @enum {string} */
-                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                 metrics: {
                     [key: string]: number;
                 } | null;
@@ -4189,6 +4203,7 @@ export interface components {
                             link?: string;
                         };
                         tiktok?: {
+                            sendToApp?: boolean;
                             /** @enum {string} */
                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                             allowComments: boolean;
@@ -4353,6 +4368,7 @@ export interface components {
                                 thumbnailAssetId?: string;
                             };
                             tiktok?: {
+                                sendToApp?: boolean;
                                 /** @enum {string} */
                                 privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                 allowComments: boolean;
@@ -4447,6 +4463,8 @@ export interface components {
                     }[];
                 };
                 queuedPosts: number;
+                /** @default 0 */
+                sentToAppPosts: number;
                 scratchpad: string;
                 sourceDraftId: string | null;
                 tagIds: string[];
@@ -6609,7 +6627,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -8954,7 +8972,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9055,7 +9073,7 @@ export interface operations {
                                 scheduledAt: string | null;
                                 scheduledPostId: string | null;
                                 /** @description Delivery state of `scheduledPostId`. */
-                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                                scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                                 specVersion: number | null;
                                 /** @enum {string} */
                                 status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9589,7 +9607,7 @@ export interface operations {
                         scheduledAt: string | null;
                         scheduledPostId: string | null;
                         /** @description Delivery state of `scheduledPostId`. */
-                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY") | null;
+                        scheduledPostStatus: ("DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP") | null;
                         specVersion: number | null;
                         /** @enum {string} */
                         status: "DRAFT" | "READY_FOR_REVIEW" | "APPROVED" | "REJECTED" | "NEEDS_CHANGES" | "SCHEDULED" | "PUBLISHED";
@@ -9758,7 +9776,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9789,7 +9807,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -9895,7 +9913,7 @@ export interface operations {
                             /** @description RFC 3339 timestamp of the planned publication. */
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             /** @description The content draft the post came from, when it has no variant. */
                             contentDraftId: string | null;
                             /** @description The approved campaign variant the post came from, when it has no draft. */
@@ -10539,6 +10557,7 @@ export interface operations {
                                             thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10633,6 +10652,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10656,7 +10677,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;
@@ -10842,6 +10863,7 @@ export interface operations {
                                             thumbnailAssetId?: string;
                                         };
                                         tiktok?: {
+                                            sendToApp?: boolean;
                                             /** @enum {string} */
                                             privacy: "" | "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
                                             allowComments: boolean;
@@ -10936,6 +10958,8 @@ export interface operations {
                                 }[];
                             };
                             queuedPosts: number;
+                            /** @default 0 */
+                            sentToAppPosts: number;
                             scratchpad: string;
                             sourceDraftId: string | null;
                             tagIds: string[];
@@ -10959,7 +10983,7 @@ export interface operations {
                             platform: string;
                             scheduledFor: string;
                             /** @enum {string} */
-                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY";
+                            status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "PUBLISHED" | "FAILED" | "CANCELLED" | "UNKNOWN_DELIVERY" | "SENT_TO_APP";
                             metrics: {
                                 [key: string]: number;
                             } | null;

@@ -54,6 +54,7 @@ const ACTIONS: Record<string, string> = {
   'post.cancelled': 'Cancelled a post',
   'post.scheduled': 'Queued a post',
   'post.published': 'Published a post',
+  'post.sent_to_app': 'Sent a post to the app to finish there',
   'post.publish_failed': 'A post failed',
   'post.publish_recovery_required': 'A post’s outcome is unknown',
 }

@@ -19,6 +19,7 @@ import {
   postFailureReason,
   postState,
   STATUS_GROUPS,
+  statusGroup,
 } from '../lib/content-drafts/post-status'
 import { platformLabel } from '../lib/content-drafts/serialize'
 import {
@@ -555,6 +556,9 @@ test('a destination reads as overdue, publishing, needing a check or failed, nev
   assert.equal(postState('FAILED', at(0), now), 'Failed')
   assert.equal(postState('PUBLISHED', at(0), now), 'Published')
   assert.equal(postState('CANCELLED', at(0), now), 'Cancelled')
+  // A TikTok app draft is delivered but never published: the person posts it in the app.
+  assert.equal(postState('SENT_TO_APP', at(0), now), 'Sent to app')
+  assert.equal(statusGroup('Sent to app'), 'Sent to app')
 })
 
 test('every recorded failure code reads as something a person can act on', () => {
@@ -595,7 +599,7 @@ test('a status filter saved before the finer states still shows every post in it
   ].map((status) => ({ ...base, id: status, status }))
   const shown = (statuses: string[]) =>
     visibleItems(items, planPreferencesSchema.parse({ statuses })).map((item) => item.id)
-  assert.deepEqual(STATUS_GROUPS, ['Planned', 'Scheduled', 'Published', 'Failed'])
+  assert.deepEqual(STATUS_GROUPS, ['Planned', 'Scheduled', 'Published', 'Sent to app', 'Failed'])
   assert.deepEqual(shown(['Scheduled']), ['Scheduled', 'Overdue', 'Publishing'])
   assert.deepEqual(shown(['Failed']), ['Failed', 'Needs check'])
   assert.equal(shown([]).length, items.length)
@@ -640,6 +644,7 @@ test('a draft reads as the state that needs attention first, never hiding a fail
     'Published',
     'Publishing',
     'Scheduled',
+    'Sent to app',
   ])
 })
 
@@ -858,6 +863,28 @@ test('Home names a listed post by how far it has gone, not as a draft', () => {
   assert.equal(listedStatus({ ...counts, queuedPosts: 1 }), 'Scheduled')
   assert.equal(listedStatus({ ...counts, publishedPosts: 1, attentionPosts: 1 }), 'Failed')
   assert.equal(listedStatus({ ...counts, status: 'archived' }), 'Archived')
+  // Posting it in the app is still to do, so it reads before what went out or is queued.
+  assert.equal(listedStatus({ ...counts, sentToAppPosts: 1 }), 'Sent to app')
+  assert.equal(
+    listedStatus({ ...counts, publishedPosts: 1, queuedPosts: 1, sentToAppPosts: 1 }),
+    'Sent to app'
+  )
+  assert.equal(listedStatus({ ...counts, attentionPosts: 1, sentToAppPosts: 1 }), 'Failed')
+  assert.equal(
+    listedAttention({ ...counts, attentionPosts: 1, sentToAppPosts: 2 })?.total,
+    3,
+    'a post sent to an app is one of the draft’s outcomes'
+  )
+  assert.deepEqual(
+    draftPostsState(
+      [
+        { status: 'PUBLISHED', scheduledFor: '2026-11-04T04:00:00Z' },
+        { status: 'SENT_TO_APP', scheduledFor: '2026-11-04T04:00:00Z' },
+      ],
+      Date.parse('2026-11-04T05:00:00Z')
+    ),
+    { state: 'Sent to app', count: 1, total: 2 }
+  )
 })
 
 test('a connection platform reads as people write it', () => {

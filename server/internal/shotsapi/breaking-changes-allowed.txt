@@ -160,3 +160,20 @@ POST /api/v1/content-drafts/{id}/revisions/{revisionId}/recover the `draft/platf
 POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `200`
 POST /api/v1/posts the `draft/platformVersions/versions` response property's maxItems was increased from `8` to `11` for the response status `201`
 GET /api/v1/social-connection-availability the `providers` response property's maxItems was increased from `12` to `15` for the response status `200`
+
+# Slice 5 (docs/scheduling/post-bridge/composer/implementation.md): a post sent to TikTok as an
+# app draft is SENT_TO_APP, delivered but finished and posted by the person in the app.
+GET /api/v1/approvals added the new `SENT_TO_APP` enum value to the `data/items/post/scheduledPostStatus/anyOf[subschema #1]/` response property for the response status `200`
+POST /api/v1/calendar/mutations added the new `SENT_TO_APP` enum value to the `posts/items/status` response property for the response status `200`
+POST /api/v1/campaigns added the new `SENT_TO_APP` enum value to the `campaign/posts/items/scheduledPostStatus/anyOf[subschema #1]/` response property for the response status `200`
+POST /api/v1/campaigns added the new `SENT_TO_APP` enum value to the `campaign/posts/items/scheduledPostStatus/anyOf[subschema #1]/` response property for the response status `201`
+GET /api/v1/campaigns/{campaignId} added the new `SENT_TO_APP` enum value to the `posts/items/scheduledPostStatus/anyOf[subschema #1]/` response property for the response status `200`
+POST /api/v1/campaigns/{campaignId}/posts/{postId}/schedule added the new `SENT_TO_APP` enum value to the `scheduledPostStatus/anyOf[subschema #1]/` response property for the response status `200`
+GET /api/v1/content-draft-posts added the new `SENT_TO_APP` enum value to the `items/items/status` response property for the response status `200`
+GET /api/v1/content-drafts/{id}/posts added the new `SENT_TO_APP` enum value to the `posts/items/status` response property for the response status `200`
+POST /api/v1/posts added the new `SENT_TO_APP` enum value to the `posts/items/status` response property for the response status `200`
+POST /api/v1/posts added the new `SENT_TO_APP` enum value to the `posts/items/status` response property for the response status `201`
+GET /api/v1/scheduled-posts added the new `SENT_TO_APP` enum value to the `data/items/status` response property for the response status `200`
+POST /api/v1/scheduled-posts added the new `SENT_TO_APP` enum value to the `scheduledPost/status` response property for the response status `200`
+POST /api/v1/scheduled-posts added the new `SENT_TO_APP` enum value to the `scheduledPost/status` response property for the response status `201`
+POST /api/v1/scheduled-posts/{scheduledPostId}/cancel added the new `SENT_TO_APP` enum value to the `scheduledPost/status` response property for the response status `200`

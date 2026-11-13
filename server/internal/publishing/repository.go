@@ -354,7 +354,7 @@ func (r *Repository) CancelScheduledPost(ctx context.Context, actor Actor, id st
 	if err != nil {
 		return nil, err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusPROCESSING {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusPROCESSING {
 		return nil, ErrInvalidState
 	}
 	if post.Status != scheduledpost.StatusCANCELLED {
@@ -710,7 +710,7 @@ func (r *Repository) FailUnknown(ctx context.Context, postID, runID string, _ in
 	if err != nil {
 		return err
 	}
-	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
+	if post.Status == scheduledpost.StatusPUBLISHED || post.Status == scheduledpost.StatusSENT_TO_APP || post.Status == scheduledpost.StatusFAILED || post.Status == scheduledpost.StatusCANCELLED || post.Status == scheduledpost.StatusUNKNOWN_DELIVERY {
 		return nil
 	}
 	updated, err := tx.ScheduledPost.Update().Where(
@@ -751,17 +751,31 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		return err
 	}
 	defer tx.Rollback()
-	updated, err := tx.ScheduledPost.Update().Where(
+	options, err := tx.ScheduledPost.Query().Where(scheduledpost.ID(post.ID)).Select(scheduledpost.FieldPublishOptions).Only(ctx)
+	if err != nil {
+		return err
+	}
+	// A TikTok app draft reached the person's TikTok app, where they finish
+	// and post it: delivered, never published from here.
+	inApp := options.PublishOptions.TikTok != nil && options.PublishOptions.TikTok.SendToApp
+	status, event := scheduledpost.StatusPUBLISHED, "post.published"
+	update := tx.ScheduledPost.Update().Where(
 		scheduledpost.ID(post.ID),
 		scheduledpost.StatusEQ(scheduledpost.StatusPROCESSING),
 		scheduledpost.TriggerRunIDEQ(runID),
-	).SetStatus(scheduledpost.StatusPUBLISHED).SetPublishedAt(time.Now().UTC()).SetRemotePostID(providerPostID).Save(ctx)
+	).SetRemotePostID(providerPostID)
+	if inApp {
+		status, event = scheduledpost.StatusSENT_TO_APP, "post.sent_to_app"
+	} else {
+		update.SetPublishedAt(time.Now().UTC())
+	}
+	updated, err := update.SetStatus(status).Save(ctx)
 	if err != nil || updated != 1 {
 		if err != nil {
 			return err
 		}
 		published, queryErr := tx.ScheduledPost.Query().Where(
-			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(scheduledpost.StatusPUBLISHED),
+			scheduledpost.ID(post.ID), scheduledpost.StatusEQ(status),
 		).Exist(ctx)
 		if queryErr != nil {
 			return queryErr
@@ -793,12 +807,15 @@ func (r *Repository) Complete(ctx context.Context, post *ent.ScheduledPost, atte
 		SetNillableRemoteURL(postoptions.PostURL(platformOf(live), &providerPostID, live.ThreadProgress)).Save(ctx); err != nil {
 		return err
 	}
-	if err := recordPostActivity(ctx, tx, "post.published", auditInput{
-		Action: "post.published", Actor: serviceActor(post), EntityID: post.ID,
+	if err := recordPostActivity(ctx, tx, event, auditInput{
+		Action: event, Actor: serviceActor(post), EntityID: post.ID,
 		EntityType: "scheduled_post", Organization: post.OrganizationID, Outcome: auditlog.OutcomeSUCCEEDED,
 		Metadata: map[string]any{"providerPostId": providerPostID},
 	}); err != nil {
 		return err
+	}
+	if inApp {
+		return tx.Commit()
 	}
 	if err := emitDraftPublished(ctx, tx, post, providerPostID); err != nil {
 		return err

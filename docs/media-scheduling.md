@@ -156,6 +156,7 @@ single write-once PUT.
 | A draft request whose response was lost | The batch item's import key makes the retry return the same draft. |
 | One item of a batch fails to schedule | The others stay scheduled; the failed one shows its reason and can be corrected and sent again with `add`, which schedules only the accounts without a live post. |
 | Provider gives no answer | `UNKNOWN_DELIVERY`; never retried automatically. |
+| A TikTok video sent to the app as a draft | `SENT_TO_APP` once it reaches the TikTok inbox: delivered, never published; the person finishes and posts it in TikTok. |
 
 ## Bulk tools
 
@@ -334,7 +335,7 @@ account back through reconnect.
 | Mastodon | 1–4 images ≤ 16 MiB | Yes | — | Yes | Adapter (`TestDynamicPostWaitsForMediaThenPublishes`) | No |
 | Mastodon | Video (MP4, MOV, WebM) or GIF, alone, ≤ 99 MiB | Yes | — | Yes (generic media upload) | Rules only; no adapter video test | No. Server-specific limits beyond mastodon.social defaults are not read per instance. |
 | Any | Audio, or a file other than a PDF, as an attachment | Uploadable for design timelines | — | No | Refused before scheduling, with the reason | Blocked |
-| TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
+| TikTok | One MP4, ≤ 512 MiB; current creator duration and interaction limits | Yes | — | Direct publishing, explicit privacy, consent and disclosures; or a draft sent to the TikTok app (`UPLOAD`), finished there | Adapter, options, worker and social gate | Yes: private scheduled video on `@the_dark_lightskin`, 2026-11-03; native URL/playback verified and manually reconciled because private API IDs are withheld. Deleted and original public account restored. Public automatic receipts still require an audited app. |
 | YouTube | One MP4, ≤ 512 MiB; explicit title, privacy and audience | Yes | — | Resumable upload with processing confirmation | Adapter, options, worker and social gate | No: @getconduitt private video scheduled for 2026-11-04 00:20 UTC; receipt and playback pending |
 | YouTube | Tags (500 characters together), synthetic-content disclosure; custom thumbnail (JPEG or PNG ≤ 2 MB) set after the video is live, as a follow-up whose failure never fails the video | Yes | — | Yes | Adapter (`TestSetThumbnailReportsARefusal`), `TestYouTubeThumbnailIsAFollowUp`, social gate | No. A thumbnail needs a verified channel; Shorts ignore it. |
 | Facebook Pages | Text, up to 10 images (JPEG, PNG; WebP → PNG; > 4 MB or 2,048 px → derivative), or one MP4 ≤ 20 min, ≤ 1 GB; first comment as a follow-up | Yes | WebP → PNG | Yes | `TestFacebookAndPinterestKeepTheProvidersLinkAndAPinNeedsItsBoard`, social gate | No. Behind its availability check until the Meta app's Pages permissions are deployed. |
