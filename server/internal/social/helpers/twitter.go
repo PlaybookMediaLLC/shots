@@ -87,6 +87,28 @@ func unshiftSurrogates(runes []rune) []rune {
 	return out
 }
 
+// regexp2's IgnoreCase compares Unicode lowercase forms; a JavaScript /i
+// regex without u compares uppercase forms and never folds a non-ASCII
+// character onto ASCII. jsCaseStandIns maps each BMP unit on which the two
+// disagree in the three case-insensitive regexes below to a unit regexp2
+// matches as JavaScript matches the original. One unit for one, so indices
+// hold. Derived on Node 22 (Unicode 17) by testing every BMP unit against
+// each atom of those regexes, new RegExp(atom, 'i') in Node against regexp2
+// on the stand-in; redo it when regexp2, Go's Unicode or twitter-text changes.
+var jsCaseStandIns = map[rune]rune{
+	// Match only where a Latin accent letter does: İ, Ʀ, Ⱥ, Ⱦ, Ʌ, ʀ, ʌ, ⱥ, ⱦ,
+	// U+A7DC, and the iotas U+0399, U+03B9 and U+1FBE, which JavaScript folds
+	// onto the combining U+0345.
+	0x0130: 'À', 0x01a6: 'À', 0x023a: 'À', 0x023e: 'À', 0x0245: 'À', 0x0280: 'À',
+	0x028c: 'À', 0x2c65: 'À', 0x2c66: 'À', 0xa7dc: 'À', 0x0399: 'À', 0x03b9: 'À',
+	0x1fbe: 'À',
+	// The Kelvin and Angstrom signs are no letter at all.
+	0x212a: '×', 0x212b: '×',
+	// Variant forms JavaScript folds onto the letter of a Greek or Cyrillic TLD.
+	0x03f5: 'ε', 0x1c80: 'в', 0x1c81: 'д', 0x1c82: 'о', 0x1c83: 'с', 0x1c84: 'т',
+	0x1c85: 'т', 0x1c86: 'ъ', 0x1c87: 'ѣ',
+}
+
 var (
 	// \G makes an attempt match only at the index it is given.
 	extractURLAtRe = jsRegexp(`\G(?:`+extractURLSource+`)`, regexp2.IgnoreCase)
@@ -145,7 +167,7 @@ func CountLength(integrationType, text string) (int, error) {
 }
 
 func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, valid bool, validRangeEnd int, err error) {
-	normalized := utf16Units(norm.NFC.String(text))
+	normalized := utf16Units(nfcLikeJS(text))
 	shifted := shiftSurrogates(normalized)
 
 	// Hash all entities by their startIndex for fast lookup
@@ -193,6 +215,56 @@ func parseTweet(text string, maxWeightedTweetLength int) (weightedLength int, va
 	valid = valid && weightedLength > 0 && weightedLength <= maxWeightedTweetLength
 	validDisplayIndex += jsLength(text) - len(normalized)
 	return weightedLength, valid, validDisplayIndex, nil
+}
+
+// nfcLikeJS is JavaScript's normalize('NFC'). norm.NFC inserts U+034F after
+// 30 combining marks in a row (Unicode's stream-safe format), which also
+// keeps the marks after it from reordering or composing with the letter
+// before; JavaScript does neither, so such text gets NFC by the book.
+func nfcLikeJS(text string) string {
+	if out := norm.NFC.String(text); strings.Count(out, norm.GraphemeJoiner) == strings.Count(text, norm.GraphemeJoiner) {
+		return out
+	}
+	type unit struct {
+		r     rune
+		class uint8
+	}
+	var units []unit
+	for _, r := range text {
+		for _, d := range norm.NFD.String(string(r)) {
+			units = append(units, unit{d, norm.NFD.PropertiesString(string(d)).CCC()})
+		}
+	}
+	// Canonical order: each run of combining marks sorted by class.
+	for i := 0; i < len(units); i++ {
+		j := i
+		for j < len(units) && units[j].class != 0 {
+			j++
+		}
+		slices.SortStableFunc(units[i:j], func(a, b unit) int { return int(a.class) - int(b.class) })
+		i = j
+	}
+	// Canonical composition: a character joins the last starter unless a
+	// character of class 0, or of its class or higher, stands between them.
+	out := units[:0] // in place: out never passes the unit being read
+	starter := -1
+	for _, u := range units {
+		if starter >= 0 && (starter == len(out)-1 || u.class != 0 && out[len(out)-1].class < u.class) {
+			if composed := []rune(norm.NFC.String(string([]rune{out[starter].r, u.r}))); len(composed) == 1 {
+				out[starter].r = composed[0]
+				continue
+			}
+		}
+		out = append(out, u)
+		if u.class == 0 {
+			starter = len(out) - 1
+		}
+	}
+	var b strings.Builder
+	for _, u := range out {
+		b.WriteRune(u.r)
+	}
+	return b.String()
 }
 
 func isSurrogatePair(text []rune, i int) bool {
@@ -276,7 +348,14 @@ func isASCIISpace(r rune) bool { return r == ' ' || r >= '\t' && r <= '\r' }
 
 // extractWordURLs scans one word that starts at offset in the text.
 func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline time.Time) ([]*urlEntity, error) {
-	matches, err := urlMatches(word, deadline)
+	folded := slices.Clone(word)
+	for i, c := range folded {
+		if standIn, ok := jsCaseStandIns[c]; ok {
+			folded[i] = standIn
+		}
+	}
+
+	matches, err := urlMatches(folded, deadline)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +364,10 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 		before := m.GroupByNumber(2).Runes()
 		url := m.GroupByNumber(3).Runes()
 		protocol := m.GroupByNumber(4).Runes()
-		domain := m.GroupByNumber(5).Runes()
+		domainGroup := m.GroupByNumber(5)
+		domain := domainGroup.Runes()
+		// JavaScript punycodes and searches the domain as written.
+		written := word[domainGroup.Index : domainGroup.Index+domainGroup.Length]
 		path := m.GroupByNumber(7).Runes()
 		endPosition := offset + m.Index + m.Length
 		startPosition := endPosition - len(url)
@@ -294,7 +376,7 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 		if protocolLen == 0 {
 			protocolLen = len("https://")
 		}
-		if !isValidTweetURL(url, protocolLen, domain) {
+		if !isValidTweetURL(url, protocolLen, domain, written) {
 			continue
 		}
 
@@ -314,9 +396,9 @@ func extractWordURLs(word []rune, offset int, withoutProtocol bool, deadline tim
 				if asciiEnds[ai] < 0 {
 					continue
 				}
-				asciiDomain := domain[ai:asciiEnds[ai]]
+				asciiDomain := written[ai:asciiEnds[ai]]
 				ai = asciiEnds[ai] - 1
-				asciiStartPosition := indexRunes(domain, asciiDomain, asciiEndPosition)
+				asciiStartPosition := indexRunes(written, asciiDomain, asciiEndPosition)
 				asciiEndPosition = asciiStartPosition + len(asciiDomain)
 				lastURL = &urlEntity{
 					url:   asciiDomain,
@@ -525,14 +607,16 @@ func indexRunes(s, sub []rune, from int) int {
 // isValidTweetURL is extractUrlsWithIndices' isValidUrl. twitter-text's
 // idna.toAscii returns the domain unchanged when every label punycodes to
 // 1..63 characters, so only the label check and the total length matter.
-func isValidTweetURL(url []rune, protocolLen int, domain []rune) bool {
+// domain carries the stand-ins the regexes need; written is the same span
+// of the original text, which punycode encodes.
+func isValidTweetURL(url []rune, protocolLen int, domain, written []rune) bool {
 	if len(domain) >= 4 && string(domain[:4]) == "xn--" {
 		// Punycode encoded url cannot contain non ASCII characters
 		if !slices.ContainsFunc(asciiDomainEnds(domain), func(end int) bool { return end >= 0 }) {
 			return false
 		}
 	}
-	for _, label := range splitRunes(domain, func(r rune) bool { return r == '.' }) {
+	for _, label := range splitRunes(written, func(r rune) bool { return r == '.' }) {
 		// Over 2×63 units are over 63 code points, and punycode spends at
 		// least one character on each: don't encode a long CJK run to see.
 		if len(label) > 2*63 {
