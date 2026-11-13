@@ -150,6 +150,17 @@ Checks without a post:
 
 Uploaded media of the delivered posts was deleted through the Library after their drafts were archived. The four uploaded files are `DELETED`: two PNGs, the resized derivative and the PDF. One browser upload that failed before the storage CORS fix stays `PENDING` until the 24-hour expiry cleanup. Shots had no control to delete a published post; draft PR #557 adds one.
 
+#### Delete through Shots (#557)
+
+On 2026-11-13 the stack ran the #557 branch with its migration. Each post was deleted with "Delete from <network>" in Write, not in the network's app.
+
+| Date (UTC) | Account | Content | Receipt | Deletion through Shots |
+|---|---|---|---|---|
+| 2026-11-13 16:03 | X `@yoanyombax` | Thread of 2 posts | `2121272764971520079`, reply `2121272766519251072` | The first request failed both parts with `ACCOUNT_RECONNECT`: the plan named the connection row, not the social account (fixed in #557, `910a3670`). A second request after the fix deleted both parts at 16:08:00 (`done`, 2 attempts). The profile was back to 33 posts with no test text |
+| 2026-11-13 16:09 | LinkedIn member `yoanyomba` | One post | `urn:li:share:7527040024203137024` | Deleted at 16:10:30 (`done`, 1 attempt). The post page, public before the delete, then sent to the sign-up page |
+
+The failed first request also proved two review fixes: a refusal from Shots itself is not counted as deleted, and a failed part can be requested again. Both cards then showed "Deleted from <network>" with a receipt for each part.
+
 ### Open defects found by L2
 
 - A same-day Auto-RT rule ("Days later at", 0 days) is stored without `days` (fixed in #544; the fix passed a live retest at 04:11). `RetweetRule.Days` has `omitempty` (`server/internal/postoptions/postoptions.go`), and the web's strict `retweetRuleSchema` requires `days`. The draft then returns 400 on read and 409 on save, and Publish returns 500 for that profile. The draft was repaired by removing the rule. The shortest working delay is "After 1 hour".
