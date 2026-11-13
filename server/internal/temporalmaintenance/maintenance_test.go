@@ -159,6 +159,9 @@ func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 	if f.creates != len(Jobs) {
 		t.Fatalf("called Create %d times for %d schedules", f.creates, len(Jobs))
 	}
+	if _, ok := f.created["platform-maintenance-notification-retention"]; !ok {
+		t.Fatal("notification retention is not scheduled")
+	}
 	for id, o := range f.created {
 		if o.Overlap != enumspb.SCHEDULE_OVERLAP_POLICY_SKIP {
 			t.Fatal("overlap enabled")
@@ -172,6 +175,10 @@ func TestScheduleReconciliationPreservesPauseAndCadence(t *testing.T) {
 			}
 		} else if id == "platform-maintenance-outbox-retention" {
 			if o.Spec.TimeZoneName != "UTC" || o.Spec.CronExpressions[0] != "35 3 * * *" || o.CatchupWindow != 24*time.Hour {
+				t.Fatal(o.Spec)
+			}
+		} else if id == "platform-maintenance-notification-retention" {
+			if o.Spec.TimeZoneName != "UTC" || o.Spec.CronExpressions[0] != "5 4 * * *" || o.CatchupWindow != 24*time.Hour {
 				t.Fatal(o.Spec)
 			}
 		} else if id == "platform-maintenance-account-deletions" || id == "platform-maintenance-asset-cleanup" || id == "platform-maintenance-voice-cleanup" {

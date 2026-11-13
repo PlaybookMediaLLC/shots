@@ -476,6 +476,7 @@ func voicePostConfirmed(post *ent.ScheduledPost) voiceConfirmed {
 // records, with the card's edits, or records the post an earlier confirm
 // already scheduled from it.
 func (c *Configuration) ConfirmVoiceCommand(ctx context.Context, actor Actor, noteID string, input VoiceCommandConfirmInput) (*VoiceCommandConfirmation, error) {
+	ctx = withDraftCountBudget(ctx) // checkPost, then ScheduleContentDraft
 	if voiceSwitchedOff(voiceSwitchConfirm) {
 		return nil, forbidden("Voice commands are turned off for now.")
 	}

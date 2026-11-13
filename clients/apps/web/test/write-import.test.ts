@@ -30,10 +30,33 @@ test('thread split uses weighted URLs and preserves grapheme sequences', () => {
     family,
   ])
 })
+test('thread split counts the spaces between words and cuts a long word at the longest piece', () => {
+  // X counts an ideographic space as 2: ten, the space and eleven make 23.
+  const words = (last: number) => `${'a'.repeat(10)}\u3000${'b'.repeat(last)}`
+  assert.deepEqual(splitThread(words(11), 'x', 23), [words(11)])
+  assert.deepEqual(splitThread(words(12), 'x', 23), ['a'.repeat(10), 'b'.repeat(12)])
+  // X counts each of these characters as 2, so a run with no spaces is cut
+  // every 11, and the last piece counts toward the next word.
+  const text = '日本語'.repeat(10)
+  assert.deepEqual(splitThread(`${text} ${'c'.repeat(7)}`, 'x', 23), [
+    text.slice(0, 11),
+    text.slice(11, 22),
+    text.slice(22),
+    'c'.repeat(7),
+  ])
+  // X finds no link right after U+FEFF, so the link counts in full beside it.
+  const link = `https://example.com/${'b'.repeat(300)}`
+  assert.deepEqual(splitThread(`a\ufeff${link}`, 'x', 280), ['a', link])
+})
 test('imports enforce the thread and input size limits', () => {
   assert.throws(() => importedPosts(Array(26).fill('post').join('\n---\n')), /25 posts/)
   assert.throws(() => splitThread('a'.repeat(100001), 'x', 280), /100,000/)
   assert.throws(() => splitThread('post', 'x', NaN), /post length/)
+  // One grapheme of 31 units is longer than any LinkedIn post at 23.
+  assert.throws(
+    () => splitThread(`ok a${'\u0301'.repeat(30)}`, 'linkedin', 23),
+    /character sequence/
+  )
   assert.throws(() => splitThread('a'.repeat(1000), 'x', 23), /25 posts/)
   assert.deepEqual(importedPosts('one\n\nparagraph\n\n\n\ntwo'), ['one\n\nparagraph', 'two'])
 })

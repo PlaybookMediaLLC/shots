@@ -87,4 +87,12 @@ test('a prepared Auto-DM is refused here for what Go refuses on save', () => {
   assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(100) }), true)
   assert.equal(accepts({ message: 'Hi', replyText: '😀'.repeat(101) }), false)
   assert.equal(accepts({ message: 'Hi', replies: false }), false)
+  // The form shows the first problem when it stops a save: lengths are in characters.
+  const problem = (value: object) =>
+    autoDmSchema.safeParse({ ...base, ...value }).error?.issues[0].message
+  assert.equal(problem({ message: '😀'.repeat(10_001) }), 'Keep the message to 10,000 characters.')
+  assert.equal(
+    problem({ message: 'Hi', replyText: 'x'.repeat(101) }),
+    'Keep the reply text to 100 characters.'
+  )
 })

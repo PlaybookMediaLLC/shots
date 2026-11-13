@@ -2581,6 +2581,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{PlatformNotificationDeliveryColumns[6], PlatformNotificationDeliveryColumns[14]},
 			},
+			{
+				Name:    "platformnotificationdelivery_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformNotificationDeliveryColumns[19]},
+			},
 		},
 	}
 	// PlatformNotificationInboxColumns holds the columns for the "platform_notification_inbox" table.
@@ -2614,6 +2619,11 @@ var (
 				Name:    "platformnotificationinbox_organizationId_userId_event_id",
 				Unique:  true,
 				Columns: []*schema.Column{PlatformNotificationInboxColumns[1], PlatformNotificationInboxColumns[2], PlatformNotificationInboxColumns[3]},
+			},
+			{
+				Name:    "platformnotificationinbox_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{PlatformNotificationInboxColumns[12]},
 			},
 		},
 	}

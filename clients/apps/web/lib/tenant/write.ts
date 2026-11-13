@@ -212,10 +212,14 @@ function readActivity(item: BackendDraftActivity) {
   return { ...fields, at: new Date(at) }
 }
 
-/** A draft's history, newest first; null when it is not visible. */
-export async function listContentDraftActivity(context: TenantContext, id: string) {
-  const result = await orNull(backendSDK(context).listContentDraftActivity(id))
-  return result ? result.items.map(readActivity) : null
+/** A page of a draft's history, newest first; null when it is not visible. */
+export async function listContentDraftActivity(
+  context: TenantContext,
+  id: string,
+  cursor?: string
+) {
+  const result = await orNull(backendSDK(context).listContentDraftActivity(id, cursor))
+  return result ? { items: result.items.map(readActivity), nextCursor: result.nextCursor } : null
 }
 
 /** Drafts planned in [from, to); one set's when given. */

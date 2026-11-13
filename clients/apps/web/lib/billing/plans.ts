@@ -119,57 +119,6 @@ export const featureOverrideSchema = z
   .partialRecord(workspaceFeatureSchema, z.boolean())
   .default({})
 
-const planFeatures = {
-  free: [],
-  pro: [
-    'asset:create',
-    'asset:read',
-    'asset:update',
-    'asset:delete',
-    'release:create',
-    'source-app:create',
-    'workspace:use',
-    'workspace:paid',
-    'content:scheduling-advanced',
-    'campaign:workflow',
-    'content:drafts',
-    'onboarding:agent',
-  ],
-  business: [
-    'asset:create',
-    'asset:read',
-    'asset:update',
-    'asset:delete',
-    'release:create',
-    'source-app:create',
-    'workspace:use',
-    'workspace:paid',
-    'content:scheduling-advanced',
-    'campaign:workflow',
-    'content:drafts',
-    'onboarding:agent',
-  ],
-  enterprise: [
-    'asset:create',
-    'asset:read',
-    'asset:update',
-    'asset:delete',
-    'release:create',
-    'source-app:create',
-    'workspace:use',
-    'workspace:paid',
-    'content:scheduling-advanced',
-    'enterprise:audit-drain',
-    'enterprise:sso',
-    'enterprise:scim',
-    'enterprise:white-label',
-    'enterprise:permission-groups',
-    'campaign:workflow',
-    'content:drafts',
-    'onboarding:agent',
-  ],
-} as const satisfies Record<WorkspacePlan, readonly WorkspaceFeature[]>
-
 const minimumPlanByFeature: Record<WorkspaceFeature, WorkspacePlan> = {
   'asset:create': 'pro',
   'asset:read': 'pro',
@@ -227,7 +176,7 @@ const planQuotas = {
 } as const satisfies Record<WorkspacePlan, Record<WorkspaceQuota, number>>
 
 /**
- * Mirrors `planLimits` in server/internal/product/plan_limits.go. `null` is
+ * Mirrors `limits` in server/internal/workspaceplan/capacity.go. `null` is
  * unlimited. A pending invitation holds a seat; only active social channels count.
  */
 const planLimits = {
@@ -237,58 +186,31 @@ const planLimits = {
   enterprise: { channels: null, seats: null },
 } as const satisfies Record<WorkspacePlan, Record<WorkspaceLimit, number | null>>
 
-type WorkspaceEntitlementSnapshot = {
-  featureOverrides?: unknown
-  plan?: unknown
-  status?: string | null
-  graceUntil?: Date | null
-  validUntil?: Date | null
-}
-
-export type WorkspaceFeatureDecision = {
-  allowed: boolean
-  currentPlan: WorkspacePlan
-  requiredPlan: WorkspacePlan
-}
-
-export function hasWorkspaceFeature(
-  plan: WorkspacePlan,
-  feature: WorkspaceFeature,
-  overrides: Partial<Record<WorkspaceFeature, boolean>> = {}
-): boolean {
-  return overrides[feature] ?? planFeatures[plan].includes(feature as never)
+/** Whether a plan includes a feature: every paid plan at or above its minimum plan, as in Go. */
+export function hasWorkspaceFeature(plan: WorkspacePlan, feature: WorkspaceFeature): boolean {
+  const rank = workspacePlanSchema.options
+  return plan !== 'free' && rank.indexOf(plan) >= rank.indexOf(minimumPlanByFeature[feature])
 }
 
 export function getMinimumPlan(feature: WorkspaceFeature): WorkspacePlan {
   return minimumPlanByFeature[feature]
 }
 
-export function evaluateWorkspaceFeature(
-  entitlement: WorkspaceEntitlementSnapshot | null,
-  feature: WorkspaceFeature,
-  now = new Date()
-): WorkspaceFeatureDecision {
-  const parsedPlan = workspacePlanSchema.safeParse(entitlement?.plan)
-  const currentPlan = parsedPlan.success ? parsedPlan.data : 'free'
-  const overrides = featureOverrideSchema.catch({}).parse(entitlement?.featureOverrides)
-  const isCurrent = !entitlement?.validUntil || entitlement.validUntil > now
-  const isInBillingGrace =
-    entitlement?.status === 'past_due' && !!entitlement.graceUntil && entitlement.graceUntil > now
-  const isActive = entitlement
-    ? parsedPlan.success &&
-      (entitlement.status === 'active' || entitlement.status === 'trialing' || isInBillingGrace) &&
-      isCurrent
-    : true
-
-  return {
-    allowed: isActive && hasWorkspaceFeature(currentPlan, feature, overrides),
-    currentPlan,
-    requiredPlan: getMinimumPlan(feature),
-  }
-}
-
 export function getWorkspaceQuota(plan: WorkspacePlan, quota: WorkspaceQuota): number {
   return planQuotas[plan][quota]
+}
+
+/**
+ * What a workspace's plan includes of a monthly quota, as the backend decided it:
+ * nothing while the plan does not stand.
+ */
+export function includedAllowance(
+  allowances: Partial<Record<string, number>> | undefined,
+  plan: WorkspacePlan,
+  quota: WorkspaceQuota
+): number {
+  // shortcut: a backend older than its allowances sends none (a rollback); drop the plan table fallback once every backend sends them.
+  return allowances?.[quota] ?? getWorkspaceQuota(plan, quota)
 }
 
 /** How many of `limit` a plan's workspace may hold; `null` is unlimited. */

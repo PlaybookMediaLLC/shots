@@ -1,11 +1,15 @@
 package product
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/auditlog"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/ent/contentdraftrevision"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/draftdoc"
 	"github.com/PlaybookMediaLLC/screenshot-studio/services/internal/postoptions"
@@ -336,12 +340,22 @@ func TestWriteWorkspace(t *testing.T) {
 		if err != nil || len(revisions) == 0 {
 			t.Fatalf("revisions=%+v err=%v", revisions, err)
 		}
+		before, err := repo.ListContentDraftActivity(ctx, owner, draft.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
 		recovered, err := repo.RecoverContentDraftRevision(ctx, owner, draft.ID, revisions[0].ID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if recovered.Draft.ID == draft.ID || recovered.Draft.Version != 1 || recovered.Draft.SourceDraftID == nil {
 			t.Fatalf("recovered=%+v", recovered.Draft)
+		}
+		// Recovery adds to the source's history and rewrites none of it.
+		history, err := repo.ListContentDraftActivity(ctx, owner, draft.ID, "")
+		if err != nil || len(history.Items) != len(before.Items)+1 || history.Items[0].Action != "product.content_draft_recovered" ||
+			history.Items[0].Metadata["newDraftId"] != recovered.Draft.ID || !sameJSON(history.Items[1:], before.Items) {
+			t.Fatalf("history=%+v err=%v", history, err)
 		}
 		after, err := repo.GetContentDraft(ctx, owner, draft.ID)
 		if err != nil || after.Version != edited.Version || !sameJSON(after.Body, edited.Body) {
@@ -369,10 +383,103 @@ func TestWriteWorkspace(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		items, err := repo.ListContentDraftActivity(ctx, writer, draft.ID)
-		if err != nil || len(items) != 3 || items[0].Action != "product.content_draft_shared" || items[2].Action != "product.content_draft_created" ||
-			items[1].Metadata["changed"] == nil || items[0].ActorName == nil || *items[0].ActorName != "owner" {
-			t.Fatalf("activity=%+v err=%v", items, err)
+		page, err := repo.ListContentDraftActivity(ctx, writer, draft.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		items := page.Items
+		if len(items) != 3 || items[0].Action != "product.content_draft_shared" || items[2].Action != "product.content_draft_created" ||
+			items[1].Metadata["changed"] == nil || items[0].ActorName == nil || *items[0].ActorName != "owner" || items[0].Source != "person" ||
+			page.NextCursor != nil {
+			t.Fatalf("activity=%+v err=%v", page, err)
+		}
+	})
+
+	t.Run("history names each source, shows only allowed metadata, and pages without gaps", func(t *testing.T) {
+		draft, err := repo.CreateContentDraft(ctx, owner, ContentDraftInput{Body: text("sourced")})
+		if err != nil {
+			t.Fatal(err)
+		}
+		keyID := "history_key_" + w.id
+		w.exec(t, `INSERT INTO apikey (id,"referenceId",key,enabled,permissions,"createdAt","updatedAt") VALUES ($1,$2,'hashed',true,'{"draft":["write"],"artifact":["read"]}',now(),now())`, keyID, w.org)
+		key := Actor{OrganizationID: w.org, Kind: "api_key", KeyID: keyID, Display: "ss_live_secretprefix", RequestID: "history-key"}
+		mcp := key
+		mcp.Source = "mcp"
+		for version, actor := range []Actor{key, mcp} {
+			title := fmt.Sprintf("By key %d", version)
+			if _, err := repo.UpdateContentDraft(ctx, actor, draft.ID, ContentDraftUpdate{BaseVersion: version + 1, Title: &title}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// Automated writers through the shared audit writer, and one older
+		// service row recorded before sources were.
+		tx, err := w.db.Client.Tx(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, actor := range []publishing.Actor{{Type: "SERVICE", Source: "workflow", Display: "publishing-orchestrator"},
+			{Type: "SERVICE", Source: "callback", Display: "provider callback"}, {Type: "WEBHOOK", Display: "source"},
+			{Type: "SUPPORT", UserID: owner.UserID, Display: "support"}, {Type: "SERVICE", Display: "release-automation"}} {
+			if err := publishing.AppendAudit(ctx, tx, publishing.AuditInput{Action: "product.content_draft_updated", Actor: actor,
+				EntityType: "content_draft", EntityID: draft.ID, Organization: w.org, Outcome: auditlog.OutcomeSUCCEEDED,
+				Metadata: map[string]any{"changed": []string{"title"}, "keyPrefix": "ss_live", "email": "owner@example.test"}}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		page, err := repo.ListContentDraftActivity(ctx, writer, draft.ID, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var sources []string
+		for _, item := range page.Items {
+			sources = append(sources, item.Source)
+		}
+		if want := []string{"automation", "support", "callback", "callback", "workflow", "mcp", "api", "person"}; !slices.Equal(sources, want) {
+			t.Fatalf("sources=%v want %v", sources, want)
+		}
+		encoded, err := json.Marshal(page)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, secret := range []string{"ss_live", "secretprefix", "owner@example.test", "actorSource", "release-automation"} {
+			if strings.Contains(string(encoded), secret) {
+				t.Errorf("history exposes %q: %s", secret, encoded)
+			}
+		}
+
+		// More than a page: each event appears once, newest first.
+		w.exec(t, `INSERT INTO audit_log (id,"organizationId","requestId","actorType","actorUserId",action,"entityType","entityId",outcome,"createdAt")
+			SELECT 'history_'||g||'_'||$2,$1,'history','USER',$3,'product.content_draft_updated','content_draft',$2,'SUCCEEDED',now()-interval '1 hour'
+			FROM generate_series(1,55) g`, w.org, draft.ID, owner.UserID)
+		seen := map[string]bool{}
+		var last time.Time
+		lastID := ""
+		cursor, pages := "", 0
+		for {
+			page, err := repo.ListContentDraftActivity(ctx, writer, draft.ID, cursor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			pages++
+			for _, item := range page.Items {
+				if seen[item.ID] || (!last.IsZero() && (item.At.After(last) || item.At.Equal(last) && item.ID > lastID)) {
+					t.Fatalf("event %s repeated or out of order", item.ID)
+				}
+				seen[item.ID], last, lastID = true, item.At, item.ID
+			}
+			if page.NextCursor == nil {
+				break
+			}
+			cursor = *page.NextCursor
+		}
+		if pages != 2 || len(seen) != 8+55 {
+			t.Fatalf("pages=%d events=%d", pages, len(seen))
+		}
+		if _, err := repo.ListContentDraftActivity(ctx, writer, draft.ID, "not-a-cursor"); !errors.Is(err, ErrInvalidInput) {
+			t.Fatalf("bad cursor: %v", err)
 		}
 	})
 
