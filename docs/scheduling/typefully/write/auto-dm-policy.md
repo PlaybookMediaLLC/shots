@@ -1,9 +1,10 @@
 # Auto-DM: consent and abuse policy
 
-**Status: proposed, awaiting approval.** Live sending stays off until X grants
-the connection direct-message access and this policy is approved:
-`PLATFORM_X_AUTO_DM_DELIVERY_ENABLED` stays unset and no route starts a
-campaign. Composers can prepare a campaign's settings; nothing is sent.
+**Status: approved on 2026-11-13, as written.** Live sending stays off until X
+grants the connection direct-message access and turning it on is approved
+separately: `PLATFORM_X_AUTO_DM_DELIVERY_ENABLED` stays unset and no route
+starts a campaign. Composers can prepare a campaign's settings; nothing is
+sent.
 
 Each rule names the code that enforces it, in `server/internal/autodm`
 (`autodm.go`, `ledger.go`, `events.go`), and the test that shows it. The
@@ -88,10 +89,14 @@ Message text is never logged. Not built yet: when live sending is approved,
 starting and stopping a campaign also writes an audit-log entry naming the
 member, through the route that starts it.
 
-## For your decision
+## Decisions
 
-- The 4 days, 500 a day and 3 campaigns are Typefully's displayed limits, not
-  limits X has confirmed for our app.
-- A STOP is permanent for an X account. Should a person be able to opt back in?
-- What counts as an explicit opt-in on X (for example, replying "yes" to the
-  offer) depends on the event access X grants.
+Approved as written on 2026-11-13:
+
+- The limits stay at 4 days, 500 a day and 3 running campaigns. They are
+  Typefully's displayed limits, not limits X has confirmed for our app; a
+  deployment lowers them when X's are lower.
+- A STOP is permanent for an X account: there is no way to opt back in.
+
+Still open, until X grants event access: what counts as an explicit opt-in on X
+(for example, replying "yes" to the offer).
